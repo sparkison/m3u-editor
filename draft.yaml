@@ -4,6 +4,7 @@ models:
     url: string
     channels: unsignedInteger default:0
     synced: datetime nullable
+    errors: longText nullable
     relationships:
       hasMany: Channel, Group
 

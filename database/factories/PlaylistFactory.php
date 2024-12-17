@@ -25,6 +25,7 @@ class PlaylistFactory extends Factory
             'url' => $this->faker->url(),
             'channels' => $this->faker->randomNumber(),
             'synced' => $this->faker->dateTime(),
+            'errors' => $this->faker->text(),
         ];
     }
 }

@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('url');
             $table->unsignedInteger('channels')->default(0);
             $table->dateTime('synced')->nullable();
+            $table->longText('errors')->nullable();
             $table->timestamps();
         });
     }
