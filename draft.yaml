@@ -2,6 +2,7 @@ models:
   Playlist:
     name: string
     url: string
+    prefix: string nullable
     channels: unsignedInteger default:0
     synced: datetime nullable
     errors: longText nullable
@@ -16,15 +17,15 @@ models:
 
   Channel:
     name: string
-    enabled: boolean
+    enabled: boolean default:true
     channel: unsignedInteger nullable
     url: string
     logo: string
     group: string
-    id: string
+    tvgid: string
     lang: string
     country: string
     playlist_id: unsignedInteger
-    group_id: unsignedInteger
+    group_id: unsignedInteger nullable
     relationships:
       belongsTo: Playlist, Group

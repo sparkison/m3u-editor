@@ -16,6 +16,7 @@ class Channel extends Model
      * @var array
      */
     protected $casts = [
+        'id' => 'integer',
         'enabled' => 'boolean',
         'channel' => 'integer',
         'playlist_id' => 'integer',

@@ -29,6 +29,7 @@ class ChannelFactory extends Factory
             'url' => $this->faker->url(),
             'logo' => $this->faker->word(),
             'group' => $this->faker->word(),
+            'tvgid' => $this->faker->word(),
             'lang' => $this->faker->word(),
             'country' => $this->faker->country(),
             'playlist_id' => Playlist::factory(),

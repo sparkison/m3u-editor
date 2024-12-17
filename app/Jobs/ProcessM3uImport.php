@@ -27,21 +27,52 @@ class ProcessM3uImport implements ShouldQueue
      */
     public function handle(): void
     {
-        $parser = new M3UContentParser($this->playlist->url);
-        $parser->parse();
-        $count = 0;
-        foreach ($parser->all() as $item) {
-            /**
-             * @var $item M3UItem
-             */
-            dump($item);
+        try {
+            $parser = new M3UContentParser($this->playlist->url);
+            $parser->parse();
+            $count = 0;
+            $bulk = collect([]);
+            $groups = collect([]);
+            foreach ($parser->all() as $item) {
+                /**
+                 * @var $item M3UItem
+                 */
+                $bulk->push([
+                    'playlist_id' => $this->playlist->id,
+                    'enabled' => true, // enabled by default
+                    'name' => $item->getTvgName(),
+                    'url' => $item->getTvgUrl(),
+                    'group' => $item->getGroupTitle(),
+                    'tvgid' => $item->getId(),
+                    'logo' => $item->getTvgLogo(),
+                    'language' => $item->getLanguage(),
+                    'country' => $item->getCountry(),
+                ]);
+                if (!$groups->contains($item->getGroupTitle())) {
+                    $groups->push($item->getGroupTitle());
+                }
 
-            // Increment the counter
-            $count++;
+                // Increment the counter
+                $count++;
+            }
+
+            foreach ($groups as $group) {
+                $g = \App\Models\Group::firstOrCreate([
+                    'name' => $group,
+                ]);
+            }
+
+            $this->playlist->update([
+                'channels' => $count,
+                'synced' => now(),
+            ]);
+        } catch (\Exception $e) {
+            $this->playlist->update([
+                'channels' => 0,
+                'synced' => now(),
+                'errors' => $e->getMessage(),
+            ]);
+            return;
         }
-        $this->playlist->update([
-            'channels' => $count,
-            'synced' => now(),
-        ]);
     }
 }
