@@ -13,6 +13,7 @@
         "zikwall/m3u-content-parser": "dev-master"
     },
     "require-dev": {
+        "beyondcode/laravel-dump-server": "^2.0",
         "fakerphp/faker": "^1.23",
         "laravel-shift/blueprint": "^2.10",
         "laravel/pail": "^1.1",

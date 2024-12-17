@@ -1,2 +1,15 @@
+created:
+    - database/factories/PlaylistFactory.php
+    - database/factories/GroupFactory.php
+    - database/factories/ChannelFactory.php
+    - database/migrations/2024_12_17_215823_create_playlists_table.php
+    - database/migrations/2024_12_17_215824_create_groups_table.php
+    - database/migrations/2024_12_17_215825_create_channels_table.php
+    - app/Models/Playlist.php
+    - app/Models/Group.php
+    - app/Models/Channel.php
 models:
     User: { name: string, email: string, email_verified_at: 'datetime nullable', password: string, remember_token: 'string nullable' }
+    Playlist: { name: string, url: string, synced: 'datetime nullable', relationships: { hasMany: 'Channel, Group' } }
+    Group: { name: string, playlist_id: unsignedInteger, relationships: { belongsTo: Playlist } }
+    Channel: { name: string, enabled: boolean, url: string, logo: string, group: string, id: string, lang: string, country: string, playlist_id: unsignedInteger, group_id: unsignedInteger, relationships: { belongsTo: 'Playlist, Group' } }

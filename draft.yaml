@@ -2,7 +2,7 @@ models:
   Playlist:
     name: string
     url: string
-    synced: datetime:nullable
+    synced: datetime nullable
     relationships:
       hasMany: Channel, Group
 
