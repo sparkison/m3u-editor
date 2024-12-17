@@ -16,6 +16,7 @@ models:
   Channel:
     name: string
     enabled: boolean
+    channel: unsignedInteger nullable
     url: string
     logo: string
     group: string
