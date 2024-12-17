@@ -36,7 +36,7 @@ class Playlist extends Model
     {
         return [
             Forms\Components\TextInput::make('name')
-            ->required(),
+                ->required(),
             Forms\Components\TextInput::make('url')
                 ->hiddenOn(['update'])
                 ->required(),
