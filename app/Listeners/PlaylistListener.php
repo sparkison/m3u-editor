@@ -3,19 +3,12 @@
 namespace App\Listeners;
 
 use App\Events\PlaylistCreated;
+use App\Jobs\ProcessM3uImport;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 
-class PlaylistListener
+class PlaylistListener implements ShouldQueue
 {
-    /**
-     * Create the event listener.
-     */
-    public function __construct()
-    {
-        //
-    }
-
     /**
      * Handle the event.
      * 
@@ -23,7 +16,6 @@ class PlaylistListener
      */
     public function handle(PlaylistCreated $event): void
     {
-        // $event->playlist;
-        // @TODO - process the playlist...
+        dispatch(new ProcessM3uImport($event->playlist));
     }
 }

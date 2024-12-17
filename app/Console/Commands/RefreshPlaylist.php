@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\ProcessM3uImport;
 use Illuminate\Console\Command;
 
 class RefreshPlaylist extends Command
@@ -33,7 +34,10 @@ class RefreshPlaylist extends Command
             $this->info('Refreshing all playlists');
         }
 
-        // @todo: Implement the logic to refresh the playlist(s)
+        // @TODO: Implement the logic to refresh the playlist(s)
+
+        // dispatch(new ProcessM3uImport($playlist));
+
         $this->error('Not implemented yet');
     }
 }

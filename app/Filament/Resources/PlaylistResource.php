@@ -11,6 +11,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class PlaylistResource extends Resource
@@ -51,10 +52,23 @@ class PlaylistResource extends Resource
             ->actions([
                 Tables\Actions\EditAction::make()
                     ->slideOver(),
+                Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\BulkAction::make('process')
+                        ->action(function (Collection $records): void {
+                            foreach ($records as $record) {
+                                dispatch(new \App\Jobs\ProcessM3uImport($record));
+                            }
+                        })
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->modalIcon('heroicon-o-arrow-path')
+                        ->modalDescription('Process the selected playlist(s) now?')
+                        ->modalSubmitActionLabel('Yes, process now')
+                        ->icon('heroicon-o-arrow-path')
                 ]),
             ]);
     }
