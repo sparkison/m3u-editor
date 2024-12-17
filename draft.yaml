@@ -1,2 +1,27 @@
 models:
-  # ...
+  Playlist:
+    name: string
+    url: string
+    synced: datetime:nullable
+    relationships:
+      hasMany: Channel, Group
+
+  Group:
+    name: string
+    playlist_id: unsignedInteger
+    relationships:
+      belongsTo: Playlist
+
+  Channel:
+    name: string
+    enabled: boolean
+    url: string
+    logo: string
+    group: string
+    id: string
+    lang: string
+    country: string
+    playlist_id: unsignedInteger
+    group_id: unsignedInteger
+    relationships:
+      belongsTo: Playlist, Group

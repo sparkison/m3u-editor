@@ -1,0 +1,13 @@
+<?php
+
+namespace {{ namespace }};
+
+{{ imports }}
+
+/**
+ * @see {{ namespacedClass }}
+ */
+final class {{ class }} extends TestCase
+{
+    {{ body }}
+}

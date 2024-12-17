@@ -1,0 +1,16 @@
+<?php
+
+namespace {{ namespace }};
+
+{{ imports }}
+
+class {{ class }} extends {{ parentClass }}
+{
+    /**
+     * Transform the {{ resource }} into an array.
+     */
+    public function toArray(Request $request): array
+    {
+        {{ body }}
+    }
+}

@@ -1,0 +1,5 @@
+    #[Test]
+    public function {{ method }}(): void
+    {
+        {{ body }}
+    }
