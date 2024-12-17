@@ -29,11 +29,19 @@ class ProcessM3uImport implements ShouldQueue
     {
         $parser = new M3UContentParser($this->playlist->url);
         $parser->parse();
+        $count = 0;
         foreach ($parser->all() as $item) {
             /**
              * @var $item M3UItem
              */
             dump($item);
+
+            // Increment the counter
+            $count++;
         }
+        $this->playlist->update([
+            'channels' => $count,
+            'synced' => now(),
+        ]);
     }
 }

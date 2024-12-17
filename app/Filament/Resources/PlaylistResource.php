@@ -31,9 +31,13 @@ class PlaylistResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name')
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('url')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('channels')
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('synced')
                     ->dateTime()
                     ->sortable(),
