@@ -22,7 +22,7 @@ class ChannelResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 2;
+        return 3;
     }
 
     public static function form(Form $form): Form
@@ -48,12 +48,13 @@ class ChannelResource extends Resource
                     ->rules(['numeric', 'min:0'])
                     ->sortable(),
                 Tables\Columns\ImageColumn::make('logo')
-                    ->defaultImageUrl(fn ($record) => $record->logo),
-                Tables\Columns\TextColumn::make('url')
-                    ->searchable(),
+                    ->defaultImageUrl(fn($record) => $record->logo),
                 Tables\Columns\TextColumn::make('group')
                     ->searchable()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('url')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('shift')
                     ->numeric()
                     ->sortable()
@@ -80,6 +81,11 @@ class ChannelResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
+                Tables\Filters\SelectFilter::make('playlist')
+                    ->relationship('playlist', 'name')
+                    ->multiple()
+                    ->preload()
+                    ->searchable(),
                 Tables\Filters\SelectFilter::make('group')
                     ->relationship('group', 'name')
                     ->multiple()
@@ -93,7 +99,7 @@ class ChannelResource extends Resource
                     }),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
+                // Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
