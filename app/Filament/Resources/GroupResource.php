@@ -8,8 +8,7 @@ use App\Filament\Resources\GroupResource\RelationManagers\ChannelsRelationManage
 use App\Models\Group;
 use Filament\Forms;
 use Filament\Forms\Form;
-use Filament\Infolists\Components\Section;
-use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -45,7 +44,8 @@ class GroupResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('channels_count')
                     ->label('Channels')
-                    ->counts('channels'),
+                    ->counts('channels')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -78,13 +78,13 @@ class GroupResource extends Resource
         // return parent::infolist($infolist);
         return $infolist
             ->schema([
-                Section::make('Group Details')
+                Infolists\Components\Section::make('Group Details')
                     ->columns(2)
                     ->schema([
-                        TextEntry::make('name'),
-                        TextEntry::make('playlist.name')
+                        Infolists\Components\TextEntry::make('name'),
+                        Infolists\Components\TextEntry::make('playlist.name')
                             ->label('Playlist')
-                        //->url(fn($record): string => route('playlists.edit', ['playlist' => $record->playlist])),
+                            //->url(fn($record): string => route('playlists.edit', ['playlist' => $record->playlist])),
                     ])
             ]);
     }
@@ -100,9 +100,9 @@ class GroupResource extends Resource
     {
         return [
             'index' => Pages\ListGroups::route('/'),
+            'view' => Pages\ViewGroup::route('/{record}'),
             // 'create' => Pages\CreateGroup::route('/create'),
             // 'edit' => Pages\EditGroup::route('/{record}/edit'),
-            'view' => Pages\ViewGroup::route('/{record}'),
         ];
     }
 

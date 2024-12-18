@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class ChannelResource extends Resource
 {
@@ -34,13 +35,19 @@ class ChannelResource extends Resource
 
     public static function table(Table $table): Table
     {
-        $uri = request()->route()->uri;
+        // Check if request is for the Channels table
+        $isChannelsTable = request()->route()->uri === 'channels'
+            || Str::contains(request()->headers->get('referer'), 'channels');
+
+        // Return the table
         return $table
             ->persistFiltersInSession()
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
             ->columns([
+                Tables\Columns\ImageColumn::make('logo')
+                    ->defaultImageUrl(fn($record) => $record->logo),
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
@@ -49,10 +56,8 @@ class ChannelResource extends Resource
                 Tables\Columns\TextInputColumn::make('channel')
                     ->rules(['numeric', 'min:0'])
                     ->sortable(),
-                Tables\Columns\ImageColumn::make('logo')
-                    ->defaultImageUrl(fn($record) => $record->logo),
                 Tables\Columns\TextColumn::make('group')
-                    ->hidden(fn() => $uri !== 'channels')
+                    ->hidden(fn() => !$isChannelsTable)
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('url')
@@ -72,7 +77,7 @@ class ChannelResource extends Resource
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('playlist.name')
-                    ->hidden(fn() => $uri !== 'channels')
+                    ->hidden(fn() => !$isChannelsTable)
                     ->numeric()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
@@ -87,13 +92,13 @@ class ChannelResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('playlist')
                     ->relationship('playlist', 'name')
-                    ->hidden(fn() => $uri !== 'channels')
+                    ->hidden(fn() => !$isChannelsTable)
                     ->multiple()
                     ->preload()
                     ->searchable(),
                 Tables\Filters\SelectFilter::make('group')
                     ->relationship('group', 'name')
-                    ->hidden(fn() => $uri !== 'channels')
+                    ->hidden(fn() => !$isChannelsTable)
                     ->multiple()
                     ->preload()
                     ->searchable(),
@@ -161,13 +166,19 @@ class ChannelResource extends Resource
     public static function getForm(): array
     {
         return [
-            // Forms\Components\TextInput::make('name')
-            //     ->required()
-            //     ->maxLength(255),
+            // Custom channel fields
             Forms\Components\TextInput::make('channel')
                 ->numeric(),
             Forms\Components\Toggle::make('enabled')
                 ->required(),
+
+            /*
+             * Below fields are automatically populated/updated on Playlist sync.
+             */
+
+            // Forms\Components\TextInput::make('name')
+            //     ->required()
+            //     ->maxLength(255),
             // Forms\Components\TextInput::make('shift')
             //     ->required()
             //     ->numeric()
