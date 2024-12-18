@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('url')->nullable();
             $table->string('logo')->nullable();
             $table->string('group')->nullable();
-            $table->string('stream_id');
+            $table->string('stream_id')->nullable();
             $table->string('lang')->nullable();
             $table->string('country')->nullable();
             $table->foreignId('playlist_id')->constrained();

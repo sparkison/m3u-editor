@@ -24,7 +24,7 @@ models:
     url: string nullable
     logo: string nullable
     group: string nullable
-    stream_id: string
+    stream_id: string nullable
     lang: string nullable
     country: string nullable
     playlist_id: id foreign
