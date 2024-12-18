@@ -44,6 +44,7 @@ class GroupResource extends Resource
                     ->numeric()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('channels_count')
+                    ->label('Channels')
                     ->counts('channels'),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()

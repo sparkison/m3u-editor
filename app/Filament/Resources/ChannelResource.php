@@ -13,6 +13,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Http\Request;
 
 class ChannelResource extends Resource
 {
@@ -33,6 +34,7 @@ class ChannelResource extends Resource
 
     public static function table(Table $table): Table
     {
+        $uri = request()->route()->uri;
         return $table
             ->persistFiltersInSession()
             ->filtersTriggerAction(function ($action) {
@@ -50,7 +52,7 @@ class ChannelResource extends Resource
                 Tables\Columns\ImageColumn::make('logo')
                     ->defaultImageUrl(fn($record) => $record->logo),
                 Tables\Columns\TextColumn::make('group')
-                    ->hiddenOn(['view'])
+                    ->hidden(fn() => $uri !== 'channels')
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('url')
@@ -70,6 +72,7 @@ class ChannelResource extends Resource
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('playlist.name')
+                    ->hidden(fn() => $uri !== 'channels')
                     ->numeric()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
@@ -84,11 +87,13 @@ class ChannelResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('playlist')
                     ->relationship('playlist', 'name')
+                    ->hidden(fn() => $uri !== 'channels')
                     ->multiple()
                     ->preload()
                     ->searchable(),
                 Tables\Filters\SelectFilter::make('group')
                     ->relationship('group', 'name')
+                    ->hidden(fn() => $uri !== 'channels')
                     ->multiple()
                     ->preload()
                     ->searchable(),
