@@ -45,7 +45,7 @@ class ProcessM3uImport implements ShouldQueue
 
             foreach ($parser->all() as $item) {
                 /**
-                 * @var $item M3UItem
+                 * @var M3UItem $item 
                  */
                 $bulk->push([
                     'playlist_id' => $playlistId,
