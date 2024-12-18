@@ -24,7 +24,7 @@ class PlaylistResource extends Resource
     public static function form(Form $form): Form
     {
         return $form
-            ->schema(Playlist::getForm());
+            ->schema(self::getForm());
     }
 
     public static function table(Table $table): Table
@@ -42,8 +42,10 @@ class PlaylistResource extends Resource
                 Tables\Columns\TextColumn::make('synced')
                     ->dateTime()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('errors')
-                    ->color(fn(Column $column) => $column ? 'danger' : 'success'),
+                Tables\Columns\TextColumn::make('status')
+                    ->sortable(),
+                // Tables\Columns\TextColumn::make('errors')
+                //     ->color(fn(Column $column) => $column ? 'danger' : 'success'),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -57,8 +59,7 @@ class PlaylistResource extends Resource
                 //
             ])
             ->actions([
-                Tables\Actions\EditAction::make()
-                    ->slideOver(),
+                Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
@@ -93,6 +94,17 @@ class PlaylistResource extends Resource
             'index' => Pages\ListPlaylists::route('/'),
             //'create' => Pages\CreatePlaylist::route('/create'),
             //'edit' => Pages\EditPlaylist::route('/{record}/edit'),
+        ];
+    }
+
+    public static function getForm(): array
+    {
+        return [
+            Forms\Components\TextInput::make('name')
+            ->required(),
+            Forms\Components\TextInput::make('url')
+                // ->hiddenOn(['edit'])
+                ->required()
         ];
     }
 }

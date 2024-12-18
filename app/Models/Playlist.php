@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Filament\Forms;
 
 class Playlist extends Model
 {
@@ -30,17 +29,5 @@ class Playlist extends Model
     public function groups(): HasMany
     {
         return $this->hasMany(Group::class);
-    }
-
-    public static function getForm(): array
-    {
-        return [
-            Forms\Components\TextInput::make('name')
-                ->required(),
-            Forms\Components\TextInput::make('url')
-                ->hiddenOn(['edit'])
-                ->required()
-            // Forms\Components\,
-        ];
     }
 }

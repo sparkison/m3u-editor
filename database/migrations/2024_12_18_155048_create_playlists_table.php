@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('url');
+            $table->string('status')->nullable();
             $table->string('prefix')->nullable();
             $table->unsignedInteger('channels')->default(0);
             $table->dateTime('synced')->nullable();

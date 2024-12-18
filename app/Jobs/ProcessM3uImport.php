@@ -28,14 +28,21 @@ class ProcessM3uImport implements ShouldQueue
      */
     public function handle(): void
     {
+        $this->playlist->update([
+            'status' => 'processing',
+            'synced' => now(),
+            'errors' => null,
+        ]);
         try {
             $playlistId = $this->playlist->id;
 
             $parser = new M3UContentParser($this->playlist->url);
             $parser->parse();
+
             $count = 0;
             $bulk = collect([]);
             $groups = collect([]);
+
             foreach ($parser->all() as $item) {
                 /**
                  * @var $item M3UItem
@@ -52,6 +59,7 @@ class ProcessM3uImport implements ShouldQueue
                 ]);
                 if (!$groups->contains('title', $item->getGroupTitle())) {
                     $groups->push([
+                        'playlist_id' => $playlistId,
                         'id' => null,
                         'title' => $item->getGroupTitle()
                     ]);
@@ -62,14 +70,14 @@ class ProcessM3uImport implements ShouldQueue
             }
 
             // Find/create the channel groups
-            $groups = $groups->map(function ($group) use ($playlistId) {
+            $groups = $groups->map(function ($group) {
                 $model = \App\Models\Group::firstOrCreate([
-                    'playlist_id' => $playlistId,
+                    'playlist_id' => $group['playlist_id'],
                     'name' => $group['title'],
                 ]);
                 return [
+                    ...$group,
                     'id' => $model->id,
-                    'title' => $group['title'],
                 ];
             });
 
@@ -101,12 +109,14 @@ class ProcessM3uImport implements ShouldQueue
 
             // Update the playlist
             $this->playlist->update([
+                'status' => 'completed',
                 'channels' => $count,
                 'synced' => now(),
                 'errors' => null,
             ]);
         } catch (\Exception $e) {
             $this->playlist->update([
+                'status' => 'failed',
                 'channels' => 0,
                 'synced' => now(),
                 'errors' => $e->getMessage(),

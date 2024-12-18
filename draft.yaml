@@ -2,6 +2,7 @@ models:
   Playlist:
     name: string
     url: string
+    status: string nullable
     prefix: string nullable
     channels: unsignedInteger default:0
     synced: datetime nullable
@@ -17,7 +18,7 @@ models:
 
   Channel:
     name: string
-    enabled: boolean default:true
+    enabled: boolean default:false
     channel: unsignedInteger nullable
     url: string nullable
     logo: string nullable

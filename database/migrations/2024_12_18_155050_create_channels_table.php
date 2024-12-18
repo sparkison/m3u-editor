@@ -16,7 +16,7 @@ return new class extends Migration
         Schema::create('channels', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->boolean('enabled')->default(true);
+            $table->boolean('enabled')->default(false);
             $table->unsignedInteger('channel')->nullable();
             $table->string('url')->nullable();
             $table->string('logo')->nullable();

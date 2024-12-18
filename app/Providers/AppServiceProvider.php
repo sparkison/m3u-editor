@@ -27,7 +27,7 @@ class AppServiceProvider extends ServiceProvider
 
         // Register the event listener
         try {
-            // Playlist model might not exist yet
+            // Process playlist on creation
             Playlist::created(fn(Playlist $playlist) => event(new PlaylistCreated($playlist)));
         } catch (\Throwable $e) {
             // Log the error
