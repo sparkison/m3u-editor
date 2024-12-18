@@ -2,7 +2,7 @@ models:
   Playlist:
     name: string
     url: string
-    status: string nullable
+    status: enum:pending,processing,completed,failed default:pending
     prefix: string nullable
     channels: unsignedInteger default:0
     synced: datetime nullable
@@ -15,6 +15,7 @@ models:
     playlist_id: id foreign
     relationships:
       belongsTo: Playlist
+      hasMany: Channel
 
   Channel:
     name: string

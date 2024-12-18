@@ -4,9 +4,13 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\GroupResource\Pages;
 use App\Filament\Resources\GroupResource\RelationManagers;
+use App\Filament\Resources\GroupResource\RelationManagers\ChannelsRelationManager;
 use App\Models\Group;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Infolists\Components\Section;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -39,6 +43,8 @@ class GroupResource extends Resource
                 Tables\Columns\TextColumn::make('playlist.name')
                     ->numeric()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('channels_count')
+                    ->counts('channels'),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -49,10 +55,15 @@ class GroupResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                Tables\Filters\SelectFilter::make('playlist')
+                    ->relationship('playlist', 'name')
+                    ->multiple()
+                    ->preload()
+                    ->searchable(),
             ])
             ->actions([
                 // Tables\Actions\EditAction::make(),
+                Tables\Actions\ViewAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -61,10 +72,26 @@ class GroupResource extends Resource
             ]);
     }
 
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        // return parent::infolist($infolist);
+        return $infolist
+            ->schema([
+                Section::make('Group Details')
+                    ->columns(2)
+                    ->schema([
+                        TextEntry::make('name'),
+                        TextEntry::make('playlist.name')
+                            ->label('Playlist')
+                        //->url(fn($record): string => route('playlists.edit', ['playlist' => $record->playlist])),
+                    ])
+            ]);
+    }
+
     public static function getRelations(): array
     {
         return [
-            //
+            ChannelsRelationManager::class,
         ];
     }
 
@@ -74,6 +101,7 @@ class GroupResource extends Resource
             'index' => Pages\ListGroups::route('/'),
             // 'create' => Pages\CreateGroup::route('/create'),
             // 'edit' => Pages\EditGroup::route('/{record}/edit'),
+            'view' => Pages\ViewGroup::route('/{record}'),
         ];
     }
 

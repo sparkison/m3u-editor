@@ -30,10 +30,14 @@ class ProcessM3uImport implements ShouldQueue
      */
     public function handle(): void
     {
+        // Don't update if currently processing
+        if ($this->playlist->status === PlaylistStatus::Processing) {
+            return;
+        }
+
         // Update the playlist status to processing
         $this->playlist->update([
             'status' => PlaylistStatus::Processing,
-            'synced' => now(),
             'errors' => null,
         ]);
 

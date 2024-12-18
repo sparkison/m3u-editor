@@ -23,7 +23,7 @@ class PlaylistFactory extends Factory
         return [
             'name' => $this->faker->name(),
             'url' => $this->faker->url(),
-            'status' => $this->faker->word(),
+            'status' => $this->faker->randomElement(["pending","processing","completed","failed"]),
             'prefix' => $this->faker->word(),
             'channels' => $this->faker->randomNumber(),
             'synced' => $this->faker->dateTime(),

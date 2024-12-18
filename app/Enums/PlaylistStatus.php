@@ -4,7 +4,7 @@ namespace App\Enums;
 
 enum PlaylistStatus: string
 {
-    case Pending = '';
+    case Pending = 'pending';
     case Processing = 'processing';
     case Completed = 'completed';
     case Failed = 'failed';

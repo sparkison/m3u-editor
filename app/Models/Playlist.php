@@ -17,10 +17,10 @@ class Playlist extends Model
      * @var array
      */
     protected $casts = [
-        'status' => PlaylistStatus::class,
         'id' => 'integer',
         'channels' => 'integer',
         'synced' => 'datetime',
+        'status' => PlaylistStatus::class,
     ];
 
     public function channels(): HasMany

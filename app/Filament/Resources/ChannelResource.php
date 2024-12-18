@@ -50,6 +50,7 @@ class ChannelResource extends Resource
                 Tables\Columns\ImageColumn::make('logo')
                     ->defaultImageUrl(fn($record) => $record->logo),
                 Tables\Columns\TextColumn::make('group')
+                    ->hiddenOn(['view'])
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('url')
