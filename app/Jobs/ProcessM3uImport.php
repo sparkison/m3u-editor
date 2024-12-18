@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\PlaylistStatus;
 use App\Models\Channel;
 use App\Models\Playlist;
 use App\Models\Group;
@@ -31,20 +32,10 @@ class ProcessM3uImport implements ShouldQueue
     {
         // Update the playlist status to processing
         $this->playlist->update([
-            'status' => 'processing',
+            'status' => PlaylistStatus::Processing,
             'synced' => now(),
             'errors' => null,
         ]);
-
-        // Get ID's of existing channels and groups, in case any get removed
-        $existing_channels = Channel::where('playlist_id', $this->playlist->id)->get()
-            ->select('id')
-            ->pluck('id')
-            ->toArray();
-        $existing_groups = Group::where('playlist_id', $this->playlist->id)->get()
-            ->select('id')
-            ->pluck('id')
-            ->toArray();
 
         // Surround in a try/catch block to catch any exceptions
         try {
@@ -139,14 +130,14 @@ class ProcessM3uImport implements ShouldQueue
 
             // Update the playlist
             $this->playlist->update([
-                'status' => 'completed',
+                'status' => PlaylistStatus::Completed,
                 'channels' => $count,
                 'synced' => now(),
                 'errors' => null,
             ]);
         } catch (\Exception $e) {
             $this->playlist->update([
-                'status' => 'failed',
+                'status' => PlaylistStatus::Failed,
                 'channels' => 0,
                 'synced' => now(),
                 'errors' => $e->getMessage(),

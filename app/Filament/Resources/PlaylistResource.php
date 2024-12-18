@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\PlaylistStatus;
 use App\Filament\Resources\PlaylistResource\Pages;
 use App\Filament\Resources\PlaylistResource\RelationManagers;
 use App\Models\Playlist;
@@ -20,6 +21,11 @@ class PlaylistResource extends Resource
     protected static ?string $model = Playlist::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-play';
+
+    public static function getNavigationSort(): ?int
+    {
+        return 1;
+    }
 
     public static function form(Form $form): Form
     {
@@ -42,12 +48,7 @@ class PlaylistResource extends Resource
                 Tables\Columns\TextColumn::make('status')
                     ->sortable()
                     ->badge()
-                    ->color(fn(string $state): string => match ($state) {
-                        null => 'gray',
-                        'processing' => 'warning',
-                        'completed' => 'success',
-                        'failed' => 'danger',
-                    }),
+                    ->color(fn(PlaylistStatus $state) => $state->getColor()),
                 Tables\Columns\TextColumn::make('synced')
                     ->dateTime()
                     ->sortable(),
@@ -78,10 +79,10 @@ class PlaylistResource extends Resource
                         })
                         ->deselectRecordsAfterCompletion()
                         ->requiresConfirmation()
+                        ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
                         ->modalDescription('Process the selected playlist(s) now?')
                         ->modalSubmitActionLabel('Yes, process now')
-                        ->icon('heroicon-o-arrow-path')
                 ]),
             ]);
     }

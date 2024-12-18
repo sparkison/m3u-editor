@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\PlaylistStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -16,6 +17,7 @@ class Playlist extends Model
      * @var array
      */
     protected $casts = [
+        'status' => PlaylistStatus::class,
         'id' => 'integer',
         'channels' => 'integer',
         'synced' => 'datetime',
