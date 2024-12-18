@@ -4,8 +4,8 @@ namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
-use App\Models\;
 use App\Models\Channel;
+use App\Models\Group;
 use App\Models\Playlist;
 
 class ChannelFactory extends Factory
@@ -33,7 +33,7 @@ class ChannelFactory extends Factory
             'lang' => $this->faker->word(),
             'country' => $this->faker->country(),
             'playlist_id' => Playlist::factory(),
-            'group_id' => ::factory(),
+            'group_id' => Group::factory(),
         ];
     }
 }

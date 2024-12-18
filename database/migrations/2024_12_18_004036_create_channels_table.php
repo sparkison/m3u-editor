@@ -11,21 +11,25 @@ return new class extends Migration
      */
     public function up(): void
     {
+        Schema::disableForeignKeyConstraints();
+
         Schema::create('channels', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->boolean('enabled')->default(true);
             $table->unsignedInteger('channel')->nullable();
-            $table->string('url');
-            $table->string('logo');
-            $table->string('group');
+            $table->string('url')->nullable();
+            $table->string('logo')->nullable();
+            $table->string('group')->nullable();
             $table->string('tvgid');
-            $table->string('lang');
-            $table->string('country');
-            $table->foreignId('playlist_id');
-            $table->foreignId('group_id')->nullable();
+            $table->string('lang')->nullable();
+            $table->string('country')->nullable();
+            $table->foreignId('playlist_id')->constrained();
+            $table->foreignId('group_id')->nullable()->constrained();
             $table->timestamps();
         });
+
+        Schema::enableForeignKeyConstraints();
     }
 
     /**

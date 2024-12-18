@@ -11,7 +11,7 @@ models:
 
   Group:
     name: string
-    playlist_id: unsignedInteger
+    playlist_id: id foreign
     relationships:
       belongsTo: Playlist
 
@@ -19,13 +19,13 @@ models:
     name: string
     enabled: boolean default:true
     channel: unsignedInteger nullable
-    url: string
-    logo: string
-    group: string
+    url: string nullable
+    logo: string nullable
+    group: string nullable
     tvgid: string
-    lang: string
-    country: string
-    playlist_id: unsignedInteger
-    group_id: unsignedInteger nullable
+    lang: string nullable
+    country: string nullable
+    playlist_id: id foreign
+    group_id: id foreign nullable
     relationships:
       belongsTo: Playlist, Group

@@ -39,7 +39,8 @@ class Playlist extends Model
                 ->required(),
             Forms\Components\TextInput::make('url')
                 ->hiddenOn(['edit'])
-                ->required(),
+                ->required()
+            // Forms\Components\,
         ];
     }
 }

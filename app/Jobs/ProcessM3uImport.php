@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\Channel;
 use App\Models\Playlist;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -28,6 +29,8 @@ class ProcessM3uImport implements ShouldQueue
     public function handle(): void
     {
         try {
+            $playlistId = $this->playlist->id;
+
             $parser = new M3UContentParser($this->playlist->url);
             $parser->parse();
             $count = 0;
@@ -38,33 +41,69 @@ class ProcessM3uImport implements ShouldQueue
                  * @var $item M3UItem
                  */
                 $bulk->push([
-                    'playlist_id' => $this->playlist->id,
-                    'enabled' => true, // enabled by default
+                    'playlist_id' => $playlistId,
+                    'tvgid' => $item->getId(),
                     'name' => $item->getTvgName(),
                     'url' => $item->getTvgUrl(),
                     'group' => $item->getGroupTitle(),
-                    'tvgid' => $item->getId(),
                     'logo' => $item->getTvgLogo(),
-                    'language' => $item->getLanguage(),
+                    'lang' => $item->getLanguage(),
                     'country' => $item->getCountry(),
                 ]);
-                if (!$groups->contains($item->getGroupTitle())) {
-                    $groups->push($item->getGroupTitle());
+                if (!$groups->contains('title', $item->getGroupTitle())) {
+                    $groups->push([
+                        'id' => null,
+                        'title' => $item->getGroupTitle()
+                    ]);
                 }
 
                 // Increment the counter
                 $count++;
             }
 
-            foreach ($groups as $group) {
-                $g = \App\Models\Group::firstOrCreate([
-                    'name' => $group,
+            // Find/create the channel groups
+            $groups = $groups->map(function ($group) use ($playlistId) {
+                $model = \App\Models\Group::firstOrCreate([
+                    'playlist_id' => $playlistId,
+                    'name' => $group['title'],
                 ]);
-            }
+                return [
+                    'id' => $model->id,
+                    'title' => $group['title'],
+                ];
+            });
 
+            // Link the channel groups to the channels
+            $bulk = $bulk->filter(function ($channel) use ($groups) {
+                $model = Channel::where([
+                    'playlist_id' => $channel['playlist_id'],
+                    'tvgid' => $channel['tvgid'],
+                ])->first();
+                if ($model) {
+                    // Update the existing channel, if found
+                    $model->update([
+                        ...$channel,
+                        'group_id' => $groups->firstWhere('title', $channel['group'])['id'],
+                    ]);
+                    return false;
+                } else {
+                    return true;
+                }
+            })->map(function ($channel) use ($groups) {
+                return [
+                    ...$channel,
+                    'group_id' => $groups->firstWhere('title', $channel['group'])['id'],
+                ];
+            });
+
+            // Insert the new channels in bulk
+            Channel::insert($bulk->toArray());
+
+            // Update the playlist
             $this->playlist->update([
                 'channels' => $count,
                 'synced' => now(),
+                'errors' => null,
             ]);
         } catch (\Exception $e) {
             $this->playlist->update([

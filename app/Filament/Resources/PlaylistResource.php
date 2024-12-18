@@ -9,6 +9,7 @@ use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Columns\Column;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -41,6 +42,8 @@ class PlaylistResource extends Resource
                 Tables\Columns\TextColumn::make('synced')
                     ->dateTime()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('errors')
+                    ->color(fn(Column $column) => $column ? 'danger' : 'success'),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
