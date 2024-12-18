@@ -6,6 +6,7 @@ use App\Enums\PlaylistStatus;
 use App\Models\Channel;
 use App\Models\Playlist;
 use App\Models\Group;
+use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -139,7 +140,22 @@ class ProcessM3uImport implements ShouldQueue
                 'synced' => now(),
                 'errors' => null,
             ]);
+
+            // Send notification
+            Notification::make()
+                ->success()
+                ->title('Playlist Synced')
+                ->body("'{$this->playlist->name}' has been successfully synced.")
+                ->sendToDatabase($this->playlist->user);
         } catch (\Exception $e) {
+            // Send notification
+            Notification::make()
+                ->danger()
+                ->title("Error syncing '{$this->playlist->name}'")
+                ->body($e->getMessage())
+                ->sendToDatabase($this->playlist->user);
+
+            // Update the playlist
             $this->playlist->update([
                 'status' => PlaylistStatus::Failed,
                 'channels' => 0,

@@ -5,6 +5,7 @@ namespace Database\Factories;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 use App\Models\Playlist;
+use App\Models\User;
 
 class PlaylistFactory extends Factory
 {
@@ -28,6 +29,7 @@ class PlaylistFactory extends Factory
             'channels' => $this->faker->randomNumber(),
             'synced' => $this->faker->dateTime(),
             'errors' => $this->faker->text(),
+            'user_id' => User::factory(),
         ];
     }
 }

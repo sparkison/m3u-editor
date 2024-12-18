@@ -8,6 +8,7 @@ use App\Filament\Resources\PlaylistResource\RelationManagers;
 use App\Models\Playlist;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\Column;
@@ -77,6 +78,13 @@ class PlaylistResource extends Resource
                             foreach ($records as $record) {
                                 dispatch(new \App\Jobs\ProcessM3uImport($record));
                             }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Selected playlists are processing')
+                                ->body('The selected playlists are being processed in the background. Depending on the size of your playlist, this may take a while.')
+                                ->duration(10000)
+                                ->send();
                         })
                         ->deselectRecordsAfterCompletion()
                         ->requiresConfirmation()

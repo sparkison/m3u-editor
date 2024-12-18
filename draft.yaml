@@ -7,7 +7,9 @@ models:
     channels: unsignedInteger default:0
     synced: datetime nullable
     errors: longText nullable
+    user_id: id foreign
     relationships:
+      belongsTo: User
       hasMany: Channel, Group
 
   Group:

@@ -29,6 +29,10 @@ class AppServiceProvider extends ServiceProvider
         try {
             // Process playlist on creation
             Playlist::created(fn(Playlist $playlist) => event(new PlaylistCreated($playlist)));
+            Playlist::creating(function (Playlist $playlist) {
+                $playlist->user_id = auth()->id();
+                return $playlist;
+            });
         } catch (\Throwable $e) {
             // Log the error
             report($e);

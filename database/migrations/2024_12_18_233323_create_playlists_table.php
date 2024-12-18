@@ -11,6 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
+        Schema::disableForeignKeyConstraints();
+
         Schema::create('playlists', function (Blueprint $table) {
             $table->id();
             $table->string('name');
@@ -20,8 +22,11 @@ return new class extends Migration
             $table->unsignedInteger('channels')->default(0);
             $table->dateTime('synced')->nullable();
             $table->longText('errors')->nullable();
+            $table->foreignId('user_id')->constrained();
             $table->timestamps();
         });
+
+        Schema::enableForeignKeyConstraints();
     }
 
     /**

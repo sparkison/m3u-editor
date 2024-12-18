@@ -87,7 +87,7 @@ class GroupResource extends Resource
                         Infolists\Components\TextEntry::make('name'),
                         Infolists\Components\TextEntry::make('playlist.name')
                             ->label('Playlist')
-                        //->url(fn($record): string => route('playlists.edit', ['playlist' => $record->playlist])),
+                            // ->url(fn($record) => PlaylistResource::getUrl('edit', ['record' => $record->playlist_id])),
                     ])
             ]);
     }
