@@ -7,6 +7,7 @@ use App\Filament\Resources\ChannelResource\RelationManagers;
 use App\Models\Channel;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -115,13 +116,19 @@ class ChannelResource extends Resource
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     // Tables\Actions\DeleteBulkAction::make(),
-                    Tables\Actions\BulkAction::make('enabled')
+                    Tables\Actions\BulkAction::make('enable')
                         ->action(function (Collection $records): void {
                             foreach ($records as $record) {
                                 $record->update([
                                     'enabled' => true,
                                 ]);
                             }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Selected channels enabled')
+                                ->body('The selected channels have been enabled.')
+                                ->send();
                         })
                         ->deselectRecordsAfterCompletion()
                         ->requiresConfirmation()
@@ -136,6 +143,12 @@ class ChannelResource extends Resource
                                     'enabled' => false,
                                 ]);
                             }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Selected channels disabled')
+                                ->body('The selected channels have been disabled.')
+                                ->send();
                         })
                         ->deselectRecordsAfterCompletion()
                         ->requiresConfirmation()
