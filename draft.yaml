@@ -20,10 +20,11 @@ models:
     name: string
     enabled: boolean default:false
     channel: unsignedInteger nullable
+    shift: unsignedInteger default:0
     url: string nullable
     logo: string nullable
     group: string nullable
-    tvgid: string
+    stream_id: string
     lang: string nullable
     country: string nullable
     playlist_id: id foreign

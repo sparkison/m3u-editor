@@ -19,6 +19,7 @@ class Channel extends Model
         'id' => 'integer',
         'enabled' => 'boolean',
         'channel' => 'integer',
+        'shift' => 'integer',
         'playlist_id' => 'integer',
         'group_id' => 'integer',
     ];

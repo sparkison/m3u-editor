@@ -18,10 +18,11 @@ return new class extends Migration
             $table->string('name');
             $table->boolean('enabled')->default(false);
             $table->unsignedInteger('channel')->nullable();
+            $table->unsignedInteger('shift')->default(0);
             $table->string('url')->nullable();
             $table->string('logo')->nullable();
             $table->string('group')->nullable();
-            $table->string('tvgid');
+            $table->string('stream_id');
             $table->string('lang')->nullable();
             $table->string('country')->nullable();
             $table->foreignId('playlist_id')->constrained();

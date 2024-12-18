@@ -49,11 +49,12 @@ class ProcessM3uImport implements ShouldQueue
                  */
                 $bulk->push([
                     'playlist_id' => $playlistId,
-                    'tvgid' => $item->getId(),
+                    'stream_id' => $item->getId(),
+                    'shift' => $item->getTvgShift(),
                     'name' => $item->getTvgName(),
                     'url' => $item->getTvgUrl(),
-                    'group' => $item->getGroupTitle(),
                     'logo' => $item->getTvgLogo(),
+                    'group' => $item->getGroupTitle(),
                     'lang' => $item->getLanguage(),
                     'country' => $item->getCountry(),
                 ]);
@@ -85,7 +86,7 @@ class ProcessM3uImport implements ShouldQueue
             $bulk = $bulk->filter(function ($channel) use ($groups) {
                 $model = Channel::where([
                     'playlist_id' => $channel['playlist_id'],
-                    'tvgid' => $channel['tvgid'],
+                    'stream_id' => $channel['stream_id'],
                 ])->first();
                 if ($model) {
                     // Update the existing channel, if found

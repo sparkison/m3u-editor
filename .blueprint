@@ -2,9 +2,9 @@ created:
     - database/factories/PlaylistFactory.php
     - database/factories/GroupFactory.php
     - database/factories/ChannelFactory.php
-    - database/migrations/2024_12_18_155048_create_playlists_table.php
-    - database/migrations/2024_12_18_155049_create_groups_table.php
-    - database/migrations/2024_12_18_155050_create_channels_table.php
+    - database/migrations/2024_12_18_160529_create_playlists_table.php
+    - database/migrations/2024_12_18_160530_create_groups_table.php
+    - database/migrations/2024_12_18_160531_create_channels_table.php
     - app/Models/Playlist.php
     - app/Models/Group.php
     - app/Models/Channel.php
@@ -12,4 +12,4 @@ models:
     User: { name: string, email: string, email_verified_at: 'timestamp nullable', password: string, remember_token: 'string:100 nullable' }
     Playlist: { name: string, url: string, status: 'string nullable', prefix: 'string nullable', channels: 'unsignedInteger default:0', synced: 'datetime nullable', errors: 'longText nullable', relationships: { hasMany: 'Channel, Group' } }
     Group: { name: string, playlist_id: 'id foreign', relationships: { belongsTo: Playlist } }
-    Channel: { name: string, enabled: 'boolean default:false', channel: 'unsignedInteger nullable', url: 'string nullable', logo: 'string nullable', group: 'string nullable', tvgid: string, lang: 'string nullable', country: 'string nullable', playlist_id: 'id foreign', group_id: 'id foreign nullable', relationships: { belongsTo: 'Playlist, Group' } }
+    Channel: { name: string, enabled: 'boolean default:false', channel: 'unsignedInteger nullable', shift: 'unsignedInteger default:0', url: 'string nullable', logo: 'string nullable', group: 'string nullable', stream_id: string, lang: 'string nullable', country: 'string nullable', playlist_id: 'id foreign', group_id: 'id foreign nullable', relationships: { belongsTo: 'Playlist, Group' } }
