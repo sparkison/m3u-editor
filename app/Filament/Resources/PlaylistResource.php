@@ -39,13 +39,18 @@ class PlaylistResource extends Resource
                 Tables\Columns\TextColumn::make('channels')
                     ->searchable()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('status')
+                    ->sortable()
+                    ->badge()
+                    ->color(fn(string $state): string => match ($state) {
+                        null => 'gray',
+                        'processing' => 'warning',
+                        'completed' => 'success',
+                        'failed' => 'danger',
+                    }),
                 Tables\Columns\TextColumn::make('synced')
                     ->dateTime()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('status')
-                    ->sortable(),
-                // Tables\Columns\TextColumn::make('errors')
-                //     ->color(fn(Column $column) => $column ? 'danger' : 'success'),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -101,7 +106,7 @@ class PlaylistResource extends Resource
     {
         return [
             Forms\Components\TextInput::make('name')
-            ->required(),
+                ->required(),
             Forms\Components\TextInput::make('url')
                 // ->hiddenOn(['edit'])
                 ->required()
