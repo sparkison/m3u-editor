@@ -108,10 +108,13 @@ class PlaylistResource extends Resource
     {
         return [
             Forms\Components\TextInput::make('name')
-                ->required(),
+                ->required()
+                ->helperText('Enter the name of the playlist. Internal use only.'),
             Forms\Components\TextInput::make('url')
                 // ->hiddenOn(['edit'])
+                ->url()
                 ->required()
+                ->helperText('Enter the URL of the playlist file. If changing URL, the playlist will be re-imported. Use with caution as this could lead to data loss if the new playlist differs from the old one.'),
         ];
     }
 }

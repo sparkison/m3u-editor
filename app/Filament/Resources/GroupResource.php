@@ -36,6 +36,9 @@ class GroupResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->filtersTriggerAction(function ($action) {
+                return $action->button()->label('Filters');
+            })
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->searchable(),
@@ -84,7 +87,7 @@ class GroupResource extends Resource
                         Infolists\Components\TextEntry::make('name'),
                         Infolists\Components\TextEntry::make('playlist.name')
                             ->label('Playlist')
-                            //->url(fn($record): string => route('playlists.edit', ['playlist' => $record->playlist])),
+                        //->url(fn($record): string => route('playlists.edit', ['playlist' => $record->playlist])),
                     ])
             ]);
     }
