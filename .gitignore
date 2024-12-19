@@ -21,4 +21,6 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
-.sqlite
+*.sqlite
+*.csv
+*.m3u

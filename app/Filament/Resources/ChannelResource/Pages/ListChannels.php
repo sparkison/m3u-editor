@@ -21,18 +21,24 @@ class ListChannels extends ListRecords
                 ->importer(ChannelImporter::class)
                 ->label('Import Channels')
                 ->icon('heroicon-m-arrow-down-tray')
+                ->color('primary')
                 ->modalDescription('Import channels from a CSV or XLSX file.'),
             Actions\ExportAction::make()
                 ->exporter(ChannelExporter::class)
                 ->label('Export Channels')
                 ->icon('heroicon-m-arrow-up-tray')
-                ->modalDescription('Export all channels to a CSV or XLSX file.')
+                ->color('primary')
+                ->modalDescription('Export channels to a CSV or XLSX file. NOTE: Only enabled channels will be exported.')
                 ->columnMapping(false)
                 ->modifyQueryUsing(function ($query, array $options) {
-                    return $query->where('playlist_id', $options['playlist'])
-                        ->when($options['enabled'], function ($query, $enabled) {
-                            return $query->where('enabled', $enabled);
-                        });
+                    return $query->where([
+                        ['playlist_id', $options['playlist']],
+                        ['enabled', true],
+                    ]);
+                    // return $query->where('playlist_id', $options['playlist'])
+                    //     ->when($options['enabled'], function ($query, $enabled) {
+                    //         return $query->where('enabled', $enabled);
+                    //     });
                 }),
         ];
     }
