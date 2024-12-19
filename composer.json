@@ -9,6 +9,8 @@
         "php": "^8.2",
         "filament/filament": "^3.2",
         "laravel/framework": "^11.31",
+        "laravel/horizon": "^5.30",
+        "laravel/octane": "^2.6",
         "laravel/reverb": "^1.0",
         "laravel/tinker": "^2.9",
         "zikwall/m3u-content-parser": "dev-master"
@@ -19,7 +21,7 @@
         "laravel-shift/blueprint": "^2.10",
         "laravel/pail": "^1.1",
         "laravel/pint": "^1.13",
-        "laravel/sail": "^1.26",
+        "laravel/sail": "^1.39",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.1",
         "pestphp/pest": "^3.7",
