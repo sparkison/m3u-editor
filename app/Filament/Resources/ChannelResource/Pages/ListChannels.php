@@ -28,7 +28,12 @@ class ListChannels extends ListRecords
                 ->icon('heroicon-m-arrow-up-tray')
                 ->modalDescription('Export all channels to a CSV or XLSX file.')
                 ->columnMapping(false)
-                ->modifyQueryUsing(fn($query, array $options) => $query->where('playlist_id', $options['playlist'])),
+                ->modifyQueryUsing(function ($query, array $options) {
+                    return $query->where('playlist_id', $options['playlist'])
+                        ->when($options['enabled'], function ($query, $enabled) {
+                            return $query->where('enabled', $enabled);
+                        });
+                }),
         ];
     }
 

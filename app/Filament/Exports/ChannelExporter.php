@@ -7,7 +7,7 @@ use App\Models\Playlist;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
-use Filament\Forms\Components\Select;
+use Filament\Forms;
 
 class ChannelExporter extends Exporter
 {
@@ -16,12 +16,15 @@ class ChannelExporter extends Exporter
     public static function getOptionsFormComponents(): array
     {
         return [
-            Select::make('playlist')
+            Forms\Components\Select::make('playlist')
                 ->required()
                 ->label('Playlist')
                 ->helperText('Select the playlist you would like to export channels for.')
-                ->options(Playlist::all()->pluck('name', 'id'))
-                ->searchable()
+                ->options(Playlist::all(['name', 'id'])->pluck('name', 'id'))
+                ->searchable(),
+            Forms\Components\Toggle::make('enabled')
+                ->label('Only export enabled channels?')
+                ->default(true),
         ];
     }
 

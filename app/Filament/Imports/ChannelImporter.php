@@ -8,6 +8,7 @@ use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Importer;
 use Filament\Actions\Imports\Models\Import;
 use Filament\Forms\Components\Select;
+use Illuminate\Database\Eloquent\Model;
 
 class ChannelImporter extends Importer
 {
@@ -20,7 +21,7 @@ class ChannelImporter extends Importer
                 ->required()
                 ->label('Playlist')
                 ->helperText('Select the playlist this import is associated with.')
-                ->options(Playlist::all()->pluck('name', 'id'))
+                ->options(Playlist::all(['name', 'id'])->pluck('name', 'id'))
                 ->searchable()
         ];
     }
@@ -36,16 +37,18 @@ class ChannelImporter extends Importer
                 ->rules(['required', 'max:255']),
             ImportColumn::make('channel')
                 ->requiredMapping()
-                ->rules(['required', 'numeric', 'min:0']),
+                ->rules(['numeric', 'min:0'])
+                ->ignoreBlankState(),
             ImportColumn::make('enabled')
                 ->requiredMapping()
-                ->rules(['required', 'numeric', 'min:0', 'max:1'])
+                ->rules(['numeric', 'min:0', 'max:1'])
+                ->ignoreBlankState(),
         ];
     }
 
-    public function resolveRecord(): ?Channel
+    public function resolveRecord(): ?Model
     {
-        return Channel::firstOrNew([
+        return Channel::first([
             'name' => $this->data['name'],
             'group' => $this->data['group'],
             'playlist_id' => $this->options['playlist'],
