@@ -42,10 +42,12 @@ class ChannelResource extends Resource
 
         // Return the table
         return $table
-            // ->persistFiltersInSession()
+            ->persistFiltersInSession()
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
+            ->paginated([10, 25, 50, 100, 250, 500])
+            ->defaultPaginationPageOption(50)
             ->columns([
                 Tables\Columns\ImageColumn::make('logo')
                     ->defaultImageUrl(fn($record) => $record->logo),
