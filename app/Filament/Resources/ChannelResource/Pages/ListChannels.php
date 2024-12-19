@@ -5,6 +5,7 @@ namespace App\Filament\Resources\ChannelResource\Pages;
 use App\Filament\Exports\ChannelExporter;
 use App\Filament\Imports\ChannelImporter;
 use App\Filament\Resources\ChannelResource;
+use App\Models\Channel;
 use Filament\Actions;
 use Filament\Resources\Components\Tab;
 use Filament\Resources\Pages\ListRecords;
@@ -49,13 +50,17 @@ class ListChannels extends ListRecords
         return [
             'all' => Tab::make('All Channels'),
             'enabled' => Tab::make('Enabled Channels')
+                ->icon('heroicon-m-check')
+                ->badgeColor('success')
                 ->modifyQueryUsing(function ($query) {
                     return $query->where('enabled', true);
-                }),
+                })->badge(Channel::query()->where('enabled', true)->count()),
             'disabled' => Tab::make('Disabled Channels')
+                ->icon('heroicon-m-x-mark')
+                ->badgeColor('danger')
                 ->modifyQueryUsing(function ($query) {
                     return $query->where('enabled', false);
-                }),
+                })->badge(Channel::query()->where('enabled', false)->count()),
         ];
     }
 }
