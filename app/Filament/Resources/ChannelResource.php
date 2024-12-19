@@ -104,7 +104,7 @@ class ChannelResource extends Resource
                     ->preload()
                     ->searchable(),
                 Tables\Filters\Filter::make('enabled')
-                    ->label('Is enabled')
+                    ->label('Channel is enabled')
                     ->toggle()
                     ->query(function ($query) {
                         return $query->where('enabled', true);
@@ -117,6 +117,7 @@ class ChannelResource extends Resource
                 Tables\Actions\BulkActionGroup::make([
                     // Tables\Actions\DeleteBulkAction::make(),
                     Tables\Actions\BulkAction::make('enable')
+                        ->label('Enable selected')
                         ->action(function (Collection $records): void {
                             foreach ($records as $record) {
                                 $record->update([
@@ -130,6 +131,7 @@ class ChannelResource extends Resource
                                 ->body('The selected channels have been enabled.')
                                 ->send();
                         })
+                        ->color('success')
                         ->deselectRecordsAfterCompletion()
                         ->requiresConfirmation()
                         ->icon('heroicon-o-check-circle')
@@ -137,6 +139,7 @@ class ChannelResource extends Resource
                         ->modalDescription('Enable the selected channels(s) now?')
                         ->modalSubmitActionLabel('Yes, enable now'),
                     Tables\Actions\BulkAction::make('disable')
+                        ->label('Disable selected')
                         ->action(function (Collection $records): void {
                             foreach ($records as $record) {
                                 $record->update([
@@ -150,6 +153,7 @@ class ChannelResource extends Resource
                                 ->body('The selected channels have been disabled.')
                                 ->send();
                         })
+                        ->color('danger')
                         ->deselectRecordsAfterCompletion()
                         ->requiresConfirmation()
                         ->icon('heroicon-o-x-circle')

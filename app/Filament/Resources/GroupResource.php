@@ -84,9 +84,11 @@ class GroupResource extends Resource
                 Infolists\Components\Section::make('Group Details')
                     ->columns(2)
                     ->schema([
-                        Infolists\Components\TextEntry::make('name'),
+                        Infolists\Components\TextEntry::make('name')
+                            ->badge(),
                         Infolists\Components\TextEntry::make('playlist.name')
                             ->label('Playlist')
+                            ->badge(),
                             // ->url(fn($record) => PlaylistResource::getUrl('edit', ['record' => $record->playlist_id])),
                     ])
             ]);

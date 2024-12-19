@@ -151,9 +151,14 @@ class ProcessM3uImport implements ShouldQueue
                 ->success()
                 ->title('Playlist Synced')
                 ->body("'{$this->playlist->name}' has been successfully synced.")
-                ->sendToDatabase($this->playlist->user);
+                ->broadcast($this->playlist->user);
         } catch (\Exception $e) {
             // Send notification
+            Notification::make()
+                ->danger()
+                ->title("Error syncing '{$this->playlist->name}'")
+                ->body('Please view your notifications for details.')
+                ->broadcast($this->playlist->user);
             Notification::make()
                 ->danger()
                 ->title("Error syncing '{$this->playlist->name}'")
