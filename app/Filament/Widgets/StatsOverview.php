@@ -20,7 +20,8 @@ class StatsOverview extends BaseWidget
                 ->description($relative ? "Last sync $relative" : 'No syncs yet')
                 ->descriptionIcon('heroicon-m-calendar-days'),
             Stat::make('Groups', Group::count()),
-            Stat::make('Channels', Channel::count()),
+            Stat::make('Total Channels', Channel::count()),
+            Stat::make('Enabled Channels', Channel::where('enabled', true)->count()),
         ];
     }
 }

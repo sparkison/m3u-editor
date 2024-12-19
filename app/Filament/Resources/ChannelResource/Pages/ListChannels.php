@@ -31,6 +31,7 @@ class ListChannels extends ListRecords
                 ->modalDescription('Export channels to a CSV or XLSX file. NOTE: Only enabled channels will be exported.')
                 ->columnMapping(false)
                 ->modifyQueryUsing(function ($query, array $options) {
+                    // For now, only allow exporting enabled channels
                     return $query->where([
                         ['playlist_id', $options['playlist']],
                         ['enabled', true],

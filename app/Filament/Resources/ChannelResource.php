@@ -42,7 +42,7 @@ class ChannelResource extends Resource
 
         // Return the table
         return $table
-            ->persistFiltersInSession()
+            // ->persistFiltersInSession()
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })

@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\PlaylistStatus;
 use App\Filament\Resources\PlaylistResource\Pages;
 use App\Filament\Resources\PlaylistResource\RelationManagers;
+use App\Forms\Components\PlaylistM3uUrl;
 use App\Models\Playlist;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -153,10 +154,13 @@ class PlaylistResource extends Resource
                 ->required()
                 ->helperText('Enter the name of the playlist. Internal use only.'),
             Forms\Components\TextInput::make('url')
-                // ->hiddenOn(['edit'])
                 ->url()
                 ->required()
                 ->helperText('Enter the URL of the playlist file. If changing URL, the playlist will be re-imported. Use with caution as this could lead to data loss if the new playlist differs from the old one.'),
+            PlaylistM3uUrl::make('m3u_url')
+                ->hiddenOn(['create'])
+                ->columnSpan(2)
+                ->helperText('Your generated m3u playlist, based on the playlist configurtation. Only enabled channels will be included.'),
         ];
     }
 }

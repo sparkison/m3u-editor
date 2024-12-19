@@ -37,11 +37,11 @@ class ChannelImporter extends Importer
                 ->rules(['required', 'max:255']),
             ImportColumn::make('channel')
                 ->requiredMapping()
-                ->rules(['numeric', 'min:0'])
+                ->rules(['sometimes', 'numeric', 'min:0'])
                 ->ignoreBlankState(),
             ImportColumn::make('enabled')
                 ->requiredMapping()
-                ->rules(['numeric', 'min:0', 'max:1'])
+                ->rules(['sometimes', 'numeric', 'min:0', 'max:1'])
                 ->ignoreBlankState(),
         ];
     }
