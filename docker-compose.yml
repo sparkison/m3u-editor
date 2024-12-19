@@ -1,5 +1,5 @@
 services:
-    laravel.test:
+    m3ueditor.local:
         build:
             context: './docker/8.4'
             dockerfile: Dockerfile
