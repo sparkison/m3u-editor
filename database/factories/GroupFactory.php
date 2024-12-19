@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 use App\Models\Group;
 use App\Models\Playlist;
+use App\Models\User;
 
 class GroupFactory extends Factory
 {
@@ -23,6 +24,8 @@ class GroupFactory extends Factory
     {
         return [
             'name' => $this->faker->name(),
+            'uuid' => $this->faker->uuid(),
+            'user_id' => User::factory(),
             'playlist_id' => Playlist::factory(),
         ];
     }

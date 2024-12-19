@@ -1,26 +1,30 @@
 models:
   Playlist:
     name: string
+    uuid: uuid
     url: string
     status: enum:pending,processing,completed,failed default:pending
     prefix: string nullable
     channels: unsignedInteger default:0
     synced: datetime nullable
     errors: longText nullable
-    user_id: id foreign
+    user_id: id foreign:users
     relationships:
       belongsTo: User
       hasMany: Channel, Group
 
   Group:
     name: string
-    playlist_id: id foreign
+    uuid: uuid
+    user_id: id foreign:users
+    playlist_id: id foreign:playlists
     relationships:
-      belongsTo: Playlist
+      belongsTo: User, Playlist
       hasMany: Channel
 
   Channel:
     name: string
+    uuid: uuid
     enabled: boolean default:false
     channel: unsignedInteger nullable
     shift: unsignedInteger default:0
@@ -30,7 +34,8 @@ models:
     stream_id: string nullable
     lang: string nullable
     country: string nullable
-    playlist_id: id foreign
-    group_id: id foreign nullable
+    user_id: id foreign:users
+    playlist_id: id foreign:playlists
+    group_id: id foreign:groups nullable
     relationships:
-      belongsTo: Playlist, Group
+      belongsTo: User, Playlist, Group

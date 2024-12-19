@@ -20,9 +20,15 @@ class Channel extends Model
         'enabled' => 'boolean',
         'channel' => 'integer',
         'shift' => 'integer',
+        'user_id' => 'integer',
         'playlist_id' => 'integer',
         'group_id' => 'integer',
     ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
     public function playlist(): BelongsTo
     {

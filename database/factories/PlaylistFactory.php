@@ -23,6 +23,7 @@ class PlaylistFactory extends Factory
     {
         return [
             'name' => $this->faker->name(),
+            'uuid' => $this->faker->uuid(),
             'url' => $this->faker->url(),
             'status' => $this->faker->randomElement(["pending","processing","completed","failed"]),
             'prefix' => $this->faker->word(),

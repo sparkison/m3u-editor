@@ -16,13 +16,14 @@ return new class extends Migration
         Schema::create('playlists', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+            $table->uuid('uuid');
             $table->string('url');
             $table->enum('status', ["pending","processing","completed","failed"])->default('pending');
             $table->string('prefix')->nullable();
             $table->unsignedInteger('channels')->default(0);
             $table->dateTime('synced')->nullable();
             $table->longText('errors')->nullable();
-            $table->foreignId('user_id')->constrained();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
             $table->timestamps();
         });
 

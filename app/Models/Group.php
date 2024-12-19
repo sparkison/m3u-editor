@@ -18,8 +18,14 @@ class Group extends Model
      */
     protected $casts = [
         'id' => 'integer',
+        'user_id' => 'integer',
         'playlist_id' => 'integer',
     ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
     public function playlist(): BelongsTo
     {

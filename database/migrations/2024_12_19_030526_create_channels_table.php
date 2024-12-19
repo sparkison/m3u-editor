@@ -16,6 +16,7 @@ return new class extends Migration
         Schema::create('channels', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+            $table->uuid('uuid');
             $table->boolean('enabled')->default(false);
             $table->unsignedInteger('channel')->nullable();
             $table->unsignedInteger('shift')->default(0);
@@ -25,8 +26,9 @@ return new class extends Migration
             $table->string('stream_id')->nullable();
             $table->string('lang')->nullable();
             $table->string('country')->nullable();
-            $table->foreignId('playlist_id')->constrained();
-            $table->foreignId('group_id')->nullable()->constrained();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
+            $table->foreignId('playlist_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
+            $table->foreignId('group_id')->nullable()->constrained()->cascadeOnDelete()->cascadeOnUpdate();
             $table->timestamps();
         });
 
