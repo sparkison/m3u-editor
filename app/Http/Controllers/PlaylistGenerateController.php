@@ -4,11 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\Playlist;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class PlaylistGenerateController extends Controller
 {
     public function __invoke(Playlist $playlist)
     {
+        // Generate a filename
+        $filename = Str::replace('.', '', Str::snake($playlist->name)) . '.m3u8';
+
         // Get ll active channels
         return response()->stream(
             function () use ($playlist) {
@@ -28,6 +32,7 @@ class PlaylistGenerateController extends Controller
             200,
             [
                 'Access-Control-Allow-Origin' => '*',
+                'Content-Disposition' => "attachment; filename=$filename",
                 'Content-Type' => 'application/vnd.apple.mpegurl'
             ]
         );
