@@ -17,6 +17,9 @@ class ProcessM3uImport implements ShouldQueue
 {
     use Queueable;
 
+    // Giving a timeout of 10 minutes to the Job to process the file
+    public $timeout = 600;
+
     /**
      * Create a new job instance.
      * 
