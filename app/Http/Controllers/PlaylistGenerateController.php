@@ -22,13 +22,13 @@ class PlaylistGenerateController extends Controller
                 // Get all active channels
                 $channels = $playlist->channels()
                     ->where('enabled', true)
+                    ->orderBy('channel')
                     ->get();
 
                 // Output the enabled channels
                 echo "#EXTM3U\n";
                 foreach ($channels as $channel) {
-                    $channel_number = $channel->channel || 0;
-                    echo "#EXTINF:-1 tvg-chno=\"$channel_number\" tvg-id=\"$channel->name\" tvg-name=\"$channel->name\" tvg-logo=\"$channel->logo\" group-title=\"$channel->group\"," . $channel->name . "\n";
+                    echo "#EXTINF:-1 tvg-chno=\"$channel->channel\" tvg-id=\"$channel->name\" tvg-name=\"$channel->name\" tvg-logo=\"$channel->logo\" group-title=\"$channel->group\"," . $channel->name . "\n";
                     echo $channel->url . "\n";
                 }
             },
