@@ -67,8 +67,23 @@ class PlaylistResource extends Resource
                 //
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\EditAction::make()
+                        ->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('New playlist added')
+                                ->body('Playlist is currently processing in the background. Depending on the size of your playlist, this may take a while.')
+                                ->duration(10000)
+                                ->send();
+                        }),
+                    Tables\Actions\Action::make('Download M3U')
+                        ->label('Download M3U')
+                        ->icon('heroicon-o-arrow-down-tray')
+                        ->url(fn(Playlist $record) => route('playlists.generate', $record))
+                        ->openUrlInNewTab(),
+                    Tables\Actions\DeleteAction::make(),
+                ]),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
