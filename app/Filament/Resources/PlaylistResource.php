@@ -77,6 +77,22 @@ class PlaylistResource extends Resource
                                 ->duration(10000)
                                 ->send();
                         }),
+                    Tables\Actions\Action::make('process')
+                        ->label('Process')
+                        ->icon('heroicon-o-arrow-path')
+                        ->action(fn($record) => dispatch(new \App\Jobs\ProcessM3uImport($record)))->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Playlist is processing')
+                                ->body('Playlist is being processed in the background. Depending on the size of your playlist, this may take a while.')
+                                ->duration(10000)
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-arrow-path')
+                        ->modalIcon('heroicon-o-arrow-path')
+                        ->modalDescription('Process playlist now?')
+                        ->modalSubmitActionLabel('Yes, process now'),
                     Tables\Actions\Action::make('Download M3U')
                         ->label('Download M3U')
                         ->icon('heroicon-o-arrow-down-tray')
@@ -89,6 +105,7 @@ class PlaylistResource extends Resource
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                     Tables\Actions\BulkAction::make('process')
+                        ->label('Process selected')
                         ->action(function (Collection $records): void {
                             foreach ($records as $record) {
                                 dispatch(new \App\Jobs\ProcessM3uImport($record));
