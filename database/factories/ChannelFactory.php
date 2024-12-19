@@ -25,7 +25,6 @@ class ChannelFactory extends Factory
     {
         return [
             'name' => $this->faker->name(),
-            'uuid' => $this->faker->uuid(),
             'enabled' => $this->faker->boolean(),
             'channel' => $this->faker->randomNumber(),
             'shift' => $this->faker->randomNumber(),

@@ -24,7 +24,6 @@ class GroupFactory extends Factory
     {
         return [
             'name' => $this->faker->name(),
-            'uuid' => $this->faker->uuid(),
             'user_id' => User::factory(),
             'playlist_id' => Playlist::factory(),
         ];

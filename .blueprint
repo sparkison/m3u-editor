@@ -2,14 +2,14 @@ created:
     - database/factories/PlaylistFactory.php
     - database/factories/GroupFactory.php
     - database/factories/ChannelFactory.php
-    - database/migrations/2024_12_19_030524_create_playlists_table.php
-    - database/migrations/2024_12_19_030525_create_groups_table.php
-    - database/migrations/2024_12_19_030526_create_channels_table.php
+    - database/migrations/2024_12_19_031323_create_playlists_table.php
+    - database/migrations/2024_12_19_031324_create_groups_table.php
+    - database/migrations/2024_12_19_031325_create_channels_table.php
     - app/Models/Playlist.php
     - app/Models/Group.php
     - app/Models/Channel.php
 models:
     User: { name: string, email: string, email_verified_at: 'timestamp nullable', password: string, remember_token: 'string:100 nullable' }
     Playlist: { name: string, uuid: uuid, url: string, status: 'enum:pending,processing,completed,failed default:pending', prefix: 'string nullable', channels: 'unsignedInteger default:0', synced: 'datetime nullable', errors: 'longText nullable', user_id: 'id foreign:users', relationships: { belongsTo: User, hasMany: 'Channel, Group' } }
-    Group: { name: string, uuid: uuid, user_id: 'id foreign:users', playlist_id: 'id foreign:playlists', relationships: { belongsTo: 'User, Playlist', hasMany: Channel } }
-    Channel: { name: string, uuid: uuid, enabled: 'boolean default:false', channel: 'unsignedInteger nullable', shift: 'unsignedInteger default:0', url: 'string nullable', logo: 'string nullable', group: 'string nullable', stream_id: 'string nullable', lang: 'string nullable', country: 'string nullable', user_id: 'id foreign:users', playlist_id: 'id foreign:playlists', group_id: 'id foreign:groups nullable', relationships: { belongsTo: 'User, Playlist, Group' } }
+    Group: { name: string, user_id: 'id foreign:users', playlist_id: 'id foreign:playlists', relationships: { belongsTo: 'User, Playlist', hasMany: Channel } }
+    Channel: { name: string, enabled: 'boolean default:false', channel: 'unsignedInteger nullable', shift: 'unsignedInteger default:0', url: 'string nullable', logo: 'string nullable', group: 'string nullable', stream_id: 'string nullable', lang: 'string nullable', country: 'string nullable', user_id: 'id foreign:users', playlist_id: 'id foreign:playlists', group_id: 'id foreign:groups nullable', relationships: { belongsTo: 'User, Playlist, Group' } }

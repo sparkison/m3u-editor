@@ -8,8 +8,11 @@ use Illuminate\Support\Str;
 
 class PlaylistGenerateController extends Controller
 {
-    public function __invoke(Playlist $playlist)
+    public function __invoke(string $uuid)
     {
+        // Fetch the playlist
+        $playlist = Playlist::where('uuid', $uuid)->firstOrFail();
+
         // Generate a filename
         $filename = Str::slug($playlist->name) . '.m3u';
 

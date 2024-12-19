@@ -49,6 +49,7 @@ class ProcessM3uImport implements ShouldQueue
             $new_groups = [];
 
             $playlistId = $this->playlist->id;
+            $userId = $this->playlist->user_id;
 
             $parser = new M3UContentParser($this->playlist->url);
             $parser->parse();
@@ -64,6 +65,7 @@ class ProcessM3uImport implements ShouldQueue
                  */
                 $channels->push([
                     'playlist_id' => $playlistId,
+                    'user_id' => $userId,
                     'stream_id' => $item->getId(), // usually null/empty
                     'shift' => $item->getTvgShift(), // usually null/empty
                     'name' => $item->getTvgName(),
@@ -79,6 +81,7 @@ class ProcessM3uImport implements ShouldQueue
                     $groups->push([
                         'id' => null,
                         'playlist_id' => $playlistId,
+                        'user_id' => $userId,
                         'name' => $item->getGroupTitle()
                     ]);
                 }
@@ -91,6 +94,7 @@ class ProcessM3uImport implements ShouldQueue
                 // Find/create the group
                 $model = Group::firstOrCreate([
                     'playlist_id' => $group['playlist_id'],
+                    'user_id' => $group['user_id'],
                     'name' => $group['name'],
                 ]);
 
@@ -109,6 +113,7 @@ class ProcessM3uImport implements ShouldQueue
                 // Find/create the channel
                 $model = Channel::firstOrCreate([
                     'playlist_id' => $channel['playlist_id'],
+                    'user_id' => $channel['user_id'],
                     'name' => $channel['name'],
                     'group' => $channel['group'],
                 ]);

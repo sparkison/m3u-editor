@@ -80,7 +80,7 @@ class PlaylistResource extends Resource
                     Tables\Actions\Action::make('Download M3U')
                         ->label('Download M3U')
                         ->icon('heroicon-o-arrow-down-tray')
-                        ->url(fn(Playlist $record) => route('playlists.generate', $record))
+                        ->url(fn(Playlist $record) => route('playlists.generate', ['uuid' => $record->uuid]))
                         ->openUrlInNewTab(),
                     Tables\Actions\DeleteAction::make(),
                 ]),

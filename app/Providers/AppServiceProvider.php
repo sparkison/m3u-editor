@@ -31,6 +31,7 @@ class AppServiceProvider extends ServiceProvider
             Playlist::created(fn(Playlist $playlist) => event(new PlaylistCreated($playlist)));
             Playlist::creating(function (Playlist $playlist) {
                 $playlist->user_id = auth()->id();
+                $playlist->uuid = \Illuminate\Support\Str::orderedUuid()->toString();
                 return $playlist;
             });
         } catch (\Throwable $e) {

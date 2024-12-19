@@ -13,22 +13,11 @@ return new class extends Migration
     {
         Schema::disableForeignKeyConstraints();
 
-        Schema::create('channels', function (Blueprint $table) {
+        Schema::create('groups', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->uuid('uuid');
-            $table->boolean('enabled')->default(false);
-            $table->unsignedInteger('channel')->nullable();
-            $table->unsignedInteger('shift')->default(0);
-            $table->string('url')->nullable();
-            $table->string('logo')->nullable();
-            $table->string('group')->nullable();
-            $table->string('stream_id')->nullable();
-            $table->string('lang')->nullable();
-            $table->string('country')->nullable();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
             $table->foreignId('playlist_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
-            $table->foreignId('group_id')->nullable()->constrained()->cascadeOnDelete()->cascadeOnUpdate();
             $table->timestamps();
         });
 
@@ -40,6 +29,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('channels');
+        Schema::dropIfExists('groups');
     }
 };

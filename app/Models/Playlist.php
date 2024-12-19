@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\PlaylistStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,6 +22,7 @@ class Playlist extends Model
         'channels' => 'integer',
         'synced' => 'datetime',
         'user_id' => 'integer',
+        'status' => PlaylistStatus::class,
     ];
 
     public function user(): BelongsTo

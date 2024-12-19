@@ -15,7 +15,6 @@ models:
 
   Group:
     name: string
-    uuid: uuid
     user_id: id foreign:users
     playlist_id: id foreign:playlists
     relationships:
@@ -24,7 +23,6 @@ models:
 
   Channel:
     name: string
-    uuid: uuid
     enabled: boolean default:false
     channel: unsignedInteger nullable
     shift: unsignedInteger default:0
