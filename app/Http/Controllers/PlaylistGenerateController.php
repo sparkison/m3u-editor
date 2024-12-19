@@ -11,7 +11,7 @@ class PlaylistGenerateController extends Controller
     public function __invoke(Playlist $playlist)
     {
         // Generate a filename
-        $filename = Str::replace('.', '', Str::snake($playlist->name)) . '.m3u8';
+        $filename = Str::slug($playlist->name) . '.m3u';
 
         // Get ll active channels
         return response()->stream(

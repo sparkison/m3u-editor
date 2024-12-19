@@ -108,7 +108,9 @@ class PlaylistResource extends Resource
                         ->modalDescription('Process the selected playlist(s) now?')
                         ->modalSubmitActionLabel('Yes, process now')
                 ]),
-            ]);
+            ])->checkIfRecordIsSelectableUsing(
+                fn($record): bool => $record->status !== PlaylistStatus::Processing,
+            );
     }
 
     public static function getRelations(): array
