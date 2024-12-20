@@ -44,12 +44,13 @@ class ChannelImporter extends Importer
                     if (blank($state)) {
                         return null;
                     }
+                    return $state;
                 }),
             ImportColumn::make('enabled')
                 ->requiredMapping()
                 ->rules(['required', 'boolean'])
                 ->ignoreBlankState()
-                ->castStateUsing(function (string $state): ?int {
+                ->castStateUsing(function (string $state): ?bool {
                     return boolval($state);
                 }),
         ];
@@ -57,11 +58,11 @@ class ChannelImporter extends Importer
 
     public function resolveRecord(): ?Model
     {
-        return Channel::first([
+        return Channel::where([
             'name' => $this->data['name'],
             'group' => $this->data['group'],
             'playlist_id' => $this->options['playlist'],
-        ]);
+        ])->first();
     }
 
     public static function getCompletedNotificationBody(Import $import): string
