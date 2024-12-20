@@ -47,7 +47,7 @@ class ChannelImporter extends Importer
                 }),
             ImportColumn::make('enabled')
                 ->requiredMapping()
-                ->rules(['required', 'numeric', 'min:0', 'max:1'])
+                ->rules(['required', 'boolean'])
                 ->ignoreBlankState()
                 ->castStateUsing(function (string $state): ?int {
                     return boolval($state);
