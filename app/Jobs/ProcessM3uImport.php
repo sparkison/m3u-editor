@@ -115,7 +115,7 @@ class ProcessM3uImport implements ShouldQueue
                 'synced' => now(),
                 'errors' => $e->getMessage(),
             ]);
-            return;
         }
+        return;
     }
 }

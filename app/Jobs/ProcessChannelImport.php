@@ -40,7 +40,7 @@ class ProcessChannelImport implements ShouldQueue
 
         try {
             // Keep track of new channels and groups
-            // $new_channels = [];
+            $new_channels = [];
 
             $groups = $this->groups;
 
