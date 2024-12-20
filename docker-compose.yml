@@ -10,7 +10,7 @@ services:
             - 'host.docker.internal:host-gateway'
         ports:
             - '${APP_PORT:-36400}:36400'
-            - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
+            # - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
             - '${REVERB_PORT:-36800}:${REVERB_PORT:-36800}'
         environment:
             WWWUSER: '${WWWUSER}'
