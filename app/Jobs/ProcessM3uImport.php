@@ -3,13 +3,10 @@
 namespace App\Jobs;
 
 use App\Enums\PlaylistStatus;
-use App\Models\Channel;
 use App\Models\Playlist;
-use App\Models\Group;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Facades\Process;
 use zikwall\m3ucontentparser\M3UContentParser;
 use zikwall\m3ucontentparser\M3UItem;
 
@@ -90,7 +87,7 @@ class ProcessM3uImport implements ShouldQueue
             }
 
             // Send m3u processed data to the channel import job
-            dispatch(new ProcessChannelImport(
+            dispatch(new ProcessGroupImport(
                 $this->playlist,
                 $count,
                 $groups,
@@ -115,7 +112,6 @@ class ProcessM3uImport implements ShouldQueue
             // Update the playlist
             $this->playlist->update([
                 'status' => PlaylistStatus::Failed,
-                'channels' => 0,
                 'synced' => now(),
                 'errors' => $e->getMessage(),
             ]);
