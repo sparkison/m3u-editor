@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\GroupResource\RelationManagers;
 
 use App\Filament\Resources\ChannelResource;
+use App\Filament\Resources\ChannelResource\Pages\ListChannels;
 use App\Models\Channel;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -25,5 +26,10 @@ class ChannelsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return ChannelResource::table($table);
+    }
+
+    public function getTabs(): array
+    {
+        return ListChannels::tabs($this->ownerRecord->id);
     }
 }

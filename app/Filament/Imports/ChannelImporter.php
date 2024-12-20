@@ -22,6 +22,7 @@ class ChannelImporter extends Importer
                 ->label('Playlist')
                 ->helperText('Select the playlist this import is associated with.')
                 ->options(Playlist::all(['name', 'id'])->pluck('name', 'id'))
+                ->preload()
                 ->searchable()
         ];
     }
@@ -37,12 +38,20 @@ class ChannelImporter extends Importer
                 ->rules(['required', 'max:255']),
             ImportColumn::make('channel')
                 ->requiredMapping()
-                ->rules(['sometimes', 'numeric', 'min:0'])
-                ->ignoreBlankState(),
+                ->rules(['required', 'numeric', 'min:0'])
+                ->ignoreBlankState()
+                ->castStateUsing(function (string $state): ?int {
+                    if (blank($state)) {
+                        return null;
+                    }
+                }),
             ImportColumn::make('enabled')
                 ->requiredMapping()
-                ->rules(['sometimes', 'numeric', 'min:0', 'max:1'])
-                ->ignoreBlankState(),
+                ->rules(['required', 'numeric', 'min:0', 'max:1'])
+                ->ignoreBlankState()
+                ->castStateUsing(function (string $state): ?int {
+                    return boolval($state);
+                }),
         ];
     }
 

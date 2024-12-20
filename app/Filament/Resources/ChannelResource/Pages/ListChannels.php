@@ -47,20 +47,34 @@ class ListChannels extends ListRecords
 
     public function getTabs(): array
     {
+        return self::tabs();
+    }
+
+    public static function tabs($groupId = null): array
+    {
+        // Change count based on view
+        $enabledCount = Channel::query()->where('enabled', true)
+            ->when($groupId, function ($query, $groupId) {
+                return $query->where('group_id', $groupId);
+            })->count();
+        $disabledCount = Channel::query()->where('enabled', false)
+            ->when($groupId, function ($query, $groupId) {
+                return $query->where('group_id', $groupId);
+            })->count();
+
+        // Return tabs
         return [
             'all' => Tab::make('All Channels'),
             'enabled' => Tab::make('Enabled Channels')
-                ->icon('heroicon-m-check')
+                // ->icon('heroicon-m-check')
                 ->badgeColor('success')
-                ->modifyQueryUsing(function ($query) {
-                    return $query->where('enabled', true);
-                })->badge(Channel::query()->where('enabled', true)->count()),
+                ->modifyQueryUsing(fn($query) => $query->where('enabled', true))
+                ->badge($enabledCount),
             'disabled' => Tab::make('Disabled Channels')
-                ->icon('heroicon-m-x-mark')
+                // ->icon('heroicon-m-x-mark')
                 ->badgeColor('danger')
-                ->modifyQueryUsing(function ($query) {
-                    return $query->where('enabled', false);
-                })->badge(Channel::query()->where('enabled', false)->count()),
+                ->modifyQueryUsing(fn($query) => $query->where('enabled', false))
+                ->badge($disabledCount),
         ];
     }
 }

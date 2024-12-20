@@ -9,7 +9,7 @@ use App\Models\Group;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-
+use Illuminate\Support\Facades\Process;
 use zikwall\m3ucontentparser\M3UContentParser;
 use zikwall\m3ucontentparser\M3UItem;
 
@@ -47,10 +47,6 @@ class ProcessM3uImport implements ShouldQueue
 
         // Surround in a try/catch block to catch any exceptions
         try {
-            // Keep track of new channels and groups
-            $new_channels = [];
-            $new_groups = [];
-
             $playlistId = $this->playlist->id;
             $userId = $this->playlist->user_id;
 
@@ -93,78 +89,26 @@ class ProcessM3uImport implements ShouldQueue
                 $count++;
             }
 
-            $groups = $groups->map(function ($group) use (&$new_groups) {
-                // Find/create the group
-                $model = Group::firstOrCreate([
-                    'playlist_id' => $group['playlist_id'],
-                    'user_id' => $group['user_id'],
-                    'name' => $group['name'],
-                ]);
-
-                // Keep track of groups
-                $new_groups[] = $model->id;
-
-                // Return the group, with the ID
-                return [
-                    ...$group,
-                    'id' => $model->id,
-                ];
-            });
-
-            // Link the channel groups to the channels
-            $channels->map(function ($channel) use ($groups, &$new_channels) {
-                // Find/create the channel
-                $model = Channel::firstOrCreate([
-                    'playlist_id' => $channel['playlist_id'],
-                    'user_id' => $channel['user_id'],
-                    'name' => $channel['name'],
-                    'group' => $channel['group'],
-                ]);
-
-                // Keep track of channels
-                $new_channels[] = $model->id;
-
-                // Update the channel
-                $model->update([
-                    ...$channel,
-                    'group_id' => $groups->firstWhere('name', $channel['group'])['id']
-                ]);
-                return $channel;
-            });
-
-            // Remove orphaned channels and groups
-            Channel::where('playlist_id', $playlistId)
-                ->whereNotIn('id', $new_channels)
-                ->delete();
-
-            Group::where('playlist_id', $playlistId)
-                ->whereNotIn('id', $new_groups)
-                ->delete();
-
-            // Update the playlist
-            $this->playlist->update([
-                'status' => PlaylistStatus::Completed,
-                'channels' => $count,
-                'synced' => now(),
-                'errors' => null,
-            ]);
-
-            // Send notification
-            Notification::make()
-                ->success()
-                ->title('Playlist Synced')
-                ->body("'{$this->playlist->name}' has been successfully synced.")
-                ->broadcast($this->playlist->user);
+            // Send m3u processed data to the channel import job
+            dispatch(new ProcessChannelImport(
+                $this->playlist,
+                $count,
+                $groups,
+                $channels
+            ));
         } catch (\Exception $e) {
+            // Log the exception
+            logger()->error($e->getMessage());
+
             // Send notification
             Notification::make()
                 ->danger()
-                ->title("Error syncing '{$this->playlist->name}'")
+                ->title("Error processing '{$this->playlist->name}'")
                 ->body('Please view your notifications for details.')
                 ->broadcast($this->playlist->user);
             Notification::make()
                 ->danger()
-                ->title("Error syncing '{$this->playlist->name}'")
+                ->title("Error processing '{$this->playlist->name}'")
                 ->body($e->getMessage())
                 ->sendToDatabase($this->playlist->user);
 

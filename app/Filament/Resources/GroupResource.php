@@ -6,7 +6,6 @@ use App\Filament\Resources\GroupResource\Pages;
 use App\Filament\Resources\GroupResource\RelationManagers;
 use App\Filament\Resources\GroupResource\RelationManagers\ChannelsRelationManager;
 use App\Models\Group;
-use App\Tables\Columns\GroupEnabledChannelsCount;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Infolists;
@@ -47,14 +46,13 @@ class GroupResource extends Resource
                     ->numeric()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('channels_count')
-                    ->label('Channels')
+                    ->label('Available Channels')
                     ->counts('channels')
                     ->sortable(),
-                // Tables\Columns\TextColumn::make('channels_count')->counts([
-                //     'channels' => fn(Builder $query) => $query->where('enabled', true),
-                // ]),
-                GroupEnabledChannelsCount::make('enabled_channels')
-                    ->label('Active Channels'),
+                Tables\Columns\TextColumn::make('enabled_channels_count')
+                    ->label('Enabled Channels')
+                    ->counts('enabled_channels')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

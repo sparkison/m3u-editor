@@ -22,5 +22,6 @@ yarn-error.log
 /.vscode
 /.zed
 *.sqlite
+*.sql
 *.csv
 *.m3u

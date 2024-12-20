@@ -36,4 +36,10 @@ class Group extends Model
     {
         return $this->hasMany(Channel::class);
     }
+
+    public function enabled_channels(): HasMany
+    {
+        return $this->hasMany(Channel::class)
+            ->where('enabled', true);
+    }
 }
