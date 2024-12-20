@@ -44,6 +44,7 @@ class PlaylistResource extends Resource
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('url')
+                    ->label('Playlist URL')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('channels')
                     ->searchable()
@@ -154,7 +155,9 @@ class PlaylistResource extends Resource
                 ->required()
                 ->helperText('Enter the name of the playlist. Internal use only.'),
             Forms\Components\TextInput::make('url')
+                ->label('Playlist URL')
                 ->url()
+                ->prefixIcon('heroicon-m-globe-alt')
                 ->required()
                 ->helperText('Enter the URL of the playlist file. If changing URL, the playlist will be re-imported. Use with caution as this could lead to data loss if the new playlist differs from the old one.'),
             PlaylistM3uUrl::make('m3u_url')

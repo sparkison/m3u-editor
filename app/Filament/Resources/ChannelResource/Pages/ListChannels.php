@@ -47,24 +47,29 @@ class ListChannels extends ListRecords
 
     public function getTabs(): array
     {
-        return self::tabs();
+        return self::setupTabs();
     }
 
-    public static function tabs($groupId = null): array
+    public static function setupTabs($relationId = null): array
     {
         // Change count based on view
+        $totalCount = Channel::query()
+            ->when($relationId, function ($query, $relationId) {
+                return $query->where('group_id', $relationId);
+            })->count();
         $enabledCount = Channel::query()->where('enabled', true)
-            ->when($groupId, function ($query, $groupId) {
-                return $query->where('group_id', $groupId);
+            ->when($relationId, function ($query, $relationId) {
+                return $query->where('group_id', $relationId);
             })->count();
         $disabledCount = Channel::query()->where('enabled', false)
-            ->when($groupId, function ($query, $groupId) {
-                return $query->where('group_id', $groupId);
+            ->when($relationId, function ($query, $relationId) {
+                return $query->where('group_id', $relationId);
             })->count();
 
         // Return tabs
         return [
-            'all' => Tab::make('All Channels'),
+            'all' => Tab::make('All Channels')
+                ->badge($totalCount),
             'enabled' => Tab::make('Enabled Channels')
                 // ->icon('heroicon-m-check')
                 ->badgeColor('success')

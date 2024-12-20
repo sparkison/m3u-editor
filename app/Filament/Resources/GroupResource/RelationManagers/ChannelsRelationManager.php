@@ -25,11 +25,11 @@ class ChannelsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return ChannelResource::table($table);
+        return ChannelResource::setupTable($table, $this->ownerRecord->id);
     }
 
     public function getTabs(): array
     {
-        return ListChannels::tabs($this->ownerRecord->id);
+        return ListChannels::setupTabs($this->ownerRecord->id);
     }
 }

@@ -36,13 +36,13 @@ class ChannelResource extends Resource
 
     public static function table(Table $table): Table
     {
-        // Check if request is for the Channels table
-        $isChannelsTable = request()->route()->uri === 'channels'
-            || Str::contains(request()->headers->get('referer'), 'channels');
+        return self::setupTable($table);
+    }
 
-        // Return the table
-        return $table
-            ->persistFiltersInSession()
+    public static function setupTable(Table $table, $relationId = null): Table
+    {
+
+        return $table->persistFiltersInSession()
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
@@ -60,7 +60,7 @@ class ChannelResource extends Resource
                     ->rules(['numeric', 'min:0'])
                     ->sortable(),
                 Tables\Columns\TextColumn::make('group')
-                    ->hidden(fn() => !$isChannelsTable)
+                    ->hidden(fn() => $relationId)
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('url')
@@ -80,7 +80,7 @@ class ChannelResource extends Resource
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('playlist.name')
-                    ->hidden(fn() => !$isChannelsTable)
+                    ->hidden(fn() => $relationId)
                     ->numeric()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
@@ -95,13 +95,13 @@ class ChannelResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('playlist')
                     ->relationship('playlist', 'name')
-                    ->hidden(fn() => !$isChannelsTable)
+                    ->hidden(fn() => $relationId)
                     ->multiple()
                     ->preload()
                     ->searchable(),
                 Tables\Filters\SelectFilter::make('group')
                     ->relationship('group', 'name')
-                    ->hidden(fn() => !$isChannelsTable)
+                    ->hidden(fn() => $relationId)
                     ->multiple()
                     ->preload()
                     ->searchable(),
