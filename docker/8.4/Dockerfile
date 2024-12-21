@@ -25,7 +25,7 @@ RUN apk update \
         dcron
 
 # Install PHP Swoole
-RUN apk add php84-pecl-swoole
+# RUN apk add php84-pecl-swoole
 # ...or Build Swoole from source
 # RUN apk add --no-cache \
 #         php84-dev php84-pear php84-openssl php84-sockets \
@@ -71,7 +71,7 @@ RUN apk --no-cache add \
         php84-pcntl \
     && ln -s /usr/bin/php84 /usr/bin/php
 
-COPY php.ini /etc/php/84/cli/conf.d/99-sail.ini
+COPY php.ini /etc/php/8.4/cli/conf.d/99-sail.ini
 
 # Configure supervisord
 RUN touch /var/run/supervisord.pid \
