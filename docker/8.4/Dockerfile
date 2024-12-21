@@ -1,92 +1,76 @@
-FROM ubuntu:24.04
+# Larabel (Alpine Edge build)
+FROM alpine:edge
 
-LABEL maintainer="Taylor Otwell"
-
+# Get build arguments
 ARG WWWGROUP
-ARG NODE_VERSION=22
-ARG MYSQL_CLIENT="mysql-client"
-ARG POSTGRES_VERSION=17
 
+# Set environment variables
+ENV APP_PORT=36400
+ENV TZ=UTC
+ENV SUPERVISOR_PHP_USER="sail"
+# Supervisord command to run the app
+# ENV SUPERVISOR_PHP_COMMAND="/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan serve --host=0.0.0.0 --port=$APP_PORT"
+ENV SUPERVISOR_PHP_COMMAND="/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan octane:start --workers=4 --task-workers=6 --server=swoole --host=0.0.0.0 --port=$APP_PORT"
+
+# Set the working directory
 WORKDIR /var/www/html
 
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=UTC
-# ENV SUPERVISOR_PHP_COMMAND="/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan serve --host=0.0.0.0 --port=80"
-ENV SUPERVISOR_PHP_COMMAND="/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan octane:start --workers=4 --task-workers=6 --server=swoole --host=0.0.0.0 --port=36400"
-ENV SUPERVISOR_PHP_USER="sail"
+# Install basic packages
+RUN apk update \
+    && apk --no-cache add  \
+        py3-setuptools \
+        supervisor \
+        dcron
 
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+# https://wiki.alpinelinux.org/wiki/Setting_the_timezone
+RUN apk --no-cache add tzdata \
+    && cp /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone \
+    && echo date
 
-RUN echo "Acquire::http::Pipeline-Depth 0;" > /etc/apt/apt.conf.d/99custom && \
-    echo "Acquire::http::No-Cache true;" >> /etc/apt/apt.conf.d/99custom && \
-    echo "Acquire::BrokenProxy    true;" >> /etc/apt/apt.conf.d/99custom
+# Install and configure bash
+RUN apk --no-cache add bash \
+    && sed -i 's/bin\/ash/bin\/bash/g' /etc/passwd
 
-RUN apt-get update && apt-get upgrade -y \
-    && mkdir -p /etc/apt/keyrings \
-    && apt-get install -y gnupg gosu curl ca-certificates zip unzip git supervisor sqlite3 libcap2-bin libpng-dev python3 dnsutils librsvg2-bin fswatch ffmpeg nano  \
-    && curl -sS 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x14aa40ec0831756756d7f66c4f4ea0aae5267a6c' | gpg --dearmor | tee /etc/apt/keyrings/ppa_ondrej_php.gpg > /dev/null \
-    && echo "deb [signed-by=/etc/apt/keyrings/ppa_ondrej_php.gpg] https://ppa.launchpadcontent.net/ondrej/php/ubuntu noble main" > /etc/apt/sources.list.d/ppa_ondrej_php.list \
-    && apt-get update \
-    && apt-get install -y php8.4-cli php8.4-dev \
-       #php8.4-pgsql php8.4-sqlite3 php8.4-gd \
-       php8.4-sqlite3 php8.4-gd \
-       #php8.4-curl php8.4-mongodb \
-       php8.4-curl \
-       #php8.4-imap php8.4-mysql php8.4-mbstring \
-       php8.4-imap php8.4-mbstring \
-       php8.4-xml php8.4-zip php8.4-bcmath php8.4-soap \
-       php8.4-intl php8.4-readline \
-       php8.4-ldap \
-       php8.4-msgpack php8.4-igbinary php8.4-redis \
-       php8.4-swoole \
-       #php8.4-memcached php8.4-pcov php8.4-imagick php8.4-xdebug \
-       php8.4-memcached php8.4-pcov php8.4-imagick \
-    && curl -sLS https://getcomposer.org/installer | php -- --install-dir=/usr/bin/ --filename=composer \
-    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
-    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_VERSION.x nodistro main" > /etc/apt/sources.list.d/nodesource.list \
-    && apt-get update \
-    && apt-get install -y nodejs \
-    && npm install -g npm \
-    && npm install -g pnpm \
-    #&& npm install -g bun \
-    && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | gpg --dearmor | tee /etc/apt/keyrings/yarn.gpg >/dev/null \
-    && echo "deb [signed-by=/etc/apt/keyrings/yarn.gpg] https://dl.yarnpkg.com/debian/ stable main" > /etc/apt/sources.list.d/yarn.list \
-    && curl -sS https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor | tee /etc/apt/keyrings/pgdg.gpg >/dev/null \
-    && echo "deb [signed-by=/etc/apt/keyrings/pgdg.gpg] http://apt.postgresql.org/pub/repos/apt noble-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
-    && apt-get update \
-    && apt-get install -y yarn \
-    # && apt-get install -y $MYSQL_CLIENT \
-    # && apt-get install -y postgresql-client-$POSTGRES_VERSION \
-    && apt-get -y autoremove \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-RUN apt-get update && apt-get install -y cron
+# Install CRON
 COPY crontab /etc/cron.d/crontab
 RUN chmod 0644 /etc/cron.d/crontab \
     && crontab /etc/cron.d/crontab \
     && touch /var/log/cron.log
 
-RUN setcap "cap_net_bind_service=+ep" /usr/bin/php8.4
+# Install and configure PHP
+RUN apk --no-cache add \
+        php84-cli php84 \
+        php84-sqlite3 php84-gd php84-curl \
+        php84-intl php84-imap php84-mbstring \
+        php84-xml php84-zip php84-bcmath php84-soap \
+        php84-xmlreader \
+        php84-ldap \
+        php84-msgpack \
+        php84-opcache \
+        php84-pecl-igbinary php84-pecl-swoole \
+        php84-pecl-pcov php84-pecl-imagick \
+        php84-pcntl \
+    && ln -s /usr/bin/php84 /usr/bin/php
 
-RUN userdel -r ubuntu
-RUN groupadd --force -g $WWWGROUP sail
-RUN useradd -ms /bin/bash --no-user-group -g $WWWGROUP -u 1337 sail
-
-# RUN mkdir -p /etc/swoole/ssl/certs/ /etc/swoole/ssl/private/
-# RUN openssl req -x509 -nodes -days 365 -subj "/C=CO/ST=QC/O=Artisan, Inc./CN=localhost" \
-#     -addext "subjectAltName=DNS:localhost" -newkey rsa:2048 \
-#     -keyout /etc/swoole/ssl/private/sail-selfsigned.key \
-#     -out /etc/swoole/ssl/certs/sail-selfsigned.crt;
-# RUN chmod 644 /etc/swoole/ssl/certs/*.crt
-# RUN chown -R root:sail /etc/swoole/ssl/private/
-# RUN chmod 640 /etc/swoole/ssl/private/*.key
-
-COPY start-container /usr/local/bin/start-container
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY php.ini /etc/php/8.4/cli/conf.d/99-sail.ini
+
+# Configure supervisord
+RUN touch /var/run/supervisord.pid \
+    && mkdir -p /etc/supervisor.d/conf.d \
+    && mkdir -p /var/log/supervisor \
+    && touch /var/log/supervisor/supervisord.log
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Configure container startup script
+COPY start-container /usr/local/bin/start-container
 RUN chmod +x /usr/local/bin/start-container
 
-EXPOSE 36400
+# Configure user for sail
+RUN addgroup $WWWGROUP \
+    && adduser -h /var/www/html -s /bin/bash -G $WWWGROUP -D sail
+
+# Expose app port
+EXPOSE $APP_PORT
 
 ENTRYPOINT ["start-container"]
