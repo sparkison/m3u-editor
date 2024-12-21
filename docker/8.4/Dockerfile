@@ -22,6 +22,10 @@ RUN apk update \
         supervisor \
         curl-dev \
         sqlite \
+        ca-certificates \
+        nodejs \
+        npm \
+        # mysql-client \
         dcron
 
 # ...or Build Swoole from source
@@ -49,11 +53,6 @@ RUN chmod 0644 /etc/cron.d/crontab \
     && crontab /etc/cron.d/crontab \
     && touch /var/log/cron.log
 
-# Install root certificates
-RUN apk add --no-cache \
-    --repository http://dl-cdn.alpinelinux.org/alpine/v3.21/main \
-    ca-certificates
-
 # Install and configure PHP
 RUN apk --no-cache add \
         php84-cli php84-dev \
@@ -64,6 +63,7 @@ RUN apk --no-cache add \
         php84-ldap \
         php84-msgpack \
         php84-opcache \
+        # php84-pdo_mysql \
         php84-pecl-igbinary php84-pecl-swoole \
         php84-pecl-pcov php84-pecl-imagick \
         php84-pcntl \

@@ -46,14 +46,20 @@ class PlaylistResource extends Resource
                 Tables\Columns\TextColumn::make('url')
                     ->label('Playlist URL')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('channels')
-                    ->searchable()
+                Tables\Columns\TextColumn::make('groups_count')
+                    ->label('Groups')
+                    ->counts('groups')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('channels_count')
+                    ->label('Channels')
+                    ->counts('channels')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->sortable()
                     ->badge()
                     ->color(fn(PlaylistStatus $state) => $state->getColor()),
                 Tables\Columns\TextColumn::make('synced')
+                    ->label('Last Synced')
                     ->dateTime()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
