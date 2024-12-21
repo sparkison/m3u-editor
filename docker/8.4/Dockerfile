@@ -26,6 +26,14 @@ RUN apk update \
 
 # Install PHP Swoole
 RUN apk add php84-pecl-swoole
+# ...or Build Swoole from source
+# RUN apk add --no-cache \
+#         php84-dev php84-pear php84-openssl php84-sockets \
+#         gcc g++ musl-dev make \
+#     && ln -s /usr/bin/pecl84 /usr/bin/pecl
+# RUN pecl install \
+#     --configureoptions 'enable-openssl="no" enable-sockets="yes" enable-mysqlnd="no" enable-swoole-curl="yes"' \
+#     swoole
         
 # https://wiki.alpinelinux.org/wiki/Setting_the_timezone
 RUN apk --no-cache add tzdata \
