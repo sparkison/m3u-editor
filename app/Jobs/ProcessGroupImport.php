@@ -83,12 +83,12 @@ class ProcessGroupImport implements ShouldQueue
                     Notification::make()
                         ->success()
                         ->title('Playlist Synced')
-                        ->body("'{$playlist->name}' has been successfully synced.")
+                        ->body("\"{$playlist->name}\" has been synced successfully.")
                         ->broadcast($playlist->user);
                     Notification::make()
                         ->success()
                         ->title('Playlist Synced')
-                        ->body("'{$playlist->name}' has been successfully synced.")
+                        ->body("\"{$playlist->name}\" has been synced successfully.")
                         ->sendToDatabase($playlist->user);
 
                     // Update the playlist
@@ -111,12 +111,12 @@ class ProcessGroupImport implements ShouldQueue
             // Send notification
             Notification::make()
                 ->danger()
-                ->title("Error importing groups from '{$this->playlist->name}'")
+                ->title("Error importing groups from \"{$this->playlist->name}\"")
                 ->body('Please view your notifications for details.')
                 ->broadcast($this->playlist->user);
             Notification::make()
                 ->danger()
-                ->title("Error importing groups from '{$this->playlist->name}'")
+                ->title("Error importing groups from \"{$this->playlist->name}\"")
                 ->body($e->getMessage())
                 ->sendToDatabase($this->playlist->user);
 

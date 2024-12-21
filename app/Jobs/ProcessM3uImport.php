@@ -100,12 +100,12 @@ class ProcessM3uImport implements ShouldQueue
             // Send notification
             Notification::make()
                 ->danger()
-                ->title("Error processing '{$this->playlist->name}'")
+                ->title("Error processing \"{$this->playlist->name}\"")
                 ->body('Please view your notifications for details.')
                 ->broadcast($this->playlist->user);
             Notification::make()
                 ->danger()
-                ->title("Error processing '{$this->playlist->name}'")
+                ->title("Error processing \"{$this->playlist->name}\"")
                 ->body($e->getMessage())
                 ->sendToDatabase($this->playlist->user);
 
