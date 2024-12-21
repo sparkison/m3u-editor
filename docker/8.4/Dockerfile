@@ -20,8 +20,9 @@ RUN apk update \
     && apk --no-cache add  \
         py3-setuptools \
         supervisor \
+        curl-dev \
         dcron
-
+        
 # https://wiki.alpinelinux.org/wiki/Setting_the_timezone
 RUN apk --no-cache add tzdata \
     && cp /usr/share/zoneinfo/$TZ /etc/localtime \
@@ -38,9 +39,23 @@ RUN chmod 0644 /etc/cron.d/crontab \
     && crontab /etc/cron.d/crontab \
     && touch /var/log/cron.log
 
+# Install root certificates
+RUN apk add --no-cache \
+    --repository http://dl-cdn.alpinelinux.org/alpine/v3.21/main \
+    ca-certificates
+
+# Install and configure Swoole
+RUN apk add --no-cache \
+        php84-dev php84-pear php84-openssl php84-sockets \
+        gcc musl-dev make \
+    && ln -s /usr/bin/pecl84 /usr/bin/pecl
+RUN pecl install \
+    --configureoptions 'enable-openssl="no" enable-sockets="yes" enable-mysqlnd="no" enable-swoole-curl="yes"' \
+    swoole
+
 # Install and configure PHP
 RUN apk --no-cache add \
-        php84-cli php84 \
+        php84-cli \
         php84-sqlite3 php84-gd php84-curl \
         php84-intl php84-imap php84-mbstring \
         php84-xml php84-zip php84-bcmath php84-soap \
