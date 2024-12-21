@@ -25,7 +25,7 @@ RUN apk update \
         ca-certificates \
         nodejs \
         npm \
-        # mysql-client \
+        git \
         dcron
 
 # ...or Build Swoole from source
@@ -61,9 +61,10 @@ RUN apk --no-cache add \
         php84-xml php84-zip php84-bcmath php84-soap \
         php84-xmlreader \
         php84-ldap \
+        php84-tokenizer \
         php84-msgpack \
         php84-opcache \
-        # php84-pdo_mysql \
+        php84-pdo_mysql \
         php84-pecl-igbinary php84-pecl-swoole \
         php84-pecl-pcov php84-pecl-imagick \
         php84-pcntl \
