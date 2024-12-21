@@ -9,8 +9,8 @@ ENV APP_PORT=36400
 ENV TZ=UTC
 ENV SUPERVISOR_PHP_USER="sail"
 # Supervisord command to run the app
-ENV SUPERVISOR_PHP_COMMAND="/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan serve --host=0.0.0.0 --port=$APP_PORT"
-# ENV SUPERVISOR_PHP_COMMAND="/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan octane:start --workers=4 --task-workers=6 --server=swoole --host=0.0.0.0 --port=$APP_PORT"
+# ENV SUPERVISOR_PHP_COMMAND="/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan serve --host=0.0.0.0 --port=$APP_PORT"
+ENV SUPERVISOR_PHP_COMMAND="/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan octane:start --workers=4 --task-workers=6 --server=swoole --host=0.0.0.0 --port=$APP_PORT"
 
 # Set the working directory
 WORKDIR /var/www/html
@@ -24,8 +24,6 @@ RUN apk update \
         sqlite \
         dcron
 
-# Install PHP Swoole
-# RUN apk add php84-pecl-swoole
 # ...or Build Swoole from source
 # RUN apk add --no-cache \
 #         php84-dev php84-pear php84-openssl php84-sockets \
@@ -71,7 +69,10 @@ RUN apk --no-cache add \
         php84-pcntl \
     && ln -s /usr/bin/php84 /usr/bin/php
 
-COPY php.ini /etc/php/8.4/cli/conf.d/99-sail.ini
+COPY php.ini /etc/php84/cli/conf.d/99-sail.ini
+
+# Install PHP Swoole
+RUN apk add php84-posix php84-pecl-swoole
 
 # Configure supervisord
 RUN touch /var/run/supervisord.pid \
