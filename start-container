@@ -71,10 +71,7 @@ ln -sf "${db_file}" "database/database.sqlite"
 
 # Update permissions
 chown -R sail:$WWWGROUP /var/www/html
-
-# # Set permissions for storage and database directories
-# chown -R $(whoami):sail /var/www/html/storage
-# chown -R $(whoami):sail /var/www/html/database
+chmod -R 775 /var/www/html/storage
 
 # If vendor directory is missing, install composer dependencies
 if [ ! -d "vendor" ]; then
