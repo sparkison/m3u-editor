@@ -24,6 +24,7 @@ RUN apk update \
         nodejs \
         npm \
         git \
+        redis \
         dcron
 
 # ...or Build Swoole from source
@@ -50,9 +51,6 @@ COPY ./docker/8.4/crontab /etc/cron.d/crontab
 RUN chmod 0644 /etc/cron.d/crontab \
     && crontab /etc/cron.d/crontab \
     && touch /var/log/cron.log
-
-# Install Redis
-COPY --from=redis:7-alpine3.20 /usr/local/bin/redis-cli /usr/local/bin/redis-cli
 
 # Install and configure PHP
 RUN apk --no-cache add \
