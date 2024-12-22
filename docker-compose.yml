@@ -1,8 +1,6 @@
 services:
     m3ueditor.local:
         build:
-            context: "./docker/8.4"
-            dockerfile: Dockerfile
             args:
                 WWWGROUP: "${WWWGROUP}"
         image: "sail-8.4/app"

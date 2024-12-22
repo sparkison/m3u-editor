@@ -48,7 +48,7 @@ RUN apk --no-cache add bash \
     && sed -i 's/bin\/ash/bin\/bash/g' /etc/passwd
 
 # Install CRON
-COPY crontab /etc/cron.d/crontab
+COPY ./docker/8.4/crontab /etc/cron.d/crontab
 RUN chmod 0644 /etc/cron.d/crontab \
     && crontab /etc/cron.d/crontab \
     && touch /var/log/cron.log
@@ -72,7 +72,7 @@ RUN apk --no-cache add \
         php84-pcntl \
     && ln -s /usr/bin/php84 /usr/bin/php
 
-COPY php.ini /etc/php84/cli/conf.d/99-sail.ini
+COPY ./docker/8.4/php.ini /etc/php84/cli/conf.d/99-sail.ini
 
 # Install PHP Swoole
 RUN apk add php84-posix php84-pecl-swoole
@@ -82,7 +82,7 @@ RUN touch /var/run/supervisord.pid \
     && mkdir -p /etc/supervisor.d/conf.d \
     && mkdir -p /var/log/supervisor \
     && touch /var/log/supervisor/supervisord.log
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY ./docker/8.4/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Install composer
 ENV COMPOSER_ALLOW_SUPERUSER 1
