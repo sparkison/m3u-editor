@@ -51,6 +51,9 @@ RUN chmod 0644 /etc/cron.d/crontab \
     && crontab /etc/cron.d/crontab \
     && touch /var/log/cron.log
 
+# Install Redis
+COPY --from=redis:7-alpine3.20 /usr/local/bin/redis-cli /usr/local/bin/redis-cli
+
 # Install and configure PHP
 RUN apk --no-cache add \
         php84-cli php84-dev \
