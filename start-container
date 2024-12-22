@@ -46,10 +46,16 @@ if [ ! -f "${log_file}" ]; then
 fi
 
 # Link the log directory to the laravel `storage/logs` directory
-ln -sf "${log_dir}" storage/logs
+ln -sf "${log_file}" storage/logs/laravel.log
+
+chown $SUPERVISOR_PHP_USER:$SUPERVISOR_PHP_USER storage/logs/laravel.log
+chmod 775 storage/logs/laravel.log
 
 # Link the database file to the laravel `database` directory
 ln -sf "${db_file}" "database/database.sqlite"
+
+chown $SUPERVISOR_PHP_USER:$SUPERVISOR_PHP_USER database/database.sqlite
+chmod 775 database/database.sqlite
 
 # If vendor directory is missing, install composer dependencies
 if [ ! -d "vendor" ]; then
