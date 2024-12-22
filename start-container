@@ -69,11 +69,6 @@ ln -sf "${swoole_log_file}" storage/logs/swoole_http.log
 # Link the database file to the laravel `database` directory
 ln -sf "${db_file}" "database/database.sqlite"
 
-# Update permissions
-sudo chown -R sail:$WWWGROUP /var/www/html
-sudo chmod -R 775 /var/www/html/storage
-sudo chmod -R 775 /var/www/html/database/database.sqlite
-
 # If vendor directory is missing, install composer dependencies
 if [ ! -d "vendor" ]; then
     echo "Installing composer dependencies..."
