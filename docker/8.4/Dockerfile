@@ -65,6 +65,8 @@ RUN apk --no-cache add \
         php84-msgpack \
         php84-opcache \
         php84-pdo_mysql \
+        php84-phar \
+        php84-fileinfo \
         php84-pecl-igbinary php84-pecl-swoole \
         php84-pecl-pcov php84-pecl-imagick \
         php84-pcntl \
@@ -91,9 +93,15 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 COPY start-container /usr/local/bin/start-container
 RUN chmod +x /usr/local/bin/start-container
 
+RUN git clone https://github.com/sparkison/m3u-editor.git /tmp/m3u-editor \
+    && mv /tmp/m3u-editor/* /var/www/html \
+    && rm -rf /tmp/m3u-editor
+
 # Configure user for sail
 RUN addgroup $WWWGROUP \
     && adduser -h /var/www/html -s /bin/bash -G $WWWGROUP -D sail
+
+RUN chown -R sail:$WWWGROUP /var/www/html
 
 # Expose app port
 EXPOSE $APP_PORT

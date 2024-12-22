@@ -5,6 +5,23 @@ if [ "$SUPERVISOR_PHP_USER" != "root" ] && [ "$SUPERVISOR_PHP_USER" != "sail" ];
     exit 1
 fi
 
+if ![ -f "$WORKDIR/artisan" ]; then
+    echo "Laravel artisan not found! Make sure project is installed."
+    exit 1
+fi
+
+composer install --no-dev --no-interaction --no-progress
+npm install
+npm run build
+
+if [[ -z "${APP_KEY}" ]]; then
+    echo "App key not set. Generating one..."
+    php artisan key:generate
+fi
+
+php artisan migrate --force
+php artisan optimize
+
 if [ ! -z "$WWWUSER" ]; then
     usermod -u $WWWUSER sail
 fi
