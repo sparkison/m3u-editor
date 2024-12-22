@@ -14,19 +14,22 @@ fi
 
 # Check for configuration directories and files
 config_dir="/var/www/config"
-database_dir="${config_dir}/database"
+db_dir="${config_dir}/database"
+db_file="${db_dir}/database.sqlite"
 log_dir="${config_dir}/logs"
-db_file="${database_dir}/database.sqlite"
 log_file="${log_dir}/laravel.log"
+queue_log_file="${log_dir}/queue.log"
+reverb_log_file="${log_dir}/reverb.log"
+swoole_log_file="${log_dir}/swoole_http.log"
 
 # Create config directories
 if [ ! -d "${config_dir}" ]; then
     echo "Missing config directory, please make sure you've linked it in volumes to continue. It should link to '/var/www/config' in the container."
     exit 1
 fi
-if [ ! -d "${database_dir}" ]; then
+if [ ! -d "${db_dir}" ]; then
     echo "Creating database directory..."
-    mkdir "${database_dir}"
+    mkdir "${db_dir}"
 fi
 if [ ! -d "${log_dir}" ]; then
     echo "Creating log directory..."
@@ -39,21 +42,43 @@ if [ ! -f "${db_file}" ]; then
     touch "${db_file}"
 fi
 
-# Create log file
+# Create log files
 if [ ! -f "${log_file}" ]; then
-    echo "Missing log file, creating now..."
+    echo "Missing laravel log file, creating now..."
     touch "${log_file}"
 fi
+if [ ! -f "${queue_log_file}" ]; then
+    echo "Missing queue log file, creating now..."
+    touch "${queue_log_file}"
+fi
+if [ ! -f "${reverb_log_file}" ]; then
+    echo "Missing reverb log file, creating now..."
+    touch "${reverb_log_file}"
+fi
+if [ ! -f "${swoole_log_file}" ]; then
+    echo "Missing swoole log file, creating now..."
+    touch "${swoole_log_file}"
+fi
 
-# Link the log directory to the laravel `storage/logs` directory
+# Link the log files to the laravel `storage/logs` directory
 ln -sf "${log_file}" storage/logs/laravel.log
-
 chown $SUPERVISOR_PHP_USER:$SUPERVISOR_PHP_USER storage/logs/laravel.log
 chmod 775 storage/logs/laravel.log
 
+ln -sf "${queue_log_file}" storage/logs/queue.log
+chown $SUPERVISOR_PHP_USER:$SUPERVISOR_PHP_USER storage/logs/queue.log
+chmod 775 storage/logs/queue.log
+
+ln -sf "${reverb_log_file}" storage/logs/reverb.log
+chown $SUPERVISOR_PHP_USER:$SUPERVISOR_PHP_USER storage/logs/reverb.log
+chmod 775 storage/logs/reverb.log
+
+ln -sf "${swoole_log_file}" storage/logs/swoole_http.log
+chown $SUPERVISOR_PHP_USER:$SUPERVISOR_PHP_USER storage/logs/swoole_http.log
+chmod 775 storage/logs/swoole_http.log
+
 # Link the database file to the laravel `database` directory
 ln -sf "${db_file}" "database/database.sqlite"
-
 chown $SUPERVISOR_PHP_USER:$SUPERVISOR_PHP_USER database/database.sqlite
 chmod 775 database/database.sqlite
 
