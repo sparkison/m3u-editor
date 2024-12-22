@@ -62,24 +62,26 @@ fi
 
 # Link the log files to the laravel `storage/logs` directory
 ln -sf "${log_file}" storage/logs/laravel.log
-chmod 775 storage/logs/laravel.log
+# chmod 775 storage/logs/laravel.log
 
 ln -sf "${queue_log_file}" storage/logs/queue.log
-chmod 775 storage/logs/queue.log
+# chmod 775 storage/logs/queue.log
 
 ln -sf "${reverb_log_file}" storage/logs/reverb.log
-chmod 775 storage/logs/reverb.log
+# chmod 775 storage/logs/reverb.log
 
 ln -sf "${swoole_log_file}" storage/logs/swoole_http.log
-chmod 775 storage/logs/swoole_http.log
+# chmod 775 storage/logs/swoole_http.log
 
 # Link the database file to the laravel `database` directory
 ln -sf "${db_file}" "database/database.sqlite"
-chmod 775 database/database.sqlite
+# chmod 775 database/database.sqlite
 
-# Set permissions for storage and database directories
-chown -R $(whoami):sail /var/www/html/storage
-chown -R $(whoami):sail /var/www/html/database
+chown -R sail:$WWWGROUP /var/www/html
+
+# # Set permissions for storage and database directories
+# chown -R $(whoami):sail /var/www/html/storage
+# chown -R $(whoami):sail /var/www/html/database
 
 # If vendor directory is missing, install composer dependencies
 if [ ! -d "vendor" ]; then
