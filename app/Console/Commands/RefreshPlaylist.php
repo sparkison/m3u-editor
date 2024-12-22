@@ -33,6 +33,7 @@ class RefreshPlaylist extends Command
             $this->info("Refreshing playlist with ID: {$playlistId}");
             $playlist = Playlist::findOrFail($playlistId);
             dispatch(new ProcessM3uImport($playlist));
+            $this->info('Dispatched playlist for refresh');
         } else {
             $this->info('Refreshing all playlists');
             $twentyFourHoursAgo = now()->subDay();
