@@ -1,12 +1,10 @@
 # Larabel (Alpine Edge build)
 FROM alpine:edge
 
-# Get build arguments
-ARG WWWGROUP
-
 # Set environment variables
 ENV APP_PORT=36400
 ENV TZ=UTC
+ENV WWWGROUP="sail"
 ENV SUPERVISOR_PHP_USER="sail"
 # Supervisord command to run the app
 # ENV SUPERVISOR_PHP_COMMAND="/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan serve --host=0.0.0.0 --port=$APP_PORT"

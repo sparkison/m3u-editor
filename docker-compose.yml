@@ -1,8 +1,7 @@
 services:
     m3ueditor.local:
         build:
-            args:
-                WWWGROUP: "${WWWGROUP}"
+            dockerfile: Dockerfile
         image: "sail-8.4/app"
         extra_hosts:
             - "host.docker.internal:host-gateway"
