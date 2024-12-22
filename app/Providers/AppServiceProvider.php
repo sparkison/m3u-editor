@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Events\PlaylistCreated;
 use App\Models\Playlist;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -38,5 +39,9 @@ class AppServiceProvider extends ServiceProvider
             // Log the error
             report($e);
         }
+
+        // Register schedule
+        Schedule::command('app:refresh-playlist')
+            ->everyFifteenMinutes();
     }
 }
