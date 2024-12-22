@@ -1,20 +1,70 @@
 #!/usr/bin/env bash
 
+# Make sure correct user is set
 if [ "$SUPERVISOR_PHP_USER" != "root" ] && [ "$SUPERVISOR_PHP_USER" != "sail" ]; then
     echo "You should set SUPERVISOR_PHP_USER to either 'sail' or 'root'."
     exit 1
 fi
 
-if ![ -f "$WORKDIR/artisan" ]; then
+# Make sure the laravel project is installed
+if [ ! -f "/var/www/html/artisan" ]; then
     echo "Laravel artisan not found! Make sure project is installed."
     exit 1
 fi
 
-composer install --no-dev --no-interaction --no-progress
-npm install
-npm run build
+# Check for configuration directories and files
+config_dir="/var/www/config"
+database_dir="${config_dir}/database"
+log_dir="${config_dir}/logs"
+db_file="${database_dir}/database.sqlite"
+log_file="${log_dir}/laravel.log"
 
-if [[ -z "${APP_KEY}" ]]; then
+# Create config directories
+if [ ! -d "${config_dir}" ]; then
+    echo "Missing config directory, please make sure you've linked it in volumes to continue. It should link to '/var/www/config' in the container."
+    exit 1
+fi
+if [ ! -d "${database_dir}" ]; then
+    echo "Creating database directory..."
+    mkdir "${database_dir}"
+fi
+if [ ! -d "${log_dir}" ]; then
+    echo "Creating log directory..."
+    mkdir "${log_dir}"
+fi
+
+# Create database file
+if [ ! -f "${db_file}" ]; then
+    echo "Missing database file, creating now..."
+    touch "${db_file}"
+fi
+
+# Create log file
+if [ ! -f "${log_file}" ]; then
+    echo "Missing log file, creating now..."
+    touch "${log_file}"
+fi
+
+# Link the log directory to the laravel `storage/logs` directory
+ln -sf "${log_dir}" storage/logs
+
+# Link the database file to the laravel `database` directory
+ln -sf "${db_file}" "database/database.sqlite"
+
+# If vendor directory is missing, install composer dependencies
+if [ ! -d "vendor" ]; then
+    echo "Installing composer dependencies..."
+    composer install --no-dev --no-interaction --no-progress
+fi
+
+# If node_modules directory is missing, install npm dependencies
+if [ ! -d "node_modules" ]; then
+    echo "Installing npm dependencies..."
+    npm install
+    npm run build
+fi
+
+if [ -z "$APP_KEY" ]; then
     echo "App key not set. Generating one..."
     php artisan key:generate
 fi
