@@ -23,9 +23,8 @@ RUN apk update \
         ca-certificates \
         nodejs \
         npm \
-        git \
-        redis \
-        dcron
+        # redis \
+        git
 
 # ...or Build Swoole from source
 # RUN apk add --no-cache \
@@ -51,6 +50,9 @@ COPY ./docker/8.4/crontab /etc/cron.d/crontab
 RUN chmod 0644 /etc/cron.d/crontab \
     && crontab /etc/cron.d/crontab \
     && touch /var/log/cron.log
+
+# Init CRON
+RUN crontab /etc/cron.d/crontab
 
 # Install and configure PHP
 RUN apk --no-cache add \
