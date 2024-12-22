@@ -54,6 +54,10 @@ RUN chmod 0644 /etc/cron.d/crontab \
 # Init CRON
 RUN crontab /etc/cron.d/crontab
 
+# Install Redis config
+COPY ./docker/8.4/redis.conf /etc/redis/redis.conf
+RUN chmod 0644 /etc/redis/redis.conf
+
 # Install and configure PHP
 RUN apk --no-cache add \
         php84-cli php84-dev \
