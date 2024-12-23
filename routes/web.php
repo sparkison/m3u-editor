@@ -4,7 +4,7 @@ use App\Http\Controllers\PlaylistGenerateController;
 use Illuminate\Support\Facades\Route;
 
 // Generate M3U playlist from the playlist configuration
-Route::get('/playlists/{uuid}/generate', PlaylistGenerateController::class)
+Route::get('/{uuid}/playlist.m3u', PlaylistGenerateController::class)
     ->name('playlists.generate');
 
 // If local env, show PHP info screen

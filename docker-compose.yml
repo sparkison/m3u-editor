@@ -8,7 +8,7 @@ services:
         ports:
             # - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
             - "${APP_PORT:-36400}:${APP_PORT:-36400}"
-            - "${REVERB_PORT:-36800}:${REVERB_PORT:-36800}"
+            # - "${REVERB_PORT:-36800}:${REVERB_PORT:-36800}"
         environment:
             WWWUSER: "${WWWUSER}"
             LARAVEL_SAIL: 1
