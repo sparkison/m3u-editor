@@ -39,9 +39,5 @@ class AppServiceProvider extends ServiceProvider
             // Log the error
             report($e);
         }
-
-        // Register schedule
-        Schedule::command('app:refresh-playlist')
-            ->everyFifteenMinutes();
     }
 }
