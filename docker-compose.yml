@@ -7,8 +7,8 @@ services:
             - "host.docker.internal:host-gateway"
         ports:
             # - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
-            - "${APP_PORT:-36400}:${APP_PORT:-36400}"
             # - "${REVERB_PORT:-36800}:${REVERB_PORT:-36800}"
+            - "${APP_PORT:-36400}:${APP_PORT:-36400}"
         environment:
             WWWUSER: "${WWWUSER}"
             LARAVEL_SAIL: 1
@@ -16,8 +16,6 @@ services:
             XDEBUG_CONFIG: "${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}"
             IGNITION_LOCAL_SITES_PATH: "${PWD}"
         volumes:
-            # - "./storage/logs:/var/www/html/storage/logs"
-            # - "./database/database.sqlite:/var/www/html/database/database.sqlite"
             - "./docker-config:/var/www/config"
         networks:
             - sail
