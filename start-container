@@ -12,14 +12,9 @@ if [ ! -f "/var/www/html/artisan" ]; then
     exit 1
 fi
 
-# Make sure the laravel project is installed
-if [ ! -f "/var/www/html/.env" ]; then
-    echo "Missing .env file, please make sure you've linked it in volumes to continue. It should link to '/var/www/html/.env' in the container."
-    exit 1
-fi
-
 # Check for configuration directories and files
 config_dir="/var/www/config"
+env_file="${config_dir}/env"
 db_dir="${config_dir}/database"
 db_file="${db_dir}/database.sqlite"
 log_dir="${config_dir}/logs"
@@ -41,6 +36,13 @@ fi
 if [ ! -d "${log_dir}" ]; then
     echo "Creating log directory..."
     mkdir "${log_dir}"
+fi
+
+# Create environment file
+if [ ! -f "${env_file}" ]; then
+    echo "Missing environment file, creating now..."
+    touch "${env_file}"
+    cat /var/www/html/.env.example >> "${env_file}"
 fi
 
 # Create database file
@@ -78,27 +80,35 @@ ln -sf "${reverb_log_file}" storage/logs/reverb.log
 ln -sf "${horizon_log_file}" storage/logs/horizon.log
 ln -sf "${swoole_log_file}" storage/logs/swoole_http.log
 
+# Link the environment file to the laravel project root
+ln -sf "${env_file}" .env
+
 # Link the database file to the laravel `database` directory
 ln -sf "${db_file}" "database/database.sqlite"
 
+# Git pull the latest changes
+echo "Pulling latest changes..."
+git config --global --add safe.directory /var/www/html
+git pull
+
+# Install composer dependencies
+echo "Installing composer dependencies..."
+composer install --no-dev --no-interaction --no-progress
+
 # If vendor directory is missing, install composer dependencies
 if [ ! -d "vendor" ]; then
-    echo "Installing composer dependencies..."
-    composer install --no-dev --no-interaction --no-progress
-
     echo "Generating application key..."
     php artisan key:generate
-
-    echo "Running migrations..."
-    php artisan migrate --force
 fi
+
+# Run any pending migrations
+echo "Running migrations..."
+php artisan migrate --force
 
 # If node_modules directory is missing, install npm dependencies
-if [ ! -d "node_modules" ]; then
-    echo "Installing npm dependencies..."
-    npm install
-    npm run build
-fi
+echo "Installing npm dependencies..."
+npm install
+npm run build
 
 if [ ! -z "$WWWUSER" ]; then
     usermod -u $WWWUSER sail
