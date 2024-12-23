@@ -91,14 +91,18 @@ echo "Pulling latest changes..."
 git config --global --add safe.directory /var/www/html
 git pull
 
-# Install composer dependencies
-echo "Installing composer dependencies..."
-composer install --no-dev --no-interaction --no-progress
-
 # If vendor directory is missing, install composer dependencies
 if [ ! -d "vendor" ]; then
+    # Install composer dependencies
+    echo "Installing composer dependencies..."
+    composer install --no-dev --no-interaction --no-progress
+    
     echo "Generating application key..."
     php artisan key:generate
+else
+    # Install composer dependencies
+    echo "Installing composer dependencies..."
+    composer install --no-dev --no-interaction --no-progress
 fi
 
 # Run any pending migrations
