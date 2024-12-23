@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-# Start redis
-# redis-server --daemonize yes
-
 # Make sure correct user is set
 if [ "$SUPERVISOR_PHP_USER" != "root" ] && [ "$SUPERVISOR_PHP_USER" != "sail" ]; then
     echo "You should set SUPERVISOR_PHP_USER to either 'sail' or 'root'."
