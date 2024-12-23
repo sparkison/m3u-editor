@@ -12,6 +12,12 @@ if [ ! -f "/var/www/html/artisan" ]; then
     exit 1
 fi
 
+# Make sure the laravel project is installed
+if [ ! -f "/var/www/html/.env" ]; then
+    echo "Missing .env file, please make sure you've linked it in volumes to continue. It should link to '/var/www/html/.env' in the container."
+    exit 1
+fi
+
 # Check for configuration directories and files
 config_dir="/var/www/config"
 db_dir="${config_dir}/database"

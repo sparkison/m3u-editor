@@ -74,6 +74,7 @@ RUN apk --no-cache add \
         php84-fileinfo \
         php84-pecl-igbinary php84-pecl-swoole \
         php84-pecl-pcov php84-pecl-imagick \
+        # php84-pecl-redis \
         php84-pcntl \
     && ln -s /usr/bin/php84 /usr/bin/php
 
