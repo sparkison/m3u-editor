@@ -9,6 +9,7 @@ use App\Models\Channel;
 use Filament\Actions;
 use Filament\Resources\Components\Tab;
 use Filament\Resources\Pages\ListRecords;
+use Illuminate\Database\Eloquent\Builder;
 
 class ListChannels extends ListRecords
 {
@@ -81,5 +82,14 @@ class ListChannels extends ListRecords
                 ->modifyQueryUsing(fn($query) => $query->where('enabled', false))
                 ->badge($disabledCount),
         ];
+    }
+
+    /**
+     * @deprecated Override the `table()` method to configure the table.
+     */
+    protected function getTableQuery(): ?Builder
+    {
+        return static::getResource()::getEloquentQuery()
+            ->where('user_id', auth()->id());
     }
 }
