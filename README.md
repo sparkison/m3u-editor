@@ -12,7 +12,7 @@ services:
   m3ueditor:
     build: https://github.com/sparkison/m3u-editor.git
     image: sail-8.4/app
-    container_name: m3ueditor
+    container_name: m3u-editor
     network_mode: host
     extra_hosts:
       - host.docker.internal:host-gateway
