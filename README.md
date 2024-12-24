@@ -1,5 +1,7 @@
 ## m3u editor
 
+Description and screenshots to come...
+
 ### 🐳 Docker compose example
 
 Use the following compose example to get up and running.
