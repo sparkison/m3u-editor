@@ -54,6 +54,10 @@ class PlaylistResource extends Resource
                     ->label('Channels')
                     ->counts('channels')
                     ->sortable(),
+                Tables\Columns\TextColumn::make('enabled_channels_count')
+                    ->label('Enabled Channels')
+                    ->counts('enabled_channels')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->sortable()
                     ->badge()

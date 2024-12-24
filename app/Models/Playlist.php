@@ -35,6 +35,12 @@ class Playlist extends Model
         return $this->hasMany(Channel::class);
     }
 
+    public function enabled_channels(): HasMany
+    {
+        return $this->hasMany(Channel::class)
+            ->where('enabled', true);
+    }
+
     public function groups(): HasMany
     {
         return $this->hasMany(Group::class);
