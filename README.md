@@ -1,4 +1,4 @@
-## M3U Proxy-editor
+## m3u editor
 
 ### Docker compose example
 
