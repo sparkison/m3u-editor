@@ -20,7 +20,8 @@ services:
     volumes:
       - /apps/m3ueditor/config:/var/www/config
     ports:
-      - 36400:36400
+      - 36400:36400 # app
+      - 36800:36800 # websockets/broadcasting
 networks: {}
 
 ```
