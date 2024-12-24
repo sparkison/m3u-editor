@@ -46,10 +46,10 @@ RUN apk --no-cache add bash \
     && sed -i 's/bin\/ash/bin\/bash/g' /etc/passwd
 
 # Install CRON
-COPY ./docker/8.4/crontab /etc/cron.d/crontab
-RUN chmod 0644 /etc/cron.d/crontab \
-    && crontab /etc/cron.d/crontab \
-    && touch /var/log/cron.log
+RUN touch crontab.tmp \
+    && echo '* * * * * cd /var/www/html && /usr/bin/php artisan schedule:run >> /dev/null 2>&1' > crontab.tmp \
+    && crontab crontab.tmp \
+    && rm -rf crontab.tmp
 
 # Install Redis config
 COPY ./docker/8.4/redis.conf /etc/redis/redis.conf
