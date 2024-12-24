@@ -167,8 +167,9 @@ class PlaylistResource extends Resource
                 ->required()
                 ->helperText('Enter the URL of the playlist file. If changing URL, the playlist will be re-imported. Use with caution as this could lead to data loss if the new playlist differs from the old one.'),
             PlaylistM3uUrl::make('m3u_url')
-                ->hiddenOn(['create'])
+                ->hiddenOn(['create']) // hide this field on the create form
                 ->columnSpan(2)
+                ->dehydrated(false) // don't save the value in the database
                 ->helperText('Your generated m3u playlist, based on the playlist configurtation. Only enabled channels will be included.'),
         ];
     }

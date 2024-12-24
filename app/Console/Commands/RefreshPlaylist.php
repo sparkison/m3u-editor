@@ -41,12 +41,13 @@ class RefreshPlaylist extends Command
                 ['status', '!=', PlaylistStatus::Processing],
                 ['synced', '<=', $twentyFourHoursAgo],
             ]);
-            if ($playlists->count() === 0) {
+            $count = $playlists->count();
+            if ($count === 0) {
                 $this->info('No playlists ready refresh');
                 return;
             }
             $playlists->get()->each(fn(Playlist $playlist) => dispatch(new ProcessM3uImport($playlist)));
-            $this->info('Dispatched ' . $playlists->count() . ' playlists for refresh');
+            $this->info('Dispatched ' . $count . ' playlists for refresh');
         }
         return;
     }
