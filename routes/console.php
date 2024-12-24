@@ -8,4 +8,4 @@ use Illuminate\Support\Facades\Schedule;
 
 // Register schedule
 Schedule::command('app:refresh-playlist')
-    ->everyFifteenMinutes();
+    ->everyFiveMinutes();

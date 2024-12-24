@@ -51,9 +51,6 @@ RUN chmod 0644 /etc/cron.d/crontab \
     && crontab /etc/cron.d/crontab \
     && touch /var/log/cron.log
 
-# Init CRON
-RUN crontab /etc/cron.d/crontab
-
 # Install Redis config
 COPY ./docker/8.4/redis.conf /etc/redis/redis.conf
 RUN chmod 0644 /etc/redis/redis.conf
