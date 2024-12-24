@@ -1,6 +1,8 @@
 ## m3u editor
 
-### Docker compose example
+### 🐳 Docker compose example
+
+Use the following compose example to get up and running.
 
 ```yaml
 version: "3.8"
@@ -25,3 +27,41 @@ services:
 networks: {}
 
 ```
+
+### 📡 Creating a playlist proxy
+
+Using the [M3U Stream Merger Proxy](https://github.com/sonroyaalmerol/m3u-stream-merger-proxy) as an example.
+
+```yaml
+version: "3.8"
+services:
+  m3u-stream-merger-proxy:
+    image: sonroyaalmerol/m3u-stream-merger-proxy:latest
+    container_name: m3u-proxy
+    network_mode: host
+    volumes:
+      # [OPTIONAL] Cache persistence: This will allow you to reuse the M3U cache across container recreates.
+      - /apps/m3u-proxy:/m3u-proxy/data
+    environment:
+      - PUID=816
+      - PGID=816
+      - TZ=Etc/UTC
+      - PORT=7001
+      - DEBUG=true
+      - SYNC_ON_BOOT=true
+      - SYNC_CRON=0 0 * * *
+      - M3U_URL_1=http://192.168.0.1:36400/[PLAYLIST_UID]/playlist.m3u
+      - M3U_MAX_CONCURRENCY_1=5
+      #- M3U_URL_2=https://iptvprovider2.com/playlist.m3u
+      #- M3U_MAX_CONCURRENCY_2=1
+      #- M3U_URL_X=
+    restart: unless-stopped
+    ports:
+      - 7001:7001
+networks: {}
+
+```
+
+Your proxied m3u playlist can then be access via: [http://192.168.0.1:7001/playlist.m3u](http://192.168.0.1:7001/playlist.m3u)
+
+More setup information can be found on the [M3U Stream Merger Proxy](https://github.com/sonroyaalmerol/m3u-stream-merger-proxy) page.
