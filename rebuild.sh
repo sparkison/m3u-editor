@@ -2,4 +2,4 @@
 
 ./vendor/bin/sail build --no-cache
  
-./vendor/bin/sail up
+./vendor/bin/sail up --remove-orphans
