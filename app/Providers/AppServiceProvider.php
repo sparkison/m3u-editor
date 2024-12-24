@@ -3,13 +3,8 @@
 namespace App\Providers;
 
 use App\Events\PlaylistCreated;
-use App\Models\Channel;
-use App\Models\Group;
 use App\Models\Playlist;
-use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
