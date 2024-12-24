@@ -21,6 +21,7 @@ services:
       - XDEBUG_MODE=off
     volumes:
       - /apps/m3ueditor/config:/var/www/config
+    restart: unless-stopped
     ports:
       - 36400:36400 # app
       - 36800:36800 # websockets/broadcasting
@@ -39,9 +40,6 @@ services:
     image: sonroyaalmerol/m3u-stream-merger-proxy:latest
     container_name: m3u-proxy
     network_mode: host
-    volumes:
-      # [OPTIONAL] Cache persistence: This will allow you to reuse the M3U cache across container recreates.
-      - /apps/m3u-proxy:/m3u-proxy/data
     environment:
       - PUID=816
       - PGID=816
@@ -55,6 +53,9 @@ services:
       #- M3U_URL_2=https://iptvprovider2.com/playlist.m3u
       #- M3U_MAX_CONCURRENCY_2=1
       #- M3U_URL_X=
+    volumes:
+      # [OPTIONAL] Cache persistence: This will allow you to reuse the M3U cache across container recreates.
+      - /apps/m3u-proxy:/m3u-proxy/data
     restart: unless-stopped
     ports:
       - 7001:7001
