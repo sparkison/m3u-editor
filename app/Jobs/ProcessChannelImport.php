@@ -55,7 +55,7 @@ class ProcessChannelImport implements ShouldQueue
                 ]);
 
                 // Keep track of channels
-                // $new_channels[] = $model->id;
+                $new_channels[] = $model->id;
 
                 // Update the channel
                 $model->update([
@@ -65,10 +65,9 @@ class ProcessChannelImport implements ShouldQueue
                 return $channel;
             });
 
-            // // Remove orphaned channels and groups
-            // Channel::where('playlist_id', $playlistId)
-            //     ->whereNotIn('id', $new_channels)
-            //     ->delete();
+            // @TODO - remove orphaned channels
+            // Tricky because channels imported across multiple jpbs...
+            
         } catch (\Exception $e) {
             // Log the exception
             logger()->error($e->getMessage());
