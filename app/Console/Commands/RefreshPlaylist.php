@@ -37,10 +37,11 @@ class RefreshPlaylist extends Command
         } else {
             $this->info('Refreshing all playlists');
             $twentyFourHoursAgo = now()->subDay();
-            $playlists = Playlist::query()->where([
-                ['status', '!=', PlaylistStatus::Processing],
-                ['synced', '<=', $twentyFourHoursAgo],
-            ]);
+            $playlists = Playlist::query()->where(
+                'status',
+                '!=',
+                PlaylistStatus::Processing,
+            )->whereDate('synced', '<=', $twentyFourHoursAgo);
             $count = $playlists->count();
             if ($count === 0) {
                 $this->info('No playlists ready refresh');
