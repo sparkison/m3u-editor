@@ -29,7 +29,6 @@ class AppServiceProvider extends ServiceProvider
         try {
             // Process playlist on creation
             Playlist::created(fn(Playlist $playlist) => event(new PlaylistCreated($playlist)));
-            Playlist::updated(fn(Playlist $playlist) => event(new PlaylistCreated($playlist)));
             Playlist::creating(function (Playlist $playlist) {
                 $playlist->user_id = auth()->id();
                 $playlist->uuid = \Illuminate\Support\Str::orderedUuid()->toString();
