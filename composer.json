@@ -9,6 +9,7 @@
         "php": "^8.2",
         "filament/filament": "^3.2",
         "laravel/framework": "^11.31",
+        "laravel/horizon": "^5.30",
         "laravel/octane": "^2.6",
         "laravel/reverb": "^1.0",
         "laravel/tinker": "^2.9",

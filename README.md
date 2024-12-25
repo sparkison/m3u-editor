@@ -26,6 +26,7 @@ services:
     restart: unless-stopped
     ports:
       - 36400:36400 # app
+      - 36790:36790 # for queue (redis server)
       - 36800:36800 # websockets/broadcasting
 networks: {}
 

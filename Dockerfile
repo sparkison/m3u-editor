@@ -5,6 +5,7 @@ FROM alpine:edge
 ENV APP_PORT=36400
 ENV TZ=UTC
 ENV WWWGROUP="sail"
+ENV NODE_VERSION=22.0.0
 ENV SUPERVISOR_PHP_USER="root"
 # Supervisord command to run the app
 # ENV SUPERVISOR_PHP_COMMAND="/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan serve --host=0.0.0.0 --port=$APP_PORT"
@@ -23,10 +24,13 @@ RUN apk update \
         ca-certificates \
         nodejs \
         npm \
-        # redis \
+        redis \
         git
 
-# ...or Build Swoole from source
+# Install PHP Swoole from prebuilt package
+RUN apk add php84-posix php84-pecl-swoole
+
+# ...or Build Swoole with pecl
 # RUN apk add --no-cache \
 #         php84-dev php84-pear php84-openssl php84-sockets \
 #         gcc g++ musl-dev make \
@@ -34,6 +38,14 @@ RUN apk update \
 # RUN pecl install \
 #     --configureoptions 'enable-openssl="no" enable-sockets="yes" enable-mysqlnd="no" enable-swoole-curl="yes"' \
 #     swoole
+
+# # Install specific Node version
+# FROM node:$NODE_VERSION-alpine AS node
+# COPY --from=node /usr/lib /usr/lib
+# COPY --from=node /usr/local/share /usr/local/share
+# COPY --from=node /usr/local/lib /usr/local/lib
+# COPY --from=node /usr/local/include /usr/local/include
+# COPY --from=node /usr/local/bin /usr/local/bin
         
 # https://wiki.alpinelinux.org/wiki/Setting_the_timezone
 RUN apk --no-cache add tzdata \
@@ -71,14 +83,11 @@ RUN apk --no-cache add \
         php84-fileinfo \
         php84-pecl-igbinary php84-pecl-swoole \
         php84-pecl-pcov php84-pecl-imagick \
-        # php84-pecl-redis \
+        php84-pecl-redis \
         php84-pcntl \
     && ln -s /usr/bin/php84 /usr/bin/php
 
 COPY ./docker/8.4/php.ini /etc/php84/cli/conf.d/99-sail.ini
-
-# Install PHP Swoole
-RUN apk add php84-posix php84-pecl-swoole
 
 # Configure supervisord
 RUN touch /var/run/supervisord.pid \

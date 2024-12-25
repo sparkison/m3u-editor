@@ -1,5 +1,3 @@
 #!/bin/bash
 
-./vendor/bin/sail build --no-cache
- 
-./vendor/bin/sail up --remove-orphans
+./vendor/bin/sail build --no-cache && ./vendor/bin/sail up --remove-orphans
