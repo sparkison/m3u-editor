@@ -24,7 +24,7 @@ RUN apk update \
         ca-certificates \
         nodejs \
         npm \
-        redis \
+        # redis \
         git
 
 # Install PHP Swoole from prebuilt package

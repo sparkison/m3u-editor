@@ -9,7 +9,7 @@ services:
             # - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
             - "${REVERB_PORT:-36800}:${REVERB_PORT:-36800}"
             - "${APP_PORT:-36400}:${APP_PORT:-36400}"
-            - 36790:36790
+            # - 36790:36790
         environment:
             WWWUSER: "${WWWUSER}"
             LARAVEL_SAIL: 1
