@@ -1,15 +1,13 @@
 services:
-    m3ueditor.local:
+    m3u-editor:
         build:
             dockerfile: Dockerfile
         image: "sail-8.4/app"
-        extra_hosts:
-            - "host.docker.internal:host-gateway"
         ports:
-            # - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
-            - "${REVERB_PORT:-36800}:${REVERB_PORT:-36800}"
-            - "${APP_PORT:-36400}:${APP_PORT:-36400}"
-            # - 36790:36790
+            # - '${VITE_PORT:-5173}:${VITE_PORT:-5173}' # Vite (development)
+            - "${REVERB_PORT:-36800}:${REVERB_PORT:-36800}" # Reverb
+            - "${APP_PORT:-36400}:${APP_PORT:-36400}" # Laravel
+            # - 36790:36790 # Redis
         environment:
             WWWUSER: "${WWWUSER}"
             LARAVEL_SAIL: 1

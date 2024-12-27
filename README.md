@@ -9,12 +9,14 @@ Use the following compose example to get up and running.
 ```yaml
 version: "3.8"
 services:
-  m3ueditor:
+  m3u-editor:
     build: https://github.com/sparkison/m3u-editor.git
     image: sail-8.4/app
     container_name: m3u-editor
     network_mode: host
     environment:
+      - PUID=1000
+      - PGID=1000
       - TZ=Etc/UTC
       - WWWUSER=sail
       - LARAVEL_SAIL=1
@@ -41,13 +43,13 @@ Using the [M3U Stream Merger Proxy](https://github.com/sonroyaalmerol/m3u-stream
 ```yaml
 version: "3.8"
 services:
-  m3u-stream-merger-proxy:
+  m3u-proxy:
     image: sonroyaalmerol/m3u-stream-merger-proxy:latest
     container_name: m3u-proxy
     network_mode: host
     environment:
-      - PUID=816
-      - PGID=816
+      - PUID=1000
+      - PGID=1000
       - TZ=Etc/UTC
       - PORT=7001
       - DEBUG=true
