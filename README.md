@@ -14,8 +14,6 @@ services:
     image: sail-8.4/app
     container_name: m3u-editor
     network_mode: host
-    extra_hosts:
-      - host.docker.internal:host-gateway
     environment:
       - TZ=Etc/UTC
       - WWWUSER=sail
