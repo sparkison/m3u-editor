@@ -1,4 +1,4 @@
-# Larabel (Alpine Edge build)
+# Laravel (Alpine Edge build)
 FROM alpine:edge
 
 # Set environment variables
