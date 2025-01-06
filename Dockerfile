@@ -5,7 +5,7 @@ FROM alpine:edge
 ENV APP_PORT=36400
 ENV TZ=UTC
 ENV WWWGROUP="sail"
-ENV NODE_VERSION=22.0.0
+ENV NODE_VERSION=22.12.0
 ENV SUPERVISOR_PHP_USER="root"
 # Supervisord command to run the app
 # ENV SUPERVISOR_PHP_COMMAND="/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan serve --host=0.0.0.0 --port=$APP_PORT"
