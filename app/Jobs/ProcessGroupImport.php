@@ -42,8 +42,7 @@ class ProcessGroupImport implements ShouldQueue
             $playlistId = $this->playlist->id;
             $batchNo = $this->batchNo;
 
-            // Keep track of new channels and groups
-            $new_channels = [];
+            // Keep track of new groups
             $new_groups = [];
 
             // Find/create the groups

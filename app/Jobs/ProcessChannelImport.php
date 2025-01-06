@@ -39,13 +39,11 @@ class ProcessChannelImport implements ShouldQueue
         }
 
         try {
-            // Keep track of new channels and groups
-            $new_channels = [];
-
+            // Get the groups
             $groups = $this->groups;
 
             // Link the channel groups to the channels
-            $this->channels->map(function ($channel) use ($groups, &$new_channels) {
+            $this->channels->map(function ($channel) use ($groups) {
                 // Find/create the channel
                 $model = Channel::firstOrCreate([
                     'playlist_id' => $channel['playlist_id'],
@@ -53,9 +51,6 @@ class ProcessChannelImport implements ShouldQueue
                     'name' => $channel['name'],
                     'group' => $channel['group'],
                 ]);
-
-                // Keep track of channels
-                $new_channels[] = $model->id;
 
                 // Update the channel
                 $model->update([
