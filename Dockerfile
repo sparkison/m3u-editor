@@ -7,8 +7,14 @@ ENV TZ=UTC
 ENV WWWGROUP="sail"
 ENV NODE_VERSION=22.12.0
 ENV SUPERVISOR_PHP_USER="root"
+#
 # Supervisord command to run the app
+#
+
+# Run via Artisan
 # ENV SUPERVISOR_PHP_COMMAND="/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan serve --host=0.0.0.0 --port=$APP_PORT"
+
+# Run via Octane
 ENV SUPERVISOR_PHP_COMMAND="/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan octane:start --workers=4 --task-workers=6 --server=swoole --host=0.0.0.0 --port=$APP_PORT"
 
 # Set the working directory
@@ -27,11 +33,16 @@ RUN apk update \
         # redis \
         git
 
+# Install PHP 8.4
+RUN apk --no-cache add \
+        php84-cli php84-dev
+
 # Install PHP Swoole from prebuilt package
-RUN apk add php84-posix php84-pecl-swoole
+RUN apk --no-cache add \
+    php84-posix php84-pecl-swoole
 
 # ...or Build Swoole with pecl
-# RUN apk add --no-cache \
+# RUN apk --no-cache add \
 #         php84-dev php84-pear php84-openssl php84-sockets \
 #         gcc g++ musl-dev make \
 #     && ln -s /usr/bin/pecl84 /usr/bin/pecl
@@ -67,9 +78,8 @@ RUN touch crontab.tmp \
 COPY ./docker/8.4/redis.conf /etc/redis/redis.conf
 RUN chmod 0644 /etc/redis/redis.conf
 
-# Install and configure PHP
+# Install and configure PHP extensions
 RUN apk --no-cache add \
-        php84-cli php84-dev \
         php84-sqlite3 php84-gd php84-curl \
         php84-intl php84-imap php84-mbstring \
         php84-xml php84-zip php84-bcmath php84-soap \
@@ -81,7 +91,7 @@ RUN apk --no-cache add \
         php84-pdo_mysql \
         php84-phar \
         php84-fileinfo \
-        php84-pecl-igbinary php84-pecl-swoole \
+        php84-pecl-igbinary \
         php84-pecl-pcov php84-pecl-imagick \
         php84-pecl-redis \
         php84-pcntl \
