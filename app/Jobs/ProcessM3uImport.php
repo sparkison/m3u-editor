@@ -9,6 +9,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use zikwall\m3ucontentparser\M3UContentParser;
 use zikwall\m3ucontentparser\M3UItem;
+use Illuminate\Support\Str;
 
 class ProcessM3uImport implements ShouldQueue
 {
@@ -46,6 +47,7 @@ class ProcessM3uImport implements ShouldQueue
         try {
             $playlistId = $this->playlist->id;
             $userId = $this->playlist->user_id;
+            $batchNo = Str::uuid7()->toString();
 
             $parser = new M3UContentParser($this->playlist->url);
             $parser->parse();
@@ -70,6 +72,7 @@ class ProcessM3uImport implements ShouldQueue
                     'group' => $item->getGroupTitle(),
                     'lang' => $item->getLanguage(), // usually null/empty
                     'country' => $item->getCountry(), // usually null/empty
+                    'import_batch_no' => $batchNo
                 ]);
 
                 // Maintain a list of unique channel groups
@@ -91,7 +94,8 @@ class ProcessM3uImport implements ShouldQueue
                 $this->playlist,
                 $count,
                 $groups,
-                $channels
+                $channels,
+                $batchNo
             ));
         } catch (\Exception $e) {
             // Log the exception

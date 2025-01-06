@@ -26,7 +26,8 @@ class ProcessGroupImport implements ShouldQueue
         public Playlist $playlist,
         public int $count,
         public Collection $groups,
-        public Collection $channels
+        public Collection $channels,
+        public string $batchNo
     ) {
         //
     }
@@ -39,6 +40,7 @@ class ProcessGroupImport implements ShouldQueue
         try {
             // Get the playlist id
             $playlistId = $this->playlist->id;
+            $batchNo = $this->batchNo;
 
             // Keep track of new channels and groups
             $new_channels = [];
@@ -76,7 +78,7 @@ class ProcessGroupImport implements ShouldQueue
                 $jobs->push(new ProcessChannelImport($count, $groups, $chunk));
             }
             Bus::batch($jobs)
-                ->then(function (Batch $batch) use ($playlist, $count) {
+                ->then(function (Batch $batch) use ($playlist, $count, $batchNo) {
                     // All jobs completed successfully...
 
                     // Send notification
@@ -90,6 +92,12 @@ class ProcessGroupImport implements ShouldQueue
                         ->title('Playlist Synced')
                         ->body("\"{$playlist->name}\" has been synced successfully.")
                         ->sendToDatabase($playlist->user);
+
+                    // Clear out invalid channels (if any)
+                    Channel::where([
+                        ['playlist_id', $playlist->id],
+                        ['import_batch_no', '!=', $batchNo],
+                    ])->delete();
 
                     // Update the playlist
                     $playlist->update([
