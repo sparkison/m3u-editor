@@ -92,7 +92,10 @@ class PlaylistResource extends Resource
                     Tables\Actions\Action::make('process')
                         ->label('Process')
                         ->icon('heroicon-o-arrow-path')
-                        ->action(fn($record) => app('Illuminate\Contracts\Bus\Dispatcher')->dispatch(new \App\Jobs\ProcessM3uImport($record)))->after(function () {
+                        ->action(function ($record) {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new \App\Jobs\ProcessM3uImport($record));
+                        })->after(function () {
                             Notification::make()
                                 ->success()
                                 ->title('Playlist is processing')
