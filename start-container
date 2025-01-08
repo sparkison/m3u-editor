@@ -109,6 +109,14 @@ fi
 echo "Running migrations..."
 php artisan migrate --force
 
+# Clearing cache
+echo "Clearing cache..."
+php artisan cache:clear
+
+# Optimizing configuration
+echo "Optimizing configuration..."
+php artisan optimize
+
 # If node_modules directory is missing, install npm dependencies
 echo "Installing npm dependencies..."
 npm install
