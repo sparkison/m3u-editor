@@ -64,7 +64,7 @@ class PlaylistResource extends Resource
                     ->color(fn(PlaylistStatus $state) => $state->getColor()),
                 Tables\Columns\TextColumn::make('synced')
                     ->label('Last Synced')
-                    ->dateTime()
+                    ->since()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
@@ -173,6 +173,11 @@ class PlaylistResource extends Resource
                 ->prefixIcon('heroicon-m-globe-alt')
                 ->required()
                 ->helperText('Enter the URL of the playlist file. If changing URL, the playlist will be re-imported. Use with caution as this could lead to data loss if the new playlist differs from the old one.'),
+            Forms\Components\DateTimePicker::make('synced')
+                ->hiddenOn(['create']) // hide this field on the create form
+                ->columnSpan(2)
+                ->label('Sync at')
+                ->helperText('Playlist will be synced every 24hr. Timestamp is automatically updated after each sync. Set to anytime in the past or future and the sync will run again when 24hr has passed since the time set.'),
             PlaylistM3uUrl::make('m3u_url')
                 ->hiddenOn(['create']) // hide this field on the create form
                 ->columnSpan(2)
