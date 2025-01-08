@@ -176,8 +176,11 @@ class PlaylistResource extends Resource
             Forms\Components\DateTimePicker::make('synced')
                 ->hiddenOn(['create']) // hide this field on the create form
                 ->columnSpan(2)
-                ->label('Sync at')
-                ->helperText('Playlist will be synced every 24hr. Timestamp is automatically updated after each sync. Set to anytime in the past or future and the sync will run again when 24hr has passed since the time set.'),
+                ->prefix('Sync 24hr from')
+                ->suffix('UTC')
+                ->native(false)
+                ->label('Last Synced')
+                ->helperText('Playlist will be synced every 24hr. Timestamp is automatically updated after each sync. Set to anytime in the past (or future) and the next sync will run when 24hr has passed since the time set.'),
             PlaylistM3uUrl::make('m3u_url')
                 ->hiddenOn(['create']) // hide this field on the create form
                 ->columnSpan(2)
