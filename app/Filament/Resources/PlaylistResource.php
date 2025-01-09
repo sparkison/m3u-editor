@@ -123,7 +123,8 @@ class PlaylistResource extends Resource
                         ->label('Process selected')
                         ->action(function (Collection $records): void {
                             foreach ($records as $record) {
-                                dispatch(new \App\Jobs\ProcessM3uImport($record));
+                                app('Illuminate\Contracts\Bus\Dispatcher')
+                                    ->dispatch(new \App\Jobs\ProcessM3uImport($record));
                             }
                         })->after(function () {
                             Notification::make()
