@@ -1,0 +1,38 @@
+name: publish
+
+on: [push]
+
+jobs:
+
+publish-m3u-editor-docker-image:
+
+runs-on: ubuntu-latest
+
+steps:
+
+- uses: actions/checkout@v2
+
+- name: Login to GitHub Container Registry
+
+uses: docker/login-action@v1
+
+with:
+
+registry: ghcr.io
+
+username: ${{ github.actor }}
+
+password: ${{ secrets.GITHUB_TOKEN }}
+
+- name: Build the m3u-editor Docker image
+
+run: |
+
+       docker build . --tag ghcr.io/sparkison/m3u-editor:latest
+
+       docker run ghcr.io/sparkison/m3u-editor:latest
+
+       docker push ghcr.io/sparkison/m3u-editor:latest
+
+
+
