@@ -6,7 +6,7 @@ enum PlaylistStatus: string
 {
     case Pending = 'pending';
     case Processing = 'processing';
-    case Completed = 'synced';
+    case Completed = 'completed';
     case Failed = 'failed';
 
     public function getColor(): string
