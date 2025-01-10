@@ -18,3 +18,4 @@ jobs:
         #   docker build . --tag ghcr.io/sparkison/m3u-editor:latest
         #   docker run ghcr.io/sparkison/m3u-editor:latest
         #   docker push ghcr.io/sparkison/m3u-editor:latest
+
