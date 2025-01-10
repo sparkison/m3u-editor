@@ -32,7 +32,7 @@ swoole_log_file="${log_dir}/swoole_http.log"
 # Create config directories
 if [ ! -d "${config_dir}" ]; then
     echo "Missing config directory, please make sure you've linked it in volumes to persist your data. It should link to '/var/www/config' in the container."
-    "${config_dir}"
+    mkdir "${config_dir}"
 fi
 if [ ! -d "${db_dir}" ]; then
     echo "Creating database directory..."
