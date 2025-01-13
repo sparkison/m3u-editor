@@ -10,8 +10,7 @@ Use the following compose example to get up and running.
 version: "3.8"
 services:
   m3u-editor:
-    build: sparkison/m3u-editor:latest
-    image: sail-8.4/app
+    image: sparkison/m3u-editor:latest
     container_name: m3u-editor
     network_mode: host
     environment:
