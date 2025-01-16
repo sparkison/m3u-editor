@@ -1,8 +1,8 @@
-name: publish
+name: Release
 on:
-  push:
-    branches:
-      - master
+  release:
+    types: [published]
+
 jobs:
   release:
     name: Publish m3u-editor Docker image

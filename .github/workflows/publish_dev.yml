@@ -1,10 +1,10 @@
-name: publish
+name: Dev
 on:
   push:
-    branches:
-      - dev
+    branches: [dev]
+
 jobs:
-  dev:
+  push:
     name: [DEV] Publish m3u-editor Docker image
     runs-on: ubuntu-latest
     steps:
