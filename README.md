@@ -70,7 +70,7 @@ networks: {}
 
 ```
 
-Access via: [http://localhost:36400](http://localhost:36400)
+Access via: [http://localhost:36400](http://localhost:36400) (user = admin, password = admin)
 
 To ensure the data is saved across builds, link an empty volume to: `/var/www/config` within the container. This is where the `env` file will be stored, along with the sqlite database and the application log files.
 
