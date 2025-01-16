@@ -3,10 +3,11 @@
 A simple `m3u` playlist editor, similar to **xteve** or **threadfin**. 
 As of now, there are no plans for EPG integration, but if there's enough interest this can be looked into.
 
-> [!NOTE]  
-> Has been tested on large playlists up to 4000 channels, which should cover most cases.
+> [!WARNING]  
+> Has not been tested on playlists larger than 4000 channels. Hopefully this covers most cases.
 
-Ability to merge playlists is not currently available, but could be fairly easily added if there are enough requests for this feature.
+> [!NOTE]  
+> Ability to merge playlists is not currently available, but could be fairly easily added if there are enough requests for this feature.
 
 ## How It Works
 1. Initialization and M3U Playlist(s) creation:
