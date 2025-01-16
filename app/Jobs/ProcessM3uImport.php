@@ -65,7 +65,6 @@ class ProcessM3uImport implements ShouldQueue
                     'playlist_id' => $playlistId,
                     'user_id' => $userId,
                     'stream_id' => $item->getId(), // usually null/empty
-                    'shift' => $item->getTvgShift(), // usually null/empty
                     'name' => $item->getTvgName(),
                     'url' => $item->getTvgUrl(),
                     'logo' => $item->getTvgLogo(),

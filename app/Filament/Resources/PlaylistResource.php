@@ -45,6 +45,7 @@ class PlaylistResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('url')
                     ->label('Playlist URL')
+                    ->toggleable()
                     ->searchable(),
                 Tables\Columns\TextColumn::make('groups_count')
                     ->label('Groups')

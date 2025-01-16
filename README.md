@@ -1,8 +1,45 @@
-## m3u editor
+# m3u editor
 
-Description and screenshots to come...
+A simple `m3u` playlist editor, similar to **xteve** or **threadfin**. 
+As of now, there are no plans for EPG integration, but if there's enough interest this can be looked into.
 
-### 🐳 Docker compose example
+> [!NOTE]  
+> Has been tested on large playlists up to 4000 channels, which should cover most cases.
+
+Ability to merge playlists is not currently available, but could be fairly easily added if there are enough requests for this feature.
+
+## How It Works
+1. Initialization and M3U Playlist(s) creation:
+    - The service loads M3U playlist from specified URL, downloading and processing it.
+    - Each playlist will have a unique URL to output enabled channels and any customizations
+    - Only enabled channels will be returned.
+2. Automatic playlist(s) sync:
+    - Playlist sync happens upon creation, and every 24hr after. The schedule can be adjusted after playlist is created.
+3. HTTP endpoints:
+    - The app can be accessed here: [http://localhost:36400](http://localhost:36400)
+    - Each playlist will have a unique URL, in the format: `http://localhost:36400/9dfbc010-a809-4a31-801d-ca2a34030966/playlist.m3u`
+4. Customization:
+    - Modify M3U channel numbers and offset. Channels are opt-in, so **all channels will be disabled by default** and need to be enabled based on your preference. This is to prevent channel additions automatically populating your playlist.
+
+## Prerequisites
+- [Docker](https://www.docker.com/) installed on your system.
+- M3U URLs containing a playlist of video streams.
+
+## Screenshots
+
+### Dashboard
+
+![Dashboard](./screenshots/dashboard.jpg)
+
+### Playlist editor
+
+![Dashboard](./screenshots/playlist-manager-popout.jpg)
+
+### Channel management
+
+![Channel Management](./screenshots/channel-management.jpg)
+
+## 🐳 Docker compose
 
 Use the following compose example to get up and running.
 
@@ -31,12 +68,14 @@ networks: {}
 
 ```
 
+Access via: [http://localhost:36400](http://localhost:36400)
+
 To ensure the data is saved across builds, link an empty volume to: `/var/www/config` within the container. This is where the `env` file will be stored, along with the sqlite database and the application log files.
 
 > [!NOTE]  
 > Once built, head to the `env` file with your linked config directory and make sure the `REVERB_HOST` is properly set to the machine IP (if not `localhost`) for websockets and broadcasting to work correctly. This is not required for the app to function, but you will not receive in-app notifications without it. You will need to restart the container after changing this.
 
-### 📡 Creating a playlist proxy
+### 📡 (Optionally) creating a playlist proxy
 
 Using the [M3U Stream Merger Proxy](https://github.com/sonroyaalmerol/m3u-stream-merger-proxy) as an example.
 

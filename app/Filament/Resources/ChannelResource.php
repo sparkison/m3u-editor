@@ -46,29 +46,31 @@ class ChannelResource extends Resource
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
-            ->paginated([10, 25, 50, 100, 250, 500])
-            ->defaultPaginationPageOption(50)
+            ->paginated([10, 25, 50, 100, 250])
+            ->defaultPaginationPageOption(25)
             ->columns([
                 Tables\Columns\ImageColumn::make('logo')
-                    ->defaultImageUrl(fn($record) => $record->logo),
+                    ->circular(),
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
+                    ->limit(40)
                     ->sortable(),
                 Tables\Columns\ToggleColumn::make('enabled')
                     ->sortable(),
                 Tables\Columns\TextInputColumn::make('channel')
                     ->rules(['numeric', 'min:0'])
                     ->sortable(),
+                Tables\Columns\TextInputColumn::make('shift')
+                    ->rules(['numeric', 'min:0'])
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('group')
                     ->hidden(fn() => $relationId)
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('url')
+                    ->url(fn($record): string => $record->url)
                     ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('shift')
-                    ->numeric()
-                    ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('stream_id')
                     ->searchable()
