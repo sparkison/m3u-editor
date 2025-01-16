@@ -13,9 +13,9 @@ if [ ! -f "/var/www/html/artisan" ]; then
 fi
 
 # Git pull the latest changes
-echo "Pulling latest changes..."
-git config --global --add safe.directory /var/www/html
-git pull
+# echo "Pulling latest changes..."
+# git config --global --add safe.directory /var/www/html
+# git pull
 
 # Check for configuration directories and files
 config_dir="/var/www/config"
