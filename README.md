@@ -18,6 +18,7 @@ As of now, there are no plans for EPG integration, but if there's enough interes
     - Playlist sync happens upon creation, and every 24hr after. The schedule can be adjusted after playlist is created.
 3. HTTP endpoints:
     - The app can be accessed here: [http://localhost:36400](http://localhost:36400)
+      - **LOGIN INFO**: user = admin, password = admin
     - Each playlist will have a unique URL, in the format: `http://localhost:36400/9dfbc010-a809-4a31-801d-ca2a34030966/playlist.m3u`
 4. Customization:
     - Modify M3U channel numbers and offset. Channels are opt-in, so **all channels will be disabled by default** and need to be enabled based on your preference. This is to prevent channel additions automatically populating your playlist.
