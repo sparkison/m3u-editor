@@ -93,7 +93,7 @@ services:
       - PGID=1000
       - TZ=Etc/UTC
       - PORT=7001
-      - DEBUG=true
+      - DEBUG=false
       - SYNC_ON_BOOT=true
       - SYNC_CRON=0 0 * * *
       - M3U_URL_1=http://192.168.0.1:36400/[PLAYLIST_UID]/playlist.m3u
