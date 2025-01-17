@@ -52,7 +52,10 @@ class ProcessChannelImport implements ShouldQueue
                     'group' => $channel['group'],
                 ]);
 
-                // Update the channel
+                // Don't overwrite the logo if currently set
+                if ($model->logo) {
+                    unset($channel['logo']);
+                }
                 $model->update([
                     ...$channel,
                     'group_id' => $groups->firstWhere('name', $channel['group'])['id']

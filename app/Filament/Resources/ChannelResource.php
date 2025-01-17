@@ -115,7 +115,7 @@ class ChannelResource extends Resource
                     }),
             ])
             ->actions([
-                // Tables\Actions\EditAction::make(),
+                Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -187,11 +187,16 @@ class ChannelResource extends Resource
     public static function getForm(): array
     {
         return [
-            // Custom channel fields
-            Forms\Components\TextInput::make('channel')
-                ->numeric(),
+            // Customizable channel fields
             Forms\Components\Toggle::make('enabled')
+                ->columnSpan('full')
                 ->required(),
+            Forms\Components\TextInput::make('logo')
+                ->url(),
+            Forms\Components\TextInput::make('channel')
+                ->rules(['numeric', 'min:0']),
+            Forms\Components\TextInput::make('shift')
+                ->rules(['numeric', 'min:0']),
 
             /*
              * Below fields are automatically populated/updated on Playlist sync.
@@ -200,13 +205,7 @@ class ChannelResource extends Resource
             // Forms\Components\TextInput::make('name')
             //     ->required()
             //     ->maxLength(255),
-            // Forms\Components\TextInput::make('shift')
-            //     ->required()
-            //     ->numeric()
-            //     ->default(0),
             // Forms\Components\TextInput::make('url')
-            //     ->maxLength(255),
-            // Forms\Components\TextInput::make('logo')
             //     ->maxLength(255),
             // Forms\Components\TextInput::make('group')
             //     ->maxLength(255),
