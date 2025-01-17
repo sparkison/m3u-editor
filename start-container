@@ -48,6 +48,10 @@ if [ ! -f "${env_file}" ]; then
     echo "Missing environment file, creating now..."
     touch "${env_file}"
     cat /var/www/html/.env.example >> "${env_file}"
+
+    # Generate application key
+    echo "Generating application key..."
+    php artisan key:generate --force
 fi
 
 # Create database file
@@ -91,24 +95,6 @@ ln -sf "${env_file}" .env
 # Link the database file to the laravel `database` directory
 ln -sf "${db_file}" "database/database.sqlite"
 
-# If vendor directory is missing...
-if [ ! -d "vendor" ]; then
-    # ...install composer dependencies and generate key
-    echo "Installing composer dependencies..."
-    composer install --no-dev --no-interaction --no-progress
-
-    echo "Generating application key..."
-    php artisan key:generate
-else
-    # ...install composer dependencies only
-    echo "Installing composer dependencies..."
-    composer install --no-dev --no-interaction --no-progress
-fi
-
-# Run any pending migrations
-echo "Running migrations..."
-php artisan migrate --force
-
 # Clearing cache
 echo "Clearing cache..."
 php artisan cache:clear
@@ -117,10 +103,9 @@ php artisan cache:clear
 echo "Optimizing configuration..."
 php artisan optimize
 
-# If node_modules directory is missing, install npm dependencies
-echo "Installing npm dependencies..."
-npm install
-npm run build
+# Run any pending migrations
+echo "Running migrations..."
+php artisan migrate --force
 
 if [ ! -z "$WWWUSER" ]; then
     usermod -u $WWWUSER sail
