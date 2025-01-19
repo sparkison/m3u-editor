@@ -2,12 +2,8 @@
 
 namespace App\Jobs;
 
-use App\Enums\PlaylistStatus;
 use App\Models\Channel;
 use App\Models\Group;
-use App\Models\Playlist;
-use App\Models\User;
-use Filament\Notifications\Notification;
 use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -21,8 +17,8 @@ class ProcessChannelImport implements ShouldQueue
      * Create a new job instance.
      */
     public function __construct(
-        public int $count,
-        public Collection $groups,
+        public int $playlistId,
+        public string $batchNo,
         public Collection $channels
     ) {
         //
@@ -38,38 +34,31 @@ class ProcessChannelImport implements ShouldQueue
             return;
         }
 
-        try {
-            // Get the groups
-            $groups = $this->groups;
+        // Get the groups
+        /** @var Collection $groups */
+        $groups = Group::where([
+            ['playlist_id', $this->playlistId],
+            ['import_batch_no', $this->batchNo]
+        ])->get(['id', 'name']);
 
-            // Link the channel groups to the channels
-            $this->channels->map(function ($channel) use ($groups) {
-                // Find/create the channel
-                $model = Channel::firstOrCreate([
-                    'playlist_id' => $channel['playlist_id'],
-                    'user_id' => $channel['user_id'],
-                    'name' => $channel['name'],
-                    'group' => $channel['group'],
-                ]);
+        // Link the channel groups to the channels
+        foreach ($this->channels as $channel) {
+            // Find/create the channel
+            $model = Channel::firstOrCreate([
+                'playlist_id' => $channel['playlist_id'],
+                'user_id' => $channel['user_id'],
+                'name' => $channel['name'],
+                'group' => $channel['group'],
+            ]);
 
-                // Don't overwrite the logo if currently set
-                if ($model->logo) {
-                    unset($channel['logo']);
-                }
-                $model->update([
-                    ...$channel,
-                    'group_id' => $groups->firstWhere('name', $channel['group'])['id']
-                ]);
-                return $channel;
-            });
-
-            // @TODO - remove orphaned channels
-            // Tricky because channels imported across multiple jpbs...
-            
-        } catch (\Exception $e) {
-            // Log the exception
-            logger()->error($e->getMessage());
+            // Don't overwrite the logo if currently set
+            if ($model->logo) {
+                unset($channel['logo']);
+            }
+            $model->update([
+                ...$channel,
+                'group_id' => $groups->firstWhere('name', $channel['group'])->id
+            ]);
         }
-        return;
     }
 }

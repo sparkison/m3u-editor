@@ -10,6 +10,11 @@ use Illuminate\Foundation\Queue\Queueable;
 use zikwall\m3ucontentparser\M3UContentParser;
 use zikwall\m3ucontentparser\M3UItem;
 use Illuminate\Support\Str;
+use Illuminate\Bus\Batch;
+use Illuminate\Support\Facades\Bus;
+use App\Models\Channel;
+use App\Models\Group;
+use Throwable;
 
 class ProcessM3uImport implements ShouldQueue
 {
@@ -45,11 +50,12 @@ class ProcessM3uImport implements ShouldQueue
 
         // Surround in a try/catch block to catch any exceptions
         try {
-            $playlistId = $this->playlist->id;
-            $userId = $this->playlist->user_id;
+            $playlist = $this->playlist;
+            $playlistId = $playlist->id;
+            $userId = $playlist->user_id;
             $batchNo = Str::uuid7()->toString();
 
-            $parser = new M3UContentParser($this->playlist->url);
+            $parser = new M3UContentParser($playlist->url);
             $parser->parse();
 
             $count = 0;
@@ -77,10 +83,10 @@ class ProcessM3uImport implements ShouldQueue
                 // Maintain a list of unique channel groups
                 if (!$groups->contains('title', $item->getGroupTitle())) {
                     $groups->push([
-                        'id' => null,
                         'playlist_id' => $playlistId,
                         'user_id' => $userId,
-                        'name' => $item->getGroupTitle()
+                        'name' => $item->getGroupTitle(),
+                        'import_batch_no' => $batchNo
                     ]);
                 }
 
@@ -88,14 +94,53 @@ class ProcessM3uImport implements ShouldQueue
                 $count++;
             }
 
-            // Send m3u processed data to the channel import job
-            dispatch(new ProcessGroupImport(
-                $this->playlist,
-                $count,
-                $groups,
-                $channels,
-                $batchNo
-            ));
+            $jobs = collect([]);
+            foreach ($groups->chunk(100) as $chunk) {
+                $jobs->push(new ProcessGroupImport($chunk));
+            }
+            foreach ($channels->chunk(100) as $chunk) {
+                $jobs->push(new ProcessChannelImport($playlistId, $batchNo, $chunk));
+            }
+            Bus::batch($jobs)
+                ->then(function (Batch $batch) use ($playlist, $count, $batchNo) {
+                    // All jobs completed successfully...
+
+                    // Send notification
+                    Notification::make()
+                        ->success()
+                        ->title('Playlist Synced')
+                        ->body("\"{$playlist->name}\" has been synced successfully.")
+                        ->broadcast($playlist->user);
+                    Notification::make()
+                        ->success()
+                        ->title('Playlist Synced')
+                        ->body("\"{$playlist->name}\" has been synced successfully.")
+                        ->sendToDatabase($playlist->user);
+
+                    // Clear out invalid groups (if any)
+                    Group::where([
+                        ['playlist_id', $playlist->id],
+                        ['import_batch_no', '!=', $batchNo],
+                    ])->delete();
+
+                    // Clear out invalid channels (if any)
+                    Channel::where([
+                        ['playlist_id', $playlist->id],
+                        ['import_batch_no', '!=', $batchNo],
+                    ])->delete();
+
+                    // Update the playlist
+                    $playlist->update([
+                        'status' => PlaylistStatus::Completed,
+                        'channels' => $count,
+                        'synced' => now(),
+                        'errors' => null,
+                    ]);
+                })->catch(function (Batch $batch, Throwable $e) {
+                    // First batch job failure detected...
+                })->finally(function (Batch $batch) {
+                    // The batch has finished executing...
+                })->name('Playlist channel import')->dispatch();
         } catch (\Exception $e) {
             // Log the exception
             logger()->error($e->getMessage());

@@ -51,7 +51,6 @@ services:
   m3u-editor:
     image: sparkison/m3u-editor:latest
     container_name: m3u-editor
-    network_mode: host
     environment:
       - PUID=1000
       - PGID=1000
@@ -87,7 +86,6 @@ services:
   m3u-proxy:
     image: sonroyaalmerol/m3u-stream-merger-proxy:latest
     container_name: m3u-proxy
-    network_mode: host
     environment:
       - PUID=1000
       - PGID=1000
