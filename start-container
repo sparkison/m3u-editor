@@ -107,6 +107,10 @@ php artisan optimize
 echo "Running migrations..."
 php artisan migrate --force
 
+# Install npm dependencies
+echo "Building assets..."
+npm install && npm run build
+
 if [ ! -z "$WWWUSER" ]; then
     usermod -u $WWWUSER sail
 fi

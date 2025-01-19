@@ -124,9 +124,6 @@ RUN git clone https://github.com/sparkison/m3u-editor.git /tmp/m3u-editor \
 # Install composer dependencies
 RUN composer install --no-dev --no-interaction --no-progress
 
-# Install npm dependencies
-RUN npm install && npm run build
-
 # Configure user for sail
 RUN addgroup $WWWGROUP \
     && adduser -h /var/www/html -s /bin/bash -G $WWWGROUP -D sail
