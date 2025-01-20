@@ -3,8 +3,8 @@
 A simple `m3u` playlist editor, similar to **xteve** or **threadfin**. 
 As of now, there are no plans for EPG integration, but if there's enough interest this can be looked into.
 
-> [!WARNING]  
-> Has not been tested on playlists larger than 4000 channels. Hopefully this covers most cases.
+> [!INFO]  
+> Has been tested on large playlist ([https://github.com/iptv-org/iptv](https://github.com/iptv-org/iptv)), with up to 10000+ channels. Note that larger lists will take longer to sync (likely a minute or two for every ~10k channels).
 
 > [!NOTE]  
 > Ability to merge playlists is not currently available, but could be fairly easily added if there are enough requests for this feature.
