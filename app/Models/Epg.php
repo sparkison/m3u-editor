@@ -21,6 +21,7 @@ class Epg extends Model
         'id' => 'integer',
         'synced' => 'datetime',
         'user_id' => 'integer',
+        'uploads' => 'array',
         'status' => EpgStatus::class,
     ];
 

@@ -36,7 +36,17 @@ class EpgChannelResource extends Resource
 
     public static function table(Table $table): Table
     {
+        return self::setupTable($table);
+    }
+
+    public static function setupTable(Table $table, $relationId = null): Table
+    {
         return $table
+            ->filtersTriggerAction(function ($action) {
+                return $action->button()->label('Filters');
+            })
+            ->paginated([10, 25, 50, 100, 250])
+            ->defaultPaginationPageOption(25)
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->searchable(),
@@ -62,7 +72,7 @@ class EpgChannelResource extends Resource
                 //
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
+                // Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

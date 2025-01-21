@@ -18,8 +18,14 @@ class EpgChannel extends Model
     protected $casts = [
         'id' => 'integer',
         'epg_id' => 'integer',
+        'user_id' => 'integer',
         'programmes' => 'array',
     ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
     public function epg(): BelongsTo
     {
