@@ -1,15 +1,14 @@
 created:
-    - database/factories/PlaylistFactory.php
-    - database/factories/GroupFactory.php
-    - database/factories/ChannelFactory.php
-    - database/migrations/2024_12_19_154247_create_playlists_table.php
-    - database/migrations/2024_12_19_154248_create_groups_table.php
-    - database/migrations/2024_12_19_154249_create_channels_table.php
-    - app/Models/Playlist.php
-    - app/Models/Group.php
-    - app/Models/Channel.php
+    - database/factories/EpgFactory.php
+    - database/factories/EpgChannelFactory.php
+    - database/migrations/2025_01_21_164226_create_epgs_table.php
+    - database/migrations/2025_01_21_164227_create_epg_channels_table.php
+    - app/Models/Epg.php
+    - app/Models/EpgChannel.php
 models:
     User: { name: string, email: string, email_verified_at: 'datetime nullable', password: string, remember_token: 'string nullable' }
     Playlist: { name: string, uuid: uuid, url: string, status: 'enum:pending,processing,completed,failed default:pending', prefix: 'string nullable', channels: 'unsignedInteger default:0', synced: 'datetime nullable', errors: 'longText nullable', user_id: 'id foreign:users', relationships: { belongsTo: User, hasMany: 'Channel, Group' } }
     Group: { name: string, user_id: 'id foreign:users', playlist_id: 'id foreign:playlists', relationships: { belongsTo: 'User, Playlist', hasMany: Channel } }
     Channel: { name: string, enabled: 'boolean default:false', channel: 'unsignedInteger nullable', shift: 'unsignedInteger default:0', url: 'string nullable', logo: 'string nullable', group: 'string nullable', stream_id: 'string nullable', lang: 'string nullable', country: 'string nullable', user_id: 'id foreign:users', playlist_id: 'id foreign:playlists', group_id: 'id foreign:groups nullable', relationships: { belongsTo: 'User, Playlist, Group' } }
+    Epg: { name: string, url: string, user_id: 'id foreign:users', relationships: { belongsTo: User } }
+    EpgChannel: { name: string, display_name: 'string nullable', lang: 'string nullable', channel_id: 'string nullable', epg_id: 'id foreign:epgs', programmes: 'longText nullable', relationships: { belongsTo: Epg } }
