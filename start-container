@@ -48,10 +48,6 @@ if [ ! -f "${env_file}" ]; then
     echo "Missing environment file, creating now..."
     touch "${env_file}"
     cat /var/www/html/.env.example >> "${env_file}"
-
-    # Generate application key
-    echo "Generating application key..."
-    php artisan key:generate --force
 fi
 
 # Create database file
@@ -94,6 +90,9 @@ ln -sf "${env_file}" .env
 
 # Link the database file to the laravel `database` directory
 ln -sf "${db_file}" "database/database.sqlite"
+
+# Set app key, if not previously set
+php artisan app:generate-key
 
 # Clearing cache
 echo "Clearing cache..."
