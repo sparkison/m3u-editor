@@ -23,6 +23,8 @@ class ChannelResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-film';
 
+    protected static ?string $navigationGroup = 'Playlist';
+
     public static function getNavigationSort(): ?int
     {
         return 3;

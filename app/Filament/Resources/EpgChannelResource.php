@@ -19,6 +19,10 @@ class EpgChannelResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-photo';
 
+    protected static ?string $label = 'EPG Programs';
+
+    protected static ?string $navigationGroup = 'EPG';
+
     public static function getNavigationSort(): ?int
     {
         return 5;

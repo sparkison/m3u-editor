@@ -3,7 +3,7 @@
 namespace App\Listeners;
 
 use App\Events\EpgCreated;
-use App\Jobs\ProcessM3uImport;
+use App\Jobs\ProcessEpgImport;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 
@@ -16,6 +16,6 @@ class EpgListener implements ShouldQueue
      */
     public function handle(EpgCreated $event): void
     {
-        // @TODO: process epg...
+        dispatch(new ProcessEpgImport($event->epg));
     }
 }

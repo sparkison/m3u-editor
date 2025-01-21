@@ -19,6 +19,10 @@ class EpgResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
 
+    protected static ?string $label = 'EPGs';
+
+    protected static ?string $navigationGroup = 'EPG';
+
     public static function getNavigationSort(): ?int
     {
         return 4;
@@ -81,13 +85,16 @@ class EpgResource extends Resource
         return [
             Forms\Components\TextInput::make('name')
                 ->required()
+                ->helperText('Enter the name of the EPG. Internal use only.')
                 ->maxLength(255),
             Forms\Components\TextInput::make('url')
                 ->required()
+                ->label('XMLTV URL')
+                ->url()
+                ->prefixIcon('heroicon-m-globe-alt')
+                ->required()
+                ->helperText('Enter the URL of the XMLTV guide data. If changing URL, the guide data will be re-imported. Use with caution as this could lead to data loss if the new guide differs from the old one.')
                 ->maxLength(255),
-            // Forms\Components\Select::make('user_id')
-            //     ->relationship('user', 'name')
-            //     ->required(),
         ];
     }
 }

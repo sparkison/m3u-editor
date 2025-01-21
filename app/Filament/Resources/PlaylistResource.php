@@ -24,6 +24,8 @@ class PlaylistResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-play';
 
+    protected static ?string $navigationGroup = 'Playlist';
+
     public static function getNavigationSort(): ?int
     {
         return 1;
