@@ -55,6 +55,10 @@ class EpgResource extends Resource
                     ->sortable()
                     ->badge()
                     ->color(fn(EpgStatus $state) => $state->getColor()),
+                Tables\Columns\TextColumn::make('synced')
+                    ->label('Last Synced')
+                    ->since()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

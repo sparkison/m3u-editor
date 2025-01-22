@@ -49,8 +49,10 @@ class EpgChannelResource extends Resource
             ->defaultPaginationPageOption(25)
             ->columns([
                 Tables\Columns\TextColumn::make('name')
+                    ->limit(40)
                     ->searchable(),
                 Tables\Columns\TextColumn::make('display_name')
+                    ->limit(40)
                     ->searchable(),
                 Tables\Columns\TextColumn::make('lang')
                     ->searchable(),
