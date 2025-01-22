@@ -4,14 +4,18 @@ namespace App\Jobs;
 
 use Exception;
 use XMLReader;
+use Throwable;
 use App\Enums\EpgStatus;
 use App\Models\Epg;
+use App\Models\EpgChannel;
+use App\Models\EpgProgramme;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Str;
 use Illuminate\Bus\Batch;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\LazyCollection;
 
 class ProcessEpgImport implements ShouldQueue
 {
@@ -39,11 +43,36 @@ class ProcessEpgImport implements ShouldQueue
             return;
         }
 
+
+
+
+
+
+        // @TODO: update status...
+
+
+
+
+
+
         // Update the playlist status to processing
         $this->epg->update([
-            'status' => EpgStatus::Processing,
+            //'status' => EpgStatus::Processing,
             'errors' => null,
         ]);
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         // Process EPG XMLTV based on standard format
         // Info: https://wiki.xmltv.org/index.php/XMLTVFormat
@@ -54,7 +83,8 @@ class ProcessEpgImport implements ShouldQueue
             $batchNo = Str::uuid7()->toString();
 
             $xmlData = null;
-            $reader = null;
+            $channelReader = null;
+            $programmeReader = null;
             if ($this->epg->url) {
                 // Fetch the file contents
                 $ch = curl_init($this->epg->url);
@@ -75,8 +105,11 @@ class ProcessEpgImport implements ShouldQueue
                 }
 
                 // Parse the XML data
-                $reader = new XMLReader();
-                $reader->xml($xmlData);
+                $channelReader = new XMLReader();
+                $channelReader->xml($xmlData);
+
+                $programmeReader = new XMLReader();
+                $programmeReader->xml($xmlData);
             } else {
                 // Get uploaded file contents
                 $output = file_get_contents($this->epg->uploads[0]);
@@ -89,17 +122,16 @@ class ProcessEpgImport implements ShouldQueue
                 }
 
                 // Parse the XML data
-                $reader = new XMLReader();
-                $reader->xml($xmlData);
+                $channelReader = new XMLReader();
+                $channelReader->xml($xmlData);
+
+                $programmeReader = new XMLReader();
+                $programmeReader->xml($xmlData);
             }
 
             // If reader valid, process the data!
-            if ($reader) {
-                // Keep track of channels and programmes
-                $channels = [];
-                $programmes = [];
-
-                // Default channel data structure
+            if ($channelReader && $programmeReader) {
+                // Default data structures
                 $defaultChannelData = [
                     'name' => null,
                     'display_name' => null,
@@ -109,32 +141,40 @@ class ProcessEpgImport implements ShouldQueue
                     'epg_id' => $epgId,
                     'user_id' => $userId,
                     'import_batch_no' => $batchNo,
-                    'programmes' => [],
+                ];
+                $defaultProgrammeData = [
+                    'name' => null,
+                    'data' => null,
+                    'channel_id' => null,
+                    'epg_id' => $epgId,
+                    'user_id' => $userId,
+                    'import_batch_no' => $batchNo,
                 ];
 
-                // Loop through the XML data
-                while ($reader->read()) {
-                    // Only consider XML elements
-                    if ($reader->nodeType == XMLReader::ELEMENT) {
-                        /*
-                         * Process channel data
-                         */
-                        if ($reader->name === 'channel') {
-                            $channel_id = trim($reader->getAttribute('id'));
-                            $innerXML = $reader->readOuterXml();
-                            $innerReader = new XMLReader();
-                            $innerReader->xml($innerXML);
-                            $elementData = [
-                                ...$defaultChannelData
-                            ];
+                // Create a lazy collection to process the XML data
+                $channelData = LazyCollection::make(function () use ($channelReader, $defaultChannelData) {
+                    // Loop through the XML data
+                    while ($channelReader->read()) {
+                        // Only consider XML elements
+                        if ($channelReader->nodeType == XMLReader::ELEMENT) {
+                            /*
+                             * Process channel data
+                             */
+                            if ($channelReader->name === 'channel') {
+                                $channelId = trim($channelReader->getAttribute('id'));
+                                $innerXML = $channelReader->readOuterXml();
+                                $innerReader = new XMLReader();
+                                $innerReader->xml($innerXML);
+                                $elementData = [
+                                    ...$defaultChannelData
+                                ];
 
-                            // Get the node data
-                            while ($innerReader->read()) {
-                                if ($innerReader->nodeType == XMLReader::ELEMENT) {
-                                    if (!array_key_exists($channel_id, $channels)) {
+                                // Get the node data
+                                while ($innerReader->read()) {
+                                    if ($innerReader->nodeType == XMLReader::ELEMENT) {
                                         switch ($innerReader->name) {
                                             case 'channel':
-                                                $elementData['channel_id'] = $channel_id;
+                                                $elementData['channel_id'] = $channelId;
                                                 $elementData['name'] = trim($innerReader->readString());
                                                 break;
                                             case 'display-name':
@@ -147,40 +187,180 @@ class ProcessEpgImport implements ShouldQueue
                                         }
                                     }
                                 }
+
+                                // Close the inner XMLReader
+                                $innerReader->close();
+
+                                // Add the channel to the collection
+                                yield $elementData;
                             }
-
-                            // Add the channel to the collection
-                            $channels[$channel_id] = $elementData;
-
-                            // Close the inner XMLReader
-                            $innerReader->close();
-                        } elseif ($reader->name === 'programme') {
+                        }
+                    }
+                });
+                $programmData = LazyCollection::make(function () use ($programmeReader, $defaultProgrammeData) {
+                    // Loop through the XML data
+                    while ($programmeReader->read()) {
+                        // Only consider XML elements
+                        if ($programmeReader->nodeType == XMLReader::ELEMENT) {
                             /* 
                              * Process program data 
                              */
-                            $channel_id = trim($reader->getAttribute('channel'));
-                            $xmlData = trim($reader->readOuterXml());
-                            if (!array_key_exists($channel_id, $programmes)) {
-                                $programmes[$channel_id] = [];
+                            if ($programmeReader->name === 'programme') {
+                                $channelId = trim($programmeReader->getAttribute('channel'));
+                                $xmlData = trim($programmeReader->readOuterXml());
+                                yield [
+                                    ...$defaultProgrammeData,
+                                    'name' => trim($programmeReader->getAttribute('title')),
+                                    'data' => $xmlData ?? '',
+                                    'channel_id' => $channelId,
+                                ];
                             }
-                            $programmes[$channel_id][] = $xmlData;
                         }
                     }
+                });
+
+                // Process the data
+                $jobs = [];
+                foreach ($channelData->chunk(100)->all() as $chunk) {
+                    $jobs[] = new ProcessEpgChannelImport($chunk->toArray());
                 }
-                // Close the main XMLReader
-                $reader->close();
+                foreach ($programmData->chunk(100)->all() as $chunk) {
+                    $jobs[] = new ProcessEpgProgrammeImport($chunk->toArray());
+                }
+
+                // Close the XMLReaders, all done!
+                $channelReader->close();
+                $programmeReader->close();
+
+                // Batch the jobs
+                Bus::batch($jobs)
+                    ->then(function (Batch $batch) use ($epg, $batchNo) {
+                        // All jobs completed successfully...
+
+                        // Send notification
+                        Notification::make()
+                            ->success()
+                            ->title('EPG Synced')
+                            ->body("\"{$epg->name}\" has been synced successfully.")
+                            ->broadcast($epg->user);
+                        Notification::make()
+                            ->success()
+                            ->title('EPG Synced')
+                            ->body("\"{$epg->name}\" has been synced successfully.")
+                            ->sendToDatabase($epg->user);
+
+                        // Clear out invalid channels and programmes
+                        EpgChannel::where([
+                            ['epg_id', $epg->id],
+                            ['import_batch_no', '!=', $batchNo],
+                        ])->delete();
+                        EpgProgramme::where([
+                            ['epg_id', $epg->id],
+                            ['import_batch_no', '!=', $batchNo],
+                        ])->delete();
+
+                        // Update the playlist
+                        $epg->update([
+                            'status' => EpgStatus::Completed,
+                            'synced' => now(),
+                            'errors' => null,
+                        ]);
+                    })->catch(function (Batch $batch, Throwable $e) {
+                        // First batch job failure detected...
+                    })->finally(function (Batch $batch) {
+                        // The batch has finished executing...
+                    })->name('EPG programme import')->dispatch();
 
 
-                // @TODO: add to database...
 
 
-                // Update the EPG status
-                $this->epg->update([
-                    'status' => EpgStatus::Completed,
-                    'errors' => null,
-                ]);
+
+
+                // dump("EPG Processed! 🎉");
+
+
+                // $epg->update([
+                //     'status' => EpgStatus::Completed,
+                //     'synced' => now(),
+                //     'errors' => null,
+                // ]);
+
+
+
+                // // Attach the programmes to the channels
+                // $channels = array_map(function ($channel) use ($programmes) {
+                //     return [
+                //         ...$channel,
+                //         'programmes' => $programmes[$channel['channel_id']] ?? []
+                //     ];
+                // }, $channels);
+
+
+
+
+
+
+                // // Collect, chunk, and disatch the import jobs
+                // $jobs = [];
+                // foreach (array_chunk($channels, 100) as $chunk) {
+                //     $jobs[] = new ProcessEpgChannelImport($chunk);
+                // }
+                // Bus::batch($jobs)
+                //     ->then(function (Batch $batch) use ($epg, $batchNo) {
+                //         // All jobs completed successfully...
+
+                //         // Send notification
+                //         Notification::make()
+                //             ->success()
+                //             ->title('EPG Synced')
+                //             ->body("\"{$epg->name}\" has been synced successfully.")
+                //             ->broadcast($epg->user);
+                //         Notification::make()
+                //             ->success()
+                //             ->title('EPG Synced')
+                //             ->body("\"{$epg->name}\" has been synced successfully.")
+                //             ->sendToDatabase($epg->user);
+
+                //         // Clear out invalid groups (if any)
+                //         EpgChannel::where([
+                //             ['epg_id', $epg->id],
+                //             ['import_batch_no', '!=', $batchNo],
+                //         ])->delete();
+
+                //         // Update the playlist
+                //         $epg->update([
+                //             'status' => EpgStatus::Completed,
+                //             'synced' => now(),
+                //             'errors' => null,
+                //         ]);
+                //     })->catch(function (Batch $batch, Throwable $e) {
+                //         // First batch job failure detected...
+                //     })->finally(function (Batch $batch) {
+                //         // The batch has finished executing...
+                //     })->name('EPG programme import')->dispatch();
             } else {
-                throw new Exception('Failed to read the XML data.');
+                // Log the exception
+                logger()->error("Error processing \"{$this->epg->name}\"");
+
+                // Send notification
+                $error = "Invalid EPG file. Unable to read or download your EPG file. Please check the URL or uploaded file amd try again.";
+                Notification::make()
+                    ->danger()
+                    ->title("Error processing \"{$this->epg->name}\"")
+                    ->body('Please view your notifications for details.')
+                    ->broadcast($this->epg->user);
+                Notification::make()
+                    ->danger()
+                    ->title("Error processing \"{$this->epg->name}\"")
+                    ->body($error)
+                    ->sendToDatabase($this->epg->user);
+
+                // Update the playlist
+                $this->epg->update([
+                    'status' => EpgStatus::Failed,
+                    'synced' => now(),
+                    'errors' => $error,
+                ]);
             }
         } catch (Exception $e) {
             // Log the exception

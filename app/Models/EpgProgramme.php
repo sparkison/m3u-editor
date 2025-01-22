@@ -2,13 +2,11 @@
 
 namespace App\Models;
 
-use App\Enums\EpgStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Epg extends Model
+class EpgProgramme extends Model
 {
     use HasFactory;
 
@@ -19,10 +17,8 @@ class Epg extends Model
      */
     protected $casts = [
         'id' => 'integer',
-        'synced' => 'datetime',
         'user_id' => 'integer',
-        'uploads' => 'array',
-        'status' => EpgStatus::class,
+        'epg_id' => 'integer',
     ];
 
     public function user(): BelongsTo
@@ -30,13 +26,8 @@ class Epg extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function channels(): HasMany
+    public function epg(): BelongsTo
     {
-        return $this->hasMany(EpgChannel::class);
-    }
-
-    public function programmes(): HasMany
-    {
-        return $this->hasMany(EpgProgramme::class);
+        return $this->belongsTo(Epg::class);
     }
 }

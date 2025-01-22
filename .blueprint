@@ -1,10 +1,7 @@
 created:
-    - database/factories/EpgFactory.php
-    - database/factories/EpgChannelFactory.php
-    - database/migrations/2025_01_21_164226_create_epgs_table.php
-    - database/migrations/2025_01_21_164227_create_epg_channels_table.php
-    - app/Models/Epg.php
-    - app/Models/EpgChannel.php
+    - database/factories/EpgProgrammeFactory.php
+    - database/migrations/2025_01_22_200353_create_epg_programmes_table.php
+    - app/Models/EpgProgramme.php
 models:
     User: { name: string, email: string, email_verified_at: 'datetime nullable', password: string, remember_token: 'string nullable' }
     Playlist: { name: string, uuid: uuid, url: string, status: 'enum:pending,processing,completed,failed default:pending', prefix: 'string nullable', channels: 'unsignedInteger default:0', synced: 'datetime nullable', errors: 'longText nullable', user_id: 'id foreign:users', relationships: { belongsTo: User, hasMany: 'Channel, Group' } }
@@ -12,3 +9,5 @@ models:
     Channel: { name: string, enabled: 'boolean default:false', channel: 'unsignedInteger nullable', shift: 'unsignedInteger default:0', url: 'string nullable', logo: 'string nullable', group: 'string nullable', stream_id: 'string nullable', lang: 'string nullable', country: 'string nullable', user_id: 'id foreign:users', playlist_id: 'id foreign:playlists', group_id: 'id foreign:groups nullable', relationships: { belongsTo: 'User, Playlist, Group' } }
     Epg: { name: string, url: string, user_id: 'id foreign:users', relationships: { belongsTo: User } }
     EpgChannel: { name: string, display_name: 'string nullable', lang: 'string nullable', channel_id: 'string nullable', epg_id: 'id foreign:epgs', programmes: 'longText nullable', relationships: { belongsTo: Epg } }
+    Programme: { name: 'string nullable', channel_id: string, data: longText, user_id: 'id foreign:users', epg_id: 'id foreign:epgs', relationships: { belongsTo: 'User, Epg' } }
+    EpgProgramme: { name: 'string nullable', channel_id: string, import_batch_no: 'string nullable', data: longText, user_id: 'id foreign:users', epg_id: 'id foreign:epgs', relationships: { belongsTo: 'User, Epg' } }
