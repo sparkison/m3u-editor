@@ -3,6 +3,8 @@
 namespace App\Jobs;
 
 use App\Enums\PlaylistStatus;
+use App\Models\Channel;
+use App\Models\Group;
 use App\Models\Playlist;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -12,8 +14,8 @@ use zikwall\m3ucontentparser\M3UItem;
 use Illuminate\Support\Str;
 use Illuminate\Bus\Batch;
 use Illuminate\Support\Facades\Bus;
-use App\Models\Channel;
-use App\Models\Group;
+use Illuminate\Support\LazyCollection;
+
 use Throwable;
 
 class ProcessM3uImport implements ShouldQueue
@@ -50,59 +52,43 @@ class ProcessM3uImport implements ShouldQueue
 
         // Surround in a try/catch block to catch any exceptions
         try {
+            // Get the playlist
             $playlist = $this->playlist;
+
+            // Get the playlist details
             $playlistId = $playlist->id;
             $userId = $playlist->user_id;
             $batchNo = Str::uuid7()->toString();
+            $url = $playlist->url;
 
-            $parser = new M3UContentParser($playlist->url);
-            $parser->parse();
+            // Use LazyCollection to handle large files
+            $m3uData = LazyCollection::make(function () use ($url, $playlistId, $userId, $batchNo) {
+                $parser = new M3UContentParser($url);
+                $parser->parse();
 
-            $count = 0;
-            $channels = collect([]);
-            $groups = collect([]);
-
-            // Process each row of the M3U file
-            foreach ($parser->all() as $item) {
-                /**
-                 * @var M3UItem $item 
-                 */
-                $channels->push([
-                    'playlist_id' => $playlistId,
-                    'user_id' => $userId,
-                    'stream_id' => $item->getId(), // usually null/empty
-                    'name' => $item->getTvgName(),
-                    'url' => $item->getTvgUrl(),
-                    'logo' => $item->getTvgLogo(),
-                    'group' => $item->getGroupTitle(),
-                    'lang' => $item->getLanguage(), // usually null/empty
-                    'country' => $item->getCountry(), // usually null/empty
-                    'import_batch_no' => $batchNo
-                ]);
-
-                // Maintain a list of unique channel groups
-                if (!$groups->contains('title', $item->getGroupTitle())) {
-                    $groups->push([
+                // Process each row of the M3U file
+                foreach ($parser->all() as $item) {
+                    yield [
                         'playlist_id' => $playlistId,
                         'user_id' => $userId,
-                        'name' => $item->getGroupTitle(),
+                        'stream_id' => $item->getId(), // usually null/empty
+                        'name' => $item->getTvgName(),
+                        'url' => $item->getTvgUrl(),
+                        'logo' => $item->getTvgLogo(),
+                        'group' => $item->getGroupTitle(),
+                        'lang' => $item->getLanguage(), // usually null/empty
+                        'country' => $item->getCountry(), // usually null/empty
                         'import_batch_no' => $batchNo
-                    ]);
+                    ];
                 }
-
-                // Increment the counter
-                $count++;
-            }
+            });
 
             $jobs = collect([]);
-            foreach ($groups->chunk(100) as $chunk) {
-                $jobs->push(new ProcessGroupImport($chunk));
-            }
-            foreach ($channels->chunk(100) as $chunk) {
-                $jobs->push(new ProcessChannelImport($playlistId, $batchNo, $chunk));
+            foreach ($m3uData->chunk(100) as $chunk) {
+                $jobs->push(new ProcessChannelAndGroupImport($playlistId, $batchNo, $chunk->toArray()));
             }
             Bus::batch($jobs)
-                ->then(function (Batch $batch) use ($playlist, $count, $batchNo) {
+                ->then(function (Batch $batch) use ($playlist, $batchNo) {
                     // All jobs completed successfully...
 
                     // Send notification
@@ -132,7 +118,7 @@ class ProcessM3uImport implements ShouldQueue
                     // Update the playlist
                     $playlist->update([
                         'status' => PlaylistStatus::Completed,
-                        'channels' => $count,
+                        'channels' => 0, // not using...
                         'synced' => now(),
                         'errors' => null,
                     ]);
