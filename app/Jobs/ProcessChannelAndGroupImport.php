@@ -43,12 +43,7 @@ class ProcessChannelAndGroupImport implements ShouldQueue
                 'group' => $channel['group'],
             ]);
 
-            // Don't overwrite the logo if currently set
-            if ($model->logo) {
-                unset($channel['logo']);
-            }
-
-            // Get or create the group
+            // Find/create the group
             $group = Group::firstOrCreate([
                 'playlist_id' => $channel['playlist_id'],
                 'user_id' => $channel['user_id'],
@@ -60,6 +55,11 @@ class ProcessChannelAndGroupImport implements ShouldQueue
                 $group->update([
                     'import_batch_no' => $this->batchNo
                 ]);
+            }
+
+            // Don't overwrite channel the logo if currently set
+            if ($model->logo) {
+                unset($channel['logo']);
             }
 
             // Update the channel with the group ID

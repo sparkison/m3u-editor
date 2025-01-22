@@ -62,15 +62,19 @@ class ProcessM3uImport implements ShouldQueue
             $url = $playlist->url;
 
             // Use LazyCollection to handle large files
-            $m3uData = LazyCollection::make(function () use ($url, $playlistId, $userId, $batchNo) {
+            $commonFields = [
+                'playlist_id' => $playlistId,
+                'user_id' => $userId,
+                'import_batch_no' => $batchNo
+            ];
+            $m3uData = LazyCollection::make(function () use ($url, $commonFields) {
                 $parser = new M3UContentParser($url);
                 $parser->parse();
 
                 // Process each row of the M3U file
                 foreach ($parser->all() as $item) {
                     yield [
-                        'playlist_id' => $playlistId,
-                        'user_id' => $userId,
+                        ...$commonFields,
                         'stream_id' => $item->getId(), // usually null/empty
                         'name' => $item->getTvgName(),
                         'url' => $item->getTvgUrl(),
@@ -78,14 +82,17 @@ class ProcessM3uImport implements ShouldQueue
                         'group' => $item->getGroupTitle(),
                         'lang' => $item->getLanguage(), // usually null/empty
                         'country' => $item->getCountry(), // usually null/empty
-                        'import_batch_no' => $batchNo
                     ];
                 }
             });
 
-            $jobs = collect([]);
-            foreach ($m3uData->chunk(100) as $chunk) {
-                $jobs->push(new ProcessChannelAndGroupImport($playlistId, $batchNo, $chunk->toArray()));
+            $jobs = [];
+            foreach ($m3uData->chunk(500) as $chunk) {
+                $jobs[] = new ProcessChannelAndGroupImport(
+                    $playlistId,
+                    $batchNo,
+                    $chunk->toArray()
+                );
             }
             Bus::batch($jobs)
                 ->then(function (Batch $batch) use ($playlist, $batchNo) {
