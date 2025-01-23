@@ -22,6 +22,7 @@ class Playlist extends Model
         'channels' => 'integer',
         'synced' => 'datetime',
         'user_id' => 'integer',
+        'sync_time' => 'float',
         'status' => PlaylistStatus::class,
     ];
 
