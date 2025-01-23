@@ -73,7 +73,7 @@ class ProcessM3uImport implements ShouldQueue
             $tmpDir = (new TemporaryDirectory())->location('local')->create();
             $tmpPath = $tmpDir->path($tmpFile);
             Http::sink($tmpPath)->withUserAgent($userAgent)
-                ->timeout(-1)
+                ->timeout(60 * 5) // set timeout to five minues
                 ->throw()
                 ->get($url->toString());
 
