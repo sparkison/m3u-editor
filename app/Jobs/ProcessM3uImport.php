@@ -70,12 +70,10 @@ class ProcessM3uImport implements ShouldQueue
 
             // We need to grab the file contents first and set to temp file
             $userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13';
-            $tmpDir = (new TemporaryDirectory())
-                ->location('public')
-                ->force()
-                ->create();
+            $tmpDir = (new TemporaryDirectory())->location('local')->create();
             $tmpPath = $tmpDir->path($tmpFile);
             Http::sink($tmpPath)->withUserAgent($userAgent)
+                ->timeout(-1)
                 ->throw()
                 ->get($url->toString());
 
