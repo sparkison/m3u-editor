@@ -45,7 +45,8 @@ class PlaylistResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('url')
                     ->label('Playlist URL')
-                    ->toggleable()
+                    ->wrap()
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->searchable(),
                 Tables\Columns\TextColumn::make('groups_count')
                     ->label('Groups')
@@ -66,6 +67,10 @@ class PlaylistResource extends Resource
                 Tables\Columns\TextColumn::make('synced')
                     ->label('Last Synced')
                     ->since()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('sync_time')
+                    ->label('Sync Time')
+                    ->formatStateUsing(fn(string $state): string => gmdate('H:i:s', $state))
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()

@@ -124,7 +124,7 @@ class ProcessM3uImport implements ShouldQueue
                         $chunk
                     );
                 }
-                foreach (array_chunk($channels, 200) as $chunk) {
+                foreach (array_chunk($channels, 500) as $chunk) {
                     $jobs[] = new ProcessChannelImport(
                         $playlistId,
                         $batchNo,
