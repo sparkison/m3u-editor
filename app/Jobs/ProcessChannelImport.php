@@ -34,8 +34,12 @@ class ProcessChannelImport implements ShouldQueue
         }
 
         // Get the groups
-        $groups = Group::where('playlist_id', $this->playlistId)
-            ->where('import_batch_no', $this->batchNo)
+        $playlistId = $this->playlistId;
+        $batchNo = $this->batchNo;
+
+        // Cache results for 10min
+        $groups = Group::where('playlist_id', $playlistId)
+            ->where('import_batch_no', $batchNo)
             ->select('id', 'name')
             ->get();
 

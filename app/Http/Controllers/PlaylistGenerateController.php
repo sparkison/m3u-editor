@@ -28,7 +28,7 @@ class PlaylistGenerateController extends Controller
                 // Output the enabled channels
                 echo "#EXTM3U\n";
                 foreach ($channels as $channel) {
-                    echo "#EXTINF:-1 tvg-chno=\"$channel->channel\" tvg-id=\"$channel->name\" tvg-name=\"$channel->name\" tvg-logo=\"$channel->logo\" group-title=\"$channel->group\"," . $channel->name . "\n";
+                    echo "#EXTINF:-1 tvg-chno=\"$channel->channel\" tvg-id=\"$channel->stream_id\" tvg-name=\"$channel->name\" tvg-logo=\"$channel->logo\" group-title=\"$channel->group\"," . $channel->title . "\n";
                     echo $channel->url . "\n";
                 }
             },

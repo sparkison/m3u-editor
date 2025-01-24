@@ -51,10 +51,17 @@ class ChannelResource extends Resource
             ->columns([
                 Tables\Columns\ImageColumn::make('logo')
                     ->circular(),
+                Tables\Columns\TextColumn::make('title')
+                    ->searchable()
+                    ->wrap()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
-                    ->limit(40)
+                    ->wrap()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('stream_id')
+                    ->searchable()
+                    ->toggleable(),
                 Tables\Columns\ToggleColumn::make('enabled')
                     ->sortable(),
                 Tables\Columns\TextInputColumn::make('channel')
@@ -70,9 +77,6 @@ class ChannelResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('url')
                     ->url(fn($record): string => $record->url)
-                    ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('stream_id')
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('lang')

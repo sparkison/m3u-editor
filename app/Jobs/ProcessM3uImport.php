@@ -6,16 +6,15 @@ use App\Enums\PlaylistStatus;
 use App\Models\Channel;
 use App\Models\Group;
 use App\Models\Playlist;
+use M3uParser\M3uParser;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use zikwall\m3ucontentparser\M3UContentParser;
 use Illuminate\Support\Str;
 use Illuminate\Bus\Batch;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\LazyCollection;
-use Spatie\TemporaryDirectory\TemporaryDirectory;
 
 use Throwable;
 
@@ -23,8 +22,8 @@ class ProcessM3uImport implements ShouldQueue
 {
     use Queueable;
 
-    // Giving a timeout of 10 minutes to the Job to process the file
-    public $timeout = 600;
+    // Giving a timeout of 15 minutes to the Job to process the file
+    public $timeout = 60 * 15;
 
     /**
      * Create a new job instance.
@@ -62,80 +61,90 @@ class ProcessM3uImport implements ShouldQueue
             // Get the playlist details
             $playlistId = $playlist->id;
             $userId = $playlist->user_id;
-            $batchNo = Str::uuid7()->toString();
+            $batchNo = Str::orderedUuid()->toString();
 
             // Normalize the playlist url and get the filename
             $url = str($playlist->url)->replace(' ', '%20');
-            $tmpFile = $url->afterLast('/') . '.tmp';
 
             // We need to grab the file contents first and set to temp file
             $userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13';
-            $tmpDir = (new TemporaryDirectory())->location('local')->create();
-            $tmpPath = $tmpDir->path($tmpFile);
-            Http::sink($tmpPath)->withUserAgent($userAgent)
+            $results = Http::withUserAgent($userAgent)
                 ->timeout(60 * 5) // set timeout to five minues
                 ->throw()
                 ->get($url->toString());
 
-            // If fetched successfully, process the downloaded file!
-            if (is_file($tmpPath)) {
-                // Use LazyCollection to handle large files
-                $commonFields = [
+            // If fetched successfully, process the results!
+            if ($results) {
+                $m3uParser = new M3uParser();
+                $m3uParser->addDefaultTags();
+                $data = $m3uParser->parse($results);
+
+                // Setup common field values
+                $channelFields = [
+                    'title' => null,
+                    'name' => null,
+                    'url' => null,
+                    'logo' => null,
+                    'group' => null,
+                    'stream_id' => null,
+                    'lang' => null,
+                    'country' => null,
                     'playlist_id' => $playlistId,
                     'user_id' => $userId,
-                    'import_batch_no' => $batchNo
+                    'import_batch_no' => $batchNo,
                 ];
 
-                // Setup the parser
-                $parser = new M3UContentParser($tmpPath);
-                $parser->parse();
+                // Setup the attribute -> key mapping
+                $attributes = [
+                    'tvg-name' => 'name',
+                    'tvg-id' => 'stream_id',
+                    'tvg-logo' => 'logo',
+                    'group-title' => 'group',
+                ];
 
                 // Extract the channels and groups from the m3u
-                $groups = [];
-                $channels = [];
-                foreach ($parser->all() as $item) {
-                    $groupTitle = $item->getGroupTitle();
-                    $channels[] = [
-                        ...$commonFields,
-                        'stream_id' => $item->getId(), // usually null/empty
-                        'name' => $item->getTvgName(),
-                        'url' => $item->getTvgUrl(),
-                        'logo' => $item->getTvgLogo(),
-                        'group' => $groupTitle,
-                        'lang' => $item->getLanguage(), // usually null/empty
-                        'country' => $item->getCountry(), // usually null/empty
-                    ];
-                    if (!in_array($groupTitle, $groups)) {
-                        $groups[] = $groupTitle;
-                    }
-                }
-                $groups = array_map(function ($name) use ($commonFields) {
-                    return [...$commonFields, 'name' => $name];
-                }, $groups);
-
-                // Chunk the jobs
                 $jobs = [];
-                foreach (array_chunk($groups, 200) as $chunk) {
-                    $jobs[] = new ProcessGroupImport(
-                        $playlistId,
-                        $batchNo,
-                        $chunk
-                    );
-                }
-                foreach (array_chunk($channels, 500) as $chunk) {
-                    $jobs[] = new ProcessChannelImport(
-                        $playlistId,
-                        $batchNo,
-                        $chunk
-                    );
-                }
-
-                // Clean up the temporary directory and files
-                $tmpDir->delete();
-
+                LazyCollection::make(function () use ($data, $channelFields, $attributes) {
+                    foreach ($data as $item) {
+                        $channel = [
+                            ...$channelFields,
+                            'url' => $item->getPath(),
+                        ];
+                        foreach ($item->getExtTags() as $extTag) {
+                            if ($extTag instanceof \M3uParser\Tag\ExtInf) {
+                                $channel['title'] = $extTag->getTitle();
+                                foreach ($attributes as $attribute => $key) {
+                                    if ($extTag->hasAttribute($attribute)) {
+                                        $channel[$key] = $extTag->getAttribute($attribute);
+                                    }
+                                }
+                            }
+                        }
+                        yield $channel;
+                    }
+                })->chunk(50)->each(function (LazyCollection $channels) use (&$jobs, $userId, $playlistId, $batchNo) {
+                    $groups = $channels->map(fn($ch) => [
+                        'name' => $ch['group'],
+                        'playlist_id' => $playlistId,
+                        'user_id' => $userId,
+                        'import_batch_no' => $batchNo,
+                    ]);
+                    // Add the jobs to the batch
+                    // Import the groups first, then the channels
+                    $jobs[] = new ProcessGroupImport($userId, $playlistId, $batchNo, $groups->toArray());
+                    $jobs[] = new ProcessChannelImport($playlistId, $batchNo, $channels->toArray());
+                });
                 Bus::batch($jobs)
-                    ->then(function (Batch $batch) use ($playlist, $batchNo, $start) {
-                        // All jobs completed successfully...
+                    ->then(function (Batch $batch)  {
+                        // The batch has been completed successfully...
+                    })->catch(function (Batch $batch, Throwable $e) {
+                        // First batch job failure detected...
+                    })->finally(function (Batch $batch) use ($playlist, $batchNo, $start) {
+                        // All jobs completed...
+
+                        // Calculate the time taken to complete the import
+                        $completedIn = $start->diffInSeconds(now());
+                        $completedInRounded = round($completedIn, 2);
 
                         // Send notification
                         Notification::make()
@@ -146,7 +155,7 @@ class ProcessM3uImport implements ShouldQueue
                         Notification::make()
                             ->success()
                             ->title('Playlist Synced')
-                            ->body("\"{$playlist->name}\" has been synced successfully.")
+                            ->body("\"{$playlist->name}\" has been synced successfully. Import completed in {$completedInRounded} seconds.")
                             ->sendToDatabase($playlist->user);
 
                         // Clear out invalid groups (if any)
@@ -167,12 +176,8 @@ class ProcessM3uImport implements ShouldQueue
                             'channels' => 0, // not using...
                             'synced' => now(),
                             'errors' => null,
-                            'sync_time' => $start->diffInSeconds(now())
+                            'sync_time' => $completedIn
                         ]);
-                    })->catch(function (Batch $batch, Throwable $e) {
-                        // First batch job failure detected...
-                    })->finally(function (Batch $batch) {
-                        // The batch has finished executing...
                     })->name('Playlist channel import')->dispatch();
             } else {
                 // Update the playlist

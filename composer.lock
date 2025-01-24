@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "39fa4ff1965a2743484fc211a3ef8189",
+    "content-hash": "cf3871305b09f2f3583b0e9badf544b8",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -1663,6 +1663,55 @@
                 }
             ],
             "time": "2023-10-12T05:21:21+00:00"
+        },
+        {
+            "name": "gemorroj/m3u-parser",
+            "version": "5.5.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Gemorroj/M3uParser.git",
+                "reference": "b78b68fb55bb4374a2dab7482c934dd2eddc2070"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Gemorroj/M3uParser/zipball/b78b68fb55bb4374a2dab7482c934dd2eddc2070",
+                "reference": "b78b68fb55bb4374a2dab7482c934dd2eddc2070",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.0.2"
+            },
+            "require-dev": {
+                "friendsofphp/php-cs-fixer": "^3.41",
+                "phpstan/phpstan": "^1.10",
+                "phpunit/phpunit": "^9.6"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "M3uParser\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "LGPL-3.0-or-later"
+            ],
+            "authors": [
+                {
+                    "name": "Gemorroj"
+                }
+            ],
+            "description": "m3u playlist parser/generator",
+            "keywords": [
+                "m3u",
+                "m3u8",
+                "playlist"
+            ],
+            "support": {
+                "issues": "https://github.com/Gemorroj/M3uParser/issues",
+                "source": "https://github.com/Gemorroj/M3uParser/tree/5.5.0"
+            },
+            "time": "2023-12-22T13:47:59+00:00"
         },
         {
             "name": "graham-campbell/result-type",
@@ -8922,43 +8971,6 @@
                 "source": "https://github.com/webmozarts/assert/tree/1.11.0"
             },
             "time": "2022-06-03T18:03:27+00:00"
-        },
-        {
-            "name": "zikwall/m3u-content-parser",
-            "version": "dev-master",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/zikwall/m3u-content-parser.git",
-                "reference": "c7b058b38dc5e50e53bc0d7c07636ab15a78fbdf"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/zikwall/m3u-content-parser/zipball/c7b058b38dc5e50e53bc0d7c07636ab15a78fbdf",
-                "reference": "c7b058b38dc5e50e53bc0d7c07636ab15a78fbdf",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=7.1.0"
-            },
-            "default-branch": true,
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "zikwall\\m3ucontentparser\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "authors": [
-                {
-                    "name": "Andrey Kapitonov",
-                    "email": "andrey.kapitonov.96@gmail.com"
-                }
-            ],
-            "support": {
-                "issues": "https://github.com/zikwall/m3u-content-parser/issues?state=open",
-                "source": "https://github.com/zikwall/m3u-content-parser"
-            },
-            "time": "2022-04-06T12:35:47+00:00"
         }
     ],
     "packages-dev": [
@@ -12296,9 +12308,7 @@
     ],
     "aliases": [],
     "minimum-stability": "dev",
-    "stability-flags": {
-        "zikwall/m3u-content-parser": 20
-    },
+    "stability-flags": {},
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {

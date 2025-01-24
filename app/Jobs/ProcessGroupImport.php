@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Models\Channel;
 use App\Models\Group;
 use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -17,6 +16,7 @@ class ProcessGroupImport implements ShouldQueue
      * Create a new job instance.
      */
     public function __construct(
+        public int $userId,
         public int $playlistId,
         public string $batchNo,
         public array $groups
@@ -34,18 +34,37 @@ class ProcessGroupImport implements ShouldQueue
             return;
         }
 
-        // Link the channel groups to the channels
-        foreach ($this->groups as $group) {
-            $model = Group::firstOrCreate([
-                'name' => $group['name'],
-                'playlist_id' => $group['playlist_id'],
-                'user_id' => $group['user_id'],
-            ]);
+        // Get the groups
+        $playlistId = $this->playlistId;
+        $userId = $this->userId;
+        $batchNo = $this->batchNo;
 
-            // Update the channel with the group ID
-            $model->update([
-                ...$group,
-            ]);
+        // Get the group names from this batch of channels
+        $groupNames = array_map(fn($group) => $group['name'], $this->groups);
+        $groupWhere = [
+            ['playlist_id', $playlistId],
+            ['user_id', $userId],
+        ];
+
+        // Update the group batch number
+        Group::where($groupWhere)
+            ->whereIn('name', $groupNames)
+            ->update(['import_batch_no' => $batchNo]);
+
+        // Get the groups
+        $groups = Group::where($groupWhere)
+            ->whereIn('name', $groupNames)
+            ->select('id', 'name')->get();
+
+        // Create the groups if they don't exist
+        foreach ($this->groups as $group) {
+            // Check if the group already exists
+            if ($groups->contains('name', $group['name'])) {
+                continue;
+            }
+
+            // Doesn't exist, create it!
+            Group::create($group);
         }
     }
 }
