@@ -122,7 +122,7 @@ class ProcessM3uImport implements ShouldQueue
                         }
                         yield $channel;
                     }
-                })->chunk(50)->each(function (LazyCollection $channels) use (&$jobs, $userId, $playlistId, $batchNo) {
+                })->chunk(100)->each(function (LazyCollection $channels) use (&$jobs, $userId, $playlistId, $batchNo) {
                     $groups = $channels->map(fn($ch) => [
                         'name' => $ch['group'],
                         'playlist_id' => $playlistId,
