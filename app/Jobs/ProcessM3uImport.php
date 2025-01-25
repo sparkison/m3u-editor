@@ -135,6 +135,7 @@ class ProcessM3uImport implements ShouldQueue
                     $jobs[] = new ProcessChannelImport($playlistId, $batchNo, $channels->toArray());
                 });
                 Bus::batch($jobs)
+                    ->onConnection('queue')
                     ->then(function (Batch $batch)  {
                         // The batch has been completed successfully...
                     })->catch(function (Batch $batch, Throwable $e) {
