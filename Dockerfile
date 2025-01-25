@@ -97,7 +97,7 @@ RUN apk --no-cache add \
         php84-pcntl \
     && ln -s /usr/bin/php84 /usr/bin/php
 
-COPY ./docker/8.4/php.ini /etc/php84/cli/conf.d/99-sail.ini
+COPY ./docker/8.4/php.ini /etc/php84/conf.d/99-sail.ini
 
 # Configure supervisord
 RUN touch /var/run/supervisord.pid \
