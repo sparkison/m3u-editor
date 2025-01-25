@@ -30,7 +30,7 @@ RUN apk update \
         ca-certificates \
         nodejs \
         npm \
-        # redis \
+        redis \
         git
 
 # Install PHP 8.4

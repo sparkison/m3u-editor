@@ -1,9 +1,9 @@
 services:
     m3u-editor:
-        # build:
-        #     dockerfile: Dockerfile
-        # image: "sail-8.4/app"
-        image: sparkison/m3u-editor:dev
+        build:
+            dockerfile: Dockerfile
+        image: "sail-8.4/app"
+        # image: sparkison/m3u-editor:dev
         ports:
             # - '${VITE_PORT:-5173}:${VITE_PORT:-5173}' # Vite (development)
             - "${REVERB_PORT:-36800}:${REVERB_PORT:-36800}" # Reverb
