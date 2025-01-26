@@ -44,10 +44,10 @@ class ProcessM3uImport implements ShouldQueue
         }
 
         // Update the playlist status to processing
-        // $this->playlist->update([
-        //     'status' => PlaylistStatus::Processing,
-        //     'errors' => null,
-        // ]);
+        $this->playlist->update([
+            'status' => PlaylistStatus::Processing,
+            'errors' => null,
+        ]);
 
         // Flag job start time
         $start = now();
