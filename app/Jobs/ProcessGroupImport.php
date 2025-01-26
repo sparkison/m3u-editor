@@ -10,7 +10,7 @@ use Illuminate\Foundation\Queue\Queueable;
 
 class ProcessGroupImport implements ShouldQueue
 {
-    use Batchable, Queueable;
+    use Queueable;
 
     /**
      * Create a new job instance.
@@ -29,11 +29,6 @@ class ProcessGroupImport implements ShouldQueue
      */
     public function handle(): void
     {
-        if ($this->batch()->cancelled()) {
-            // Determine if the batch has been cancelled...
-            return;
-        }
-
         // Get the groups
         $playlistId = $this->playlistId;
         $userId = $this->userId;

@@ -180,16 +180,16 @@ return [
     */
 
     'defaults' => [
-        'supervisor-1' => [
+        'm3u-editor' => [
             'connection' => 'redis',
             'queue' => ['default'],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
-            'maxProcesses' => 1,
+            'maxProcesses' => 10,
             'maxTime' => 0,
             'maxJobs' => 0,
             'memory' => 128,
-            'tries' => 1,
+            'tries' => 3,
             'timeout' => 60,
             'nice' => 0,
         ],
@@ -197,11 +197,7 @@ return [
 
     'environments' => [
         '*' => [
-            'supervisor-1' => [
-                'maxProcesses' => 5,
-                'balanceMaxShift' => 1,
-                'balanceCooldown' => 3,
-            ],
+            // ...
         ],
     ],
 ];

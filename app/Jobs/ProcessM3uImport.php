@@ -122,7 +122,7 @@ class ProcessM3uImport implements ShouldQueue
                         }
                         yield $channel;
                     }
-                })->chunk(100)->each(function (LazyCollection $channels) use (&$jobs, $userId, $playlistId, $batchNo) {
+                })->chunk(200)->each(function (LazyCollection $channels) use (&$jobs, $userId, $playlistId, $batchNo) {
                     $groups = $channels->map(fn($ch) => [
                         'name' => $ch['group'],
                         'playlist_id' => $playlistId,
@@ -134,56 +134,32 @@ class ProcessM3uImport implements ShouldQueue
                     $jobs[] = new ProcessGroupImport($userId, $playlistId, $batchNo, $groups->toArray());
                     $jobs[] = new ProcessChannelImport($playlistId, $batchNo, $channels->toArray());
                 });
-                Bus::batch($jobs)
-                    ->onConnection('redis')
-                    ->then(function (Batch $batch)  {
-                        // The batch has been completed successfully...
-                    })->catch(function (Batch $batch, Throwable $e) {
-                        // First batch job failure detected...
-                    })->finally(function (Batch $batch) use ($playlist, $batchNo, $start) {
-                        // All jobs completed...
 
-                        // Calculate the time taken to complete the import
-                        $completedIn = $start->diffInSeconds(now());
-                        $completedInRounded = round($completedIn, 2);
-
-                        // Send notification
+                // Last job in the batch
+                $jobs[] = new ProcessM3uImportComplete($userId, $playlistId, $batchNo, $start);
+                Bus::chain($jobs)
+                    ->onConnection('redis') // force to use redis connection
+                    ->catch(function (Throwable $e) use ($playlist) {
+                        $error = "Unable to process the proved playlist: {$e->getMessage()}";
                         Notification::make()
-                            ->success()
-                            ->title('Playlist Synced')
-                            ->body("\"{$playlist->name}\" has been synced successfully.")
+                            ->danger()
+                            ->title("Error processing \"{$playlist->name}\"")
+                            ->body('Please view your notifications for details.')
                             ->broadcast($playlist->user);
                         Notification::make()
-                            ->success()
-                            ->title('Playlist Synced')
-                            ->body("\"{$playlist->name}\" has been synced successfully. Import completed in {$completedInRounded} seconds.")
+                            ->danger()
+                            ->title("Error processing \"{$playlist->name}\"")
+                            ->body($error)
                             ->sendToDatabase($playlist->user);
-
-                        // Clear out invalid groups (if any)
-                        Group::where([
-                            ['playlist_id', $playlist->id],
-                            ['import_batch_no', '!=', $batchNo],
-                        ])->delete();
-
-                        // Clear out invalid channels (if any)
-                        Channel::where([
-                            ['playlist_id', $playlist->id],
-                            ['import_batch_no', '!=', $batchNo],
-                        ])->delete();
-
-                        // Update the playlist
                         $playlist->update([
-                            'status' => PlaylistStatus::Completed,
+                            'status' => PlaylistStatus::Failed,
                             'channels' => 0, // not using...
                             'synced' => now(),
-                            'errors' => null,
-                            'sync_time' => $completedIn
+                            'errors' => $error,
                         ]);
-                    })->name('Playlist channel import')->dispatch();
+                    })->dispatch();
             } else {
-                // Update the playlist
                 $error = "Unable to fetch the playlist from the provided URL.";
-                // Send notification
                 Notification::make()
                     ->danger()
                     ->title("Error processing \"{$this->playlist->name}\"")

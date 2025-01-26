@@ -58,4 +58,12 @@ class User extends Authenticatable implements FilamentUser
         return true;
         // return str_ends_with($this->email, '@yourdomain.com') && $this->hasVerifiedEmail();
     }
+
+    /**
+     * Users playlists.
+     */
+    public function playlists()
+    {
+        return $this->hasMany(Playlist::class);
+    }
 }
