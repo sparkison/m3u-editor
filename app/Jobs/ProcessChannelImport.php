@@ -30,6 +30,11 @@ class ProcessChannelImport implements ShouldQueue
     {
         // Link the channel groups to the channels
         foreach ($this->channels as $channel) {
+            // Make sure name is set
+            if (!isset($channel['name'])) {
+                continue;
+            }
+
             // Find/create the channel
             $model = Channel::firstOrCreate([
                 'name' => $channel['name'],
