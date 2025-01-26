@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'default' => env('QUEUE_CONNECTION', 'database'),
+    'default' => 'redis', // env('QUEUE_CONNECTION', 'database'),
 
     /*
     |--------------------------------------------------------------------------
