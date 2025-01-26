@@ -180,7 +180,7 @@ return [
     */
 
     'defaults' => [
-        'm3u-editor' => [
+        'm3u-editor-queue' => [
             'connection' => 'redis',
             'queue' => ['default'],
             'balance' => 'auto',

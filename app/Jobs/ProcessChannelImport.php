@@ -17,7 +17,7 @@ class ProcessChannelImport implements ShouldQueue
     public function __construct(
         public int $playlistId,
         public string $batchNo,
-        public Group $group,
+        public ?Group $group,
         public array $channels
     ) {
         //

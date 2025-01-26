@@ -44,10 +44,10 @@ class ProcessM3uImport implements ShouldQueue
         }
 
         // Update the playlist status to processing
-        $this->playlist->update([
-            'status' => PlaylistStatus::Processing,
-            'errors' => null,
-        ]);
+        // $this->playlist->update([
+        //     'status' => PlaylistStatus::Processing,
+        //     'errors' => null,
+        // ]);
 
         // Flag job start time
         $start = now();
@@ -67,16 +67,16 @@ class ProcessM3uImport implements ShouldQueue
 
             // We need to grab the file contents first and set to temp file
             $userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13';
-            $results = Http::withUserAgent($userAgent)
+            $response = Http::withUserAgent($userAgent)
                 ->timeout(60 * 5) // set timeout to five minues
                 ->throw()
                 ->get($url->toString());
 
             // If fetched successfully, process the results!
-            if ($results) {
+            if ($response->ok()) {
                 $m3uParser = new M3uParser();
                 $m3uParser->addDefaultTags();
-                $data = $m3uParser->parse($results);
+                $data = $m3uParser->parse($response->body());
 
                 // Setup common field values
                 $channelFields = [
@@ -121,18 +121,20 @@ class ProcessM3uImport implements ShouldQueue
                         }
                         yield $channel;
                     }
-                })->groupBy('group')->chunk(200)->each(function (LazyCollection $grouped) use (&$jobs, $userId, $playlistId, $batchNo) {
-                    foreach ($grouped->toArray() as $group => $channels) {
+                })->groupBy('group')->chunk(10)->each(function (LazyCollection $grouped) use (&$jobs, $userId, $playlistId, $batchNo) {
+                    $grouped->each(function ($channels, $groupName) use (&$jobs, $userId, $playlistId, $batchNo) {
                         $group = Group::firstOrCreate([
-                            ['name', $group],
-                            ['playlist_id', $playlistId],
-                            ['user_id', $userId],
+                            'name' => $groupName,
+                            'playlist_id' => $playlistId,
+                            'user_id' => $userId,
                         ]);
                         $group->update([
                             'import_batch_no' => $batchNo,
                         ]);
-                        $jobs[] = new ProcessChannelImport($playlistId, $batchNo, $group, $channels);
-                    }
+                        $channels->chunk(100)->each(function ($chunk) use (&$jobs, $playlistId, $batchNo, $group) {
+                            $jobs[] = new ProcessChannelImport($playlistId, $batchNo, $group, $chunk->toArray());
+                        });
+                    });
                 });
 
                 // Last job in the batch
