@@ -8,7 +8,6 @@ use App\Models\Group;
 use App\Models\User;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
-use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 

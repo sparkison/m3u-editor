@@ -3,7 +3,6 @@
 namespace App\Jobs;
 
 use App\Enums\PlaylistStatus;
-use App\Models\Channel;
 use App\Models\Group;
 use App\Models\Playlist;
 use M3uParser\M3uParser;
@@ -45,10 +44,10 @@ class ProcessM3uImport implements ShouldQueue
         }
 
         // Update the playlist status to processing
-        $this->playlist->update([
-            'status' => PlaylistStatus::Processing,
-            'errors' => null,
-        ]);
+        // $this->playlist->update([
+        //     'status' => PlaylistStatus::Processing,
+        //     'errors' => null,
+        // ]);
 
         // Flag job start time
         $start = now();
@@ -122,17 +121,18 @@ class ProcessM3uImport implements ShouldQueue
                         }
                         yield $channel;
                     }
-                })->chunk(200)->each(function (LazyCollection $channels) use (&$jobs, $userId, $playlistId, $batchNo) {
-                    $groups = $channels->map(fn($ch) => [
-                        'name' => $ch['group'],
-                        'playlist_id' => $playlistId,
-                        'user_id' => $userId,
-                        'import_batch_no' => $batchNo,
-                    ]);
-                    // Add the jobs to the batch
-                    // Import the groups first, then the channels
-                    $jobs[] = new ProcessGroupImport($userId, $playlistId, $batchNo, $groups->toArray());
-                    $jobs[] = new ProcessChannelImport($playlistId, $batchNo, $channels->toArray());
+                })->groupBy('group')->chunk(200)->each(function (LazyCollection $grouped) use (&$jobs, $userId, $playlistId, $batchNo) {
+                    foreach ($grouped->toArray() as $group => $channels) {
+                        $group = Group::firstOrCreate([
+                            ['name', $group],
+                            ['playlist_id', $playlistId],
+                            ['user_id', $userId],
+                        ]);
+                        $group->update([
+                            'import_batch_no' => $batchNo,
+                        ]);
+                        $jobs[] = new ProcessChannelImport($playlistId, $batchNo, $group, $channels);
+                    }
                 });
 
                 // Last job in the batch
