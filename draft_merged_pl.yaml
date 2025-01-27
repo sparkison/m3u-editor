@@ -1,0 +1,9 @@
+models:
+  MergedPlaylist:
+    name: string
+    uuid: uuid
+    user_id: id foreign:users
+    relationships:
+      belongsTo: User
+      belongsToMany: Channel
+
