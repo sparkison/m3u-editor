@@ -55,7 +55,7 @@ return [
             'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
             'prefix' => '',
             'prefix_indexes' => true,
-            'strict' => true,
+            'strict' => false,
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
@@ -155,7 +155,7 @@ return [
             'host' => env('REDIS_HOST', '127.0.0.1'),
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),
-            'port' => '36790', //env('REDIS_PORT', '6379'),
+            'port' => env('REDIS_SERVER_PORT', '36790'),
             'database' => env('REDIS_DB', '0'),
         ],
 
@@ -164,7 +164,7 @@ return [
             'host' => env('REDIS_HOST', '127.0.0.1'),
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),
-            'port' => '36790', //env('REDIS_PORT', '6379'),
+            'port' => env('REDIS_SERVER_PORT', '36790'),
             'database' => env('REDIS_CACHE_DB', '1'),
         ],
 

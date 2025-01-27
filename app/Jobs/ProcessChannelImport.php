@@ -29,30 +29,35 @@ class ProcessChannelImport implements ShouldQueue
     public function handle(): void
     {
         // Link the channel groups to the channels
+        $bulk = [];
         foreach ($this->channels as $channel) {
             // Make sure name is set
             if (!isset($channel['name'])) {
                 continue;
             }
 
-            // Find/create the channel
-            $model = Channel::firstOrCreate([
-                'name' => $channel['name'],
-                'group' => $channel['group'],
-                'playlist_id' => $channel['playlist_id'],
-                'user_id' => $channel['user_id'],
-            ]);
-
-            // Don't overwrite channel the logo if currently set
-            if ($model->logo) {
-                unset($channel['logo']);
-            }
-
-            // Update the channel with the group ID
-            $model->update([
+            // Add the channel for insert/update
+            $bulk[] = [
                 ...$channel,
                 'group_id' => $this->group?->id ?? null,
-            ]);
+            ];
         }
+
+        // Upsert the channels
+        Channel::upsert($bulk, uniqueBy: ['name', 'group', 'playlist_id', 'user_id'], update: [
+            // Don't update the following fields...
+            // 'title',
+            // 'name',
+            // 'group',
+            // 'playlist_id',
+            // 'user_id',
+            // 'logo',
+            // ...only update the following fields
+            'url',
+            'stream_id',
+            'lang', // should we update this? Not sure it's set anywhere...
+            'country',// should we update this? Not sure it's set anywhere...
+            'import_batch_no',
+        ]);
     }
 }
