@@ -119,6 +119,11 @@ class ProcessM3uImport implements ShouldQueue
                                 }
                             }
                         }
+                        if (!isset($channel['name'])) {
+                            // Name is required, fallback to stream ID if available, otherwise set to title
+                            // Channel will be skipped on import of not set to something...
+                            $channel['name'] = $channel['stream_id'] ?? $channel['title'];
+                        }
                         yield $channel;
                     }
                 })->groupBy('group')->chunk(10)->each(function (LazyCollection $grouped) use (&$jobs, $userId, $playlistId, $batchNo) {
