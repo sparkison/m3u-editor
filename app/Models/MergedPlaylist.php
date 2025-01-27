@@ -28,6 +28,12 @@ class MergedPlaylist extends Model
 
     public function channels(): BelongsToMany
     {
-        return $this->belongsToMany(Channel::class);
+        return $this->belongsToMany(Channel::class, 'channel_merged_playlist');
+    }
+
+    public function enabled_channels(): BelongsToMany
+    {
+        return $this->belongsToMany(Channel::class, 'channel_merged_playlist')
+            ->where('channels.enabled', true);
     }
 }
