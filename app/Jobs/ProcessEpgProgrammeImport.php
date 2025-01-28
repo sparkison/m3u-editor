@@ -3,13 +3,12 @@
 namespace App\Jobs;
 
 use App\Models\EpgProgramme;
-use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
 class ProcessEpgProgrammeImport implements ShouldQueue
 {
-    use Batchable, Queueable;
+    use Queueable;
 
     /**
      * Create a new job instance.
@@ -25,16 +24,16 @@ class ProcessEpgProgrammeImport implements ShouldQueue
      */
     public function handle(): void
     {
-        if ($this->batch()->cancelled()) {
-            // Determine if the batch has been cancelled...
-            return;
-        }
-        
-        // Create the programmes
-        foreach ($this->programmes as $programme) {
-            EpgProgramme::create([
-                ...$programme
-            ]);
-        }
+        // Upsert the channels
+        EpgProgramme::upsert($this->programmes, uniqueBy: ['name', 'channel_id', 'epg_id', 'user_id'], update: [
+            // Don't update the following fields...
+            // 'name',
+            // 'channel_id',
+            // 'epg_id',
+            // 'user_id',
+            // ...only update the following fields
+            'data',
+            'import_batch_no',
+        ]);
     }
 }

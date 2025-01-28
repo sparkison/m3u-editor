@@ -3,13 +3,12 @@
 namespace App\Jobs;
 
 use App\Models\EpgChannel;
-use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
 class ProcessEpgChannelImport implements ShouldQueue
 {
-    use Batchable, Queueable;
+    use Queueable;
 
     /**
      * Create a new job instance.
@@ -25,24 +24,18 @@ class ProcessEpgChannelImport implements ShouldQueue
      */
     public function handle(): void
     {
-        if ($this->batch()->cancelled()) {
-            // Determine if the batch has been cancelled...
-            return;
-        }
-
-        // Create the epg channels
-        foreach ($this->channels as $channel) {
-            // Find/create the epg channel
-            $model = EpgChannel::firstOrCreate([
-                'name' => $channel['name'],
-                'channel_id' => $channel['channel_id'],
-                'epg_id' => $channel['epg_id'],
-                'user_id' => $channel['user_id'],
-            ]);
-
-            $model->update([
-                ...$channel,
-            ]);
-        }
+        // Upsert the channels
+        EpgChannel::upsert($this->channels, uniqueBy: ['name', 'channel_id', 'epg_id', 'user_id'], update: [
+            // Don't update the following fields...
+            // 'name',
+            // 'epg_id',
+            // 'user_id',
+            // ...only update the following fields
+            'display_name',
+            'lang',
+            'icon',
+            'channel_id',
+            'import_batch_no',
+        ]);
     }
 }

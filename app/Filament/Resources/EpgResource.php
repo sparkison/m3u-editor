@@ -22,7 +22,7 @@ class EpgResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
 
-    protected static ?string $label = 'EPGs';
+    protected static ?string $label = 'EPG';
 
     protected static ?string $navigationGroup = 'EPG';
 
@@ -49,7 +49,8 @@ class EpgResource extends Resource
                 Tables\Columns\TextColumn::make('name')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('url')
-                    ->toggleable()
+                    ->wrap()
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->searchable(),
                 Tables\Columns\TextColumn::make('status')
                     ->sortable()
@@ -58,6 +59,10 @@ class EpgResource extends Resource
                 Tables\Columns\TextColumn::make('synced')
                     ->label('Last Synced')
                     ->since()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('sync_time')
+                    ->label('Sync Time')
+                    ->formatStateUsing(fn(string $state): string => gmdate('H:i:s', $state))
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
@@ -158,21 +163,20 @@ class EpgResource extends Resource
                 ->required()
                 ->helperText('Enter the name of the EPG. Internal use only.')
                 ->maxLength(255),
-            Forms\Components\FileUpload::make('uploads')
-                ->label('XMLTV File')
-                ->rules([
-                    'required_if:url,null',
+            Forms\Components\Section::make('XMLTV file or URL')
+                ->schema([
+                    Forms\Components\FileUpload::make('uploads')
+                        ->label('File')
+                        ->requiredIf('url', null)
+                        ->helperText('Upload the XMLTV file for the EPG. This will be used to import the guide data.'),
+                    Forms\Components\TextInput::make('url')
+                        ->label('URL')
+                        ->requiredIf('uploads', null)
+                        ->prefixIcon('heroicon-m-globe-alt')
+                        ->helperText('Enter the URL of the XMLTV guide data. If changing URL, the guide data will be re-imported. Use with caution as this could lead to data loss if the new guide differs from the old one.')
+                        ->url()
+                        ->maxLength(255),
                 ])
-                ->helperText('Upload the XMLTV file for the EPG. This will be used to import the guide data.'),
-            Forms\Components\TextInput::make('url')
-                ->label('XMLTV URL')
-                ->rules([
-                    'required_if:uploads,null',
-                ])
-                ->url()
-                ->prefixIcon('heroicon-m-globe-alt')
-                ->helperText('Enter the URL of the XMLTV guide data. If changing URL, the guide data will be re-imported. Use with caution as this could lead to data loss if the new guide differs from the old one.')
-                ->maxLength(255),
         ];
     }
 }

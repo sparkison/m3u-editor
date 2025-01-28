@@ -147,7 +147,7 @@ class ProcessM3uImport implements ShouldQueue
                 Bus::chain($jobs)
                     ->onConnection('redis') // force to use redis connection
                     ->catch(function (Throwable $e) use ($playlist) {
-                        $error = "Unable to process the proved playlist: {$e->getMessage()}";
+                        $error = "Unable to process the provided playlist: {$e->getMessage()}";
                         Notification::make()
                             ->danger()
                             ->title("Error processing \"{$playlist->name}\"")

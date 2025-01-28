@@ -66,4 +66,12 @@ class User extends Authenticatable implements FilamentUser
     {
         return $this->hasMany(Playlist::class);
     }
+
+    /**
+     * Users epgs.
+     */
+    public function epgs()
+    {
+        return $this->hasMany(Epg::class);
+    }
 }

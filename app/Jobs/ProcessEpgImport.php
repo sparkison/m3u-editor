@@ -15,6 +15,7 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Str;
 use Illuminate\Bus\Batch;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\LazyCollection;
 
 class ProcessEpgImport implements ShouldQueue
@@ -45,7 +46,6 @@ class ProcessEpgImport implements ShouldQueue
 
 
 
-        return;
 
 
 
@@ -74,6 +74,8 @@ class ProcessEpgImport implements ShouldQueue
 
 
 
+        // Flag job start time
+        $start = now();
 
         // Process EPG XMLTV based on standard format
         // Info: https://wiki.xmltv.org/index.php/XMLTVFormat
@@ -87,51 +89,82 @@ class ProcessEpgImport implements ShouldQueue
             $channelReader = null;
             $programmeReader = null;
             if ($this->epg->url) {
-                // Fetch the file contents
-                $ch = curl_init($this->epg->url);
-                curl_setopt($ch, CURLOPT_ENCODING, "");
-                curl_setopt(
-                    $ch,
-                    CURLOPT_RETURNTRANSFER,
-                    1
-                );
-                $output = curl_exec($ch);
-                curl_close($ch);
+                // // Fetch the file contents
+                // $ch = curl_init($this->epg->url);
+                // curl_setopt($ch, CURLOPT_ENCODING, "");
+                // curl_setopt(
+                //     $ch,
+                //     CURLOPT_RETURNTRANSFER,
+                //     1
+                // );
+                // $output = curl_exec($ch);
+                // curl_close($ch);
 
-                // Attempt to decode the gzipped content
-                $xmlData = gzdecode($output);
-                if (!$xmlData) {
-                    // If false, the content was not gzipped, so use the original output
-                    $xmlData = $output;
+                // // Attempt to decode the gzipped content
+                // $xmlData = gzdecode($output);
+                // if (!$xmlData) {
+                //     // If false, the content was not gzipped, so use the original output
+                //     $xmlData = $output;
+                // }
+
+                // // Parse the XML data
+                // $channelReader = new XMLReader();
+                // $channelReader->xml($xmlData);
+
+                // $programmeReader = new XMLReader();
+                // $programmeReader->xml($xmlData);
+
+                // Normalize the playlist url and get the filename
+                $url = str($this->epg->url)->replace(' ', '%20');
+
+                // We need to grab the file contents first and set to temp file
+                $userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13';
+                $response = Http::withUserAgent($userAgent)
+                    ->timeout(60 * 5) // set timeout to five minues
+                    ->throw()
+                    ->get($url->toString());
+
+                if ($response->ok()) {
+                    // Get the contents
+                    $output = $response->body();
+
+                    // Attempt to decode the gzipped content
+                    $xmlData = gzdecode($output);
+                    if (!$xmlData) {
+                        // If false, the content was not gzipped, so use the original output
+                        $xmlData = $output;
+                    }
+
+                    // Parse the XML data
+                    $channelReader = new XMLReader();
+                    $channelReader->xml($xmlData);
+
+                    // $programmeReader = new XMLReader();
+                    // $programmeReader->xml($xmlData);
                 }
-
-                // Parse the XML data
-                $channelReader = new XMLReader();
-                $channelReader->xml($xmlData);
-
-                $programmeReader = new XMLReader();
-                $programmeReader->xml($xmlData);
             } else {
                 // Get uploaded file contents
-                $output = file_get_contents($this->epg->uploads[0]);
+                if ($this->epg->uploads) {
+                    $output = file_get_contents($this->epg->uploads[0]);
 
-                // Attempt to decode the gzipped content
-                $xmlData = gzdecode($output);
-                if (!$xmlData) {
-                    // If false, the content was not gzipped, so use the original output
-                    $xmlData = $output;
+                    // Attempt to decode the gzipped content
+                    $xmlData = gzdecode($output);
+                    if (!$xmlData) {
+                        // If false, the content was not gzipped, so use the original output
+                        $xmlData = $output;
+                    }
+
+                    // Parse the XML data
+                    $channelReader = new XMLReader();
+                    $channelReader->xml($xmlData);
+
+                    // $programmeReader = new XMLReader();
+                    // $programmeReader->xml($xmlData);
                 }
-
-                // Parse the XML data
-                $channelReader = new XMLReader();
-                $channelReader->xml($xmlData);
-
-                $programmeReader = new XMLReader();
-                $programmeReader->xml($xmlData);
             }
 
             // If reader valid, process the data!
-            if ($channelReader && $programmeReader) {
+            if ($channelReader ) {
                 // Default data structures
                 $defaultChannelData = [
                     'name' => null,
@@ -222,97 +255,46 @@ class ProcessEpgImport implements ShouldQueue
 
                 // Process the data
                 $jobs = [];
-                foreach ($channelData->chunk(100)->all() as $chunk) {
+                $channelData->chunk(10)->each(function (LazyCollection $chunk) use (&$jobs) {
                     $jobs[] = new ProcessEpgChannelImport($chunk->toArray());
-                }
-                foreach ($programmData->chunk(100)->all() as $chunk) {
-                    $jobs[] = new ProcessEpgProgrammeImport($chunk->toArray());
-                }
+                });
+                // $programmData->chunk(10)->each(function (LazyCollection $chunk) use (&$jobs) {
+                //     $jobs[] = new ProcessEpgProgrammeImport($chunk->toArray());
+                // });
 
                 // Close the XMLReaders, all done!
                 $channelReader->close();
-                $programmeReader->close();
+                // $programmeReader->close();
 
-                // Batch the jobs
+                // Last job in the batch
+                $jobs[] = new ProcessEpgImportComplete($userId, $epgId, $batchNo, $start);
                 Bus::chain($jobs)
                     ->onConnection('redis') // force to use redis connection
-                    ->catch(function (Throwable $e) {
-                        // ...
+                    ->catch(function (Throwable $e) use ($epg) {
+                        $error = "Unable to process the provided epg: {$e->getMessage()}";
+                        Notification::make()
+                            ->danger()
+                            ->title("Error processing \"{$epg->name}\"")
+                            ->body('Please view your notifications for details.')
+                            ->broadcast($epg->user);
+                        Notification::make()
+                            ->danger()
+                            ->title("Error processing \"{$epg->name}\"")
+                            ->body($error)
+                            ->sendToDatabase($epg->user);
+                        $epg->update([
+                            'status' => EpgStatus::Failed,
+                            'channels' => 0, // not using...
+                            'synced' => now(),
+                            'errors' => $error,
+                        ]);
                     })->dispatch();
-
-
-
-
-
-
-                // dump("EPG Processed! 🎉");
-
-
-                // $epg->update([
-                //     'status' => EpgStatus::Completed,
-                //     'synced' => now(),
-                //     'errors' => null,
-                // ]);
-
-
-
-                // // Attach the programmes to the channels
-                // $channels = array_map(function ($channel) use ($programmes) {
-                //     return [
-                //         ...$channel,
-                //         'programmes' => $programmes[$channel['channel_id']] ?? []
-                //     ];
-                // }, $channels);
-
-
-
-
-
-
-                // // Collect, chunk, and disatch the import jobs
-                // $jobs = [];
-                // foreach (array_chunk($channels, 100) as $chunk) {
-                //     $jobs[] = new ProcessEpgChannelImport($chunk);
-                // }
-                // Bus::batch($jobs)
-                //     ->then(function (Batch $batch) use ($epg, $batchNo) {
-                //         // All jobs completed successfully...
-
-                //         // Send notification
-                //         Notification::make()
-                //             ->success()
-                //             ->title('EPG Synced')
-                //             ->body("\"{$epg->name}\" has been synced successfully.")
-                //             ->broadcast($epg->user);
-                //         Notification::make()
-                //             ->success()
-                //             ->title('EPG Synced')
-                //             ->body("\"{$epg->name}\" has been synced successfully.")
-                //             ->sendToDatabase($epg->user);
-
-                //         // Clear out invalid groups (if any)
-                //         EpgChannel::where([
-                //             ['epg_id', $epg->id],
-                //             ['import_batch_no', '!=', $batchNo],
-                //         ])->delete();
-
-                //         // Update the playlist
-                //         $epg->update([
-                //             'status' => EpgStatus::Completed,
-                //             'synced' => now(),
-                //             'errors' => null,
-                //         ]);
-                //     })->catch(function (Batch $batch, Throwable $e) {
-                //         // First batch job failure detected...
-                //     })->finally(function (Batch $batch) {
-                //         // The batch has finished executing...
-                //     })->name('EPG programme import')->dispatch();
             } else {
                 // Log the exception
                 logger()->error("Error processing \"{$this->epg->name}\"");
 
                 // Send notification
-                $error = "Invalid EPG file. Unable to read or download your EPG file. Please check the URL or uploaded file amd try again.";
+                $error = "Invalid EPG file. Unable to read or download your EPG file. Please check the URL or uploaded file and try again.";
                 Notification::make()
                     ->danger()
                     ->title("Error processing \"{$this->epg->name}\"")
