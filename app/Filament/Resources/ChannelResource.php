@@ -196,10 +196,13 @@ class ChannelResource extends Resource
                 ->columnSpan('full')
                 ->required(),
             Forms\Components\TextInput::make('logo')
+                ->columnSpan('full')
                 ->url(),
             Forms\Components\TextInput::make('channel')
+                ->columnSpan(1)
                 ->rules(['numeric', 'min:0']),
             Forms\Components\TextInput::make('shift')
+                ->columnSpan(1)
                 ->rules(['numeric', 'min:0']),
 
             /*

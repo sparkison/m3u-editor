@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\MergedPlaylistResource\RelationManagers;
 
+use App\Enums\PlaylistStatus;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -26,6 +27,26 @@ class PlaylistsRelationManager extends RelationManager
             ->recordTitleAttribute('name')
             ->columns([
                 Tables\Columns\TextColumn::make('name'),
+                Tables\Columns\TextColumn::make('groups_count')
+                    ->label('Groups')
+                    ->counts('groups')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('channels_count')
+                    ->label('Channels')
+                    ->counts('channels')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('enabled_channels_count')
+                    ->label('Enabled Channels')
+                    ->counts('enabled_channels')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('status')
+                    ->sortable()
+                    ->badge()
+                    ->color(fn(PlaylistStatus $state) => $state->getColor()),
+                Tables\Columns\TextColumn::make('synced')
+                    ->label('Last Synced')
+                    ->since()
+                    ->sortable(),
             ])
             ->filters([
                 //

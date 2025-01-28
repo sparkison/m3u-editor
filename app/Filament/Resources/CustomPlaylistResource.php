@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class CustomPlaylistResource extends Resource
 {
-    protected static ?string $navigationIcon = 'heroicon-o-play';
+    protected static ?string $navigationIcon = 'heroicon-o-list-bullet';
 
     public static function getNavigationSort(): ?int
     {
@@ -83,16 +83,27 @@ class CustomPlaylistResource extends Resource
 
     public static function getForm(): array
     {
-        return [
+        $schema = [
             Forms\Components\TextInput::make('name')
                 ->required()
-                ->columnSpan('full')
+                ->columnSpan(2)
                 ->helperText('Enter the name of the playlist. Internal use only.'),
             PlaylistM3uUrl::make('m3u_url')
                 ->hiddenOn(['create']) // hide this field on the create form
                 ->columnSpan(2)
                 ->dehydrated(false) // don't save the value in the database
                 ->helperText('Your generated m3u playlist, based on the playlist configurtation. Only enabled channels will be included.'),
+        ];
+        return [
+            Forms\Components\Grid::make()
+                ->hiddenOn(['edit']) // hide this field on the edit form
+                ->schema($schema)
+                ->columns(2),
+            Forms\Components\Section::make()
+                ->hiddenOn(['create']) // hide this field on the create form
+                ->schema($schema)
+                ->columns(4),
+
         ];
     }
 }
