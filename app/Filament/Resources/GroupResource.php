@@ -22,6 +22,8 @@ class GroupResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-queue-list';
 
+    protected static ?string $navigationGroup = 'Playlist';
+
     public static function getNavigationSort(): ?int
     {
         return 2;

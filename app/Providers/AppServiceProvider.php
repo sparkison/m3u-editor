@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Events\EpgCreated;
 use App\Events\PlaylistCreated;
 use App\Models\CustomPlaylist;
 use App\Models\MergedPlaylist;
+use App\Models\Epg;
 use App\Models\Playlist;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\ServiceProvider;
@@ -35,6 +37,13 @@ class AppServiceProvider extends ServiceProvider
                 $playlist->user_id = auth()->id();
                 $playlist->uuid = \Illuminate\Support\Str::orderedUuid()->toString();
                 return $playlist;
+            });
+
+            // Process epg on creation
+            Epg::created(fn(Epg $epg) => event(new EpgCreated($epg)));
+            Epg::creating(function (Epg $epg) {
+                $epg->user_id = auth()->id();
+                return $epg;
             });
 
             // Merged playlist
