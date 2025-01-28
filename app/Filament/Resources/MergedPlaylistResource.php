@@ -16,11 +16,15 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class MergedPlaylistResource extends Resource
 {
+    protected static ?string $model = MergedPlaylist::class;
+
     protected static ?string $navigationIcon = 'heroicon-o-forward';
+
+    protected static ?string $navigationGroup = 'Custom';
 
     public static function getNavigationSort(): ?int
     {
-        return 0;
+        return 1;
     }
 
     public static function form(Form $form): Form
@@ -35,14 +39,14 @@ class MergedPlaylistResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->searchable(),
-                // Tables\Columns\TextColumn::make('channels_count')
-                //     ->label('Channels')
-                //     ->counts('playlists.channels')
-                //     ->sortable(),
-                // Tables\Columns\TextColumn::make('enabled_channels_count')
-                //     ->label('Enabled Channels')
-                //     ->counts('playlists.enabled_channels')
-                //     ->sortable(),
+                Tables\Columns\TextColumn::make('channels_count')
+                    ->label('Channels')
+                    ->counts('channels')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('enabled_channels_count')
+                    ->label('Enabled Channels')
+                    ->counts('enabled_channels')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

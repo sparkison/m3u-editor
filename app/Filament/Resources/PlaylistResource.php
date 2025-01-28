@@ -28,7 +28,7 @@ class PlaylistResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 1;
+        return 0;
     }
 
     public static function form(Form $form): Form

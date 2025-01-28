@@ -16,11 +16,15 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class CustomPlaylistResource extends Resource
 {
+    protected static ?string $model = CustomPlaylist::class;
+
     protected static ?string $navigationIcon = 'heroicon-o-list-bullet';
+
+    protected static ?string $navigationGroup = 'Custom';
 
     public static function getNavigationSort(): ?int
     {
-        return 0;
+        return 2;
     }
 
     public static function form(Form $form): Form
@@ -35,14 +39,18 @@ class CustomPlaylistResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->searchable(),
-                // Tables\Columns\TextColumn::make('channels_count')
-                //     ->label('Channels')
-                //     ->counts('channels')
+                // Tables\Columns\TextColumn::make('playlists_count')
+                //     ->label('Playlists')
+                //     ->counts('playlists')
                 //     ->sortable(),
-                // Tables\Columns\TextColumn::make('enabled_channels_count')
-                //     ->label('Enabled Channels')
-                //     ->counts('enabled_channels')
-                //     ->sortable(),
+                Tables\Columns\TextColumn::make('channels_count')
+                    ->label('Channels')
+                    ->counts('channels')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('enabled_channels_count')
+                    ->label('Enabled Channels')
+                    ->counts('enabled_channels')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

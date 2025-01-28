@@ -45,6 +45,7 @@ class ProcessEpgImport implements ShouldQueue
 
 
 
+        return;
 
 
 
@@ -233,43 +234,11 @@ class ProcessEpgImport implements ShouldQueue
                 $programmeReader->close();
 
                 // Batch the jobs
-                Bus::batch($jobs)
-                    ->then(function (Batch $batch) use ($epg, $batchNo) {
-                        // All jobs completed successfully...
-
-                        // Send notification
-                        Notification::make()
-                            ->success()
-                            ->title('EPG Synced')
-                            ->body("\"{$epg->name}\" has been synced successfully.")
-                            ->broadcast($epg->user);
-                        Notification::make()
-                            ->success()
-                            ->title('EPG Synced')
-                            ->body("\"{$epg->name}\" has been synced successfully.")
-                            ->sendToDatabase($epg->user);
-
-                        // Clear out invalid channels and programmes
-                        EpgChannel::where([
-                            ['epg_id', $epg->id],
-                            ['import_batch_no', '!=', $batchNo],
-                        ])->delete();
-                        EpgProgramme::where([
-                            ['epg_id', $epg->id],
-                            ['import_batch_no', '!=', $batchNo],
-                        ])->delete();
-
-                        // Update the playlist
-                        $epg->update([
-                            'status' => EpgStatus::Completed,
-                            'synced' => now(),
-                            'errors' => null,
-                        ]);
-                    })->catch(function (Batch $batch, Throwable $e) {
-                        // First batch job failure detected...
-                    })->finally(function (Batch $batch) {
-                        // The batch has finished executing...
-                    })->name('EPG programme import')->dispatch();
+                Bus::chain($jobs)
+                    ->onConnection('redis') // force to use redis connection
+                    ->catch(function (Throwable $e) {
+                        // ...
+                    })->dispatch();
 
 
 

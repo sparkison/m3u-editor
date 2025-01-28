@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Pivots\MergedPlaylistPivot;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class MergedPlaylist extends Model
 {
@@ -29,5 +32,22 @@ class MergedPlaylist extends Model
     public function playlists(): BelongsToMany
     {
         return $this->belongsToMany(Playlist::class, 'merged_playlist_playlist');
+    }
+
+    public function channels(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            Channel::class,
+            MergedPlaylistPivot::class,
+            'merged_playlist_id',
+            'playlist_id',
+            'id',
+            'playlist_id'
+        );
+    }
+
+    public function enabled_channels(): HasManyThrough
+    {
+        return $this->channels()->where('enabled', true);
     }
 }
