@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Events\PlaylistCreated;
+use App\Models\CustomPlaylist;
 use App\Models\MergedPlaylist;
 use App\Models\Playlist;
 use Illuminate\Database\Eloquent\Model;
@@ -42,6 +43,14 @@ class AppServiceProvider extends ServiceProvider
                 $mergedPlaylist->user_id = auth()->id();
                 $mergedPlaylist->uuid = \Illuminate\Support\Str::orderedUuid()->toString();
                 return $mergedPlaylist;
+            });
+
+            // Custom playlist
+            // CustomPlaylist::created(fn(CustomPlaylist $customPlaylist) => /* */);
+            CustomPlaylist::creating(function (CustomPlaylist $customPlaylist) {
+                $customPlaylist->user_id = auth()->id();
+                $customPlaylist->uuid = \Illuminate\Support\Str::orderedUuid()->toString();
+                return $customPlaylist;
             });
         } catch (\Throwable $e) {
             // Log the error

@@ -2,10 +2,10 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\MergedPlaylistResource\Pages;
-use App\Filament\Resources\MergedPlaylistResource\RelationManagers;
+use App\Filament\Resources\CustomPlaylistResource\Pages;
+use App\Filament\Resources\CustomPlaylistResource\RelationManagers;
 use App\Forms\Components\PlaylistM3uUrl;
-use App\Models\MergedPlaylist;
+use App\Models\CustomPlaylist;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -14,7 +14,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
-class MergedPlaylistResource extends Resource
+class CustomPlaylistResource extends Resource
 {
     protected static ?string $navigationIcon = 'heroicon-o-play';
 
@@ -68,16 +68,16 @@ class MergedPlaylistResource extends Resource
     public static function getRelations(): array
     {
         return [
-            RelationManagers\PlaylistsRelationManager::class,
+            RelationManagers\ChannelsRelationManager::class,
         ];
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListMergedPlaylists::route('/'),
-            // 'create' => Pages\CreateMergedPlaylist::route('/create'),
-            'edit' => Pages\EditMergedPlaylist::route('/{record}/edit'),
+            'index' => Pages\ListCustomPlaylists::route('/'),
+            // 'create' => Pages\CreateCustomPlaylist::route('/create'),
+            'edit' => Pages\EditCustomPlaylist::route('/{record}/edit'),
         ];
     }
 

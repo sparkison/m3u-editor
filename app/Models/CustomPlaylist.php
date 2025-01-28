@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-class Channel extends Model
+class CustomPlaylist extends Model
 {
     use HasFactory;
 
@@ -18,12 +18,7 @@ class Channel extends Model
      */
     protected $casts = [
         'id' => 'integer',
-        'enabled' => 'boolean',
-        'channel' => 'integer',
-        'shift' => 'integer',
         'user_id' => 'integer',
-        'playlist_id' => 'integer',
-        'group_id' => 'integer',
     ];
 
     public function user(): BelongsTo
@@ -31,18 +26,8 @@ class Channel extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function playlist(): BelongsTo
+    public function channels(): BelongsToMany
     {
-        return $this->belongsTo(Playlist::class);
-    }
-
-    public function group(): BelongsTo
-    {
-        return $this->belongsTo(Group::class);
-    }
-
-    public function customPlaylists(): BelongsToMany
-    {
-        return $this->belongsToMany(CustomPlaylist::class, 'channel_custom_playlist');
+        return $this->belongsToMany(Channel::class, 'channel_custom_playlist');
     }
 }

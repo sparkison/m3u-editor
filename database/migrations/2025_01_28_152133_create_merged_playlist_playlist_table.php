@@ -13,9 +13,9 @@ return new class extends Migration
     {
         Schema::disableForeignKeyConstraints();
 
-        Schema::create('channel_merged_playlist', function (Blueprint $table) {
-            $table->foreignId('channel_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
+        Schema::create('merged_playlist_playlist', function (Blueprint $table) {
             $table->foreignId('merged_playlist_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
+            $table->foreignId('playlist_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
         });
 
         Schema::enableForeignKeyConstraints();
@@ -26,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('channel_merged_playlist');
+        Schema::dropIfExists('merged_playlist_playlist');
     }
 };
