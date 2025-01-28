@@ -13,7 +13,9 @@ class ListMergedPlaylists extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make(),
+            Actions\CreateAction::make()
+                ->successRedirectUrl(fn($record): string => EditMergedPlaylist::getUrl(['record' => $record])),
+
         ];
     }
 }

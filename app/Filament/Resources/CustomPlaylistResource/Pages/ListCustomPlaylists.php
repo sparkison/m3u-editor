@@ -14,9 +14,7 @@ class ListCustomPlaylists extends ListRecords
     {
         return [
             Actions\CreateAction::make()
-                ->successRedirectUrl(fn($record): string => route('custom_playlist.edit', [
-                    'customPlaylist' => $record,
-                ])),
+                ->successRedirectUrl(fn($record): string => EditCustomPlaylist::getUrl(['record' => $record])),
         ];
     }
 }

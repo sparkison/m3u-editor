@@ -37,11 +37,11 @@ class MergedPlaylistResource extends Resource
                     ->searchable(),
                 // Tables\Columns\TextColumn::make('channels_count')
                 //     ->label('Channels')
-                //     ->counts('channels')
+                //     ->counts('playlists.channels')
                 //     ->sortable(),
                 // Tables\Columns\TextColumn::make('enabled_channels_count')
                 //     ->label('Enabled Channels')
-                //     ->counts('enabled_channels')
+                //     ->counts('playlists.enabled_channels')
                 //     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()

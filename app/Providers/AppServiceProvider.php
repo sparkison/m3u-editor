@@ -38,7 +38,7 @@ class AppServiceProvider extends ServiceProvider
             });
 
             // Merged playlist
-            // MergedPlaylist::created(fn(MergedPlaylist $mergedPlaylist) => /* */);
+            // MergedPlaylist::created(fn(MergedPlaylist $mergedPlaylist) => /* ... */);
             MergedPlaylist::creating(function (MergedPlaylist $mergedPlaylist) {
                 $mergedPlaylist->user_id = auth()->id();
                 $mergedPlaylist->uuid = \Illuminate\Support\Str::orderedUuid()->toString();
@@ -46,7 +46,7 @@ class AppServiceProvider extends ServiceProvider
             });
 
             // Custom playlist
-            // CustomPlaylist::created(fn(CustomPlaylist $customPlaylist) => /* */);
+            // CustomPlaylist::created(fn(CustomPlaylist $customPlaylist) => /* ... */);
             CustomPlaylist::creating(function (CustomPlaylist $customPlaylist) {
                 $customPlaylist->user_id = auth()->id();
                 $customPlaylist->uuid = \Illuminate\Support\Str::orderedUuid()->toString();

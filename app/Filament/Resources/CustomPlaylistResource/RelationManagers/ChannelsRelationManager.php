@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class ChannelsRelationManager extends RelationManager
 {
+    protected static string $relationship = 'channels';
+
     public function form(Form $form): Form
     {
         return $form
