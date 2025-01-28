@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Playlist;
+use App\Models\MergedPlaylist;
+use App\Models\CustomPlaylist;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -11,7 +13,13 @@ class PlaylistGenerateController extends Controller
     public function __invoke(string $uuid)
     {
         // Fetch the playlist
-        $playlist = Playlist::where('uuid', $uuid)->firstOrFail();
+        $playlist = Playlist::where('uuid', $uuid)->first();
+        if (!$playlist) {
+            $playlist = MergedPlaylist::where('uuid', $uuid)->first();
+        }
+        if (!$playlist) {
+            $playlist = CustomPlaylist::where('uuid', $uuid)->firstOrFail();
+        }
 
         // Generate a filename
         $filename = Str::slug($playlist->name) . '.m3u';
