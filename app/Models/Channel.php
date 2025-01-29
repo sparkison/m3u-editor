@@ -41,6 +41,11 @@ class Channel extends Model
         return $this->belongsTo(Group::class);
     }
 
+    public function epgChannels(): BelongsToMany
+    {
+        return $this->belongsToMany(EpgChannel::class);
+    }
+
     public function customPlaylists(): BelongsToMany
     {
         return $this->belongsToMany(CustomPlaylist::class, 'channel_custom_playlist');

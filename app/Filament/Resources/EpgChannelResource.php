@@ -64,6 +64,11 @@ class EpgChannelResource extends Resource
                 Tables\Columns\TextColumn::make('channel_id')
                     ->sortable()
                     ->searchable(),
+                // WARNING! Slows table load quite a bit...
+                // Tables\Columns\TextColumn::make('programmes_count')
+                //     ->label('Programs')
+                //     ->counts('programmes')
+                //     ->sortable(),
                 Tables\Columns\TextColumn::make('epg.name')
                     ->sortable()
                     ->numeric()

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class EpgChannel extends Model
@@ -32,8 +33,13 @@ class EpgChannel extends Model
         return $this->belongsTo(Epg::class);
     }
 
+    public function channels(): BelongsToMany
+    {
+        return $this->belongsToMany(Channel::class);
+    }
+
     public function programmes(): HasMany
     {
-        return $this->hasMany(EpgProgramme::class);
+        return $this->hasMany(EpgProgramme::class, 'channel_id');
     }
 }
