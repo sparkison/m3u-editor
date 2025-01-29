@@ -10,3 +10,5 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::command('app:refresh-playlist')
     ->everyFiveMinutes();
 
+Schedule::command('app:refresh-epg')
+    ->everyFiveMinutes();

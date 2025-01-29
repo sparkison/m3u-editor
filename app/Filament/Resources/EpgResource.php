@@ -52,6 +52,10 @@ class EpgResource extends Resource
                     ->wrap()
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->searchable(),
+                Tables\Columns\TextColumn::make('channels_count')
+                    ->label('Channels')
+                    ->counts('channels')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->sortable()
                     ->badge()
@@ -164,18 +168,28 @@ class EpgResource extends Resource
                 ->helperText('Enter the name of the EPG. Internal use only.')
                 ->maxLength(255),
             Forms\Components\Section::make('XMLTV file or URL')
+                ->description('You can either upload an XMLTV file or provide a URL to an XMLTV file. File should conform to the XMLTV format.')
+                ->headerActions([
+                    Forms\Components\Actions\Action::make('XMLTV Format')
+                        ->label('XMLTV Format')
+                        ->icon('heroicon-o-arrow-top-right-on-square')
+                        ->iconPosition('after')
+                        ->size('sm')
+                        ->url('https://wiki.xmltv.org/index.php/XMLTVFormat')
+                        ->openUrlInNewTab(true),
+                ])
                 ->schema([
-                    Forms\Components\FileUpload::make('uploads')
-                        ->label('File')
-                        ->requiredIf('url', null)
-                        ->helperText('Upload the XMLTV file for the EPG. This will be used to import the guide data.'),
                     Forms\Components\TextInput::make('url')
                         ->label('URL')
-                        ->requiredIf('uploads', null)
+                        ->requiredIf('uploads', [null, ''])
                         ->prefixIcon('heroicon-m-globe-alt')
                         ->helperText('Enter the URL of the XMLTV guide data. If changing URL, the guide data will be re-imported. Use with caution as this could lead to data loss if the new guide differs from the old one.')
                         ->url()
                         ->maxLength(255),
+                    Forms\Components\FileUpload::make('uploads')
+                        ->label('File')
+                        ->requiredIf('url', [null, ''])
+                        ->helperText('Upload the XMLTV file for the EPG. This will be used to import the guide data.'),
                 ])
         ];
     }

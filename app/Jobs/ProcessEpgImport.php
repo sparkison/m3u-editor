@@ -89,31 +89,6 @@ class ProcessEpgImport implements ShouldQueue
             $channelReader = null;
             $programmeReader = null;
             if ($this->epg->url) {
-                // // Fetch the file contents
-                // $ch = curl_init($this->epg->url);
-                // curl_setopt($ch, CURLOPT_ENCODING, "");
-                // curl_setopt(
-                //     $ch,
-                //     CURLOPT_RETURNTRANSFER,
-                //     1
-                // );
-                // $output = curl_exec($ch);
-                // curl_close($ch);
-
-                // // Attempt to decode the gzipped content
-                // $xmlData = gzdecode($output);
-                // if (!$xmlData) {
-                //     // If false, the content was not gzipped, so use the original output
-                //     $xmlData = $output;
-                // }
-
-                // // Parse the XML data
-                // $channelReader = new XMLReader();
-                // $channelReader->xml($xmlData);
-
-                // $programmeReader = new XMLReader();
-                // $programmeReader->xml($xmlData);
-
                 // Normalize the playlist url and get the filename
                 $url = str($this->epg->url)->replace(' ', '%20');
 
@@ -121,8 +96,7 @@ class ProcessEpgImport implements ShouldQueue
                 $userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13';
                 $response = Http::withUserAgent($userAgent)
                     ->timeout(60 * 5) // set timeout to five minues
-                    ->throw()
-                    ->get($url->toString());
+                    ->throw()->get($url->toString());
 
                 if ($response->ok()) {
                     // Get the contents
@@ -131,16 +105,9 @@ class ProcessEpgImport implements ShouldQueue
                     // Attempt to decode the gzipped content
                     $xmlData = gzdecode($output);
                     if (!$xmlData) {
-                        // If false, the content was not gzipped, so use the original output
+                        // If false, the content was not gzipped, use the original output
                         $xmlData = $output;
                     }
-
-                    // Parse the XML data
-                    $channelReader = new XMLReader();
-                    $channelReader->xml($xmlData);
-
-                    // $programmeReader = new XMLReader();
-                    // $programmeReader->xml($xmlData);
                 }
             } else {
                 // Get uploaded file contents
@@ -150,21 +117,24 @@ class ProcessEpgImport implements ShouldQueue
                     // Attempt to decode the gzipped content
                     $xmlData = gzdecode($output);
                     if (!$xmlData) {
-                        // If false, the content was not gzipped, so use the original output
+                        // If false, the content was not gzipped, use the original output
                         $xmlData = $output;
                     }
-
-                    // Parse the XML data
-                    $channelReader = new XMLReader();
-                    $channelReader->xml($xmlData);
-
-                    // $programmeReader = new XMLReader();
-                    // $programmeReader->xml($xmlData);
                 }
             }
 
+            // If we have XML data, let's process it
+            if ($xmlData) {
+                // Setup the XML readers
+                $channelReader = new XMLReader();
+                $channelReader->xml($xmlData);
+
+                $programmeReader = new XMLReader();
+                $programmeReader->xml($xmlData);
+            }
+
             // If reader valid, process the data!
-            if ($channelReader ) {
+            if ($channelReader && $programmeReader) {
                 // Default data structures
                 $defaultChannelData = [
                     'name' => null,
@@ -189,89 +159,94 @@ class ProcessEpgImport implements ShouldQueue
                 $channelData = LazyCollection::make(function () use ($channelReader, $defaultChannelData) {
                     // Loop through the XML data
                     while ($channelReader->read()) {
-                        // Only consider XML elements
-                        if ($channelReader->nodeType == XMLReader::ELEMENT) {
-                            /*
-                             * Process channel data
-                             */
-                            if ($channelReader->name === 'channel') {
-                                $channelId = trim($channelReader->getAttribute('id'));
-                                $innerXML = $channelReader->readOuterXml();
-                                $innerReader = new XMLReader();
-                                $innerReader->xml($innerXML);
-                                $elementData = [
-                                    ...$defaultChannelData
-                                ];
+                        // Only consider XML elements and channel nodes
+                        if ($channelReader->nodeType == XMLReader::ELEMENT && $channelReader->name === 'channel') {
+                            // Get the channel id
+                            $channelId = trim($channelReader->getAttribute('id'));
 
-                                // Get the node data
-                                while ($innerReader->read()) {
-                                    if ($innerReader->nodeType == XMLReader::ELEMENT) {
-                                        switch ($innerReader->name) {
-                                            case 'channel':
-                                                $elementData['channel_id'] = $channelId;
-                                                $elementData['name'] = trim($innerReader->readString());
-                                                break;
-                                            case 'display-name':
+                            // Setup parser for inner nodes
+                            $innerXML = $channelReader->readOuterXml();
+                            $innerReader = new XMLReader();
+                            $innerReader->xml($innerXML);
+
+                            // Set the default data
+                            $elementData = [
+                                ...$defaultChannelData
+                            ];
+
+                            // Get the node data
+                            while ($innerReader->read()) {
+                                if ($innerReader->nodeType == XMLReader::ELEMENT) {
+                                    switch ($innerReader->name) {
+                                        case 'channel':
+                                            $elementData['channel_id'] = $channelId;
+                                            $elementData['name'] = trim($innerReader->readString());
+                                            break;
+                                        case 'display-name':
+                                            if (!$elementData['display_name']) {
+                                                // Only use the first display-name element (could be multiple)
                                                 $elementData['display_name'] = trim($innerReader->readString());
                                                 $elementData['lang'] = trim($innerReader->getAttribute('lang'));
-                                                break;
-                                            case 'icon':
-                                                $elementData['icon'] = trim($innerReader->readString());
-                                                break;
-                                        }
+                                            }
+                                            break;
+                                        case 'icon':
+                                            $elementData['icon'] = trim($innerReader->getAttribute('src'));
+                                            break;
                                     }
                                 }
+                            }
 
-                                // Close the inner XMLReader
-                                $innerReader->close();
+                            // Close the inner XMLReader
+                            $innerReader->close();
 
-                                // Add the channel to the collection
+                            // Only return valid channels
+                            if ($elementData['channel_id']) {
                                 yield $elementData;
                             }
                         }
                     }
                 });
+
+                // Process programme data separately 
                 $programmData = LazyCollection::make(function () use ($programmeReader, $defaultProgrammeData) {
                     // Loop through the XML data
                     while ($programmeReader->read()) {
-                        // Only consider XML elements
-                        if ($programmeReader->nodeType == XMLReader::ELEMENT) {
-                            /* 
-                             * Process program data 
-                             */
-                            if ($programmeReader->name === 'programme') {
-                                $channelId = trim($programmeReader->getAttribute('channel'));
-                                $xmlData = trim($programmeReader->readOuterXml());
-                                yield [
-                                    ...$defaultProgrammeData,
-                                    'name' => trim($programmeReader->getAttribute('title')),
-                                    'data' => $xmlData ?? '',
-                                    'channel_id' => $channelId,
-                                ];
-                            }
+                        // Only consider XML elements and programme nodes
+                        if ($programmeReader->nodeType == XMLReader::ELEMENT && $programmeReader->name === 'programme') {
+                            $channelId = trim($programmeReader->getAttribute('channel'));
+                            $xmlData = trim($programmeReader->readOuterXml());
+                            yield [
+                                ...$defaultProgrammeData,
+                                'name' => trim($programmeReader->getAttribute('title')),
+                                'data' => $xmlData ?? '',
+                                'channel_id' => $channelId,
+                            ];
                         }
                     }
                 });
 
                 // Process the data
                 $jobs = [];
-                $channelData->chunk(10)->each(function (LazyCollection $chunk) use (&$jobs) {
+                $channelData->chunk(100)->each(function (LazyCollection $chunk) use (&$jobs) {
                     $jobs[] = new ProcessEpgChannelImport($chunk->toArray());
                 });
-                // $programmData->chunk(10)->each(function (LazyCollection $chunk) use (&$jobs) {
-                //     $jobs[] = new ProcessEpgProgrammeImport($chunk->toArray());
+                // $programmData->groupBy('channel_id')->chunk(100)->each(function (LazyCollection $grouped) use (&$jobs) {
+                //     $grouped->each(function ($chunk, $channelId) use (&$jobs) {
+                //         // dump($channelId, $chunk->count());
+                //         // $jobs[] = new ProcessEpgProgrammeImport($chunk->toArray());
+                //     });
                 // });
 
                 // Close the XMLReaders, all done!
                 $channelReader->close();
-                // $programmeReader->close();
+                $programmeReader->close();
 
                 // Last job in the batch
                 $jobs[] = new ProcessEpgImportComplete($userId, $epgId, $batchNo, $start);
                 Bus::chain($jobs)
                     ->onConnection('redis') // force to use redis connection
                     ->catch(function (Throwable $e) use ($epg) {
-                        $error = "Unable to process the provided epg: {$e->getMessage()}";
+                        $error = "Error processing \"{$epg->name}\": {$e->getMessage()}";
                         Notification::make()
                             ->danger()
                             ->title("Error processing \"{$epg->name}\"")
@@ -315,7 +290,7 @@ class ProcessEpgImport implements ShouldQueue
             }
         } catch (Exception $e) {
             // Log the exception
-            logger()->error($e->getMessage());
+            logger()->error("Error processing \"{$this->epg->name}\": {$e->getMessage()}");
 
             // Send notification
             Notification::make()

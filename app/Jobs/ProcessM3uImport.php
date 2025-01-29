@@ -69,8 +69,7 @@ class ProcessM3uImport implements ShouldQueue
             $userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13';
             $response = Http::withUserAgent($userAgent)
                 ->timeout(60 * 5) // set timeout to five minues
-                ->throw()
-                ->get($url->toString());
+                ->throw()->get($url->toString());
 
             // If fetched successfully, process the results!
             if ($response->ok()) {
@@ -147,7 +146,7 @@ class ProcessM3uImport implements ShouldQueue
                 Bus::chain($jobs)
                     ->onConnection('redis') // force to use redis connection
                     ->catch(function (Throwable $e) use ($playlist) {
-                        $error = "Unable to process the provided playlist: {$e->getMessage()}";
+                        $error = "Error processing \"{$playlist->name}\": {$e->getMessage()}";
                         Notification::make()
                             ->danger()
                             ->title("Error processing \"{$playlist->name}\"")
@@ -186,7 +185,7 @@ class ProcessM3uImport implements ShouldQueue
             }
         } catch (\Exception $e) {
             // Log the exception
-            logger()->error($e->getMessage());
+            logger()->error("Error processing \"{$this->playlist->name}\": {$e->getMessage()}");
 
             // Send notification
             Notification::make()
