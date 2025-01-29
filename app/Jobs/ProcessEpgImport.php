@@ -214,7 +214,7 @@ class ProcessEpgImport implements ShouldQueue
                         // Only consider XML elements and programme nodes
                         if ($programmeReader->nodeType == XMLReader::ELEMENT && $programmeReader->name === 'programme') {
                             $channelId = trim($programmeReader->getAttribute('channel'));
-                            $xmlData = trim($programmeReader->readOuterXml());
+                            $xmlData = json_encode(simplexml_load_string($programmeReader->readOuterXml()));
                             yield [
                                 ...$defaultProgrammeData,
                                 'name' => trim($programmeReader->getAttribute('title')),
@@ -230,12 +230,11 @@ class ProcessEpgImport implements ShouldQueue
                 $channelData->chunk(100)->each(function (LazyCollection $chunk) use (&$jobs) {
                     $jobs[] = new ProcessEpgChannelImport($chunk->toArray());
                 });
-                // $programmData->groupBy('channel_id')->chunk(100)->each(function (LazyCollection $grouped) use (&$jobs) {
-                //     $grouped->each(function ($chunk, $channelId) use (&$jobs) {
-                //         // dump($channelId, $chunk->count());
-                //         // $jobs[] = new ProcessEpgProgrammeImport($chunk->toArray());
-                //     });
-                // });
+                $programmData->groupBy('channel_id')->chunk(100)->each(function (LazyCollection $grouped) {
+                    $grouped->each(function ($programmes, $channelId) {
+                        $programmes->chunk(500)->each(fn($chunk) => EpgProgramme::insert($chunk->toArray()));
+                    });
+                });
 
                 // Close the XMLReaders, all done!
                 $channelReader->close();

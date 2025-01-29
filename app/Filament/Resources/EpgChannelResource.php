@@ -48,17 +48,24 @@ class EpgChannelResource extends Resource
             ->paginated([10, 25, 50, 100, 250])
             ->defaultPaginationPageOption(25)
             ->columns([
+                Tables\Columns\ImageColumn::make('icon')
+                    ->circular(),
                 Tables\Columns\TextColumn::make('name')
                     ->limit(40)
+                    ->sortable()
                     ->searchable(),
                 Tables\Columns\TextColumn::make('display_name')
                     ->limit(40)
+                    ->sortable()
                     ->searchable(),
                 Tables\Columns\TextColumn::make('lang')
+                    ->sortable()
                     ->searchable(),
                 Tables\Columns\TextColumn::make('channel_id')
+                    ->sortable()
                     ->searchable(),
                 Tables\Columns\TextColumn::make('epg.name')
+                    ->sortable()
                     ->numeric()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
