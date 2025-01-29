@@ -5,6 +5,8 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\ChannelResource\Pages;
 use App\Filament\Resources\ChannelResource\RelationManagers;
 use App\Models\Channel;
+use App\Models\Epg;
+use App\Models\Playlist;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -131,6 +133,40 @@ class ChannelResource extends Resource
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     // Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\BulkAction::make('map')
+                        ->label('Map seleted to EPG')
+                        ->form([
+                            Forms\Components\Select::make('epg')
+                                ->required()
+                                ->label('EPG')
+                                ->helperText('Select the EPG you would like to map the playlist channels to.')
+                                ->options(Epg::all(['name', 'id'])->pluck('name', 'id'))
+                                ->searchable(),
+                            Forms\Components\Toggle::make('overwrite')
+                                ->label('Overwrite previously mapped channels')
+                                ->default(false),
+
+                        ])
+                        ->action(function (Collection $records, array $data): void {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new \App\Jobs\MapPlaylistChannelsToEpg(
+                                    epg: (int)$data['epg'],
+                                    channels: $records->pluck('id')->toArray(),
+                                    force: $data['overwrite'],
+                                ));
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Channel to EPG mapping')
+                                ->body('Channel mapping started, you will be notified when the process is complete.')
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-link')
+                        ->modalIcon('heroicon-o-link')
+                        ->modalDescription('Map the selected channels(s) to the selected EPG.')
+                        ->modalSubmitActionLabel('Map now'),
                     Tables\Actions\BulkAction::make('enable')
                         ->label('Enable selected')
                         ->action(function (Collection $records): void {

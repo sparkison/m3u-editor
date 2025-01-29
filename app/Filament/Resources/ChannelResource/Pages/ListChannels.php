@@ -6,10 +6,15 @@ use App\Filament\Exports\ChannelExporter;
 use App\Filament\Imports\ChannelImporter;
 use App\Filament\Resources\ChannelResource;
 use App\Models\Channel;
+use App\Models\Epg;
+use App\Models\Playlist;
 use Filament\Actions;
+use Filament\Forms;
+use Filament\Notifications\Notification;
 use Filament\Resources\Components\Tab;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 
 class ListChannels extends ListRecords
 {
@@ -19,6 +24,45 @@ class ListChannels extends ListRecords
     {
         return [
             // Actions\CreateAction::make(),
+            Actions\Action::make('map')
+                ->label('Map Playlist to EPG')
+                ->form([
+                    Forms\Components\Select::make('playlist')
+                        ->required()
+                        ->label('Playlist')
+                        ->helperText('Select the playlist you would like to map channels for.')
+                        ->options(Playlist::all(['name', 'id'])->pluck('name', 'id'))
+                        ->searchable(),
+                    Forms\Components\Select::make('epg')
+                        ->required()
+                        ->label('EPG')
+                        ->helperText('Select the EPG you would like to map the playlist channels to.')
+                        ->options(Epg::all(['name', 'id'])->pluck('name', 'id'))
+                        ->searchable(),
+                    Forms\Components\Toggle::make('overwrite')
+                        ->label('Overwrite previously mapped channels')
+                        ->default(false),
+
+                ])
+                ->action(function (Collection $records, array $data): void {
+                    app('Illuminate\Contracts\Bus\Dispatcher')
+                        ->dispatch(new \App\Jobs\MapPlaylistChannelsToEpg(
+                            epg: (int)$data['epg'],
+                            playlist: $data['playlist'],
+                            force: $data['overwrite'],
+                        ));
+                })->after(function () {
+                    Notification::make()
+                        ->success()
+                        ->title('Channel to EPG mapping')
+                        ->body('Channel mapping started, you will be notified when the process is complete.')
+                        ->send();
+                })
+                ->requiresConfirmation()
+                ->icon('heroicon-o-link')
+                ->modalIcon('heroicon-o-link')
+                ->modalDescription('Map the selected Playlist channels to the selected EPG.')
+                ->modalSubmitActionLabel('Map now'),
             Actions\ImportAction::make()
                 ->importer(ChannelImporter::class)
                 ->label('Import Channels')

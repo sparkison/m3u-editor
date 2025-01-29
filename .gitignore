@@ -27,3 +27,4 @@ yarn-error.log
 *.sql
 *.csv
 *.m3u
+DockerfileDev

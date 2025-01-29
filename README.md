@@ -56,8 +56,6 @@ services:
       - PGID=1000
       - TZ=Etc/UTC
       - WWWUSER=sail
-      - LARAVEL_SAIL=1
-      - XDEBUG_MODE=off
     volumes:
       - /apps/m3ueditor/config:/var/www/config
     restart: unless-stopped

@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\PlaylistStatus;
 use App\Filament\Resources\PlaylistResource\Pages;
 use App\Filament\Resources\PlaylistResource\RelationManagers;
+use App\Forms\Components\PlaylistEpgUrl;
 use App\Forms\Components\PlaylistM3uUrl;
 use App\Models\Playlist;
 use Filament\Forms;
@@ -119,7 +120,12 @@ class PlaylistResource extends Resource
                     Tables\Actions\Action::make('Download M3U')
                         ->label('Download M3U')
                         ->icon('heroicon-o-arrow-down-tray')
-                        ->url(fn(Playlist $record) => route('playlists.generate', ['uuid' => $record->uuid]))
+                        ->url(fn($record) => route('playlist.generate', ['uuid' => $record->uuid]))
+                        ->openUrlInNewTab(),
+                    Tables\Actions\Action::make('Download M3U')
+                        ->label('Download EPG')
+                        ->icon('heroicon-o-arrow-down-tray')
+                        ->url(fn($record) => route('epg.generate', ['uuid' => $record->uuid]))
                         ->openUrlInNewTab(),
                     Tables\Actions\DeleteAction::make(),
                 ]),
@@ -195,6 +201,11 @@ class PlaylistResource extends Resource
                 ->columnSpan(2)
                 ->dehydrated(false) // don't save the value in the database
                 ->helperText('Your generated m3u playlist, based on the playlist configurtation. Only enabled channels will be included.'),
+            PlaylistEpgUrl::make('epg_url')
+                ->hiddenOn(['create']) // hide this field on the create form
+                ->columnSpan(2)
+                ->dehydrated(false) // don't save the value in the database
+                ->helperText('Your generated EPG, based on the playlist configurtation. Only enabled channels will be included.'),
         ];
     }
 }
