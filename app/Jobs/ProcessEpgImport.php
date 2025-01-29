@@ -44,35 +44,11 @@ class ProcessEpgImport implements ShouldQueue
             return;
         }
 
-
-
-
-
-
-        // @TODO: update status...
-
-
-
-
-
-
         // Update the playlist status to processing
         $this->epg->update([
-            //'status' => EpgStatus::Processing,
+            'status' => EpgStatus::Processing,
             'errors' => null,
         ]);
-
-
-
-
-
-
-
-
-
-
-
-
 
         // Flag job start time
         $start = now();
