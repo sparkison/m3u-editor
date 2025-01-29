@@ -52,7 +52,8 @@ class PlaylistsRelationManager extends RelationManager
                 //
             ])
             ->headerActions([
-                Tables\Actions\AttachAction::make(),
+                Tables\Actions\AttachAction::make()
+                    ->preloadRecordSelect(),
 
                 // Advanced attach when adding pivot values:
                 // Tables\Actions\AttachAction::make()->form(fn(Tables\Actions\AttachAction $action): array => [

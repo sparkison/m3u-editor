@@ -33,9 +33,9 @@ class EpgChannel extends Model
         return $this->belongsTo(Epg::class);
     }
 
-    public function channels(): BelongsToMany
+    public function channels(): HasMany
     {
-        return $this->belongsToMany(Channel::class);
+        return $this->hasMany(Channel::class);
     }
 
     public function programmes(): HasMany

@@ -63,7 +63,8 @@ class ChannelResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('stream_id')
                     ->searchable()
-                    ->toggleable(),
+                    ->toggleable()
+                    ->sortable(),
                 Tables\Columns\ToggleColumn::make('enabled')
                     ->sortable(),
                 Tables\Columns\TextInputColumn::make('channel')
@@ -75,6 +76,10 @@ class ChannelResource extends Resource
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('group')
                     ->hidden(fn() => $relationId)
+                    ->searchable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('epgChannel.name')
+                    ->label('EPG Channel')
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('url')
@@ -206,6 +211,13 @@ class ChannelResource extends Resource
             Forms\Components\TextInput::make('shift')
                 ->columnSpan(1)
                 ->rules(['numeric', 'min:0']),
+            Forms\Components\Select::make('epg_channel_id')
+                ->label('EPG Channel')
+                ->helperText('Select an associated EPG channel for this channel.')
+                ->relationship('epgChannel', 'name')
+                ->searchable()
+                ->preload()
+                ->columnSpan(1),
 
             /*
              * Below fields are automatically populated/updated on Playlist sync.
