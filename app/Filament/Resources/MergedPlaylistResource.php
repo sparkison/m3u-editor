@@ -126,7 +126,7 @@ class MergedPlaylistResource extends Resource
             Forms\Components\Section::make()
                 ->hiddenOn(['create']) // hide this field on the create form
                 ->schema($schema)
-                ->columns(4),
+                ->columns(2),
 
         ];
     }
