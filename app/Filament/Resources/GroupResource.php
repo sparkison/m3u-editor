@@ -45,7 +45,8 @@ class GroupResource extends Resource
             ->defaultPaginationPageOption(25)
             ->columns([
                 Tables\Columns\TextColumn::make('name')
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('playlist.name')
                     ->numeric()
                     ->sortable(),

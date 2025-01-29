@@ -47,7 +47,8 @@ class EpgResource extends Resource
             ->defaultPaginationPageOption(25)
             ->columns([
                 Tables\Columns\TextColumn::make('name')
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('url')
                     ->wrap()
                     ->toggleable(isToggledHiddenByDefault: true)
@@ -55,6 +56,10 @@ class EpgResource extends Resource
                 Tables\Columns\TextColumn::make('channels_count')
                     ->label('Channels')
                     ->counts('channels')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('programmes_count')
+                    ->label('Programs')
+                    ->counts('programmes')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->sortable()
