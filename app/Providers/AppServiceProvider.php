@@ -43,6 +43,7 @@ class AppServiceProvider extends ServiceProvider
             Epg::created(fn(Epg $epg) => event(new EpgCreated($epg)));
             Epg::creating(function (Epg $epg) {
                 $epg->user_id = auth()->id();
+                $epg->uuid = \Illuminate\Support\Str::orderedUuid()->toString();
                 return $epg;
             });
 

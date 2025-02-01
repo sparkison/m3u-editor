@@ -5,7 +5,6 @@ namespace App\Filament\Widgets;
 use App\Models\Channel;
 use App\Models\Epg;
 use App\Models\EpgChannel;
-use App\Models\EpgProgramme;
 use App\Models\Group;
 use App\Models\Playlist;
 use Carbon\Carbon;
@@ -33,7 +32,6 @@ class StatsOverview extends BaseWidget
                 ->description($epgRelative ? "Last sync $epgRelative" : 'No syncs yet')
                 ->descriptionIcon('heroicon-m-calendar-days'),
             Stat::make('Total EPG Channels', EpgChannel::count()),
-            Stat::make('Total EPG Programs', EpgProgramme::count()),
             Stat::make('EPG Mapped Channels', Channel::where('epg_channel_id', '!=', null)->count()),
         ];
     }

@@ -196,16 +196,19 @@ class PlaylistResource extends Resource
                 ->native(false)
                 ->label('Last Synced')
                 ->helperText('Playlist will be synced every 24hr. Timestamp is automatically updated after each sync. Set to any time in the past (or future) and the next sync will run when 24hr has passed since the time set.'),
-            PlaylistM3uUrl::make('m3u_url')
-                ->hiddenOn(['create']) // hide this field on the create form
-                ->columnSpan(2)
-                ->dehydrated(false) // don't save the value in the database
-                ->helperText('Your generated m3u playlist, based on the playlist configurtation. Only enabled channels will be included.'),
-            PlaylistEpgUrl::make('epg_url')
-                ->hiddenOn(['create']) // hide this field on the create form
-                ->columnSpan(2)
-                ->dehydrated(false) // don't save the value in the database
-                ->helperText('Your generated EPG, based on the playlist configurtation. Only enabled channels will be included.'),
+
+            
+            Forms\Components\Section::make('Links')
+                ->description('These links are generated based on the current playlist configuration. Only enabled channels will be included.')
+                ->schema([
+                    PlaylistM3uUrl::make('m3u_url')
+                        ->columnSpan(2)
+                        ->dehydrated(false), // don't save the value in the database
+                    PlaylistEpgUrl::make('epg_url')
+                        ->columnSpan(2)
+                        ->dehydrated(false) // don't save the value in the database
+                ])->hiddenOn(['create']),
+
         ];
     }
 }

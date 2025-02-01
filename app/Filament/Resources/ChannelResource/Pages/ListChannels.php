@@ -60,6 +60,7 @@ class ListChannels extends ListRecords
                 })
                 ->requiresConfirmation()
                 ->icon('heroicon-o-link')
+                ->color('gray')
                 ->modalIcon('heroicon-o-link')
                 ->modalDescription('Map the selected Playlist channels to the selected EPG.')
                 ->modalSubmitActionLabel('Map now'),

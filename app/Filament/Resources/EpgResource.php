@@ -57,10 +57,6 @@ class EpgResource extends Resource
                     ->label('Channels')
                     ->counts('channels')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('programmes_count')
-                    ->label('Programs')
-                    ->counts('programmes')
-                    ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->sortable()
                     ->badge()
@@ -180,7 +176,8 @@ class EpgResource extends Resource
                         ->icon('heroicon-o-arrow-top-right-on-square')
                         ->iconPosition('after')
                         ->size('sm')
-                        ->url('https://wiki.xmltv.org/index.php/XMLTVFormat')
+                        // ->url('https://wiki.xmltv.org/index.php/XMLTVFormat')
+                        ->url('https://github.com/XMLTV/xmltv/blob/master/xmltv.dtd')
                         ->openUrlInNewTab(true),
                 ])
                 ->schema([

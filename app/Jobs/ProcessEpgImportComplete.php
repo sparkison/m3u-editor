@@ -4,7 +4,6 @@ namespace App\Jobs;
 
 use App\Enums\EpgStatus;
 use App\Models\EpgChannel;
-use App\Models\EpgProgramme;
 use App\Models\User;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
@@ -50,12 +49,6 @@ class ProcessEpgImportComplete implements ShouldQueue
             ->title('EPG Synced')
             ->body("\"{$epg->name}\" has been synced successfully. Import completed in {$completedInRounded} seconds.")
             ->sendToDatabase($epg->user);
-
-        // Clear out invalid programmes (if any)
-        EpgProgramme::where([
-            ['epg_id', $epg->id],
-            ['import_batch_no', '!=', $this->batchNo],
-        ])->delete();
 
         // Clear out invalid channels (if any)
         EpgChannel::where([

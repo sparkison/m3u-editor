@@ -111,16 +111,16 @@ class CustomPlaylistResource extends Resource
                 ->required()
                 ->columnSpan(2)
                 ->helperText('Enter the name of the playlist. Internal use only.'),
-            PlaylistM3uUrl::make('m3u_url')
-                ->hiddenOn(['create']) // hide this field on the create form
-                ->columnSpan(2)
-                ->dehydrated(false) // don't save the value in the database
-                ->helperText('Your generated m3u playlist, based on the playlist configurtation. Only enabled channels will be included.'),
-            PlaylistEpgUrl::make('epg_url')
-                ->hiddenOn(['create']) // hide this field on the create form
-                ->columnSpan(2)
-                ->dehydrated(false) // don't save the value in the database
-                ->helperText('Your generated EPG, based on the playlist configurtation. Only enabled channels will be included.'),
+            Forms\Components\Section::make('Links')
+                ->description('These links are generated based on the current playlist configuration. Only enabled channels will be included.')
+                ->schema([
+                    PlaylistM3uUrl::make('m3u_url')
+                        ->columnSpan(2)
+                        ->dehydrated(false), // don't save the value in the database
+                    PlaylistEpgUrl::make('epg_url')
+                        ->columnSpan(2)
+                        ->dehydrated(false) // don't save the value in the database
+                ])->hiddenOn(['create']),
         ];
         return [
             Forms\Components\Grid::make()

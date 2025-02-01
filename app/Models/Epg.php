@@ -34,9 +34,4 @@ class Epg extends Model
     {
         return $this->hasMany(EpgChannel::class);
     }
-
-    public function programmes(): HasMany
-    {
-        return $this->hasMany(EpgProgramme::class);
-    }
 }

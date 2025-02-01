@@ -8,7 +8,6 @@ use Throwable;
 use App\Enums\EpgStatus;
 use App\Models\Epg;
 use App\Models\EpgChannel;
-use App\Models\EpgProgramme;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -16,6 +15,7 @@ use Illuminate\Support\Str;
 use Illuminate\Bus\Batch;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\LazyCollection;
 
 class ProcessEpgImport implements ShouldQueue
@@ -63,7 +63,6 @@ class ProcessEpgImport implements ShouldQueue
 
             $xmlData = null;
             $channelReader = null;
-            $programmeReader = null;
             if ($this->epg->url) {
                 // Normalize the playlist url and get the filename
                 $url = str($this->epg->url)->replace(' ', '%20');
@@ -105,26 +104,24 @@ class ProcessEpgImport implements ShouldQueue
                 $channelReader = new XMLReader();
                 $channelReader->xml($xmlData);
 
-                $programmeReader = new XMLReader();
-                $programmeReader->xml($xmlData);
+                // Save the contents to a file
+                $filename = Str::slug($epg->name) . '.xml';
+
+                // Remove previous saved files
+                Storage::disk('local')->deleteDirectory("epg/{$epg->uuid}");
+
+                // Save the file to local storage
+                Storage::disk('local')->put("epg/{$epg->uuid}/{$filename}", $xmlData);
             }
 
             // If reader valid, process the data!
-            if ($channelReader && $programmeReader) {
+            if ($channelReader) {
                 // Default data structures
                 $defaultChannelData = [
                     'name' => null,
                     'display_name' => null,
                     'lang' => null,
                     'icon' => null,
-                    'channel_id' => null,
-                    'epg_id' => $epgId,
-                    'user_id' => $userId,
-                    'import_batch_no' => $batchNo,
-                ];
-                $defaultProgrammeData = [
-                    'name' => null,
-                    'data' => null,
                     'channel_id' => null,
                     'epg_id' => $epgId,
                     'user_id' => $userId,
@@ -183,38 +180,14 @@ class ProcessEpgImport implements ShouldQueue
                     }
                 });
 
-                // Process programme data separately 
-                $programmData = LazyCollection::make(function () use ($programmeReader, $defaultProgrammeData) {
-                    // Loop through the XML data
-                    while ($programmeReader->read()) {
-                        // Only consider XML elements and programme nodes
-                        if ($programmeReader->nodeType == XMLReader::ELEMENT && $programmeReader->name === 'programme') {
-                            $channelId = trim($programmeReader->getAttribute('channel'));
-                            $xmlData = json_encode(simplexml_load_string($programmeReader->readOuterXml()));
-                            yield [
-                                ...$defaultProgrammeData,
-                                'name' => trim($programmeReader->getAttribute('title')),
-                                'data' => $xmlData ?? '',
-                                'channel_id' => $channelId,
-                            ];
-                        }
-                    }
-                });
-
                 // Process the data
                 $jobs = [];
                 $channelData->chunk(100)->each(function (LazyCollection $chunk) use (&$jobs) {
                     $jobs[] = new ProcessEpgChannelImport($chunk->toArray());
                 });
-                $programmData->groupBy('channel_id')->chunk(100)->each(function (LazyCollection $grouped) {
-                    $grouped->each(function ($programmes, $channelId) {
-                        $programmes->chunk(500)->each(fn($chunk) => EpgProgramme::insert($chunk->toArray()));
-                    });
-                });
 
                 // Close the XMLReaders, all done!
                 $channelReader->close();
-                $programmeReader->close();
 
                 // Last job in the batch
                 $jobs[] = new ProcessEpgImportComplete($userId, $epgId, $batchNo, $start);

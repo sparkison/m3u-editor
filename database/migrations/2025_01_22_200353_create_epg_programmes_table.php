@@ -11,20 +11,20 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::disableForeignKeyConstraints();
+        // Schema::disableForeignKeyConstraints();
 
-        Schema::create('epg_programmes', function (Blueprint $table) {
-            $table->id();
-            $table->string('name')->nullable();
-            $table->string('channel_id');
-            $table->string('import_batch_no')->nullable();
-            $table->longText('data');
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
-            $table->foreignId('epg_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
-            $table->timestamps();
-        });
+        // Schema::create('epg_programmes', function (Blueprint $table) {
+        //     $table->id();
+        //     $table->string('name')->nullable();
+        //     $table->string('channel_id');
+        //     $table->string('import_batch_no')->nullable();
+        //     $table->longText('data');
+        //     $table->foreignId('user_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
+        //     $table->foreignId('epg_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
+        //     $table->timestamps();
+        // });
 
-        Schema::enableForeignKeyConstraints();
+        // Schema::enableForeignKeyConstraints();
     }
 
     /**
@@ -32,6 +32,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('epg_programmes');
+        // Schema::dropIfExists('epg_programmes');
     }
 };

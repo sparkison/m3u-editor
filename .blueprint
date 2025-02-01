@@ -3,9 +3,7 @@ created:
     - database/migrations/2025_01_28_152137_create_custom_playlists_table.php
     - database/migrations/2025_01_28_152138_create_channel_custom_playlist_table.php
     - app/Models/CustomPlaylist.php
-    - database/factories/EpgProgrammeFactory.php
     - database/migrations/2025_01_22_200353_create_epg_programmes_table.php
-    - app/Models/EpgProgramme.php
 models:
     User: { name: string, email: string, email_verified_at: 'datetime nullable', password: string, remember_token: 'string nullable' }
     Playlist: { name: string, uuid: uuid, url: string, status: 'enum:pending,processing,completed,failed default:pending', prefix: 'string nullable', channels: 'unsignedInteger default:0', synced: 'datetime nullable', errors: 'longText nullable', user_id: 'id foreign:users', relationships: { belongsTo: User, hasMany: 'Channel, Group' } }
@@ -16,4 +14,3 @@ models:
     Epg: { name: string, url: string, user_id: 'id foreign:users', relationships: { belongsTo: User } }
     EpgChannel: { name: string, display_name: 'string nullable', lang: 'string nullable', channel_id: 'string nullable', epg_id: 'id foreign:epgs', programmes: 'longText nullable', relationships: { belongsTo: Epg } }
     Programme: { name: 'string nullable', channel_id: string, data: longText, user_id: 'id foreign:users', epg_id: 'id foreign:epgs', relationships: { belongsTo: 'User, Epg' } }
-    EpgProgramme: { name: 'string nullable', channel_id: string, import_batch_no: 'string nullable', data: longText, user_id: 'id foreign:users', epg_id: 'id foreign:epgs', relationships: { belongsTo: 'User, Epg' } }
