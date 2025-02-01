@@ -38,10 +38,9 @@ class EpgGenerateController extends Controller
 
                 // Setup the channels
                 $epgChannels = [];
-                $channels = Channel::where([
-                    ['playlist_id', $playlist->id],
-                    ['enabled', true],
-                ])->cursor();
+                $channels = $playlist->channels()
+                    ->where('enabled', true)
+                    ->cursor();
                 foreach ($channels as $channel) {
                     // Output the <channel> tag
                     if ($channel->epgChannel) {
