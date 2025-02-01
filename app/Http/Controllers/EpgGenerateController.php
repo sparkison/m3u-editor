@@ -80,12 +80,8 @@ class EpgGenerateController extends Controller
                         continue;
                     }
 
-                    // Filename
-                    $filename = Str::slug($epg->name) . '.xml';
-
                     // Get the content
-                    $content = file_get_contents(Storage::disk('local')
-                        ->path("epg/{$epg->uuid}/{$filename}"));
+                    $content = file_get_contents(Storage::disk('local')->path($epg->file_path));
 
                     // Create a new XMLReader instance
                     $programReader = new XMLReader();

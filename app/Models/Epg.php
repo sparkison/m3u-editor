@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class Epg extends Model
 {
@@ -24,6 +25,16 @@ class Epg extends Model
         'uploads' => 'array',
         'status' => EpgStatus::class,
     ];
+
+    public function getFolderPathAttribute(): string
+    {
+        return "epg/{$this->uuid}";
+    }
+
+    public function getFilePathAttribute(): string
+    {
+        return "epg/{$this->uuid}/epg.xml";
+    }
 
     public function user(): BelongsTo
     {

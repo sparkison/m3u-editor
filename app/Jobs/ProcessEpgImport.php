@@ -108,10 +108,10 @@ class ProcessEpgImport implements ShouldQueue
                 $filename = Str::slug($epg->name) . '.xml';
 
                 // Remove previous saved files
-                Storage::disk('local')->deleteDirectory("epg/{$epg->uuid}");
+                Storage::disk('local')->deleteDirectory($epg->folder_path);
 
                 // Save the file to local storage
-                Storage::disk('local')->put("epg/{$epg->uuid}/{$filename}", $xmlData);
+                Storage::disk('local')->put($epg->file_path, $xmlData);
             }
 
             // If reader valid, process the data!

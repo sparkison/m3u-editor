@@ -111,6 +111,11 @@ class EpgResource extends Resource
                         ->modalIcon('heroicon-o-arrow-path')
                         ->modalDescription('Process EPG now?')
                         ->modalSubmitActionLabel('Yes, process now'),
+                    Tables\Actions\Action::make('Download EPG')
+                        ->label('Download EPG')
+                        ->icon('heroicon-o-arrow-down-tray')
+                        ->url(fn($record) => route('epg.file', ['uuid' => $record->uuid]))
+                        ->openUrlInNewTab(),
                     Tables\Actions\DeleteAction::make(),
                 ]),
             ])
