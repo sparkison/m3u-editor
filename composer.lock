@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "95e8bdfc6ab9137e55d6f05765bb21ff",
+    "content-hash": "4289343d4f72df1700bf6835ac087b30",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -660,60 +660,6 @@
                 "source": "https://github.com/dflydev/dflydev-dot-access-data/tree/v3.0.3"
             },
             "time": "2024-07-08T12:26:09+00:00"
-        },
-        {
-            "name": "digitickets/lalit",
-            "version": "3.4.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/digitickets/lalit.git",
-                "reference": "b88856d0434bf3eb465b4ad872ee4eea6ccb582a"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/digitickets/lalit/zipball/b88856d0434bf3eb465b4ad872ee4eea6ccb582a",
-                "reference": "b88856d0434bf3eb465b4ad872ee4eea6ccb582a",
-                "shasum": ""
-            },
-            "require": {
-                "ext-dom": "*",
-                "php": ">=7"
-            },
-            "require-dev": {
-                "phpunit/phpunit": "*",
-                "yetanotherape/diff-match-patch": "*"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "LaLit\\": "src"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "CC0-1.0"
-            ],
-            "authors": [
-                {
-                    "name": "Lalit Patel",
-                    "role": "Lead Developer"
-                },
-                {
-                    "name": "Richard Quadling",
-                    "role": "Developer"
-                }
-            ],
-            "description": "GitHub copy of LaLit's XML2Array and Array2XML",
-            "homepage": "http://www.lalit.org/lab",
-            "keywords": [
-                "array",
-                "xml"
-            ],
-            "support": {
-                "issues": "https://github.com/digitickets/lalit/issues",
-                "source": "https://github.com/digitickets/lalit/tree/3.4.0"
-            },
-            "time": "2024-03-08T20:59:04+00:00"
         },
         {
             "name": "doctrine/dbal",
@@ -6315,67 +6261,6 @@
                 }
             ],
             "time": "2024-12-09T16:29:14+00:00"
-        },
-        {
-            "name": "spatie/temporary-directory",
-            "version": "2.3.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/spatie/temporary-directory.git",
-                "reference": "580eddfe9a0a41a902cac6eeb8f066b42e65a32b"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/spatie/temporary-directory/zipball/580eddfe9a0a41a902cac6eeb8f066b42e65a32b",
-                "reference": "580eddfe9a0a41a902cac6eeb8f066b42e65a32b",
-                "shasum": ""
-            },
-            "require": {
-                "php": "^8.0"
-            },
-            "require-dev": {
-                "phpunit/phpunit": "^9.5"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Spatie\\TemporaryDirectory\\": "src"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Alex Vanderbist",
-                    "email": "alex@spatie.be",
-                    "homepage": "https://spatie.be",
-                    "role": "Developer"
-                }
-            ],
-            "description": "Easily create, use and destroy temporary directories",
-            "homepage": "https://github.com/spatie/temporary-directory",
-            "keywords": [
-                "php",
-                "spatie",
-                "temporary-directory"
-            ],
-            "support": {
-                "issues": "https://github.com/spatie/temporary-directory/issues",
-                "source": "https://github.com/spatie/temporary-directory/tree/2.3.0"
-            },
-            "funding": [
-                {
-                    "url": "https://spatie.be/open-source/support-us",
-                    "type": "custom"
-                },
-                {
-                    "url": "https://github.com/spatie",
-                    "type": "github"
-                }
-            ],
-            "time": "2025-01-13T13:04:43+00:00"
         },
         {
             "name": "symfony/clock",

@@ -4,12 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Channel;
 use App\Models\CustomPlaylist;
+use App\Models\Epg;
 use App\Models\MergedPlaylist;
 use App\Models\Playlist;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use PHPUnit\Event\Runtime\PHP;
-use LaLit\Array2XML;
 
 class EpgGenerateController extends Controller
 {
@@ -37,11 +36,24 @@ class EpgGenerateController extends Controller
             ['playlist_id', $playlist->id],
             ['enabled', true],
         ];
+        $epgChannels = [];
         $channels = Channel::where($where)->cursor();
         foreach ($channels as $channel) {
             // Output the <channel> tag
             if ($channel->epgChannel) {
                 $epgData = $channel->epgChannel;
+
+                // Keep track of which EPGs have which channels mapped
+                $channelData = [
+                    'name' => $epgData->name,
+                    'channel_id' => $epgData->channel_id,
+                ];
+                if (!array_key_exists($epgData->epg_id, $epgChannels)) {
+                    $epgChannels[$epgData->epg_id] = [$channelData];
+                } else {
+                    $epgChannels[$epgData->epg_id][] = $channelData;
+                }
+
                 echo '  <channel id="' . $epgData->channel_id . '">' . PHP_EOL;
                 echo '    <display-name lang="' . $epgData->lang . '">' . $epgData->name . '</display-name>';
                 if ($epgData->icon) {
@@ -50,6 +62,19 @@ class EpgGenerateController extends Controller
                 echo PHP_EOL . '  </channel>' . PHP_EOL;
             }
         }
+
+        // Fetch the EPGs
+        $epgs = Epg::whereIn('id', array_keys($epgChannels))->get();
+        foreach ($epgs as $epg) {
+            // Channel data
+            $channels = $epgChannels[$epg->id];
+
+            // Filename
+            $filename = Str::slug($epg->name) . '.xml';
+
+            // dump($channels, $epg->name, $filename);
+        }
+        
 
         // @TODO: get the epg data...
 
