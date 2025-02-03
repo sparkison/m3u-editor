@@ -16,8 +16,15 @@ class EpgFileController extends Controller
         if (!Storage::exists($epg->file_path)) {
             abort(404);
         }
+
+        // Generate a filename
+        $filename = Str::slug($epg->name) . '.xml';
+
+        // Setup the file stream
         $fs = Storage::getDriver();
         $stream = $fs->readStream($epg->file_path);
+
+        // Return the original file
         return response()->stream(
             function () use ($stream) {
                 while (ob_get_level() > 0) ob_end_flush();
@@ -25,8 +32,9 @@ class EpgFileController extends Controller
             },
             200,
             [
+                'Access-Control-Allow-Origin' => '*',
+                'Content-Disposition' => "attachment; filename=$filename",
                 'Content-Type' => 'application/xml',
-                'Content-disposition' => 'attachment; filename="' . Str::slug($epg->name) . '.xml"',
             ]
         );
     }
