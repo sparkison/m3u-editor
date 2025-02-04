@@ -28,7 +28,11 @@ class EpgFileController extends Controller
         return response()->stream(
             function () use ($stream) {
                 while (ob_get_level() > 0) ob_end_flush();
-                fpassthru($stream);
+                // fpassthru($stream);
+                while (!feof($stream)) {
+                    echo fread($stream, 8192); // Read in 8KB chunks
+                    flush(); // Ensure immediate output
+                }
             },
             200,
             [
