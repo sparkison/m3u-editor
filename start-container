@@ -22,6 +22,7 @@ config_dir="/var/www/config"
 env_file="${config_dir}/env"
 db_dir="${config_dir}/database"
 db_file="${db_dir}/database.sqlite"
+epg_dir="${config_dir}/epgs"
 log_dir="${config_dir}/logs"
 log_file="${log_dir}/laravel.log"
 queue_log_file="${log_dir}/queue.log"
@@ -42,6 +43,11 @@ if [ ! -d "${log_dir}" ]; then
     echo "Creating log directory..."
     mkdir "${log_dir}"
 fi
+if [ ! -d "${epg_dir}" ]; then
+    echo "Creating EPG directory..."
+    mkdir "${epg_dir}"
+fi
+
 
 # Create environment file
 if [ ! -f "${env_file}" ]; then
@@ -90,6 +96,9 @@ ln -sf "${env_file}" .env
 
 # Link the database file to the laravel `database` directory
 ln -sf "${db_file}" "database/database.sqlite"
+
+# Link the EPG directory to the laravel `storage` directory
+ln -sf "${epg_dir}" "storage/app/private/epg"
 
 # Set app key, if not previously set
 php artisan app:generate-key
