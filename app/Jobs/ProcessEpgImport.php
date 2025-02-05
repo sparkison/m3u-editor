@@ -86,8 +86,8 @@ class ProcessEpgImport implements ShouldQueue
                 }
             } else {
                 // Get uploaded file contents
-                if ($this->epg->uploads) {
-                    $output = file_get_contents($this->epg->uploads[0]);
+                if ($this->epg->uploads && Storage::disk('local')->exists($this->epg->uploads)) {
+                    $output = file_get_contents(Storage::disk('local')->path($this->epg->uploads));
 
                     // Attempt to decode the gzipped content
                     $xmlData = gzdecode($output);

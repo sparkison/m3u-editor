@@ -195,6 +195,9 @@ class EpgResource extends Resource
                         ->maxLength(255),
                     Forms\Components\FileUpload::make('uploads')
                         ->label('File')
+                        ->disk('local')
+                        ->directory('epg')
+                        ->rules(['file'])
                         ->requiredIf('url', [null, ''])
                         ->helperText('Upload the XMLTV file for the EPG. This will be used to import the guide data.'),
                 ])
