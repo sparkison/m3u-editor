@@ -114,6 +114,7 @@ class PlaylistResource extends Resource
                                 ->duration(10000)
                                 ->send();
                         })
+                        ->disabled(fn($record): bool => ! $record->auto_sync)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
