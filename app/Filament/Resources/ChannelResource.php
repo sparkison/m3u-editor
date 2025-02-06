@@ -54,11 +54,11 @@ class ChannelResource extends Resource
             ->defaultPaginationPageOption(25)
             ->columns([
                 Tables\Columns\ImageColumn::make('logo')
+                    ->toggleable()
                     ->circular(),
                 Tables\Columns\TextColumn::make('title')
                     ->searchable()
                     ->wrap()
-                    ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()

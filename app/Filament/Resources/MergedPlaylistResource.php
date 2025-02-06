@@ -44,10 +44,12 @@ class MergedPlaylistResource extends Resource
                 Tables\Columns\TextColumn::make('channels_count')
                     ->label('Channels')
                     ->counts('channels')
+                    ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('enabled_channels_count')
                     ->label('Enabled Channels')
                     ->counts('enabled_channels')
+                    ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()

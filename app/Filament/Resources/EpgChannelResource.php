@@ -49,6 +49,7 @@ class EpgChannelResource extends Resource
             ->defaultPaginationPageOption(25)
             ->columns([
                 Tables\Columns\ImageColumn::make('icon')
+                    ->toggleable()
                     ->circular(),
                 Tables\Columns\TextColumn::make('name')
                     ->limit(40)
@@ -57,12 +58,15 @@ class EpgChannelResource extends Resource
                 Tables\Columns\TextColumn::make('display_name')
                     ->limit(40)
                     ->sortable()
+                    ->toggleable()
                     ->searchable(),
                 Tables\Columns\TextColumn::make('lang')
                     ->sortable()
+                    ->toggleable()
                     ->searchable(),
                 Tables\Columns\TextColumn::make('channel_id')
                     ->sortable()
+                    ->toggleable()
                     ->searchable(),
                 // WARNING! Slows table load quite a bit...
                 // Tables\Columns\TextColumn::make('programmes_count')
@@ -72,6 +76,7 @@ class EpgChannelResource extends Resource
                 Tables\Columns\TextColumn::make('epg.name')
                     ->sortable()
                     ->numeric()
+                    ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()

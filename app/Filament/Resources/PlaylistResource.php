@@ -55,18 +55,22 @@ class PlaylistResource extends Resource
                 Tables\Columns\TextColumn::make('groups_count')
                     ->label('Groups')
                     ->counts('groups')
+                    ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('channels_count')
                     ->label('Channels')
                     ->counts('channels')
+                    ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('enabled_channels_count')
                     ->label('Enabled Channels')
                     ->counts('enabled_channels')
+                    ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->sortable()
                     ->badge()
+                    ->toggleable()
                     ->color(fn(PlaylistStatus $state) => $state->getColor()),
                 Tables\Columns\IconColumn::make('auto_sync')
                     ->label('Auto Sync')
@@ -76,14 +80,16 @@ class PlaylistResource extends Resource
                     })->color(fn(string $state): string => match ($state) {
                         '1' => 'success',
                         '0' => 'danger',
-                    })->sortable(),
+                    })->toggleable()->sortable(),
                 Tables\Columns\TextColumn::make('synced')
                     ->label('Last Synced')
                     ->since()
+                    ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('sync_time')
                     ->label('Sync Time')
                     ->formatStateUsing(fn(string $state): string => gmdate('H:i:s', $state))
+                    ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()

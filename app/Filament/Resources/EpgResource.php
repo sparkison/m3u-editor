@@ -57,13 +57,16 @@ class EpgResource extends Resource
                 Tables\Columns\TextColumn::make('channels_count')
                     ->label('Channels')
                     ->counts('channels')
+                    ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->sortable()
+                    ->toggleable()
                     ->badge()
                     ->color(fn(EpgStatus $state) => $state->getColor()),
                 Tables\Columns\IconColumn::make('auto_sync')
                     ->label('Auto Sync')
+                    ->toggleable()
                     ->icon(fn(string $state): string => match ($state) {
                         '1' => 'heroicon-o-check-circle',
                         '0' => 'heroicon-o-minus-circle',
@@ -74,10 +77,12 @@ class EpgResource extends Resource
                 Tables\Columns\TextColumn::make('synced')
                     ->label('Last Synced')
                     ->since()
+                    ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('sync_time')
                     ->label('Sync Time')
                     ->formatStateUsing(fn(string $state): string => gmdate('H:i:s', $state))
+                    ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
