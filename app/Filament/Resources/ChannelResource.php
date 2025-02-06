@@ -58,45 +58,55 @@ class ChannelResource extends Resource
                 Tables\Columns\TextColumn::make('title')
                     ->searchable()
                     ->wrap()
+                    ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
                     ->wrap()
+                    ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('stream_id')
                     ->searchable()
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\ToggleColumn::make('enabled')
+                    ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextInputColumn::make('channel')
                     ->rules(['numeric', 'min:0'])
+                    ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextInputColumn::make('shift')
                     ->rules(['numeric', 'min:0'])
-                    ->sortable()
-                    ->toggleable(),
+                    ->toggleable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('group')
                     ->hidden(fn() => $relationId)
+                    ->toggleable()
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('epgChannel.name')
                     ->label('EPG Channel')
+                    ->toggleable()
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('url')
                     ->url(fn($record): string => $record->url)
                     ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('lang')
                     ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('country')
                     ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('playlist.name')
                     ->hidden(fn() => $relationId)
                     ->numeric()
+                    ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()

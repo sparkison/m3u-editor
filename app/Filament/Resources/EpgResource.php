@@ -181,13 +181,12 @@ class EpgResource extends Resource
                 ->live()
                 ->default(true),
             Forms\Components\DateTimePicker::make('synced')
-                ->hiddenOn(['create']) // hide this field on the create form
                 ->columnSpan(2)
                 ->prefix('Sync 24hr from')
                 ->suffix('UTC')
                 ->native(false)
                 ->label('Last Synced')
-                ->hidden(fn(Get $get): bool => ! $get('auto_sync'))
+                ->hidden(fn(Get $get, string $operation): bool => ! $get('auto_sync') || $operation === 'create')
                 ->helperText('EPG will be synced every 24hr. Timestamp is automatically updated after each sync. Set to any time in the past (or future) and the next sync will run when 24hr has passed since the time set.'),
 
             Forms\Components\Section::make('XMLTV file or URL')
@@ -217,7 +216,7 @@ class EpgResource extends Resource
                         ->rules(['file'])
                         ->requiredIf('url', [null, ''])
                         ->helperText('Upload the XMLTV file for the EPG. This will be used to import the guide data.'),
-                ])
+                ])->hiddenOn(['create'])
         ];
     }
 }
