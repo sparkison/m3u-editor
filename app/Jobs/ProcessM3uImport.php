@@ -43,6 +43,11 @@ class ProcessM3uImport implements ShouldQueue
             return;
         }
 
+        // Check if auto sync is enabled, or the playlist hasn't been synced yet
+        if (!$this->playlist->auto_sync && $this->playlist->synced) {
+            return;
+        }
+
         // Update the playlist status to processing
         $this->playlist->update([
             'status' => PlaylistStatus::Processing,

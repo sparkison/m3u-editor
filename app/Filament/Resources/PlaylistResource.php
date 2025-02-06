@@ -10,6 +10,7 @@ use App\Forms\Components\PlaylistM3uUrl;
 use App\Models\Playlist;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -67,6 +68,15 @@ class PlaylistResource extends Resource
                     ->sortable()
                     ->badge()
                     ->color(fn(PlaylistStatus $state) => $state->getColor()),
+                Tables\Columns\IconColumn::make('auto_sync')
+                    ->label('Auto Sync')
+                    ->icon(fn(string $state): string => match ($state) {
+                        '1' => 'heroicon-o-check-circle',
+                        '0' => 'heroicon-o-minus-circle',
+                    })->color(fn(string $state): string => match ($state) {
+                        '1' => 'success',
+                        '0' => 'danger',
+                    })->sortable(),
                 Tables\Columns\TextColumn::make('synced')
                     ->label('Last Synced')
                     ->since()
@@ -89,15 +99,7 @@ class PlaylistResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ActionGroup::make([
-                    Tables\Actions\EditAction::make()
-                        ->after(function () {
-                            Notification::make()
-                                ->success()
-                                ->title('New playlist added')
-                                ->body('Playlist is currently processing in the background. Depending on the size of your playlist, this may take a while.')
-                                ->duration(10000)
-                                ->send();
-                        }),
+                    Tables\Actions\EditAction::make(),
                     Tables\Actions\Action::make('process')
                         ->label('Process')
                         ->icon('heroicon-o-arrow-path')
@@ -188,6 +190,10 @@ class PlaylistResource extends Resource
                 ->prefixIcon('heroicon-m-globe-alt')
                 ->required()
                 ->helperText('Enter the URL of the playlist file. If changing URL, the playlist will be re-imported. Use with caution as this could lead to data loss if the new playlist differs from the old one.'),
+            Forms\Components\Toggle::make('auto_sync')
+                ->label('Automatically sync playlist every 24hr')
+                ->live()
+                ->default(true),
             Forms\Components\DateTimePicker::make('synced')
                 ->hiddenOn(['create']) // hide this field on the create form
                 ->columnSpan(2)
@@ -195,9 +201,9 @@ class PlaylistResource extends Resource
                 ->suffix('UTC')
                 ->native(false)
                 ->label('Last Synced')
+                ->hidden(fn(Get $get): bool => ! $get('auto_sync'))
                 ->helperText('Playlist will be synced every 24hr. Timestamp is automatically updated after each sync. Set to any time in the past (or future) and the next sync will run when 24hr has passed since the time set.'),
 
-            
             Forms\Components\Section::make('Links')
                 ->description('These links are generated based on the current playlist configuration. Only enabled channels will be included.')
                 ->schema([

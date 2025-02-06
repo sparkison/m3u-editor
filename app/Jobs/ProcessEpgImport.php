@@ -44,6 +44,11 @@ class ProcessEpgImport implements ShouldQueue
             return;
         }
 
+        // Check if auto sync is enabled, or the playlist hasn't been synced yet
+        if (!$this->epg->auto_sync && $this->epg->synced) {
+            return;
+        }
+
         // Update the playlist status to processing
         $this->epg->update([
             'status' => EpgStatus::Processing,
