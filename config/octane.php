@@ -156,6 +156,12 @@ return [
     //         'ssl_key_file' => '/etc/swoole/ssl/private/sail-selfsigned.key',
     //     ]
     // ],
+    'swoole' => [
+        'options' => [
+            'log_file' => storage_path('logs/swoole_http.log'),
+            'package_max_length' => 1024 * 1024 * 1024, // 1024 MB
+        ],
+    ],
 
     /*
     |--------------------------------------------------------------------------
