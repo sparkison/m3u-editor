@@ -25,19 +25,19 @@ class ListChannels extends ListRecords
         return [
             // Actions\CreateAction::make(),
             Actions\Action::make('map')
-                ->label('Map Playlist to EPG')
+                ->label('Map EPG to Playlist')
                 ->form([
-                    Forms\Components\Select::make('playlist')
-                        ->required()
-                        ->label('Playlist')
-                        ->helperText('Select the playlist you would like to map channels for.')
-                        ->options(Playlist::all(['name', 'id'])->pluck('name', 'id'))
-                        ->searchable(),
                     Forms\Components\Select::make('epg')
                         ->required()
                         ->label('EPG')
-                        ->helperText('Select the EPG you would like to map the playlist channels to.')
+                        ->helperText('Select the EPG you would like to map from.')
                         ->options(Epg::all(['name', 'id'])->pluck('name', 'id'))
+                        ->searchable(),
+                    Forms\Components\Select::make('playlist')
+                        ->required()
+                        ->label('Playlist')
+                        ->helperText('Select the playlist you would like to map to.')
+                        ->options(Playlist::all(['name', 'id'])->pluck('name', 'id'))
                         ->searchable(),
                     Forms\Components\Toggle::make('overwrite')
                         ->label('Overwrite previously mapped channels')
@@ -54,7 +54,7 @@ class ListChannels extends ListRecords
                 })->after(function () {
                     Notification::make()
                         ->success()
-                        ->title('Channel to EPG mapping')
+                        ->title('EPG to Channel mapping')
                         ->body('Channel mapping started, you will be notified when the process is complete.')
                         ->send();
                 })
@@ -62,7 +62,7 @@ class ListChannels extends ListRecords
                 ->icon('heroicon-o-link')
                 ->color('gray')
                 ->modalIcon('heroicon-o-link')
-                ->modalDescription('Map the selected Playlist channels to the selected EPG.')
+                ->modalDescription('Map the selected EPG to the selected Playlist channels.')
                 ->modalSubmitActionLabel('Map now'),
             Actions\ImportAction::make()
                 ->importer(ChannelImporter::class)

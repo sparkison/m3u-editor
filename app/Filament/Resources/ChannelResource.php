@@ -144,12 +144,12 @@ class ChannelResource extends Resource
                 Tables\Actions\BulkActionGroup::make([
                     // Tables\Actions\DeleteBulkAction::make(),
                     Tables\Actions\BulkAction::make('map')
-                        ->label('Map seleted to EPG')
+                        ->label('Map EPG to seleted')
                         ->form([
                             Forms\Components\Select::make('epg')
                                 ->required()
                                 ->label('EPG')
-                                ->helperText('Select the EPG you would like to map the playlist channels to.')
+                                ->helperText('Select the EPG you would like to map from.')
                                 ->options(Epg::all(['name', 'id'])->pluck('name', 'id'))
                                 ->searchable(),
                             Forms\Components\Toggle::make('overwrite')
@@ -175,7 +175,7 @@ class ChannelResource extends Resource
                         ->requiresConfirmation()
                         ->icon('heroicon-o-link')
                         ->modalIcon('heroicon-o-link')
-                        ->modalDescription('Map the selected channels(s) to the selected EPG.')
+                        ->modalDescription('Map the selected EPG to the selected channels(s).')
                         ->modalSubmitActionLabel('Map now'),
                     Tables\Actions\BulkAction::make('enable')
                         ->label('Enable selected')
