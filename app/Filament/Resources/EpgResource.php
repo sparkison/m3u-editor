@@ -221,7 +221,7 @@ class EpgResource extends Resource
                         ->rules(['file'])
                         ->requiredIf('url', [null, ''])
                         ->helperText('Upload the XMLTV file for the EPG. This will be used to import the guide data.'),
-                ])->hiddenOn(['create'])
+                ])
         ];
     }
 }

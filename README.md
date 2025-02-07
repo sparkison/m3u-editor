@@ -1,31 +1,40 @@
 # m3u editor
 
-A simple `m3u` playlist editor, similar to **xteve** or **threadfin**. 
-As of now, there are no plans for EPG integration, but if there's enough interest this can be looked into.
+A simple `m3u` playlist editor, similar to **xteve** or **threadfin**, with `epg` management.
 
 > [!TIP]  
-> Has been tested on large playlist ([https://github.com/iptv-org/iptv](https://github.com/iptv-org/iptv)), with up to 10000+ channels. Note that larger lists will take longer to sync (likely a minute or two for every ~10k channels).
-
-> [!NOTE]  
-> Ability to merge playlists is not currently available, but could be fairly easily added if there are enough requests for this feature.
+> Has been tested on large playlist ([https://github.com/iptv-org/iptv](https://github.com/iptv-org/iptv)), with up to 10000+ channels. Note that larger lists will take longer to sync (likely a closer to a minute for every ~10k channels, depending on the list. Some import quicker than others.).
 
 ## How It Works
+
 1. Initialization and M3U Playlist(s) creation:
     - The service loads M3U playlist from specified URL, downloading and processing it.
     - Each playlist will have a unique URL to output enabled channels and any customizations
     - Only enabled channels will be returned.
-2. Automatic playlist(s) sync:
-    - Playlist sync happens upon creation, and every 24hr after. The schedule can be adjusted after playlist is created.
-3. HTTP endpoints:
+2. Initialization and XML EPG(s) creation:
+    - The service loads EPG from specified URL, or from the uploaded file, downloading and processing it. File should conform to the [XMLTV standard](https://github.com/XMLTV/xmltv/blob/master/xmltv.dtd).
+    - Each playlist will have a unique URL to output enabled channels EPG data
+    - Only enabled channels, that have been mapped to an EPG, will be returned.
+3. Automatic playlist(s) and epg(s) syncing:
+    - Playlist and EPG syncs happens upon creation, and every 24hr after. The schedule can be adjusted after playlist is created. Auto sync can also be disabled to prevent this (an initial sync will still happen upon creation).
+4. (Optionally) custom and merged playlists can be created:
+    - Merged playlists will allow you to create a new playlist from existing playslist, allowing you to combine multiple playlists into one.
+    - Custom playlists allow you to select specific channels from existing playslist to compose a new playlist.
+5. HTTP endpoints:
     - The app can be accessed here: [http://localhost:36400](http://localhost:36400)
       - **LOGIN INFO**: user = admin, password = admin
     - Each playlist will have a unique URL, in the format: `http://localhost:36400/9dfbc010-a809-4a31-801d-ca2a34030966/playlist.m3u`
-4. Customization:
-    - Modify M3U channel numbers and offset. Channels are opt-in, so **all channels will be disabled by default** and need to be enabled based on your preference. This is to prevent channel additions automatically populating your playlist.
+    - Each playlist will also have a unique EPG URL, in a similar format: `http://localhost:36400/9dfbc010-a809-4a31-801d-ca2a34030966/epg.xml`
+      - **NOTE** Only enabled channels that have been mapped to an EPG will be included.
+6. Customization:
+    - Enable/disable auto syncing of Playlists and EPGs.
+    - Modify M3U channel numbers, logos, and offset. Channels are opt-in, so **all channels will be disabled by default** and need to be enabled based on your preference. This is to prevent channel additions automatically populating your playlist.
 
 ## Prerequisites
+
 - [Docker](https://www.docker.com/) installed on your system.
 - M3U URLs containing a playlist of video streams.
+- (Optionally) EPG URLs/files containing valid XMLTV data.
 
 ## Screenshots
 
