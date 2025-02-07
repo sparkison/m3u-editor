@@ -25,7 +25,7 @@ A simple `m3u` playlist editor, similar to **xteve** or **threadfin**, with `epg
       - **LOGIN INFO**: user = admin, password = admin
     - Each playlist will have a unique URL, in the format: `http://localhost:36400/9dfbc010-a809-4a31-801d-ca2a34030966/playlist.m3u`
     - Each playlist will also have a unique EPG URL, in a similar format: `http://localhost:36400/9dfbc010-a809-4a31-801d-ca2a34030966/epg.xml`
-      - **NOTE** Only enabled channels that have been mapped to an EPG will be included.
+      - **NOTE**: Only enabled channels that have been mapped to an EPG will be included.
 6. Customization:
     - Enable/disable auto syncing of Playlists and EPGs.
     - Modify M3U channel numbers, logos, and offset. Channels are opt-in, so **all channels will be disabled by default** and need to be enabled based on your preference. This is to prevent channel additions automatically populating your playlist.
