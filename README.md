@@ -84,37 +84,21 @@ To ensure the data is saved across builds, link an empty volume to: `/var/www/co
 
 ### 📡 (Optionally) creating a playlist proxy
 
-Using the [M3U Stream Merger Proxy](https://github.com/sonroyaalmerol/m3u-stream-merger-proxy) as an example.
+Using the [MediaFlow Proxy](https://github.com/mhdzumair/mediaflow-proxy) as an example.
 
 ```yaml
-version: "3.8"
+version: "3.3"
 services:
-  m3u-proxy:
-    image: sonroyaalmerol/m3u-stream-merger-proxy:latest
-    container_name: m3u-proxy
+  mediaflow-proxy:
+    image: mhdzumair/mediaflow-proxy
     environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Etc/UTC
-      - PORT=7001
-      - DEBUG=false
-      - SYNC_ON_BOOT=true
-      - SYNC_CRON=0 0 * * *
-      - M3U_URL_1=http://192.168.0.1:36400/[PLAYLIST_UID]/playlist.m3u
-      - M3U_MAX_CONCURRENCY_1=5
-      #- M3U_URL_2=https://iptvprovider2.com/playlist.m3u
-      #- M3U_MAX_CONCURRENCY_2=1
-      #- M3U_URL_X=
-    volumes:
-      # [OPTIONAL] Cache persistence: This will allow you to reuse the M3U cache across container recreates.
-      - /apps/m3u-proxy:/m3u-proxy/data
-    restart: unless-stopped
+      - API_PASSWORD=YOUR_PROXY_API_PASSWORD
     ports:
-      - 7001:7001
+      - 8888:8888
 networks: {}
 
 ```
 
-Your proxied m3u playlist can then be access via: [http://192.168.0.1:7001/playlist.m3u](http://192.168.0.1:7001/playlist.m3u)
+Your proxied m3u playlist can then be access via: [http://localhost:8888/proxy/hls/manifest.m3u8?d=http://localhost:36400/YOUR_M3U_EDITOR_PLAYLIST_UID/playlist.m3u&api_password=YOUR_PROXY_API_PASSWORD](http://localhost:8888/proxy/hls/manifest.m3u8?d=http://localhost:36400/YOUR_M3U_EDITOR_PLAYLIST_UID/playlist.m3u&api_password=YOUR_PROXY_API_PASSWORD)
 
-More setup information can be found on the [M3U Stream Merger Proxy](https://github.com/sonroyaalmerol/m3u-stream-merger-proxy) page.
+More setup information can be found on the [MediaFlow Proxy](https://github.com/mhdzumair/mediaflow-proxy) page.
