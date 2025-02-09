@@ -100,6 +100,12 @@ ln -sf "${db_file}" "database/database.sqlite"
 # Link the EPG directory to the laravel `storage` directory
 ln -sf "${epg_dir}" "storage/app/private/epg"
 
+# Link storage
+if [ ! -d "public/storage" ]; then
+    echo "Linking storage directory..."
+    php artisan storage:link
+fi
+
 # Set app key, if not previously set
 php artisan app:generate-key
 

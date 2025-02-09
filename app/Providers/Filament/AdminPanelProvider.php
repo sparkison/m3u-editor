@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Auth\Login;
+use App\Filament\Pages\Auth\EditProfile;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -30,6 +31,7 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('')
             ->login(Login::class)
+            ->profile(EditProfile::class, isSimple: false)
             ->brandLogo(fn() => view('filament.admin.logo'))
             ->brandLogoHeight('2rem')
             ->databaseNotifications()
