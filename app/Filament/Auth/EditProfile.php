@@ -1,8 +1,7 @@
 <?php
 
-namespace App\Filament\Pages\Auth;
+namespace App\Filament\Auth;
 
-use Filament\Forms\Components\TextInput;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Pages\Auth\EditProfile as BaseEditProfile;
