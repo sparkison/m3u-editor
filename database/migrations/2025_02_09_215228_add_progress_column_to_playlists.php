@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('playlists', function (Blueprint $table) {
-            $table->float('progress')->default(0)->after('status');
+            $table->float('progress')->default(100)->after('status');
         });
     }
 
