@@ -19,6 +19,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use RyanChandler\FilamentProgressColumn\ProgressColumn;
 
 class PlaylistResource extends Resource
 {
@@ -72,6 +73,10 @@ class PlaylistResource extends Resource
                     ->badge()
                     ->toggleable()
                     ->color(fn(PlaylistStatus $state) => $state->getColor()),
+                ProgressColumn::make('progress')
+                    ->sortable()
+                    ->poll(fn($record) => $record->status === PlaylistStatus::Processing && $record->progress < 100 ? '5s' : null)
+                    ->toggleable(),
                 Tables\Columns\IconColumn::make('auto_sync')
                     ->label('Auto Sync')
                     ->icon(fn(string $state): string => match ($state) {
@@ -136,6 +141,32 @@ class PlaylistResource extends Resource
                         ->icon('heroicon-o-arrow-down-tray')
                         ->url(fn($record) => route('epg.generate', ['uuid' => $record->uuid]))
                         ->openUrlInNewTab(),
+                    Tables\Actions\Action::make('reset')
+                        ->label('Reset status')
+                        ->icon('heroicon-o-arrow-uturn-left')
+                        ->color('warning')
+                        ->action(function ($record) {
+                            $record->update([
+                                'status' => PlaylistStatus::Pending,
+                                'progress' => 0,
+                                'channels' => 0,
+                                'synced' => null,
+                                'errors' => null,
+                            ]);
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Playlist status reset')
+                                ->body('Playlist status has been reset.')
+                                ->duration(3000)
+                                ->send();
+                        })
+                        ->disabled(fn($record): bool => ! $record->auto_sync)
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-arrow-uturn-left')
+                        ->modalIcon('heroicon-o-arrow-uturn-left')
+                        ->modalDescription('Reset playlist status so it can be processed again. Only perform this action if you are having problems with the playlist syncing.')
+                        ->modalSubmitActionLabel('Yes, reset now'),
                     Tables\Actions\DeleteAction::make(),
                 ]),
             ])

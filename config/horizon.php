@@ -182,7 +182,7 @@ return [
     'defaults' => [
         'm3u-editor-queue' => [
             'connection' => 'redis',
-            'queue' => ['default'],
+            'queue' => ['default', 'import'],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
             'maxProcesses' => 10,

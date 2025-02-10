@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use Throwable;
 use App\Enums\PlaylistStatus;
 use App\Models\Group;
 use App\Models\Playlist;
@@ -14,8 +15,6 @@ use Illuminate\Bus\Batch;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\LazyCollection;
-
-use Throwable;
 
 class ProcessM3uImport implements ShouldQueue
 {
@@ -52,6 +51,7 @@ class ProcessM3uImport implements ShouldQueue
         $this->playlist->update([
             'status' => PlaylistStatus::Processing,
             'errors' => null,
+            'progress' => 0,
         ]);
 
         // Flag job start time
@@ -146,10 +146,20 @@ class ProcessM3uImport implements ShouldQueue
                     });
                 });
 
+                // Add progress update job to the batch
+                $count = count($jobs);
+                $chunkSize = ceil($count / 10);
+                for ($i = $chunkSize; $i < $count; $i += $chunkSize) {
+                    array_splice($jobs, $i, 0, function () use ($playlist, $i, $count) {
+                        $playlist->update(['progress' => ($i / $count) * 100]);
+                    });
+                }
+
                 // Last job in the batch
                 $jobs[] = new ProcessM3uImportComplete($userId, $playlistId, $batchNo, $start);
                 Bus::chain($jobs)
                     ->onConnection('redis') // force to use redis connection
+                    ->onQueue('import')
                     ->catch(function (Throwable $e) use ($playlist) {
                         $error = "Error processing \"{$playlist->name}\": {$e->getMessage()}";
                         Notification::make()
@@ -167,6 +177,7 @@ class ProcessM3uImport implements ShouldQueue
                             'channels' => 0, // not using...
                             'synced' => now(),
                             'errors' => $error,
+                            'progress' => 100,
                         ]);
                     })->dispatch();
             } else {
@@ -186,6 +197,7 @@ class ProcessM3uImport implements ShouldQueue
                     'channels' => 0, // not using...
                     'synced' => now(),
                     'errors' => $error,
+                    'progress' => 100,
                 ]);
             }
         } catch (\Exception $e) {
@@ -209,6 +221,7 @@ class ProcessM3uImport implements ShouldQueue
                 'status' => PlaylistStatus::Failed,
                 'synced' => now(),
                 'errors' => $e->getMessage(),
+                'progress' => 100,
             ]);
         }
         return;

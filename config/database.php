@@ -159,6 +159,16 @@ return [
             'database' => env('REDIS_DB', '0'),
         ],
 
+        // Add import connection
+        'import' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'username' => env('REDIS_USERNAME'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('REDIS_SERVER_PORT', '36790'),
+            'database' => env('REDIS_DB', '3'),
+        ],
+
         'cache' => [
             'url' => env('REDIS_URL'),
             'host' => env('REDIS_HOST', '127.0.0.1'),

@@ -61,7 +61,8 @@ class ProcessEpgImportComplete implements ShouldQueue
             'status' => EpgStatus::Completed,
             'synced' => now(),
             'errors' => null,
-            'sync_time' => $completedIn
+            'sync_time' => $completedIn,
+            'progress' => 100,
         ]);
     }
 }

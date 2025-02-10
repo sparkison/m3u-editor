@@ -69,7 +69,8 @@ class ProcessM3uImportComplete implements ShouldQueue
             'channels' => 0, // not using...
             'synced' => now(),
             'errors' => null,
-            'sync_time' => $completedIn
+            'sync_time' => $completedIn,
+            'progress' => 100,
         ]);
     }
 }

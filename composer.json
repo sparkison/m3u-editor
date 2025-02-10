@@ -7,6 +7,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "croustibat/filament-jobs-monitor": "^2.5",
         "filament/filament": "^3.2",
         "gemorroj/m3u-parser": "^5.5",
         "laravel/framework": "^11.31",
@@ -14,7 +15,8 @@
         "laravel/octane": "^2.6",
         "laravel/reverb": "^1.0",
         "laravel/tinker": "^2.9",
-        "predis/predis": "^2.3"
+        "predis/predis": "^2.3",
+        "ryangjchandler/filament-progress-column": "^1.0"
     },
     "require-dev": {
         "beyondcode/laravel-dump-server": "^2.0",

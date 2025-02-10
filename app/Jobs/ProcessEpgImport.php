@@ -53,6 +53,7 @@ class ProcessEpgImport implements ShouldQueue
         $this->epg->update([
             'status' => EpgStatus::Processing,
             'errors' => null,
+            'progress' => 0,
         ]);
 
         // Flag job start time
@@ -108,9 +109,6 @@ class ProcessEpgImport implements ShouldQueue
                 // Setup the XML readers
                 $channelReader = new XMLReader();
                 $channelReader->xml($xmlData);
-
-                // Save the contents to a file
-                $filename = Str::slug($epg->name) . '.xml';
 
                 // Remove previous saved files
                 Storage::disk('local')->deleteDirectory($epg->folder_path);
@@ -194,10 +192,20 @@ class ProcessEpgImport implements ShouldQueue
                 // Close the XMLReaders, all done!
                 $channelReader->close();
 
+                // Add progress update job to the batch
+                $count = count($jobs);
+                $chunkSize = ceil($count / 10);
+                for ($i = $chunkSize; $i < $count; $i += $chunkSize) {
+                    array_splice($jobs, $i, 0, function () use ($epg, $i, $count) {
+                        $epg->update(['progress' => ($i / $count) * 100]);
+                    });
+                }
+
                 // Last job in the batch
                 $jobs[] = new ProcessEpgImportComplete($userId, $epgId, $batchNo, $start);
                 Bus::chain($jobs)
                     ->onConnection('redis') // force to use redis connection
+                    ->onQueue('import')
                     ->catch(function (Throwable $e) use ($epg) {
                         $error = "Error processing \"{$epg->name}\": {$e->getMessage()}";
                         Notification::make()
@@ -215,6 +223,7 @@ class ProcessEpgImport implements ShouldQueue
                             'channels' => 0, // not using...
                             'synced' => now(),
                             'errors' => $error,
+                            'progress' => 100,
                         ]);
                     })->dispatch();
             } else {
@@ -239,6 +248,7 @@ class ProcessEpgImport implements ShouldQueue
                     'status' => EpgStatus::Failed,
                     'synced' => now(),
                     'errors' => $error,
+                    'progress' => 100,
                 ]);
             }
         } catch (Exception $e) {
@@ -262,6 +272,7 @@ class ProcessEpgImport implements ShouldQueue
                 'status' => EpgStatus::Failed,
                 'synced' => now(),
                 'errors' => $e->getMessage(),
+                'progress' => 100,
             ]);
         }
         return;
