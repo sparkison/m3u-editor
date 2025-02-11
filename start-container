@@ -97,8 +97,10 @@ ln -sf "${env_file}" .env
 # Link the database file to the laravel `database` directory
 ln -sf "${db_file}" "database/database.sqlite"
 
-# Link the EPG directory to the laravel `storage` directory
-ln -sf "${epg_dir}" "storage/app/private/epg"
+# Clean up recursion EPG directory from previous push
+if [ ! -d "storage/epgs/epgs" ]; then
+    rm -f storage/epgs/epgs
+fi
 
 # Link storage
 if [ ! -d "public/storage" ]; then
