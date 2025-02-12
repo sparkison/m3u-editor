@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "43957cbbf7474f9152bc145095bcca35",
+    "content-hash": "f491b42f428d29ca0e397b23dca5dd2f",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -6185,10 +6185,16 @@
         {
             "name": "sparkison/m3u-parser",
             "version": "dev-master",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/sparkison/M3uParser.git",
+                "reference": "d62ad2f0372e13963ea2b411981045e478c88ba9"
+            },
             "dist": {
-                "type": "path",
-                "url": "../M3uParser",
-                "reference": "69d3eb541768901ce906b33051b5bc693161a0c1"
+                "type": "zip",
+                "url": "https://api.github.com/repos/sparkison/M3uParser/zipball/d62ad2f0372e13963ea2b411981045e478c88ba9",
+                "reference": "d62ad2f0372e13963ea2b411981045e478c88ba9",
+                "shasum": ""
             },
             "require": {
                 "php": ">=8.0.2"
@@ -6198,17 +6204,14 @@
                 "phpstan/phpstan": "^2",
                 "phpunit/phpunit": "^9.6.22"
             },
+            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
                     "M3uParser\\": "src/"
                 }
             },
-            "autoload-dev": {
-                "psr-4": {
-                    "M3uParser\\Tests\\": "tests/"
-                }
-            },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "LGPL-3.0-or-later"
             ],
@@ -6226,9 +6229,10 @@
                 "m3u8",
                 "playlist"
             ],
-            "transport-options": {
-                "relative": true
-            }
+            "support": {
+                "source": "https://github.com/sparkison/M3uParser/tree/master"
+            },
+            "time": "2025-02-11T23:29:46+00:00"
         },
         {
             "name": "spatie/color",

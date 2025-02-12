@@ -30,12 +30,6 @@
         "pestphp/pest": "^3.7",
         "pestphp/pest-plugin-laravel": "^3.0"
     },
-    "repositories": [
-        {
-            "type": "path",
-            "url": "../M3uParser"
-        }
-    ],
     "autoload": {
         "psr-4": {
             "App\\": "app/",
