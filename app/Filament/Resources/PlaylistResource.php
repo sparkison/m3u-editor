@@ -121,11 +121,11 @@ class PlaylistResource extends Resource
                             Notification::make()
                                 ->success()
                                 ->title('Playlist is processing')
-                                ->body('Playlist is being processed in the background. Depending on the size of your playlist, this may take a while.')
+                                ->body('Playlist is being processed in the background. Depending on the size of your playlist, this may take a while. You will be notified on completion.')
                                 ->duration(10000)
                                 ->send();
                         })
-                        ->disabled(fn($record): bool => ! $record->auto_sync)
+                        ->disabled(fn($record): bool => ! $record->auto_sync || $record->status === PlaylistStatus::Processing)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')

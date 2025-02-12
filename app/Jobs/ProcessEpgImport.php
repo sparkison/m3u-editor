@@ -67,8 +67,8 @@ class ProcessEpgImport implements ShouldQueue
             $userId = $epg->user_id;
             $batchNo = Str::uuid7()->toString();
 
-            $xmlData = null;
             $channelReader = null;
+            $filePath = null;
             if ($this->epg->url) {
                 // Normalize the playlist url and get the filename
                 $url = str($this->epg->url)->replace(' ', '%20');
@@ -80,41 +80,30 @@ class ProcessEpgImport implements ShouldQueue
                     ->throw()->get($url->toString());
 
                 if ($response->ok()) {
-                    // Get the contents
-                    $output = $response->body();
+                    // Remove previous saved files
+                    Storage::disk('local')->deleteDirectory($epg->folder_path);
 
-                    // Attempt to decode the gzipped content
-                    $xmlData = gzdecode($output);
-                    if (!$xmlData) {
-                        // If false, the content was not gzipped, use the original output
-                        $xmlData = $output;
-                    }
+                    // Save the file to local storage
+                    Storage::disk('local')->put(
+                        $epg->file_path,
+                        $response->body()
+                    );
+
+                    // Update the file path
+                    $filePath = Storage::disk('local')->path($epg->file_path);
                 }
             } else {
                 // Get uploaded file contents
                 if ($this->epg->uploads && Storage::disk('local')->exists($this->epg->uploads)) {
-                    $output = file_get_contents(Storage::disk('local')->path($this->epg->uploads));
-
-                    // Attempt to decode the gzipped content
-                    $xmlData = gzdecode($output);
-                    if (!$xmlData) {
-                        // If false, the content was not gzipped, use the original output
-                        $xmlData = $output;
-                    }
+                    $filePath = Storage::disk('local')->path($this->epg->uploads);
                 }
             }
 
             // If we have XML data, let's process it
-            if ($xmlData) {
+            if ($filePath) {
                 // Setup the XML readers
                 $channelReader = new XMLReader();
-                $channelReader->xml($xmlData);
-
-                // Remove previous saved files
-                Storage::disk('local')->deleteDirectory($epg->folder_path);
-
-                // Save the file to local storage
-                Storage::disk('local')->put($epg->file_path, $xmlData);
+                $channelReader->open('compress.zlib://' . $filePath);
             }
 
             // If reader valid, process the data!

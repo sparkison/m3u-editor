@@ -114,11 +114,11 @@ class EpgResource extends Resource
                             Notification::make()
                                 ->success()
                                 ->title('EPG is processing')
-                                ->body('EPG is being processed in the background. Depending on the size of the guide data, this may take a while.')
+                                ->body('EPG is being processed in the background. Depending on the size of the guide data, this may take a while. You will be notified on completion.')
                                 ->duration(10000)
                                 ->send();
                         })
-                        ->disabled(fn($record): bool => ! $record->auto_sync)
+                        ->disabled(fn($record): bool => ! $record->auto_sync || $record->status === EpgStatus::Processing)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
@@ -137,15 +137,14 @@ class EpgResource extends Resource
                             $record->update([
                                 'status' => EpgStatus::Pending,
                                 'progress' => 0,
-                                'channels' => 0,
                                 'synced' => null,
                                 'errors' => null,
                             ]);
                         })->after(function () {
                             Notification::make()
                                 ->success()
-                                ->title('Playlist status reset')
-                                ->body('Playlist status has been reset.')
+                                ->title('EPG status reset')
+                                ->body('EPG status has been reset.')
                                 ->duration(3000)
                                 ->send();
                         })
@@ -213,7 +212,7 @@ class EpgResource extends Resource
                 ->helperText('Enter the name of the EPG. Internal use only.')
                 ->maxLength(255),
             Forms\Components\Toggle::make('auto_sync')
-                ->label('Automatically sync playlist every 24hr')
+                ->label('Automatically sync EPG every 24hr')
                 ->live()
                 ->default(true),
             Forms\Components\DateTimePicker::make('synced')

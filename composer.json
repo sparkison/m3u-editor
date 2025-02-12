@@ -9,14 +9,14 @@
         "php": "^8.2",
         "croustibat/filament-jobs-monitor": "^2.5",
         "filament/filament": "^3.2",
-        "gemorroj/m3u-parser": "^5.5",
         "laravel/framework": "^11.31",
         "laravel/horizon": "^5.30",
         "laravel/octane": "^2.6",
         "laravel/reverb": "^1.0",
         "laravel/tinker": "^2.9",
         "predis/predis": "^2.3",
-        "ryangjchandler/filament-progress-column": "^1.0"
+        "ryangjchandler/filament-progress-column": "^1.0",
+        "sparkison/m3u-parser": "dev-master"
     },
     "require-dev": {
         "beyondcode/laravel-dump-server": "^2.0",
@@ -30,6 +30,12 @@
         "pestphp/pest": "^3.7",
         "pestphp/pest-plugin-laravel": "^3.0"
     },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../M3uParser"
+        }
+    ],
     "autoload": {
         "psr-4": {
             "App\\": "app/",
