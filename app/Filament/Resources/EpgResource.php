@@ -152,7 +152,7 @@ class EpgResource extends Resource
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-uturn-left')
                         ->modalIcon('heroicon-o-arrow-uturn-left')
-                        ->modalDescription('Reset playlist status so it can be processed again. Only perform this action if you are having problems with the playlist syncing.')
+                        ->modalDescription('Reset EPG status so it can be processed again. Only perform this action if you are having problems with the EPG syncing.')
                         ->modalSubmitActionLabel('Yes, reset now'),
                     Tables\Actions\DeleteAction::make(),
                 ]),

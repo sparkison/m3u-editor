@@ -120,6 +120,9 @@ class ProcessEpgImport implements ShouldQueue
                     'import_batch_no' => $batchNo,
                 ];
 
+                // Update progress
+                $epg->update(['progress' => 10]); // set to 10% to start
+
                 // Create a lazy collection to process the XML data
                 $channelData = LazyCollection::make(function () use ($channelReader, $defaultChannelData) {
                     // Loop through the XML data

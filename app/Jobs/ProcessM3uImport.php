@@ -82,6 +82,9 @@ class ProcessM3uImport implements ShouldQueue
                 $m3uParser->addDefaultTags();
                 $data = $m3uParser->parse($response->body());
 
+                // Update progress
+                $playlist->update(['progress' => 10]); // set to 10% to start
+
                 // Setup common field values
                 $channelFields = [
                     'title' => null,
