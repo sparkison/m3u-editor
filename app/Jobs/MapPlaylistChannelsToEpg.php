@@ -53,14 +53,14 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
         // Fetch the playlist (if set)
         $channels = [];
         if ($this->channels) {
-            $channels = Channel::whereIn('id', $this->channels)->get();
+            $channels = Channel::whereIn('id', $this->channels)->cursor();
         } else {
             $playlist = $this->playlist ? Playlist::find($this->playlist) : null;
             if ($playlist) {
                 $channels = $playlist->channels()
                     ->when(!$this->force, function ($query) {
                         $query->where('epg_channel_id', null);
-                    })->get();
+                    })->cursor();
             }
         }
 

@@ -88,7 +88,12 @@ class EpgChannelResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                Tables\Filters\SelectFilter::make('epg')
+                    ->relationship('epg', 'name')
+                    ->hidden(fn() => $relationId)
+                    ->multiple()
+                    ->preload()
+                    ->searchable(),
             ])
             ->actions([
                 // Tables\Actions\EditAction::make(),
