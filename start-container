@@ -22,6 +22,7 @@ config_dir="/var/www/config"
 env_file="${config_dir}/env"
 db_dir="${config_dir}/database"
 db_file="${db_dir}/database.sqlite"
+db_file_jobs="${db_dir}/jobs.sqlite"
 epg_dir="${config_dir}/epgs"
 log_dir="${config_dir}/logs"
 log_file="${log_dir}/laravel.log"
@@ -61,6 +62,10 @@ if [ ! -f "${db_file}" ]; then
     echo "Missing database file, creating now..."
     touch "${db_file}"
 fi
+if [ ! -f "${db_file_jobs}" ]; then
+    echo "Missing jobs database file, creating now..."
+    touch "${db_file_jobs}"
+fi
 
 # Create log files
 if [ ! -f "${log_file}" ]; then
@@ -96,6 +101,7 @@ ln -sf "${env_file}" .env
 
 # Link the database file to the laravel `database` directory
 ln -sf "${db_file}" "database/database.sqlite"
+ln -sf "${db_file_jobs}" "database/jobs.sqlite"
 
 # Clean up recursion EPG directory from previous push
 if [ ! -d "storage/epgs/epgs" ]; then

@@ -188,7 +188,7 @@ class ProcessEpgImport implements ShouldQueue
 
                 // Add progress update job to the batch
                 $count = count($jobs);
-                $chunkSize = ceil($count / 10);
+                $chunkSize = ceil($count / 20);
                 for ($i = $chunkSize; $i < $count; $i += $chunkSize) {
                     array_splice($jobs, $i, 0, function () use ($epg, $i, $count) {
                         $epg->update(['progress' => ($i / $count) * 100]);

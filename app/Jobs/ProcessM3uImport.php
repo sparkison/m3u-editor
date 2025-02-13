@@ -5,6 +5,7 @@ namespace App\Jobs;
 use Throwable;
 use App\Enums\PlaylistStatus;
 use App\Models\Group;
+use App\Models\Job;
 use App\Models\Playlist;
 use M3uParser\M3uParser;
 use Filament\Notifications\Notification;
@@ -111,7 +112,6 @@ class ProcessM3uImport implements ShouldQueue
                 ];
 
                 // Extract the channels and groups from the m3u
-                $jobs = [];
                 LazyCollection::make(function () use ($data, $channelFields, $attributes) {
                     foreach ($data as $item) {
                         $channel = [
@@ -135,25 +135,49 @@ class ProcessM3uImport implements ShouldQueue
                         }
                         yield $channel;
                     }
-                })->groupBy('group')->chunk(10)->each(function (LazyCollection $grouped) use (&$jobs, $userId, $playlistId, $batchNo) {
-                    $grouped->each(function ($channels, $groupName) use (&$jobs, $userId, $playlistId, $batchNo) {
-                        $group = Group::firstOrCreate([
+                })->groupBy('group')->chunk(10)->each(function (LazyCollection $grouped) use ($userId, $playlistId, $batchNo) {
+                    $grouped->each(function ($channels, $groupName) use ($userId, $playlistId, $batchNo) {
+                        $group = Group::where([
                             'name' => $groupName,
                             'playlist_id' => $playlistId,
                             'user_id' => $userId,
-                        ]);
-                        $group->update([
-                            'import_batch_no' => $batchNo,
-                        ]);
-                        $channels->chunk(100)->each(function ($chunk) use (&$jobs, $playlistId, $batchNo, $group) {
-                            $jobs[] = new ProcessChannelImport($playlistId, $batchNo, $group, $chunk->toArray());
+                        ])->first();
+                        if (!$group) {
+                            $group = Group::create([
+                                'name' => $groupName,
+                                'playlist_id' => $playlistId,
+                                'user_id' => $userId,
+                                'import_batch_no' => $batchNo,
+                            ]);
+                        } else {
+                            $group->update([
+                                'import_batch_no' => $batchNo,
+                            ]);
+                        }
+                        $channels->chunk(100)->each(function ($chunk) use ($playlistId, $batchNo, $group) {
+                            Job::create([
+                                'title' => "Processing channel import for group: {$group->name}",
+                                'batch_no' => $batchNo,
+                                'payload' => $chunk->toArray(),
+                                'variables' => [
+                                    'groupId' => $group->id,
+                                    'playlistId' => $playlistId,
+                                ]
+                            ]);
                         });
                     });
                 });
 
+                // Get the jobs for the batch
+                $jobs = [];
+                $jobsBatch = Job::where('batch_no', $batchNo)->select('id')->cursor();
+                $jobsBatch->chunk(100)->each(function ($chunk) use (&$jobs) {
+                    $jobs[] = new ProcessM3uImportChunk($chunk->pluck('id')->toArray());
+                });
+
                 // Add progress update job to the batch
                 $count = count($jobs);
-                $chunkSize = ceil($count / 10);
+                $chunkSize = ceil($count / 20);
                 for ($i = $chunkSize; $i < $count; $i += $chunkSize) {
                     array_splice($jobs, $i, 0, function () use ($playlist, $i, $count) {
                         $playlist->update(['progress' => ($i / $count) * 100]);

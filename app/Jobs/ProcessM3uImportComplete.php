@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Enums\PlaylistStatus;
 use App\Models\Channel;
 use App\Models\Group;
+use App\Models\Job;
 use App\Models\User;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
@@ -62,6 +63,9 @@ class ProcessM3uImportComplete implements ShouldQueue
             ['playlist_id', $playlist->id],
             ['import_batch_no', '!=', $this->batchNo],
         ])->delete();
+
+        // Clear out the jobs
+        Job::where(['batch_no', $this->batchNo])->delete();
 
         // Update the playlist
         $playlist->update([
