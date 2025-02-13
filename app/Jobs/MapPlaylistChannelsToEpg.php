@@ -4,14 +4,21 @@ namespace App\Jobs;
 
 use App\Models\Channel;
 use App\Models\Epg;
+use App\Models\EpgChannel;
 use App\Models\Playlist;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\LazyCollection;
+use Throwable;
 
 class MapPlaylistChannelsToEpg implements ShouldQueue
 {
     use Queueable;
+
+    // Giving a timeout of 15 minutes to the Job to process the mapping
+    public $timeout = 60 * 15;
 
     /**
      * Create a new job instance.
@@ -52,10 +59,10 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
 
         // Fetch the playlist (if set)
         $channels = [];
+        $playlist = $this->playlist ? Playlist::find($this->playlist) : null;
         if ($this->channels) {
             $channels = Channel::whereIn('id', $this->channels)->cursor();
         } else {
-            $playlist = $this->playlist ? Playlist::find($this->playlist) : null;
             if ($playlist) {
                 $channels = $playlist->channels()
                     ->when(!$this->force, function ($query) {
@@ -65,25 +72,44 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
         }
 
         // Map the channels
-        foreach ($channels as $channel) {
-            $epgChannel = $epg->channels()->where('channel_id', $channel->name)->select('id')->first();
-            if ($epgChannel) {
-                $channel->epg_channel_id = $epgChannel->id;
-                $channel->save();
+        $jobs = [];
+        LazyCollection::make(function () use ($channels, $epg) {
+            $epgChannels = $epg->channels()
+                ->where('channel_id', '!=', '')
+                ->whereIn('channel_id', $channels->pluck('name'))
+                ->select('id', 'channel_id')
+                ->get();
+
+            foreach ($channels as $channel) {
+                $epgChannel = $epgChannels->where('channel_id', $channel->name)->first();
+                if ($epgChannel) {
+                    $channel->epg_channel_id = $epgChannel->id;
+                    yield $channel->toArray();
+                }
             }
-        }
+        })->chunk(500)->each(function ($chunk) use (&$jobs) {
+            $jobs[] = new MapEpgToChannels($chunk->toArray());
+        });
 
-        // Calculate the time taken to complete the import
-        $completedIn = $start->diffInSeconds(now());
-        $completedInRounded = round($completedIn, 2);
+        // Last job in the batch
+        $jobs[] = new MapEpgToChannelsComplete($playlist, $epg, $start);
 
-        // Notify the user
-        $title = "Completed processing EPG channel mapping";
-        $body = "Channel mapping complete for EPG \"{$epg->name}\". Mapping took {$completedInRounded} seconds.";
-        Notification::make()
-            ->success()
-            ->title($title)->body($body)
-            ->broadcast($epg->user)
-            ->sendToDatabase($epg->user);
+        // Dispatch the batch
+        Bus::chain($jobs)
+            ->onConnection('redis') // force to use redis connection
+            ->onQueue('import')
+            ->catch(function (Throwable $e) use ($epg, $playlist) {
+                $error = "Error processing \"{$epg->name}\" mapping to \"{$playlist->name}\": {$e->getMessage()}";
+                Notification::make()
+                    ->danger()
+                    ->title("Error processing \"{$epg->name}\" mapping to \"{$playlist->name}\"")
+                    ->body('Please view your notifications for details.')
+                    ->broadcast($epg->user);
+                Notification::make()
+                    ->danger()
+                    ->title("Error processing \"{$epg->name}\" mapping to \"{$playlist->name}\"")
+                    ->body($error)
+                    ->sendToDatabase($epg->user);
+            })->dispatch();
     }
 }

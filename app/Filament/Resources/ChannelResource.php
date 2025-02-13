@@ -167,8 +167,8 @@ class ChannelResource extends Resource
                         })->after(function () {
                             Notification::make()
                                 ->success()
-                                ->title('Channel to EPG mapping')
-                                ->body('Channel mapping started, you will be notified when the process is complete.')
+                                ->title('EPG to Channel mapping')
+                                ->body('Mapping started, you will be notified when the process is complete.')
                                 ->send();
                         })
                         ->deselectRecordsAfterCompletion()
