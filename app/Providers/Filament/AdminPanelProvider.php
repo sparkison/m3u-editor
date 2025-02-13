@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use \Croustibat\FilamentJobsMonitor\FilamentJobsMonitorPlugin;
 use Filament\Support\Enums\MaxWidth;
+use Hydrat\TableLayoutToggle\TableLayoutTogglePlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -62,7 +63,8 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->plugins([
                 FilamentJobsMonitorPlugin::make()
-                    ->enableNavigation(app()->environment('local')) // local only for testing...
+                    ->enableNavigation(app()->environment('local')), // local only for testing...
+                TableLayoutTogglePlugin::make(),
             ])
             ->maxContentWidth(MaxWidth::Full)
             // ->simplePageMaxContentWidth(MaxWidth::Small) // Login, sign in, etc.

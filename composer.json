@@ -9,6 +9,7 @@
         "php": "^8.2",
         "croustibat/filament-jobs-monitor": "^2.5",
         "filament/filament": "^3.2",
+        "hydrat/filament-table-layout-toggle": "^2.0",
         "laravel/framework": "^11.31",
         "laravel/horizon": "^5.30",
         "laravel/octane": "^2.6",

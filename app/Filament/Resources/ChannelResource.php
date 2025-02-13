@@ -11,7 +11,9 @@ use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Support\Enums\Alignment;
 use Filament\Tables;
+use Filament\Tables\Columns\Layout\Grid;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -45,14 +47,118 @@ class ChannelResource extends Resource
 
     public static function setupTable(Table $table, $relationId = null): Table
     {
-
+        $livewire = $table->getLivewire();
         return $table->persistFiltersInSession()
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
+            ->contentGrid(fn() => $livewire->isListLayout()
+                ? null
+                : [
+                    'md' => 2,
+                    'lg' => 3,
+                    'xl' => 4,
+                    '2xl' => 5,
+                ])
             ->paginated([10, 25, 50, 100, 250])
             ->defaultPaginationPageOption(25)
-            ->columns([
+            ->columns($livewire->isGridLayout() ? [
+                Grid::make()
+                    ->columns(1)
+                    ->schema([
+                        Tables\Columns\Layout\Grid::make()
+                            ->columns(3)
+                            ->schema([
+                                Tables\Columns\Layout\Grid::make()
+                                    ->columnSpan(1)
+                                    ->columns(1)
+                                    ->schema([
+                                        Tables\Columns\ImageColumn::make('logo')
+                                            ->toggleable()
+                                            ->columnSpan(1)
+                                            ->circular(),
+                                        Tables\Columns\ToggleColumn::make('enabled')
+                                            ->toggleable()
+                                            ->tooltip('Toggle channel status')
+                                            ->sortable(),
+                                    ]),
+                                Tables\Columns\Layout\Stack::make([
+                                    Tables\Columns\TextColumn::make('title')
+                                        ->description('Title', position: 'above')
+                                        ->searchable()
+                                        ->wrap()
+                                        ->sortable(),
+                                    Tables\Columns\TextColumn::make('name')
+                                        ->description('Name', position: 'above')
+                                        ->searchable()
+                                        ->wrap()
+                                        ->toggleable()
+                                        ->sortable(),
+                                ])->columnSpan(2)->alignment(Alignment::End)
+                            ]),
+                        Tables\Columns\Layout\Panel::make([
+                            Tables\Columns\Layout\Grid::make()
+                                ->columns(1)
+                                ->schema([
+                                    Tables\Columns\TextInputColumn::make('channel')
+                                        ->rules(['numeric', 'min:0'])
+                                        ->type('number')
+                                        ->tooltip('Channel number')
+                                        ->placeholder('Channel No.')
+                                        ->toggleable()
+                                        ->sortable(),
+                                    Tables\Columns\TextInputColumn::make('shift')
+                                        ->rules(['numeric', 'min:0'])
+                                        ->type('number')
+                                        ->tooltip('Shift')
+                                        ->placeholder('Shift')
+                                        ->toggleable()
+                                        ->sortable(),
+                                ])
+                        ])->collapsible()->collapsed(false),
+                        Tables\Columns\Layout\Panel::make([
+                            Tables\Columns\Layout\Grid::make()
+                                ->columns(1)
+                                ->schema([
+                                    Tables\Columns\TextColumn::make('group')
+                                        ->hidden(fn() => $relationId)
+                                        ->description('Group', position: 'above')
+                                        ->toggleable()
+                                        ->searchable()
+                                        ->sortable(),
+                                    Tables\Columns\TextColumn::make('epgChannel.name')
+                                        ->label('EPG Channel')
+                                        ->description('EPG Channel', position: 'above')
+                                        ->toggleable()
+                                        ->searchable()
+                                        ->sortable(),
+                                    Tables\Columns\TextColumn::make('url')
+                                        ->url(fn($record): string => $record->url)
+                                        ->limit(20)
+                                        ->description('URL', position: 'above')
+                                        ->searchable()
+                                        ->toggleable(isToggledHiddenByDefault: true)
+                                        ->sortable(),
+                                    Tables\Columns\TextColumn::make('lang')
+                                        ->description('Language', position: 'above')
+                                        ->searchable()
+                                        ->toggleable(isToggledHiddenByDefault: true)
+                                        ->sortable(),
+                                    Tables\Columns\TextColumn::make('country')
+                                        ->description('Country', position: 'above')
+                                        ->searchable()
+                                        ->toggleable(isToggledHiddenByDefault: true)
+                                        ->sortable(),
+                                    Tables\Columns\TextColumn::make('playlist.name')
+                                        ->description('Playlist', position: 'above')
+                                        ->hidden(fn() => $relationId)
+                                        ->numeric()
+                                        ->toggleable()
+                                        ->sortable(),
+                                ])
+                        ])->collapsible()->collapsed(true),
+                    ])
+            ] : [
                 Tables\Columns\ImageColumn::make('logo')
                     ->toggleable()
                     ->circular(),
@@ -71,13 +177,20 @@ class ChannelResource extends Resource
                     ->sortable(),
                 Tables\Columns\ToggleColumn::make('enabled')
                     ->toggleable()
+                    ->tooltip('Toggle channel status')
                     ->sortable(),
                 Tables\Columns\TextInputColumn::make('channel')
                     ->rules(['numeric', 'min:0'])
+                    ->type('number')
+                    ->placeholder('Channel No.')
+                    ->tooltip('Channel number')
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextInputColumn::make('shift')
                     ->rules(['numeric', 'min:0'])
+                    ->type('number')
+                    ->placeholder('Shift')
+                    ->tooltip('Shift')
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('group')
