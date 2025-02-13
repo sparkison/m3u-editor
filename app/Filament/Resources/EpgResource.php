@@ -86,7 +86,7 @@ class EpgResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('sync_time')
                     ->label('Sync Time')
-                    ->formatStateUsing(fn(string $state): string => gmdate('H:i:s', $state))
+                    ->formatStateUsing(fn(string $state): string => gmdate('H:i:s', (int)$state))
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
