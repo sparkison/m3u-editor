@@ -63,6 +63,7 @@ class ProcessEpgImportComplete implements ShouldQueue
             'errors' => null,
             'sync_time' => $completedIn,
             'progress' => 100,
+            'processing' => false,
         ]);
     }
 }

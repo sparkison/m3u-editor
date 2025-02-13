@@ -25,6 +25,7 @@ class Playlist extends Model
         'user_id' => 'integer',
         'sync_time' => 'float',
         'status' => PlaylistStatus::class,
+        'processing' => 'boolean',
     ];
 
     public function user(): BelongsTo

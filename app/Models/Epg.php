@@ -24,6 +24,7 @@ class Epg extends Model
         'user_id' => 'integer',
         'uploads' => 'array',
         'status' => EpgStatus::class,
+        'processing' => 'boolean',
     ];
 
     public function getFolderPathAttribute(): string

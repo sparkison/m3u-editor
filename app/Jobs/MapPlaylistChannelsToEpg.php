@@ -6,6 +6,7 @@ use App\Models\Channel;
 use App\Models\Epg;
 use App\Models\EpgChannel;
 use App\Models\Playlist;
+use Exception;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -40,76 +41,84 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
         // Flag job start time
         $start = now();
 
-        // Fetch the EPG
-        $epg = Epg::find($this->epg);
-        if (!$epg) {
-            $error = "Unable to map to the selected EPG, it no longer exists. Please select a different EPG and try again.";
-            Notification::make()
-                ->danger()
-                ->title("Error processing EPG channel mapping")
-                ->body('Please view your notifications for details.')
-                ->broadcast($epg->user);
-            Notification::make()
-                ->danger()
-                ->title("Error processing EPG channel mapping")
-                ->body($error)
-                ->sendToDatabase($epg->user);
-            return;
-        }
-
-        // Fetch the playlist (if set)
-        $channels = [];
-        $playlist = $this->playlist ? Playlist::find($this->playlist) : null;
-        if ($this->channels) {
-            $channels = Channel::whereIn('id', $this->channels)->cursor();
-        } else {
-            if ($playlist) {
-                $channels = $playlist->channels()
-                    ->when(!$this->force, function ($query) {
-                        $query->where('epg_channel_id', null);
-                    })->cursor();
-            }
-        }
-
-        // Map the channels
-        $jobs = [];
-        LazyCollection::make(function () use ($channels, $epg) {
-            $epgChannels = $epg->channels()
-                ->where('channel_id', '!=', '')
-                ->whereIn('channel_id', $channels->pluck('name'))
-                ->select('id', 'channel_id')
-                ->get();
-
-            foreach ($channels as $channel) {
-                $epgChannel = $epgChannels->where('channel_id', $channel->name)->first();
-                if ($epgChannel) {
-                    $channel->epg_channel_id = $epgChannel->id;
-                    yield $channel->toArray();
-                }
-            }
-        })->chunk(500)->each(function ($chunk) use (&$jobs) {
-            $jobs[] = new MapEpgToChannels($chunk->toArray());
-        });
-
-        // Last job in the batch
-        $jobs[] = new MapEpgToChannelsComplete($playlist, $epg, $start);
-
-        // Dispatch the batch
-        Bus::chain($jobs)
-            ->onConnection('redis') // force to use redis connection
-            ->onQueue('import')
-            ->catch(function (Throwable $e) use ($epg, $playlist) {
-                $error = "Error processing \"{$epg->name}\" mapping to \"{$playlist->name}\": {$e->getMessage()}";
+        try {
+            // Fetch the EPG
+            $epg = Epg::find($this->epg);
+            if (!$epg) {
+                $error = "Unable to map to the selected EPG, it no longer exists. Please select a different EPG and try again.";
                 Notification::make()
                     ->danger()
-                    ->title("Error processing \"{$epg->name}\" mapping to \"{$playlist->name}\"")
+                    ->title("Error processing EPG channel mapping")
                     ->body('Please view your notifications for details.')
                     ->broadcast($epg->user);
                 Notification::make()
                     ->danger()
-                    ->title("Error processing \"{$epg->name}\" mapping to \"{$playlist->name}\"")
+                    ->title("Error processing EPG channel mapping")
                     ->body($error)
                     ->sendToDatabase($epg->user);
-            })->dispatch();
+                return;
+            }
+
+            // Fetch the playlist (if set)
+            $channels = [];
+            $playlist = $this->playlist ? Playlist::find($this->playlist) : null;
+            if ($this->channels) {
+                $channels = Channel::whereIn('id', $this->channels)->cursor();
+            } else {
+                if ($playlist) {
+                    $channels = $playlist->channels()
+                        ->when(!$this->force, function ($query) {
+                            $query->where('epg_channel_id', null);
+                        })->cursor();
+                }
+            }
+
+            // Map the channels
+            $jobs = [];
+            LazyCollection::make(function () use ($channels, $epg) {
+                $epgChannels = $epg->channels()
+                    ->where('channel_id', '!=', '')
+                    ->whereIn('channel_id', $channels->pluck('name'))
+                    ->select('id', 'channel_id')
+                    ->get();
+
+                foreach ($channels as $channel) {
+                    $epgChannel = $epgChannels->where('channel_id', $channel->name)->first();
+                    if ($epgChannel) {
+                        $channel->epg_channel_id = $epgChannel->id;
+                        yield $channel->toArray();
+                    }
+                }
+            })->chunk(500)->each(function ($chunk) use (&$jobs) {
+                $jobs[] = new MapEpgToChannels($chunk->toArray());
+            });
+
+            // Last job in the batch
+            $jobs[] = new MapEpgToChannelsComplete($playlist, $epg, $start);
+
+            // Dispatch the batch
+            Bus::chain($jobs)
+                ->onConnection('redis') // force to use redis connection
+                ->onQueue('import')
+                ->catch(function (Throwable $e) use ($epg, $playlist) {
+                    $error = "Error processing \"{$epg->name}\" mapping to \"{$playlist->name}\": {$e->getMessage()}";
+                    Notification::make()
+                        ->danger()
+                        ->title("Error processing \"{$epg->name}\" mapping to \"{$playlist->name}\"")
+                        ->body('Please view your notifications for details.')
+                        ->broadcast($epg->user);
+                    Notification::make()
+                        ->danger()
+                        ->title("Error processing \"{$epg->name}\" mapping to \"{$playlist->name}\"")
+                        ->body($error)
+                        ->sendToDatabase($epg->user);
+                })->dispatch();
+        } catch (Exception $e) {
+            Notification::make()
+                ->title('Error')
+                ->body('An error occurred while mapping channels to the EPG \"{$epg->name}\": ' . $e->getMessage())
+                ->danger()
+                ->send();
+        }
     }
 }

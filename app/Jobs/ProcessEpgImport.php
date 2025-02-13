@@ -31,7 +31,8 @@ class ProcessEpgImport implements ShouldQueue
      * @param Epg $epg
      */
     public function __construct(
-        public Epg $epg
+        public Epg $epg,
+        public ?bool $force = false,
     ) {}
 
     /**
@@ -40,18 +41,19 @@ class ProcessEpgImport implements ShouldQueue
     public function handle(): void
     {
         // Don't update if currently processing
-        if ($this->epg->status === EpgStatus::Processing) {
+        if ($this->epg->processing) {
             return;
         }
-
-        // Check if auto sync is enabled, or the playlist hasn't been synced yet
-        if (!$this->epg->auto_sync && $this->epg->synced) {
-            return;
+        if (!$this->force) {
+            // Check if auto sync is enabled, or the playlist hasn't been synced yet
+            if (!$this->epg->auto_sync && $this->epg->synced) {
+                return;
+            }
         }
 
         // Update the playlist status to processing
         $this->epg->update([
-            'status' => EpgStatus::Processing,
+            'processing' => true,
             'errors' => null,
             'progress' => 0,
         ]);
@@ -216,6 +218,7 @@ class ProcessEpgImport implements ShouldQueue
                             'synced' => now(),
                             'errors' => $error,
                             'progress' => 100,
+                            'processing' => false,
                         ]);
                     })->dispatch();
             } else {
@@ -241,6 +244,7 @@ class ProcessEpgImport implements ShouldQueue
                     'synced' => now(),
                     'errors' => $error,
                     'progress' => 100,
+                    'processing' => false,
                 ]);
             }
         } catch (Exception $e) {
@@ -265,6 +269,7 @@ class ProcessEpgImport implements ShouldQueue
                 'synced' => now(),
                 'errors' => $e->getMessage(),
                 'progress' => 100,
+                'processing' => false,
             ]);
         }
         return;

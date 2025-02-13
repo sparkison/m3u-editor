@@ -29,7 +29,8 @@ class ProcessM3uImport implements ShouldQueue
      * @param Playlist $playlist
      */
     public function __construct(
-        public Playlist $playlist
+        public Playlist $playlist,
+        public ?bool $force = false,
     ) {}
 
     /**
@@ -38,18 +39,19 @@ class ProcessM3uImport implements ShouldQueue
     public function handle(): void
     {
         // Don't update if currently processing
-        if ($this->playlist->status === PlaylistStatus::Processing) {
+        if ($this->playlist->processing) {
             return;
         }
-
-        // Check if auto sync is enabled, or the playlist hasn't been synced yet
-        if (!$this->playlist->auto_sync && $this->playlist->synced) {
-            return;
+        if (!$this->force) {
+            // Check if auto sync is enabled, or the playlist hasn't been synced yet
+            if (!$this->playlist->auto_sync && $this->playlist->synced) {
+                return;
+            }
         }
 
         // Update the playlist status to processing
         $this->playlist->update([
-            'status' => PlaylistStatus::Processing,
+            'processing' => true,
             'errors' => null,
             'progress' => 0,
         ]);
@@ -181,6 +183,7 @@ class ProcessM3uImport implements ShouldQueue
                             'synced' => now(),
                             'errors' => $error,
                             'progress' => 100,
+                            'processing' => false,
                         ]);
                     })->dispatch();
             } else {
@@ -201,6 +204,7 @@ class ProcessM3uImport implements ShouldQueue
                     'synced' => now(),
                     'errors' => $error,
                     'progress' => 100,
+                    'processing' => false,
                 ]);
             }
         } catch (\Exception $e) {
@@ -225,6 +229,7 @@ class ProcessM3uImport implements ShouldQueue
                 'synced' => now(),
                 'errors' => $e->getMessage(),
                 'progress' => 100,
+                'processing' => false,
             ]);
         }
         return;

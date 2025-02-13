@@ -67,7 +67,7 @@ class EpgResource extends Resource
                     ->color(fn(EpgStatus $state) => $state->getColor()),
                 ProgressColumn::make('progress')
                     ->sortable()
-                    ->poll(fn($record) => $record->status === EpgStatus::Processing && $record->progress < 100 ? '5s' : null)
+                    ->poll(fn($record) => $record->status === EpgStatus::Processing ? '5s' : null)
                     ->toggleable(),
                 Tables\Columns\IconColumn::make('auto_sync')
                     ->label('Auto Sync')
@@ -108,8 +108,12 @@ class EpgResource extends Resource
                         ->label('Process')
                         ->icon('heroicon-o-arrow-path')
                         ->action(function ($record) {
+                            $record->update([
+                                'status' => EpgStatus::Processing,
+                                'progress' => 0,
+                            ]);
                             app('Illuminate\Contracts\Bus\Dispatcher')
-                                ->dispatch(new \App\Jobs\ProcessEpgImport($record));
+                                ->dispatch(new \App\Jobs\ProcessEpgImport($record, force: true));
                         })->after(function () {
                             Notification::make()
                                 ->success()
@@ -118,7 +122,7 @@ class EpgResource extends Resource
                                 ->duration(10000)
                                 ->send();
                         })
-                        ->disabled(fn($record): bool => ! $record->auto_sync || $record->status === EpgStatus::Processing)
+                        ->disabled(fn($record): bool => $record->status === EpgStatus::Processing)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
@@ -136,6 +140,7 @@ class EpgResource extends Resource
                         ->action(function ($record) {
                             $record->update([
                                 'status' => EpgStatus::Pending,
+                                'processing' => false,
                                 'progress' => 0,
                                 'synced' => null,
                                 'errors' => null,
@@ -164,8 +169,12 @@ class EpgResource extends Resource
                         ->label('Process selected')
                         ->action(function (Collection $records): void {
                             foreach ($records as $record) {
+                                $record->update([
+                                    'status' => EpgStatus::Processing,
+                                    'progress' => 0,
+                                ]);
                                 app('Illuminate\Contracts\Bus\Dispatcher')
-                                    ->dispatch(new \App\Jobs\ProcessEpgImport($record));
+                                    ->dispatch(new \App\Jobs\ProcessEpgImport($record, force: true));
                             }
                         })->after(function () {
                             Notification::make()
