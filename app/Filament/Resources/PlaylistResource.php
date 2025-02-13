@@ -245,13 +245,6 @@ class PlaylistResource extends Resource
                 ->label('Automatically sync playlist')
                 ->live()
                 ->default(true),
-            Forms\Components\DateTimePicker::make('synced')
-                ->columnSpan(2)
-                ->suffix('UTC')
-                ->native(false)
-                ->label('Last Synced')
-                ->hidden(fn(Get $get, string $operation): bool => ! $get('auto_sync') || $operation === 'create')
-                ->helperText('Playlist will be synced at the specified interval. Timestamp is automatically updated after each sync. Set to any time in the past (or future) and the next sync will run when the defined interval has passed since the time set.'),
             Forms\Components\Select::make('sync_interval')
                 ->label('Sync Every')
                 ->options([
@@ -264,6 +257,13 @@ class PlaylistResource extends Resource
                     '2 weeks' => '2 weeks',
                     '1 month' => '1 month',
                 ])->hidden(fn(Get $get): bool => ! $get('auto_sync')),
+            Forms\Components\DateTimePicker::make('synced')
+                ->columnSpan(2)
+                ->suffix('UTC')
+                ->native(false)
+                ->label('Last Synced')
+                ->hidden(fn(Get $get, string $operation): bool => ! $get('auto_sync') || $operation === 'create')
+                ->helperText('Playlist will be synced at the specified interval. Timestamp is automatically updated after each sync. Set to any time in the past (or future) and the next sync will run when the defined interval has passed since the time set.'),
 
             Forms\Components\Section::make('Links')
                 ->description('These links are generated based on the current playlist configuration. Only enabled channels will be included.')

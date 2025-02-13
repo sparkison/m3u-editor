@@ -228,13 +228,6 @@ class EpgResource extends Resource
                 ->label('Automatically sync EPG')
                 ->live()
                 ->default(true),
-            Forms\Components\DateTimePicker::make('synced')
-                ->columnSpan(2)
-                ->suffix('UTC')
-                ->native(false)
-                ->label('Last Synced')
-                ->hidden(fn(Get $get, string $operation): bool => ! $get('auto_sync') || $operation === 'create')
-                ->helperText('EPG will be synced at the specified interval. Timestamp is automatically updated after each sync. Set to any time in the past (or future) and the next sync will run when the defined interval has passed since the time set.'),
             Forms\Components\Select::make('sync_interval')
                 ->label('Sync Every')
                 ->options([
@@ -247,6 +240,13 @@ class EpgResource extends Resource
                     '2 weeks' => '2 weeks',
                     '1 month' => '1 month',
                 ])->hidden(fn(Get $get): bool => ! $get('auto_sync')),
+            Forms\Components\DateTimePicker::make('synced')
+                ->columnSpan(2)
+                ->suffix('UTC')
+                ->native(false)
+                ->label('Last Synced')
+                ->hidden(fn(Get $get, string $operation): bool => ! $get('auto_sync') || $operation === 'create')
+                ->helperText('EPG will be synced at the specified interval. Timestamp is automatically updated after each sync. Set to any time in the past (or future) and the next sync will run when the defined interval has passed since the time set.'),
 
             Forms\Components\Section::make('XMLTV file or URL')
                 ->description('You can either upload an XMLTV file or provide a URL to an XMLTV file. File should conform to the XMLTV format.')
