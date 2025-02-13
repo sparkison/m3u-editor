@@ -22,9 +22,16 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use \Croustibat\FilamentJobsMonitor\FilamentJobsMonitorPlugin;
+use Filament\Support\Enums\MaxWidth;
 
 class AdminPanelProvider extends PanelProvider
 {
+    protected static ?string $navigationIcon = 'heroicon-o-tachometer';
+    public static function getNavigationIcon(): ?string
+    {
+        return 'heroicon-o-tachometer';
+    }
+
     public function panel(Panel $panel): Panel
     {
         return $panel
@@ -45,6 +52,9 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 Pages\Dashboard::class,
             ])
+            ->topNavigation()
+            ->breadcrumbs(false)
+            // ->sidebarCollapsibleOnDesktop()
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
                 // Widgets\AccountWidget::class,
@@ -54,6 +64,8 @@ class AdminPanelProvider extends PanelProvider
                 FilamentJobsMonitorPlugin::make()
                     ->enableNavigation(app()->environment('local')) // local only for testing...
             ])
+            ->maxContentWidth(MaxWidth::Full)
+            // ->simplePageMaxContentWidth(MaxWidth::Small) // Login, sign in, etc.
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
@@ -67,6 +79,12 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+            ])
+            ->spa()
+            ->spaUrlExceptions(fn(): array => [
+                '*/playlist.m3u',
+                '*/epg.xml',
+                'epgs/*/epg.xml'
             ]);
     }
 
