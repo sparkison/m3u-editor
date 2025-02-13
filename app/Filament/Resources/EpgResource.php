@@ -84,6 +84,10 @@ class EpgResource extends Resource
                     ->since()
                     ->toggleable()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('sync_interval')
+                    ->label('Interval')
+                    ->toggleable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('sync_time')
                     ->label('Sync Time')
                     ->formatStateUsing(fn(string $state): string => gmdate('H:i:s', (int)$state))
@@ -221,17 +225,28 @@ class EpgResource extends Resource
                 ->helperText('Enter the name of the EPG. Internal use only.')
                 ->maxLength(255),
             Forms\Components\Toggle::make('auto_sync')
-                ->label('Automatically sync EPG every 24hr')
+                ->label('Automatically sync EPG')
                 ->live()
                 ->default(true),
             Forms\Components\DateTimePicker::make('synced')
                 ->columnSpan(2)
-                ->prefix('Sync 24hr from')
                 ->suffix('UTC')
                 ->native(false)
                 ->label('Last Synced')
                 ->hidden(fn(Get $get, string $operation): bool => ! $get('auto_sync') || $operation === 'create')
-                ->helperText('EPG will be synced every 24hr. Timestamp is automatically updated after each sync. Set to any time in the past (or future) and the next sync will run when 24hr has passed since the time set.'),
+                ->helperText('EPG will be synced at the specified interval. Timestamp is automatically updated after each sync. Set to any time in the past (or future) and the next sync will run when the defined interval has passed since the time set.'),
+            Forms\Components\Select::make('sync_interval')
+                ->label('Sync Every')
+                ->options([
+                    '8hr' => '8hr',
+                    '12hr' => '12hr',
+                    '24hr' => '24hr',
+                    '2 days' => '2 days',
+                    '3 days' => '3 days',
+                    '1 week' => '1 week',
+                    '2 weeks' => '2 weeks',
+                    '1 month' => '1 month',
+                ])->hidden(fn(Get $get): bool => ! $get('auto_sync')),
 
             Forms\Components\Section::make('XMLTV file or URL')
                 ->description('You can either upload an XMLTV file or provide a URL to an XMLTV file. File should conform to the XMLTV format.')

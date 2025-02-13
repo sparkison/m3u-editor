@@ -36,18 +36,25 @@ class RefreshPlaylist extends Command
             $this->info('Dispatched playlist for refresh');
         } else {
             $this->info('Refreshing all playlists');
-            $twentyFourHoursAgo = now()->subDay();
+            $eightHoursAgo = now()->subHours(8); // lowest interval
             $playlists = Playlist::query()->where(
                 'status',
                 '!=',
                 PlaylistStatus::Processing,
-            )->whereDate('synced', '<=', $twentyFourHoursAgo);
+            )->whereDate('synced', '<=', $eightHoursAgo);
             $count = $playlists->count();
             if ($count === 0) {
                 $this->info('No playlists ready refresh');
                 return;
             }
-            $playlists->get()->each(fn(Playlist $playlist) => dispatch(new ProcessM3uImport($playlist)));
+            $playlists->get()->each(function (Playlist $playlist) {
+                // Check the sync interval to see if we need to refresh yet
+                $playlist->synced->add($playlist->interval);
+                if ($playlist->synced->isFuture()) {
+                    return;
+                }
+                dispatch(new ProcessM3uImport($playlist));
+            });
             $this->info('Dispatched ' . $count . ' playlists for refresh');
         }
         return;
