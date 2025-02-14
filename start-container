@@ -129,10 +129,6 @@ php artisan optimize
 echo "Running migrations..."
 php artisan migrate --force
 
-# Run autodiscovery on app start
-php artisan package:discover --ansi
-php artisan filament:upgrade
-
 # Install npm dependencies
 echo "Building assets..."
 npm install && npm run build

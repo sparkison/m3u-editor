@@ -23,6 +23,8 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use \Croustibat\FilamentJobsMonitor\FilamentJobsMonitorPlugin;
+use Doctrine\DBAL\Query\QueryException;
+use Exception;
 use Filament\Support\Enums\MaxWidth;
 use Hydrat\TableLayoutToggle\TableLayoutTogglePlugin;
 
@@ -37,6 +39,20 @@ class AdminPanelProvider extends PanelProvider
     public function panel(Panel $panel): Panel
     {
         $userPreferences = app(GeneralSettings::class);
+        $settings = [
+            'navigation_position' => 'left',
+            'show_breadcrumbs' => true,
+            'content_width' => MaxWidth::ScreenLarge,
+        ];
+        try {
+            $settings = [
+                'navigation_position' => $userPreferences->navigation_position ?? $settings['navigation_position'],
+                'show_breadcrumbs' => $userPreferences->show_breadcrumbs ?? $settings['show_breadcrumbs'],
+                'content_width' => $userPreferences->content_width ?? $settings['content_width'],
+            ];
+        } catch (Exception $e) {
+            // Ignore
+        }
         $adminPanel = $panel
             ->default()
             ->id('admin')
@@ -55,7 +71,7 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 Pages\Dashboard::class,
             ])
-            ->breadcrumbs($preferences->show_breadcrumbs ?? true)
+            ->breadcrumbs($settings['show_breadcrumbs'])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
                 // Widgets\AccountWidget::class,
@@ -66,7 +82,7 @@ class AdminPanelProvider extends PanelProvider
                     ->enableNavigation(app()->environment('local')), // local only for testing...
                 TableLayoutTogglePlugin::make(),
             ])
-            ->maxContentWidth($userPreferences->content_width ?? MaxWidth::ScreenLarge)
+            ->maxContentWidth($settings['content_width'])
             // ->simplePageMaxContentWidth(MaxWidth::Small) // Login, sign in, etc.
             ->middleware([
                 EncryptCookies::class,
@@ -89,12 +105,11 @@ class AdminPanelProvider extends PanelProvider
                 'epgs/*/epg.xml'
             ]);
 
-        if ($userPreferences->navigation_position === 'top') {
+        if ($settings['navigation_position'] === 'top') {
             $adminPanel->topNavigation();
         } else {
             $adminPanel->sidebarCollapsibleOnDesktop();
         }
-
         return $adminPanel;
     }
 
