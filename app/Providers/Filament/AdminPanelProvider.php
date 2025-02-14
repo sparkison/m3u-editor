@@ -4,6 +4,7 @@ namespace App\Providers\Filament;
 
 use App\Filament\Auth\Login;
 use App\Filament\Auth\EditProfile;
+use App\Settings\GeneralSettings;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -35,7 +36,8 @@ class AdminPanelProvider extends PanelProvider
 
     public function panel(Panel $panel): Panel
     {
-        return $panel
+        $userPreferences = app(GeneralSettings::class);
+        $adminPanel = $panel
             ->default()
             ->id('admin')
             ->path('')
@@ -53,9 +55,7 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 Pages\Dashboard::class,
             ])
-            ->topNavigation()
-            ->breadcrumbs(false)
-            // ->sidebarCollapsibleOnDesktop()
+            ->breadcrumbs($preferences->show_breadcrumbs ?? true)
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
                 // Widgets\AccountWidget::class,
@@ -66,7 +66,7 @@ class AdminPanelProvider extends PanelProvider
                     ->enableNavigation(app()->environment('local')), // local only for testing...
                 TableLayoutTogglePlugin::make(),
             ])
-            ->maxContentWidth(MaxWidth::Full)
+            ->maxContentWidth($userPreferences->content_width ?? MaxWidth::ScreenLarge)
             // ->simplePageMaxContentWidth(MaxWidth::Small) // Login, sign in, etc.
             ->middleware([
                 EncryptCookies::class,
@@ -88,6 +88,14 @@ class AdminPanelProvider extends PanelProvider
                 '*/epg.xml',
                 'epgs/*/epg.xml'
             ]);
+
+        if ($userPreferences->navigation_position === 'top') {
+            $adminPanel->topNavigation();
+        } else {
+            $adminPanel->sidebarCollapsibleOnDesktop();
+        }
+
+        return $adminPanel;
     }
 
     public function register(): void
