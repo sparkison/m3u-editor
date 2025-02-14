@@ -29,3 +29,5 @@ yarn-error.log
 *.m3u
 docker-compose.yml
 DockerfileDev
+.rr.yaml
+rr

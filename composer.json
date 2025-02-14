@@ -18,7 +18,9 @@
         "laravel/tinker": "^2.9",
         "predis/predis": "^2.3",
         "ryangjchandler/filament-progress-column": "^1.0",
-        "sparkison/m3u-parser": "dev-master"
+        "sparkison/m3u-parser": "dev-master",
+        "spiral/roadrunner-cli": "^2.6.0",
+        "spiral/roadrunner-http": "^3.3.0"
     },
     "require-dev": {
         "beyondcode/laravel-dump-server": "^2.0",
