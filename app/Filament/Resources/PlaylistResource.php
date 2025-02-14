@@ -243,11 +243,13 @@ class PlaylistResource extends Resource
                 ->helperText('Enter the URL of the playlist file. If changing URL, the playlist will be re-imported. Use with caution as this could lead to data loss if the new playlist differs from the old one.'),
             Forms\Components\Toggle::make('auto_sync')
                 ->label('Automatically sync playlist')
+                ->helperText('When enabled, the playlist will be automatically re-synced at the specified interval.')
                 ->live()
                 ->inline(false)
                 ->default(true),
             Forms\Components\Select::make('sync_interval')
                 ->label('Sync Every')
+                ->helperText('Default is every 24hr if left empty.')
                 ->options([
                     '8hr' => '8hr',
                     '12hr' => '12hr',
@@ -265,6 +267,28 @@ class PlaylistResource extends Resource
                 ->label('Last Synced')
                 ->hidden(fn(Get $get, string $operation): bool => ! $get('auto_sync') || $operation === 'create')
                 ->helperText('Playlist will be synced at the specified interval. Timestamp is automatically updated after each sync. Set to any time in the past (or future) and the next sync will run when the defined interval has passed since the time set.'),
+
+            Forms\Components\Toggle::make('import_prefs.preprocess')
+                ->label('Preprocess playlist')
+                ->columnSpan('full')
+                ->live()
+                ->inline(false)
+                ->default(false)
+                ->helperText('When enabled, the playlist will be preprocessed before importing. You can then select which groups you would like to import.'),
+            Forms\Components\Select::make('import_prefs.selected_groups')
+                ->label('Groups to import')
+                ->columnSpan('full')
+                ->searchable()
+                ->multiple()
+                ->helperText('You will need to manually run the sync if updating the groups to import. If the list is empty, process the list and check again once complete.')
+                ->options(function (Get $get): array {
+                    $options = [];
+                    foreach ($get('groups') ?? [] as $option) {
+                        $options[$option] = $option;
+                    }
+                    return $options;
+                })
+                ->hidden(fn(Get $get): bool => ! $get('import_prefs.preprocess') || !$get('status')),
 
             Forms\Components\Section::make('Links')
                 ->description('These links are generated based on the current playlist configuration. Only enabled channels will be included.')

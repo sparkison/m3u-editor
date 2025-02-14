@@ -18,6 +18,7 @@
         "vite": "^6.0"
     },
     "dependencies": {
+        "@iptv/playlist": "^1.1.0",
         "@iptv/xmltv": "^1.0.1"
     }
 }

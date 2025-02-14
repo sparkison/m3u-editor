@@ -22,6 +22,7 @@ class ProcessM3uImportComplete implements ShouldQueue
     public function __construct(
         public int $userId,
         public int $playlistId,
+        public array $groups,
         public string $batchNo,
         public Carbon $start,
     ) {
@@ -67,6 +68,19 @@ class ProcessM3uImportComplete implements ShouldQueue
         // Clear out the jobs
         Job::where(['batch_no', $this->batchNo])->delete();
 
+        // Update the import preferences
+        if ($playlist->import_prefs['preprocess'] ?? false) {
+            $importPrefs = [
+                ...$playlist->import_prefs ?? [],
+
+                // Make sure there's no selected groups that are no longer in the available groups
+                'selected_groups' => array_intersect($playlist->import_prefs['selected_groups'] ?? [], $this->groups),
+            ];
+        } else {
+            // no changes to import prefs
+            $importPrefs = $playlist->import_prefs;
+        }
+
         // Update the playlist
         $playlist->update([
             'status' => PlaylistStatus::Completed,
@@ -76,6 +90,8 @@ class ProcessM3uImportComplete implements ShouldQueue
             'sync_time' => $completedIn,
             'progress' => 100,
             'processing' => false,
+            'import_prefs' => $importPrefs,
+            'groups' => $this->groups,
         ]);
     }
 }

@@ -231,6 +231,7 @@ class EpgResource extends Resource
                 ->default(true),
             Forms\Components\Select::make('sync_interval')
                 ->label('Sync Every')
+                ->helperText('When enabled, the EPG will be automatically re-synced at the specified interval.')
                 ->options([
                     '8hr' => '8hr',
                     '12hr' => '12hr',
