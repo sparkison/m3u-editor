@@ -9,6 +9,6 @@ return new class extends SettingsMigration
     {
         $this->migrator->add('general.navigation_position', 'left');
         $this->migrator->add('general.show_breadcrumbs', true);
-        $this->migrator->add('general.content_width', MaxWidth::ScreenLarge);
+        $this->migrator->add('general.content_width', MaxWidth::ScreenExtraLarge);
     }
 };
