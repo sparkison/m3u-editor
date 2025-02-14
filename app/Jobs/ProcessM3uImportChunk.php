@@ -5,7 +5,6 @@ namespace App\Jobs;
 use App\Models\Channel;
 use App\Models\Job;
 use App\Models\Playlist;
-use Carbon\Carbon;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 

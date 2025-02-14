@@ -68,7 +68,9 @@
     },
     "extra": {
         "laravel": {
-            "dont-discover": []
+            "dont-discover": [
+                "filament/spatie-laravel-settings-plugin"
+            ]
         }
     },
     "config": {
