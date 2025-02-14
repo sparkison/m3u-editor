@@ -12,9 +12,12 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Hydrat\TableLayoutToggle\Concerns\HasToggleableTable;
 
 class ChannelsRelationManager extends RelationManager
 {
+    use HasToggleableTable;
+    
     protected static string $relationship = 'channels';
 
     public function form(Form $form): Form
