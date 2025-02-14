@@ -20,7 +20,8 @@ class Preferences extends SettingsPage
         return $form
             ->schema([
                 Forms\Components\Section::make()
-                    ->description('App appearance preferences')
+                    ->heading('App appearance preferences')
+                    ->description('NOTE: You will need to reload the page to see the changes.')
                     ->schema([
                         Forms\Components\Select::make('navigation_position')
                             ->label('Navigation position')
