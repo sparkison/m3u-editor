@@ -28,7 +28,7 @@ return [
      * When no repository was set for a settings class the following repository
      * will be used for loading and saving settings.
      */
-    'default_repository' => 'redis',
+    'default_repository' => 'database',
 
     /*
      * Settings will be stored and loaded from these repositories.
