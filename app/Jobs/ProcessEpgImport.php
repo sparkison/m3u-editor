@@ -8,6 +8,7 @@ use Throwable;
 use App\Enums\EpgStatus;
 use App\Models\Epg;
 use App\Models\EpgChannel;
+use App\Models\Job;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -175,16 +176,26 @@ class ProcessEpgImport implements ShouldQueue
                             }
                         }
                     }
-                });
-
-                // Process the data
-                $jobs = [];
-                $channelData->chunk(100)->each(function (LazyCollection $chunk) use (&$jobs) {
-                    $jobs[] = new ProcessEpgChannelImport($chunk->toArray());
+                })->chunk(100)->each(function (LazyCollection $chunk) use ($epg, $batchNo) {
+                    Job::create([
+                        'title' => "Processing import for EPG: {$epg->name}",
+                        'batch_no' => $batchNo,
+                        'payload' => $chunk->toArray(),
+                        'variables' => [
+                            'epgId' => $epg->id,
+                        ]
+                    ]);
                 });
 
                 // Close the XMLReaders, all done!
                 $channelReader->close();
+
+                // Get the jobs for the batch
+                $jobs = [];
+                $jobsBatch = Job::where('batch_no', $batchNo)->select('id')->cursor();
+                $jobsBatch->chunk(100)->each(function ($chunk) use (&$jobs) {
+                    $jobs[] = new ProcessEpgImportChunk($chunk->pluck('id')->toArray());
+                });
 
                 // Add progress update job to the batch
                 $count = count($jobs);

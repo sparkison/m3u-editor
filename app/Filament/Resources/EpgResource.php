@@ -227,6 +227,7 @@ class EpgResource extends Resource
             Forms\Components\Toggle::make('auto_sync')
                 ->label('Automatically sync EPG')
                 ->live()
+                ->inline(false)
                 ->default(true),
             Forms\Components\Select::make('sync_interval')
                 ->label('Sync Every')
