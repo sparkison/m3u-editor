@@ -50,10 +50,9 @@ class RefreshEpg extends Command
             $epgs->get()->each(function (Epg $epg) {
                 // Check the sync interval to see if we need to refresh yet
                 $nextSync = $epg->synced->add($epg->interval);
-                if ($nextSync->isFuture()) {
-                    return;
+                if (!$nextSync->isFuture()) {
+                    dispatch(new ProcessEpgImport($epg));
                 }
-                dispatch(new ProcessEpgImport($epg));
             });
             $this->info('Dispatched ' . $count . ' epgs for refresh');
         }

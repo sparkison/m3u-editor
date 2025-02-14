@@ -50,10 +50,9 @@ class RefreshPlaylist extends Command
             $playlists->get()->each(function (Playlist $playlist) {
                 // Check the sync interval to see if we need to refresh yet
                 $nextSync = $playlist->synced->add($playlist->interval);
-                if ($nextSync->isFuture()) {
-                    return;
+                if (!$nextSync->isFuture()) {
+                    dispatch(new ProcessM3uImport($playlist));
                 }
-                dispatch(new ProcessM3uImport($playlist));
             });
             $this->info('Dispatched ' . $count . ' playlists for refresh');
         }
