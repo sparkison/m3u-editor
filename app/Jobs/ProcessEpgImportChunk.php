@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\Epg;
 use App\Models\EpgChannel;
 use App\Models\Job;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -16,6 +17,7 @@ class ProcessEpgImportChunk implements ShouldQueue
      */
     public function __construct(
         public array $jobs,
+        public int $batchCount,
     ) {
         //
     }
@@ -25,9 +27,21 @@ class ProcessEpgImportChunk implements ShouldQueue
      */
     public function handle(): void
     {
-        foreach (Job::whereIn('id', $this->jobs)->cursor() as $job) {
+        // Determine what percentage of the import this batch accounts for
+        $totalJobsCount = $this->batchCount;
+        $chunkSize = 20;
+
+        // Process the jobs
+        foreach (Job::whereIn('id', $this->jobs)->cursor() as $index => $job) {
             $bulk = [];
-            // $epgId = $job->variables['epgId'];
+            if ($index % $chunkSize === 0) {
+                $epg = Epg::find($job->variables['epgId']);
+                $epg->update([
+                    'progress' => $epg->progress + ($chunkSize / $totalJobsCount) * 100,
+                ]);
+            }
+
+            // Add the channel for insert/update
             foreach ($job->payload as $channel) {
                 $bulk[] = [
                     ...$channel,

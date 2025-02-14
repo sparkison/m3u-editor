@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Channel;
 use App\Models\Job;
+use App\Models\Playlist;
 use Carbon\Carbon;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -17,6 +18,7 @@ class ProcessM3uImportChunk implements ShouldQueue
      */
     public function __construct(
         public array $jobs,
+        public int $batchCount,
     ) {
         //
     }
@@ -26,8 +28,21 @@ class ProcessM3uImportChunk implements ShouldQueue
      */
     public function handle(): void
     {
-        foreach (Job::whereIn('id', $this->jobs)->cursor() as $job) {
+        // Determine what percentage of the import this batch accounts for
+        $totalJobsCount = $this->batchCount;
+        $chunkSize = 20;
+
+        // Process the jobs
+        foreach (Job::whereIn('id', $this->jobs)->cursor() as $index => $job) {
             $bulk = [];
+            if ($index % $chunkSize === 0) {
+                $playlist = Playlist::find($job->variables['playlistId']);
+                $playlist->update([
+                    'progress' => $playlist->progress + ($chunkSize / $totalJobsCount) * 100,
+                ]);
+            }
+
+            // Add the channel for insert/update
             $groupId = $job->variables['groupId'];
             foreach ($job->payload as $channel) {
                 // Make sure name is set

@@ -12,7 +12,6 @@ use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Str;
-use Illuminate\Bus\Batch;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\LazyCollection;
@@ -170,19 +169,11 @@ class ProcessM3uImport implements ShouldQueue
 
                 // Get the jobs for the batch
                 $jobs = [];
+                $batchCount = Job::where('batch_no', $batchNo)->select('id')->count();
                 $jobsBatch = Job::where('batch_no', $batchNo)->select('id')->cursor();
-                $jobsBatch->chunk(100)->each(function ($chunk) use (&$jobs) {
-                    $jobs[] = new ProcessM3uImportChunk($chunk->pluck('id')->toArray());
+                $jobsBatch->chunk(100)->each(function ($chunk) use (&$jobs, $batchCount) {
+                    $jobs[] = new ProcessM3uImportChunk($chunk->pluck('id')->toArray(), $batchCount);
                 });
-
-                // Add progress update job to the batch
-                $count = count($jobs);
-                $chunkSize = ceil($count / 20);
-                for ($i = $chunkSize; $i < $count; $i += $chunkSize) {
-                    array_splice($jobs, $i, 0, function () use ($playlist, $i, $count) {
-                        $playlist->update(['progress' => ($i / $count) * 100]);
-                    });
-                }
 
                 // Last job in the batch
                 $jobs[] = new ProcessM3uImportComplete($userId, $playlistId, $batchNo, $start);

@@ -7,13 +7,11 @@ use XMLReader;
 use Throwable;
 use App\Enums\EpgStatus;
 use App\Models\Epg;
-use App\Models\EpgChannel;
 use App\Models\Job;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Str;
-use Illuminate\Bus\Batch;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -127,7 +125,7 @@ class ProcessEpgImport implements ShouldQueue
                 $epg->update(['progress' => 10]); // set to 10% to start
 
                 // Create a lazy collection to process the XML data
-                $channelData = LazyCollection::make(function () use ($channelReader, $defaultChannelData) {
+                LazyCollection::make(function () use ($channelReader, $defaultChannelData) {
                     // Loop through the XML data
                     while ($channelReader->read()) {
                         // Only consider XML elements and channel nodes
@@ -192,19 +190,11 @@ class ProcessEpgImport implements ShouldQueue
 
                 // Get the jobs for the batch
                 $jobs = [];
+                $batchCount = Job::where('batch_no', $batchNo)->select('id')->count();
                 $jobsBatch = Job::where('batch_no', $batchNo)->select('id')->cursor();
-                $jobsBatch->chunk(100)->each(function ($chunk) use (&$jobs) {
-                    $jobs[] = new ProcessEpgImportChunk($chunk->pluck('id')->toArray());
+                $jobsBatch->chunk(100)->each(function ($chunk) use (&$jobs, $batchCount) {
+                    $jobs[] = new ProcessEpgImportChunk($chunk->pluck('id')->toArray(), $batchCount);
                 });
-
-                // Add progress update job to the batch
-                $count = count($jobs);
-                $chunkSize = ceil($count / 20);
-                for ($i = $chunkSize; $i < $count; $i += $chunkSize) {
-                    array_splice($jobs, $i, 0, function () use ($epg, $i, $count) {
-                        $epg->update(['progress' => ($i / $count) * 100]);
-                    });
-                }
 
                 // Last job in the batch
                 $jobs[] = new ProcessEpgImportComplete($userId, $epgId, $batchNo, $start);
