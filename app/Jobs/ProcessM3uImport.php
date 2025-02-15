@@ -126,7 +126,7 @@ class ProcessM3uImport implements ShouldQueue
                         $url = $item->getPath();
                         foreach ($excludeFileTypes as $excludeFileType) {
                             if (str($url)->endsWith($excludeFileType)) {
-                                continue;
+                                continue 2;
                             }
                         }
                         $channel = [
