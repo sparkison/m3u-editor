@@ -37,7 +37,7 @@ class ProcessM3uImportChunk implements ShouldQueue
             if ($index % $chunkSize === 0) {
                 $playlist = Playlist::find($job->variables['playlistId']);
                 $playlist->update([
-                    'progress' => $playlist->progress + ($chunkSize / $totalJobsCount) * 100,
+                    'progress' => min(99, $playlist->progress + ($chunkSize / $totalJobsCount) * 100),
                 ]);
             }
 

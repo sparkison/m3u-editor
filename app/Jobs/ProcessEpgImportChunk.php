@@ -37,7 +37,7 @@ class ProcessEpgImportChunk implements ShouldQueue
             if ($index % $chunkSize === 0) {
                 $epg = Epg::find($job->variables['epgId']);
                 $epg->update([
-                    'progress' => $epg->progress + ($chunkSize / $totalJobsCount) * 100,
+                    'progress' => min(99, $epg->progress + ($chunkSize / $totalJobsCount) * 100),
                 ]);
             }
 

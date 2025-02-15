@@ -81,6 +81,9 @@ class ProcessM3uImport implements ShouldQueue
                 ->timeout(60 * 5) // set timeout to five minues
                 ->throw()->get($url->toString());
 
+            // Update progress
+            $playlist->update(['progress' => 5]); // set to 5% to start
+
             // If fetched successfully, process the results!
             if ($response->ok()) {
                 $m3uParser = new M3uParser();
@@ -88,7 +91,7 @@ class ProcessM3uImport implements ShouldQueue
                 $data = $m3uParser->parse($response->body());
 
                 // Update progress
-                $playlist->update(['progress' => 10]); // set to 10% to start
+                $playlist->update(['progress' => 10]);
 
                 // Setup common field values
                 $channelFields = [
@@ -163,7 +166,7 @@ class ProcessM3uImport implements ShouldQueue
                                         'import_batch_no' => $batchNo,
                                     ]);
                                 }
-                                $channels->chunk(100)->each(function ($chunk) use ($playlistId, $batchNo, $group) {
+                                $channels->chunk(50)->each(function ($chunk) use ($playlistId, $batchNo, $group) {
                                     Job::create([
                                         'title' => "Processing channel import for group: {$group->name}",
                                         'batch_no' => $batchNo,
@@ -181,6 +184,9 @@ class ProcessM3uImport implements ShouldQueue
 
                 // Remove duplicate groups
                 $groups = array_unique($groups);
+
+                // Update progress
+                $playlist->update(['progress' => 15]);
 
                 // Check if preprocessing, and not groups selected yet
                 if ($preprocess && count($selectedGroups) === 0) {
@@ -213,7 +219,7 @@ class ProcessM3uImport implements ShouldQueue
                     $jobs = [];
                     $batchCount = Job::where('batch_no', $batchNo)->select('id')->count();
                     $jobsBatch = Job::where('batch_no', $batchNo)->select('id')->cursor();
-                    $jobsBatch->chunk(100)->each(function ($chunk) use (&$jobs, $batchCount) {
+                    $jobsBatch->chunk(50)->each(function ($chunk) use (&$jobs, $batchCount) {
                         $jobs[] = new ProcessM3uImportChunk($chunk->pluck('id')->toArray(), $batchCount);
                     });
 

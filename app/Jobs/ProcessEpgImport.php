@@ -100,6 +100,9 @@ class ProcessEpgImport implements ShouldQueue
                 }
             }
 
+            // Update progress
+            $epg->update(['progress' => 5]); // set to 5% to start
+
             // If we have XML data, let's process it
             if ($filePath) {
                 // Setup the XML readers
@@ -122,7 +125,7 @@ class ProcessEpgImport implements ShouldQueue
                 ];
 
                 // Update progress
-                $epg->update(['progress' => 10]); // set to 10% to start
+                $epg->update(['progress' => 10]);
 
                 // Create a lazy collection to process the XML data
                 LazyCollection::make(function () use ($channelReader, $defaultChannelData) {
@@ -174,7 +177,7 @@ class ProcessEpgImport implements ShouldQueue
                             }
                         }
                     }
-                })->chunk(100)->each(function (LazyCollection $chunk) use ($epg, $batchNo) {
+                })->chunk(50)->each(function (LazyCollection $chunk) use ($epg, $batchNo) {
                     Job::create([
                         'title' => "Processing import for EPG: {$epg->name}",
                         'batch_no' => $batchNo,
@@ -188,11 +191,14 @@ class ProcessEpgImport implements ShouldQueue
                 // Close the XMLReaders, all done!
                 $channelReader->close();
 
+                // Update progress
+                $epg->update(['progress' => 15]);
+
                 // Get the jobs for the batch
                 $jobs = [];
                 $batchCount = Job::where('batch_no', $batchNo)->select('id')->count();
                 $jobsBatch = Job::where('batch_no', $batchNo)->select('id')->cursor();
-                $jobsBatch->chunk(100)->each(function ($chunk) use (&$jobs, $batchCount) {
+                $jobsBatch->chunk(50)->each(function ($chunk) use (&$jobs, $batchCount) {
                     $jobs[] = new ProcessEpgImportChunk($chunk->pluck('id')->toArray(), $batchCount);
                 });
 

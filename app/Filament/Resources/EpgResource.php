@@ -67,7 +67,7 @@ class EpgResource extends Resource
                     ->color(fn(EpgStatus $state) => $state->getColor()),
                 ProgressColumn::make('progress')
                     ->sortable()
-                    ->poll(fn($record) => $record->status === EpgStatus::Processing || $record->status === EpgStatus::Pending ? '5s' : null)
+                    ->poll(fn($record) => $record->status === EpgStatus::Processing || $record->status === EpgStatus::Pending ? '3s' : null)
                     ->toggleable(),
                 Tables\Columns\IconColumn::make('auto_sync')
                     ->label('Auto Sync')

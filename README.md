@@ -3,7 +3,7 @@
 A simple `m3u` playlist editor, similar to **xteve** or **threadfin**, with `epg` management.
 
 > [!TIP]  
-> Has been tested on large playlist ([https://github.com/iptv-org/iptv](https://github.com/iptv-org/iptv)), with up to 10000+ channels. Note that larger lists will take longer to sync (likely a closer to a minute for every ~10k channels, depending on the list. Some import quicker than others.).
+> Has been tested on large playlist ([https://github.com/iptv-org/iptv](https://github.com/iptv-org/iptv)), with up to 10000+ channels. Note that larger lists will take longer to sync (it takes aproximately 1s for every 1000 channels.).
 
 ## How It Works
 
