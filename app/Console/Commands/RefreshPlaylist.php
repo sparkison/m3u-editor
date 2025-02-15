@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Enums\PlaylistStatus;
 use App\Jobs\ProcessM3uImport;
 use App\Models\Playlist;
+use Carbon\CarbonInterval;
 use Illuminate\Console\Command;
 
 class RefreshPlaylist extends Command
@@ -49,7 +50,8 @@ class RefreshPlaylist extends Command
             }
             $playlists->get()->each(function (Playlist $playlist) {
                 // Check the sync interval to see if we need to refresh yet
-                $nextSync = $playlist->synced->add($playlist->interval);
+                $interval = CarbonInterval::make($playlist->interval ?? '24 hours');
+                $nextSync = $playlist->synced->add($interval);
                 if (!$nextSync->isFuture()) {
                     dispatch(new ProcessM3uImport($playlist));
                 }

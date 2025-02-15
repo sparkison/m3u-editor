@@ -49,14 +49,14 @@ class AppServiceProvider extends ServiceProvider
             Playlist::creating(function (Playlist $playlist) {
                 $playlist->user_id = auth()->id();
                 if (!$playlist->sync_interval) {
-                    $playlist->sync_interval = '24hr';
+                    $playlist->sync_interval = '24 hours';
                 }
                 $playlist->uuid = \Illuminate\Support\Str::orderedUuid()->toString();
                 return $playlist;
             });
             Playlist::updating(function (Playlist $playlist) {
                 if (!$playlist->sync_interval) {
-                    $playlist->sync_interval = '24hr';
+                    $playlist->sync_interval = '24 hours';
                 }
                 return $playlist;
             });
@@ -66,14 +66,14 @@ class AppServiceProvider extends ServiceProvider
             Epg::creating(function (Epg $epg) {
                 $epg->user_id = auth()->id();
                 if (!$epg->sync_interval) {
-                    $epg->sync_interval = '24hr';
+                    $epg->sync_interval = '24 hours';
                 }
                 $epg->uuid = \Illuminate\Support\Str::orderedUuid()->toString();
                 return $epg;
             });
             Epg::updating(function (Epg $epg) {
                 if (!$epg->sync_interval) {
-                    $epg->sync_interval = '24hr';
+                    $epg->sync_interval = '24 hours';
                 }
                 return $epg;
             });

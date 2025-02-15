@@ -179,6 +179,9 @@ class ProcessM3uImport implements ShouldQueue
                     });
                 });
 
+                // Remove duplicate groups
+                $groups = array_unique($groups);
+
                 // Check if preprocessing, and not groups selected yet
                 if ($preprocess && count($selectedGroups) === 0) {
                     $completedIn = $start->diffInSeconds(now());

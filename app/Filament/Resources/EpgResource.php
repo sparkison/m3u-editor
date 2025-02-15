@@ -234,9 +234,9 @@ class EpgResource extends Resource
                 ->label('Sync Every')
                 ->helperText('Default is every 24hr if left empty.')
                 ->options([
-                    '8hr' => '8hr',
-                    '12hr' => '12hr',
-                    '24hr' => '24hr',
+                    '8 hours' => '8 hours',
+                    '12 hours' => '12 hours',
+                    '24 hours' => '24 hours',
                     '2 days' => '2 days',
                     '3 days' => '3 days',
                     '1 week' => '1 week',

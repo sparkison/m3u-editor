@@ -64,7 +64,6 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Etc/UTC
-      - WWWUSER=sail
     volumes:
       - /apps/m3ueditor/config:/var/www/config
     restart: unless-stopped

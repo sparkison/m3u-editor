@@ -2,13 +2,14 @@
 FROM alpine:edge
 
 # Set environment variables
-ENV APP_PORT=36400
-ENV TZ=UTC
 ENV WWWGROUP="sail"
-ENV NODE_VERSION=22.12.0
+ENV APP_PORT=36400
+ENV REVERB_PORT=36800
+ENV TZ=UTC
+# ENV NODE_VERSION=22.12.0
 ENV SUPERVISOR_PHP_USER="root"
 #
-# Supervisord command to run the app
+# Supervisord command to run the app services
 #
 
 # Run via Artisan
@@ -16,6 +17,16 @@ ENV SUPERVISOR_PHP_USER="root"
 
 # Run via Octane
 ENV SUPERVISOR_PHP_COMMAND="/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan octane:start --workers=4 --task-workers=6 --server=swoole --host=0.0.0.0 --port=$APP_PORT"
+
+# Queue worker
+# Laravel queue worker
+#ENV QUEUE_PHP_COMMAND="/usr/bin/php /var/www/html/artisan queue:work --queue=default,import --sleep=3 --tries=3"
+
+# Horizon queue worker
+ENV QUEUE_PHP_COMMAND="/usr/bin/php /var/www/html/artisan horizon"
+
+# Websockets
+ENV WEBSOCKET_PHP_COMMAND="/usr/bin/php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=$REVERB_PORT --no-interaction --no-ansi"
 
 # Set the working directory
 WORKDIR /var/www/html
