@@ -118,12 +118,20 @@ class ProcessM3uImport implements ShouldQueue
 
                 // Extract the channels and groups from the m3u
                 $groups = [];
+                $excludeFileTypes =
+                $playlist->import_prefs['ignored_file_types'] ?? [];
                 $selectedGroups = $playlist->import_prefs['selected_groups'] ?? [];
-                LazyCollection::make(function () use ($data, $channelFields, $attributes) {
+                LazyCollection::make(function () use ($data, $channelFields, $attributes, $excludeFileTypes) {
                     foreach ($data as $item) {
+                        $url = $item->getPath();
+                        foreach ($excludeFileTypes as $excludeFileType) {
+                            if (str($url)->endsWith($excludeFileType)) {
+                                continue;
+                            }
+                        }
                         $channel = [
                             ...$channelFields,
-                            'url' => $item->getPath(),
+                            'url' => $url,
                         ];
                         foreach ($item->getExtTags() as $extTag) {
                             if ($extTag instanceof \M3uParser\Tag\ExtInf) {
@@ -183,7 +191,7 @@ class ProcessM3uImport implements ShouldQueue
                 });
 
                 // Remove duplicate groups
-                $groups = array_unique($groups);
+                $groups = array_values(array_unique($groups));
 
                 // Update progress
                 $playlist->update(['progress' => 15]);

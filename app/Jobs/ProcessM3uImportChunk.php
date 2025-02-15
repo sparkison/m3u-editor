@@ -29,7 +29,7 @@ class ProcessM3uImportChunk implements ShouldQueue
     {
         // Determine what percentage of the import this batch accounts for
         $totalJobsCount = $this->batchCount;
-        $chunkSize = 20;
+        $chunkSize = 10;
 
         // Process the jobs
         foreach (Job::whereIn('id', $this->jobs)->cursor() as $index => $job) {
@@ -37,7 +37,7 @@ class ProcessM3uImportChunk implements ShouldQueue
             if ($index % $chunkSize === 0) {
                 $playlist = Playlist::find($job->variables['playlistId']);
                 $playlist->update([
-                    'progress' => min(99, $playlist->progress + ($chunkSize / $totalJobsCount) * 100),
+                    'progress' => min(99, $playlist->progress + (($chunkSize / $totalJobsCount) * 100)),
                 ]);
             }
 

@@ -8,6 +8,7 @@
     "require": {
         "php": "^8.2",
         "croustibat/filament-jobs-monitor": "^2.5",
+        "dragonmantank/cron-expression": "^3.4",
         "filament/filament": "^3.2",
         "filament/spatie-laravel-settings-plugin": "^3.2",
         "hydrat/filament-table-layout-toggle": "^2.0",
