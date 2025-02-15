@@ -50,8 +50,7 @@ class RefreshPlaylist extends Command
             }
             $playlists->get()->each(function (Playlist $playlist) {
                 // Check the sync interval to see if we need to refresh yet
-                $interval = CarbonInterval::make($playlist->interval ?? '24 hours');
-                $nextSync = $playlist->synced->add($interval);
+                $nextSync = $playlist->synced->add($playlist->interval ?? '24 hours');
                 if (!$nextSync->isFuture()) {
                     dispatch(new ProcessM3uImport($playlist));
                 }

@@ -49,7 +49,7 @@ class RefreshEpg extends Command
             }
             $epgs->get()->each(function (Epg $epg) {
                 // Check the sync interval to see if we need to refresh yet
-                $nextSync = $epg->synced->add($epg->interval);
+                $nextSync = $epg->synced->add($epg->interval ?? '24 hours');
                 if (!$nextSync->isFuture()) {
                     dispatch(new ProcessEpgImport($epg));
                 }
