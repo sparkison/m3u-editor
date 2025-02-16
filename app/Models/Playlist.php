@@ -22,6 +22,7 @@ class Playlist extends Model
         'id' => 'integer',
         'channels' => 'integer',
         'synced' => 'datetime',
+        // 'auto_sync' => 'boolean',
         'user_id' => 'integer',
         'sync_time' => 'float',
         'processing' => 'boolean',

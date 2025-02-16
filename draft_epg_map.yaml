@@ -1,0 +1,13 @@
+models:
+  EpgMap:
+    name: string
+    uuid: uuid
+    errors: longText nullable
+    status: enum:pending,processing,completed,failed default:pending
+    processing: boolean default:false
+    progress: float default:0
+    sync_time: datetime nullable
+    user_id: id foreign:users
+    epg_id: id foreign:epgs
+    relationships:
+      belongsTo: User, Epg

@@ -2,9 +2,11 @@
 
 namespace App\Jobs;
 
+use App\Enums\EpgStatus;
 use App\Models\Epg;
+use App\Models\EpgMap;
+use App\Models\Job;
 use App\Models\Playlist;
-use App\Models\User;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -18,8 +20,11 @@ class MapEpgToChannelsComplete implements ShouldQueue
      * Create a new job instance.
      */
     public function __construct(
-        public Playlist $playlist,
         public Epg $epg,
+        public int $batchCount,
+        public int $channelCount,
+        public int $mappedCount,
+        public string $batchNo,
         public Carbon $start,
     ) {
         //
@@ -34,11 +39,27 @@ class MapEpgToChannelsComplete implements ShouldQueue
         $completedIn = $this->start->diffInSeconds(now());
         $completedInRounded = round($completedIn, 2);
 
+        // Get the map
+        $map = EpgMap::where('uuid', $this->batchNo)->first();
+
+        // Clear out the jobs
+        Job::where(['batch_no', $this->batchNo])->delete();
+
+        // Update the map
+        $map->update([
+            'status' => EpgStatus::Completed,
+            'errors' => null,
+            'sync_time' => $completedIn,
+            'channel_count' => $this->channelCount,
+            'mapped_count' => $this->mappedCount,
+            'progress' => 100,
+            'processing' => false,
+        ]);
+
         // Notify the user
         $epg = $this->epg;
-        $playlist = $this->playlist;
         $title = "Completed processing EPG channel mapping";
-        $body = "EPG \"{$epg->name}\" to channel mapping for playlist \"{$playlist->name}\" completed. Mapping took {$completedInRounded} seconds.";
+        $body = "EPG \"{$epg->name}\" channel mapping completed. Mapping took {$completedInRounded} seconds.";
         Notification::make()
             ->success()
             ->title($title)->body($body)
