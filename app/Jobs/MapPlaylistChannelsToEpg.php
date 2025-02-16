@@ -66,6 +66,7 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
 
         // Create the record
         $map = EpgMap::create([
+            'name' => $epg->name . ' - channel mapping',
             'epg_id' => $epg->id,
             'user_id' => $epg->user_id,
             'uuid' => $batchNo,
