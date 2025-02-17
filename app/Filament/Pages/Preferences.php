@@ -30,6 +30,9 @@ class Preferences extends SettingsPage
                                 'left' => 'Left',
                                 'top' => 'Top',
                             ]),
+                        Forms\Components\Toggle::make('show_jobs_navigation')
+                            ->label('Show jobs navigation')
+                            ->helperText('View jobs and job status for background tasks'),
                         Forms\Components\Toggle::make('show_breadcrumbs')
                             ->label('Show breadcrumbs')
                             ->helperText('Show breadcrumbs under the page titles'),

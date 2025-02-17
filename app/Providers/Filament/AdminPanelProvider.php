@@ -42,12 +42,14 @@ class AdminPanelProvider extends PanelProvider
         $settings = [
             'navigation_position' => 'left',
             'show_breadcrumbs' => true,
+            'show_jobs_navigation' => false,
             'content_width' => MaxWidth::ScreenLarge,
         ];
         try {
             $settings = [
                 'navigation_position' => $userPreferences->navigation_position ?? $settings['navigation_position'],
                 'show_breadcrumbs' => $userPreferences->show_breadcrumbs ?? $settings['show_breadcrumbs'],
+                'show_jobs_navigation' => $userPreferences->show_jobs_navigation ?? $settings['show_jobs_navigation'],
                 'content_width' => $userPreferences->content_width ?? $settings['content_width'],
             ];
         } catch (Exception $e) {
@@ -81,7 +83,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->plugins([
                 FilamentJobsMonitorPlugin::make()
-                    ->enableNavigation(app()->environment('local')), // local only for testing...
+                    ->enableNavigation($settings['show_jobs_navigation'] ?? false),
                 TableLayoutTogglePlugin::make(),
             ])
             ->maxContentWidth($settings['content_width'])
