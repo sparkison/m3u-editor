@@ -261,11 +261,6 @@ class EpgResource extends Resource
 
                 ]),
 
-
-
-
-
-
             Forms\Components\Section::make('XMLTV file or URL')
                 ->description('You can either upload an XMLTV file or provide a URL to an XMLTV file. File should conform to the XMLTV format.')
                 ->headerActions([

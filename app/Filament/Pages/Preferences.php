@@ -49,6 +49,15 @@ class Preferences extends SettingsPage
                 Forms\Components\Section::make()
                     ->heading('Processing')
                     ->description('Processing preferences and settings.')
+                    ->headerActions([
+                        Forms\Components\Actions\Action::make('User Agent')
+                            ->label('User-Agent info')
+                            ->icon('heroicon-o-arrow-top-right-on-square')
+                            ->iconPosition('after')
+                            ->size('sm')
+                            ->url('https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/User-Agent')
+                            ->openUrlInNewTab(true),
+                    ])
                     ->schema([
                         Forms\Components\TextInput::make('playlist_agent_string')
                             ->label('Playlist user agent string')
