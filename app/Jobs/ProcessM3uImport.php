@@ -69,9 +69,6 @@ class ProcessM3uImport implements ShouldQueue
             $userId = $playlist->user_id;
             $batchNo = Str::orderedUuid()->toString();
 
-            // Check if preprocessing is enabled
-            $preprocess = $playlist->import_prefs['preprocess'] ?? false;
-
             // Normalize the playlist url and get the filename
             $url = str($playlist->url)->replace(' ', '%20');
 
@@ -110,17 +107,20 @@ class ProcessM3uImport implements ShouldQueue
 
                 // Setup the attribute -> key mapping
                 $attributes = [
-                    'tvg-name' => 'name',
-                    'tvg-id' => 'stream_id',
-                    'tvg-logo' => 'logo',
-                    'group-title' => 'group',
+                    'name' => 'tvg-name',
+                    'stream_id' => 'tvg-id',
+                    'logo' => 'tvg-logo',
+                    'group' => 'group-title',
                 ];
+
+                // Check if preprocessing is enabled
+                $preprocess = $playlist->import_prefs['preprocess'] ?? false;
 
                 // Extract the channels and groups from the m3u
                 $groups = [];
-                $excludeFileTypes =
-                $playlist->import_prefs['ignored_file_types'] ?? [];
+                $excludeFileTypes = $playlist->import_prefs['ignored_file_types'] ?? [];
                 $selectedGroups = $playlist->import_prefs['selected_groups'] ?? [];
+                $includedGroupPrefixes = $playlist->import_prefs['included_group_prefixes'] ?? [];
                 LazyCollection::make(function () use ($data, $channelFields, $attributes, $excludeFileTypes) {
                     foreach ($data as $item) {
                         $url = $item->getPath();
@@ -136,7 +136,7 @@ class ProcessM3uImport implements ShouldQueue
                         foreach ($item->getExtTags() as $extTag) {
                             if ($extTag instanceof \M3uParser\Tag\ExtInf) {
                                 $channel['title'] = $extTag->getTitle();
-                                foreach ($attributes as $attribute => $key) {
+                                foreach ($attributes as $key => $attribute) {
                                     if ($extTag->hasAttribute($attribute)) {
                                         $channel[$key] = $extTag->getAttribute($attribute);
                                     }
@@ -150,13 +150,34 @@ class ProcessM3uImport implements ShouldQueue
                         }
                         yield $channel;
                     }
-                })->groupBy('group')->chunk(10)->each(function (LazyCollection $grouped) use (&$groups, $selectedGroups, $preprocess, $userId, $playlistId, $batchNo) {
-                    $grouped->each(function ($channels, $groupName) use (&$groups, $selectedGroups, $preprocess, $userId, $playlistId, $batchNo) {
+                })->groupBy('group')->chunk(10)->each(function (LazyCollection $grouped) use (&$groups, $selectedGroups, $includedGroupPrefixes, $preprocess, $userId, $playlistId, $batchNo) {
+                    $grouped->each(function ($channels, $groupName) use (&$groups, $selectedGroups, $includedGroupPrefixes, $preprocess, $userId, $playlistId, $batchNo) {
                         $groupNames = explode(';', $groupName);
                         foreach ($groupNames as $groupName) {
+                            // Trim whitespace
                             $groupName = trim($groupName);
+
+                            // Add to groups if not already added
                             $groups[] = $groupName;
-                            if (!$preprocess || in_array($groupName, $selectedGroups)) {
+                            $shouldAdd = !$preprocess;
+                            if (!$shouldAdd) {
+                                // If preprocessing, check if group is selected
+                                $shouldAdd = in_array($groupName, $selectedGroups);
+                            }
+                            if (!$shouldAdd) {
+                                // If preprocessing, check if group starts with any of the included prefixes
+                                // Only check if the group isn't directly included already
+                                foreach ($includedGroupPrefixes as $prefix) {
+                                    if (str_starts_with($groupName, $prefix)) {
+                                        $shouldAdd = true;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            // Confirm if adding or skipping
+                            if ($shouldAdd) {
+                                // Add group and associated channels
                                 $group = Group::where([
                                     'name' => $groupName,
                                     'playlist_id' => $playlistId,

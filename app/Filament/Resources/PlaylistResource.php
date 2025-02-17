@@ -278,6 +278,7 @@ class PlaylistResource extends Resource
 
             Forms\Components\Section::make('Processing')
                 ->description('Import preferences')
+                ->columns(2)
                 ->schema([
                     Forms\Components\Toggle::make('import_prefs.preprocess')
                         ->label('Preprocess playlist')
@@ -288,7 +289,7 @@ class PlaylistResource extends Resource
                         ->helperText('When enabled, the playlist will be preprocessed before importing. You can then select which groups you would like to import.'),
                     Forms\Components\Select::make('import_prefs.selected_groups')
                         ->label('Groups to import')
-                        ->columnSpan('full')
+                        ->columnSpan(1)
                         ->searchable()
                         ->multiple()
                         ->helperText('You will need to manually run the sync if updating the groups to import. If the list is empty, process the list and check again once complete.')
@@ -300,9 +301,23 @@ class PlaylistResource extends Resource
                             return $options;
                         })
                         ->hidden(fn(Get $get): bool => ! $get('import_prefs.preprocess') || !$get('status')),
+                    Forms\Components\TagsInput::make('import_prefs.included_group_prefixes')
+                        ->label('Group prefixes to import')
+                        ->helperText('Press [tab] or [return] to add item. Use to include multiple groups that have a similar prefix (.e.g.: "US -", "UK -", etc.)')
+                        ->columnSpan(1)
+                        ->suggestions([
+                            'US -',
+                            'UK -',
+                            'CA -'
+                        ])
+                        ->tagSuffix('*')
+                        ->splitKeys(['Tab', ' '])
+                        ->hidden(fn(Get $get): bool => ! $get('import_prefs.preprocess') || !$get('status')),
+
                     Forms\Components\TagsInput::make('import_prefs.ignored_file_types')
                         ->label('Ignored file types')
                         ->helperText('Press [tab] or [return] to add item. You can ignore certain file types from being imported (.e.g.: ".mkv", ".mp4", etc.) This is useful for ignoring VOD or other unwanted content.')
+                        ->columnSpan(2)
                         ->suggestions([
                             '.avi',
                             '.mkv',
