@@ -65,8 +65,10 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
         }
 
         // Create the record
+        $playlist = $this->playlist ? Playlist::find($this->playlist) : null;
+        $subtext = $playlist ? ' - ' . $playlist->name . ' mapping' : ' custom channel mapping';
         $map = EpgMap::create([
-            'name' => $epg->name . ' - channel mapping',
+            'name' => $epg->name . $subtext,
             'epg_id' => $epg->id,
             'user_id' => $epg->user_id,
             'uuid' => $batchNo,
@@ -78,7 +80,6 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
         try {
             // Fetch the playlist (if set)
             $channels = [];
-            $playlist = $this->playlist ? Playlist::find($this->playlist) : null;
             if ($this->channels) {
                 $channels = Channel::whereIn('id', $this->channels)->cursor();
             } else {

@@ -21,7 +21,7 @@ class Preferences extends SettingsPage
             ->schema([
                 Forms\Components\Section::make()
                     ->heading('App appearance preferences')
-                    ->description('NOTE: You will need to reload the page to see the changes.')
+                    ->description('NOTE: You may need to reload the page to see these changes.')
                     ->schema([
                         Forms\Components\Select::make('navigation_position')
                             ->label('Navigation position')
@@ -42,6 +42,19 @@ class Preferences extends SettingsPage
                                 MaxWidth::ScreenTwoExtraLarge->value => '2XL',
                                 MaxWidth::Full->value => 'Full',
                             ]),
+                    ]),
+                Forms\Components\Section::make()
+                    ->heading('Processing')
+                    ->description('Processing preferences and settings.')
+                    ->schema([
+                        Forms\Components\TextInput::make('playlist_agent_string')
+                            ->label('Playlist user agent string')
+                            ->required()
+                            ->helperText('The default user agent string used to fetch your playlists.'),
+                        Forms\Components\TextInput::make('epg_agent_string')
+                            ->label('EPG user agent string')
+                            ->required()
+                            ->helperText('The default user agent string used to fetch your EPGs.'),
                     ])
             ]);
     }

@@ -21,6 +21,9 @@ class EpgMapResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-map';
 
+    protected static ?string $label = 'EPG Map';
+    protected static ?string $pluralLabel = 'EPG Maps';
+
     protected static ?string $navigationGroup = 'Playlist';
 
     public static function getNavigationSort(): ?int

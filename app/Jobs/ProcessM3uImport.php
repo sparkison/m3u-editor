@@ -7,6 +7,8 @@ use App\Enums\PlaylistStatus;
 use App\Models\Group;
 use App\Models\Job;
 use App\Models\Playlist;
+use App\Settings\GeneralSettings;
+use Exception;
 use M3uParser\M3uParser;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -73,7 +75,12 @@ class ProcessM3uImport implements ShouldQueue
             $url = str($playlist->url)->replace(' ', '%20');
 
             // We need to grab the file contents first and set to temp file
-            $userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13';
+            $userPreferences = app(GeneralSettings::class);
+            try {
+                $userAgent = $userPreferences->playlist_agent_string;
+            } catch (Exception $e) {
+                $userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13';
+            }
             $response = Http::withUserAgent($userAgent)
                 ->timeout(60 * 5) // set timeout to five minues
                 ->throw()->get($url->toString());

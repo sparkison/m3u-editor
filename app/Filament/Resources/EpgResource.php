@@ -25,6 +25,7 @@ class EpgResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
 
     protected static ?string $label = 'EPG';
+    protected static ?string $pluralLabel = 'EPGs';
 
     protected static ?string $navigationGroup = 'EPG';
 
