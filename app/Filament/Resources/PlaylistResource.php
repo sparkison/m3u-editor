@@ -311,7 +311,7 @@ class PlaylistResource extends Resource
                             'CA -'
                         ])
                         ->tagSuffix('*')
-                        ->splitKeys(['Tab', ' '])
+                        ->splitKeys(['Tab', 'Return', ','])
                         ->hidden(fn(Get $get): bool => ! $get('import_prefs.preprocess') || !$get('status')),
 
                     Forms\Components\TagsInput::make('import_prefs.ignored_file_types')
@@ -322,7 +322,7 @@ class PlaylistResource extends Resource
                             '.avi',
                             '.mkv',
                             '.mp4',
-                        ])->splitKeys(['Tab', ' ']),
+                        ])->splitKeys(['Tab', 'Return', ',', ' ']),
                 ]),
 
             Forms\Components\Section::make('Links')
