@@ -1,5 +1,7 @@
 # m3u editor
 
+![logo](./public/favicon.png)
+
 A simple `m3u` playlist editor, similar to **xteve** or **threadfin**, with `epg` management.
 
 > [!TIP]  
@@ -38,17 +40,7 @@ A simple `m3u` playlist editor, similar to **xteve** or **threadfin**, with `epg
 
 ## Screenshots
 
-### Dashboard
-
-![Dashboard](./screenshots/dashboard.jpg)
-
-### Playlist editor
-
-![Dashboard](./screenshots/playlist-manager-popout.jpg)
-
-### Channel management
-
-![Channel Management](./screenshots/channel-management.jpg)
+[View screenshots](./screenshots/)
 
 ## 🐳 Docker compose
 

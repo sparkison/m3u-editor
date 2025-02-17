@@ -59,8 +59,10 @@ class AdminPanelProvider extends PanelProvider
             ->path('')
             ->login(Login::class)
             ->profile(EditProfile::class, isSimple: false)
+            ->brandName('m3u editor')
             ->brandLogo(fn() => view('filament.admin.logo'))
-            ->brandLogoHeight('2rem')
+            ->favicon(asset('favicon.png'))
+            ->brandLogoHeight('2.5rem')
             ->databaseNotifications()
             ->databaseNotificationsPolling('10s')
             ->colors([
