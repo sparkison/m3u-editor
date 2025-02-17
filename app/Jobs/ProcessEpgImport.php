@@ -196,7 +196,7 @@ class ProcessEpgImport implements ShouldQueue
 
                 // Get the jobs for the batch
                 $jobs = [];
-                $batchCount = Job::where('batch_no', $batchNo)->select('id')->count();
+                $batchCount = Job::where('batch_no', $batchNo)->count();
                 $jobsBatch = Job::where('batch_no', $batchNo)->select('id')->cursor();
                 $jobsBatch->chunk(50)->each(function ($chunk) use (&$jobs, $batchCount) {
                     $jobs[] = new ProcessEpgImportChunk($chunk->pluck('id')->toArray(), $batchCount);

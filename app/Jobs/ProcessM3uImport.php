@@ -218,7 +218,7 @@ class ProcessM3uImport implements ShouldQueue
                 $playlist->update(['progress' => 15]);
 
                 // Check if preprocessing, and not groups selected yet
-                if ($preprocess && count($selectedGroups) === 0) {
+                if ($preprocess && count($selectedGroups) === 0 && count($includedGroupPrefixes) === 0) {
                     $completedIn = $start->diffInSeconds(now());
                     $completedInRounded = round($completedIn, 2);
                     $playlist->update([
@@ -246,7 +246,7 @@ class ProcessM3uImport implements ShouldQueue
                 } else {
                     // Get the jobs for the batch
                     $jobs = [];
-                    $batchCount = Job::where('batch_no', $batchNo)->select('id')->count();
+                    $batchCount = Job::where('batch_no', $batchNo)->count();
                     $jobsBatch = Job::where('batch_no', $batchNo)->select('id')->cursor();
                     $jobsBatch->chunk(50)->each(function ($chunk) use (&$jobs, $batchCount) {
                         $jobs[] = new ProcessM3uImportChunk($chunk->pluck('id')->toArray(), $batchCount);
