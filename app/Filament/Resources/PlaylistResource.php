@@ -282,11 +282,17 @@ class PlaylistResource extends Resource
                 ->schema([
                     Forms\Components\Toggle::make('import_prefs.preprocess')
                         ->label('Preprocess playlist')
-                        ->columnSpan('full')
+                        ->columnSpan(1)
                         ->live()
                         ->inline(false)
                         ->default(false)
                         ->helperText('When enabled, the playlist will be preprocessed before importing. You can then select which groups you would like to import.'),
+                    Forms\Components\Toggle::make('enable_channels')
+                        ->label('Enable new channels')
+                        ->columnSpan(1)
+                        ->inline(false)
+                        ->default(false)
+                        ->helperText('When enabled, newly added channels will be enabled by default.'),
                     Forms\Components\Select::make('import_prefs.selected_groups')
                         ->label('Groups to import')
                         ->columnSpan(1)

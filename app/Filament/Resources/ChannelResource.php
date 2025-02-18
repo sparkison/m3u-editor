@@ -375,7 +375,7 @@ class ChannelResource extends Resource
                 ->helperText('Select an associated EPG channel for this channel.')
                 ->relationship('epgChannel', 'name')
                 ->searchable()
-                ->preload()
+                // ->preload()
                 ->columnSpan(1),
 
             /*

@@ -110,6 +110,7 @@ class ProcessM3uImport implements ShouldQueue
                     'playlist_id' => $playlistId,
                     'user_id' => $userId,
                     'import_batch_no' => $batchNo,
+                    'enabled' => $playlist->enable_channels,
                 ];
 
                 // Setup the attribute -> key mapping

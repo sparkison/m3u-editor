@@ -65,6 +65,8 @@ class ProcessM3uImportChunk implements ShouldQueue
                 // 'playlist_id',
                 // 'user_id',
                 // 'logo',
+                // 'enabled',
+                // 'epg_channel_id',
                 // ...only update the following fields
                 'url',
                 'stream_id',

@@ -47,10 +47,6 @@ class GroupResource extends Resource
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('playlist.name')
-                    ->numeric()
-                    ->toggleable()
-                    ->sortable(),
                 Tables\Columns\TextColumn::make('channels_count')
                     ->label('Available Channels')
                     ->counts('channels')
@@ -59,6 +55,10 @@ class GroupResource extends Resource
                 Tables\Columns\TextColumn::make('enabled_channels_count')
                     ->label('Enabled Channels')
                     ->counts('enabled_channels')
+                    ->toggleable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('playlist.name')
+                    ->numeric()
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
