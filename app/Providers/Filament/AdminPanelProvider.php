@@ -29,6 +29,7 @@ use Doctrine\DBAL\Query\QueryException;
 use Filament\Support\Enums\MaxWidth;
 use Hydrat\TableLayoutToggle\TableLayoutTogglePlugin;
 use Devonab\FilamentEasyFooter\EasyFooterPlugin;
+use Illuminate\Support\HtmlString;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -90,11 +91,8 @@ class AdminPanelProvider extends PanelProvider
                 TableLayoutTogglePlugin::make(),
                 EasyFooterPlugin::make()
                     ->withBorder()
+                    ->withSentence(new HtmlString('<img src="/logo.svg" alt="m3u editor logo" width="20" height="20">m3u editor'))
                     ->withGithub(showLogo: true, showUrl: true)
-                    ->withLogo('/images/logo-mark.svg', 'https://brightmindedmedia.com', 30)
-                    // ->withLinks([
-                    //     ['title' => 'Join us on discord', 'url' => 'https://discord.gg/szPUzZT6'],
-                    // ]),
             ])
             ->maxContentWidth($settings['content_width'])
             ->middleware([
