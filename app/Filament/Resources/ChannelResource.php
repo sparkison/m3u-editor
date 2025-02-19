@@ -292,7 +292,7 @@ class ChannelResource extends Resource
                         ->icon('heroicon-o-play')
                         ->modalIcon('heroicon-o-play')
                         ->modalDescription('Add the selected channels(s) to the chosen custom playlist.')
-                        ->modalSubmitActionLabel('Move now'),
+                        ->modalSubmitActionLabel('Add now'),
                     Tables\Actions\BulkAction::make('move')
                         ->label('Move to group')
                         ->form([
