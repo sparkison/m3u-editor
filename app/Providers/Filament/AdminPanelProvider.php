@@ -2,8 +2,10 @@
 
 namespace App\Providers\Filament;
 
+use Exception;
 use App\Filament\Auth\Login;
 use App\Filament\Auth\EditProfile;
+use App\Filament\Widgets\DiscordWidget;
 use App\Settings\GeneralSettings;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -24,9 +26,9 @@ use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use \Croustibat\FilamentJobsMonitor\FilamentJobsMonitorPlugin;
 use Doctrine\DBAL\Query\QueryException;
-use Exception;
 use Filament\Support\Enums\MaxWidth;
 use Hydrat\TableLayoutToggle\TableLayoutTogglePlugin;
+use Devonab\FilamentEasyFooter\EasyFooterPlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -79,16 +81,22 @@ class AdminPanelProvider extends PanelProvider
             ->breadcrumbs($settings['show_breadcrumbs'])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                // Widgets\AccountWidget::class,
-                // Widgets\FilamentInfoWidget::class,
+                Widgets\AccountWidget::class,
+                DiscordWidget::class,
             ])
             ->plugins([
                 FilamentJobsMonitorPlugin::make()
                     ->enableNavigation($settings['show_jobs_navigation'] ?? false),
                 TableLayoutTogglePlugin::make(),
+                EasyFooterPlugin::make()
+                    ->withBorder()
+                    ->withGithub(showLogo: true, showUrl: true)
+                    ->withLogo('/images/logo-mark.svg', 'https://brightmindedmedia.com', 30)
+                    // ->withLinks([
+                    //     ['title' => 'Join us on discord', 'url' => 'https://discord.gg/szPUzZT6'],
+                    // ]),
             ])
             ->maxContentWidth($settings['content_width'])
-            // ->simplePageMaxContentWidth(MaxWidth::Small) // Login, sign in, etc.
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
