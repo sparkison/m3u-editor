@@ -10,6 +10,8 @@ class ListCustomPlaylists extends ListRecords
 {
     protected static string $resource = CustomPlaylistResource::class;
 
+    protected ?string $subheading = 'Create playlists composed of channels from your other playlists. Head to channels to bulk add channels to your custom playlist.';
+
     protected function getHeaderActions(): array
     {
         return [
