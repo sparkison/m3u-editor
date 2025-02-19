@@ -13,12 +13,14 @@ return new class extends Migration
     public function up(): void
     {
         // 1. creating a new column
-        Schema::table('channels', function (Blueprint $table) {
-            $table->string('group_internal')->after('group')->nullable();
-        });
+        if (!Schema::hasColumn('channels', 'group_internal')) {
+            Schema::table('channels', function (Blueprint $table) {
+                $table->string('group_internal')->after('group')->nullable();
+            });
+        }
 
         // 2. copying the existing column values into new one
-        DB::statement("UPDATE channels SET group_internal = group");
+        DB::statement("UPDATE `channels` SET `group_internal` = `group`");
 
         // 3. drop unique index
         Schema::table('channels', function (Blueprint $table) {

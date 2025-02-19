@@ -36,6 +36,7 @@ RUN apk update \
     && apk --no-cache add  \
         py3-setuptools \
         supervisor \
+        nano \
         wget \
         curl \
         curl-dev \
