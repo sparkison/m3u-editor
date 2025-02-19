@@ -7,6 +7,12 @@ A simple `m3u` playlist editor, similar to **xteve** or **threadfin**, with `epg
 > [!TIP]  
 > Has been tested on large playlist ([https://github.com/iptv-org/iptv](https://github.com/iptv-org/iptv)), with up to 10000+ channels. Note that larger lists will take longer to sync (it takes aproximately 1s for every 1000 channels.).
 
+### Questions/issues/suggestions
+
+Feel free to open an issue on this repo, you can also join our Discord server to ask questions and get help, help others, suggest new ideas, and offer suggestions for improvements! 🎉
+
+[![](https://dcbadge.limes.pink/api/server/szPUzZT6)](https://discord.gg/szPUzZT6)
+
 ## How It Works
 
 1. Initialization and M3U Playlist(s) creation:
