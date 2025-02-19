@@ -99,3 +99,15 @@ networks: {}
 Your proxied m3u playlist can then be access via: [http://localhost:8888/proxy/hls/manifest.m3u8?d=http://localhost:36400/YOUR_M3U_EDITOR_PLAYLIST_UID/playlist.m3u&api_password=YOUR_PROXY_API_PASSWORD](http://localhost:8888/proxy/hls/manifest.m3u8?d=http://localhost:36400/YOUR_M3U_EDITOR_PLAYLIST_UID/playlist.m3u&api_password=YOUR_PROXY_API_PASSWORD)
 
 More setup information can be found on the [MediaFlow Proxy](https://github.com/mhdzumair/mediaflow-proxy) page.
+
+## Known issues
+
+- 💻 Apple Silicon (M-series) and other non-x86_64 platforms will need to add the `platform` (`platform: linux/x86_64`) parameter to the compose file to support x86_64 architecture - for example:
+
+```yaml
+services:
+  m3u-editor:
+    platform: linux/x86_64
+    image: sparkison/m3u-editor:latest
+    ...
+```
