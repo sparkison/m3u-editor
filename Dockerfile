@@ -36,6 +36,8 @@ RUN apk update \
     && apk --no-cache add  \
         py3-setuptools \
         supervisor \
+        wget \
+        curl \
         curl-dev \
         sqlite \
         ca-certificates \
