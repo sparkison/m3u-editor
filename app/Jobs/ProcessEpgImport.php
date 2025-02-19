@@ -78,12 +78,14 @@ class ProcessEpgImport implements ShouldQueue
                 // We need to grab the file contents first and set to temp file
                 $userPreferences = app(GeneralSettings::class);
                 try {
+                    $verify = !$userPreferences->disable_ssl_verification;
                     $userAgent = $userPreferences->playlist_agent_string;
                 } catch (Exception $e) {
+                    $verify = true;
                     $userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13';
                 }
                 $response = Http::withUserAgent($userAgent)
-                    ->withoutVerifying()
+                    ->withOptions(['verify' => $verify])
                     ->timeout(60 * 5) // set timeout to five minues
                     ->throw()->get($url->toString());
 

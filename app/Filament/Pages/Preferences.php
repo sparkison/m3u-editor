@@ -59,6 +59,9 @@ class Preferences extends SettingsPage
                             ->openUrlInNewTab(true),
                     ])
                     ->schema([
+                        Forms\Components\Toggle::make('disable_ssl_verification')
+                            ->label('Disable SSL verification')
+                            ->helperText('Disable SSL verification for Playlist and EPG fetch requests.'),
                         Forms\Components\TextInput::make('playlist_agent_string')
                             ->label('Playlist user agent string')
                             ->required()
