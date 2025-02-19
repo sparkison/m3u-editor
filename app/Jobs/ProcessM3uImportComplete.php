@@ -55,6 +55,7 @@ class ProcessM3uImportComplete implements ShouldQueue
 
         // Clear out invalid groups (if any)
         Group::where([
+            ['custom', false],
             ['playlist_id', $playlist->id],
             ['import_batch_no', '!=', $this->batchNo],
         ])->delete();

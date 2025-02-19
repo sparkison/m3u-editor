@@ -25,6 +25,14 @@ class PlaylistResource extends Resource
 {
     protected static ?string $model = Playlist::class;
 
+    protected static ?string $recordTitleAttribute = 'name';
+
+    public static function getGlobalSearchEloquentQuery(): Builder
+    {
+        return parent::getGlobalSearchEloquentQuery()
+            ->where('user_id', auth()->id());
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-play';
 
     protected static ?string $navigationGroup = 'Playlist';

@@ -8,6 +8,7 @@ use App\Jobs\ReloadApp;
 use App\Models\CustomPlaylist;
 use App\Models\MergedPlaylist;
 use App\Models\Epg;
+use App\Models\Group;
 use App\Models\Playlist;
 use App\Settings\GeneralSettings;
 use Illuminate\Database\Eloquent\Model;
@@ -92,6 +93,16 @@ class AppServiceProvider extends ServiceProvider
                 $customPlaylist->user_id = auth()->id();
                 $customPlaylist->uuid = \Illuminate\Support\Str::orderedUuid()->toString();
                 return $customPlaylist;
+            });
+
+            // Groups
+            Group::updated(function (Group $group) {
+                $changes = $group->getChanges();
+                if (isset($changes['name'])) {
+                    // Update the name of the group in the channels
+                    $group->channels()
+                        ->update(['group' => $group->name]);
+                }
             });
         } catch (\Throwable $e) {
             // Log the error

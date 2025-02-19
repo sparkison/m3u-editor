@@ -6,6 +6,7 @@ use App\Filament\Resources\GroupResource\Pages;
 use App\Filament\Resources\GroupResource\RelationManagers;
 use App\Filament\Resources\GroupResource\RelationManagers\ChannelsRelationManager;
 use App\Models\Group;
+use App\Models\Playlist;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Infolists;
@@ -37,7 +38,7 @@ class GroupResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return $table->persistFiltersInSession()
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
@@ -45,6 +46,10 @@ class GroupResource extends Resource
             ->defaultPaginationPageOption(25)
             ->columns([
                 Tables\Columns\TextColumn::make('name')
+                    ->searchable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('name_internal')
+                    ->label('Playlist group name')
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('channels_count')
@@ -61,6 +66,15 @@ class GroupResource extends Resource
                     ->numeric()
                     ->toggleable()
                     ->sortable(),
+                Tables\Columns\IconColumn::make('custom')
+                    ->label('Custom')
+                    ->icon(fn(string $state): string => match ($state) {
+                        '1' => 'heroicon-o-check-circle',
+                        '0' => 'heroicon-o-minus-circle',
+                    })->color(fn(string $state): string => match ($state) {
+                        '1' => 'success',
+                        '0' => 'danger',
+                    })->toggleable()->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -78,8 +92,12 @@ class GroupResource extends Resource
                     ->searchable(),
             ])
             ->actions([
-                // Tables\Actions\EditAction::make(),
-                Tables\Actions\ViewAction::make(),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\EditAction::make(),
+                    Tables\Actions\ViewAction::make(),
+                    Tables\Actions\DeleteAction::make()
+                        ->disabled(fn($record) => !$record->custom),
+                ]),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -130,8 +148,13 @@ class GroupResource extends Resource
                 ->required()
                 ->maxLength(255),
             Forms\Components\Select::make('playlist_id')
-                ->relationship('playlist', 'name')
-                ->required(),
+                ->required()
+                ->label('Playlist')
+                ->relationship(name: 'playlist', titleAttribute: 'name')
+                ->helperText('Select the playlist you would like to add the group to.')
+                ->preload()
+                ->hiddenOn(['edit'])
+                ->searchable(),
         ];
     }
 }

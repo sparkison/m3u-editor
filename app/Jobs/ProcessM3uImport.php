@@ -104,6 +104,7 @@ class ProcessM3uImport implements ShouldQueue
                     'url' => null,
                     'logo' => null,
                     'group' => null,
+                    'group_internal' => null,
                     'stream_id' => null,
                     'lang' => null,
                     'country' => null,
@@ -119,6 +120,7 @@ class ProcessM3uImport implements ShouldQueue
                     'stream_id' => 'tvg-id',
                     'logo' => 'tvg-logo',
                     'group' => 'group-title',
+                    'group_internal' => 'group-title',
                 ];
 
                 // Check if preprocessing is enabled
@@ -169,12 +171,12 @@ class ProcessM3uImport implements ShouldQueue
                             $groups[] = $groupName;
                             $shouldAdd = !$preprocess;
                             if (!$shouldAdd) {
-                                // If preprocessing, check if group is selected
+                                // If preprocessing, check if group is selected...
                                 $shouldAdd = in_array($groupName, $selectedGroups);
                             }
                             if (!$shouldAdd) {
-                                // If preprocessing, check if group starts with any of the included prefixes
-                                // Only check if the group isn't directly included already
+                                // ...if group not selected, check if group starts with any of the included prefixes
+                                // (only check if the group isn't directly included already)
                                 foreach ($includedGroupPrefixes as $prefix) {
                                     if (str_starts_with($groupName, $prefix)) {
                                         $shouldAdd = true;
@@ -187,13 +189,15 @@ class ProcessM3uImport implements ShouldQueue
                             if ($shouldAdd) {
                                 // Add group and associated channels
                                 $group = Group::where([
-                                    'name' => $groupName,
+                                    'name_internal' => $groupName,
                                     'playlist_id' => $playlistId,
                                     'user_id' => $userId,
+                                    'custom' => false,
                                 ])->first();
                                 if (!$group) {
                                     $group = Group::create([
                                         'name' => $groupName,
+                                        'name_internal' => $groupName,
                                         'playlist_id' => $playlistId,
                                         'user_id' => $userId,
                                         'import_batch_no' => $batchNo,
@@ -249,7 +253,7 @@ class ProcessM3uImport implements ShouldQueue
                     Notification::make()
                         ->success()
                         ->title('Playlist Synced')
-                        ->body("\"{$playlist->name}\" has been preprocessed successfully. You can now select the groups you would like to import and process the playlist again to import your selected groups. Preprocessed completed in {$completedInRounded} seconds.")
+                        ->body("\"{$playlist->name}\" has been preprocessed successfully. You can now select the groups you would like to import and process the playlist again to import your selected groups. Preprocessing completed in {$completedInRounded} seconds.")
                         ->sendToDatabase($playlist->user);
                 } else {
                     // Get the jobs for the batch

@@ -51,15 +51,16 @@ class MapEpgToChannels implements ShouldQueue
             }
 
             // Upsert the channels
-            Channel::upsert($bulk, uniqueBy: ['name', 'group', 'playlist_id', 'user_id'], update: [
+            Channel::upsert($bulk, uniqueBy: ['name', 'group_internal', 'playlist_id', 'user_id'], update: [
                 // Don't update the following fields...
                 // 'title',
                 // 'name',
                 // 'group',
+                // 'group_internal',
                 // 'playlist_id',
                 // 'user_id',
                 // 'logo',
-                // ...only update the following fields
+                // 'enabled',
                 // 'url',
                 // 'stream_id',
                 // 'lang', // should we update this? Not sure it's set anywhere...

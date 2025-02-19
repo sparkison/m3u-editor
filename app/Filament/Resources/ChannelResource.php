@@ -5,10 +5,13 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\ChannelResource\Pages;
 use App\Filament\Resources\ChannelResource\RelationManagers;
 use App\Models\Channel;
+use App\Models\CustomPlaylist;
 use App\Models\Epg;
+use App\Models\Group;
 use App\Models\Playlist;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\Alignment;
@@ -24,6 +27,14 @@ use Illuminate\Support\Str;
 class ChannelResource extends Resource
 {
     protected static ?string $model = Channel::class;
+
+    protected static ?string $recordTitleAttribute = 'title';
+
+    public static function getGlobalSearchEloquentQuery(): Builder
+    {
+        return parent::getGlobalSearchEloquentQuery()
+            ->where('user_id', auth()->id());
+    }
 
     protected static ?string $navigationIcon = 'heroicon-o-film';
 
@@ -256,6 +267,76 @@ class ChannelResource extends Resource
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     // Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\BulkAction::make('add')
+                        ->label('Add to custom playlist')
+                        ->form([
+                            Forms\Components\Select::make('playlist')
+                                ->required()
+                                ->label('Custom Playlist')
+                                ->helperText('Select the custom playlist you would like to add the selected channel(s) to.')
+                                ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                                ->searchable(),
+                        ])
+                        ->action(function (Collection $records, array $data): void {
+                            $playlist = CustomPlaylist::findOrFail($data['playlist']);
+                            $playlist->channels()->syncWithoutDetaching($records->pluck('id'));
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Channels added to custom playlist')
+                                ->body('The selected channels have been added to the chosen custom playlist.')
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-play')
+                        ->modalIcon('heroicon-o-play')
+                        ->modalDescription('Add the selected channels(s) to the chosen custom playlist.')
+                        ->modalSubmitActionLabel('Move now'),
+                    Tables\Actions\BulkAction::make('move')
+                        ->label('Move to group')
+                        ->form([
+                            Forms\Components\Select::make('playlist')
+                                ->required()
+                                ->live()
+                                ->afterStateUpdated(function (Forms\Set $set) {
+                                    $set('group', null);
+                                })
+                                ->label('Playlist')
+                                ->helperText('Select a playlist - only channels in the selected playlist will be moved. Any channels selected from another playlist will be ignored.')
+                                ->options(Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                                ->searchable(),
+                            Forms\Components\Select::make('group')
+                                ->required()
+                                ->live()
+                                ->label('Group')
+                                ->helperText(fn(Get $get) => $get('playlist') === null ? 'Select a playlist first...' : 'Select the group you would like to move the items to.')
+                                ->options(fn(Get $get) => Group::where(['user_id' => auth()->id(), 'playlist_id' => $get('playlist')])->get(['name', 'id'])->pluck('name', 'id'))
+                                ->searchable()
+                                ->disabled(fn(Get $get) => $get('playlist') === null),
+                        ])
+                        ->action(function (Collection $records, array $data): void {
+                            $filtered = $records->where('playlist_id', $data['playlist']);
+                            $group = Group::findOrFail($data['group']);
+                            foreach ($filtered as $record) {
+                                $record->update([
+                                    'group' => $group->name,
+                                    'group_id' => $group->id,
+                                ]);
+                            }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Channels moved to group')
+                                ->body('The selected channels have been moved to the chosen group.')
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-arrows-right-left')
+                        ->modalIcon('heroicon-o-arrows-right-left')
+                        ->modalDescription('Move the selected channels(s) to the chosen group.')
+                        ->modalSubmitActionLabel('Move now'),
                     Tables\Actions\BulkAction::make('map')
                         ->label('Map EPG to seleted')
                         ->form([
@@ -263,7 +344,7 @@ class ChannelResource extends Resource
                                 ->required()
                                 ->label('EPG')
                                 ->helperText('Select the EPG you would like to map from.')
-                                ->options(Epg::all(['name', 'id'])->pluck('name', 'id'))
+                                ->options(Epg::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
                                 ->searchable(),
                             Forms\Components\Toggle::make('overwrite')
                                 ->label('Overwrite previously mapped channels')

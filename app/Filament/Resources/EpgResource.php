@@ -22,6 +22,14 @@ class EpgResource extends Resource
 {
     protected static ?string $model = Epg::class;
 
+    protected static ?string $recordTitleAttribute = 'name';
+
+    public static function getGlobalSearchEloquentQuery(): Builder
+    {
+        return parent::getGlobalSearchEloquentQuery()
+            ->where('user_id', auth()->id());
+    }
+    
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
 
     protected static ?string $label = 'EPG';

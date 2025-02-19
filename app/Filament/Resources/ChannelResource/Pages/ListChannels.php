@@ -34,13 +34,13 @@ class ListChannels extends ListRecords
                         ->required()
                         ->label('EPG')
                         ->helperText('Select the EPG you would like to map from.')
-                        ->options(Epg::all(['name', 'id'])->pluck('name', 'id'))
+                        ->options(Epg::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
                         ->searchable(),
                     Forms\Components\Select::make('playlist')
                         ->required()
                         ->label('Playlist')
                         ->helperText('Select the playlist you would like to map to.')
-                        ->options(Playlist::all(['name', 'id'])->pluck('name', 'id'))
+                        ->options(Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
                         ->searchable(),
                     Forms\Components\Toggle::make('overwrite')
                         ->label('Overwrite previously mapped channels')
