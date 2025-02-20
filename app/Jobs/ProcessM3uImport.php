@@ -124,6 +124,9 @@ class ProcessM3uImport implements ShouldQueue
                     'logo' => 'tvg-logo',
                     'group' => 'group-title',
                     'group_internal' => 'group-title',
+                    'channel' => 'tvg-chno',
+                    'lang' => 'tvg-language',
+                    'country' => 'tvg-country',
                 ];
 
                 // Check if preprocessing is enabled
@@ -151,7 +154,11 @@ class ProcessM3uImport implements ShouldQueue
                                 $channel['title'] = $extTag->getTitle();
                                 foreach ($attributes as $key => $attribute) {
                                     if ($extTag->hasAttribute($attribute)) {
-                                        $channel[$key] = $extTag->getAttribute($attribute);
+                                        if ($attribute === 'tvg-chno') {
+                                            $channel[$key] = (int)$extTag->getAttribute($attribute);
+                                        } else {
+                                            $channel[$key] = $extTag->getAttribute($attribute);
+                                        }
                                     }
                                 }
                             }

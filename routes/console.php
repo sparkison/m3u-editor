@@ -1,14 +1,19 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
-// ...
+/*
+ * Register schedules
+ */
 
-// Register schedule
+// Refresh playlists
 Schedule::command('app:refresh-playlist')
     ->everyFiveMinutes();
 
+// Refresh EPG
 Schedule::command('app:refresh-epg')
     ->everyFiveMinutes();
+
+// Cleanup old/stale job batches
+Schedule::command('app:flush-jobs-table')
+    ->twiceDaily();

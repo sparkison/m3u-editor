@@ -48,7 +48,6 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
 
         // Fetch the EPG
         $epg = Epg::find($this->epg);
-
         if (!$epg) {
             $error = "Unable to map to the selected EPG, it no longer exists. Please select a different EPG and try again.";
             Notification::make()
@@ -94,26 +93,42 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                 }
             }
 
+
+            // Update the progress
+            $progress = 0;
+            $map->update(['progress' => $progress += 2]); // start at 2%
+
             // Map the channels
             $channelCount = 0;
             $mappedCount = 0;
             LazyCollection::make(function () use ($channels, $epg, &$channelCount, &$mappedCount) {
-                $epgChannels = $epg->channels()
-                    ->where('channel_id', '!=', '')
-                    ->whereIn('channel_id', $channels->pluck('name'))
-                    ->select('id', 'channel_id')
-                    ->get();
-
                 foreach ($channels as $channel) {
+                    // Increment counter
                     $channelCount++;
-                    $epgChannel = $epgChannels->where('channel_id', $channel->name)->first();
+
+                    // Get the EPG channel
+                    $epgChannel = $epg->channels()
+                        ->where('channel_id', '!=', '')
+                        ->where(function ($sub) use ($channel) {
+                            return $sub->where('channel_id', '=', $channel->sream_id)
+                                ->orWhere('channel_id', '=', $channel->name);
+                        })
+                        ->select('id', 'channel_id')
+                        ->first();
+
+                    // If EPG channel found, link it to the Playlist channel
                     if ($epgChannel) {
                         $mappedCount++;
                         $channel->epg_channel_id = $epgChannel->id;
                         yield $channel->toArray();
                     }
                 }
-            })->chunk(50)->each(function ($chunk) use ($epg, $batchNo) {
+            })->chunk(50)->each(function ($chunk, $index) use ($epg, $batchNo, &$progress, &$map) {
+                if ($index % 20 === 0) {
+                    $map->update([
+                        'progress' => min(99, $progress += 10),
+                    ]);
+                }
                 Job::create([
                     'title' => "Processing channel import for EPG: {$epg->name}",
                     'batch_no' => $batchNo,
@@ -125,7 +140,7 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
             });
 
             // Update the progress
-            $map->update(['progress' => 10]);
+            $map->update(['progress' => $progress += 5]);
 
             // Get the jobs for the batch
             $jobs = [];
