@@ -16,6 +16,8 @@ class ProcessM3uImportComplete implements ShouldQueue
 {
     use Queueable;
 
+    public $deleteWhenMissingModels = true;
+
     /**
      * Create a new job instance.
      */

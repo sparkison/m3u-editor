@@ -22,6 +22,8 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
 {
     use Queueable;
 
+    public $deleteWhenMissingModels = true;
+
     // Giving a timeout of 15 minutes to the Job to process the mapping
     public $timeout = 60 * 15;
 

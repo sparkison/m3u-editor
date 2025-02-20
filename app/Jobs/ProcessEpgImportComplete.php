@@ -15,6 +15,8 @@ class ProcessEpgImportComplete implements ShouldQueue
 {
     use Queueable;
 
+    public $deleteWhenMissingModels = true;
+
     /**
      * Create a new job instance.
      */
