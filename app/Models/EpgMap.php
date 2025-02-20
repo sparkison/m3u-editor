@@ -21,7 +21,6 @@ class EpgMap extends Model
         'processing' => 'boolean',
         // 'override' => 'boolean',
         'progress' => 'float',
-        'sync_time' => 'datetime',
         'user_id' => 'integer',
         'epg_id' => 'integer',
         'channel_count' => 'integer',
