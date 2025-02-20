@@ -5,13 +5,13 @@ namespace App\Providers\Filament;
 use Exception;
 use App\Filament\Auth\Login;
 use App\Filament\Auth\EditProfile;
+use App\Filament\Pages\CustomDashboard;
 use App\Filament\Widgets\DiscordWidget;
 use App\Settings\GeneralSettings;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -25,7 +25,6 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use \Croustibat\FilamentJobsMonitor\FilamentJobsMonitorPlugin;
-use Doctrine\DBAL\Query\QueryException;
 use Filament\Support\Enums\MaxWidth;
 use Hydrat\TableLayoutToggle\TableLayoutTogglePlugin;
 use Devonab\FilamentEasyFooter\EasyFooterPlugin;
@@ -77,7 +76,8 @@ class AdminPanelProvider extends PanelProvider
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
-                Pages\Dashboard::class,
+                // Pages\Dashboard::class,
+                CustomDashboard::class
             ])
             ->breadcrumbs($settings['show_breadcrumbs'])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')

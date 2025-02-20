@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Artisan;
 
 class GenerateAppKey extends Command
 {
@@ -32,7 +31,7 @@ class GenerateAppKey extends Command
             return;
         } else {
             $this->info("🔑 App key not found, generating one now...\n");
-            Artisan::call('key:generate', [
+            $this->call('key:generate', [
                 '--force' => true,
             ]);
         }
