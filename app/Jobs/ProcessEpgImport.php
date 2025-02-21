@@ -119,6 +119,32 @@ class ProcessEpgImport implements ShouldQueue
                 // Setup the XML readers
                 $channelReader = new XMLReader();
                 $channelReader->open('compress.zlib://' . $filePath);
+            } else {
+                // Log the exception
+                logger()->error("Error processing \"{$this->epg->name}\"");
+
+                // Send notification
+                $error = "Invalid EPG file. Unable to read or download your EPG file. Please check the URL or uploaded file and try again.";
+                Notification::make()
+                    ->danger()
+                    ->title("Error processing \"{$this->epg->name}\"")
+                    ->body('Please view your notifications for details.')
+                    ->broadcast($this->epg->user);
+                Notification::make()
+                    ->danger()
+                    ->title("Error processing \"{$this->epg->name}\"")
+                    ->body($error)
+                    ->sendToDatabase($this->epg->user);
+
+                // Update the EPG
+                $this->epg->update([
+                    'status' => EpgStatus::Failed,
+                    'synced' => now(),
+                    'errors' => $error,
+                    'progress' => 100,
+                    'processing' => false,
+                ]);
+                return;
             }
 
             // If reader valid, process the data!
@@ -256,7 +282,7 @@ class ProcessEpgImport implements ShouldQueue
                     ->body($error)
                     ->sendToDatabase($this->epg->user);
 
-                // Update the playlist
+                // Update the EPG
                 $this->epg->update([
                     'status' => EpgStatus::Failed,
                     'synced' => now(),

@@ -7,6 +7,7 @@ use App\Models\CustomPlaylist;
 use App\Models\Epg;
 use App\Models\MergedPlaylist;
 use App\Models\Playlist;
+use Filament\Notifications\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -81,11 +82,30 @@ class EpgGenerateController extends Controller
                     }
 
                     // Get the content
-                    $content = file_get_contents(Storage::disk('local')->path($epg->file_path));
+                    if (Storage::disk('local')->exists($epg->file_path)) {
+                        $filePath = Storage::disk('local')->path($epg->file_path);
+                    } elseif ($epg->uploads && Storage::disk('local')->exists($epg->uploads)) {
+                        $filePath = Storage::disk('local')->path($epg->uploads);
+                    }
+                    if (!$filePath) {
+                        // Send notification
+                        $error = "Invalid EPG file. Unable to read or download an associated EPG file. Please check the URL or uploaded file and try again.";
+                        Notification::make()
+                            ->danger()
+                            ->title("Error generating playlist epg for EPG: \"{$epg->name}\"")
+                            ->body($error)
+                            ->broadcast($epg->user);
+                        Notification::make()
+                            ->danger()
+                            ->title("Error generating playlist epg for EPG: \"{$epg->name}\"")
+                            ->body($error)
+                            ->sendToDatabase($epg->user);
+                        continue;
+                    }
 
-                    // Create a new XMLReader instance
+                    // Setup the reader
                     $programReader = new XMLReader();
-                    $programReader->xml($content);
+                    $programReader->open('compress.zlib://' . $filePath);
 
                     // Loop through the XML data
                     while ($programReader->read()) {
