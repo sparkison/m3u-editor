@@ -23,7 +23,7 @@ class CustomDashboard extends Dashboard
                     Notification::make()
                         ->success()
                         ->title('Queue reset')
-                        ->body('The queue workers have been restarted and any pending jobs flushed. You may need to reset the status of your Playlist or EPG if it\'s stuck in a "Processing" state.')
+                        ->body('The queue workers have been restarted and any pending jobs flushed. You may need to manually sync any Playlists or EPGs that were in progress.')
                         ->duration(10000)
                         ->send();
                 })
@@ -32,8 +32,8 @@ class CustomDashboard extends Dashboard
                 ->requiresConfirmation()
                 ->icon('heroicon-o-exclamation-triangle')
                 ->modalIcon('heroicon-o-exclamation-triangle')
-                ->modalDescription('Resetting the queue will restart the queue workers and flush any pending jobs. You may need to reset the status of your Playlist or EPG if it\'s stuck in a "Processing" state.')
-                ->modalSubmitActionLabel('Yes, reset now')
+                ->modalDescription('Resetting the queue will restart the queue workers and flush any pending jobs. Any syncs or background processes will be stopped and removed. Only perform this action if you are having sync issues.')
+                ->modalSubmitActionLabel('I understand, reset now')
         ];
     }
 }

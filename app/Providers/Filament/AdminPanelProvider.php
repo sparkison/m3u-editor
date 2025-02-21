@@ -24,7 +24,6 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
-use \Croustibat\FilamentJobsMonitor\FilamentJobsMonitorPlugin;
 use Filament\Support\Enums\MaxWidth;
 use Hydrat\TableLayoutToggle\TableLayoutTogglePlugin;
 use Devonab\FilamentEasyFooter\EasyFooterPlugin;
@@ -85,8 +84,6 @@ class AdminPanelProvider extends PanelProvider
                 DiscordWidget::class,
             ])
             ->plugins([
-                FilamentJobsMonitorPlugin::make()
-                    ->enableNavigation($settings['show_jobs_navigation'] ?? false),
                 TableLayoutTogglePlugin::make(),
                 EasyFooterPlugin::make()
                     ->withBorder()

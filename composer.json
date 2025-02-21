@@ -3,11 +3,13 @@
     "name": "laravel/laravel",
     "type": "project",
     "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
+    "keywords": [
+        "laravel",
+        "framework"
+    ],
     "license": "MIT",
     "require": {
         "php": "^8.2",
-        "croustibat/filament-jobs-monitor": "^2.5",
         "devonab/filament-easy-footer": "^1.0",
         "dragonmantank/cron-expression": "^3.4",
         "filament/filament": "^3.2",
@@ -18,6 +20,7 @@
         "laravel/octane": "^2.6",
         "laravel/reverb": "^1.0",
         "laravel/tinker": "^2.9",
+        "opcodesio/log-viewer": "^3.15",
         "predis/predis": "^2.3",
         "ryangjchandler/filament-progress-column": "^1.0",
         "sparkison/m3u-parser": "dev-master",
