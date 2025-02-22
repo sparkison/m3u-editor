@@ -241,14 +241,37 @@ class PlaylistResource extends Resource
     {
         return [
             Forms\Components\TextInput::make('name')
+                ->columnSpan('full')
                 ->required()
                 ->helperText('Enter the name of the playlist. Internal use only.'),
-            Forms\Components\TextInput::make('url')
-                ->label('Playlist URL')
-                ->url()
-                ->prefixIcon('heroicon-m-globe-alt')
-                ->required()
-                ->helperText('Enter the URL of the playlist file. If changing URL, the playlist will be re-imported. Use with caution as this could lead to data loss if the new playlist differs from the old one.'),
+
+            Forms\Components\Section::make('M3U file or URL')
+                ->description('You can either upload an M3U file or provide a URL to an M3U file. File should conform to the M3U format.')
+                ->headerActions([
+                    Forms\Components\Actions\Action::make('M3U Format')
+                        ->label('M3U Format')
+                        ->icon('heroicon-o-arrow-top-right-on-square')
+                        ->iconPosition('after')
+                        ->size('sm')
+                        ->url('https://en.wikipedia.org/wiki/M3U')
+                        ->openUrlInNewTab(true),
+                ])
+                ->schema([
+                    Forms\Components\TextInput::make('url')
+                        ->label('URL')
+                        ->requiredIf('uploads', [null, ''])
+                        ->prefixIcon('heroicon-m-globe-alt')
+                        ->helperText('Enter the URL of the playlist file. If changing URL, the playlist will be re-imported. Use with caution as this could lead to data loss if the new playlist differs from the old one.')
+                        ->url()
+                        ->maxLength(255),
+                    Forms\Components\FileUpload::make('uploads')
+                        ->label('File')
+                        ->disk('local')
+                        ->directory('playlist')
+                        ->rules(['file'])
+                        ->requiredIf('url', [null, ''])
+                        ->helperText('Upload the playlist file. This will be used to import groups and channels.'),
+                ]),
 
             Forms\Components\Section::make('Scheduling')
                 ->description('Auto sync and scheduling options')

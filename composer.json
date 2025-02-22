@@ -10,7 +10,6 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
-        "devonab/filament-easy-footer": "^1.0",
         "dragonmantank/cron-expression": "^3.4",
         "filament/filament": "^3.2",
         "filament/spatie-laravel-settings-plugin": "^3.2",

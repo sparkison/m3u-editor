@@ -26,8 +26,7 @@ use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Filament\Support\Enums\MaxWidth;
 use Hydrat\TableLayoutToggle\TableLayoutTogglePlugin;
-use Devonab\FilamentEasyFooter\EasyFooterPlugin;
-use Illuminate\Support\HtmlString;
+use Filament\View\PanelsRenderHook;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -85,10 +84,6 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->plugins([
                 TableLayoutTogglePlugin::make(),
-                EasyFooterPlugin::make()
-                    ->withBorder()
-                    ->withSentence(new HtmlString('<img src="/logo.svg" alt="m3u editor logo" width="20" height="20">m3u editor'))
-                    ->withGithub(showLogo: true, showUrl: true)
             ])
             ->maxContentWidth($settings['content_width'])
             ->middleware([
@@ -110,7 +105,12 @@ class AdminPanelProvider extends PanelProvider
                 '*/playlist.m3u',
                 '*/epg.xml',
                 'epgs/*/epg.xml'
-            ]);
+            ])
+            ->renderHook(
+                // PanelsRenderHook::BODY_END,
+                PanelsRenderHook::FOOTER,
+                fn() => view('footer')
+            );
 
         if ($settings['navigation_position'] === 'top') {
             $adminPanel->topNavigation();

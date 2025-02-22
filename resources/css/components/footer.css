@@ -1,0 +1,42 @@
+
+.fi-footer > span {
+    @apply text-center;
+}
+
+.fi-footer.fi-sidebar > span:not(:first-child) {
+    @apply pl-0 pr-0 border-0;
+}
+
+.fi-footer > span:first-child {
+    @apply pr-4 border-r border-gray-200 dark:border-gray-700;
+}
+
+.fi-footer:not(.fi-sidebar) > span:not(:first-child):not(:last-child) {
+    @apply border-r border-gray-200 dark:border-gray-700;
+}
+
+.fi-footer > span:not(:first-child):not(:last-child) {
+    @apply pl-0 pr-4;
+}
+
+.fi-footer > span:last-child {
+    @apply border-0 pl-0 !important;
+}
+
+.fi-footer.fi-sidebar > span {
+    @apply px-2;
+}
+
+.fi-footer.gap-4 > span {
+    @apply px-4;
+}
+
+
+.fi-footer.fi-sidebar.gap-2 > span {
+    @apply px-2;
+}
+
+.fi-footer.fi-sidebar.gap-2 > span:nth-child(2)
+{
+    @apply pl-0;
+}

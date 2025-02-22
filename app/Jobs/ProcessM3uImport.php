@@ -16,6 +16,7 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\LazyCollection;
 
 class ProcessM3uImport implements ShouldQueue
@@ -73,35 +74,93 @@ class ProcessM3uImport implements ShouldQueue
             $userId = $playlist->user_id;
             $batchNo = Str::orderedUuid()->toString();
 
-            // Normalize the playlist url and get the filename
-            $url = str($playlist->url)->replace(' ', '%20');
+            $fileContent = null;
+            $filePath = null;
+            if ($playlist->url) {
+                // Normalize the playlist url and get the filename
+                $url = str($playlist->url)->replace(' ', '%20');
 
-            // We need to grab the file contents first and set to temp file
-            $userPreferences = app(GeneralSettings::class);
-            try {
-                $verify = !$userPreferences->disable_ssl_verification;
-                $userAgent = $userPreferences->playlist_agent_string;
-            } catch (Exception $e) {
-                $verify = true;
-                $userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13';
+                // We need to grab the file contents first and set to temp file
+                $userPreferences = app(GeneralSettings::class);
+                try {
+                    $verify = !$userPreferences->disable_ssl_verification;
+                    $userAgent = $userPreferences->playlist_agent_string;
+                } catch (Exception $e) {
+                    $verify = true;
+                    $userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13';
+                }
+                $response = Http::withUserAgent($userAgent)
+                    ->withOptions(['verify' => $verify])
+                    ->timeout(60 * 5) // set timeout to five minues
+                    ->throw()->get($url->toString());
+
+                if ($response->ok()) {
+                    // Remove previous saved files
+                    Storage::disk('local')->deleteDirectory($playlist->folder_path);
+
+                    // Get the content
+                    $fileContent = $response->body();
+
+                    // Save the file to local storage
+                    Storage::disk('local')->put(
+                        $playlist->file_path,
+                        $fileContent
+                    );
+
+                    // Update the file path
+                    $filePath = Storage::disk('local')->path($playlist->file_path);
+                }
+            } else {
+                // Get uploaded file contents
+                if ($playlist->uploads && Storage::disk('local')->exists($playlist->uploads)) {
+                    // Get the contents and the path
+                    $fileContent = Storage::disk('local')->get($playlist->uploads);
+                    $filePath = Storage::disk('local')->path($playlist->uploads);
+                }
             }
-            $response = Http::withUserAgent($userAgent)
-                ->withOptions(['verify' => $verify])
-                ->timeout(60 * 5) // set timeout to five minues
-                ->throw()->get($url->toString());
 
             // Update progress
             $playlist->update(['progress' => 5]); // set to 5% to start
 
-            // If fetched successfully, process the results!
-            if ($response->ok()) {
+            // If file path is set, we can process the file
+            if ($fileContent) {
                 $m3uParser = new M3uParser();
                 $m3uParser->addDefaultTags();
-                $data = $m3uParser->parse($response->body());
+                $data = $m3uParser->parse($fileContent);
 
                 // Update progress
                 $playlist->update(['progress' => 10]);
+            } else {
+                // Log the exception
+                logger()->error("Error processing \"{$playlist->name}\"");
 
+                // Send notification
+                $error = "Invalid playlist file. Unable to read or download your playlist file. Please check the URL or uploaded file and try again.";
+                Notification::make()
+                    ->danger()
+                    ->title("Error processing \"{$playlist->name}\"")
+                    ->body('Please view your notifications for details.')
+                    ->broadcast($playlist->user);
+                Notification::make()
+                    ->danger()
+                    ->title("Error processing \"{$playlist->name}\"")
+                    ->body($error)
+                    ->sendToDatabase($playlist->user);
+
+                // Update the Playlist
+                $playlist->update([
+                    'status' => PlaylistStatus::Failed,
+                    'channels' => 0, // not using...
+                    'synced' => now(),
+                    'errors' => $error,
+                    'progress' => 100,
+                    'processing' => false,
+                ]);
+                return;
+            }
+
+            // If fetched successfully, process the results!
+            if ($m3uParser) {
                 // Setup common field values
                 $channelFields = [
                     'title' => null,
@@ -304,7 +363,7 @@ class ProcessM3uImport implements ShouldQueue
                         })->dispatch();
                 }
             } else {
-                $error = "Unable to fetch the playlist from the provided URL.";
+                $error = "Unable to parse the playlist, invalid file found. Please check the URL or re-upload your file and try to sync again.";
                 Notification::make()
                     ->danger()
                     ->title("Error processing \"{$this->playlist->name}\"")

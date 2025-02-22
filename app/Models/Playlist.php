@@ -22,7 +22,7 @@ class Playlist extends Model
         'id' => 'integer',
         'channels' => 'integer',
         'synced' => 'datetime',
-        // 'auto_sync' => 'boolean',
+        'uploads' => 'array',
         'user_id' => 'integer',
         'sync_time' => 'float',
         'processing' => 'boolean',
@@ -31,6 +31,16 @@ class Playlist extends Model
         'status' => PlaylistStatus::class,
     ];
 
+    public function getFolderPathAttribute(): string
+    {
+        return "playlist/{$this->uuid}";
+    }
+
+    public function getFilePathAttribute(): string
+    {
+        return "playlist/{$this->uuid}/playlist.m3u";
+    }
+    
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

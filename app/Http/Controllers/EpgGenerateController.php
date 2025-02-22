@@ -92,12 +92,12 @@ class EpgGenerateController extends Controller
                         $error = "Invalid EPG file. Unable to read or download an associated EPG file. Please check the URL or uploaded file and try again.";
                         Notification::make()
                             ->danger()
-                            ->title("Error generating playlist epg for EPG: \"{$epg->name}\"")
+                            ->title("Error generating epg data for playlist \"{$playlist->name}\" using EPG \"{$epg->name}\"")
                             ->body($error)
                             ->broadcast($epg->user);
                         Notification::make()
                             ->danger()
-                            ->title("Error generating playlist epg for EPG: \"{$epg->name}\"")
+                            ->title("Error generating epg data for playlist \"{$playlist->name}\" using EPG \"{$epg->name}\"")
                             ->body($error)
                             ->sendToDatabase($epg->user);
                         continue;
