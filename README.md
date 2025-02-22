@@ -9,7 +9,7 @@ A simple `m3u` playlist editor, similar to **xteve** or **threadfin**, with `epg
 
 ### Questions/issues/suggestions
 
-Feel free to open an issue on this repo, you can also join our Discord server to ask questions and get help, help others, suggest new ideas, and offer suggestions for improvements! 🎉
+Feel free to [open an issue](https://github.com/sparkison/m3u-editor/issues/new?template=bug_report.md) on this repo, you can also join our Discord server to ask questions and get help, help others, suggest new ideas, and offer suggestions for improvements! 🎉
 
 [![](https://dcbadge.limes.pink/api/server/szPUzZT6)](https://discord.gg/szPUzZT6)
 
@@ -34,18 +34,19 @@ Feel free to open an issue on this repo, you can also join our Discord server to
     - Custom playlists allow you to select specific channels from existing playslist to compose a new playlist.
 5. HTTP endpoints:
     - The app can be accessed here: [http://localhost:36400](http://localhost:36400)
-      - **LOGIN INFO**: user = admin, password = admin
+      - **LOGIN INFO**: user = admin, password = admin (this can be changed at any time in user profile)
     - Each playlist will have a unique URL, in the format: `http://localhost:36400/9dfbc010-a809-4a31-801d-ca2a34030966/playlist.m3u`
+      - **NOTE**: Only enabled channels be included.
     - Each playlist will also have a unique EPG URL, in a similar format: `http://localhost:36400/9dfbc010-a809-4a31-801d-ca2a34030966/epg.xml`
       - **NOTE**: Only enabled channels that have been mapped to an EPG will be included.
 6. Customization:
     - Enable/disable auto syncing of Playlists and EPGs.
-    - Modify M3U channel numbers, logos, and offset. Channels are opt-in, so **all channels will be disabled by default** and need to be enabled based on your preference. This is to prevent channel additions automatically populating your playlist.
+    - Modify M3U channel numbers, logos, and offset. Channels are opt-in, so **all channels will be disabled by default** and need to be enabled based on your preference. This is to prevent channel additions automatically populating your playlist. The behavior can be changed to enalbe channels by default when creating/editing a playlist.
 
 ## Prerequisites
 
 - [Docker](https://www.docker.com/) installed on your system.
-- M3U URLs containing a playlist of video streams.
+- M3U URLs/files containing an M3U playlist of video streams.
 - (Optionally) EPG URLs/files containing valid XMLTV data.
 
 ## Screenshots

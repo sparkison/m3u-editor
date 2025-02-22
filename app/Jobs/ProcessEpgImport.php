@@ -56,6 +56,7 @@ class ProcessEpgImport implements ShouldQueue
         // Update the playlist status to processing
         $this->epg->update([
             'processing' => true,
+            'status' => EpgStatus::Processing,
             'errors' => null,
             'progress' => 0,
         ]);

@@ -57,6 +57,7 @@ class ProcessM3uImport implements ShouldQueue
         // Update the playlist status to processing
         $this->playlist->update([
             'processing' => true,
+            'status' => PlaylistStatus::Processing,
             'errors' => null,
             'progress' => 0,
         ]);
@@ -124,43 +125,9 @@ class ProcessM3uImport implements ShouldQueue
 
             // If file path is set, we can process the file
             if ($fileContent) {
-                $m3uParser = new M3uParser();
-                $m3uParser->addDefaultTags();
-                $data = $m3uParser->parse($fileContent);
-
                 // Update progress
                 $playlist->update(['progress' => 10]);
-            } else {
-                // Log the exception
-                logger()->error("Error processing \"{$playlist->name}\"");
 
-                // Send notification
-                $error = "Invalid playlist file. Unable to read or download your playlist file. Please check the URL or uploaded file and try again.";
-                Notification::make()
-                    ->danger()
-                    ->title("Error processing \"{$playlist->name}\"")
-                    ->body('Please view your notifications for details.')
-                    ->broadcast($playlist->user);
-                Notification::make()
-                    ->danger()
-                    ->title("Error processing \"{$playlist->name}\"")
-                    ->body($error)
-                    ->sendToDatabase($playlist->user);
-
-                // Update the Playlist
-                $playlist->update([
-                    'status' => PlaylistStatus::Failed,
-                    'channels' => 0, // not using...
-                    'synced' => now(),
-                    'errors' => $error,
-                    'progress' => 100,
-                    'processing' => false,
-                ]);
-                return;
-            }
-
-            // If fetched successfully, process the results!
-            if ($m3uParser) {
                 // Setup common field values
                 $channelFields = [
                     'title' => null,
@@ -198,8 +165,10 @@ class ProcessM3uImport implements ShouldQueue
                 $excludeFileTypes = $playlist->import_prefs['ignored_file_types'] ?? [];
                 $selectedGroups = $playlist->import_prefs['selected_groups'] ?? [];
                 $includedGroupPrefixes = $playlist->import_prefs['included_group_prefixes'] ?? [];
-                LazyCollection::make(function () use ($data, $channelFields, $attributes, $excludeFileTypes) {
-                    foreach ($data as $item) {
+                LazyCollection::make(function () use ($fileContent, $channelFields, $attributes, $excludeFileTypes) {
+                    $m3uParser = new M3uParser();
+                    $m3uParser->addDefaultTags();
+                    foreach ($m3uParser->parse($fileContent) as $item) {
                         $url = $item->getPath();
                         foreach ($excludeFileTypes as $excludeFileType) {
                             if (str_ends_with($url, $excludeFileType)) {
@@ -243,7 +212,10 @@ class ProcessM3uImport implements ShouldQueue
                             $shouldAdd = !$preprocess;
                             if (!$shouldAdd) {
                                 // If preprocessing, check if group is selected...
-                                $shouldAdd = in_array($groupName, $selectedGroups);
+                                $shouldAdd = in_array(
+                                    $groupName,
+                                    $selectedGroups
+                                );
                             }
                             if (!$shouldAdd) {
                                 // ...if group not selected, check if group starts with any of the included prefixes
@@ -363,17 +335,23 @@ class ProcessM3uImport implements ShouldQueue
                         })->dispatch();
                 }
             } else {
-                $error = "Unable to parse the playlist, invalid file found. Please check the URL or re-upload your file and try to sync again.";
+                // Log the exception
+                logger()->error("Error processing \"{$playlist->name}\"");
+
+                // Send notification
+                $error = "Invalid playlist file. Unable to read or download your playlist file. Please check the URL or uploaded file and try again.";
                 Notification::make()
                     ->danger()
-                    ->title("Error processing \"{$this->playlist->name}\"")
+                    ->title("Error processing \"{$playlist->name}\"")
                     ->body('Please view your notifications for details.')
-                    ->broadcast($this->playlist->user);
+                    ->broadcast($playlist->user);
                 Notification::make()
                     ->danger()
-                    ->title("Error processing \"{$this->playlist->name}\"")
+                    ->title("Error processing \"{$playlist->name}\"")
                     ->body($error)
-                    ->sendToDatabase($this->playlist->user);
+                    ->sendToDatabase($playlist->user);
+
+                // Update the Playlist
                 $playlist->update([
                     'status' => PlaylistStatus::Failed,
                     'channels' => 0, // not using...
@@ -382,6 +360,7 @@ class ProcessM3uImport implements ShouldQueue
                     'progress' => 100,
                     'processing' => false,
                 ]);
+                return;
             }
         } catch (\Exception $e) {
             // Log the exception
