@@ -51,14 +51,14 @@ class EpgChannelResource extends Resource
                 Tables\Columns\ImageColumn::make('icon')
                     ->toggleable()
                     ->circular(),
+                Tables\Columns\TextInputColumn::make('display_name')
+                    ->sortable()
+                    ->tooltip('Display Name')
+                    ->toggleable()
+                    ->searchable(),
                 Tables\Columns\TextColumn::make('name')
                     ->limit(40)
                     ->sortable()
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('display_name')
-                    ->limit(40)
-                    ->sortable()
-                    ->toggleable()
                     ->searchable(),
                 Tables\Columns\TextColumn::make('lang')
                     ->sortable()
@@ -96,12 +96,12 @@ class EpgChannelResource extends Resource
                     ->searchable(),
             ])
             ->actions([
-                // Tables\Actions\EditAction::make(),
+                Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
+                // Tables\Actions\BulkActionGroup::make([
+                //     Tables\Actions\DeleteBulkAction::make(),
+                // ]),
             ]);
     }
 
@@ -124,20 +124,20 @@ class EpgChannelResource extends Resource
     public static function getForm(): array
     {
         return [
-            Forms\Components\TextInput::make('name')
-                ->required()
-                ->maxLength(255),
+            // Forms\Components\TextInput::make('name')
+            //     ->required()
+            //     ->maxLength(255),
+            Forms\Components\TextInput::make('icon')
+                ->url(),
             Forms\Components\TextInput::make('display_name')
                 ->maxLength(255),
-            Forms\Components\TextInput::make('lang')
-                ->maxLength(255),
-            Forms\Components\TextInput::make('channel_id')
-                ->maxLength(255),
-            Forms\Components\Select::make('epg_id')
-                ->relationship('epg', 'name')
-                ->required(),
-            Forms\Components\Textarea::make('programmes')
-                ->columnSpanFull(),
+            // Forms\Components\TextInput::make('lang')
+            //     ->maxLength(255),
+            // Forms\Components\TextInput::make('channel_id')
+            //     ->maxLength(255),
+            // Forms\Components\Select::make('epg_id')
+            //     ->relationship('epg', 'name')
+            //     ->required(),
         ];
     }
 }
