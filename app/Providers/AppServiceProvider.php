@@ -14,6 +14,7 @@ use App\Settings\GeneralSettings;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Storage;
 use Spatie\LaravelSettings\Events\SettingsSaved;
 
 class AppServiceProvider extends ServiceProvider
@@ -61,6 +62,13 @@ class AppServiceProvider extends ServiceProvider
                 }
                 return $playlist;
             });
+            Playlist::deleting(function (Playlist $playlist) {
+                Storage::disk('local')->deleteDirectory($playlist->folder_path);
+                if ($playlist->uploads && Storage::disk('local')->exists($playlist->uploads)) {
+                    Storage::disk('local')->delete($playlist->uploads);
+                }
+                return $playlist;
+            });
 
             // Process epg on creation
             Epg::created(fn(Epg $epg) => event(new EpgCreated($epg)));
@@ -75,6 +83,13 @@ class AppServiceProvider extends ServiceProvider
             Epg::updating(function (Epg $epg) {
                 if (!$epg->sync_interval) {
                     $epg->sync_interval = '24 hours';
+                }
+                return $epg;
+            });
+            Epg::deleting(function (Epg $epg) {
+                Storage::disk('local')->deleteDirectory($epg->folder_path);
+                if ($epg->uploads && Storage::disk('local')->exists($epg->uploads)) {
+                    Storage::disk('local')->delete($epg->uploads);
                 }
                 return $epg;
             });
