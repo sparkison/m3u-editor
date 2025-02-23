@@ -22,6 +22,8 @@ class ProcessEpgImport implements ShouldQueue
 {
     use Queueable;
 
+    public $maxItems = 50000;
+
     public $deleteWhenMissingModels = true;
 
     // Giving a timeout of 10 minutes to the Job to process the file
@@ -42,11 +44,12 @@ class ProcessEpgImport implements ShouldQueue
      */
     public function handle(): void
     {
-        // Don't update if currently processing
-        if ($this->epg->processing) {
-            return;
-        }
         if (!$this->force) {
+            // Don't update if currently processing
+            if ($this->epg->processing) {
+                return;
+            }
+
             // Check if auto sync is enabled, or the playlist hasn't been synced yet
             if (!$this->epg->auto_sync && $this->epg->synced) {
                 return;
@@ -74,9 +77,9 @@ class ProcessEpgImport implements ShouldQueue
 
             $channelReader = null;
             $filePath = null;
-            if ($this->epg->url) {
+            if ($epg->url && str_starts_with($epg->url, 'http')) {
                 // Normalize the playlist url and get the filename
-                $url = str($this->epg->url)->replace(' ', '%20');
+                $url = str($epg->url)->replace(' ', '%20');
 
                 // We need to grab the file contents first and set to temp file
                 $userPreferences = app(GeneralSettings::class);
@@ -107,8 +110,10 @@ class ProcessEpgImport implements ShouldQueue
                 }
             } else {
                 // Get uploaded file contents
-                if ($this->epg->uploads && Storage::disk('local')->exists($this->epg->uploads)) {
-                    $filePath = Storage::disk('local')->path($this->epg->uploads);
+                if ($epg->uploads && Storage::disk('local')->exists($epg->uploads)) {
+                    $filePath = Storage::disk('local')->path($epg->uploads);
+                } else if ($epg->url) {
+                    $filePath = $epg->url;
                 }
             }
 
@@ -168,7 +173,13 @@ class ProcessEpgImport implements ShouldQueue
                 // Create a lazy collection to process the XML data
                 LazyCollection::make(function () use ($channelReader, $defaultChannelData) {
                     // Loop through the XML data
+                    $count = 0;
                     while ($channelReader->read()) {
+                        // Limit the number of items to process
+                        if ($count >= $this->maxItems) {
+                            break;
+                        }
+
                         // Only consider XML elements and channel nodes
                         if ($channelReader->nodeType == XMLReader::ELEMENT && $channelReader->name === 'channel') {
                             // Get the channel id
@@ -211,6 +222,7 @@ class ProcessEpgImport implements ShouldQueue
 
                             // Only return valid channels
                             if ($elementData['channel_id']) {
+                                $count++;
                                 yield $elementData;
                             }
                         }
@@ -236,7 +248,7 @@ class ProcessEpgImport implements ShouldQueue
                 $jobs = [];
                 $batchCount = Job::where('batch_no', $batchNo)->count();
                 $jobsBatch = Job::where('batch_no', $batchNo)->select('id')->cursor();
-                $jobsBatch->chunk(50)->each(function ($chunk) use (&$jobs, $batchCount) {
+                $jobsBatch->chunk(100)->each(function ($chunk) use (&$jobs, $batchCount) {
                     $jobs[] = new ProcessEpgImportChunk($chunk->pluck('id')->toArray(), $batchCount);
                 });
 

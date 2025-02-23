@@ -23,6 +23,8 @@ class ProcessM3uImport implements ShouldQueue
 {
     use Queueable;
 
+    public $maxItems = 50000;
+
     public $deleteWhenMissingModels = true;
 
     // Giving a timeout of 15 minutes to the Job to process the file
@@ -43,11 +45,12 @@ class ProcessM3uImport implements ShouldQueue
      */
     public function handle(): void
     {
-        // Don't update if currently processing
-        if ($this->playlist->processing) {
-            return;
-        }
         if (!$this->force) {
+            // Don't update if currently processing
+            if ($this->playlist->processing) {
+                return;
+            }
+
             // Check if auto sync is enabled, or the playlist hasn't been synced yet
             if (!$this->playlist->auto_sync && $this->playlist->synced) {
                 return;
@@ -75,9 +78,8 @@ class ProcessM3uImport implements ShouldQueue
             $userId = $playlist->user_id;
             $batchNo = Str::orderedUuid()->toString();
 
-            $fileContent = null;
             $filePath = null;
-            if ($playlist->url) {
+            if ($playlist->url && str_starts_with($playlist->url, 'http')) {
                 // Normalize the playlist url and get the filename
                 $url = str($playlist->url)->replace(' ', '%20');
 
@@ -99,13 +101,10 @@ class ProcessM3uImport implements ShouldQueue
                     // Remove previous saved files
                     Storage::disk('local')->deleteDirectory($playlist->folder_path);
 
-                    // Get the content
-                    $fileContent = $response->body();
-
                     // Save the file to local storage
                     Storage::disk('local')->put(
                         $playlist->file_path,
-                        $fileContent
+                        $response->body()
                     );
 
                     // Update the file path
@@ -115,16 +114,18 @@ class ProcessM3uImport implements ShouldQueue
                 // Get uploaded file contents
                 if ($playlist->uploads && Storage::disk('local')->exists($playlist->uploads)) {
                     // Get the contents and the path
-                    $fileContent = Storage::disk('local')->get($playlist->uploads);
                     $filePath = Storage::disk('local')->path($playlist->uploads);
+                } else if ($playlist->url) {
+                    $filePath = $playlist->url;
                 }
+                
             }
 
             // Update progress
             $playlist->update(['progress' => 5]); // set to 5% to start
 
             // If file path is set, we can process the file
-            if ($fileContent) {
+            if ($filePath) {
                 // Update progress
                 $playlist->update(['progress' => 10]);
 
@@ -165,11 +166,15 @@ class ProcessM3uImport implements ShouldQueue
                 $excludeFileTypes = $playlist->import_prefs['ignored_file_types'] ?? [];
                 $selectedGroups = $playlist->import_prefs['selected_groups'] ?? [];
                 $includedGroupPrefixes = $playlist->import_prefs['included_group_prefixes'] ?? [];
-                LazyCollection::make(function () use ($fileContent, $channelFields, $attributes, $excludeFileTypes) {
+                LazyCollection::make(function () use ($filePath, $channelFields, $attributes, $excludeFileTypes) {
                     $m3uParser = new M3uParser();
                     $m3uParser->addDefaultTags();
-                    foreach ($m3uParser->parse($fileContent) as $item) {
+                    $count = 0;
+                    foreach ($m3uParser->parseFile($filePath, max_length: 2048) as $item) {
                         $url = $item->getPath();
+                        if ($count++ >= $this->maxItems) {
+                            break;
+                        }
                         foreach ($excludeFileTypes as $excludeFileType) {
                             if (str_ends_with($url, $excludeFileType)) {
                                 continue 2;
@@ -303,7 +308,7 @@ class ProcessM3uImport implements ShouldQueue
                     $jobs = [];
                     $batchCount = Job::where('batch_no', $batchNo)->count();
                     $jobsBatch = Job::where('batch_no', $batchNo)->select('id')->cursor();
-                    $jobsBatch->chunk(50)->each(function ($chunk) use (&$jobs, $batchCount) {
+                    $jobsBatch->chunk(100)->each(function ($chunk) use (&$jobs, $batchCount) {
                         $jobs[] = new ProcessM3uImportChunk($chunk->pluck('id')->toArray(), $batchCount);
                     });
 
