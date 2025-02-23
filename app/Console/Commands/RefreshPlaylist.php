@@ -15,7 +15,7 @@ class RefreshPlaylist extends Command
      *
      * @var string
      */
-    protected $signature = 'app:refresh-playlist {playlist?}';
+    protected $signature = 'app:refresh-playlist {playlist?} {force?}';
 
     /**
      * The console command description.
@@ -31,9 +31,10 @@ class RefreshPlaylist extends Command
     {
         $playlistId = $this->argument('playlist');
         if ($playlistId) {
+            $force = $this->argument('force') ?? false;
             $this->info("Refreshing playlist with ID: {$playlistId}");
             $playlist = Playlist::findOrFail($playlistId);
-            dispatch(new ProcessM3uImport($playlist));
+            dispatch(new ProcessM3uImport($playlist, boolval($force)));
             $this->info('Dispatched playlist for refresh');
         } else {
             $this->info('Refreshing all playlists');
