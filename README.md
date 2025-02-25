@@ -69,6 +69,8 @@ services:
       - TZ=Etc/UTC
     volumes:
       # This will allow you to reuse the data across container recreates.
+      # Format is: <host_directory_path>:<container_path>
+      # More information: https://docs.docker.com/reference/compose-file/volumes/
       - ./data:/var/www/config
     restart: unless-stopped
     ports:
