@@ -201,11 +201,11 @@ class ProcessEpgImport implements ShouldQueue
                                     switch ($innerReader->name) {
                                         case 'channel':
                                             $elementData['channel_id'] = $channelId;
-                                            $elementData['name'] = trim($innerReader->readString());
                                             break;
                                         case 'display-name':
                                             if (!$elementData['display_name']) {
                                                 // Only use the first display-name element (could be multiple)
+                                                $elementData['name'] = trim($innerReader->readString());
                                                 $elementData['display_name'] = trim($innerReader->readString());
                                                 $elementData['lang'] = trim($innerReader->getAttribute('lang'));
                                             }

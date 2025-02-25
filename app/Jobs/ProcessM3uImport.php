@@ -192,7 +192,11 @@ class ProcessM3uImport implements ShouldQueue
                                         if ($attribute === 'tvg-chno') {
                                             $channel[$key] = (int)$extTag->getAttribute($attribute);
                                         } else {
-                                            $channel[$key] = $extTag->getAttribute($attribute);
+                                            $channel[$key] = str_replace(
+                                                [',', '"', "'"],
+                                                '',
+                                                $extTag->getAttribute($attribute)
+                                            );
                                         }
                                     }
                                 }
@@ -210,7 +214,11 @@ class ProcessM3uImport implements ShouldQueue
                         $groupNames = explode(';', $groupName);
                         foreach ($groupNames as $groupName) {
                             // Trim whitespace
-                            $groupName = trim($groupName);
+                            $groupName = str_replace(
+                                [',', '"', "'"],
+                                '',
+                                trim($groupName)
+                            );
 
                             // Add to groups if not already added
                             $groups[] = $groupName;

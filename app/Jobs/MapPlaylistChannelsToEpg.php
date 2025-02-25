@@ -112,8 +112,8 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                     $epgChannel = $epg->channels()
                         ->where('channel_id', '!=', '')
                         ->where(function ($sub) use ($channel) {
-                            return $sub->whereRaw('LOWER(`channel_id`) = ?', [strtolower(trim(($channel->name)))])
-                                ->orWhereRaw('LOWER(`channel_id`) = ?', [strtolower(trim(($channel->group_internal)))]);
+                            return $sub->whereRaw('LOWER(`channel_id`) = ?', [strtolower(trim(($channel->stream_id)))])
+                                ->orWhereRaw('LOWER(`channel_id`) = ?', [strtolower(trim(($channel->name)))]);
                         })
                         ->select('id', 'channel_id')
                         ->first();

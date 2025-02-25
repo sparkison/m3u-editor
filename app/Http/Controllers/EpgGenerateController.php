@@ -58,7 +58,7 @@ class EpgGenerateController extends Controller
 
                         // Output the <channel> tag
                         echo '  <channel id="' . $epgData->channel_id . '">' . PHP_EOL;
-                        echo '    <display-name lang="' . $epgData->lang . '">' . $epgData->name . '</display-name>';
+                        echo '    <display-name lang="' . $epgData->lang . '">' . $epgData->display_name . '</display-name>';
                         if ($epgData->icon) {
                             echo PHP_EOL . '    <icon src="' . $epgData->icon . '"/>';
                         }
@@ -68,7 +68,6 @@ class EpgGenerateController extends Controller
 
                 // Fetch the EPGs
                 $epgs = Epg::whereIn('id', array_keys($epgChannels))
-                    ->select('id', 'uuid', 'name')
                     ->get();
 
                 // Loop through the EPGs and output the <programme> tags
@@ -82,6 +81,7 @@ class EpgGenerateController extends Controller
                     }
 
                     // Get the content
+                    $filePath = null;
                     if (Storage::disk('local')->exists($epg->file_path)) {
                         $filePath = Storage::disk('local')->path($epg->file_path);
                     } elseif ($epg->uploads && Storage::disk('local')->exists($epg->uploads)) {
