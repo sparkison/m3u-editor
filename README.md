@@ -68,7 +68,8 @@ services:
       - PGID=1000
       - TZ=Etc/UTC
     volumes:
-      - /apps/m3ueditor/config:/var/www/config
+      # This will allow you to reuse the data across container recreates.
+      - ./data:/var/www/config
     restart: unless-stopped
     ports:
       - 36400:36400 # app
@@ -104,6 +105,19 @@ networks: {}
 Your proxied m3u playlist can then be access via: [http://localhost:8888/proxy/hls/manifest.m3u8?d=http://localhost:36400/YOUR_M3U_EDITOR_PLAYLIST_UID/playlist.m3u&api_password=YOUR_PROXY_API_PASSWORD](http://localhost:8888/proxy/hls/manifest.m3u8?d=http://localhost:36400/YOUR_M3U_EDITOR_PLAYLIST_UID/playlist.m3u&api_password=YOUR_PROXY_API_PASSWORD)
 
 More setup information can be found on the [MediaFlow Proxy](https://github.com/mhdzumair/mediaflow-proxy) page.
+
+## Tips and tricks
+
+- 🔒 Use the app over HTTPS:
+  - You will need to update the `env` file within the config directory and update: `OCTANE_HTTPS=true` and then restart your container. You can also issue the following cli command within the container to restart the app: `php artisan octane:reload`. This will reload the app with HTTPS support and remove any mixed contents warnings/errors.
+- 🌄 Using local images for playlist or EPG icons:
+  - Map a local directory to a directory in the public direcory of m3u editor, e.g.:
+  ```yaml
+  volumes:
+      - ...
+      - ./images/logos:/var/www/html/public/logos
+  ```
+  - Your logos can then be accesses via [http://localhost:36400/logos/filename.jpg](http://localhost:36400/logos/filename.jpg) and updated in your channel or EPG channel within m3u editor.
 
 ## Known issues
 
