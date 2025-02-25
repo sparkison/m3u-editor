@@ -8,6 +8,7 @@ use App\Filament\Resources\PlaylistResource\RelationManagers;
 use App\Forms\Components\PlaylistEpgUrl;
 use App\Forms\Components\PlaylistM3uUrl;
 use App\Models\Playlist;
+use App\Rules\CheckIfUrlOrLocalPath;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -259,18 +260,18 @@ class PlaylistResource extends Resource
                 ->schema([
                     Forms\Components\TextInput::make('url')
                         ->label('URL or Local file path')
-                        ->requiredIf('uploads', [null, ''])
                         ->prefixIcon('heroicon-m-globe-alt')
                         ->helperText('Enter the URL of the playlist file. If this is a local file, you can enter a full or relative path. If changing URL, the playlist will be re-imported. Use with caution as this could lead to data loss if the new playlist differs from the old one.')
-                        // ->url()
+                        ->requiredWithout('uploads')
+                        ->rules([new CheckIfUrlOrLocalPath()])
                         ->maxLength(255),
                     Forms\Components\FileUpload::make('uploads')
                         ->label('File')
                         ->disk('local')
                         ->directory('playlist')
+                        ->helperText('Upload the playlist file. This will be used to import groups and channels.')
                         ->rules(['file'])
-                        ->requiredIf('url', [null, ''])
-                        ->helperText('Upload the playlist file. This will be used to import groups and channels.'),
+                        ->requiredWithout('url'),
                 ]),
 
             Forms\Components\Section::make('Scheduling')

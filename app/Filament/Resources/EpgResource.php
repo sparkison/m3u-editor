@@ -6,6 +6,7 @@ use App\Enums\EpgStatus;
 use App\Filament\Resources\EpgResource\Pages;
 use App\Filament\Resources\EpgResource\RelationManagers;
 use App\Models\Epg;
+use App\Rules\CheckIfUrlOrLocalPath;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -29,7 +30,7 @@ class EpgResource extends Resource
         return parent::getGlobalSearchEloquentQuery()
             ->where('user_id', auth()->id());
     }
-    
+
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
 
     protected static ?string $label = 'EPG';
@@ -284,18 +285,18 @@ class EpgResource extends Resource
                 ->schema([
                     Forms\Components\TextInput::make('url')
                         ->label('URL or Local file path')
-                        ->requiredIf('uploads', [null, ''])
                         ->prefixIcon('heroicon-m-globe-alt')
                         ->helperText('Enter the URL of the XMLTV guide data. If this is a local file, you can enter a full or relative path. If changing URL, the guide data will be re-imported. Use with caution as this could lead to data loss if the new guide differs from the old one.')
-                        // ->url()
+                        ->requiredWithout('uploads')
+                        ->rules([new CheckIfUrlOrLocalPath()])
                         ->maxLength(255),
                     Forms\Components\FileUpload::make('uploads')
                         ->label('File')
                         ->disk('local')
                         ->directory('epg')
+                        ->helperText('Upload the XMLTV file for the EPG. This will be used to import the guide data.')
                         ->rules(['file'])
-                        ->requiredIf('url', [null, ''])
-                        ->helperText('Upload the XMLTV file for the EPG. This will be used to import the guide data.'),
+                        ->requiredWithout('url'),
                 ])
         ];
     }

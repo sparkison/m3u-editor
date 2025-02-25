@@ -128,6 +128,7 @@ class EpgChannelResource extends Resource
             //     ->required()
             //     ->maxLength(255),
             Forms\Components\TextInput::make('icon')
+                ->prefixIcon('heroicon-m-globe-alt')
                 ->url(),
             Forms\Components\TextInput::make('display_name')
                 ->maxLength(255),

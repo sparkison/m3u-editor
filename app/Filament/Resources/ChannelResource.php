@@ -444,6 +444,7 @@ class ChannelResource extends Resource
                 ->required(),
             Forms\Components\TextInput::make('logo')
                 ->columnSpan('full')
+                ->prefixIcon('heroicon-m-globe-alt')
                 ->url(),
             Forms\Components\TextInput::make('channel')
                 ->columnSpan(1)
