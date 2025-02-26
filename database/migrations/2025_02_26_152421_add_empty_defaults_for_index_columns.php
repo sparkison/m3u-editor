@@ -12,15 +12,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // 1. drop unique index
-        Schema::table('channels', function (Blueprint $table) {
-            $table->dropUnique(['name', 'group_internal', 'playlist_id', 'user_id']);
-        });
-
-        // 2. make sure title set
-        DB::statement("UPDATE `channels` SET `title` = `name` where `title` = ''");
-
-        // 3. Remove duplicate rows
+        // 1. Remove duplicate rows
         DB::table('channels')
             ->whereIn('id', DB::table('channels')
                 ->select('id', 'title', 'name', 'group_internal', 'playlist_id')
@@ -29,9 +21,13 @@ return new class extends Migration
                 ->get()->pluck('id'))
             ->delete();
 
-        // 4. re-add unique index with new column
+        // 2. Set empty defaults
+        DB::table('channels')
+            ->where('group_internal', null)->update(['group_internal' => '']);
+
+        // 3. Update the column to allow empty defaults
         Schema::table('channels', function (Blueprint $table) {
-            $table->unique(['title', 'name', 'group_internal', 'playlist_id']);
+            $table->string('group_internal')->default('')->change();
         });
     }
 

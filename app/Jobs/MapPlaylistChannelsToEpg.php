@@ -121,8 +121,13 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                     // If EPG channel found, link it to the Playlist channel
                     if ($epgChannel) {
                         $mappedCount++;
-                        $channel->epg_channel_id = $epgChannel->id;
-                        yield $channel->toArray();
+                        yield [
+                            'title' => $channel->title,
+                            'name' => $channel->name,
+                            'group_internal' => $channel->group_internal,
+                            'playlist_id' => $channel->playlist_id,
+                            'epg_channel_id' => $epgChannel->id,
+                        ];
                     }
                 }
             })->chunk(50)->each(function ($chunk) use ($epg, $batchNo) {
