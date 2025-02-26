@@ -23,7 +23,8 @@ env_file="${config_dir}/env"
 db_dir="${config_dir}/database"
 db_file="${db_dir}/database.sqlite"
 db_file_jobs="${db_dir}/jobs.sqlite"
-epg_dir="${config_dir}/epgs"
+epg_dir="${config_dir}/epg"
+playlist_dir="${config_dir}/playlist"
 log_dir="${config_dir}/logs"
 log_file="${log_dir}/laravel.log"
 queue_log_file="${log_dir}/queue.log"
@@ -50,6 +51,10 @@ fi
 if [ ! -d "${epg_dir}" ]; then
     echo "Creating EPG directory..."
     mkdir "${epg_dir}"
+fi
+if [ ! -d "${playlist_dir}" ]; then
+    echo "Creating Playlist directory..."
+    mkdir "${playlist_dir}"
 fi
 
 # Create environment file
@@ -109,8 +114,21 @@ ln -sf "${db_file}" "database/database.sqlite"
 ln -sf "${db_file_jobs}" "database/jobs.sqlite"
 
 # Clean up recursion EPG directory from previous push
-if [ ! -d "storage/epgs/epgs" ]; then
-    rm -f storage/epgs/epgs
+if [ -d "storage/epgs" ]; then
+    rm -rf storage/epgs
+fi
+if [ -d "/var/www/config/epgs" ]; then
+    rm -rf /var/www/config/epgs
+fi
+
+# Link EPG and Playlist directories
+if [ ! -d "storage/app/private/epg" ]; then
+    echo "Linking EPG directory..."
+    ln -sf "${epg_dir}" storage/app/private/epg
+fi
+if [ ! -d "storage/app/private/playlist" ]; then
+    echo "Linking Playlist directory..."
+    ln -sf "${playlist_dir}" storage/app/private/playlist
 fi
 
 # Link storage

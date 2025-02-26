@@ -132,7 +132,7 @@ class ProcessM3uImport implements ShouldQueue
                 // Setup common field values
                 $channelFields = [
                     'title' => null,
-                    'name' => null,
+                    'name' => '',
                     'url' => null,
                     'logo' => null,
                     'group' => '',
@@ -206,10 +206,6 @@ class ProcessM3uImport implements ShouldQueue
                             // Name is required, fallback to stream ID if available, otherwise set to title
                             // Channel will be skipped on import of not set to something...
                             $channel['title'] = $channel['stream_id'] ?? $channel['name'];
-                        }
-                        if (!isset($channel['name'])) {
-                            // Name is required, fallback to title if not set
-                            $channel['name'] = $channel['title'];
                         }
                         yield $channel;
                     }
