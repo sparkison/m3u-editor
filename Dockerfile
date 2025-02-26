@@ -121,8 +121,8 @@ RUN touch /var/run/supervisord.pid \
 COPY ./docker/8.4/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Install composer
-ENV COMPOSER_ALLOW_SUPERUSER 1
-ENV PATH $PATH:/root/.composer/vendor/bin
+ENV COMPOSER_ALLOW_SUPERUSER=1
+ENV PATH=$PATH:/root/.composer/vendor/bin
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Configure container startup script
