@@ -47,7 +47,7 @@ class ProcessM3uImportChunk implements ShouldQueue
             $groupId = $job->variables['groupId'];
             foreach ($job->payload as $channel) {
                 // Make sure name is set
-                if (!isset($channel['name'])) {
+                if (!(isset($channel['name']) && isset($channel['title']))) {
                     continue;
                 }
 

@@ -135,8 +135,8 @@ class ProcessM3uImport implements ShouldQueue
                     'name' => null,
                     'url' => null,
                     'logo' => null,
-                    'group' => null,
-                    'group_internal' => null,
+                    'group' => '',
+                    'group_internal' => '',
                     'stream_id' => null,
                     'lang' => null,
                     'country' => null,
@@ -249,15 +249,15 @@ class ProcessM3uImport implements ShouldQueue
                             if ($shouldAdd) {
                                 // Add group and associated channels
                                 $group = Group::where([
-                                    'name_internal' => $groupName,
+                                    'name_internal' => $groupName ?? '',
                                     'playlist_id' => $playlistId,
                                     'user_id' => $userId,
                                     'custom' => false,
                                 ])->first();
                                 if (!$group) {
                                     $group = Group::create([
-                                        'name' => $groupName,
-                                        'name_internal' => $groupName,
+                                        'name' => $groupName ?? '',
+                                        'name_internal' => $groupName ?? '',
                                         'playlist_id' => $playlistId,
                                         'user_id' => $userId,
                                         'import_batch_no' => $batchNo,
