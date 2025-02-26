@@ -202,10 +202,10 @@ class ProcessM3uImport implements ShouldQueue
                                 }
                             }
                         }
-                        if (!isset($channel['name'])) {
+                        if (!isset($channel['title'])) {
                             // Name is required, fallback to stream ID if available, otherwise set to title
                             // Channel will be skipped on import of not set to something...
-                            $channel['name'] = $channel['stream_id'] ?? $channel['title'];
+                            $channel['title'] = $channel['stream_id'] ?? $channel['name'];
                         }
                         yield $channel;
                     }
