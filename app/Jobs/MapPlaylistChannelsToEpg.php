@@ -126,6 +126,7 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                             'name' => $channel->name,
                             'group_internal' => $channel->group_internal,
                             'playlist_id' => $channel->playlist_id,
+                            'user_id' => $channel->user_id,
                             'epg_channel_id' => $epgChannel->id,
                         ];
                     }
