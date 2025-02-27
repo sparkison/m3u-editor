@@ -17,9 +17,4 @@
         </a>
         <span>v{{ config('dev.version') }}</span>
     </span>
-    <span class="flex items-center">
-        <a href="{{ config('dev.donate') }}" target="_blank" class="inline-flex">
-            <img src="/images/bmc-button.svg" alt="Buy me a coffee" class="w-auto object-contain" style="height: 30px;">
-        </a>
-    </span>
 </footer>

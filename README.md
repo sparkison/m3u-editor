@@ -13,10 +13,6 @@ Feel free to [open an issue](https://github.com/sparkison/m3u-editor/issues/new?
 
 [![](https://dcbadge.limes.pink/api/server/szPUzZT6)](https://discord.gg/szPUzZT6)
 
-### Help support this project
-
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/shparkison)
-
 ## How It Works
 
 1. Initialization and M3U Playlist(s) creation:
