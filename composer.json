@@ -10,6 +10,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "cerbero/json-parser": "^1.1",
         "dragonmantank/cron-expression": "^3.4",
         "filament/filament": "^3.2",
         "filament/spatie-laravel-settings-plugin": "^3.2",

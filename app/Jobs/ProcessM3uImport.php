@@ -3,12 +3,13 @@
 namespace App\Jobs;
 
 use Throwable;
+use Exception;
 use App\Enums\PlaylistStatus;
 use App\Models\Group;
 use App\Models\Job;
 use App\Models\Playlist;
 use App\Settings\GeneralSettings;
-use Exception;
+use Carbon\Carbon;
 use M3uParser\M3uParser;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -18,6 +19,7 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\LazyCollection;
+use Cerbero\JsonParser\JsonParser;
 
 class ProcessM3uImport implements ShouldQueue
 {
@@ -65,6 +67,171 @@ class ProcessM3uImport implements ShouldQueue
             'progress' => 0,
         ]);
 
+        // Determine if using Xtream API or M3U+
+        if ($this->playlist->xtream) {
+            $this->processXtreamApi();
+        } else {
+            $this->processM3uPlus();
+        }
+    }
+
+    /**
+     * Process the Xtream API
+     */
+    private function processXtreamApi()
+    {
+        // Flag job start time
+        $start = now();
+
+        // Surround in a try/catch block to catch any exceptions
+        try {
+            // Get the playlist
+            $playlist = $this->playlist;
+
+            // Get the playlist details
+            $playlistId = $playlist->id;
+            $userId = $playlist->user_id;
+            $batchNo = Str::orderedUuid()->toString();
+
+            // Get the Xtream API credentials
+            $baseUrl = str($playlist->xtream_config['url'])->replace(' ', '%20')->toString();
+            $user = urlencode($playlist->xtream_config['username']);
+            $password = $playlist->xtream_config['password'];
+
+            // Setup the category and stream URLs
+            $liveCategories = "$baseUrl/player_api.php?username=$user&password=$password&action=get_live_categories&type=m3u_plus";
+            $liveStreams = "$baseUrl/player_api.php?username=$user&password=$password&action=get_live_streams&type=m3u_plus";
+
+            // Setup the user agent and SSL verification
+            $userPreferences = app(GeneralSettings::class);
+            try {
+                $verify = !$userPreferences->disable_ssl_verification;
+                $userAgent = $userPreferences->playlist_agent_string;
+            } catch (Exception $e) {
+                $verify = true;
+                $userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13';
+            }
+
+            // Get the categories
+            $categoriesResponse = Http::withUserAgent($userAgent)
+                ->withOptions(['verify' => $verify])
+                ->timeout(30) // set timeout to one minute
+                ->throw()->get($liveCategories);
+            $connectionSuccess = false;
+            if ($categoriesResponse->ok()) {
+                // Update progress
+                $playlist->update(['progress' => 5]); // set to 5% to start
+
+                $connectionSuccess = true;
+                $categories = collect(json_decode($categoriesResponse->body(), true));
+                $liveStreamsResponse = Http::withUserAgent($userAgent)
+                    ->withOptions(['verify' => $verify])
+                    ->timeout(60 * 10) // set timeout to ten minute
+                    ->throw()->get($liveStreams);
+                if ($liveStreamsResponse->ok()) {
+                    // Update progress
+                    $playlist->update(['progress' => 10]);
+
+                    // Setup common field values
+                    $channelFields = [
+                        'title' => null,
+                        'name' => '',
+                        'url' => null,
+                        'logo' => null,
+                        'group' => '',
+                        'group_internal' => '',
+                        'stream_id' => null,
+                        'lang' => null,
+                        'country' => null,
+                        'playlist_id' => $playlistId,
+                        'user_id' => $userId,
+                        'import_batch_no' => $batchNo,
+                        'enabled' => $playlist->enable_channels,
+                    ];
+
+                    // Get the live streams
+                    $liveStreams = JsonParser::parse($liveStreamsResponse->body());
+
+                    // Process the live streams
+                    $streamBaseUrl = "$baseUrl/live/$user/$password";
+                    $collection = LazyCollection::make(function () use ($liveStreams, $streamBaseUrl, $categories, $channelFields) {
+                        foreach ($liveStreams as $item) {
+                            $category = $categories->firstWhere('category_id', $item['category_id']);
+                            yield [
+                                ...$channelFields,
+                                'title' => $item['name'],
+                                'name' => $item['name'],
+                                'url' => "$streamBaseUrl/{$item['stream_id']}.ts",
+                                'logo' => $item['stream_icon'],
+                                'group' => $category['category_name'] ?? '',
+                                'group_internal' => $category['category_name'] ?? '',
+                                'stream_id' => $item['stream_id'],
+                                'channel' => $item['num'] ?? null,
+                            ];
+                        }
+                    });
+                    $this->processChannelCollection($collection, $playlist, $batchNo, $userId, $start);
+                } else {
+                    $connectionSuccess = false;
+                }
+            }
+            if (!$connectionSuccess) {
+                $error = "Invalid Xtream API credentials. Unable to connect to the Xtream API. Please check your credentials and try again.";
+                Notification::make()
+                    ->danger()
+                    ->title("Error processing \"{$playlist->name}\"")
+                    ->body('Please view your notifications for details.')
+                    ->broadcast($playlist->user);
+                Notification::make()
+                    ->danger()
+                    ->title("Error processing \"{$playlist->name}\"")
+                    ->body($error)
+                    ->sendToDatabase($playlist->user);
+
+                // Update the Playlist
+                $playlist->update([
+                    'status' => PlaylistStatus::Failed,
+                    'channels' => 0, // not using...
+                    'synced' => now(),
+                    'errors' => $error,
+                    'progress' => 100,
+                    'processing' => false,
+                ]);
+                return;
+            }
+        } catch (Exception $e) {
+            // Log the exception
+            logger()->error("Error processing \"{$this->playlist->name}\": {$e->getMessage()}");
+
+            // Send notification
+            Notification::make()
+                ->danger()
+                ->title("Error processing \"{$this->playlist->name}\"")
+                ->body('Please view your notifications for details.')
+                ->broadcast($this->playlist->user);
+            Notification::make()
+                ->danger()
+                ->title("Error processing \"{$this->playlist->name}\"")
+                ->body($e->getMessage())
+                ->sendToDatabase($this->playlist->user);
+
+            // Update the playlist
+            $this->playlist->update([
+                'status' => PlaylistStatus::Failed,
+                'synced' => now(),
+                'errors' => $e->getMessage(),
+                'progress' => 100,
+                'processing' => false,
+            ]);
+        }
+        return;
+    }
+
+    /**
+     * Process the M3U+ playlist
+     */
+    private function processM3uPlus()
+    {
         // Flag job start time
         $start = now();
 
@@ -118,7 +285,6 @@ class ProcessM3uImport implements ShouldQueue
                 } else if ($playlist->url) {
                     $filePath = $playlist->url;
                 }
-                
             }
 
             // Update progress
@@ -158,15 +324,9 @@ class ProcessM3uImport implements ShouldQueue
                     'country' => 'tvg-country',
                 ];
 
-                // Check if preprocessing is enabled
-                $preprocess = $playlist->import_prefs['preprocess'] ?? false;
-
                 // Extract the channels and groups from the m3u
-                $groups = [];
                 $excludeFileTypes = $playlist->import_prefs['ignored_file_types'] ?? [];
-                $selectedGroups = $playlist->import_prefs['selected_groups'] ?? [];
-                $includedGroupPrefixes = $playlist->import_prefs['included_group_prefixes'] ?? [];
-                LazyCollection::make(function () use ($filePath, $channelFields, $attributes, $excludeFileTypes) {
+                $collection = LazyCollection::make(function () use ($filePath, $channelFields, $attributes, $excludeFileTypes) {
                     $m3uParser = new M3uParser();
                     $m3uParser->addDefaultTags();
                     $count = 0;
@@ -209,144 +369,8 @@ class ProcessM3uImport implements ShouldQueue
                         }
                         yield $channel;
                     }
-                })->groupBy('group')->chunk(10)->each(function (LazyCollection $grouped) use (&$groups, $selectedGroups, $includedGroupPrefixes, $preprocess, $userId, $playlistId, $batchNo) {
-                    $grouped->each(function ($channels, $groupName) use (&$groups, $selectedGroups, $includedGroupPrefixes, $preprocess, $userId, $playlistId, $batchNo) {
-                        $groupNames = explode(';', $groupName);
-                        foreach ($groupNames as $groupName) {
-                            // Trim whitespace
-                            $groupName = str_replace(
-                                [',', '"', "'"],
-                                '',
-                                trim($groupName)
-                            );
-
-                            // Add to groups if not already added
-                            $groups[] = $groupName;
-                            $shouldAdd = !$preprocess;
-                            if (!$shouldAdd) {
-                                // If preprocessing, check if group is selected...
-                                $shouldAdd = in_array(
-                                    $groupName,
-                                    $selectedGroups
-                                );
-                            }
-                            if (!$shouldAdd) {
-                                // ...if group not selected, check if group starts with any of the included prefixes
-                                // (only check if the group isn't directly included already)
-                                foreach ($includedGroupPrefixes as $prefix) {
-                                    if (str_starts_with($groupName, $prefix)) {
-                                        $shouldAdd = true;
-                                        break;
-                                    }
-                                }
-                            }
-
-                            // Confirm if adding or skipping
-                            if ($shouldAdd) {
-                                // Add group and associated channels
-                                $group = Group::where([
-                                    'name_internal' => $groupName ?? '',
-                                    'playlist_id' => $playlistId,
-                                    'user_id' => $userId,
-                                    'custom' => false,
-                                ])->first();
-                                if (!$group) {
-                                    $group = Group::create([
-                                        'name' => $groupName ?? '',
-                                        'name_internal' => $groupName ?? '',
-                                        'playlist_id' => $playlistId,
-                                        'user_id' => $userId,
-                                        'import_batch_no' => $batchNo,
-                                    ]);
-                                } else {
-                                    $group->update([
-                                        'import_batch_no' => $batchNo,
-                                    ]);
-                                }
-                                $channels->chunk(50)->each(function ($chunk) use ($playlistId, $batchNo, $group) {
-                                    Job::create([
-                                        'title' => "Processing channel import for group: {$group->name}",
-                                        'batch_no' => $batchNo,
-                                        'payload' => $chunk->toArray(),
-                                        'variables' => [
-                                            'groupId' => $group->id,
-                                            'playlistId' => $playlistId,
-                                        ]
-                                    ]);
-                                });
-                            }
-                        }
-                    });
                 });
-
-                // Remove duplicate groups
-                $groups = array_values(array_unique($groups));
-
-                // Update progress
-                $playlist->update(['progress' => 15]);
-
-                // Check if preprocessing, and not groups selected yet
-                if ($preprocess && count($selectedGroups) === 0 && count($includedGroupPrefixes) === 0) {
-                    $completedIn = $start->diffInSeconds(now());
-                    $completedInRounded = round($completedIn, 2);
-                    $playlist->update([
-                        'status' => PlaylistStatus::Completed,
-                        'channels' => 0, // not using...
-                        'synced' => now(),
-                        'errors' => null,
-                        'sync_time' => $completedIn,
-                        'progress' => 100,
-                        'processing' => false,
-                        'groups' => $groups,
-                    ]);
-
-                    // Send notification
-                    Notification::make()
-                        ->success()
-                        ->title('Playlist Preprocessing Completed')
-                        ->body("\"{$playlist->name}\" has been preprocessed.")
-                        ->broadcast($playlist->user);
-                    Notification::make()
-                        ->success()
-                        ->title('Playlist Synced')
-                        ->body("\"{$playlist->name}\" has been preprocessed successfully. You can now select the groups you would like to import and process the playlist again to import your selected groups. Preprocessing completed in {$completedInRounded} seconds.")
-                        ->sendToDatabase($playlist->user);
-                } else {
-                    // Get the jobs for the batch
-                    $jobs = [];
-                    $batchCount = Job::where('batch_no', $batchNo)->count();
-                    $jobsBatch = Job::where('batch_no', $batchNo)->select('id')->cursor();
-                    $jobsBatch->chunk(100)->each(function ($chunk) use (&$jobs, $batchCount) {
-                        $jobs[] = new ProcessM3uImportChunk($chunk->pluck('id')->toArray(), $batchCount);
-                    });
-
-                    // Last job in the batch
-                    $jobs[] = new ProcessM3uImportComplete($userId, $playlistId, $groups, $batchNo, $start);
-                    Bus::chain($jobs)
-                        ->onConnection('redis') // force to use redis connection
-                        ->onQueue('import')
-                        ->catch(function (Throwable $e) use ($playlist) {
-                            $error = "Error processing \"{$playlist->name}\": {$e->getMessage()}";
-                            Notification::make()
-                                ->danger()
-                                ->title("Error processing \"{$playlist->name}\"")
-                                ->body('Please view your notifications for details.')
-                                ->broadcast($playlist->user);
-                            Notification::make()
-                                ->danger()
-                                ->title("Error processing \"{$playlist->name}\"")
-                                ->body($error)
-                                ->sendToDatabase($playlist->user);
-                            $playlist->update([
-                                'status' => PlaylistStatus::Failed,
-                                'channels' => 0, // not using...
-                                'synced' => now(),
-                                'errors' => $error,
-                                'progress' => 100,
-                                'processing' => false,
-                            ]);
-                        })->dispatch();
-                }
+                $this->processChannelCollection($collection, $playlist, $batchNo, $userId, $start);
             } else {
                 // Log the exception
                 logger()->error("Error processing \"{$playlist->name}\"");
@@ -401,5 +425,162 @@ class ProcessM3uImport implements ShouldQueue
             ]);
         }
         return;
+    }
+
+    /**
+     * Process the channel collection
+     */
+    private function processChannelCollection(LazyCollection $collection, Playlist $playlist, string $batchNo, int $userId, Carbon $start)
+    {
+        // Get the playlist ID
+        $playlistId = $playlist->id;
+
+        // Check if preprocessing is enabled
+        $preprocess = $playlist->import_prefs['preprocess'] ?? false;
+
+        // Extract the channels and groups from the m3u
+        $groups = [];
+        $selectedGroups = $playlist->import_prefs['selected_groups'] ?? [];
+        $includedGroupPrefixes = $playlist->import_prefs['included_group_prefixes'] ?? [];
+
+        // Process the collection
+        $collection->groupBy('group')->chunk(10)->each(function (LazyCollection $grouped) use (&$groups, $selectedGroups, $includedGroupPrefixes, $preprocess, $userId, $playlistId, $batchNo) {
+            $grouped->each(function ($channels, $groupName) use (&$groups, $selectedGroups, $includedGroupPrefixes, $preprocess, $userId, $playlistId, $batchNo) {
+                $groupNames = explode(';', $groupName);
+                foreach ($groupNames as $groupName) {
+                    // Trim whitespace
+                    $groupName = str_replace(
+                        [',', '"', "'"],
+                        '',
+                        trim($groupName)
+                    );
+
+                    // Add to groups if not already added
+                    $groups[] = $groupName;
+                    $shouldAdd = !$preprocess;
+                    if (!$shouldAdd) {
+                        // If preprocessing, check if group is selected...
+                        $shouldAdd = in_array(
+                            $groupName,
+                            $selectedGroups
+                        );
+                    }
+                    if (!$shouldAdd) {
+                        // ...if group not selected, check if group starts with any of the included prefixes
+                        // (only check if the group isn't directly included already)
+                        foreach ($includedGroupPrefixes as $prefix) {
+                            if (str_starts_with($groupName, $prefix)) {
+                                $shouldAdd = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Confirm if adding or skipping
+                    if ($shouldAdd) {
+                        // Add group and associated channels
+                        $group = Group::where([
+                            'name_internal' => $groupName ?? '',
+                            'playlist_id' => $playlistId,
+                            'user_id' => $userId,
+                            'custom' => false,
+                        ])->first();
+                        if (!$group) {
+                            $group = Group::create([
+                                'name' => $groupName ?? '',
+                                'name_internal' => $groupName ?? '',
+                                'playlist_id' => $playlistId,
+                                'user_id' => $userId,
+                                'import_batch_no' => $batchNo,
+                            ]);
+                        } else {
+                            $group->update([
+                                'import_batch_no' => $batchNo,
+                            ]);
+                        }
+                        $channels->chunk(50)->each(function ($chunk) use ($playlistId, $batchNo, $group) {
+                            Job::create([
+                                'title' => "Processing channel import for group: {$group->name}",
+                                'batch_no' => $batchNo,
+                                'payload' => $chunk->toArray(),
+                                'variables' => [
+                                    'groupId' => $group->id,
+                                    'playlistId' => $playlistId,
+                                ]
+                            ]);
+                        });
+                    }
+                }
+            });
+        });
+
+        // Remove duplicate groups
+        $groups = array_values(array_unique($groups));
+
+        // Update progress
+        $playlist->update(['progress' => 15]);
+
+        // Check if preprocessing, and not groups selected yet
+        if ($preprocess && count($selectedGroups) === 0 && count($includedGroupPrefixes) === 0) {
+            $completedIn = $start->diffInSeconds(now());
+            $completedInRounded = round($completedIn, 2);
+            $playlist->update([
+                'status' => PlaylistStatus::Completed,
+                'channels' => 0, // not using...
+                'synced' => now(),
+                'errors' => null,
+                'sync_time' => $completedIn,
+                'progress' => 100,
+                'processing' => false,
+                'groups' => $groups,
+            ]);
+
+            // Send notification
+            Notification::make()
+                ->success()
+                ->title('Playlist Preprocessing Completed')
+                ->body("\"{$playlist->name}\" has been preprocessed.")
+                ->broadcast($playlist->user);
+            Notification::make()
+                ->success()
+                ->title('Playlist Synced')
+                ->body("\"{$playlist->name}\" has been preprocessed successfully. You can now select the groups you would like to import and process the playlist again to import your selected groups. Preprocessing completed in {$completedInRounded} seconds.")
+                ->sendToDatabase($playlist->user);
+        } else {
+            // Get the jobs for the batch
+            $jobs = [];
+            $batchCount = Job::where('batch_no', $batchNo)->count();
+            $jobsBatch = Job::where('batch_no', $batchNo)->select('id')->cursor();
+            $jobsBatch->chunk(100)->each(function ($chunk) use (&$jobs, $batchCount) {
+                $jobs[] = new ProcessM3uImportChunk($chunk->pluck('id')->toArray(), $batchCount);
+            });
+
+            // Last job in the batch
+            $jobs[] = new ProcessM3uImportComplete($userId, $playlistId, $groups, $batchNo, $start);
+            Bus::chain($jobs)
+                ->onConnection('redis') // force to use redis connection
+                ->onQueue('import')
+                ->catch(function (Throwable $e) use ($playlist) {
+                    $error = "Error processing \"{$playlist->name}\": {$e->getMessage()}";
+                    Notification::make()
+                        ->danger()
+                        ->title("Error processing \"{$playlist->name}\"")
+                        ->body('Please view your notifications for details.')
+                        ->broadcast($playlist->user);
+                    Notification::make()
+                        ->danger()
+                        ->title("Error processing \"{$playlist->name}\"")
+                        ->body($error)
+                        ->sendToDatabase($playlist->user);
+                    $playlist->update([
+                        'status' => PlaylistStatus::Failed,
+                        'channels' => 0, // not using...
+                        'synced' => now(),
+                        'errors' => $error,
+                        'progress' => 100,
+                        'processing' => false,
+                    ]);
+                })->dispatch();
+        }
     }
 }

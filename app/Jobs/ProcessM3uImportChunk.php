@@ -63,11 +63,12 @@ class ProcessM3uImportChunk implements ShouldQueue
                 // Don't update the following fields...
                 // 'title',
                 // 'name',
-                // 'group',
+                // 'group', // user override
                 // 'group_internal',
                 // 'playlist_id',
                 // 'user_id',
-                // 'logo',
+                // 'logo', // user override
+                // 'channel', // user override
                 // 'enabled',
                 // 'epg_channel_id',
                 // ...only update the following fields
