@@ -99,6 +99,7 @@ class ProcessM3uImport implements ShouldQueue
             $password = $playlist->xtream_config['password'];
 
             // Setup the category and stream URLs
+            // $userInfo = "$baseUrl/player_api.php?username=$user&password=$password";
             $liveCategories = "$baseUrl/player_api.php?username=$user&password=$password&action=get_live_categories&type=m3u_plus";
             $liveStreams = "$baseUrl/player_api.php?username=$user&password=$password&action=get_live_streams&type=m3u_plus";
 

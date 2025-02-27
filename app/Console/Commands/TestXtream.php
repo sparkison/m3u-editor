@@ -37,11 +37,25 @@ class TestXtream extends Command implements PromptsForMissingInput
         $password = $this->argument('password');
 
         $baseUrl = str($this->argument('url'))->replace(' ', '%20')->toString();
+        $userInfo = "$baseUrl/player_api.php?username=$user&password=$password";
         $liveCategories = "$baseUrl/player_api.php?username=$user&password=$password&action=get_live_categories&type=m3u_plus";
         $liveStreams = "$baseUrl/player_api.php?username=$user&password=$password&action=get_live_streams&type=m3u_plus";
 
         $userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13';
         $verify = true;
+
+        $userInfoResponse = Http::withUserAgent($userAgent)
+            ->withOptions(['verify' => $verify])
+            ->timeout(30) // set timeout to one minute
+            ->throw()->get($userInfo);
+        if ($userInfoResponse->ok()) {
+            $userInfo = json_decode($userInfoResponse->body(), true);
+            $this->info("User Info: " . json_encode($userInfo));
+        } else {
+            $this->error("Error fetching user info: {$userInfoResponse->body()}");
+            return;
+        }
+
         $categoriesResponse = Http::withUserAgent($userAgent)
             ->withOptions(['verify' => $verify])
             ->timeout(30) // set timeout to one minute
