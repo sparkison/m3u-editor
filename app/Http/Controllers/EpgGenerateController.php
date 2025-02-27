@@ -57,8 +57,8 @@ class EpgGenerateController extends Controller
                         }
 
                         // Output the <channel> tag
-                        echo '  <channel id="' . $epgData->channel_id . '">' . PHP_EOL;
-                        echo '    <display-name lang="' . $epgData->lang . '">' . htmlspecialchars($epgData->display_name) . '</display-name>';
+                        echo '  <channel id="' . $channel->stream_id . '">' . PHP_EOL;
+                        echo '    <display-name lang="' . $epgData->lang . '">' . htmlspecialchars($channel->title) . '</display-name>';
                         if ($epgData->icon) {
                             echo PHP_EOL . '    <icon src="' . $epgData->icon . '"/>';
                         }
