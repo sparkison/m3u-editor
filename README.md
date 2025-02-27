@@ -11,7 +11,7 @@ A simple `m3u` playlist editor, similar to **xteve** or **threadfin**, with `epg
 
 Feel free to [open an issue](https://github.com/sparkison/m3u-editor/issues/new?template=bug_report.md) on this repo, you can also join our Discord server to ask questions and get help, help others, suggest new ideas, and offer suggestions for improvements! 🎉
 
-[![](https://dcbadge.limes.pink/api/server/szPUzZT6)](https://discord.gg/MSaptvvY)
+[![](https://dcbadge.limes.pink/api/server/szPUzZT6)](https://discord.gg/rS3abJ5dz7)
 
 ## How It Works
 
