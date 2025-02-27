@@ -46,7 +46,7 @@ class TestXtream extends Command implements PromptsForMissingInput
 
         $userInfoResponse = Http::withUserAgent($userAgent)
             ->withOptions(['verify' => $verify])
-            ->timeout(30) // set timeout to one minute
+            ->timeout(30)
             ->throw()->get($userInfo);
         if ($userInfoResponse->ok()) {
             $userInfo = json_decode($userInfoResponse->body(), true);
@@ -58,13 +58,13 @@ class TestXtream extends Command implements PromptsForMissingInput
 
         $categoriesResponse = Http::withUserAgent($userAgent)
             ->withOptions(['verify' => $verify])
-            ->timeout(30) // set timeout to one minute
+            ->timeout(60 * 5) // set timeout to five minutes
             ->throw()->get($liveCategories);
         if ($categoriesResponse->ok()) {
             $categories = collect(json_decode($categoriesResponse->body(), true));
             $liveStreamsResponse = Http::withUserAgent($userAgent)
                 ->withOptions(['verify' => $verify])
-                ->timeout(60 * 5) // set timeout to five minute
+                ->timeout(60 * 10) // set timeout to ten minute
                 ->throw()->get($liveStreams);
             if ($liveStreamsResponse->ok()) {
                 $channelFields = [

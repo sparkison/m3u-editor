@@ -116,7 +116,7 @@ class ProcessM3uImport implements ShouldQueue
             // Get the categories
             $categoriesResponse = Http::withUserAgent($userAgent)
                 ->withOptions(['verify' => $verify])
-                ->timeout(30) // set timeout to one minute
+                ->timeout(60 * 5) // set timeout to five minute
                 ->throw()->get($liveCategories);
             $connectionSuccess = false;
             if ($categoriesResponse->ok()) {

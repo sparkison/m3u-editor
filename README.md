@@ -107,7 +107,9 @@ More setup information can be found on the [MediaFlow Proxy](https://github.com/
 ## Tips and tricks
 
 - 🔒 Use the app over HTTPS:
-  - You will need to update the `env` file within the config directory and update: `OCTANE_HTTPS=true` and then restart your container. You can also issue the following cli command within the container to restart the app: `php artisan octane:reload`. This will reload the app with HTTPS support and remove any mixed contents warnings/errors.
+  - You will need to update the `env` file within the config directory and update: `OCTANE_HTTPS=true` and then restart your container. You may also need to set the `APP_URL` if `localhost` is not valid for your configuration.
+    - Note: you can also issue the following cli command within the container to restart the app: `php artisan octane:reload` so you don't need to restart the entire container.
+  - This will reload the app with HTTPS support and remove any mixed contents warnings/errors.
 - 🌄 Using local images for playlist or EPG icons:
   - Map a local directory to a directory in the public direcory of m3u editor, e.g.:
   ```yaml
