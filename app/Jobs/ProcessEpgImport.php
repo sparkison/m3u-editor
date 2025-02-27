@@ -24,6 +24,8 @@ class ProcessEpgImport implements ShouldQueue
 
     public $maxItems = 50000;
 
+    public $userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13';
+
     public $deleteWhenMissingModels = true;
 
     // Giving a timeout of 10 minutes to the Job to process the file
@@ -82,14 +84,8 @@ class ProcessEpgImport implements ShouldQueue
                 $url = str($epg->url)->replace(' ', '%20');
 
                 // We need to grab the file contents first and set to temp file
-                $userPreferences = app(GeneralSettings::class);
-                try {
-                    $verify = !$userPreferences->disable_ssl_verification;
-                    $userAgent = $userPreferences->playlist_agent_string;
-                } catch (Exception $e) {
-                    $verify = true;
-                    $userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13';
-                }
+                $verify = !$epg->disable_ssl_verification;
+                $userAgent = empty($epg->user_agent) ? $this->userAgent : $epg->user_agent;
                 $response = Http::withUserAgent($userAgent)
                     ->withOptions(['verify' => $verify])
                     ->timeout(60 * 5) // set timeout to five minues

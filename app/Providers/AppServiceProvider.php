@@ -11,10 +11,12 @@ use App\Models\Epg;
 use App\Models\Group;
 use App\Models\Playlist;
 use App\Settings\GeneralSettings;
+use Exception;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
+use Opcodes\LogViewer\Facades\LogViewer;
 use Spatie\LaravelSettings\Events\SettingsSaved;
 
 class AppServiceProvider extends ServiceProvider
@@ -34,6 +36,17 @@ class AppServiceProvider extends ServiceProvider
     {
         // Disable mass assignment protection (security handled by Filament)
         Model::unguard();
+
+        // Add log viewer auth
+        LogViewer::auth(function ($request) {
+            $userPreferences = app(GeneralSettings::class);
+            $showLogs = false;
+            try {
+                $showLogs = $userPreferences->show_logs;
+            } catch (Exception $e) {
+            }
+            return $showLogs;
+        });
 
         // Listen for settings update
         Event::listen(SettingsSaved::class, function ($event) {

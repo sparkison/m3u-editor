@@ -27,6 +27,8 @@ class ProcessM3uImport implements ShouldQueue
 
     public $maxItems = 50000;
 
+    public $userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13';
+
     public $deleteWhenMissingModels = true;
 
     // Giving a timeout of 15 minutes to the Job to process the file
@@ -104,14 +106,8 @@ class ProcessM3uImport implements ShouldQueue
             $liveStreams = "$baseUrl/player_api.php?username=$user&password=$password&action=get_live_streams&type=m3u_plus";
 
             // Setup the user agent and SSL verification
-            $userPreferences = app(GeneralSettings::class);
-            try {
-                $verify = !$userPreferences->disable_ssl_verification;
-                $userAgent = $userPreferences->playlist_agent_string;
-            } catch (Exception $e) {
-                $verify = true;
-                $userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13';
-            }
+            $verify = !$playlist->disable_ssl_verification;
+            $userAgent = empty($playlist->user_agent) ? $this->userAgent : $playlist->user_agent;
 
             // Get the categories
             $categoriesResponse = Http::withUserAgent($userAgent)

@@ -44,29 +44,21 @@ class Preferences extends SettingsPage
                             ]),
                     ]),
                 Forms\Components\Section::make()
-                    ->heading('Processing')
-                    ->description('Processing preferences and settings.')
+                    ->heading('Debugging')
+                    ->description('Debug settings')
                     ->headerActions([
-                        Forms\Components\Actions\Action::make('User Agent')
-                            ->label('User-Agent info')
+                        Forms\Components\Actions\Action::make('view_logs')
+                            ->label('View Logs')
                             ->icon('heroicon-o-arrow-top-right-on-square')
                             ->iconPosition('after')
                             ->size('sm')
-                            ->url('https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/User-Agent')
+                            ->url('/logs')
                             ->openUrlInNewTab(true),
                     ])
                     ->schema([
-                        Forms\Components\Toggle::make('disable_ssl_verification')
-                            ->label('Disable SSL verification')
-                            ->helperText('Disable SSL verification for Playlist and EPG fetch requests.'),
-                        Forms\Components\TextInput::make('playlist_agent_string')
-                            ->label('Playlist user agent string')
-                            ->required()
-                            ->helperText('The default user agent string used to fetch your playlists.'),
-                        Forms\Components\TextInput::make('epg_agent_string')
-                            ->label('EPG user agent string')
-                            ->required()
-                            ->helperText('The default user agent string used to fetch your EPGs.'),
+                        Forms\Components\Toggle::make('show_logs')
+                            ->label('Make log files viewable')
+                            ->helperText('When enabled you can view the log files using the "View Logs" button. When disabled the logs endpoint will return a 403 (Unauthorized).'),
                     ])
             ]);
     }

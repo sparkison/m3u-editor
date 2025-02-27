@@ -297,6 +297,23 @@ class EpgResource extends Resource
                         ->helperText('Upload the XMLTV file for the EPG. This will be used to import the guide data.')
                         ->rules(['file'])
                         ->requiredWithout('url'),
+
+                    Forms\Components\Grid::make()
+                        ->columns(3)
+                        ->columnSpanFull()
+                        ->schema([
+                            Forms\Components\TextInput::make('user_agent')
+                                ->helperText('User agent string to use for fetching the EPG.')
+                                ->default('Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13')
+                                ->columnSpan(2)
+                                ->required(),
+                            Forms\Components\Toggle::make('disable_ssl_verification')
+                                ->label('Disable SSL verification')
+                                ->helperText('Only disable this if you are having issues.')
+                                ->columnSpan(1)
+                                ->inline(false)
+                                ->default(false),
+                        ])
                 ])
         ];
     }
