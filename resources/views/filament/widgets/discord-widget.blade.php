@@ -2,7 +2,7 @@
     <x-filament::section>
         <div class="flex items-center gap-x-3">
             <div>
-                <a href="https://discord.gg/szPUzZT6" rel="noopener noreferrer" target="_blank">
+                <a href="{{ config('dev.discord_url') }}" rel="noopener noreferrer" target="_blank">
                     <svg width="2.7rem" height="2.7rem" viewBox="0 -28.5 256 256" version="1.1"
                         xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
                         preserveAspectRatio="xMidYMid">
@@ -27,7 +27,7 @@
             </div>
 
             <div class="flex flex-col items-end gap-y-1">
-                <x-filament::button color="gray" tag="a" href="https://discord.gg/szPUzZT6"
+                <x-filament::button color="gray" tag="a" href="{{ config('dev.discord_url') }}"
                     icon="heroicon-m-arrow-top-right-on-square"
                     icon-alias="panels::widgets.filament-info.open-documentation-button" rel="noopener noreferrer"
                     target="_blank">
