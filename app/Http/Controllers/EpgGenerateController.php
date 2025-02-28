@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use DOMDocument;
+use XMLReader;
 use App\Models\Channel;
 use App\Models\CustomPlaylist;
 use App\Models\Epg;
@@ -11,7 +13,6 @@ use Filament\Notifications\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use XMLReader;
 
 class EpgGenerateController extends Controller
 {
@@ -119,9 +120,21 @@ class EpgGenerateController extends Controller
                             if (!in_array($channelId, $channels)) {
                                 continue;
                             }
+
                             // Channel program found, output the <programme> tag
-                            echo  "  " . $programReader->readOuterXml();
-                            echo PHP_EOL;
+                            // First, we need to make sure the channel is correct
+                            // Replace `channel="<channel_id>"` with `channel="<stream_id>"`
+                            $itemDom = new DOMDocument();
+                            $itemDom->loadXML($programReader->readOuterXML());
+
+                            // Get the item element
+                            $item = $itemDom->documentElement;
+
+                            // Modify the attribute
+                            $item->setAttribute('channel', $channel->stream_id);
+
+                            // Output modified line
+                            echo "  " . $itemDom->saveXML($item) . PHP_EOL;
                         }
                     }
                     // Close the XMLReader for this epg
