@@ -22,14 +22,20 @@ class ProcessEpgImport implements ShouldQueue
 {
     use Queueable;
 
+    // To prevent errors when processing large files, limit imported channels to 50,000
+    // NOTE: this only applies to M3U+ files
+    //       Xtream API files are not limited
     public $maxItems = 50000;
 
+    // Default user agent to use for HTTP requests
+    // Used when user agent is not set in the EPG
     public $userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13';
 
+    // Delete the job if the model is missing
     public $deleteWhenMissingModels = true;
 
     // Giving a timeout of 10 minutes to the Job to process the file
-    public $timeout = 600;
+    public $timeout = 60 * 10;
 
     /**
      * Create a new job instance.
@@ -52,13 +58,13 @@ class ProcessEpgImport implements ShouldQueue
                 return;
             }
 
-            // Check if auto sync is enabled, or the playlist hasn't been synced yet
+            // Check if auto sync is enabled, or the EPG hasn't been synced yet
             if (!$this->epg->auto_sync && $this->epg->synced) {
                 return;
             }
         }
 
-        // Update the playlist status to processing
+        // Update the EPG status to processing
         $this->epg->update([
             'processing' => true,
             'status' => EpgStatus::Processing,
@@ -80,7 +86,7 @@ class ProcessEpgImport implements ShouldQueue
             $channelReader = null;
             $filePath = null;
             if ($epg->url && str_starts_with($epg->url, 'http')) {
-                // Normalize the playlist url and get the filename
+                // Normalize the EPG url and get the filename
                 $url = str($epg->url)->replace(' ', '%20');
 
                 // We need to grab the file contents first and set to temp file
@@ -316,7 +322,7 @@ class ProcessEpgImport implements ShouldQueue
                 ->body($e->getMessage())
                 ->sendToDatabase($this->epg->user);
 
-            // Update the playlist
+            // Update the EPG
             $this->epg->update([
                 'status' => EpgStatus::Failed,
                 'synced' => now(),

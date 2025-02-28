@@ -404,15 +404,23 @@ class PlaylistResource extends Resource
                                 ->label('Preprocess playlist')
                                 ->columnSpan(1)
                                 ->live()
-                                ->inline(false)
+                                ->inline(true)
                                 ->default(false)
                                 ->helperText('When enabled, the playlist will be preprocessed before importing. You can then select which groups you would like to import.'),
                             Forms\Components\Toggle::make('enable_channels')
                                 ->label('Enable new channels')
                                 ->columnSpan(1)
-                                ->inline(false)
+                                ->inline(true)
                                 ->default(false)
                                 ->helperText('When enabled, newly added channels will be enabled by default.'),
+                            Forms\Components\Toggle::make('import_prefs.use_regex')
+                                ->label('Use regex for filtering')
+                                ->columnSpan(2)
+                                ->inline(true)
+                                ->live()
+                                ->default(false)
+                                ->helperText('When enabled, groups will be included based on regex pattern match instead of prefix.')
+                                ->hidden(fn(Get $get): bool => ! $get('import_prefs.preprocess') || ! $get('status')),
                             Forms\Components\Select::make('import_prefs.selected_groups')
                                 ->label('Groups to import')
                                 ->columnSpan(1)
@@ -426,19 +434,21 @@ class PlaylistResource extends Resource
                                     }
                                     return $options;
                                 })
-                                ->hidden(fn(Get $get): bool => ! $get('import_prefs.preprocess') || !$get('status')),
+                                ->hidden(fn(Get $get): bool => ! $get('import_prefs.preprocess') || ! $get('status')),
                             Forms\Components\TagsInput::make('import_prefs.included_group_prefixes')
-                                ->label('Group prefixes to import')
-                                ->helperText('Press [tab] or [return] to add item. Use to include multiple groups that have a similar prefix (.e.g.: "US -", "UK -", etc.)')
+                                ->label(fn(Get $get) => ! $get('import_prefs.use_regex') ? 'Group prefixes to import' : 'Regex patterns to import')
+                                ->helperText('Press [tab] or [return] to add item.')
                                 ->columnSpan(1)
                                 ->suggestions([
                                     'US -',
                                     'UK -',
-                                    'CA -'
+                                    'CA -',
+                                    '^(US|UK|CA)',
+                                    'Sports.*HD$',
+                                    '\[.*\]'
                                 ])
-                                ->tagSuffix('*')
                                 ->splitKeys(['Tab', 'Return', ','])
-                                ->hidden(fn(Get $get): bool => ! $get('import_prefs.preprocess') || !$get('status')),
+                                ->hidden(fn(Get $get): bool => ! $get('import_prefs.preprocess') || ! $get('status')),
                             Forms\Components\TagsInput::make('import_prefs.ignored_file_types')
                                 ->label('Ignored file types')
                                 ->helperText('Press [tab] or [return] to add item. You can ignore certain file types from being imported (.e.g.: ".mkv", ".mp4", etc.) This is useful for ignoring VOD or other unwanted content.')
