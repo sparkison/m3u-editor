@@ -249,14 +249,8 @@ class ProcessM3uImport implements ShouldQueue
                 $url = str($playlist->url)->replace(' ', '%20');
 
                 // We need to grab the file contents first and set to temp file
-                $userPreferences = app(GeneralSettings::class);
-                try {
-                    $verify = !$userPreferences->disable_ssl_verification;
-                    $userAgent = $userPreferences->playlist_agent_string;
-                } catch (Exception $e) {
-                    $verify = true;
-                    $userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13';
-                }
+                $verify = !$playlist->disable_ssl_verification;
+                $userAgent = empty($playlist->user_agent) ? $this->userAgent : $playlist->user_agent;
                 $response = Http::withUserAgent($userAgent)
                     ->withOptions(['verify' => $verify])
                     ->timeout(60 * 5) // set timeout to five minues
