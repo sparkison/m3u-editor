@@ -51,11 +51,7 @@ class EpgGenerateController extends Controller
 
                         // Keep track of which EPGs have which channels mapped
                         // Need this to output the <programme> tags later
-                        if (!array_key_exists($epgData->epg_id, $epgChannels)) {
-                            $epgChannels[$epgData->epg_id] = [$epgData->channel_id];
-                        } else {
-                            $epgChannels[$epgData->epg_id][] = $epgData->channel_id;
-                        }
+                        $epgChannels[$epgData->epg_id][$epgData->channel_id] = $channel->stream_id;
 
                         // Output the <channel> tag
                         echo '  <channel id="' . $channel->stream_id . '">' . PHP_EOL;
@@ -117,7 +113,7 @@ class EpgGenerateController extends Controller
                             if (!$channelId) {
                                 continue;
                             }
-                            if (!in_array($channelId, $channels)) {
+                            if (!array_key_exists($channelId, $channels)) {
                                 continue;
                             }
 
@@ -131,7 +127,7 @@ class EpgGenerateController extends Controller
                             $item = $itemDom->documentElement;
 
                             // Modify the attribute
-                            $item->setAttribute('channel', $channel->stream_id);
+                            $item->setAttribute('channel', $channels[$channelId]);
 
                             // Output modified line
                             echo "  " . $itemDom->saveXML($item) . PHP_EOL;
