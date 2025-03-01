@@ -8,7 +8,6 @@ use Throwable;
 use App\Enums\EpgStatus;
 use App\Models\Epg;
 use App\Models\Job;
-use App\Settings\GeneralSettings;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;

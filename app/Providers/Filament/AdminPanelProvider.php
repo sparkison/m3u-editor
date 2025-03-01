@@ -7,6 +7,7 @@ use App\Filament\Auth\Login;
 use App\Filament\Auth\EditProfile;
 use App\Filament\Pages\CustomDashboard;
 use App\Filament\Widgets\DiscordWidget;
+use App\Filament\Widgets\PayPalDonateWidget;
 use App\Settings\GeneralSettings;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -81,6 +82,7 @@ class AdminPanelProvider extends PanelProvider
             ->widgets([
                 Widgets\AccountWidget::class,
                 DiscordWidget::class,
+                PayPalDonateWidget::class,
             ])
             ->plugins([
                 TableLayoutTogglePlugin::make(),
