@@ -4,6 +4,8 @@
 
 A simple `m3u` playlist editor, similar to **xteve** or **threadfin**, with `epg` management.
 
+Works with m3u, m3u8, m3u+ and Xtream codes api!
+
 > [!TIP]  
 > Has been tested on large playlist ([https://github.com/iptv-org/iptv](https://github.com/iptv-org/iptv)), with up to 10000+ channels. Note that larger lists will take longer to sync (it takes aproximately 1s for every 1000 channels.). If you are experiencing issues with your playlist, try the m3u playlist url provided in the link above to confirm it works to help rule out network or connectivity issues.
 
@@ -11,12 +13,12 @@ A simple `m3u` playlist editor, similar to **xteve** or **threadfin**, with `epg
 
 Feel free to [open an issue](https://github.com/sparkison/m3u-editor/issues/new?template=bug_report.md) on this repo, you can also join our Discord server to ask questions and get help, help others, suggest new ideas, and offer suggestions for improvements! 🎉
 
-[![](https://dcbadge.limes.pink/api/server/szPUzZT6)](https://discord.gg/rS3abJ5dz7)
+[![](https://dcbadge.limes.pink/api/server/rS3abJ5dz7)](https://discord.gg/rS3abJ5dz7)
 
 ## How It Works
 
 1. Initialization and M3U Playlist(s) creation:
-    - The service loads M3U playlist from specified URL, downloading and processing it.
+    - The service loads M3U playlist from specified URL, provided file, or via Xtream API, downloading and processing it.
     - Each playlist will have a unique URL to output enabled channels and any customizations
     - Only enabled channels will be returned.
 2. Initialization and XML EPG(s) creation:
@@ -42,7 +44,7 @@ Feel free to [open an issue](https://github.com/sparkison/m3u-editor/issues/new?
 ## Prerequisites
 
 - [Docker](https://www.docker.com/) installed on your system.
-- M3U URLs/files containing an M3U playlist of video streams.
+- Xtream codes API login info or M3U URLs/files containing an M3U playlist of video streams.
 - (Optionally) EPG URLs/files containing valid XMLTV data.
 
 ## Screenshots
