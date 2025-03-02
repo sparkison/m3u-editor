@@ -175,7 +175,7 @@ class ProcessEpgImport implements ShouldQueue
                 LazyCollection::make(function () use ($channelReader, $defaultChannelData) {
                     // Loop through the XML data
                     $count = 0;
-                    while ($channelReader->read()) {
+                    while (@$channelReader->read()) {
                         // Limit the number of items to process
                         if ($count >= $this->maxItems) {
                             break;
@@ -197,7 +197,7 @@ class ProcessEpgImport implements ShouldQueue
                             ];
 
                             // Get the node data
-                            while ($innerReader->read()) {
+                            while (@$innerReader->read()) {
                                 if ($innerReader->nodeType == XMLReader::ELEMENT) {
                                     switch ($innerReader->name) {
                                         case 'channel':

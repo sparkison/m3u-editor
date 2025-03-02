@@ -105,7 +105,7 @@ class EpgGenerateController extends Controller
                     $programReader->open('compress.zlib://' . $filePath);
 
                     // Loop through the XML data
-                    while ($programReader->read()) {
+                    while (@$programReader->read()) {
                         // Only consider XML elements and programme nodes
                         if ($programReader->nodeType == XMLReader::ELEMENT && $programReader->name === 'programme') {
                             // Get the channel id
