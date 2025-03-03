@@ -49,6 +49,7 @@ class EpgChannelResource extends Resource
             ->defaultPaginationPageOption(25)
             ->columns([
                 Tables\Columns\ImageColumn::make('icon')
+                    ->checkFileExistence(false)
                     ->toggleable()
                     ->circular(),
                 Tables\Columns\TextInputColumn::make('display_name')

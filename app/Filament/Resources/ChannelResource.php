@@ -87,6 +87,7 @@ class ChannelResource extends Resource
                                         Tables\Columns\ImageColumn::make('logo')
                                             ->toggleable()
                                             ->columnSpan(1)
+                                            ->checkFileExistence(false)
                                             ->circular(),
                                         Tables\Columns\ToggleColumn::make('enabled')
                                             ->toggleable()
@@ -171,6 +172,7 @@ class ChannelResource extends Resource
                     ])
             ] : [
                 Tables\Columns\ImageColumn::make('logo')
+                    ->checkFileExistence(false)
                     ->toggleable()
                     ->circular(),
                 Tables\Columns\TextColumn::make('title')

@@ -34,6 +34,7 @@ class ChannelsRelationManager extends RelationManager
             ->defaultPaginationPageOption(25)
             ->columns([
                 Tables\Columns\ImageColumn::make('logo')
+                    ->checkFileExistence(false)
                     ->circular(),
                 Tables\Columns\TextColumn::make('title')
                     ->searchable()
@@ -100,7 +101,7 @@ class ChannelsRelationManager extends RelationManager
             ])
             ->headerActions([
                 Tables\Actions\AttachAction::make()
-                    // ->preloadRecordSelect()
+                // ->preloadRecordSelect()
 
                 // Advanced attach when adding pivot values:
                 // Tables\Actions\AttachAction::make()->form(fn(Tables\Actions\AttachAction $action): array => [
