@@ -40,7 +40,7 @@
                 </h2>
 
                 <p class="text-sm text-gray-500 dark:text-gray-400">
-                    Support this project by donating
+                    Help support this project by donating! Any amount is appreciated.
                 </p>
             </div>
 
