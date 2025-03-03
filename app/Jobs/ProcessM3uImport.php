@@ -375,7 +375,6 @@ class ProcessM3uImport implements ShouldQueue
                     $count = 0;
                     foreach ($m3uParser->parseFile($filePath, max_length: 2048) as $item) {
                         $url = $item->getPath();
-                        $maxChannels = $count++ >= $this->maxItems;
                         foreach ($excludeFileTypes as $excludeFileType) {
                             if (str_ends_with($url, $excludeFileType)) {
                                 continue 2;
@@ -416,13 +415,13 @@ class ProcessM3uImport implements ShouldQueue
                                 // Add group to list
                                 $this->groups[] = $chGroup;
 
-                                // Check if max channels reached
-                                if ($maxChannels) {
+                                // Check if preprocessing, and should include group
+                                if ($this->preprocess && !$this->shouldIncludeChannel($chGroup)) {
                                     continue;
                                 }
 
-                                // Check if preprocessing, and should include group
-                                if ($this->preprocess && !$this->shouldIncludeChannel($chGroup)) {
+                                // Check if max channels reached
+                                if ($count++ >= $this->maxItems) {
                                     continue;
                                 }
 
@@ -435,13 +434,13 @@ class ProcessM3uImport implements ShouldQueue
                             // Add group to list
                             $this->groups[] = $channel['group'];
 
-                            // Check if max channels reached
-                            if ($maxChannels) {
+                            // Check if preprocessing, and should include group
+                            if ($this->preprocess && !$this->shouldIncludeChannel($channel['group'])) {
                                 continue;
                             }
 
-                            // Check if preprocessing, and should include group
-                            if ($this->preprocess && !$this->shouldIncludeChannel($channel['group'])) {
+                            // Check if max channels reached
+                            if ($count++ >= $this->maxItems) {
                                 continue;
                             }
 
