@@ -7,7 +7,9 @@ use App\Filament\Auth\Login;
 use App\Filament\Auth\EditProfile;
 use App\Filament\Pages\CustomDashboard;
 use App\Filament\Widgets\DiscordWidget;
+use App\Filament\Widgets\KoFiWidget;
 use App\Filament\Widgets\PayPalDonateWidget;
+use App\Filament\Widgets\StatsOverview;
 use App\Settings\GeneralSettings;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -17,7 +19,6 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Support\Facades\FilamentView;
-use Filament\Widgets;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -28,6 +29,7 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Filament\Support\Enums\MaxWidth;
 use Hydrat\TableLayoutToggle\TableLayoutTogglePlugin;
 use Filament\View\PanelsRenderHook;
+use Filament\Widgets\AccountWidget;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -78,11 +80,14 @@ class AdminPanelProvider extends PanelProvider
                 CustomDashboard::class
             ])
             ->breadcrumbs($settings['show_breadcrumbs'])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
+            // Don't auto discover widgets, we'll manually register them
+            // ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                Widgets\AccountWidget::class,
+                AccountWidget::class,
                 DiscordWidget::class,
-                PayPalDonateWidget::class,
+                // PayPalDonateWidget::class,
+                KoFiWidget::class,
+                StatsOverview::class,
             ])
             ->plugins([
                 TableLayoutTogglePlugin::make(),

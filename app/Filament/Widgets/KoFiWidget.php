@@ -1,0 +1,12 @@
+<?php
+
+namespace App\Filament\Widgets;
+
+use Filament\Widgets\Widget;
+
+class KoFiWidget extends Widget
+{
+    protected int | string | array $columnSpan = 2;
+
+    protected static string $view = 'filament.widgets.ko-fi-widget';
+}

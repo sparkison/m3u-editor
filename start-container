@@ -156,10 +156,6 @@ php artisan migrate --force
 echo "Building assets..."
 npm install && npm run build
 
-if [ ! -z "$WWWUSER" ]; then
-    usermod -u $WWWUSER sail
-fi
-
 if [ ! -d /.composer ]; then
     mkdir /.composer
 fi

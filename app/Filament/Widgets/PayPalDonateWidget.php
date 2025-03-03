@@ -6,7 +6,7 @@ use Filament\Widgets\Widget;
 
 class PayPalDonateWidget extends Widget
 {
-    protected int | string | array $columnSpan = 2;
+    // protected int | string | array $columnSpan = 2;
     
     protected static string $view = 'filament.widgets.pay-pal-donate-widget';
 }
