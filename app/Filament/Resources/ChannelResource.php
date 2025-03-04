@@ -88,8 +88,8 @@ class ChannelResource extends Resource
                     ->label('Title')
                     ->rules(['min:0', 'max:255'])
                     ->placeholder(fn($record) => $record->title)
-                    ->toggleable()
-                    ->sortable(),
+                    ->toggleable(),
+                    // ->sortable(),
                 // Tables\Columns\TextColumn::make('title')
                 //     ->searchable()
                 //     ->wrap()
@@ -98,8 +98,8 @@ class ChannelResource extends Resource
                     ->label('Name')
                     ->rules(['min:0', 'max:255'])
                     ->placeholder(fn($record) => $record->name)
-                    ->toggleable(isToggledHiddenByDefault: false)
-                    ->sortable(),
+                    ->toggleable(isToggledHiddenByDefault: false),
+                    // ->sortable(),
                 // Tables\Columns\TextColumn::make('name')
                 //     ->searchable()
                 //     ->wrap()
