@@ -138,7 +138,7 @@ class ChannelResource extends Resource
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('logo_type')
-                    ->label('Preferred Logo')
+                    ->label('Preferred Icon')
                     ->sortable()
                     ->badge()
                     ->toggleable()
