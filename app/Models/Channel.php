@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ChannelLogoType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -24,6 +25,7 @@ class Channel extends Model
         'user_id' => 'integer',
         'playlist_id' => 'integer',
         'group_id' => 'integer',
+        'logo_type' => ChannelLogoType::class,
     ];
 
     public function user(): BelongsTo

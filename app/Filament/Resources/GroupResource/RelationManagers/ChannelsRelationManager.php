@@ -16,7 +16,7 @@ use Hydrat\TableLayoutToggle\Concerns\HasToggleableTable;
 
 class ChannelsRelationManager extends RelationManager
 {
-    use HasToggleableTable;
+    // use HasToggleableTable;
     
     protected static string $relationship = 'channels';
 

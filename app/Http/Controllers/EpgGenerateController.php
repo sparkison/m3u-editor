@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ChannelLogoType;
 use DOMDocument;
 use XMLReader;
 use App\Models\Channel;
@@ -53,11 +54,20 @@ class EpgGenerateController extends Controller
                         // Need this to output the <programme> tags later
                         $epgChannels[$epgData->epg_id][$epgData->channel_id] = $channel->stream_id;
 
+                        // Get the icon
+                        $icon = '';
+                        if ($channel->logo_type === ChannelLogoType::Epg && $epgData->icon) {
+                            $icon = $epgData->icon ?? '';
+                        } elseif ($channel->logo_type === ChannelLogoType::Channel && $channel->logo) {
+                            $icon = $channel->logo ?? '';
+                        }
+
                         // Output the <channel> tag
+                        $title = $channel->title_custom ?? $channel->title;
                         echo '  <channel id="' . $channel->stream_id . '">' . PHP_EOL;
-                        echo '    <display-name lang="' . $epgData->lang . '">' . htmlspecialchars($channel->title) . '</display-name>';
-                        if ($epgData->icon) {
-                            echo PHP_EOL . '    <icon src="' . $epgData->icon . '"/>';
+                        echo '    <display-name lang="' . $epgData->lang . '">' . htmlspecialchars($title) . '</display-name>';
+                        if ($icon) {
+                            echo PHP_EOL . '    <icon src="' . $icon . '"/>';
                         }
                         echo PHP_EOL . '  </channel>' . PHP_EOL;
                     }

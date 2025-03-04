@@ -19,7 +19,7 @@ use Hydrat\TableLayoutToggle\Concerns\HasToggleableTable;
 
 class ListChannels extends ListRecords
 {
-    use HasToggleableTable;
+    // use HasToggleableTable;
     
     protected static string $resource = ChannelResource::class;
 
