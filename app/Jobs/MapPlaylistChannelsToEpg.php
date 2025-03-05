@@ -35,6 +35,8 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
         public ?int $playlist = null,
         public ?array $channels = null,
         public ?bool $force = false,
+        public ?bool $recurring = false,
+        public ?int $epgMapId = null,
     ) {
         //
     }
@@ -68,15 +70,27 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
         // Create the record
         $playlist = $this->playlist ? Playlist::find($this->playlist) : null;
         $subtext = $playlist ? ' -> ' . $playlist->name . ' mapping' : ' custom channel mapping';
-        $map = EpgMap::create([
-            'name' => $epg->name . $subtext,
-            'epg_id' => $epg->id,
-            'user_id' => $epg->user_id,
-            'uuid' => $batchNo,
-            'status' => EpgStatus::Processing,
-            'processing' => true,
-            'override' => $this->force,
-        ]);
+        if ($this->epgMapId) {
+            $map = EpgMap::find($this->epgMapId);
+            $map->update([
+                'uuid' => $batchNo,
+                'progress' => 0,
+                'status' => EpgStatus::Processing,
+                'processing' => true,
+            ]);
+        } else {
+            $map = EpgMap::create([
+                'name' => $epg->name . $subtext,
+                'epg_id' => $epg->id,
+                'playlist_id' => $playlist ? $playlist->id : null,
+                'user_id' => $epg->user_id,
+                'uuid' => $batchNo,
+                'status' => EpgStatus::Processing,
+                'processing' => true,
+                'override' => $this->force,
+                'recurring' => $this->recurring,
+            ]);
+        }
 
         try {
             // Fetch the playlist (if set)

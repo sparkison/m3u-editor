@@ -41,7 +41,7 @@ class Playlist extends Model
     {
         return "playlist/{$this->uuid}/playlist.m3u";
     }
-    
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -65,5 +65,10 @@ class Playlist extends Model
     public function mergedPlaylists(): BelongsToMany
     {
         return $this->belongsToMany(MergedPlaylist::class, 'merged_playlist_playlist');
+    }
+
+    public function epgMaps(): HasMany
+    {
+        return $this->hasMany(EpgMap::class);
     }
 }

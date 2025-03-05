@@ -20,7 +20,7 @@ use Hydrat\TableLayoutToggle\Concerns\HasToggleableTable;
 class ListChannels extends ListRecords
 {
     // use HasToggleableTable;
-    
+
     protected static string $resource = ChannelResource::class;
 
     protected function getHeaderActions(): array
@@ -43,9 +43,13 @@ class ListChannels extends ListRecords
                         ->options(Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
                         ->searchable(),
                     Forms\Components\Toggle::make('overwrite')
-                        ->label('Overwrite previously mapped channels')
+                        ->label('Overwrite')
+                        ->helperText('Overwrite channels with existing mappings?')
                         ->default(false),
-
+                    Forms\Components\Toggle::make('recurring')
+                        ->label('Recurring')
+                        ->helperText('Re-run this mapping everytime the EPG is synced?')
+                        ->default(false),
                 ])
                 ->action(function (Collection $records, array $data): void {
                     app('Illuminate\Contracts\Bus\Dispatcher')
@@ -53,6 +57,7 @@ class ListChannels extends ListRecords
                             epg: (int)$data['epg'],
                             playlist: $data['playlist'],
                             force: $data['overwrite'],
+                            recurring: $data['recurring'],
                         ));
                 })->after(function () {
                     Notification::make()

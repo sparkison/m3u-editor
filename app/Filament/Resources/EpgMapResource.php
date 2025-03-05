@@ -71,19 +71,25 @@ class EpgMapResource extends Resource
                         '1' => 'success',
                         '0' => 'danger',
                     })->toggleable()->sortable(),
+                Tables\Columns\IconColumn::make('recurring')
+                    ->label('Recurring')
+                    ->icon(fn(string $state): string => match ($state) {
+                        '1' => 'heroicon-o-check-circle',
+                        '0' => 'heroicon-o-minus-circle',
+                    })->color(fn(string $state): string => match ($state) {
+                        '1' => 'success',
+                        '0' => 'danger',
+                    })->toggleable()->sortable(),
                 Tables\Columns\TextColumn::make('sync_time')
                     ->label('Sync Time')
                     ->formatStateUsing(fn(string $state): string => gmdate('H:i:s', (int)$state))
                     ->toggleable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('updated_at')
-                    ->dateTime()
+                    ->label('Last ran')
+                    ->since()
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(isToggledHiddenByDefault: false),
             ])
             ->filters([
                 //

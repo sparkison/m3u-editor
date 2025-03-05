@@ -118,8 +118,8 @@ class GroupResource extends Resource
                             ->badge(),
                         Infolists\Components\TextEntry::make('playlist.name')
                             ->label('Playlist')
-                            ->badge(),
-                        // ->url(fn($record) => PlaylistResource::getUrl('edit', ['record' => $record->playlist_id])),
+                            //->badge(),
+                            ->url(fn($record) => PlaylistResource::getUrl('edit', ['record' => $record->playlist_id])),
                     ])
             ]);
     }

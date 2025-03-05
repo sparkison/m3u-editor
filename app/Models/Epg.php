@@ -46,4 +46,9 @@ class Epg extends Model
     {
         return $this->hasMany(EpgChannel::class);
     }
+
+    public function epgMaps(): HasMany
+    {
+        return $this->hasMany(EpgMap::class);
+    }
 }

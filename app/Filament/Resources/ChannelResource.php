@@ -266,7 +266,7 @@ class ChannelResource extends Resource
                         ->modalDescription('Move the selected channels(s) to the chosen group.')
                         ->modalSubmitActionLabel('Move now'),
                     Tables\Actions\BulkAction::make('map')
-                        ->label('Map EPG to seleted')
+                        ->label('Map EPG to selected')
                         ->form([
                             Forms\Components\Select::make('epg')
                                 ->required()
@@ -275,9 +275,9 @@ class ChannelResource extends Resource
                                 ->options(Epg::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
                                 ->searchable(),
                             Forms\Components\Toggle::make('overwrite')
-                                ->label('Overwrite previously mapped channels')
+                                ->label('Overwrite')
+                                ->helperText('Overwrite channels with existing mappings?')
                                 ->default(false),
-
                         ])
                         ->action(function (Collection $records, array $data): void {
                             app('Illuminate\Contracts\Bus\Dispatcher')

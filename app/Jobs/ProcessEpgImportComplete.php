@@ -21,11 +21,12 @@ class ProcessEpgImportComplete implements ShouldQueue
      * Create a new job instance.
      */
     public function __construct(
-        public int $userId,
-        public int $epgId,
+        public int    $userId,
+        public int    $epgId,
         public string $batchNo,
         public Carbon $start,
-    ) {
+    )
+    {
         //
     }
 
@@ -71,5 +72,18 @@ class ProcessEpgImportComplete implements ShouldQueue
             'progress' => 100,
             'processing' => false,
         ]);
+
+        // Check if there are any sync jobs that should be re-run
+        $epg->epgMaps()->where([
+            ['recurring', '=', true],
+            ['playlist_id', '!=', null],
+        ])->get()->each(function ($map) {
+            dispatch(new MapPlaylistChannelsToEpg(
+                epg: $map->epg_id,
+                playlist: $map->playlist_id,
+                epgMapId: $map->id,
+            ));
+        });
+
     }
 }

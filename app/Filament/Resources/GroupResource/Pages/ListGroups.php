@@ -27,7 +27,7 @@ class ListGroups extends ListRecords
                 ->successNotification(
                     Notification::make()
                         ->success()
-                        ->title('Group createdd')
+                        ->title('Group created')
                         ->body('You can now assign channels to this group from the Channels section.'),
                 )
         ];
