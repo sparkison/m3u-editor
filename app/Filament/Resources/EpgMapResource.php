@@ -62,34 +62,26 @@ class EpgMapResource extends Resource
                 Tables\Columns\TextColumn::make('mapped_count')
                     ->toggleable()
                     ->sortable(),
-                Tables\Columns\IconColumn::make('override')
-                    ->label('Override')
-                    ->icon(fn(string $state): string => match ($state) {
-                        '1' => 'heroicon-o-check-circle',
-                        '0' => 'heroicon-o-minus-circle',
-                    })->color(fn(string $state): string => match ($state) {
-                        '1' => 'success',
-                        '0' => 'danger',
-                    })->toggleable()->sortable(),
-                Tables\Columns\IconColumn::make('recurring')
-                    ->label('Recurring')
-                    ->icon(fn(string $state): string => match ($state) {
-                        '1' => 'heroicon-o-check-circle',
-                        '0' => 'heroicon-o-minus-circle',
-                    })->color(fn(string $state): string => match ($state) {
-                        '1' => 'success',
-                        '0' => 'danger',
-                    })->toggleable()->sortable(),
+                Tables\Columns\ToggleColumn::make('override')
+                    ->toggleable()
+                    ->tooltip('Override existing EPG mappings')
+                    ->disabled((fn(EpgMap $record) => $record->playlist_id === null))
+                    ->sortable(),
+                Tables\Columns\ToggleColumn::make('recurring')
+                    ->toggleable()
+                    ->tooltip('Run again on EPG sync')
+                    ->disabled((fn(EpgMap $record) => $record->playlist_id === null))
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('sync_time')
                     ->label('Sync Time')
                     ->formatStateUsing(fn(string $state): string => gmdate('H:i:s', (int)$state))
                     ->toggleable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('updated_at')
+                Tables\Columns\TextColumn::make('mapped_at')
                     ->label('Last ran')
                     ->since()
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: false),
+                    ->toggleable(),
             ])
             ->filters([
                 //

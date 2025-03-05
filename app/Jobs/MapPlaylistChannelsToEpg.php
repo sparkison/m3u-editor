@@ -77,6 +77,7 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                 'progress' => 0,
                 'status' => EpgStatus::Processing,
                 'processing' => true,
+                'mapped_at' => now(),
             ]);
         } else {
             $map = EpgMap::create([
@@ -89,6 +90,7 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                 'processing' => true,
                 'override' => $this->force,
                 'recurring' => $this->recurring,
+                'mapped_at' => now(),
             ]);
         }
 

@@ -72,18 +72,23 @@ class ChannelResource extends Resource
             ->paginated([10, 25, 50, 100, 250])
             ->defaultPaginationPageOption(25)
             ->columns([
+                Tables\Columns\TextColumn::make('stream_id')
+                    ->label('ID')
+                    ->searchable()
+                    ->toggleable()
+                    ->sortable(),
                 Tables\Columns\ImageColumn::make('logo')
                     ->label('Icon')
                     ->checkFileExistence(false)
-                    ->stacked()
+                    ->height(40)
+                    ->width('auto')
                     ->getStateUsing(function ($record) {
                         if ($record->logo_type === ChannelLogoType::Channel) {
                             return $record->logo;
                         }
                         return $record->epgChannel?->icon ?? $record->logo;
                     })
-                    ->toggleable()
-                    ->circular(),
+                    ->toggleable(),
                 Tables\Columns\TextInputColumn::make('title_custom')
                     ->label('Title')
                     ->rules(['min:0', 'max:255'])
@@ -105,10 +110,6 @@ class ChannelResource extends Resource
                 //     ->wrap()
                 //     ->toggleable()
                 //     ->sortable(),
-                Tables\Columns\TextColumn::make('stream_id')
-                    ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: false)
-                    ->sortable(),
                 Tables\Columns\ToggleColumn::make('enabled')
                     ->toggleable()
                     ->tooltip('Toggle channel status')
@@ -136,6 +137,7 @@ class ChannelResource extends Resource
                     ->label('EPG Channel')
                     ->toggleable()
                     ->searchable()
+                    ->limit(40)
                     ->sortable(),
                 Tables\Columns\TextColumn::make('logo_type')
                     ->label('Preferred Icon')
