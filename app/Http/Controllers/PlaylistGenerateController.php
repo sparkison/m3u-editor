@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ChannelLogoType;
 use App\Models\Playlist;
 use App\Models\MergedPlaylist;
 use App\Models\CustomPlaylist;
@@ -30,13 +31,28 @@ class PlaylistGenerateController extends Controller
                 // Get all active channels
                 $channels = $playlist->channels()
                     ->where('enabled', true)
+                    ->with('epgChannel')
                     ->orderBy('channel')
                     ->get();
 
                 // Output the enabled channels
                 echo "#EXTM3U\n";
                 foreach ($channels as $channel) {
-                    echo "#EXTINF:-1 tvg-chno=\"$channel->channel\" tvg-id=\"$channel->stream_id\" tvg-name=\"$channel->name\" tvg-logo=\"$channel->logo\" group-title=\"$channel->group\"," . $channel->title . "\n";
+                    // Get the title and name
+                    $title = $channel->title_custom ?? $channel->title;
+                    $name = $channel->name_custom ?? $channel->name;
+                    $epgData = $channel->epgChannel ?? null;
+
+                    // Get the icon
+                    $icon = '';
+                    if ($channel->logo_type === ChannelLogoType::Epg && $epgData && $epgData->icon) {
+                        $icon = $epgData->icon ?? '';
+                    } elseif ($channel->logo_type === ChannelLogoType::Channel && $channel->logo) {
+                        $icon = $channel->logo ?? '';
+                    }
+
+                    // Output the channel
+                    echo "#EXTINF:-1 tvg-chno=\"$channel->channel\" tvg-id=\"$channel->stream_id\" tvg-name=\"$name\" tvg-logo=\"$icon\" group-title=\"$channel->group\"," . $title . "\n";
                     echo $channel->url . "\n";
                 }
             },
