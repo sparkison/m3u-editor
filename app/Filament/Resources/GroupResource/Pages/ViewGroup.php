@@ -47,7 +47,7 @@ class ViewGroup extends ViewRecord
                         ->body('Group channels have been disabled.')
                         ->send();
                 })
-                ->color('danger')
+                ->color('warning')
                 ->requiresConfirmation()
                 ->modalIcon('heroicon-o-x-circle')
                 ->modalDescription('Disable all group channels now?')
