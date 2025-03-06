@@ -72,11 +72,6 @@ class ChannelResource extends Resource
             ->paginated([10, 25, 50, 100, 250])
             ->defaultPaginationPageOption(25)
             ->columns([
-                Tables\Columns\TextColumn::make('stream_id')
-                    ->label('ID')
-                    ->searchable()
-                    ->toggleable()
-                    ->sortable(),
                 Tables\Columns\ImageColumn::make('logo')
                     ->label('Icon')
                     ->checkFileExistence(false)
@@ -89,12 +84,22 @@ class ChannelResource extends Resource
                         return $record->epgChannel?->icon ?? $record->logo;
                     })
                     ->toggleable(),
+                Tables\Columns\TextInputColumn::make('stream_id_custom')
+                    ->label('ID')
+                    ->rules(['min:0', 'max:255'])
+                    ->placeholder(fn($record) => $record->stream_id)
+                    ->toggleable(),
+                //Tables\Columns\TextColumn::make('stream_id')
+                //    ->label('ID')
+                //    ->searchable()
+                //    ->toggleable()
+                //    ->sortable(),
                 Tables\Columns\TextInputColumn::make('title_custom')
                     ->label('Title')
                     ->rules(['min:0', 'max:255'])
                     ->placeholder(fn($record) => $record->title)
                     ->toggleable(),
-                    // ->sortable(),
+                // ->sortable(),
                 // Tables\Columns\TextColumn::make('title')
                 //     ->searchable()
                 //     ->wrap()
@@ -104,7 +109,7 @@ class ChannelResource extends Resource
                     ->rules(['min:0', 'max:255'])
                     ->placeholder(fn($record) => $record->name)
                     ->toggleable(isToggledHiddenByDefault: false),
-                    // ->sortable(),
+                // ->sortable(),
                 // Tables\Columns\TextColumn::make('name')
                 //     ->searchable()
                 //     ->wrap()
@@ -121,6 +126,12 @@ class ChannelResource extends Resource
                     ->tooltip('Channel number')
                     ->toggleable()
                     ->sortable(),
+                Tables\Columns\TextInputColumn::make('url_custom')
+                    ->label('URL')
+                    ->rules(['url'])
+                    ->type('url')
+                    ->placeholder(fn($record) => $record->url)
+                    ->toggleable(),
                 Tables\Columns\TextInputColumn::make('shift')
                     ->rules(['numeric', 'min:0'])
                     ->type('number')
@@ -139,17 +150,25 @@ class ChannelResource extends Resource
                     ->searchable()
                     ->limit(40)
                     ->sortable(),
-                Tables\Columns\TextColumn::make('logo_type')
+                Tables\Columns\SelectColumn::make('logo_type')
                     ->label('Preferred Icon')
+                    ->options([
+                        'channel' => 'Channel',
+                        'epg' => 'EPG',
+                    ])
                     ->sortable()
-                    ->badge()
-                    ->toggleable()
-                    ->color(fn(ChannelLogoType $state) => $state->getColor()),
-                Tables\Columns\TextColumn::make('url')
-                    ->url(fn($record): string => $record->url)
-                    ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true)
-                    ->sortable(),
+                    ->toggleable(),
+//                Tables\Columns\TextColumn::make('logo_type')
+//                    ->label('Preferred Icon')
+//                    ->sortable()
+//                    ->badge()
+//                    ->toggleable()
+//                    ->color(fn(ChannelLogoType $state) => $state->getColor()),
+//                Tables\Columns\TextColumn::make('url')
+//                    ->url(fn($record): string => $record->url)
+//                    ->searchable()
+//                    ->toggleable(isToggledHiddenByDefault: true)
+//                    ->sortable(),
                 Tables\Columns\TextColumn::make('lang')
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true)

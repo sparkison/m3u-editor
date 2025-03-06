@@ -41,19 +41,21 @@ class PlaylistGenerateController extends Controller
                     // Get the title and name
                     $title = $channel->title_custom ?? $channel->title;
                     $name = $channel->name_custom ?? $channel->name;
+                    $tvgId = $channel->stream_id_custom ?? $channel->stream_id;
+                    $url = $channel->url_custom ?? $channel->url;
                     $epgData = $channel->epgChannel ?? null;
 
                     // Get the icon
                     $icon = '';
-                    if ($channel->logo_type === ChannelLogoType::Epg && $epgData && $epgData->icon) {
+                    if ($channel->logo_type === ChannelLogoType::Epg && $epgData) {
                         $icon = $epgData->icon ?? '';
-                    } elseif ($channel->logo_type === ChannelLogoType::Channel && $channel->logo) {
+                    } elseif ($channel->logo_type === ChannelLogoType::Channel) {
                         $icon = $channel->logo ?? '';
                     }
 
                     // Output the channel
-                    echo "#EXTINF:-1 tvg-chno=\"$channel->channel\" tvg-id=\"$channel->stream_id\" tvg-name=\"$name\" tvg-logo=\"$icon\" group-title=\"$channel->group\"," . $title . "\n";
-                    echo $channel->url . "\n";
+                    echo "#EXTINF:-1 tvg-chno=\"$channel->channel\" tvg-id=\"$tvgId\" tvg-name=\"$name\" tvg-logo=\"$icon\" group-title=\"$channel->group\"," . $title . "\n";
+                    echo $url . "\n";
                 }
             },
             200,

@@ -49,22 +49,23 @@ class EpgGenerateController extends Controller
                     if ($channel->epgChannel) {
                         // Get the EPG channel data
                         $epgData = $channel->epgChannel;
+                        $streamId = $channel->stream_id_custom ?? $channel->stream_id;
 
                         // Keep track of which EPGs have which channels mapped
                         // Need this to output the <programme> tags later
-                        $epgChannels[$epgData->epg_id][$epgData->channel_id] = $channel->stream_id;
+                        $epgChannels[$epgData->epg_id][$epgData->channel_id] = $streamId;
 
                         // Get the icon
                         $icon = '';
-                        if ($channel->logo_type === ChannelLogoType::Epg && $epgData->icon) {
+                        if ($channel->logo_type === ChannelLogoType::Epg) {
                             $icon = $epgData->icon ?? '';
-                        } elseif ($channel->logo_type === ChannelLogoType::Channel && $channel->logo) {
+                        } elseif ($channel->logo_type === ChannelLogoType::Channel) {
                             $icon = $channel->logo ?? '';
                         }
 
                         // Output the <channel> tag
                         $title = $channel->title_custom ?? $channel->title;
-                        echo '  <channel id="' . $channel->stream_id . '">' . PHP_EOL;
+                        echo '  <channel id="' . $streamId . '">' . PHP_EOL;
                         echo '    <display-name lang="' . $epgData->lang . '">' . htmlspecialchars($title) . '</display-name>';
                         if ($icon) {
                             echo PHP_EOL . '    <icon src="' . $icon . '"/>';

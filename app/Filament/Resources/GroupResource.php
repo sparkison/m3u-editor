@@ -45,11 +45,13 @@ class GroupResource extends Resource
             ->paginated([10, 25, 50, 100, 250])
             ->defaultPaginationPageOption(25)
             ->columns([
-                Tables\Columns\TextColumn::make('name')
-                    ->searchable()
-                    ->sortable(),
+                Tables\Columns\TextInputColumn::make('name')
+                    ->label('Name')
+                    ->rules(['min:0', 'max:255'])
+                    ->placeholder(fn($record) => $record->name_internal)
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('name_internal')
-                    ->label('Playlist group name')
+                    ->label('Default name')
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('channels_count')
