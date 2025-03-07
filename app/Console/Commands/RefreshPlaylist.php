@@ -49,10 +49,14 @@ class RefreshPlaylist extends Command
                 $this->info('No playlists ready refresh');
                 return;
             }
-            $playlists->get()->each(function (Playlist $playlist) {
+            $count = 0;
+            $playlists->get()->each(function (Playlist $playlist) use (&$count) {
                 // Check the sync interval to see if we need to refresh yet
-                $nextSync = $playlist->synced->add($playlist->interval ?? '24 hours');
+                $nextSync = $playlist->sync_interval
+                    ? $playlist->synced->add(CarbonInterval::fromString($playlist->sync_interval))
+                    : $playlist->synced->addDay();
                 if (!$nextSync->isFuture()) {
+                    $count++;
                     dispatch(new ProcessM3uImport($playlist));
                 }
             });

@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Enums\EpgStatus;
 use App\Jobs\ProcessEpgImport;
 use App\Models\Epg;
+use Carbon\CarbonInterval;
 use Illuminate\Console\Command;
 
 class RefreshEpg extends Command
@@ -47,10 +48,14 @@ class RefreshEpg extends Command
                 $this->info('No EPGs ready refresh');
                 return;
             }
-            $epgs->get()->each(function (Epg $epg) {
+            $count = 0;
+            $epgs->get()->each(function (Epg $epg) use (&$count) {
                 // Check the sync interval to see if we need to refresh yet
-                $nextSync = $epg->synced->add($epg->interval ?? '24 hours');
+                $nextSync = $epg->sync_interval
+                    ? $epg->synced->add(CarbonInterval::fromString($epg->sync_interval))
+                    : $epg->synced->addDay();
                 if (!$nextSync->isFuture()) {
+                    $count++;
                     dispatch(new ProcessEpgImport($epg));
                 }
             });
