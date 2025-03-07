@@ -23,6 +23,8 @@ class EpgChannel extends Model
         'user_id' => 'integer',
     ];
 
+    protected $with = ['epg'];
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -30,7 +32,8 @@ class EpgChannel extends Model
 
     public function epg(): BelongsTo
     {
-        return $this->belongsTo(Epg::class);
+        return $this->belongsTo(Epg::class)
+            ->select(['id', 'name']);
     }
 
     public function channels(): HasMany
