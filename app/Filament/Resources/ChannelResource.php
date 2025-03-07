@@ -438,11 +438,23 @@ class ChannelResource extends Resource
                 ->placeholder(fn(Get $get) => $get('url'))
                 ->helperText("Leave empty to use playlist default value.")
                 ->rules(['min:1', 'max:255'])
+                ->suffixAction(
+                    Forms\Components\Actions\Action::make('copy')
+                        ->icon('heroicon-s-clipboard-document-check')
+                        ->action(function (Get $get, $livewire, $state) {
+                            $url =  $state ?? $get('url');
+                            $livewire->js(
+                                'window.navigator.clipboard.writeText("' . $url . '");
+                                $tooltip("' . __('Copied to clipboard') . '", { timeout: 1500 });'
+                            );
+                        })
+                )
                 ->type('url'),
             Forms\Components\Select::make('epg_channel_id')
                 ->label('EPG Channel')
                 ->helperText('Select an associated EPG channel for this channel.')
                 ->relationship('epgChannel', 'name')
+                ->getOptionLabelFromRecordUsing(fn ($record) => "$record->name [{$record->epg->name}]")
                 ->searchable()
                 ->columnSpan(1),
             Forms\Components\Select::make('logo_type')

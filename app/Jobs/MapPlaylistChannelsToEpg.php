@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Enums\EpgStatus;
+use App\Services\SimilaritySearchService;
 use Throwable;
 use Exception;
 use App\Models\Channel;
@@ -27,18 +28,22 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
     // Giving a timeout of 15 minutes to the Job to process the mapping
     public $timeout = 60 * 15;
 
+    // Similarity search service
+    protected SimilaritySearchService $similaritySearch;
+
     /**
      * Create a new job instance.
      */
     public function __construct(
-        public int $epg,
-        public ?int $playlist = null,
+        public int    $epg,
+        public ?int   $playlist = null,
         public ?array $channels = null,
-        public ?bool $force = false,
-        public ?bool $recurring = false,
-        public ?int $epgMapId = null,
-    ) {
-        //
+        public ?bool  $force = false,
+        public ?bool  $recurring = false,
+        public ?int   $epgMapId = null,
+    )
+    {
+        $this->similaritySearch = new SimilaritySearchService();
     }
 
     /**
@@ -102,15 +107,12 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                     ->when(!$this->force, function ($query) {
                         $query->where('epg_channel_id', null);
                     })->cursor();
-            } else {
-                if ($playlist) {
-                    $channels = $playlist->channels()
-                        ->when(!$this->force, function ($query) {
-                            $query->where('epg_channel_id', null);
-                        })->cursor();
-                }
+            } else if ($playlist) {
+                $channels = $playlist->channels()
+                    ->when(!$this->force, function ($query) {
+                        $query->where('epg_channel_id', null);
+                    })->cursor();
             }
-
 
             // Update the progress
             $progress = 0;
@@ -133,6 +135,13 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                         })
                         ->select('id', 'channel_id')
                         ->first();
+
+
+                    // @TODO: implement and test similarity search function.
+                    // Something like this maybe?
+                    // $epgChannel = $this->similaritySearch('epg_channels', 'channel_id', $channel->name, 1);
+                    // Should probably set toggle to use similar search, along with threshold value.
+
 
                     // If EPG channel found, link it to the Playlist channel
                     if ($epgChannel) {

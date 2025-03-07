@@ -34,7 +34,7 @@ class RefreshPlaylist extends Command
             $force = $this->argument('force') ?? false;
             $this->info("Refreshing playlist with ID: {$playlistId}");
             $playlist = Playlist::findOrFail($playlistId);
-            dispatch(new ProcessM3uImport($playlist, boolval($force)));
+            dispatch(new ProcessM3uImport($playlist, (bool)$force));
             $this->info('Dispatched playlist for refresh');
         } else {
             $this->info('Refreshing all playlists');
