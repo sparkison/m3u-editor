@@ -61,6 +61,7 @@ class ChannelResource extends Resource
             ->modifyQueryUsing(function (Builder $query) {
                 $query->with('epgChannel');
             })
+            ->deferLoading()
 //            ->contentGrid(fn() => $livewire->isListLayout()
 //                ? null
 //                : [
@@ -96,6 +97,7 @@ class ChannelResource extends Resource
                     ->label('Sort Order')
                     ->rules(['min:0'])
                     ->type('number')
+                    ->placeholder('Sort Order')
                     ->sortable()
                     ->tooltip('Channel sort order')
                     ->toggleable(),
