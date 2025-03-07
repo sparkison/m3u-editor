@@ -53,7 +53,7 @@ class ChannelResource extends Resource
 
     public static function setupTable(Table $table, $relationId = null): Table
     {
-        // $livewire = $table->getLivewire();
+//        $livewire = $table->getLivewire();
         return $table->persistFiltersInSession()
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
@@ -61,15 +61,23 @@ class ChannelResource extends Resource
             ->modifyQueryUsing(function (Builder $query) {
                 $query->with('epgChannel');
             })
-            // ->contentGrid(fn() => $livewire->isListLayout()
-            //     ? null
-            //     : [
-            //         'md' => 2,
-            //         'lg' => 3,
-            //         'xl' => 4,
-            //         '2xl' => 5,
-            //     ])
-            ->paginated([10, 25, 50, 100, 250])
+//            ->contentGrid(fn() => $livewire->isListLayout()
+//                ? null
+//                : [
+//                    'md' => 2,
+//                    'lg' => 3,
+//                    'xl' => 4,
+//                    '2xl' => 5,
+//                ])
+//            ->reorderable('sort', $relationId !== null)
+//            ->reorderRecordsTriggerAction(
+//                fn(Tables\Actions\Action $action, bool $isReordering) => $action
+//                    ->button()
+//                    ->tooltip('')
+//                    ->label($isReordering ? 'Disable reordering' : 'Enable reordering'),
+//            )
+            ->paginated([10, 25, 50, 100])
+            ->paginatedWhileReordering()
             ->defaultPaginationPageOption(25)
             ->columns([
                 Tables\Columns\ImageColumn::make('logo')
@@ -83,6 +91,13 @@ class ChannelResource extends Resource
                         }
                         return $record->epgChannel?->icon ?? $record->logo;
                     })
+                    ->toggleable(),
+                Tables\Columns\TextInputColumn::make('sort')
+                    ->label('Sort Order')
+                    ->rules(['min:0'])
+                    ->type('number')
+                    ->sortable()
+                    ->tooltip('Channel sort order')
                     ->toggleable(),
                 Tables\Columns\TextInputColumn::make('stream_id_custom')
                     ->label('ID')
@@ -442,7 +457,7 @@ class ChannelResource extends Resource
                     Forms\Components\Actions\Action::make('copy')
                         ->icon('heroicon-s-clipboard-document-check')
                         ->action(function (Get $get, $livewire, $state) {
-                            $url =  $state ?? $get('url');
+                            $url = $state ?? $get('url');
                             $livewire->js(
                                 'window.navigator.clipboard.writeText("' . $url . '");
                                 $tooltip("' . __('Copied to clipboard') . '", { timeout: 1500 });'
@@ -454,7 +469,7 @@ class ChannelResource extends Resource
                 ->label('EPG Channel')
                 ->helperText('Select an associated EPG channel for this channel.')
                 ->relationship('epgChannel', 'name')
-                ->getOptionLabelFromRecordUsing(fn ($record) => "$record->name [{$record->epg->name}]")
+                ->getOptionLabelFromRecordUsing(fn($record) => "$record->name [{$record->epg->name}]")
                 ->searchable()
                 ->columnSpan(1),
             Forms\Components\Select::make('logo_type')

@@ -32,7 +32,9 @@ class PlaylistGenerateController extends Controller
                 $channels = $playlist->channels()
                     ->where('enabled', true)
                     ->with('epgChannel')
+                    ->orderBy('sort')
                     ->orderBy('channel')
+                    ->orderBy('title')
                     ->get();
 
                 // Output the enabled channels
