@@ -186,8 +186,8 @@ class PlaylistResource extends Resource
                         ->modalDescription('Reset playlist status so it can be processed again. Only perform this action if you are having problems with the playlist syncing.')
                         ->modalSubmitActionLabel('Yes, reset now'),
                     Tables\Actions\DeleteAction::make(),
-                ]),
-            ])
+                ])->button()->hiddenLabel(),
+            ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
@@ -292,7 +292,7 @@ class PlaylistResource extends Resource
                                 ->url()
                                 ->columnSpan(2)
                                 ->required()
-                                ->hidden(fn(Get $get): bool => ! $get('xtream')),
+                                ->hidden(fn(Get $get): bool => !$get('xtream')),
 
                             Forms\Components\Grid::make()
                                 ->columns(2)
@@ -302,14 +302,14 @@ class PlaylistResource extends Resource
                                         ->label('Xtream API Username')
                                         ->required()
                                         ->columnSpan(1)
-                                        ->hidden(fn(Get $get): bool => ! $get('xtream')),
+                                        ->hidden(fn(Get $get): bool => !$get('xtream')),
                                     Forms\Components\TextInput::make('xtream_config.password')
                                         ->label('Xtream API Password')
                                         ->required()
                                         ->columnSpan(1)
                                         ->password()
                                         ->revealable()
-                                        ->hidden(fn(Get $get): bool => ! $get('xtream')),
+                                        ->hidden(fn(Get $get): bool => !$get('xtream')),
                                 ]),
 
                             Forms\Components\TextInput::make('url')
@@ -320,7 +320,7 @@ class PlaylistResource extends Resource
                                 ->requiredWithout('uploads')
                                 ->rules([new CheckIfUrlOrLocalPath()])
                                 ->maxLength(255)
-                                ->hidden(fn(Get $get): bool => !! $get('xtream')),
+                                ->hidden(fn(Get $get): bool => !!$get('xtream')),
                             Forms\Components\FileUpload::make('uploads')
                                 ->label('File')
                                 ->columnSpan(2)
@@ -329,7 +329,7 @@ class PlaylistResource extends Resource
                                 ->helperText('Upload the playlist file. This will be used to import groups and channels.')
                                 ->rules(['file'])
                                 ->requiredWithout('url')
-                                ->hidden(fn(Get $get): bool => !! $get('xtream')),
+                                ->hidden(fn(Get $get): bool => !!$get('xtream')),
                         ]),
 
                     Forms\Components\Grid::make()
@@ -381,7 +381,7 @@ class PlaylistResource extends Resource
                                             '1 week' => '1 week',
                                             '2 weeks' => '2 weeks',
                                             '1 month' => '1 month',
-                                        ])->hidden(fn(Get $get): bool => ! $get('auto_sync')),
+                                        ])->hidden(fn(Get $get): bool => !$get('auto_sync')),
                                 ]),
 
                             Forms\Components\DateTimePicker::make('synced')
@@ -389,7 +389,7 @@ class PlaylistResource extends Resource
                                 ->suffix('UTC')
                                 ->native(false)
                                 ->label('Last Synced')
-                                ->hidden(fn(Get $get, string $operation): bool => ! $get('auto_sync') || $operation === 'create')
+                                ->hidden(fn(Get $get, string $operation): bool => !$get('auto_sync') || $operation === 'create')
                                 ->helperText('Playlist will be synced at the specified interval. Timestamp is automatically updated after each sync. Set to any time in the past (or future) and the next sync will run when the defined interval has passed since the time set.'),
                         ])
                 ]),
@@ -420,7 +420,7 @@ class PlaylistResource extends Resource
                                 ->live()
                                 ->default(false)
                                 ->helperText('When enabled, groups will be included based on regex pattern match instead of prefix.')
-                                ->hidden(fn(Get $get): bool => ! $get('import_prefs.preprocess') || ! $get('status')),
+                                ->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
                             Forms\Components\Select::make('import_prefs.selected_groups')
                                 ->label('Groups to import')
                                 ->columnSpan(1)
@@ -434,9 +434,9 @@ class PlaylistResource extends Resource
                                     }
                                     return $options;
                                 })
-                                ->hidden(fn(Get $get): bool => ! $get('import_prefs.preprocess') || ! $get('status')),
+                                ->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
                             Forms\Components\TagsInput::make('import_prefs.included_group_prefixes')
-                                ->label(fn(Get $get) => ! $get('import_prefs.use_regex') ? 'Group prefixes to import' : 'Regex patterns to import')
+                                ->label(fn(Get $get) => !$get('import_prefs.use_regex') ? 'Group prefixes to import' : 'Regex patterns to import')
                                 ->helperText('Press [tab] or [return] to add item.')
                                 ->columnSpan(1)
                                 ->suggestions([
@@ -448,7 +448,7 @@ class PlaylistResource extends Resource
                                     '\[.*\]'
                                 ])
                                 ->splitKeys(['Tab', 'Return', ','])
-                                ->hidden(fn(Get $get): bool => ! $get('import_prefs.preprocess') || ! $get('status')),
+                                ->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
                             Forms\Components\TagsInput::make('import_prefs.ignored_file_types')
                                 ->label('Ignored file types')
                                 ->helperText('Press [tab] or [return] to add item. You can ignore certain file types from being imported (.e.g.: ".mkv", ".mp4", etc.) This is useful for ignoring VOD or other unwanted content.')
@@ -458,6 +458,28 @@ class PlaylistResource extends Resource
                                     '.mkv',
                                     '.mp4',
                                 ])->splitKeys(['Tab', 'Return', ',', ' ']),
+                        ]),
+                ]),
+            Forms\Components\Wizard\Step::make('Output')
+                ->schema([
+                    Forms\Components\Grid::make()
+                        ->columns(2)
+                        ->columnSpanFull()
+                        ->schema([
+                            Forms\Components\Toggle::make('auto_channel_increment')
+                                ->label('Auto channel number increment')
+                                ->columnSpan(1)
+                                ->inline(false)
+                                ->live()
+                                ->default(false)
+                                ->helperText('If no channel number is set, output an automatically incrementing number.'),
+                            Forms\Components\TextInput::make('channel_start')
+                                ->helperText('The starting channel number.')
+                                ->columnSpan(1)
+                                ->rules(['min:1'])
+                                ->type('number')
+                                ->hidden(fn(Get $get): bool => !$get('auto_channel_increment'))
+                                ->required(),
                         ])
                 ]),
         ];

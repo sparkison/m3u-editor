@@ -39,6 +39,7 @@ class PlaylistGenerateController extends Controller
 
                 // Output the enabled channels
                 echo "#EXTM3U\n";
+                $channelNumber = $playlist->auto_channel_increment ? $playlist->channel_start - 1 : 0;
                 foreach ($channels as $channel) {
                     // Get the title and name
                     $title = $channel->title_custom ?? $channel->title;
@@ -46,6 +47,10 @@ class PlaylistGenerateController extends Controller
                     $tvgId = $channel->stream_id_custom ?? $channel->stream_id;
                     $url = $channel->url_custom ?? $channel->url;
                     $epgData = $channel->epgChannel ?? null;
+                    $channelNo = $channel->channel;
+                    if (!$channelNo && $playlist->auto_channel_increment) {
+                        $channelNo = ++$channelNumber;
+                    }
 
                     // Get the icon
                     $icon = '';
@@ -56,7 +61,7 @@ class PlaylistGenerateController extends Controller
                     }
 
                     // Output the channel
-                    echo "#EXTINF:-1 tvg-chno=\"$channel->channel\" tvg-id=\"$tvgId\" tvg-name=\"$name\" tvg-logo=\"$icon\" group-title=\"$channel->group\"," . $title . "\n";
+                    echo "#EXTINF:-1 tvg-chno=\"$channelNo\" tvg-id=\"$tvgId\" tvg-name=\"$name\" tvg-logo=\"$icon\" group-title=\"$channel->group\"," . $title . "\n";
                     echo $url . "\n";
                 }
             },

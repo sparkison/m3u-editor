@@ -9,6 +9,7 @@ use App\Forms\Components\PlaylistM3uUrl;
 use App\Models\CustomPlaylist;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -81,8 +82,8 @@ class CustomPlaylistResource extends Resource
                         ->url(fn($record) => route('epg.generate', ['uuid' => $record->uuid]))
                         ->openUrlInNewTab(),
                     Tables\Actions\DeleteAction::make(),
-                ])
-            ])
+                ])->button()->hiddenLabel()
+            ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
@@ -134,6 +135,24 @@ class CustomPlaylistResource extends Resource
                 ->schema($schema)
                 ->columns(2),
 
+            Forms\Components\Section::make('Output')
+                ->columns(2)
+                ->schema([
+                    Forms\Components\Toggle::make('auto_channel_increment')
+                        ->label('Auto channel number increment')
+                        ->columnSpan(1)
+                        ->inline(false)
+                        ->live()
+                        ->default(false)
+                        ->helperText('If no channel number is set, output an automatically incrementing number.'),
+                    Forms\Components\TextInput::make('channel_start')
+                        ->helperText('The starting channel number.')
+                        ->columnSpan(1)
+                        ->rules(['min:1'])
+                        ->type('number')
+                        ->hidden(fn(Get $get): bool => !$get('auto_channel_increment'))
+                        ->required(),
+                ]),
         ];
     }
 }

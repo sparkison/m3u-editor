@@ -101,8 +101,8 @@ class GroupResource extends Resource
                     Tables\Actions\ViewAction::make(),
                     Tables\Actions\DeleteAction::make()
                         ->disabled(fn($record) => !$record->custom),
-                ]),
-            ])
+                ])->button()->hiddenLabel(),
+            ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
 //                     Tables\Actions\DeleteBulkAction::make(),
