@@ -6,6 +6,10 @@ use Illuminate\Support\Facades\Schedule;
  * Register schedules
  */
 
+// Check for updates
+Schedule::command('app:update-check')
+    ->daily();
+
 // Refresh playlists
 Schedule::command('app:refresh-playlist')
     ->everyFiveMinutes();

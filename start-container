@@ -140,6 +140,9 @@ fi
 # Set app key, if not previously set
 php artisan app:generate-key
 
+# Check for updates
+php artisan app:update-check
+
 # Clearing cache
 echo "Clearing cache..."
 php artisan cache:clear

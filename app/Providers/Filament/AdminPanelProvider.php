@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Widgets\UpdateNoticeWidget;
 use Exception;
 use App\Filament\Auth\Login;
 use App\Filament\Auth\EditProfile;
@@ -83,10 +84,12 @@ class AdminPanelProvider extends PanelProvider
             // Don't auto discover widgets, we'll manually register them
             // ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
+                UpdateNoticeWidget::class,
                 AccountWidget::class,
-                DiscordWidget::class,
                 // PayPalDonateWidget::class,
                 KoFiWidget::class,
+                DiscordWidget::class,
+
                 StatsOverview::class,
             ])
             ->plugins([

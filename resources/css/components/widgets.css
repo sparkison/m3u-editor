@@ -1,0 +1,5 @@
+.fi-wi-widget dl,
+.fi-wi-widget section,
+.fi-wi-widget .fi-fo-component-ctn {
+    @apply h-full;
+}
