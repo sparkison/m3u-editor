@@ -13,6 +13,7 @@ use App\Models\Playlist;
 use App\Settings\GeneralSettings;
 use Exception;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
@@ -38,15 +39,16 @@ class AppServiceProvider extends ServiceProvider
         Model::unguard();
 
         // Add log viewer auth
-        LogViewer::auth(function ($request) {
-            $userPreferences = app(GeneralSettings::class);
+        $userPreferences = app(GeneralSettings::class);
+        try {
+            $showLogs = $userPreferences->show_logs;
+        } catch (Exception $e) {
             $showLogs = false;
-            try {
-                $showLogs = $userPreferences->show_logs;
-            } catch (Exception $e) {
-            }
-            return $showLogs;
-        });
+        }
+        if (!$showLogs) {
+            Gate::define('viewLogViewer', fn() => false);
+        }
+        LogViewer::auth(fn($request) => $showLogs);
 
         // Listen for settings update
         Event::listen(SettingsSaved::class, function ($event) {

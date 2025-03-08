@@ -54,11 +54,21 @@ class Preferences extends SettingsPage
                             ->size('sm')
                             ->url('/logs')
                             ->openUrlInNewTab(true),
+                        Forms\Components\Actions\Action::make('view_queue_manager')
+                            ->label('Queue Manager')
+                            ->icon('heroicon-o-arrow-top-right-on-square')
+                            ->iconPosition('after')
+                            ->size('sm')
+                            ->url('/horizon')
+                            ->openUrlInNewTab(true),
                     ])
                     ->schema([
                         Forms\Components\Toggle::make('show_logs')
                             ->label('Make log files viewable')
                             ->helperText('When enabled you can view the log files using the "View Logs" button. When disabled the logs endpoint will return a 403 (Unauthorized).'),
+                        Forms\Components\Toggle::make('show_queue_manager')
+                            ->label('Allow queue manager access')
+                            ->helperText('When enabled you can access the queue manager using the "Queue Manager" button. When disabled the queue manager endpoint will return a 403 (Unauthorized).'),
                     ])
             ]);
     }
