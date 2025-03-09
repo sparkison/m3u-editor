@@ -190,7 +190,6 @@ class PlaylistResource extends Resource
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
                     Tables\Actions\BulkAction::make('process')
                         ->label('Process selected')
                         ->action(function (Collection $records): void {
@@ -215,7 +214,9 @@ class PlaylistResource extends Resource
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
                         ->modalDescription('Process the selected playlist(s) now?')
-                        ->modalSubmitActionLabel('Yes, process now')
+                        ->modalSubmitActionLabel('Yes, process now'),
+
+                    Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])->checkIfRecordIsSelectableUsing(
                 fn($record): bool => $record->status !== PlaylistStatus::Processing,
