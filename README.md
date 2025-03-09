@@ -56,7 +56,6 @@ Feel free to [open an issue](https://github.com/sparkison/m3u-editor/issues/new?
 Use the following compose example to get up and running.
 
 ```yaml
-version: "3.8"
 services:
   m3u-editor:
     image: sparkison/m3u-editor:latest
@@ -75,7 +74,12 @@ services:
       - 36400:36400 # app
       - 36800:36800 # websockets/broadcasting
 networks: {}
+```
 
+Or via Docker CLI:
+
+```bash
+ docker run --name m3u-editor -e PUID=1000 -e PGID=1000 -e TZ=Etc/UTC -v ./data:/var/www/config --restart unless-stopped -p 36400:36400 -p 36800:36800 sparkison/m3u-editor:latest 
 ```
 
 Access via: [http://localhost:36400](http://localhost:36400) (user = admin, password = admin)
@@ -90,7 +94,6 @@ To ensure the data is saved across builds, link an empty volume to: `/var/www/co
 Using the [MediaFlow Proxy](https://github.com/mhdzumair/mediaflow-proxy) as an example.
 
 ```yaml
-version: "3.3"
 services:
   mediaflow-proxy:
     image: mhdzumair/mediaflow-proxy
