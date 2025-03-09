@@ -9,6 +9,7 @@ use App\Forms\Components\PlaylistEpgUrl;
 use App\Forms\Components\PlaylistM3uUrl;
 use App\Models\Playlist;
 use App\Rules\CheckIfUrlOrLocalPath;
+use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -109,6 +110,19 @@ class PlaylistResource extends Resource
                     ->formatStateUsing(fn(string $state): string => gmdate('H:i:s', (int)$state))
                     ->toggleable()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('exp_date')
+                    ->label('Expiry Date')
+                    ->getStateUsing(function ($record) {
+                        if ($record->xtream_status) {
+                            try {
+                                $expires = Carbon::createFromTimestamp($record->xtream_status['user_info']['exp_date']);
+                                return $expires->toDayDateTimeString();
+                            } catch (\Exception $e) {
+                            }
+                        }
+                        return 'N/A';
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

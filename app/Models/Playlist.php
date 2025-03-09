@@ -29,6 +29,7 @@ class Playlist extends Model
         'import_prefs' => 'array',
         'groups' => 'array',
         'xtream_config' => 'array',
+        'xtream_status' => 'array',
         'status' => PlaylistStatus::class,
     ];
 
