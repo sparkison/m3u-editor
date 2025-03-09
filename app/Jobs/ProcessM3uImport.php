@@ -56,7 +56,7 @@ class ProcessM3uImport implements ShouldQueue
 
     /**
      * Create a new job instance.
-     * 
+     *
      * @param Playlist $playlist
      */
     public function __construct(
@@ -124,6 +124,7 @@ class ProcessM3uImport implements ShouldQueue
             $baseUrl = str($playlist->xtream_config['url'])->replace(' ', '%20')->toString();
             $user = urlencode($playlist->xtream_config['username']);
             $password = $playlist->xtream_config['password'];
+            $output = $playlist->xtream_config['output'] ?? 'ts';
 
             // Setup the category and stream URLs
             // $userInfo = "$baseUrl/player_api.php?username=$user&password=$password";
@@ -189,7 +190,7 @@ class ProcessM3uImport implements ShouldQueue
 
                     // Process the live streams
                     $streamBaseUrl = "$baseUrl/live/$user/$password";
-                    $collection = LazyCollection::make(function () use ($liveStreams, $streamBaseUrl, $categories, $channelFields) {
+                    $collection = LazyCollection::make(function () use ($liveStreams, $streamBaseUrl, $categories, $channelFields, $output) {
                         foreach ($liveStreams as $item) {
                             // Get the category
                             $category = $categories->firstWhere('category_id', $item['category_id']);
@@ -202,7 +203,7 @@ class ProcessM3uImport implements ShouldQueue
                                 ...$channelFields,
                                 'title' => $item['name'],
                                 'name' => $item['name'],
-                                'url' => "$streamBaseUrl/{$item['stream_id']}.ts",
+                                'url' => "$streamBaseUrl/{$item['stream_id']}.$output",
                                 'logo' => $item['stream_icon'],
                                 'group' => $category['category_name'] ?? '',
                                 'group_internal' => $category['category_name'] ?? '',
@@ -633,7 +634,7 @@ class ProcessM3uImport implements ShouldQueue
 
     /**
      * Determine if the channel should be included
-     * 
+     *
      * @param string $groupName
      */
     private function shouldIncludeChannel($groupName): bool

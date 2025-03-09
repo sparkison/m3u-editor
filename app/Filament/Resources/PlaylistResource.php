@@ -296,7 +296,7 @@ class PlaylistResource extends Resource
                                 ->hidden(fn(Get $get): bool => !$get('xtream')),
 
                             Forms\Components\Grid::make()
-                                ->columns(2)
+                                ->columns(3)
                                 ->columnSpanFull()
                                 ->schema([
                                     Forms\Components\TextInput::make('xtream_config.username')
@@ -310,6 +310,15 @@ class PlaylistResource extends Resource
                                         ->columnSpan(1)
                                         ->password()
                                         ->revealable()
+                                        ->hidden(fn(Get $get): bool => !$get('xtream')),
+                                    Forms\Components\Select::make('xtream_config.output')
+                                        ->label('Output')
+                                        ->required()
+                                        ->columnSpan(1)
+                                        ->options([
+                                            'ts' => 'MPEG-TS (.ts)',
+                                            'm3u8' => 'HLS (.m3u8)',
+                                        ])->default('ts')
                                         ->hidden(fn(Get $get): bool => !$get('xtream')),
                                 ]),
 
