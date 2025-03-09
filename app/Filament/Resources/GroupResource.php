@@ -197,7 +197,7 @@ class GroupResource extends Resource
                         ->modalSubmitActionLabel('Yes, disable now'),
 
                     Tables\Actions\DeleteAction::make()
-                        ->disabled(fn($record) => !$record->custom),
+                        ->hidden(fn($record) => !$record->custom),
                 ])->button()->hiddenLabel(),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
