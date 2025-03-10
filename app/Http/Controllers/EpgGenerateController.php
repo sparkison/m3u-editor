@@ -75,7 +75,7 @@ class EpgGenerateController extends Controller
                         echo '  <channel id="' . $streamId . '">' . PHP_EOL;
                         echo '    <display-name lang="' . $epgData->lang . '">' . htmlspecialchars($title) . '</display-name>';
                         if ($icon) {
-                            echo PHP_EOL . '    <icon src="' . $icon . '"/>';
+                            echo PHP_EOL . '    <icon src="' . htmlspecialchars($icon) . '"/>';
                         }
                         echo PHP_EOL . '  </channel>' . PHP_EOL;
                     }
