@@ -62,6 +62,11 @@ class PlaylistGenerateController extends Controller
 
                     // Output the channel
                     echo "#EXTINF:-1 tvg-chno=\"$channelNo\" tvg-id=\"$tvgId\" tvg-name=\"$name\" tvg-logo=\"$icon\" group-title=\"$channel->group\"," . $title . "\n";
+                    if ($channel->extvlcopt) {
+                        foreach ($channel->extvlcopt as $extvlcopt) {
+                            echo "#EXTVLCOPT:{$extvlcopt['key']}={$extvlcopt['value']}\n";
+                        }
+                    }
                     echo $url . "\n";
                 }
             },

@@ -353,6 +353,7 @@ class ProcessM3uImport implements ShouldQueue
                     'user_id' => $userId,
                     'import_batch_no' => $batchNo,
                     'enabled' => $playlist->enable_channels,
+                    'extvlcopt' => null
                 ];
 
                 // Setup the attribute -> key mapping
@@ -391,6 +392,7 @@ class ProcessM3uImport implements ShouldQueue
                             ...$channelFields,
                             'url' => $url,
                         ];
+                        $extvlcopt = [];
                         foreach ($item->getExtTags() as $extTag) {
                             if ($extTag instanceof \M3uParser\Tag\ExtInf) {
                                 $channel['title'] = $extTag->getTitle();
@@ -408,6 +410,15 @@ class ProcessM3uImport implements ShouldQueue
                                     }
                                 }
                             }
+                            if ($extTag instanceof \M3uParser\Tag\ExtVlcOpt) {
+                                $extvlcopt[] = [
+                                    'key' => $extTag->getKey(),
+                                    'value' => $extTag->getValue(),
+                                ];
+                            }
+                        }
+                        if (count($extvlcopt) > 0) {
+                            $channel['extvlcopt'] = json_encode($extvlcopt);
                         }
                         if (!isset($channel['title'])) {
                             // Name is required, fallback to stream ID if available, otherwise set to title

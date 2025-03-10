@@ -25,6 +25,7 @@ class Channel extends Model
         'user_id' => 'integer',
         'playlist_id' => 'integer',
         'group_id' => 'integer',
+        'extvlcopt' => 'array',
         'logo_type' => ChannelLogoType::class,
     ];
 
