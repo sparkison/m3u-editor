@@ -39,7 +39,7 @@ Feel free to [open an issue](https://github.com/sparkison/m3u-editor/issues/new?
       - **NOTE**: Only enabled channels that have been mapped to an EPG will be included.
 6. Customization:
     - Enable/disable auto syncing of Playlists and EPGs.
-    - Modify M3U channel numbers, logos, and offset. Channels are opt-in, so **all channels will be disabled by default** and need to be enabled based on your preference. This is to prevent channel additions automatically populating your playlist. The behavior can be changed to enalbe channels by default when creating/editing a playlist.
+    - Modify M3U channel numbers, logos, and offset. Channels are opt-in, so **all channels will be disabled by default** and need to be enabled based on your preference. This is to prevent channel additions automatically populating your playlist. The behavior can be changed to enable channels by default when creating/editing a playlist.
 
 ## Prerequisites
 
