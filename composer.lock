@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "4846790eb9ab6d6f16d4e18932890a95",
+    "content-hash": "cb29a32c837d5804b55547b00f29bc1f",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -11437,6 +11437,91 @@
                 "source": "https://github.com/webmozarts/assert/tree/1.11.0"
             },
             "time": "2022-06-03T18:03:27+00:00"
+        },
+        {
+            "name": "wnx/laravel-backup-restore",
+            "version": "v1.6.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/stefanzweifel/laravel-backup-restore.git",
+                "reference": "9ba307f7fa3071a5af51cf881f42d07118f7beda"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/stefanzweifel/laravel-backup-restore/zipball/9ba307f7fa3071a5af51cf881f42d07118f7beda",
+                "reference": "9ba307f7fa3071a5af51cf881f42d07118f7beda",
+                "shasum": ""
+            },
+            "require": {
+                "ext-zip": "*",
+                "illuminate/contracts": "^10.17.0 || ^11.07 || ^12.0",
+                "laravel/prompts": "^0.1.11 || ^0.2 || ^0.3",
+                "php": "^8.2",
+                "spatie/laravel-backup": "^9.0",
+                "spatie/laravel-package-tools": "^1.14.0",
+                "spatie/temporary-directory": "^2.0"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.0",
+                "nunomaduro/collision": "^6.0 || ^7.0 || ^8.0",
+                "orchestra/testbench": "^8.13 || ^9.0 || ^10.0",
+                "pestphp/pest": "^2.0 | ^3.0",
+                "pestphp/pest-plugin-laravel": "^2.0 | ^3.0",
+                "pestphp/pest-plugin-watch": "^2.0 | ^3.0",
+                "phpstan/extension-installer": "^1.1",
+                "phpstan/phpstan-deprecation-rules": "^1.0",
+                "phpstan/phpstan-phpunit": "^1.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "LaravelBackupRestore": "Wnx\\LaravelBackupRestore\\Facades\\LaravelBackupRestore"
+                    },
+                    "providers": [
+                        "Wnx\\LaravelBackupRestore\\LaravelBackupRestoreServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Wnx\\LaravelBackupRestore\\": "src",
+                    "Wnx\\LaravelBackupRestore\\Database\\Factories\\": "database/factories"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Stefan Zweifel",
+                    "email": "stefan@stefanzweifel.dev",
+                    "role": "Developer"
+                }
+            ],
+            "description": "A package to restore database backups made with spatie/laravel-backup.",
+            "homepage": "https://github.com/stefanzweifel/laravel-backup-restore",
+            "keywords": [
+                "laravel",
+                "laravel-backup",
+                "laravel-backup-restore"
+            ],
+            "support": {
+                "issues": "https://github.com/stefanzweifel/laravel-backup-restore/issues",
+                "source": "https://github.com/stefanzweifel/laravel-backup-restore/tree/v1.6.1"
+            },
+            "funding": [
+                {
+                    "url": "https://buymeacoff.ee/3oQ64YW",
+                    "type": "custom"
+                },
+                {
+                    "url": "https://github.com/stefanzweifel",
+                    "type": "github"
+                }
+            ],
+            "time": "2025-02-14T19:58:38+00:00"
         }
     ],
     "packages-dev": [

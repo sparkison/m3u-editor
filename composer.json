@@ -27,7 +27,8 @@
         "spatie/laravel-backup": "^9.2",
         "spiral/roadrunner-cli": "^2.6.0",
         "spiral/roadrunner-http": "^3.3.0",
-        "stephenjude/filament-two-factor-authentication": "^0.0.21"
+        "stephenjude/filament-two-factor-authentication": "^0.0.21",
+        "wnx/laravel-backup-restore": "^1.6"
     },
     "require-dev": {
         "beyondcode/laravel-dump-server": "^2.0",
