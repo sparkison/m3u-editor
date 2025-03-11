@@ -14,10 +14,11 @@ return [
                 /*
                  * The list of directories and files that will be included in the backup.
                  */
-                'include' => [
-                    base_path('storage/app/private/epg'),
-                    base_path('storage/app/private/playlist'),
-                ],
+                'include' => array_merge(
+                    [],
+                    glob(base_path('storage/app/private/epg/*')),
+                    glob(base_path('storage/app/private/playlist/*'))
+                ),
 
                 /*
                  * These directories and files will be excluded from the backup.
