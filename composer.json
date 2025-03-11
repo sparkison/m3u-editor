@@ -23,6 +23,7 @@
         "opcodesio/log-viewer": "^3.15",
         "predis/predis": "^2.3",
         "ryangjchandler/filament-progress-column": "^1.0",
+        "shuvroroy/filament-spatie-laravel-backup": "^2.2",
         "sparkison/m3u-parser": "dev-master",
         "spatie/laravel-backup": "^9.2",
         "spiral/roadrunner-cli": "^2.6.0",

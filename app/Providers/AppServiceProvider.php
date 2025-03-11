@@ -10,6 +10,7 @@ use App\Models\MergedPlaylist;
 use App\Models\Epg;
 use App\Models\Group;
 use App\Models\Playlist;
+use App\Models\User;
 use App\Settings\GeneralSettings;
 use Exception;
 use Illuminate\Database\Eloquent\Model;
@@ -37,6 +38,13 @@ class AppServiceProvider extends ServiceProvider
     {
         // Disable mass assignment protection (security handled by Filament)
         Model::unguard();
+
+        Gate::define('download-backup', function (User $user) {
+            return $user->email === 'admin@test.com';
+        });
+        Gate::define('delete-backup', function (User $user) {
+            return $user->email === 'admin@test.com';
+        });
 
         // Add log viewer auth
         $userPreferences = app(GeneralSettings::class);

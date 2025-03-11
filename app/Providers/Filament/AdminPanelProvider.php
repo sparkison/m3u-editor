@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Backups;
 use App\Filament\Widgets\UpdateNoticeWidget;
 use Exception;
 use App\Filament\Auth\Login;
@@ -32,6 +33,7 @@ use Hydrat\TableLayoutToggle\TableLayoutTogglePlugin;
 use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Stephenjude\FilamentTwoFactorAuthentication\TwoFactorAuthenticationPlugin;
+use ShuvroRoy\FilamentSpatieLaravelBackup\FilamentSpatieLaravelBackupPlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -95,6 +97,9 @@ class AdminPanelProvider extends PanelProvider
                 StatsOverview::class,
             ])
             ->plugins([
+                FilamentSpatieLaravelBackupPlugin::make()
+                    ->authorize(fn (): bool => auth()->user()->email === 'admin@test.com')
+                    ->usingPage(Backups::class),
                 TableLayoutTogglePlugin::make(),
                 TwoFactorAuthenticationPlugin::make()
                     ->addTwoFactorMenuItem(true, 'Configure 2FA') // Add 2FA settings to user menu items
@@ -125,7 +130,6 @@ class AdminPanelProvider extends PanelProvider
                 PanelsRenderHook::FOOTER,
                 fn() => view('footer')
             );
-
         if ($settings['navigation_position'] === 'top') {
             $adminPanel->topNavigation();
         } else {
