@@ -24,8 +24,10 @@
         "predis/predis": "^2.3",
         "ryangjchandler/filament-progress-column": "^1.0",
         "sparkison/m3u-parser": "dev-master",
+        "spatie/laravel-backup": "^9.2",
         "spiral/roadrunner-cli": "^2.6.0",
-        "spiral/roadrunner-http": "^3.3.0"
+        "spiral/roadrunner-http": "^3.3.0",
+        "stephenjude/filament-two-factor-authentication": "^0.0.21"
     },
     "require-dev": {
         "beyondcode/laravel-dump-server": "^2.0",
