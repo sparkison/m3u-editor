@@ -1,4 +1,4 @@
-<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 221.19 221.19">
+<svg style="height: 2.5rem; width: 2.9rem;" id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 221.19 221.19">
   <defs>
     <linearGradient id="linear-gradient" x1="16.04" y1="162.24" x2="189.09" y2="67.7" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#f43f5e"/>

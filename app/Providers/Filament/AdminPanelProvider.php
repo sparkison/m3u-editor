@@ -31,10 +31,12 @@ use Filament\Support\Enums\MaxWidth;
 use Hydrat\TableLayoutToggle\TableLayoutTogglePlugin;
 use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
+use Stephenjude\FilamentTwoFactorAuthentication\TwoFactorAuthenticationPlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
     protected static ?string $navigationIcon = 'heroicon-o-tachometer';
+
     public static function getNavigationIcon(): ?string
     {
         return 'heroicon-o-tachometer';
@@ -94,6 +96,8 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->plugins([
                 TableLayoutTogglePlugin::make(),
+                TwoFactorAuthenticationPlugin::make()
+                    ->addTwoFactorMenuItem(true, 'Configure 2FA') // Add 2FA settings to user menu items
             ])
             ->maxContentWidth($settings['content_width'])
             ->middleware([
@@ -117,7 +121,7 @@ class AdminPanelProvider extends PanelProvider
                 'epgs/*/epg.xml'
             ])
             ->renderHook(
-                // PanelsRenderHook::BODY_END,
+            // PanelsRenderHook::BODY_END,
                 PanelsRenderHook::FOOTER,
                 fn() => view('footer')
             );
