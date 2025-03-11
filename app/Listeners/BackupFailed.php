@@ -23,7 +23,7 @@ class BackupFailed
      */
     public function handle(BackupHasFailed $event): void
     {
-        $user = User::where('email', 'admin@test.com')->first();
+        $user = User::whereIn('email', config('dev.admin_emails'))->first();
         if ($user) {
             $exception = $event->exception;
             $message = "Backup failed, error: \"{$exception->getMessage()}\"";

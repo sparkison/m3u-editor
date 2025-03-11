@@ -93,12 +93,11 @@ class AdminPanelProvider extends PanelProvider
                 // PayPalDonateWidget::class,
                 KoFiWidget::class,
                 DiscordWidget::class,
-
                 StatsOverview::class,
             ])
             ->plugins([
                 FilamentSpatieLaravelBackupPlugin::make()
-                    ->authorize(fn (): bool => auth()->user()->email === 'admin@test.com')
+                    ->authorize(fn (): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true))
                     ->usingPage(Backups::class),
                 TableLayoutTogglePlugin::make(),
                 TwoFactorAuthenticationPlugin::make()

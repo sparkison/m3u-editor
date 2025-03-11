@@ -39,11 +39,12 @@ class AppServiceProvider extends ServiceProvider
         // Disable mass assignment protection (security handled by Filament)
         Model::unguard();
 
+        // Allow only the admin to download and delete backups
         Gate::define('download-backup', function (User $user) {
-            return $user->email === 'admin@test.com';
+            return in_array($user->email, config('dev.admin_emails'), true);
         });
         Gate::define('delete-backup', function (User $user) {
-            return $user->email === 'admin@test.com';
+            return in_array($user->email, config('dev.admin_emails'), true);
         });
 
         // Add log viewer auth
