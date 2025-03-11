@@ -15,7 +15,8 @@ return [
                  * The list of directories and files that will be included in the backup.
                  */
                 'include' => [
-                    base_path(),
+                    base_path('storage/app/private/epg/*'),
+                    base_path('storage/app/private/playlist/*'),
                 ],
 
                 /*
@@ -24,14 +25,13 @@ return [
                  * Directories used by the backup process will automatically be excluded.
                  */
                 'exclude' => [
-                    base_path('vendor'),
-                    base_path('node_modules'),
+                    // ..
                 ],
 
                 /*
                  * Determines if symlinks should be followed.
                  */
-                'follow_links' => false,
+                'follow_links' => true,
 
                 /*
                  * Determines if it should avoid unreadable folders.
@@ -77,7 +77,8 @@ return [
              * For a complete list of available customization options, see https://github.com/spatie/db-dumper
              */
             'databases' => [
-                'mysql',
+                // 'mysql',
+                'sqlite'
             ],
         ],
 
