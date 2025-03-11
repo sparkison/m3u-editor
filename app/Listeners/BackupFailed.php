@@ -6,18 +6,9 @@ use App\Models\User;
 use Filament\Notifications\Notification;
 use Spatie\Backup\Events\BackupHasFailed;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Queue\InteractsWithQueue;
 
-class BackupFailed
+class BackupFailed implements ShouldQueue
 {
-    /**
-     * Create the event listener.
-     */
-    public function __construct()
-    {
-        //
-    }
-
     /**
      * Handle the event.
      */

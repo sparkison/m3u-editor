@@ -100,9 +100,6 @@ if [ -f "${horizon_log_file}" ]; then
     rm -f "${horizon_log_file}"
 fi
 
-# Link the log files to the laravel `storage/logs` directory
-ln -sf "${log_dir}" storage/logs
-
 # Link the environment file to the laravel project root
 ln -sf "${env_file}" .env
 
@@ -117,6 +114,10 @@ fi
 if [ -d "/var/www/config/epgs" ]; then
     rm -rf /var/www/config/epgs
 fi
+
+# Link the log files to the laravel `storage/logs` directory
+rm -rf storage/logs
+ln -sf "${log_dir}" storage/
 
 # Link EPG and Playlist directories
 if [ ! -d "storage/app/private/epg" ]; then
