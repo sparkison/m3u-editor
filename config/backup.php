@@ -77,9 +77,7 @@ return [
              * For a complete list of available customization options, see https://github.com/spatie/db-dumper
              */
             'databases' => [
-                // 'mysql',
-                // 'sqlite'
-                config('database.default')
+                env('DB_CONNECTION', 'sqlite')
             ],
         ],
 
