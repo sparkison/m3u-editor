@@ -14,13 +14,9 @@ return [
                 /*
                  * The list of directories and files that will be included in the backup.
                  */
-//                'include' => array_merge(
-//                    [],
-//                    glob(base_path('storage/app/private/epg/*')),
-//                    glob(base_path('storage/app/private/playlist/*'))
-//                ),
                 'include' => [
-                    // ...
+                    base_path('storage/app/private/epg'),
+                    base_path('storage/app/private/playlist')
                 ],
 
                 /*
@@ -82,7 +78,8 @@ return [
              */
             'databases' => [
                 // 'mysql',
-                'sqlite'
+                // 'sqlite'
+                config('database.default')
             ],
         ],
 

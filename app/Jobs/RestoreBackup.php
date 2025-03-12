@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\Job;
 use App\Models\User;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -26,10 +27,13 @@ class RestoreBackup implements ShouldQueue
     public function handle(): void
     {
         try {
+            // Flush the jobs table
+            Job::truncate();
+
             // Restore the selected backup
             Artisan::call('backup:restore', [
                 '--backup' => $this->backupPath,
-                '--reset' => true,
+                //'--reset' => true, // reset DB before restore?
                 '--no-interaction' => true,
             ]);
 

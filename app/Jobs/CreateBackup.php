@@ -15,7 +15,7 @@ class CreateBackup implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct()
+    public function __construct(public bool $includeFiles = false)
     {
         //
     }
@@ -27,7 +27,9 @@ class CreateBackup implements ShouldQueue
     {
         try {
             // Create a new backup
-            Artisan::call('backup:run');
+            Artisan::call('backup:run', [
+                '--only-db' => !$this->includeFiles,
+            ]);
 
             // Notify the admin that the backup was restored
             $user = User::whereIn('email', config('dev.admin_emails'))->first();

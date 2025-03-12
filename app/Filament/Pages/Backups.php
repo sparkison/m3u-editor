@@ -20,6 +20,8 @@ class Backups extends BaseBackups
 
     protected static ?string $navigationLabel = 'Backup & Restore';
 
+    protected ?string $subheading = 'NOTE: Restoring a backup will overwrite any existing data. Your manually uploaded EPG and Playlist files will NOT be restored. You will need to download the backup and manually re-upload where needed.';
+
     protected function getActions(): array
     {
         $availableBackups = BackupDestination::query()->get();
@@ -47,12 +49,17 @@ class Backups extends BaseBackups
                 ->icon('heroicon-o-arrow-up-tray')
                 ->color('gray')
                 ->modalIcon('heroicon-o-arrow-up-tray')
-                ->modalDescription('Restore the selected backup. This will overwrite any existing data with the backup.')
+                ->modalDescription('NOTE: Only the database will be restored, which will overwrite any existing data with the backup data. Files will not be automatically restored, you will need to manually re-upload them where needed.')
                 ->modalSubmitActionLabel('Restore now'),
             Action::make('Create Backup')
+                ->form([
+                    Forms\Components\Toggle::make('include_files')
+                        ->label('Include Files')
+                        ->helperText('When enabled, the backup will include your uploaded Playlist and EPG files.'),
+                ])
                 ->action(function (array $data): void {
                     app('Illuminate\Contracts\Bus\Dispatcher')
-                        ->dispatch(new CreateBackup());
+                        ->dispatch(new CreateBackup($data['include_files'] ?? false));
                 })->after(function () {
                     Notification::make()
                         ->success()
@@ -64,7 +71,7 @@ class Backups extends BaseBackups
                 ->icon('heroicon-o-arrow-down-tray')
                 ->color('primary')
                 ->modalIcon('heroicon-o-arrow-down-tray')
-                ->modalDescription('Create an application backup now.')
+                ->modalDescription('NOTE: When restoring a backup, only the database will be restored, files will not be automatically restored. You will need to manually re-upload them where needed.')
                 ->modalSubmitActionLabel('Create now'),
 
 //            Action::make('Create Backup')
