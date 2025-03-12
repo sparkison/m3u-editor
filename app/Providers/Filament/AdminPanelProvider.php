@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\View\Components\ProfileComponent;
 use Exception;
 use App\Filament\Pages\Backups;
 use App\Filament\Widgets\UpdateNoticeWidget;
@@ -32,8 +33,8 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Filament\Support\Enums\MaxWidth;
 use Hydrat\TableLayoutToggle\TableLayoutTogglePlugin;
 use Filament\Widgets\AccountWidget;
-use Stephenjude\FilamentTwoFactorAuthentication\TwoFactorAuthenticationPlugin;
 use ShuvroRoy\FilamentSpatieLaravelBackup\FilamentSpatieLaravelBackupPlugin;
+use Jeffgreco13\FilamentBreezy\BreezyCore;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -66,7 +67,7 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('')
             ->login(Login::class)
-            ->profile(EditProfile::class, isSimple: false)
+            // ->profile(EditProfile::class, isSimple: false)
             ->brandName('m3u editor')
             ->brandLogo(fn() => view('filament.admin.logo'))
             ->favicon('/favicon.png')
@@ -98,8 +99,18 @@ class AdminPanelProvider extends PanelProvider
                     ->authorize(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true))
                     ->usingPage(Backups::class),
                 TableLayoutTogglePlugin::make(),
-                TwoFactorAuthenticationPlugin::make()
-                    ->addTwoFactorMenuItem(true, 'Configure 2FA') // Add 2FA settings to user menu items
+                BreezyCore::make()
+                    ->myProfile(
+                        userMenuLabel: 'Profile',
+                        slug: 'profile'
+                    )
+                    ->enableTwoFactorAuthentication()
+                    ->enableSanctumTokens(
+                        // permissions: ['my','custom','permissions'] // optional, customize the permissions (default = ["create", "view", "update", "delete"])
+                    )
+                    ->myProfileComponents([
+                        'personal_info' => ProfileComponent::class
+                    ]),
             ])
             ->maxContentWidth($settings['content_width'])
             ->middleware([

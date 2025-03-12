@@ -65,6 +65,11 @@ class AppServiceProvider extends ServiceProvider
             return in_array($user->email, config('dev.admin_emails'), true);
         });
 
+        // Allow access to api docs
+        Gate::define('viewApiDocs', function (User $user) {
+            return in_array($user->email, config('dev.admin_emails'), true);
+        });
+
         // Add log viewer auth
         $userPreferences = app(GeneralSettings::class);
         try {

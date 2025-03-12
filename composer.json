@@ -11,14 +11,17 @@
     "require": {
         "php": "^8.2",
         "cerbero/json-parser": "^1.1",
+        "dedoc/scramble": "^0.12.11",
         "dragonmantank/cron-expression": "^3.4",
         "filament/filament": "^3.2",
         "filament/spatie-laravel-settings-plugin": "^3.2",
         "hydrat/filament-table-layout-toggle": "^2.0",
+        "jeffgreco13/filament-breezy": "^2.6",
         "laravel/framework": "^11.31",
         "laravel/horizon": "^5.30",
         "laravel/octane": "^2.6",
         "laravel/reverb": "^1.0",
+        "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.9",
         "opcodesio/log-viewer": "^3.15",
         "predis/predis": "^2.3",
@@ -28,7 +31,6 @@
         "spatie/laravel-backup": "^9.2",
         "spiral/roadrunner-cli": "^2.6.0",
         "spiral/roadrunner-http": "^3.3.0",
-        "stephenjude/filament-two-factor-authentication": "^0.0.21",
         "wnx/laravel-backup-restore": "^1.6"
     },
     "require-dev": {
