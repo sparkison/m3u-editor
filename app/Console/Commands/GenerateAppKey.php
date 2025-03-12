@@ -18,7 +18,7 @@ class GenerateAppKey extends Command
      *
      * @var string
      */
-    protected $description = 'Command description';
+    protected $description = 'Generate an app key if it does not exist.';
 
     /**
      * Execute the console command.

@@ -2,7 +2,6 @@
 
 namespace App\Providers\Filament;
 
-use App\View\Components\ProfileComponent;
 use Exception;
 use App\Filament\Pages\Backups;
 use App\Filament\Widgets\UpdateNoticeWidget;
@@ -35,6 +34,7 @@ use Hydrat\TableLayoutToggle\TableLayoutTogglePlugin;
 use Filament\Widgets\AccountWidget;
 use ShuvroRoy\FilamentSpatieLaravelBackup\FilamentSpatieLaravelBackupPlugin;
 use Jeffgreco13\FilamentBreezy\BreezyCore;
+use App\Livewire\ProfileComponent;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -101,8 +101,8 @@ class AdminPanelProvider extends PanelProvider
                 TableLayoutTogglePlugin::make(),
                 BreezyCore::make()
                     ->myProfile(
+                        slug: 'profile',
                         userMenuLabel: 'Profile',
-                        slug: 'profile'
                     )
                     ->enableTwoFactorAuthentication()
                     ->enableSanctumTokens(
