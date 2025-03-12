@@ -2,15 +2,16 @@
 
 namespace App\Providers\Filament;
 
+use Exception;
 use App\Filament\Pages\Backups;
 use App\Filament\Widgets\UpdateNoticeWidget;
-use Exception;
 use App\Filament\Auth\Login;
 use App\Filament\Auth\EditProfile;
 use App\Filament\Pages\CustomDashboard;
 use App\Filament\Widgets\DiscordWidget;
 use App\Filament\Widgets\KoFiWidget;
-use App\Filament\Widgets\PayPalDonateWidget;
+
+//use App\Filament\Widgets\PayPalDonateWidget;
 use App\Filament\Widgets\StatsOverview;
 use App\Settings\GeneralSettings;
 use Filament\Http\Middleware\Authenticate;
@@ -49,14 +50,12 @@ class AdminPanelProvider extends PanelProvider
         $settings = [
             'navigation_position' => 'left',
             'show_breadcrumbs' => true,
-            'show_jobs_navigation' => false,
             'content_width' => MaxWidth::ScreenLarge,
         ];
         try {
             $settings = [
                 'navigation_position' => $userPreferences->navigation_position ?? $settings['navigation_position'],
                 'show_breadcrumbs' => $userPreferences->show_breadcrumbs ?? $settings['show_breadcrumbs'],
-                'show_jobs_navigation' => $userPreferences->show_jobs_navigation ?? $settings['show_jobs_navigation'],
                 'content_width' => $userPreferences->content_width ?? $settings['content_width'],
             ];
         } catch (Exception $e) {
@@ -96,7 +95,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->plugins([
                 FilamentSpatieLaravelBackupPlugin::make()
-                    ->authorize(fn (): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true))
+                    ->authorize(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true))
                     ->usingPage(Backups::class),
                 TableLayoutTogglePlugin::make(),
                 TwoFactorAuthenticationPlugin::make()
@@ -121,7 +120,7 @@ class AdminPanelProvider extends PanelProvider
             ->spaUrlExceptions(fn(): array => [
                 '*/playlist.m3u',
                 '*/epg.xml',
-                'epgs/*/epg.xml'
+                'epgs/*/epg.xml',
             ]);
         if ($settings['navigation_position'] === 'top') {
             $adminPanel->topNavigation();
