@@ -30,7 +30,6 @@ use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Filament\Support\Enums\MaxWidth;
 use Hydrat\TableLayoutToggle\TableLayoutTogglePlugin;
-use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Stephenjude\FilamentTwoFactorAuthentication\TwoFactorAuthenticationPlugin;
 use ShuvroRoy\FilamentSpatieLaravelBackup\FilamentSpatieLaravelBackupPlugin;
@@ -123,12 +122,7 @@ class AdminPanelProvider extends PanelProvider
                 '*/playlist.m3u',
                 '*/epg.xml',
                 'epgs/*/epg.xml'
-            ])
-            ->renderHook(
-            // PanelsRenderHook::BODY_END,
-                PanelsRenderHook::FOOTER,
-                fn() => view('footer')
-            );
+            ]);
         if ($settings['navigation_position'] === 'top') {
             $adminPanel->topNavigation();
         } else {

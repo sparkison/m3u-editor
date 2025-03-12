@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Exception;
 use App\Events\EpgCreated;
 use App\Events\PlaylistCreated;
 use App\Jobs\ReloadApp;
@@ -12,7 +13,6 @@ use App\Models\Group;
 use App\Models\Playlist;
 use App\Models\User;
 use App\Settings\GeneralSettings;
-use Exception;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -178,11 +178,16 @@ class AppServiceProvider extends ServiceProvider
      */
     private function registerFilamentHooks(): void
     {
+        // Add scroll to top event listener
         FilamentView::registerRenderHook(
             PanelsRenderHook::SCRIPTS_AFTER,
-            fn (): string => new HtmlString('
-        <script>document.addEventListener("scroll-to-top", () => window.scrollTo({top: 0, left: 0, behavior: "smooth"}))</script>
-            '),
+            fn (): string => new HtmlString('<script>document.addEventListener("scroll-to-top", () => window.scrollTo({top: 0, left: 0, behavior: "smooth"}))</script>'),
+        );
+
+        // Add footer view
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::FOOTER,
+            fn() => view('footer')
         );
     }
 }
