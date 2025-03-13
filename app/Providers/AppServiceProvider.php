@@ -14,10 +14,12 @@ use App\Models\Playlist;
 use App\Models\User;
 use App\Settings\GeneralSettings;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Opcodes\LogViewer\Facades\LogViewer;
 use Spatie\LaravelSettings\Events\SettingsSaved;
 use Filament\Support\Facades\FilamentView;
@@ -26,6 +28,9 @@ use Illuminate\Support\HtmlString;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use Dedoc\Scramble\Scramble;
+use Dedoc\Scramble\Support\Generator\OpenApi;
+use Dedoc\Scramble\Support\Generator\SecurityScheme;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -56,6 +61,9 @@ class AppServiceProvider extends ServiceProvider
 
         // Register the Filament hooks
         $this->registerFilamentHooks();
+
+        // Setup the API
+        $this->setupApi();
     }
 
     /**
@@ -78,11 +86,6 @@ class AppServiceProvider extends ServiceProvider
             return in_array($user->email, config('dev.admin_emails'), true);
         });
         Gate::define('delete-backup', function (User $user) {
-            return in_array($user->email, config('dev.admin_emails'), true);
-        });
-
-        // Allow access to api docs
-        Gate::define('viewApiDocs', function (User $user) {
             return in_array($user->email, config('dev.admin_emails'), true);
         });
 
@@ -210,5 +213,38 @@ class AppServiceProvider extends ServiceProvider
             PanelsRenderHook::FOOTER,
             fn() => view('footer')
         );
+    }
+
+    /**
+     * Setup the API.
+     */
+    private function setupApi(): void
+    {
+        // Add log viewer auth
+        $userPreferences = app(GeneralSettings::class);
+        try {
+            $showApiDocs = $userPreferences->show_api_docs;
+        } catch (Exception $e) {
+            $showApiDocs = false;
+        }
+
+        // Allow access to api docs
+        Gate::define('viewApiDocs', function (User $user) use ($showApiDocs) {
+            return $showApiDocs && in_array($user->email, config('dev.admin_emails'), true);
+        });
+
+        // Configure the API
+        Scramble::configure()
+            ->routes(function (Route $route) {
+                return Str::startsWith($route->uri, 'api/');
+            });
+
+        // Setup auth
+        Scramble::configure()
+            ->withDocumentTransformers(function (OpenApi $openApi) {
+                $openApi->secure(
+                    SecurityScheme::http('bearer')
+                );
+            });
     }
 }
