@@ -61,6 +61,27 @@ class Preferences extends SettingsPage
                             ->size('sm')
                             ->url('/horizon')
                             ->openUrlInNewTab(true),
+                    ])
+                    ->schema([
+                        Forms\Components\Toggle::make('show_logs')
+                            ->label('Make log files viewable')
+                            ->helperText('When enabled you can view the log files using the "View Logs" button. When disabled, the logs endpoint will return a 403 (Unauthorized).'),
+                        Forms\Components\Toggle::make('show_queue_manager')
+                            ->label('Allow queue manager access')
+                            ->helperText('When enabled you can access the queue manager using the "Queue Manager" button. When disabled, the queue manager endpoint will return a 403 (Unauthorized).'),
+                    ]),
+
+                Forms\Components\Section::make()
+                    ->heading('API')
+                    ->description('Use the API to make calls directly to the app.')
+                    ->headerActions([
+                        Forms\Components\Actions\Action::make('manage_api_keys')
+                            ->label('Manage API Tokens')
+                            ->color('gray')
+                            ->icon('heroicon-s-key')
+                            ->iconPosition('before')
+                            ->size('sm')
+                            ->url('/profile'),
                         Forms\Components\Actions\Action::make('view_api_docs')
                             ->label('API Docs')
                             ->icon('heroicon-o-arrow-top-right-on-square')
@@ -70,15 +91,9 @@ class Preferences extends SettingsPage
                             ->openUrlInNewTab(true),
                     ])
                     ->schema([
-                        Forms\Components\Toggle::make('show_logs')
-                            ->label('Make log files viewable')
-                            ->helperText('When enabled you can view the log files using the "View Logs" button. When disabled the logs endpoint will return a 403 (Unauthorized).'),
-                        Forms\Components\Toggle::make('show_queue_manager')
-                            ->label('Allow queue manager access')
-                            ->helperText('When enabled you can access the queue manager using the "Queue Manager" button. When disabled the queue manager endpoint will return a 403 (Unauthorized).'),
                         Forms\Components\Toggle::make('show_api_docs')
-                            ->label('Allow access to the API docs panel')
-                            ->helperText('When enabled you can access the API documentation using the "API Docs" button. When docs endpoint will return a 403 (Unauthorized). NOTE: The API will respond regardless of this setting.'),
+                            ->label('Allow access to API docs')
+                            ->helperText('When enabled you can access the API documentation using the "API Docs" button. When disabled, the docs endpoint will return a 403 (Unauthorized). NOTE: The API will respond regardless of this setting. You do not need to enable it to use the API.'),
                     ])
             ]);
     }

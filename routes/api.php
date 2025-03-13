@@ -10,11 +10,15 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::group(['prefix' => 'v1'], function () {
 
         // Get the authenticated user
-        Route::get('/whoami', [\App\Http\Controllers\ApiController::class, 'user']);
+        Route::group(['prefix' => 'user'], function () {
+            Route::get('whoami', [\App\Http\Controllers\ApiController::class, 'user']);
+        });
 
         // Sync endpoints
-        Route::post('/sync-playlist/{playlist}/{force?}', [\App\Http\Controllers\ApiController::class, 'refreshPlaylist']);
-        Route::post('/sync-epg/{epg}/{force?}', [\App\Http\Controllers\ApiController::class, 'refreshEpg']);
+        Route::group(['prefix' => 'sync'], function () {
+            Route::post('playlist/{playlist}/{force?}', [\App\Http\Controllers\ApiController::class, 'refreshPlaylist']);
+            Route::post('epg/{epg}/{force?}', [\App\Http\Controllers\ApiController::class, 'refreshEpg']);
+        });
 
         // ...
 
