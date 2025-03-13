@@ -60,6 +60,7 @@ class EpgResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('id')
                     ->searchable()
+                    ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
