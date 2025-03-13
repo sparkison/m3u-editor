@@ -6,11 +6,17 @@ use Illuminate\Support\Facades\Route;
 // API routes
 Route::group(['middleware' => ['auth:sanctum']], function () {
 
-    // Get the authenticated user
-    Route::get('/user', function (Request $request) {
-        return $request->user()->only('name');
+    // API v1
+    Route::group(['prefix' => 'v1'], function () {
+
+        // Get the authenticated user
+        Route::get('/user', function (Request $request) {
+            return $request->user()->only('name');
+        });
+
+        // ...
+
     });
 
     // ...
-
 });
