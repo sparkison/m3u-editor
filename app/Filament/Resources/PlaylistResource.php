@@ -55,6 +55,9 @@ class PlaylistResource extends Resource
         return $table
             ->poll()
             ->columns([
+                Tables\Columns\TextColumn::make('id')
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
                     ->sortable(),

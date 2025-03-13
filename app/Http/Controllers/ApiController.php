@@ -26,7 +26,7 @@ class ApiController extends Controller
      * Sync the selected Playlist.
      *
      * Use the `playlist` parameter to select the playlist to refresh.
-     * You can find the playlist ID by looking at the URL when viewing a playlist.
+     * You can find the playlist ID by looking at the ID column when viewing the playlist table.
      *
      * @param \Illuminate\Http\Request $request
      * @param \App\Models\Playlist $playlist
@@ -55,7 +55,7 @@ class ApiController extends Controller
      * Sync the selected EPG.
      *
      * Use the `epg` parameter to select the EPG to refresh.
-     * You can find the EPG ID by looking at the URL when viewing an EPG.
+     * You can find the EPG ID by looking at the ID column when viewing the EPG table.
      *
      * @param \Illuminate\Http\Request $request
      * @param \App\Models\Playlist $epg
