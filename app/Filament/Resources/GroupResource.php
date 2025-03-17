@@ -25,6 +25,13 @@ class GroupResource extends Resource
 {
     protected static ?string $model = Group::class;
 
+    protected static ?string $recordTitleAttribute = 'name';
+
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['name', 'name_internal'];
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-queue-list';
 
     protected static ?string $navigationGroup = 'Playlist';
@@ -53,6 +60,7 @@ class GroupResource extends Resource
                     ->label('Name')
                     ->rules(['min:0', 'max:255'])
                     ->placeholder(fn($record) => $record->name_internal)
+                    ->searchable()
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('name_internal')
                     ->label('Default name')

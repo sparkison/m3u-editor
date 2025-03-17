@@ -25,6 +25,11 @@ class ChannelResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'title';
 
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['title', 'title_custom', 'name', 'name_custom', 'url', 'stream_id', 'stream_id_custom'];
+    }
+
     public static function getGlobalSearchEloquentQuery(): Builder
     {
         return parent::getGlobalSearchEloquentQuery()
@@ -106,18 +111,21 @@ class ChannelResource extends Resource
                     ->rules(['min:0', 'max:255'])
                     ->tooltip('Channel/stream ID')
                     ->placeholder(fn($record) => $record->stream_id)
+                    ->searchable()
                     ->toggleable(),
                 Tables\Columns\TextInputColumn::make('title_custom')
                     ->label('Title')
                     ->rules(['min:0', 'max:255'])
                     ->tooltip('Channel title')
                     ->placeholder(fn($record) => $record->title)
+                    ->searchable()
                     ->toggleable(),
                 Tables\Columns\TextInputColumn::make('name_custom')
                     ->label('Name')
                     ->rules(['min:0', 'max:255'])
                     ->tooltip('Channel name')
                     ->placeholder(fn($record) => $record->name)
+                    ->searchable()
                     ->toggleable(),
                 Tables\Columns\ToggleColumn::make('enabled')
                     ->toggleable()
@@ -136,6 +144,7 @@ class ChannelResource extends Resource
                     ->type('url')
                     ->tooltip('Channel url')
                     ->placeholder(fn($record) => $record->url)
+                    ->searchable()
                     ->toggleable(),
                 Tables\Columns\TextInputColumn::make('shift')
                     ->rules(['numeric', 'min:0'])
@@ -177,6 +186,28 @@ class ChannelResource extends Resource
                     ->numeric()
                     ->toggleable()
                     ->sortable(),
+
+                Tables\Columns\TextColumn::make('stream_id')
+                    ->label('Default ID')
+                    ->sortable()
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('title')
+                    ->label('Default Title')
+                    ->sortable()
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('name')
+                    ->label('Default Name')
+                    ->sortable()
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('url')
+                    ->label('Default URL')
+                    ->sortable()
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

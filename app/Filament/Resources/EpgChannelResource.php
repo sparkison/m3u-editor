@@ -17,6 +17,13 @@ class EpgChannelResource extends Resource
 {
     protected static ?string $model = EpgChannel::class;
 
+//    protected static ?string $recordTitleAttribute = 'name';
+
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['name', 'display_name'];
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-photo';
 
     protected static ?string $label = 'Channels';

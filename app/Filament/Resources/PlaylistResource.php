@@ -29,6 +29,11 @@ class PlaylistResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['name', 'url'];
+    }
+
     public static function getGlobalSearchEloquentQuery(): Builder
     {
         return parent::getGlobalSearchEloquentQuery()

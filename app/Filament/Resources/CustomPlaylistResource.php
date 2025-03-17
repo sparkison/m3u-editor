@@ -20,6 +20,13 @@ class CustomPlaylistResource extends Resource
 {
     protected static ?string $model = CustomPlaylist::class;
 
+    protected static ?string $recordTitleAttribute = 'name';
+
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['name'];
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-list-bullet';
 
     protected static ?string $navigationGroup = 'Custom';
