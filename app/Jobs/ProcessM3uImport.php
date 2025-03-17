@@ -129,8 +129,8 @@ class ProcessM3uImport implements ShouldQueue
 
             // Setup the category and stream URLs
             $userInfo = "$baseUrl/player_api.php?username=$user&password=$password";
-            $liveCategories = "$baseUrl/player_api.php?username=$user&password=$password&action=get_live_categories&type=m3u_plus";
-            $liveStreams = "$baseUrl/player_api.php?username=$user&password=$password&action=get_live_streams&type=m3u_plus";
+            $liveCategories = "$baseUrl/player_api.php?username=$user&password=$password&action=get_live_categories";
+            $liveStreams = "$baseUrl/player_api.php?username=$user&password=$password&action=get_live_streams";
 
             // Setup the user agent and SSL verification
             $verify = !$playlist->disable_ssl_verification;
