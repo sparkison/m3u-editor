@@ -23,6 +23,7 @@ class ListChannels extends ListRecords
 
     protected static string $resource = ChannelResource::class;
 
+    protected ?string $subheading = 'NOTE: Playlist channel output order is based on: 1 Sort order, 2 Channel no. and 3 Channel title - in that order. You can edit your Playlist output to auto sort as well, which will define the sort order based on the playlist order.';
     public function setPage($page, $pageName = 'page'): void
     {
         parent::setPage($page, $pageName);
@@ -34,75 +35,77 @@ class ListChannels extends ListRecords
     {
         return [
             // Actions\CreateAction::make(),
-            Actions\Action::make('map')
-                ->label('Map EPG to Playlist')
-                ->form([
-                    Forms\Components\Select::make('epg')
-                        ->required()
-                        ->label('EPG')
-                        ->helperText('Select the EPG you would like to map from.')
-                        ->options(Epg::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                        ->searchable(),
-                    Forms\Components\Select::make('playlist')
-                        ->required()
-                        ->label('Playlist')
-                        ->helperText('Select the playlist you would like to map to.')
-                        ->options(Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                        ->searchable(),
-                    Forms\Components\Toggle::make('overwrite')
-                        ->label('Overwrite')
-                        ->helperText('Overwrite channels with existing mappings?')
-                        ->default(false),
-                    Forms\Components\Toggle::make('recurring')
-                        ->label('Recurring')
-                        ->helperText('Re-run this mapping everytime the EPG is synced?')
-                        ->default(false),
-                ])
-                ->action(function (Collection $records, array $data): void {
-                    app('Illuminate\Contracts\Bus\Dispatcher')
-                        ->dispatch(new \App\Jobs\MapPlaylistChannelsToEpg(
-                            epg: (int)$data['epg'],
-                            playlist: $data['playlist'],
-                            force: $data['overwrite'],
-                            recurring: $data['recurring'],
-                        ));
-                })->after(function () {
-                    Notification::make()
-                        ->success()
-                        ->title('EPG to Channel mapping')
-                        ->body('Channel mapping started, you will be notified when the process is complete.')
-                        ->send();
-                })
-                ->requiresConfirmation()
-                ->icon('heroicon-o-link')
-                ->color('gray')
-                ->modalIcon('heroicon-o-link')
-                ->modalDescription('Map the selected EPG to the selected Playlist channels.')
-                ->modalSubmitActionLabel('Map now'),
-            Actions\ImportAction::make()
-                ->importer(ChannelImporter::class)
-                ->label('Import Channels')
-                ->icon('heroicon-m-arrow-down-tray')
-                ->color('primary')
-                ->modalDescription('Import channels from a CSV or XLSX file.'),
-            Actions\ExportAction::make()
-                ->exporter(ChannelExporter::class)
-                ->label('Export Channels')
-                ->icon('heroicon-m-arrow-up-tray')
-                ->color('primary')
-                ->modalDescription('Export channels to a CSV or XLSX file. NOTE: Only enabled channels will be exported.')
-                ->columnMapping(false)
-                ->modifyQueryUsing(function ($query, array $options) {
-                    // For now, only allow exporting enabled channels
-                    return $query->where([
-                        ['playlist_id', $options['playlist']],
-                        ['enabled', true],
-                    ]);
-                    // return $query->where('playlist_id', $options['playlist'])
-                    //     ->when($options['enabled'], function ($query, $enabled) {
-                    //         return $query->where('enabled', $enabled);
-                    //     });
-                }),
+            Actions\ActionGroup::make([
+                Actions\Action::make('map')
+                    ->label('Map EPG to Playlist')
+                    ->form([
+                        Forms\Components\Select::make('epg')
+                            ->required()
+                            ->label('EPG')
+                            ->helperText('Select the EPG you would like to map from.')
+                            ->options(Epg::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                            ->searchable(),
+                        Forms\Components\Select::make('playlist')
+                            ->required()
+                            ->label('Playlist')
+                            ->helperText('Select the playlist you would like to map to.')
+                            ->options(Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                            ->searchable(),
+                        Forms\Components\Toggle::make('overwrite')
+                            ->label('Overwrite')
+                            ->helperText('Overwrite channels with existing mappings?')
+                            ->default(false),
+                        Forms\Components\Toggle::make('recurring')
+                            ->label('Recurring')
+                            ->helperText('Re-run this mapping everytime the EPG is synced?')
+                            ->default(false),
+                    ])
+                    ->action(function (Collection $records, array $data): void {
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new \App\Jobs\MapPlaylistChannelsToEpg(
+                                epg: (int)$data['epg'],
+                                playlist: $data['playlist'],
+                                force: $data['overwrite'],
+                                recurring: $data['recurring'],
+                            ));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('EPG to Channel mapping')
+                            ->body('Channel mapping started, you will be notified when the process is complete.')
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-link')
+                    ->color('gray')
+                    ->modalIcon('heroicon-o-link')
+                    ->modalDescription('Map the selected EPG to the selected Playlist channels.')
+                    ->modalSubmitActionLabel('Map now'),
+                Actions\ImportAction::make()
+                    ->importer(ChannelImporter::class)
+                    ->label('Import Channels')
+                    ->icon('heroicon-m-arrow-down-tray')
+                    ->color('primary')
+                    ->modalDescription('Import channels from a CSV or XLSX file.'),
+                Actions\ExportAction::make()
+                    ->exporter(ChannelExporter::class)
+                    ->label('Export Channels')
+                    ->icon('heroicon-m-arrow-up-tray')
+                    ->color('primary')
+                    ->modalDescription('Export channels to a CSV or XLSX file. NOTE: Only enabled channels will be exported.')
+                    ->columnMapping(false)
+                    ->modifyQueryUsing(function ($query, array $options) {
+                        // For now, only allow exporting enabled channels
+                        return $query->where([
+                            ['playlist_id', $options['playlist']],
+                            ['enabled', true],
+                        ]);
+                        // return $query->where('playlist_id', $options['playlist'])
+                        //     ->when($options['enabled'], function ($query, $enabled) {
+                        //         return $query->where('enabled', $enabled);
+                        //     });
+                    })
+            ])->button()->label('Actions'),
         ];
     }
 

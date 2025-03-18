@@ -119,6 +119,7 @@ class ProcessM3uImport implements ShouldQueue
             // Get the playlist details
             $playlistId = $playlist->id;
             $userId = $playlist->user_id;
+            $autoSort = $playlist->auto_sort;
             $batchNo = Str::orderedUuid()->toString();
 
             // Get the Xtream API credentials
@@ -191,13 +192,30 @@ class ProcessM3uImport implements ShouldQueue
                         'enabled' => $playlist->enable_channels,
                     ];
 
+                    // Keep track of channel number
+                    $channelNo = 0;
+                    if ($autoSort) {
+                        $channelFields['sort'] = 0;
+                    }
+
                     // Get the live streams
                     $liveStreams = JsonParser::parse($liveStreamsResponse->body());
 
                     // Process the live streams
                     $streamBaseUrl = "$baseUrl/live/$user/$password";
-                    $collection = LazyCollection::make(function () use ($liveStreams, $streamBaseUrl, $categories, $channelFields, $output) {
+                    $collection = LazyCollection::make(function () use (
+                        $liveStreams,
+                        $streamBaseUrl,
+                        $categories,
+                        $channelFields,
+                        $autoSort,
+                        $channelNo,
+                        $output
+                    ) {
                         foreach ($liveStreams as $item) {
+                            // Increment channel number
+                            ++$channelNo;
+
                             // Get the category
                             $category = $categories->firstWhere('category_id', $item['category_id']);
 
@@ -205,7 +223,7 @@ class ProcessM3uImport implements ShouldQueue
                             if ($this->preprocess && !$this->shouldIncludeChannel($category['category_name'] ?? '')) {
                                 continue;
                             }
-                            yield [
+                            $channel = [
                                 ...$channelFields,
                                 'title' => $item['name'],
                                 'name' => $item['name'],
@@ -216,6 +234,10 @@ class ProcessM3uImport implements ShouldQueue
                                 'stream_id' => $item['stream_id'],
                                 'channel' => $item['num'] ?? null,
                             ];
+                            if ($autoSort) {
+                                $channel['sort'] = $channelNo;
+                            }
+                            yield $channel;
                         }
                     });
                     $this->processChannelCollection($collection, $playlist, $batchNo, $userId, $start);
@@ -291,6 +313,7 @@ class ProcessM3uImport implements ShouldQueue
             // Get the playlist details
             $playlistId = $playlist->id;
             $userId = $playlist->user_id;
+            $autoSort = $playlist->auto_sort;
             $batchNo = Str::orderedUuid()->toString();
 
             $filePath = null;
@@ -355,33 +378,42 @@ class ProcessM3uImport implements ShouldQueue
                     'enabled' => $playlist->enable_channels,
                     'extvlcopt' => null
                 ];
-
-                // Setup the attribute -> key mapping
-                $attributes = [
-                    'name' => 'tvg-name',
-                    'stream_id' => 'tvg-id',
-                    'logo' => 'tvg-logo',
-                    'group' => 'group-title',
-                    'group_internal' => 'group-title',
-                    'channel' => 'tvg-chno',
-                    'lang' => 'tvg-language',
-                    'country' => 'tvg-country',
-                ];
+                if ($autoSort) {
+                    $channelFields['sort'] = 0;
+                }
 
                 // Extract the channels and groups from the m3u
                 $excludeFileTypes = $playlist->import_prefs['ignored_file_types'] ?? [];
                 $collection = LazyCollection::make(function () use (
                     $filePath,
                     $channelFields,
-                    $attributes,
-                    $excludeFileTypes
+                    $excludeFileTypes,
+                    $autoSort
                 ) {
+                    // Keep track of channel number
+                    $channelNo = 0;
+
+                    // Setup the attribute -> key mapping
+                    $attributes = [
+                        'name' => 'tvg-name',
+                        'stream_id' => 'tvg-id',
+                        'logo' => 'tvg-logo',
+                        'group' => 'group-title',
+                        'group_internal' => 'group-title',
+                        'channel' => 'tvg-chno',
+                        'lang' => 'tvg-language',
+                        'country' => 'tvg-country',
+                    ];
+
                     // Parse the M3U file
                     // NOTE: max line length is set to 2048 to prevent memory issues
                     $m3uParser = new M3uParser();
                     $m3uParser->addDefaultTags();
                     $count = 0;
                     foreach ($m3uParser->parseFile($filePath, max_length: 2048) as $item) {
+                        // Increment channel number
+                        ++$channelNo;
+
                         $url = $item->getPath();
                         foreach ($excludeFileTypes as $excludeFileType) {
                             if (str_ends_with($url, $excludeFileType)) {
@@ -446,6 +478,13 @@ class ProcessM3uImport implements ShouldQueue
                                 // Update group name to the singular name and return the channel
                                 $channel['group'] = $chGroup;
                                 $channel['group_internal'] = $chGroup;
+
+                                // Set channel number, if auto sort is enabled
+                                if ($autoSort) {
+                                    $channel['sort'] = $channelNo;
+                                }
+
+                                // Return the channel
                                 yield $channel;
                             }
                         } else {
@@ -460,6 +499,11 @@ class ProcessM3uImport implements ShouldQueue
                             // Check if max channels reached
                             if ($count++ >= $this->maxItems) {
                                 continue;
+                            }
+
+                            // Set channel number, if auto sort is enabled
+                            if ($autoSort) {
+                                $channel['sort'] = $channelNo;
                             }
 
                             // Return the channel

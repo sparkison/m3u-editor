@@ -64,7 +64,7 @@ class ChannelResource extends Resource
                 return $action->button()->label('Filters');
             })
             ->modifyQueryUsing(function (Builder $query) {
-                $query->with('epgChannel');
+                $query->with('epgChannel', 'playlist');
             })
             ->deferLoading()
 //            ->contentGrid(fn() => $livewire->isListLayout()
@@ -104,7 +104,8 @@ class ChannelResource extends Resource
                     ->type('number')
                     ->placeholder('Sort Order')
                     ->sortable()
-                    ->tooltip('Channel sort order')
+                    ->tooltip(fn($record) => $record->playlist->auto_sort ? 'Playlist auto-sort enabled; disable to change' : 'Channel sort order')
+                    ->disabled(fn($record) => $record->playlist->auto_sort)
                     ->toggleable(),
                 Tables\Columns\TextInputColumn::make('stream_id_custom')
                     ->label('ID')
