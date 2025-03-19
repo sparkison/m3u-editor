@@ -44,6 +44,7 @@ RUN apk update \
         ca-certificates \
         nodejs \
         npm \
+        ffmpeg \
         redis \
         git
 
