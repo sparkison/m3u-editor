@@ -484,7 +484,7 @@ class ChannelResource extends Resource
                 ->rules(['numeric', 'min:0']),
             Forms\Components\TextInput::make('url_custom')
                 ->label('URL')
-                ->columnSpan('full')
+                ->columnSpan(1)
                 ->prefixIcon('heroicon-m-globe-alt')
                 ->placeholder(fn(Get $get) => $get('url'))
                 ->helperText("Leave empty to use playlist default value.")
@@ -500,6 +500,26 @@ class ChannelResource extends Resource
                             );
                         })
                 )
+                ->type('url'),
+            Forms\Components\TextInput::make('url_proxy')
+                ->label('Proxy URL')
+                ->columnSpan(1)
+                ->prefixIcon('heroicon-m-globe-alt')
+                ->placeholder(fn($record) => route('stream', base64_encode((string)$record->id)))
+                ->helperText("Use to test the proxy functionality of m3u editor.")
+                ->disabled()
+                ->suffixAction(
+                    Forms\Components\Actions\Action::make('copy')
+                        ->icon('heroicon-s-clipboard-document-check')
+                        ->action(function ($record, $livewire, $state) {
+                            $url = route('stream', base64_encode((string)$record->id));
+                            $livewire->js(
+                                'window.navigator.clipboard.writeText("' . $url . '");
+                                $tooltip("' . __('Copied to clipboard') . '", { timeout: 1500 });'
+                            );
+                        })
+                )
+                ->dehydrated(false) // don't save the value in the database
                 ->type('url'),
             Forms\Components\Select::make('epg_channel_id')
                 ->label('EPG Channel')

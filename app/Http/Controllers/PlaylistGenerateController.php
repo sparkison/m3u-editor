@@ -55,7 +55,7 @@ class PlaylistGenerateController extends Controller
                         $channelNo = ++$channelNumber;
                     }
                     if ($proxyEnabled) {
-                        $url = route('stream', $channel->id);
+                        $url = route('stream', base64_encode((string)$channel->id));
                     }
 
                     // Get the icon

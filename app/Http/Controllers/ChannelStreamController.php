@@ -22,7 +22,7 @@ class ChannelStreamController extends Controller
     public function __invoke(Request $request, $id)
     {
         // Find the channel by ID, else throw a 404
-        $channel = Channel::findOrFail($id);
+        $channel = Channel::findOrFail(base64_decode($id));
 
         // Enable debug output?
         $userPreferences = app(GeneralSettings::class);
@@ -85,7 +85,7 @@ class ChannelStreamController extends Controller
      */
     public function hls(Request $request, $id)
     {
-        $channel = Channel::findOrFail($id);
+        $channel = Channel::findOrFail(base64_decode($id));
         $streamUrl = $channel->url_custom ?? $channel->url;
 
         // Path for HLS files
