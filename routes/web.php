@@ -27,5 +27,5 @@ Route::get('/phpinfo', function () {
 });
 
 // Stream an IPTV channel
-Route::get('/stream/{id}', \App\Http\Controllers\ChannelStreamController::class);
-Route::get('/stream/hls/{id}', [\App\Http\Controllers\ChannelStreamController::class, 'hls']);
+Route::get('/stream/{id}', \App\Http\Controllers\ChannelStreamController::class)->name('stream');
+Route::get('/stream/hls/{id}', [\App\Http\Controllers\ChannelStreamController::class, 'hls'])->name('stream.hls');

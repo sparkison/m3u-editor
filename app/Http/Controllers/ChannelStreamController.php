@@ -23,7 +23,8 @@ class ChannelStreamController extends Controller
         $channel = Channel::findOrFail($id);
 
         // Get the stream URL (could be multiple, allow for fallbacks)
-        $streamUrls = [$channel->url];
+        $streamUrl = $channel->url_custom ?? $channel->url;
+        $streamUrls = [$streamUrl];
 
         // Stream the content directly from FFmpeg
         return new StreamedResponse(function () use ($streamUrls) {
@@ -68,7 +69,7 @@ class ChannelStreamController extends Controller
     public function hls(Request $request, $id)
     {
         $channel = Channel::findOrFail($id);
-        $streamUrl = $channel->url;
+        $streamUrl = $channel->url_custom ?? $channel->url;
 
         // Path for HLS files
         $hlsDir = storage_path("app/public/hls/{$id}");

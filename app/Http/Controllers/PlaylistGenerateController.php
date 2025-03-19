@@ -25,9 +25,12 @@ class PlaylistGenerateController extends Controller
         // Generate a filename
         $filename = Str::slug($playlist->name) . '.m3u';
 
+        // Check if proxy enabled
+        $proxyEnabled = $playlist->enable_proxy;
+
         // Get ll active channels
         return response()->stream(
-            function () use ($playlist) {
+            function () use ($playlist, $proxyEnabled) {
                 // Get all active channels
                 $channels = $playlist->channels()
                     ->where('enabled', true)
@@ -50,6 +53,9 @@ class PlaylistGenerateController extends Controller
                     $channelNo = $channel->channel;
                     if (!$channelNo && $playlist->auto_channel_increment) {
                         $channelNo = ++$channelNumber;
+                    }
+                    if ($proxyEnabled) {
+                        $url = route('stream', $channel->id);
                     }
 
                     // Get the icon
