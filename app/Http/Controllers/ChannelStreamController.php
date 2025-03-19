@@ -42,14 +42,14 @@ class ChannelStreamController extends Controller
                 // Try streaming from this URL
                 $cmd = "ffmpeg -re -i \"$streamUrl\" -c copy -f mpegts pipe:1";
                 if (!$enabledDebug) {
-                    $cmd .= " -hide_banner -loglevel quiet";
+                    $cmd .= " -hide_banner -nostats -loglevel quiet 2>/dev/null";
                 }
                 $process = popen($cmd, 'r');
 
                 if ($process) {
                     while (!feof($process)) {
                         if (connection_aborted()) {
-                            pclose($process);
+                            pclose($process); // Attempt to close FFmpeg connection immediately
                             return;
                         }
                         $data = fread($process, 4096);
