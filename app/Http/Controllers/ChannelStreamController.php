@@ -48,6 +48,10 @@ class ChannelStreamController extends Controller
 
                 if ($process) {
                     while (!feof($process)) {
+                        if (connection_aborted()) {
+                            pclose($process);
+                            return;
+                        }
                         $data = fread($process, 4096);
                         if ($data === false) {
                             break; // Stop if no data
