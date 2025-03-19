@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Channel;
+use App\Settings\GeneralSettings;
 use Illuminate\Http\Request;
+use Mockery\Exception;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -22,15 +24,26 @@ class ChannelStreamController extends Controller
         // Find the channel by ID, else throw a 404
         $channel = Channel::findOrFail($id);
 
+        // Enable debug output?
+        $userPreferences = app(GeneralSettings::class);
+        try {
+            $enabledDebug = $userPreferences->show_proxy_debug;
+        } catch (Exception $e) {
+            $enabledDebug = false;
+        }
+
         // Get the stream URL (could be multiple, allow for fallbacks)
         $streamUrl = $channel->url_custom ?? $channel->url;
         $streamUrls = [$streamUrl];
 
         // Stream the content directly from FFmpeg
-        return new StreamedResponse(function () use ($streamUrls) {
+        return new StreamedResponse(function () use ($streamUrls, $enabledDebug) {
             foreach ($streamUrls as $streamUrl) {
                 // Try streaming from this URL
-                $cmd = "ffmpeg -re -i \"$streamUrl\" -c copy -f mpegts pipe:1 2>&1";
+                $cmd = "ffmpeg -re -i \"$streamUrl\" -c copy -f mpegts pipe:1";
+                if (!$enabledDebug) {
+                    $cmd .= " -hide_banner -loglevel quiet";
+                }
                 $process = popen($cmd, 'r');
 
                 if ($process) {

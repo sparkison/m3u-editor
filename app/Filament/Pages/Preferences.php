@@ -69,6 +69,9 @@ class Preferences extends SettingsPage
                         Forms\Components\Toggle::make('show_queue_manager')
                             ->label('Allow queue manager access')
                             ->helperText('When enabled you can access the queue manager using the "Queue Manager" button. When disabled, the queue manager endpoint will return a 403 (Unauthorized).'),
+                        Forms\Components\Toggle::make('show_proxy_debug')
+                            ->label('Show proxy (ffmpeg) debug in cli')
+                            ->helperText('When enabled, you can view the ffmpeg debug output in the console. When disabled, the debug output will be hidden. This setting only affects the ffmpeg CLI output, not the logs.'),
                     ]),
 
                 Forms\Components\Section::make()
