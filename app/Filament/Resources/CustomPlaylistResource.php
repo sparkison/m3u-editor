@@ -152,6 +152,15 @@ class CustomPlaylistResource extends Resource
                         ->live()
                         ->default(false)
                         ->helperText('If no channel number is set, output an automatically incrementing number.'),
+                    Forms\Components\Toggle::make('enable_proxy')
+                        ->label('Enable Proxy')
+                        ->hint(fn(Get $get): string => $get('enable_proxy') ? 'Proxied' : 'Not proxied')
+                        ->hintIcon(fn(Get $get): string => !$get('enable_proxy') ? 'heroicon-m-lock-open' : 'heroicon-m-lock-closed')
+                        ->columnSpan(1)
+                        ->live()
+                        ->inline(false)
+                        ->default(false)
+                        ->helperText('When enabled, playlists urls will be proxied through m3u editor and streamed via ffmpeg.'),
                     Forms\Components\TextInput::make('channel_start')
                         ->helperText('The starting channel number.')
                         ->columnSpan(1)

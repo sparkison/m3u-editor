@@ -499,6 +499,21 @@ class PlaylistResource extends Resource
                         ->columns(2)
                         ->columnSpanFull()
                         ->schema([
+                            Forms\Components\Toggle::make('auto_sort')
+                                ->label('Automatically assign sort number based on playlist order')
+                                ->columnSpan(1)
+                                ->inline(false)
+                                ->default(true)
+                                ->helperText('NOTE: You will need to re-sync your playlist, or wait for the next scheduled sync, if changing this. This will overwrite any existing channel sort order customization for this playlist.'),
+                            Forms\Components\Toggle::make('enable_proxy')
+                                ->label('Enable Proxy')
+                                ->hint(fn(Get $get): string => $get('enable_proxy') ? 'Proxied' : 'Not proxied')
+                                ->hintIcon(fn(Get $get): string => !$get('enable_proxy') ? 'heroicon-m-lock-open' : 'heroicon-m-lock-closed')
+                                ->columnSpan(1)
+                                ->live()
+                                ->inline(false)
+                                ->default(false)
+                                ->helperText('When enabled, playlists urls will be proxied through m3u editor and streamed via ffmpeg.'),
                             Forms\Components\Toggle::make('auto_channel_increment')
                                 ->label('Auto channel number increment')
                                 ->columnSpan(1)
@@ -506,12 +521,6 @@ class PlaylistResource extends Resource
                                 ->live()
                                 ->default(false)
                                 ->helperText('If no channel number is set, output an automatically incrementing number.'),
-                            Forms\Components\Toggle::make('auto_sort')
-                                ->label('Automatically assign sort number based on playlist order')
-                                ->columnSpan(1)
-                                ->inline(false)
-                                ->default(true)
-                                ->helperText('NOTE: You will need to re-sync your playlist if changing this. This will overwrite any existing channel sort order customization for this playlist.'),
                             Forms\Components\TextInput::make('channel_start')
                                 ->helperText('The starting channel number.')
                                 ->columnSpan(1)
