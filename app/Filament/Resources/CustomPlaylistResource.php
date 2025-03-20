@@ -170,12 +170,6 @@ class CustomPlaylistResource extends Resource
                                 ->live()
                                 ->default(false)
                                 ->helperText('If no channel number is set, output an automatically incrementing number.'),
-                            Forms\Components\Toggle::make('auto_sort')
-                                ->label('Automatically assign sort number based on playlist order')
-                                ->columnSpan(1)
-                                ->inline(false)
-                                ->default(true)
-                                ->helperText('NOTE: You will need to re-sync your playlist, or wait for the next scheduled sync, if changing this. This will overwrite any existing channel sort order customization for this playlist.'),
                             Forms\Components\TextInput::make('channel_start')
                                 ->helperText('The starting channel number.')
                                 ->columnSpan(1)
