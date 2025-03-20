@@ -158,29 +158,54 @@ class CustomPlaylistResource extends Resource
             Forms\Components\Section::make('Output')
                 ->columns(2)
                 ->schema([
-                    Forms\Components\Toggle::make('auto_channel_increment')
-                        ->label('Auto channel number increment')
-                        ->columnSpan(1)
-                        ->inline(false)
-                        ->live()
-                        ->default(false)
-                        ->helperText('If no channel number is set, output an automatically incrementing number.'),
-                    Forms\Components\Toggle::make('enable_proxy')
-                        ->label('Enable Proxy')
-                        ->hint(fn(Get $get): string => $get('enable_proxy') ? 'Proxied' : 'Not proxied')
-                        ->hintIcon(fn(Get $get): string => !$get('enable_proxy') ? 'heroicon-m-lock-open' : 'heroicon-m-lock-closed')
-                        ->columnSpan(1)
-                        ->live()
-                        ->inline(false)
-                        ->default(false)
-                        ->helperText('When enabled, playlists urls will be proxied through m3u editor and streamed via ffmpeg.'),
-                    Forms\Components\TextInput::make('channel_start')
-                        ->helperText('The starting channel number.')
-                        ->columnSpan(1)
-                        ->rules(['min:1'])
-                        ->type('number')
-                        ->hidden(fn(Get $get): bool => !$get('auto_channel_increment'))
-                        ->required(),
+                    Forms\Components\Section::make('Playlist Output')
+                        ->description('Determines how the playlist is output')
+                        ->columnSpanFull()
+                        ->columns(2)
+                        ->schema([
+                            Forms\Components\Toggle::make('auto_channel_increment')
+                                ->label('Auto channel number increment')
+                                ->columnSpan(1)
+                                ->inline(false)
+                                ->live()
+                                ->default(false)
+                                ->helperText('If no channel number is set, output an automatically incrementing number.'),
+                            Forms\Components\Toggle::make('auto_sort')
+                                ->label('Automatically assign sort number based on playlist order')
+                                ->columnSpan(1)
+                                ->inline(false)
+                                ->default(true)
+                                ->helperText('NOTE: You will need to re-sync your playlist, or wait for the next scheduled sync, if changing this. This will overwrite any existing channel sort order customization for this playlist.'),
+                            Forms\Components\TextInput::make('channel_start')
+                                ->helperText('The starting channel number.')
+                                ->columnSpan(1)
+                                ->rules(['min:1'])
+                                ->type('number')
+                                ->hidden(fn(Get $get): bool => !$get('auto_channel_increment'))
+                                ->required(),
+                        ]),
+                    Forms\Components\Section::make('Streaming Output')
+                        ->description('Output processing options')
+                        ->columnSpanFull()
+                        ->columns(2)
+                        ->schema([
+                            Forms\Components\TextInput::make('streams')
+                                ->helperText('Number of streams available (currently used for HDHR service).')
+                                ->columnSpan(1)
+                                ->rules(['min:1'])
+                                ->type('number')
+                                ->required(),
+                            Forms\Components\Toggle::make('enable_proxy')
+                                ->label('Enable Proxy')
+                                ->hint(fn(Get $get): string => $get('enable_proxy') ? 'Proxied' : 'Not proxied')
+                                ->hintIcon(fn(Get $get): string => !$get('enable_proxy') ? 'heroicon-m-lock-open' : 'heroicon-m-lock-closed')
+                                ->columnSpan(1)
+                                ->live()
+                                ->inline(false)
+                                ->default(false)
+                                ->helperText('When enabled, playlists urls will be proxied through m3u editor and streamed via ffmpeg.'),
+
+                        ])
                 ]),
         ];
     }

@@ -88,8 +88,22 @@ class PlaylistGenerateController extends Controller
 
     public function hdhr(string $uuid)
     {
+        // Fetch the playlist so we can send a 404 if not found
+        $playlist = Playlist::where('uuid', $uuid)->first();
+        if (!$playlist) {
+            $playlist = MergedPlaylist::where('uuid', $uuid)->first();
+        }
+        if (!$playlist) {
+            $playlist = CustomPlaylist::where('uuid', $uuid)->first();
+        }
+
+        // Check if playlist exists
+        if (!$playlist) {
+            return response()->json(['Error' => 'Playlist Not Found'], 404);
+        }
+
         // Setup the HDHR device info
-        $deviceInfo = $this->getDeviceInfo($uuid);
+        $deviceInfo = $this->getDeviceInfo($playlist);
         $deviceInfoXml = collect($deviceInfo)->map(function ($value, $key) {
             return "<$key>$value</$key>";
         })->implode('');
@@ -116,7 +130,7 @@ class PlaylistGenerateController extends Controller
         }
 
         // Return the HDHR device info
-        return $this->getDeviceInfo($uuid);
+        return $this->getDeviceInfo($playlist);
     }
 
     public function hdhrLineup(string $uuid)
@@ -165,18 +179,22 @@ class PlaylistGenerateController extends Controller
         ]);
     }
 
-    private function getDeviceInfo($uuid)
+    private function getDeviceInfo($playlist)
     {
         // Return the HDHR device info
+        $uuid = $playlist->uuid;
+        $tunerCount = $playlist->streams;
+        $deviceId = substr($uuid, 0, 8);
         return [
-            'DeviceID' => '12345678',
-            'FriendlyName' => 'm3u editor HDHomeRun',
+            'DeviceID' => $deviceId,
+            'FriendlyName' => "{$playlist->name} HDHomeRun",
             'ModelNumber' => 'HDTC-2US',
             'FirmwareName' => 'hdhomerun3_atsc',
             'FirmwareVersion' => '20200101',
             'DeviceAuth' => 'test_auth_token',
             'BaseURL' => url("/$uuid/hdhr"),
             'LineupURL' => route('playlist.hdhr.lineup', $uuid),
+            'TunerCount' => $tunerCount,
         ];
     }
 }
