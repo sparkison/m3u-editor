@@ -113,6 +113,23 @@ class PlaylistGenerateController extends Controller
         return response($xmlResponse)->header('Content-Type', 'application/xml');
     }
 
+    public function hdhrOverview(string $uuid)
+    {
+        // Fetch the playlist so we can send a 404 if not found
+        $playlist = Playlist::where('uuid', $uuid)->first();
+        if (!$playlist) {
+            $playlist = MergedPlaylist::where('uuid', $uuid)->first();
+        }
+        if (!$playlist) {
+            $playlist = CustomPlaylist::where('uuid', $uuid)->first();
+        }
+
+        return view('hdhr', [
+            'name' => $playlist->name,
+            'uuid' => $uuid,
+        ]);
+    }
+
     public function hdhrDiscover(string $uuid)
     {
         // Fetch the playlist so we can send a 404 if not found
@@ -192,7 +209,7 @@ class PlaylistGenerateController extends Controller
             'FirmwareName' => 'hdhomerun3_atsc',
             'FirmwareVersion' => '20200101',
             'DeviceAuth' => 'test_auth_token',
-            'BaseURL' => url("/$uuid/hdhr"),
+            'BaseURL' => route('playlist.hdhr.overview', $uuid),
             'LineupURL' => route('playlist.hdhr.lineup', $uuid),
             'TunerCount' => $tunerCount,
         ];

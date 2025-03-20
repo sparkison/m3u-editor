@@ -25,8 +25,6 @@
         "laravel/tinker": "^2.9",
         "opcodesio/log-viewer": "^3.15",
         "predis/predis": "^2.3",
-        "react/datagram": "^1.10",
-        "react/event-loop": "^1.5",
         "ryangjchandler/filament-progress-column": "^1.0",
         "shuvroroy/filament-spatie-laravel-backup": "^2.2",
         "sparkison/m3u-parser": "dev-master",

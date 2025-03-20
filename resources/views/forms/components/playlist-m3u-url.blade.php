@@ -1,6 +1,6 @@
 <x-dynamic-component :component="$getFieldWrapperView()" :field="$field">
     @php($m3uUrl = route('playlist.generate', ['uuid' => $getRecord()->uuid]))
-    @php($hdhrUrl = route('playlist.hdhr', ['uuid' => $getRecord()->uuid]))
+    @php($hdhrUrl = route('playlist.hdhr.overview', ['uuid' => $getRecord()->uuid]))
     <div x-data="{ state: $wire.$entangle('{{ $getStatePath() }}') }">
         <a href="{{ $m3uUrl }}" target="_blank"
             class="underline flex items-center gap-1 text-primary-500 hover:text-primary-700 dark:hover:text-primary-300">

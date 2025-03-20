@@ -11,6 +11,8 @@ Route::get('/{uuid}/playlist.m3u', PlaylistGenerateController::class)
 
 Route::get('/{uuid}/hdhr/device.xml', [\App\Http\Controllers\PlaylistGenerateController::class, 'hdhr'])
     ->name('playlist.hdhr');
+Route::get('/{uuid}/hdhr', [\App\Http\Controllers\PlaylistGenerateController::class, 'hdhrOverview'])
+    ->name('playlist.hdhr.overview');
 Route::get('/{uuid}/hdhr/discover.json', [\App\Http\Controllers\PlaylistGenerateController::class, 'hdhrDiscover'])
     ->name('playlist.hdhr.discover');
 Route::get('/{uuid}/hdhr/lineup.json', [\App\Http\Controllers\PlaylistGenerateController::class, 'hdhrLineup'])
