@@ -26,6 +26,7 @@ class Channel extends Model
         'playlist_id' => 'integer',
         'group_id' => 'integer',
         'extvlcopt' => 'array',
+        'kodidrop' => 'array',
         'logo_type' => ChannelLogoType::class,
     ];
 

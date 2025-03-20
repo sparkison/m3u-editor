@@ -376,7 +376,8 @@ class ProcessM3uImport implements ShouldQueue
                     'user_id' => $userId,
                     'import_batch_no' => $batchNo,
                     'enabled' => $playlist->enable_channels,
-                    'extvlcopt' => null
+                    'extvlcopt' => null,
+                    'kodidrop' => null,
                 ];
                 if ($autoSort) {
                     $channelFields['sort'] = 0;
@@ -425,6 +426,7 @@ class ProcessM3uImport implements ShouldQueue
                             'url' => $url,
                         ];
                         $extvlcopt = [];
+                        $kodidrop = [];
                         foreach ($item->getExtTags() as $extTag) {
                             if ($extTag instanceof \M3uParser\Tag\ExtInf) {
                                 $channel['title'] = $extTag->getTitle();
@@ -448,9 +450,18 @@ class ProcessM3uImport implements ShouldQueue
                                     'value' => $extTag->getValue(),
                                 ];
                             }
+                            if ($extTag instanceof \M3uParser\Tag\KodiDrop) {
+                                $kodidrop[] = [
+                                    'key' => $extTag->getKey(),
+                                    'value' => $extTag->getValue(),
+                                ];
+                            }
                         }
                         if (count($extvlcopt) > 0) {
                             $channel['extvlcopt'] = json_encode($extvlcopt);
+                        }
+                        if (count($kodidrop) > 0) {
+                            $channel['kodidrop'] = json_encode($kodidrop);
                         }
                         if (!isset($channel['title'])) {
                             // Name is required, fallback to stream ID if available, otherwise set to title

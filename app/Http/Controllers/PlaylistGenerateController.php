@@ -74,6 +74,11 @@ class PlaylistGenerateController extends Controller
                             echo "#EXTVLCOPT:{$extvlcopt['key']}={$extvlcopt['value']}\n";
                         }
                     }
+                    if ($channel->kodidrop) {
+                        foreach ($channel->kodidrop as $kodidrop) {
+                            echo "#KODIPROP:{$kodidrop['key']}={$kodidrop['value']}\n";
+                        }
+                    }
                     echo $url . "\n";
                 }
             },
@@ -182,6 +187,19 @@ class PlaylistGenerateController extends Controller
                 'GuideName' => $channel->title_custom ?? $channel->title,
                 'URL' => $url,
             ];
+
+            // Example of more detailed response
+//            return [
+//                'GuideNumber' => $channel->channel_number ?? $streamId, // Channel number (e.g., "100")
+//                'GuideName'   => $channel->title_custom ?? $channel->title, // Channel name
+//                'URL'         => $url, // Stream URL
+//                'HD'          => $is_hd ? 1 : 0, // HD flag
+//                'VideoCodec'  => 'H264', // Set based on your stream format
+//                'AudioCodec'  => 'AAC', // Set based on your stream format
+//                'Favorite'    => $favorite ? 1 : 0, // Favorite flag
+//                'DRM'         => 0, // Assuming no DRM
+//                'Streaming'   => 'direct', // Direct stream or transcoding
+//            ];
         }));
     }
 

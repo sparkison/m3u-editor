@@ -40,7 +40,7 @@
         <li>Open Plex Web App by navigating to <a href="https://app.plex.tv/" target="_blank">Plex</a> in your browser.</li>
         <li>Go to <strong>Settings</strong> (click the wrench icon in the top-right corner).</li>
         <li>Under <strong>Manage</strong>, select <strong>Live TV & DVR</strong>.</li>
-        <li>Click on <strong>Set Up Plex DVR</strong>.</li>
+        <li>Click on <strong>Set Up Plex Tuner</strong>.</li>
         <li>Enter the following HDHomeRun tuner address manually: <strong>{{ route('playlist.hdhr.overview', $uuid) }}</strong></li>
         <li>Select the tuner and click <strong>Continue</strong>.</li>
         <li>Choose your location and allow Plex to fetch channel guide data.</li>
