@@ -15,7 +15,7 @@ return [
     |
     */
 
-    'default' => env('CACHE_STORE', 'database'),
+    'default' => 'redis', // env('CACHE_STORE', 'database'),
 
     /*
     |--------------------------------------------------------------------------

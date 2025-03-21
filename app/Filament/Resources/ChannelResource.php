@@ -535,7 +535,6 @@ class ChannelResource extends Resource
                     'channel' => 'Channel',
                     'epg' => 'EPG',
                 ])
-                ->searchable()
                 ->columnSpan(1),
         ];
     }

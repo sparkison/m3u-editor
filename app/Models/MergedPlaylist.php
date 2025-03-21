@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\PlaylistChannelId;
 use App\Pivots\MergedPlaylistPivot;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -22,6 +23,7 @@ class MergedPlaylist extends Model
     protected $casts = [
         'id' => 'integer',
         'user_id' => 'integer',
+        'id_channel_by' => PlaylistChannelId::class
     ];
 
     public function user(): BelongsTo

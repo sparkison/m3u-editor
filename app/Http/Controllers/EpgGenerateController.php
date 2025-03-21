@@ -48,19 +48,28 @@ class EpgGenerateController extends Controller
                     ->orderBy('title')
                     ->cursor();
 
+                $channelNumber = $playlist->auto_channel_increment ? $playlist->channel_start - 1 : 0;
+                $idChannelBy = $playlist->id_channel_by;
                 foreach ($channels as $channel) {
+                    $channelNo = $channel->channel;
+                    if (!$channelNo && $playlist->auto_channel_increment) {
+                        $channelNo = ++$channelNumber;
+                    }
+
                     // Output the <channel> tag
                     if ($channel->epgChannel) {
                         // Get the EPG channel data
                         $epgData = $channel->epgChannel;
-                        $streamId = $channel->stream_id_custom ?? $channel->stream_id;
+                        $tvgId = $idChannelBy === 'stream_id'
+                            ? $channel->stream_id_custom ?? $channel->stream_id
+                            : $channelNo;
 
                         // Keep track of which EPGs have which channels mapped
                         // Need this to output the <programme> tags later
                         if (!array_key_exists($epgData->epg_id, $epgChannels)) {
                             $epgChannels[$epgData->epg_id] = [];
                         }
-                        $epgChannels[$epgData->epg_id][] = [$epgData->channel_id => $streamId];
+                        $epgChannels[$epgData->epg_id][] = [$epgData->channel_id => $tvgId];
 
                         // Get the icon
                         $icon = '';
@@ -72,8 +81,9 @@ class EpgGenerateController extends Controller
 
                         // Output the <channel> tag
                         $title = $channel->title_custom ?? $channel->title;
-                        echo '  <channel id="' . $streamId . '">' . PHP_EOL;
+                        echo '  <channel id="' . $tvgId . '">' . PHP_EOL;
                         echo '    <display-name lang="' . $epgData->lang . '">' . htmlspecialchars($title) . '</display-name>';
+                        echo '    <display-name>' . $channelNo . '</display-name>';
                         if ($icon) {
                             echo PHP_EOL . '    <icon src="' . htmlspecialchars($icon) . '"/>';
                         }

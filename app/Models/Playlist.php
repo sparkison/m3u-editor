@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\PlaylistChannelId;
 use App\Enums\PlaylistStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -31,6 +32,7 @@ class Playlist extends Model
         'xtream_config' => 'array',
         'xtream_status' => 'array',
         'status' => PlaylistStatus::class,
+        'id_channel_by' => PlaylistChannelId::class
     ];
 
     public function getFolderPathAttribute(): string

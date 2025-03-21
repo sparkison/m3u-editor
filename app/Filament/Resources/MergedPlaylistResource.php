@@ -158,6 +158,14 @@ class MergedPlaylistResource extends Resource
                         ->columnSpanFull()
                         ->columns(2)
                         ->schema([
+                            Forms\Components\Select::make('id_channel_by')
+                                ->label('Preferred TVG ID output')
+                                ->helperText('How you would like to ID your channels.')
+                                ->options([
+                                    'stream_id' => 'TVG ID/Stream ID (default)',
+                                    'channel_id' => 'Channel Number',
+                                ])
+                                ->columnSpan(1),
                             Forms\Components\Toggle::make('auto_channel_increment')
                                 ->label('Auto channel number increment')
                                 ->columnSpan(1)

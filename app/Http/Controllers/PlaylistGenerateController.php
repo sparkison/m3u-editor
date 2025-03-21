@@ -44,11 +44,11 @@ class PlaylistGenerateController extends Controller
                 // Output the enabled channels
                 echo "#EXTM3U\n";
                 $channelNumber = $playlist->auto_channel_increment ? $playlist->channel_start - 1 : 0;
+                $idChannelBy = $playlist->id_channel_by;
                 foreach ($channels as $channel) {
                     // Get the title and name
                     $title = $channel->title_custom ?? $channel->title;
                     $name = $channel->name_custom ?? $channel->name;
-                    $tvgId = $channel->stream_id_custom ?? $channel->stream_id;
                     $url = $channel->url_custom ?? $channel->url;
                     $epgData = $channel->epgChannel ?? null;
                     $channelNo = $channel->channel;
@@ -58,6 +58,9 @@ class PlaylistGenerateController extends Controller
                     if ($proxyEnabled) {
                         $url = route('stream', base64_encode((string)$channel->id));
                     }
+                    $tvgId = $idChannelBy === 'stream_id'
+                        ? $channel->stream_id_custom ?? $channel->stream_id
+                        : $channelNo;
 
                     // Get the icon
                     $icon = '';
