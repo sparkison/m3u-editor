@@ -96,6 +96,11 @@ class MergedPlaylistResource extends Resource
                         ->icon('heroicon-o-arrow-down-tray')
                         ->url(fn($record) => route('epg.generate', ['uuid' => $record->uuid]))
                         ->openUrlInNewTab(),
+                    Tables\Actions\Action::make('HDHomeRun URL')
+                        ->label('HDHomeRun Url')
+                        ->icon('heroicon-o-arrow-top-right-on-square')
+                        ->url(fn($record) => route('playlist.hdhr.overview', ['uuid' => $record->uuid]))
+                        ->openUrlInNewTab(),
                     Tables\Actions\DeleteAction::make(),
                 ])->button()->hiddenLabel()
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
