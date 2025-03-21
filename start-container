@@ -153,10 +153,6 @@ php artisan app:generate-key
 # Check for updates
 php artisan app:update-check
 
-# Clearing cache
-echo "Clearing cache..."
-php artisan cache:clear
-
 # Optimizing configuration
 echo "Optimizing configuration..."
 php artisan optimize
