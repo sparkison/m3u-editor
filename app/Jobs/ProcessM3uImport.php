@@ -248,7 +248,7 @@ class ProcessM3uImport implements ShouldQueue
 
             // Update the groups array
             $groups = $categories->pluck('category_name');
-            if (isset($vodCategories)) {
+            if (!is_string($vodCategories)) {
                 $groups = $groups->merge($vodCategories->pluck('category_name'));
             }
             $this->groups = $groups->unique()->values()->toArray();
