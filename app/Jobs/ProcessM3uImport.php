@@ -104,6 +104,38 @@ class ProcessM3uImport implements ShouldQueue
     }
 
     /**
+     * @param string $message
+     * @param string $error
+     * @return void
+     */
+    private function sendError($message, $error): void
+    {
+        // Log the exception
+        logger()->error("Error processing \"{$this->playlist->name}\": $error");
+
+        // Send notification
+        Notification::make()
+            ->danger()
+            ->title("Error processing \"{$this->playlist->name}\"")
+            ->body($message)
+            ->broadcast($this->playlist->user);
+        Notification::make()
+            ->danger()
+            ->title("Error processing \"{$this->playlist->name}\"")
+            ->body($message)
+            ->sendToDatabase($this->playlist->user);
+
+        // Update the playlist
+        $this->playlist->update([
+            'status' => PlaylistStatus::Failed,
+            'synced' => now(),
+            'errors' => $error,
+            'progress' => 100,
+            'processing' => false,
+        ]);
+    }
+
+    /**
      * Process the Xtream API
      */
     private function processXtreamApi()
@@ -127,11 +159,14 @@ class ProcessM3uImport implements ShouldQueue
             $user = urlencode($playlist->xtream_config['username']);
             $password = $playlist->xtream_config['password'];
             $output = $playlist->xtream_config['output'] ?? 'ts';
+            $categoriesToImport = $playlist->xtream_config['import_options'] ?? [];
 
             // Setup the category and stream URLs
             $userInfo = "$baseUrl/player_api.php?username=$user&password=$password";
             $liveCategories = "$baseUrl/player_api.php?username=$user&password=$password&action=get_live_categories";
             $liveStreams = "$baseUrl/player_api.php?username=$user&password=$password&action=get_live_streams";
+            $vodCategories = "$baseUrl/player_api.php?username=$user&password=$password&action=get_vod_categories";
+            $vodStreams = "$baseUrl/player_api.php?username=$user&password=$password&action=get_vod_streams";
 
             // Setup the user agent and SSL verification
             $verify = !$playlist->disable_ssl_verification;
@@ -148,127 +183,183 @@ class ProcessM3uImport implements ShouldQueue
                 ]);
             }
 
-            // Get the categories
+            // Set the initial progress
+            $initialProgress = 3; // start at 3%
+
+            // Get the live categories
             $categoriesResponse = Http::withUserAgent($userAgent)
                 ->withOptions(['verify' => $verify])
                 ->timeout(60 * 5) // set timeout to five minute
                 ->throw()->get($liveCategories);
-            $connectionSuccess = false;
-            if ($categoriesResponse->ok()) {
-                // Update progress
-                $playlist->update(['progress' => 5]); // set to 5% to start
-
-                // Update progress
-                $connectionSuccess = true;
-                $categories = collect($categoriesResponse->json());
-                $liveStreamsResponse = Http::withUserAgent($userAgent)
-                    ->withOptions(['verify' => $verify])
-                    ->timeout(60 * 10) // set timeout to ten minute
-                    ->throw()->get($liveStreams);
-
-                // Update the groups array
-                $this->groups = $categories->pluck('category_name')->toArray();
-
-                // Get the live streams
-                if ($liveStreamsResponse->ok()) {
-                    // Update progress
-                    $playlist->update(['progress' => 10]);
-
-                    // Setup common field values
-                    $channelFields = [
-                        'title' => null,
-                        'name' => '',
-                        'url' => null,
-                        'logo' => null,
-                        'channel' => null,
-                        'group' => '',
-                        'group_internal' => '',
-                        'stream_id' => null,
-                        'lang' => null,
-                        'country' => null,
-                        'playlist_id' => $playlistId,
-                        'user_id' => $userId,
-                        'import_batch_no' => $batchNo,
-                        'enabled' => $playlist->enable_channels,
-                    ];
-
-                    // Keep track of channel number
-                    $channelNo = 0;
-                    if ($autoSort) {
-                        $channelFields['sort'] = 0;
-                    }
-
-                    // Get the live streams
-                    $liveStreams = JsonParser::parse($liveStreamsResponse->body());
-
-                    // Process the live streams
-                    $streamBaseUrl = "$baseUrl/live/$user/$password";
-                    $collection = LazyCollection::make(function () use (
-                        $liveStreams,
-                        $streamBaseUrl,
-                        $categories,
-                        $channelFields,
-                        $autoSort,
-                        $channelNo,
-                        $output
-                    ) {
-                        foreach ($liveStreams as $item) {
-                            // Increment channel number
-                            ++$channelNo;
-
-                            // Get the category
-                            $category = $categories->firstWhere('category_id', $item['category_id']);
-
-                            // Determine if the channel should be included
-                            if ($this->preprocess && !$this->shouldIncludeChannel($category['category_name'] ?? '')) {
-                                continue;
-                            }
-                            $channel = [
-                                ...$channelFields,
-                                'title' => $item['name'],
-                                'name' => $item['name'],
-                                'url' => "$streamBaseUrl/{$item['stream_id']}.$output",
-                                'logo' => $item['stream_icon'],
-                                'group' => $category['category_name'] ?? '',
-                                'group_internal' => $category['category_name'] ?? '',
-                                'stream_id' => $item['stream_id'],
-                                'channel' => $item['num'] ?? null,
-                            ];
-                            if ($autoSort) {
-                                $channel['sort'] = $channelNo;
-                            }
-                            yield $channel;
-                        }
-                    });
-                    $this->processChannelCollection($collection, $playlist, $batchNo, $userId, $start);
-                } else {
-                    $connectionSuccess = false;
-                }
-            }
-            if (!$connectionSuccess) {
-                $error = "Invalid Xtream API credentials. Unable to connect to the Xtream API. Please check your credentials and try again.";
-                Notification::make()
-                    ->danger()
-                    ->title("Error processing \"{$playlist->name}\"")
-                    ->body('Please view your notifications for details.')
-                    ->broadcast($playlist->user);
-                Notification::make()
-                    ->danger()
-                    ->title("Error processing \"{$playlist->name}\"")
-                    ->body($error)
-                    ->sendToDatabase($playlist->user);
-
-                // Update the Playlist
-                $playlist->update([
-                    'status' => PlaylistStatus::Failed,
-                    'channels' => 0, // not using...
-                    'synced' => now(),
-                    'errors' => $error,
-                    'progress' => 100,
-                    'processing' => false,
-                ]);
+            if (!$categoriesResponse->ok()) {
+                $error = $categoriesResponse->body();
+                $message = "Error processing Live categories: $error";
+                $this->sendError($message, $error);
                 return;
             }
+
+            // Get the live streams
+            $liveStreamsResponse = Http::withUserAgent($userAgent)
+                ->withOptions(['verify' => $verify])
+                ->timeout(60 * 10) // set timeout to ten minute
+                ->throw()->get($liveStreams);
+            if (!$liveStreamsResponse->ok()) {
+                $error = $liveStreamsResponse->body();
+                $message = "Error processing Live streams: $error";
+                $this->sendError($message, $error);
+                return;
+            }
+            $initialProgress += 3;
+            $playlist->update(['progress' => $initialProgress]);
+            $categories = collect($categoriesResponse->json());
+
+            // If including VOD, get the categories
+            if (in_array('vod', $categoriesToImport)) {
+                $vodCategoriesResponse = Http::withUserAgent($userAgent)
+                    ->withOptions(['verify' => $verify])
+                    ->timeout(60 * 5)
+                    ->throw()->get($vodCategories);
+                if (!$vodCategoriesResponse->ok()) {
+                    $error = $vodCategoriesResponse->body();
+                    $message = "Error processing VOD categories: $error";
+                    $this->sendError($message, $error);
+                    return;
+                }
+
+                // Get the VOD streams
+                $vodStreamsResponse = Http::withUserAgent($userAgent)
+                    ->withOptions(['verify' => $verify])
+                    ->timeout(60 * 10) // set timeout to ten minute
+                    ->throw()->get($vodStreams);
+                if (!$vodStreamsResponse->ok()) {
+                    $error = $vodStreamsResponse->body();
+                    $message = "Error processing VOD streams: $error";
+                    $this->sendError($message, $error);
+                    return;
+                }
+                $initialProgress += 3;
+                $playlist->update(['progress' => $initialProgress]);
+                $vodCategories = collect($vodCategoriesResponse->json());
+            }
+
+            // Update progress
+            $initialProgress += 5;
+            $playlist->update(['progress' => $initialProgress]);
+
+            // Update the groups array
+            $groups = $categories->pluck('category_name');
+            if (isset($vodCategories)) {
+                $groups = $groups->merge($vodCategories->pluck('category_name'));
+            }
+            $this->groups = $groups->unique()->values()->toArray();
+
+            // Setup common field values
+            $channelFields = [
+                'title' => null,
+                'name' => '',
+                'url' => null,
+                'logo' => null,
+                'channel' => null,
+                'group' => '',
+                'group_internal' => '',
+                'stream_id' => null,
+                'lang' => null,
+                'country' => null,
+                'playlist_id' => $playlistId,
+                'user_id' => $userId,
+                'import_batch_no' => $batchNo,
+                'enabled' => $playlist->enable_channels,
+            ];
+
+            // Update progress
+            $playlist->update(['progress' => 10]);
+
+            // Keep track of channel number
+            $channelNo = 0;
+            if ($autoSort) {
+                $channelFields['sort'] = 0;
+            }
+
+            // Get the live streams
+            $liveStreams = JsonParser::parse($liveStreamsResponse->body());
+            $vodStreams = isset($vodStreamsResponse) ? JsonParser::parse($vodStreamsResponse->body()) : null;
+
+            // Process the live streams
+            $streamBaseUrl = "$baseUrl/live/$user/$password";
+            $vodBaseUrl = "$baseUrl/movie/$user/$password";
+            $collection = LazyCollection::make(function () use (
+                $liveStreams,
+                $vodStreams,
+                $streamBaseUrl,
+                $vodBaseUrl,
+                $categories,
+                $vodCategories,
+                $channelFields,
+                $autoSort,
+                $channelNo,
+                $output
+            ) {
+                // Output the live streams first
+                foreach ($liveStreams as $item) {
+                    // Increment channel number
+                    ++$channelNo;
+
+                    // Get the category
+                    $category = $categories->firstWhere('category_id', $item['category_id']);
+
+                    // Determine if the channel should be included
+                    if ($this->preprocess && !$this->shouldIncludeChannel($category['category_name'] ?? '')) {
+                        continue;
+                    }
+                    $channel = [
+                        ...$channelFields,
+                        'title' => $item['name'],
+                        'name' => $item['name'],
+                        'url' => "$streamBaseUrl/{$item['stream_id']}.$output",
+                        'logo' => $item['stream_icon'],
+                        'group' => $category['category_name'] ?? '',
+                        'group_internal' => $category['category_name'] ?? '',
+                        'stream_id' => $item['stream_id'],
+                        'channel' => $item['num'] ?? null,
+                    ];
+                    if ($autoSort) {
+                        $channel['sort'] = $channelNo;
+                    }
+                    yield $channel;
+                }
+
+                // If VOD streams, add them
+                if ($vodStreams) {
+                    foreach ($vodStreams as $item) {
+                        // Increment channel number
+                        ++$channelNo;
+
+                        // Get the category
+                        $category = $vodCategories->firstWhere('category_id', $item['category_id']);
+
+                        // Determine if the channel should be included
+                        if ($this->preprocess && !$this->shouldIncludeChannel($category['category_name'] ?? '')) {
+                            continue;
+                        }
+                        $channel = [
+                            ...$channelFields,
+                            'title' => $item['name'],
+                            'name' => $item['name'],
+                            'url' => "$vodBaseUrl/{$item['stream_id']}." . $item['container_extension'] ?? "mp4",
+                            'logo' => $item['stream_icon'],
+                            'group' => $category['category_name'] ?? '',
+                            'group_internal' => $category['category_name'] ?? '',
+                            'stream_id' => $item['stream_id'],
+                            'channel' => $item['num'] ?? null,
+                        ];
+                        if ($autoSort) {
+                            $channel['sort'] = $channelNo;
+                        }
+                        yield $channel;
+                    }
+                }
+            });
+            $this->processChannelCollection($collection, $playlist, $batchNo, $userId, $start);
         } catch (Exception $e) {
             // Log the exception
             logger()->error("Error processing \"{$this->playlist->name}\": {$e->getMessage()}");

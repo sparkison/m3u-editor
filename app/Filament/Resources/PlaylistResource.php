@@ -337,15 +337,13 @@ class PlaylistResource extends Resource
                                     Forms\Components\TextInput::make('xtream_config.username')
                                         ->label('Xtream API Username')
                                         ->required()
-                                        ->columnSpan(1)
-                                        ->hidden(fn(Get $get): bool => !$get('xtream')),
+                                        ->columnSpan(1),
                                     Forms\Components\TextInput::make('xtream_config.password')
                                         ->label('Xtream API Password')
                                         ->required()
                                         ->columnSpan(1)
                                         ->password()
-                                        ->revealable()
-                                        ->hidden(fn(Get $get): bool => !$get('xtream')),
+                                        ->revealable(),
                                     Forms\Components\Select::make('xtream_config.output')
                                         ->label('Output')
                                         ->required()
@@ -353,9 +351,15 @@ class PlaylistResource extends Resource
                                         ->options([
                                             'ts' => 'MPEG-TS (.ts)',
                                             'm3u8' => 'HLS (.m3u8)',
-                                        ])->default('ts')
-                                        ->hidden(fn(Get $get): bool => !$get('xtream')),
-                                ]),
+                                        ])->default('ts'),
+                                    Forms\Components\CheckboxList::make('xtream_config.import_options')
+                                        ->label('Additional categories & streams to import')
+                                        ->columnSpan(3)
+                                        ->options([
+                                            'vod' => 'VOD',
+                                            //'series' => 'Series',
+                                        ])->helperText('NOTE: Live categories & streams will be included by default'),
+                                ])->hidden(fn(Get $get): bool => !$get('xtream')),
 
                             Forms\Components\TextInput::make('url')
                                 ->label('URL or Local file path')

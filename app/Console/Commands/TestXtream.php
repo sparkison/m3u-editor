@@ -36,10 +36,12 @@ class TestXtream extends Command implements PromptsForMissingInput
         $user = urlencode($this->argument('user'));
         $password = $this->argument('password');
 
+        $type = $this->choice('What category would you like to fetch? (live or vod)', ['live', 'vod'], 'live');
+
         $baseUrl = str($this->argument('url'))->replace(' ', '%20')->toString();
         $userInfo = "$baseUrl/player_api.php?username=$user&password=$password";
-        $liveCategories = "$baseUrl/player_api.php?username=$user&password=$password&action=get_live_categories&type=m3u_plus";
-        $liveStreams = "$baseUrl/player_api.php?username=$user&password=$password&action=get_live_streams&type=m3u_plus";
+        $liveCategories = "$baseUrl/player_api.php?username=$user&password=$password&action=get_{$type}_categories";
+        $liveStreams = "$baseUrl/player_api.php?username=$user&password=$password&action=get_{$type}_streams";
 
         $userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13';
         $verify = true;
@@ -79,14 +81,14 @@ class TestXtream extends Command implements PromptsForMissingInput
                     'country' => null,
                 ];
                 $liveStreams = JsonParser::parse($liveStreamsResponse->body());
-                $streamBaseUrl = "$baseUrl/live/$user/$password";
+                $streamBaseUrl = "$baseUrl/$type/$user/$password";
                 LazyCollection::make($liveStreams)->each(function ($item) use ($streamBaseUrl, $categories, $channelFields) {
                     $category = $categories->firstWhere('category_id', $item['category_id']);
                     $channel = [
                         ...$channelFields,
                         'title' => $item['name'],
                         'name' => $item['name'],
-                        'url' => "$streamBaseUrl/{$item['stream_id']}.ts",
+                        'url' => "$streamBaseUrl/{$item['stream_id']}." . $item['container_extension'] ?? "ts",
                         'logo' => $item['stream_icon'],
                         'group' => $category['category_name'] ?? '',
                         'group_internal' => $category['category_name'] ?? '',
