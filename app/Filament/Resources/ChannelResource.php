@@ -225,12 +225,6 @@ class ChannelResource extends Resource
                     ->multiple()
                     ->preload()
                     ->searchable(),
-                Tables\Filters\SelectFilter::make('group')
-                    ->relationship('group', 'name')
-                    ->hidden(fn() => $relationId)
-                    ->multiple()
-                    ->preload()
-                    ->searchable(),
                 Tables\Filters\Filter::make('enabled')
                     ->label('Channel is enabled')
                     ->toggle()

@@ -36,12 +36,16 @@ class TestXtream extends Command implements PromptsForMissingInput
         $user = urlencode($this->argument('user'));
         $password = $this->argument('password');
 
-        $type = $this->choice('What category would you like to fetch? (live or vod)', ['live', 'vod'], 'live');
+        $type = $this->choice(
+            'What category would you like to fetch? (live or vod)',
+            ['live', 'vod'],
+            'live'
+        );
 
         $baseUrl = str($this->argument('url'))->replace(' ', '%20')->toString();
         $userInfo = "$baseUrl/player_api.php?username=$user&password=$password";
-        $liveCategories = "$baseUrl/player_api.php?username=$user&password=$password&action=get_{$type}_categories";
-        $liveStreams = "$baseUrl/player_api.php?username=$user&password=$password&action=get_{$type}_streams";
+        $typeCategories = "$baseUrl/player_api.php?username=$user&password=$password&action=get_{$type}_categories";
+        $typeStreams = "$baseUrl/player_api.php?username=$user&password=$password&action=get_{$type}_streams";
 
         $userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13';
         $verify = true;
@@ -61,14 +65,14 @@ class TestXtream extends Command implements PromptsForMissingInput
         $categoriesResponse = Http::withUserAgent($userAgent)
             ->withOptions(['verify' => $verify])
             ->timeout(60 * 5) // set timeout to five minutes
-            ->throw()->get($liveCategories);
+            ->throw()->get($typeCategories);
         if ($categoriesResponse->ok()) {
             $categories = collect(json_decode($categoriesResponse->body(), true));
-            $liveStreamsResponse = Http::withUserAgent($userAgent)
+            $typeStreamsResponse = Http::withUserAgent($userAgent)
                 ->withOptions(['verify' => $verify])
                 ->timeout(60 * 10) // set timeout to ten minute
-                ->throw()->get($liveStreams);
-            if ($liveStreamsResponse->ok()) {
+                ->throw()->get($typeStreams);
+            if ($typeStreamsResponse->ok()) {
                 $channelFields = [
                     'title' => null,
                     'name' => '',
@@ -80,9 +84,9 @@ class TestXtream extends Command implements PromptsForMissingInput
                     'lang' => null,
                     'country' => null,
                 ];
-                $liveStreams = JsonParser::parse($liveStreamsResponse->body());
+                $typeStreams = JsonParser::parse($typeStreamsResponse->body());
                 $streamBaseUrl = "$baseUrl/$type/$user/$password";
-                LazyCollection::make($liveStreams)->each(function ($item) use ($streamBaseUrl, $categories, $channelFields) {
+                LazyCollection::make($typeStreams)->each(function ($item) use ($streamBaseUrl, $categories, $channelFields) {
                     $category = $categories->firstWhere('category_id', $item['category_id']);
                     $channel = [
                         ...$channelFields,
@@ -98,7 +102,7 @@ class TestXtream extends Command implements PromptsForMissingInput
                     $this->info(json_encode($channel));
                 });
             } else {
-                $this->error("Error fetching streams: {$liveStreamsResponse->body()}");
+                $this->error("Error fetching streams: {$typeStreamsResponse->body()}");
             }
         } else {
             $this->error("Error fetching categories: {$categoriesResponse->body()}");
