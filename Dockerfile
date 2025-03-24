@@ -34,7 +34,7 @@ WORKDIR /var/www/html
 # Install basic packages
 RUN apk update \
     && apk --no-cache add  \
-        py3-setuptools \
+        coreutils \
         supervisor \
         nano \
         wget \
