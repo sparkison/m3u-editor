@@ -43,7 +43,12 @@ class VersionServiceProvider extends ServiceProvider
 
     public static function getRemoteVersion($refresh = false): string
     {
-        $remoteVersion = Cache::get(self::$cacheKey);
+        // If using redis, may not be initialized yet, so catch the exception
+        try {
+            $remoteVersion = Cache::get(self::$cacheKey);
+        } catch (\Exception $e) {
+            $remoteVersion = null;
+        }
         if ($remoteVersion === null || $refresh) {
             $remoteVersion = '';
             try {
