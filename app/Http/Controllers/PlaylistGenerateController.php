@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 
 class PlaylistGenerateController extends Controller
 {
-    public function __invoke(string $uuid)
+    public function __invoke(Request $request, string $uuid)
     {
         // Fetch the playlist
         $playlist = Playlist::where('uuid', $uuid)->first();
@@ -27,7 +27,11 @@ class PlaylistGenerateController extends Controller
         $filename = Str::slug($playlist->name) . '.m3u';
 
         // Check if proxy enabled
-        $proxyEnabled = $playlist->enable_proxy;
+        if ($request->has('proxy')) {
+            $proxyEnabled = $request->input('proxy') === 'true';
+        } else {
+            $proxyEnabled = $playlist->enable_proxy;
+        }
 
         // Get ll active channels
         return response()->stream(
