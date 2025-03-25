@@ -136,12 +136,10 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                         ->select('id', 'channel_id')
                         ->first();
 
-
-                    // @TODO: implement and test similarity search function.
-                    // Something like this maybe?
-                    // $epgChannel = $this->similaritySearch('epg_channels', 'channel_id', $channel->name, ['epg_id, '=' ,$epg->id], 1);
-                    // Should probably set toggle to use similar search, along with threshold value.
-
+                    // Of no direct match, attempt a similarity search
+                    if (!$epgChannel) {
+                        $epgChannel = $this->similaritySearch->findMatchingEpgChannel($channel, $epg);
+                    }
 
                     // If EPG channel found, link it to the Playlist channel
                     if ($epgChannel) {

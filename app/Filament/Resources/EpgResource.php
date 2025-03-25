@@ -324,6 +324,17 @@ class EpgResource extends Resource
                                 ->inline(false)
                                 ->default(false),
                         ])
+                ]),
+
+            Forms\Components\Section::make('Mapping')
+                ->description('Settings used when mapping EPG to a Playlist.')
+                ->schema([
+                    Forms\Components\TextInput::make('preferred_local')
+                        ->label('Preferred Locale')
+                        ->prefixIcon('heroicon-m-language')
+                        ->placeholder('en')
+                        ->helperText('Entered your desired locale - if you\'re not sure what to put here, look at your EPG source. If you see entries like "CHANNEL.en", then "en" would be a good choice if you prefer english. This is used when mapping the EPG to a playlist. If the EPG has multiple locales, this will be used as the preferred locale when a direct match is not found.')
+                        ->maxLength(10),
                 ])
         ];
     }
