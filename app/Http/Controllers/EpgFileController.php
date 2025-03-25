@@ -13,7 +13,8 @@ class EpgFileController extends Controller
     public function __invoke(string $uuid)
     {
         $epg = Epg::where('uuid', $uuid)->firstOrFail();
-        if ($epg->url && $epg->url && str_starts_with($epg->url, 'http')) {
+        $filePath = null;
+        if ($epg->url && str_starts_with($epg->url, 'http')) {
             $filePath = Storage::disk('local')->path($epg->file_path);
         } else if ($epg->uploads && Storage::disk('local')->exists($epg->uploads)) {
             $filePath = Storage::disk('local')->path($epg->uploads);
