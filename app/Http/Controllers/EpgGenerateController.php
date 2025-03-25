@@ -107,10 +107,12 @@ class EpgGenerateController extends Controller
 
                     // Get the content
                     $filePath = null;
-                    if (Storage::disk('local')->exists($epg->file_path)) {
+                    if ($epg->url && $epg->url && str_starts_with($epg->url, 'http')) {
                         $filePath = Storage::disk('local')->path($epg->file_path);
-                    } elseif ($epg->uploads && Storage::disk('local')->exists($epg->uploads)) {
+                    } else if ($epg->uploads && Storage::disk('local')->exists($epg->uploads)) {
                         $filePath = Storage::disk('local')->path($epg->uploads);
+                    } else if ($epg->url) {
+                        $filePath = $epg->url;
                     }
                     if (!$filePath) {
                         // Send notification
