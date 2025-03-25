@@ -21,7 +21,7 @@ class EpgFileController extends Controller
         } else if ($epg->url) {
             $filePath = $epg->url;
         }
-        if (!file_exists($filePath)) {
+        if (!($filePath && file_exists($filePath))) {
             abort(404);
         }
 

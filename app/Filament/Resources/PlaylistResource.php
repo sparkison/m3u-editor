@@ -189,7 +189,7 @@ class PlaylistResource extends Resource
                         ->url(fn($record) => route('epg.generate', ['uuid' => $record->uuid]))
                         ->openUrlInNewTab(),
                     Tables\Actions\Action::make('HDHomeRun URL')
-                        ->label('HDHomeRun Url')
+                        ->label('HDHomeRun URL')
                         ->icon('heroicon-o-arrow-top-right-on-square')
                         ->url(fn($record) => route('playlist.hdhr.overview', ['uuid' => $record->uuid]))
                         ->openUrlInNewTab(),
@@ -564,7 +564,7 @@ class PlaylistResource extends Resource
                                 ->live()
                                 ->inline(false)
                                 ->default(false)
-                                ->helperText('When enabled, playlists urls will be proxied through m3u editor and streamed via ffmpeg.'),
+                                ->helperText('When enabled, channel urls will be proxied through m3u editor and streamed via ffmpeg (m3u editor will act as your client, playing the channels directly and sending the content to your client).'),
 
                         ])
                 ]),

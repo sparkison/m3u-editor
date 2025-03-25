@@ -139,7 +139,7 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
 
                     // @TODO: implement and test similarity search function.
                     // Something like this maybe?
-                    // $epgChannel = $this->similaritySearch('epg_channels', 'channel_id', $channel->name, 1);
+                    // $epgChannel = $this->similaritySearch('epg_channels', 'channel_id', $channel->name, ['epg_id, '=' ,$epg->id], 1);
                     // Should probably set toggle to use similar search, along with threshold value.
 
 
