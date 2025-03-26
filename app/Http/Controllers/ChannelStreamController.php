@@ -33,10 +33,11 @@ class ChannelStreamController extends Controller
 
         // Stream the content directly from FFmpeg
         return new StreamedResponse(function () use ($streamUrls) {
-            // Disable output compression
+            if (ob_get_level() > 0) {
+                flush();
+            }
             ini_set('zlib.output_compression', 0);
 
-            // Stream the content
             foreach ($streamUrls as $streamUrl) {
                 $cmd = "ffmpeg -re -i \"$streamUrl\" -c copy -f mpegts pipe:1 -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -timeout 100000000 -http_persistent 1";
                 if (config('dev.ffmpeg.debug')) {
