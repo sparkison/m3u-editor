@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Channel;
 use Illuminate\Http\Request;
-use Laravel\Octane\Facades\Octane;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -35,7 +34,6 @@ class ChannelStreamController extends Controller
         // Stream the content directly from FFmpeg
         return new StreamedResponse(function () use ($streamUrls) {
             if (ob_get_level() > 0) {
-                Octane::flush();
                 flush();
             }
             ini_set('zlib.output_compression', 0);
