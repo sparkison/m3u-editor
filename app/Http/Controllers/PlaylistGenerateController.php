@@ -55,6 +55,7 @@ class PlaylistGenerateController extends Controller
                     $url = $channel->url_custom ?? $channel->url;
                     $epgData = $channel->epgChannel ?? null;
                     $channelNo = $channel->channel;
+                    $timeshift = $channel->shift ?? 0;
                     if (!$channelNo && $playlist->auto_channel_increment) {
                         $channelNo = ++$channelNumber;
                     }
@@ -72,7 +73,7 @@ class PlaylistGenerateController extends Controller
                     }
 
                     // Output the channel
-                    echo "#EXTINF:-1 tvg-chno=\"$channelNo\" tvg-id=\"$tvgId\" tvg-name=\"$name\" tvg-logo=\"$icon\" group-title=\"$channel->group\"," . $title . "\n";
+                    echo "#EXTINF:-1 tvg-chno=\"$channelNo\" tvg-id=\"$tvgId\" timeshift=\"$timeshift\" tvg-name=\"$name\" tvg-logo=\"$icon\" group-title=\"$channel->group\"," . $title . "\n";
                     if ($channel->extvlcopt) {
                         foreach ($channel->extvlcopt as $extvlcopt) {
                             echo "#EXTVLCOPT:{$extvlcopt['key']}={$extvlcopt['value']}\n";
