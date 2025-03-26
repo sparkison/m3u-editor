@@ -64,8 +64,8 @@ class SimilaritySearchService
         // Fetch EPG channels
         $epgChannels = $epg->channels()
             ->where(function ($query) use ($normalizedChan) {
-                $query->where('channel_id', 'like', '%' . $normalizedChan . '%')
-                    ->orWhere('name', 'like', '%' . $normalizedChan . '%');
+                $query->whereRaw('LOWER(`channel_id`) like ?', ["%$normalizedChan%"])
+                    ->orWhereRaw('LOWER(`name`) like ?', ["%$normalizedChan%"]);
             });
 
         // Setup variables
@@ -80,7 +80,9 @@ class SimilaritySearchService
             return null;
         }
         foreach ($epgChannels->cursor() as $epgChannel) {
-            $normalizedEpg = $this->normalizeChannelName($epgChannel->name);
+            $normalizedEpg = empty($epgChannel->name)
+                ? $this->normalizeChannelName($epgChannel->channel_id)
+                : $this->normalizeChannelName($epgChannel->name);
             if (!$normalizedEpg) continue;
 
             // Calculate fuzzy similarity
