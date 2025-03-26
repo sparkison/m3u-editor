@@ -244,6 +244,6 @@ return [
     |
     */
 
-    'max_execution_time' => 60,
+    'max_execution_time' => 0,
 
 ];
