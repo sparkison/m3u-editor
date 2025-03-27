@@ -58,7 +58,7 @@ class ChannelResource extends Resource
 
     public static function setupTable(Table $table, $relationId = null): Table
     {
-//        $livewire = $table->getLivewire();
+        //        $livewire = $table->getLivewire();
         return $table->persistFiltersInSession()
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
@@ -67,21 +67,21 @@ class ChannelResource extends Resource
                 $query->with(['epgChannel', 'playlist']);
             })
             ->deferLoading()
-//            ->contentGrid(fn() => $livewire->isListLayout()
-//                ? null
-//                : [
-//                    'md' => 2,
-//                    'lg' => 3,
-//                    'xl' => 4,
-//                    '2xl' => 5,
-//                ])
-//            ->reorderable('sort', $relationId !== null)
-//            ->reorderRecordsTriggerAction(
-//                fn(Tables\Actions\Action $action, bool $isReordering) => $action
-//                    ->button()
-//                    ->tooltip('')
-//                    ->label($isReordering ? 'Disable reordering' : 'Enable reordering'),
-//            )
+            //            ->contentGrid(fn() => $livewire->isListLayout()
+            //                ? null
+            //                : [
+            //                    'md' => 2,
+            //                    'lg' => 3,
+            //                    'xl' => 4,
+            //                    '2xl' => 5,
+            //                ])
+            //            ->reorderable('sort', $relationId !== null)
+            //            ->reorderRecordsTriggerAction(
+            //                fn(Tables\Actions\Action $action, bool $isReordering) => $action
+            //                    ->button()
+            //                    ->tooltip('')
+            //                    ->label($isReordering ? 'Disable reordering' : 'Enable reordering'),
+            //            )
             ->paginated([10, 25, 50, 100])
             ->paginatedWhileReordering()
             ->defaultPaginationPageOption(25)
@@ -486,12 +486,16 @@ class ChannelResource extends Resource
                 ->suffixAction(
                     Forms\Components\Actions\Action::make('copy')
                         ->icon('heroicon-s-clipboard-document-check')
-                        ->action(function (Get $get, $livewire, $state) {
+                        ->action(function (Get $get, $record, $state) {
                             $url = $state ?? $get('url');
-                            $livewire->js(
-                                'window.navigator.clipboard.writeText("' . $url . '");
-                                $tooltip("' . __('Copied to clipboard') . '", { timeout: 1500 });'
-                            );
+                            $title = $record->title_custom ?? $record->title;
+                            Notification::make()
+                        ->icon('heroicon-s-clipboard-document-check')
+                        ->title("$title - URL")
+                                ->success()
+                                ->body($url)
+                                ->persistent()
+                                ->send();
                         })
                 )
                 ->type('url'),
@@ -505,12 +509,16 @@ class ChannelResource extends Resource
                 ->suffixAction(
                     Forms\Components\Actions\Action::make('copy')
                         ->icon('heroicon-s-clipboard-document-check')
-                        ->action(function ($record, $livewire, $state) {
+                        ->action(function ($record, $state) {
                             $url = route('stream', base64_encode((string)$record->id));
-                            $livewire->js(
-                                'window.navigator.clipboard.writeText("' . $url . '");
-                                $tooltip("' . __('Copied to clipboard') . '", { timeout: 1500 });'
-                            );
+                            $title = $record->title_custom ?? $record->title;
+                            Notification::make()
+                                ->icon('heroicon-s-clipboard-document-check')
+                                ->title("$title - Proxy URL")
+                                ->success()
+                                ->body($url)
+                                ->persistent()
+                                ->send();
                         })
                 )
                 ->dehydrated(false) // don't save the value in the database
