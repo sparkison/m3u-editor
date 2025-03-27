@@ -54,6 +54,8 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    'port' => env('APP_PORT', 36400),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

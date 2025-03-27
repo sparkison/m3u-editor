@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Enums\ChannelLogoType;
+use App\Facades\ProxyFacade;
 use App\Filament\Resources\ChannelResource\Pages;
 use App\Models\Channel;
 use App\Models\CustomPlaylist;
@@ -503,14 +504,14 @@ class ChannelResource extends Resource
                 ->label('Proxy URL')
                 ->columnSpan(1)
                 ->prefixIcon('heroicon-m-globe-alt')
-                ->placeholder(fn($record) => route('stream', base64_encode((string)$record->id)))
+                ->placeholder(fn($record) => ProxyFacade::getProxyUrlForChannel($record->id))
                 ->helperText("Use to play stream via the proxy functionality of m3u editor.")
                 ->disabled()
                 ->suffixAction(
                     Forms\Components\Actions\Action::make('copy')
                         ->icon('heroicon-s-clipboard-document-check')
                         ->action(function ($record, $state) {
-                            $url = route('stream', base64_encode((string)$record->id));
+                            $url = ProxyFacade::getProxyUrlForChannel($record->id);
                             $title = $record->title_custom ?? $record->title;
                             Notification::make()
                                 ->icon('heroicon-s-clipboard-document-check')

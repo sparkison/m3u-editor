@@ -49,7 +49,7 @@
                     icon="heroicon-m-arrow-top-right-on-square"
                     icon-alias="panels::widgets.filament-info.open-documentation-button" rel="noopener noreferrer"
                     target="_blank">
-                    Donate now
+                    🙏 Donate now ❤️
                 </x-filament::button>
             </div>
         </div>

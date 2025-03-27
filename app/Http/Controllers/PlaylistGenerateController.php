@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\ChannelLogoType;
+use App\Facades\ProxyFacade;
 use App\Models\Channel;
 use App\Models\Playlist;
 use App\Models\MergedPlaylist;
@@ -60,7 +61,7 @@ class PlaylistGenerateController extends Controller
                         $channelNo = ++$channelNumber;
                     }
                     if ($proxyEnabled) {
-                        $url = route('stream', base64_encode((string)$channel->id));
+                        $url = ProxyFacade::getProxyUrlForChannel($channel->id);
                     }
                     $tvgId = $channel->stream_id_custom ?? $channel->stream_id;
 

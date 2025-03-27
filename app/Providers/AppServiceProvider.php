@@ -12,6 +12,7 @@ use App\Models\Epg;
 use App\Models\Group;
 use App\Models\Playlist;
 use App\Models\User;
+use App\Services\ProxyService;
 use App\Settings\GeneralSettings;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Routing\Route;
@@ -64,6 +65,9 @@ class AppServiceProvider extends ServiceProvider
 
         // Setup the API
         $this->setupApi();
+
+        // Setup the services
+        $this->setupServices();
     }
 
     /**
@@ -243,5 +247,16 @@ class AppServiceProvider extends ServiceProvider
                     SecurityScheme::http('bearer')
                 );
             });
+    }
+
+    /**
+     * Setup the services.
+     */
+    public function setupServices(): void
+    {
+        // Register the proxy service
+        $this->app->singleton('proxy', function () {
+            return new ProxyService();
+        });
     }
 }
