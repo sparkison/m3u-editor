@@ -51,7 +51,9 @@ class SimilaritySearchService
     {
         $debug = config('app.debug');
         $regionCode = $epg->preferred_local ? strtolower($epg->preferred_local) : null;
-        $fallbackName = trim($channel->title ?: $channel->name);
+        $title = $channel->title_custom ?? $channel->title;
+        $name = $channel->name_custom ?? $channel->name;
+        $fallbackName = trim($title ?: $name);
         $normalizedChan = $this->normalizeChannelName($fallbackName);
 
         if (!$normalizedChan) {
