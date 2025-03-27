@@ -9,6 +9,7 @@ use App\Filament\Auth\Login;
 use App\Filament\Auth\EditProfile;
 use App\Filament\Pages\CustomDashboard;
 use App\Filament\Widgets\DiscordWidget;
+use App\Filament\Widgets\DocumentsWidget;
 use App\Filament\Widgets\KoFiWidget;
 
 //use App\Filament\Widgets\PayPalDonateWidget;
@@ -86,13 +87,14 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->breadcrumbs($settings['show_breadcrumbs'])
             // Don't auto discover widgets, we'll manually register them
-            // ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
+            //->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
                 UpdateNoticeWidget::class,
                 AccountWidget::class,
+                DocumentsWidget::class,
+                DiscordWidget::class,
                 // PayPalDonateWidget::class,
                 KoFiWidget::class,
-                DiscordWidget::class,
                 StatsOverview::class,
             ])
             ->plugins([
@@ -112,12 +114,12 @@ class AdminPanelProvider extends PanelProvider
                     ->myProfileComponents([
                         'personal_info' => ProfileComponent::class
                     ])
-//                    ->passwordUpdateRules(
-//                        rules: [
-//                            'min:4'
-//                        ],
-//                        requiresCurrentPassword: false
-//                    ),
+                //                    ->passwordUpdateRules(
+                //                        rules: [
+                //                            'min:4'
+                //                        ],
+                //                        requiresCurrentPassword: false
+                //                    ),
             ])
             ->maxContentWidth($settings['content_width'])
             ->middleware([
