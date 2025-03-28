@@ -15,8 +15,8 @@ class PlaylistController extends Controller
      * 
      * Sync the selected Playlist.
      *
-     * Use the `playlist` parameter to select the playlist to refresh.
-     * You can find the playlist ID by looking at the ID column when viewing the playlist table.
+     * Use the `uuid` parameter to select the playlist to refresh.
+     * You can find the playlist UUID by using the `User > Get your Playlists` endpoint.
      *
      * @param \Illuminate\Http\Request $request
      * @param string $uuid

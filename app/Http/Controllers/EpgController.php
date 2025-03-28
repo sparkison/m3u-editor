@@ -11,8 +11,8 @@ class EpgController extends Controller
     /**
      * Sync the selected EPG.
      *
-     * Use the `epg` parameter to select the EPG to refresh.
-     * You can find the EPG ID by looking at the ID column when viewing the EPG table.
+     * Use the `uuid` parameter to select the EPG to refresh.
+     * You can find the EPG UUID by using the `User > Get your EPGs` endpoint.
      *
      * @param \Illuminate\Http\Request $request
      * @param string $uuid
