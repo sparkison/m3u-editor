@@ -12,27 +12,34 @@ use Illuminate\Http\Request;
 class PlaylistController extends Controller
 {
     /**
+     * 
      * Sync the selected Playlist.
      *
      * Use the `playlist` parameter to select the playlist to refresh.
      * You can find the playlist ID by looking at the ID column when viewing the playlist table.
      *
      * @param \Illuminate\Http\Request $request
-     * @param \App\Models\Playlist $playlist
+     * @param string $uuid
      *
      * @return \Illuminate\Http\JsonResponse
-     * @response array{message: "Response"}
+     * 
+     * @unauthenticated
+     * @response array{message: "Playlist is currently being synced..."}
      */
-    public function refreshPlaylist(Request $request, Playlist $playlist)
+    public function refreshPlaylist(Request $request, string $uuid)
     {
         $request->validate([
             // If true, will force a refresh of the EPG, ignoring any scheduling. Default is true.
             'force' => 'boolean',
         ]);
-        if ($request->user()->id !== $playlist->user_id) {
-            return response()->json([
-                'message' => 'Unauthorized',
-            ])->setStatusCode(403);
+
+        // Fetch the playlist
+        $playlist = Playlist::where('uuid', $uuid)->first();
+        if (!$playlist) {
+            $playlist = MergedPlaylist::where('uuid', $uuid)->first();
+        }
+        if (!$playlist) {
+            $playlist = CustomPlaylist::where('uuid', $uuid)->firstOrFail();
         }
 
         // Refresh the playlist

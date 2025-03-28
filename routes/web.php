@@ -40,3 +40,26 @@ Route::get('/phpinfo', function () {
 // Stream an IPTV channel
 Route::get('/stream/{id}', \App\Http\Controllers\ChannelStreamController::class)->name('stream');
 Route::get('/stream/hls/{id}', [\App\Http\Controllers\ChannelStreamController::class, 'hls'])->name('stream.hls');
+
+// API routes (for authenticated users only)
+Route::group(['middleware' => ['auth:sanctum']], function () {
+    // Get the authenticated user
+    Route::group(['prefix' => 'user'], function () {
+        Route::get('playlists', [\App\Http\Controllers\UserController::class, 'playlists'])
+            ->name('api.user.playlists');
+        Route::get('epgs', [\App\Http\Controllers\UserController::class, 'epgs'])
+            ->name('api.user.epgs');
+    });
+});
+
+// Playlist API routes
+Route::group(['prefix' => 'playlist'], function () {
+    Route::get('{uuid}', [\App\Http\Controllers\PlaylistController::class, 'refreshPlaylist'])
+        ->name('api.playlist.sync');
+});
+
+// EPG API routes
+Route::group(['prefix' => 'epg'], function () {
+    Route::get('{uuid}', [\App\Http\Controllers\EpgController::class, 'refreshEpg'])
+        ->name('api.epg.sync');
+});
