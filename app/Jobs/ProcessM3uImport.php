@@ -319,7 +319,7 @@ class ProcessM3uImport implements ShouldQueue
                         'logo' => $item['stream_icon'],
                         'group' => $category['category_name'] ?? '',
                         'group_internal' => $category['category_name'] ?? '',
-                        'stream_id' => $item['stream_id'],
+                        'stream_id' => $item['epg_channel_id'] ?? $item['stream_id'], // prefer EPG id for mapping, if set
                         'channel' => $item['num'] ?? null,
                     ];
                     if ($autoSort) {
