@@ -8,6 +8,9 @@ class UserController extends Controller
 {
     /**
      * Get your Playlists.
+     * 
+     * Returns an array of your Playlists, including their names and UUIDs.
+     * This is useful for calling the Playlist endpoints as a UUID is required.
      *
      * @param \Illuminate\Http\Request $request
      * @return []|\Illuminate\Http\Response
@@ -29,6 +32,9 @@ class UserController extends Controller
 
     /**
      * Get your EPGs.
+     * 
+     * Returns an array of your EPGs, including their names and UUIDs.
+     * This is useful for calling the EPG endpoints as a UUID is required.
      *
      * @param \Illuminate\Http\Request $request
      * @return []|\Illuminate\Http\Response

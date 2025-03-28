@@ -54,12 +54,12 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
 // Playlist API routes
 Route::group(['prefix' => 'playlist'], function () {
-    Route::get('{uuid}', [\App\Http\Controllers\PlaylistController::class, 'refreshPlaylist'])
+    Route::get('{uuid}/sync', [\App\Http\Controllers\PlaylistController::class, 'refreshPlaylist'])
         ->name('api.playlist.sync');
 });
 
 // EPG API routes
 Route::group(['prefix' => 'epg'], function () {
-    Route::get('{uuid}', [\App\Http\Controllers\EpgController::class, 'refreshEpg'])
+    Route::get('{uuid}/sync', [\App\Http\Controllers\EpgController::class, 'refreshEpg'])
         ->name('api.epg.sync');
 });
