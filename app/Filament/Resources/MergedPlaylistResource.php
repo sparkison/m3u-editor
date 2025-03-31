@@ -170,6 +170,8 @@ class MergedPlaylistResource extends Resource
                                     'stream_id' => 'TVG ID/Stream ID (default)',
                                     'channel_id' => 'Channel Number',
                                 ])
+                                ->required()
+                                ->default('stream_id') // Default to stream_id
                                 ->columnSpan(1),
                             Forms\Components\Toggle::make('auto_channel_increment')
                                 ->label('Auto channel number increment')
@@ -196,6 +198,7 @@ class MergedPlaylistResource extends Resource
                                 ->columnSpan(1)
                                 ->rules(['min:1'])
                                 ->type('number')
+                                ->default(1) // Default to 1 stream
                                 ->required(),
                             Forms\Components\Toggle::make('enable_proxy')
                                 ->label('Enable Proxy')
