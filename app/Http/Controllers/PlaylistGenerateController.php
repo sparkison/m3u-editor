@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\ChannelLogoType;
+use App\Enums\PlaylistChannelId;
 use App\Facades\ProxyFacade;
 use App\Models\Channel;
 use App\Models\Playlist;
@@ -49,6 +50,7 @@ class PlaylistGenerateController extends Controller
                 // Output the enabled channels
                 echo "#EXTM3U\n";
                 $channelNumber = $playlist->auto_channel_increment ? $playlist->channel_start - 1 : 0;
+                $idChannelBy = $playlist->id_channel_by;
                 foreach ($channels as $channel) {
                     // Get the title and name
                     $title = $channel->title_custom ?? $channel->title;
@@ -63,7 +65,9 @@ class PlaylistGenerateController extends Controller
                     if ($proxyEnabled) {
                         $url = ProxyFacade::getProxyUrlForChannel($channel->id);
                     }
-                    $tvgId = $channel->stream_id_custom ?? $channel->stream_id;
+                    $tvgId = $idChannelBy === PlaylistChannelId::TvgId
+                        ? $channel->stream_id_custom ?? $channel->stream_id
+                        : $channelNo;
 
                     // Get the icon
                     $icon = '';

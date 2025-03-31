@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\ChannelLogoType;
 use DOMDocument;
 use XMLReader;
+use App\Enums\ChannelLogoType;
+use App\Enums\PlaylistChannelId;
 use App\Models\Channel;
 use App\Models\CustomPlaylist;
 use App\Models\Epg;
@@ -60,7 +61,7 @@ class EpgGenerateController extends Controller
                     if ($channel->epgChannel) {
                         // Get the EPG channel data
                         $epgData = $channel->epgChannel;
-                        $tvgId = $idChannelBy === 'stream_id'
+                        $tvgId = $idChannelBy === PlaylistChannelId::TvgId
                             ? $channel->stream_id_custom ?? $channel->stream_id
                             : $channelNo;
 
