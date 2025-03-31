@@ -232,6 +232,12 @@ class ChannelResource extends Resource
                     ->query(function ($query) {
                         return $query->where('enabled', true);
                     }),
+                Tables\Filters\Filter::make('mapped')
+                    ->label('EPG is mapped')
+                    ->toggle()
+                    ->query(function ($query) {
+                        return $query->where('epg_channel_id', '!=', null);
+                    }),
             ])
             ->actions([
                 Tables\Actions\EditAction::make()
@@ -375,6 +381,96 @@ class ChannelResource extends Resource
                         ->modalIcon('heroicon-o-photo')
                         ->modalDescription('Update the preferred icon for the selected channel(s).')
                         ->modalSubmitActionLabel('Update now'),
+                    Tables\Actions\BulkAction::make('find-replace')
+                        ->label('Find & Replace')
+                        ->form([
+                            Forms\Components\Toggle::make('use_regex')
+                                ->label('Use Regex')
+                                ->live()
+                                ->helperText('Use regex patterns to find and replace. If disabled, will use direct string comparison.')
+                                ->default(true),
+                            Forms\Components\Select::make('column')
+                                ->label('Column to modify')
+                                ->options([
+                                    'title' => 'Channel Title',
+                                    'name' => 'Channel Name (tvg-name)',
+                                ])
+                                ->default('title')
+                                ->required()
+                                ->columnSpan(1),
+                            Forms\Components\TextInput::make('find_replace')
+                                ->label(fn(Get $get) =>  !$get('use_regex') ? 'String to replace' : 'Pattern to replace')
+                                ->required()
+                                ->placeholder(
+                                    fn(Get $get) => $get('use_regex')
+                                        ? '^(US- |UK- |CA- )'
+                                        : 'US -'
+                                )->helperText(
+                                    fn(Get $get) => !$get('use_regex')
+                                        ? 'This is the string you want to find and replace.'
+                                        : 'This is the regex pattern you want to find. Make sure to use valid regex syntax.'
+                                ),
+                            Forms\Components\TextInput::make('replace_with')
+                                ->label('Replace with (optional)')
+                                ->placeholder('Leave empty to remove')
+
+                        ])
+                        ->action(function (Collection $records, array $data): void {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new \App\Jobs\ChannelFindAndReplace(
+                                    user_id: auth()->id(), // The ID of the user who owns the content
+                                    use_regex: $data['use_regex'] ?? true,
+                                    column: $data['column'] ?? 'title',
+                                    find_replace: $data['find_replace'] ?? null,
+                                    replace_with: $data['replace_with'] ?? '',
+                                    channels: $records
+                                ));
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Find & Replace started')
+                                ->body('Find & Replace working in the background. You will be notified once the process is complete.')
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-magnifying-glass')
+                        ->color('gray')
+                        ->modalIcon('heroicon-o-magnifying-glass')
+                        ->modalDescription('Select what you would like to find and replace in the selected channels.')
+                        ->modalSubmitActionLabel('Replace now'),
+                    Tables\Actions\BulkAction::make('find-replace-reset')
+                        ->label('Undo Find & Replace')
+                        ->form([
+                            Forms\Components\Select::make('column')
+                                ->label('Column to reset')
+                                ->options([
+                                    'title' => 'Channel Title',
+                                    'name' => 'Channel Name (tvg-name)',
+                                ])
+                                ->default('title')
+                                ->required()
+                                ->columnSpan(1),
+                        ])
+                        ->action(function (Collection $records, array $data): void {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new \App\Jobs\ChannelFindAndReplaceReset(
+                                    user_id: auth()->id(), // The ID of the user who owns the content
+                                    column: $data['column'] ?? 'title',
+                                    channels: $records
+                                ));
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Find & Replace reset started')
+                                ->body('Find & Replace reset working in the background. You will be notified once the process is complete.')
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-arrow-uturn-left')
+                        ->color('warning')
+                        ->modalIcon('heroicon-o-arrow-uturn-left')
+                        ->modalDescription('Reset Find & Replace results back to playlist defaults for the selected channels. This will remove any custom values set in the selected column.')
+                        ->modalSubmitActionLabel('Reset now'),
                     Tables\Actions\BulkAction::make('enable')
                         ->label('Enable selected')
                         ->action(function (Collection $records): void {
@@ -491,8 +587,8 @@ class ChannelResource extends Resource
                             $url = $state ?? $get('url');
                             $title = $record->title_custom ?? $record->title;
                             Notification::make()
-                        ->icon('heroicon-s-clipboard-document-check')
-                        ->title("$title - URL")
+                                ->icon('heroicon-s-clipboard-document-check')
+                                ->title("$title - URL")
                                 ->success()
                                 ->body($url)
                                 ->persistent()
