@@ -20,19 +20,18 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract release version
-        run: |
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-          else
-            echo "This workflow only runs on releases, but was triggered on: ${GITHUB_REF}"
-            exit 1
-          fi
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: sparkison/m3u-editor
+          tags: |
+            type=semver,pattern={{version}}
+            latest
 
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
           push: true
-          tags: |
-            sparkison/m3u-editor:latest
-            sparkison/m3u-editor:${{ env.RELEASE_VERSION }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
