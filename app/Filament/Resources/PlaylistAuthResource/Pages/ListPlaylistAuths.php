@@ -14,6 +14,8 @@ class ListPlaylistAuths extends ListRecords
 {
     protected static string $resource = PlaylistAuthResource::class;
 
+    protected ?string $subheading = 'Create credentials and assign them to your Playlist for simple authentication.';
+
     protected function getHeaderActions(): array
     {
         return [

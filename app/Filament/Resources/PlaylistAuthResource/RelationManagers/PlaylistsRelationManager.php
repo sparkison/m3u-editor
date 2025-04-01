@@ -12,12 +12,12 @@ use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class PlaylistsRelationManager extends RelationManager
 {
     protected static string $relationship = 'playlists';
+
+    protected static ?string $title = 'Assigned to';
 
     public function form(Form $form): Form
     {
@@ -85,8 +85,8 @@ class PlaylistsRelationManager extends RelationManager
             ])
             ->headerActions([
                 Tables\Actions\CreateAction::make()
-                    ->label('Add Auth to Playlist')
-                    ->modalHeading('Add Auth to Playlist'),
+                    ->label('Assign Auth to Playlist')
+                    ->modalHeading('Assign Auth to Playlist'),
             ])
             ->actions([
                 Tables\Actions\DeleteAction::make()
@@ -94,6 +94,8 @@ class PlaylistsRelationManager extends RelationManager
                     ->modalHeading('Remove Auth')
                     ->modalDescription('Remove auth from Playlist?')
                     ->modalSubmitActionLabel('Remove')
+                    ->icon('heroicon-o-x-circle')
+                    ->modalIcon('heroicon-o-x-circle')
                     ->button()
                     ->hiddenLabel(),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
@@ -103,7 +105,9 @@ class PlaylistsRelationManager extends RelationManager
                         ->label('Remove auth')
                         ->modalHeading('Remove Auth')
                         ->modalDescription('Remove auth from selected Playlist?')
-                        ->modalSubmitActionLabel('Remove'),
+                        ->modalSubmitActionLabel('Remove')
+                        ->icon('heroicon-o-x-circle')
+                        ->modalIcon('heroicon-o-x-circle'),
                 ]),
             ]);
     }
