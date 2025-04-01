@@ -25,6 +25,17 @@ class PlaylistGenerateController extends Controller
             $playlist = CustomPlaylist::where('uuid', $uuid)->firstOrFail();
         }
 
+        // Check auth
+        $auth = $playlist->playlistAuths()->where('enabled', true)->first();
+        if ($auth) {
+            if (
+                $request->get('username') !== $auth->username ||
+                $request->get('password') !== $auth->password
+            ) {
+                return response()->json(['Error' => 'Unauthorized'], 401);
+            }
+        }
+
         // Generate a filename
         $filename = Str::slug($playlist->name) . '.m3u';
 
@@ -128,7 +139,7 @@ class PlaylistGenerateController extends Controller
         return response($xmlResponse)->header('Content-Type', 'application/xml');
     }
 
-    public function hdhrOverview(string $uuid)
+    public function hdhrOverview(Request $request, string $uuid)
     {
         // Fetch the playlist so we can send a 404 if not found
         $playlist = Playlist::where('uuid', $uuid)->first();
@@ -137,6 +148,17 @@ class PlaylistGenerateController extends Controller
         }
         if (!$playlist) {
             $playlist = CustomPlaylist::where('uuid', $uuid)->first();
+        }
+
+        // Check auth
+        $auth = $playlist->playlistAuths()->where('enabled', true)->first();
+        if ($auth) {
+            if (
+                $request->get('username') !== $auth->username ||
+                $request->get('password') !== $auth->password
+            ) {
+                return response()->json(['Error' => 'Unauthorized'], 401);
+            }
         }
 
         return view('hdhr', [
@@ -199,17 +221,17 @@ class PlaylistGenerateController extends Controller
             ];
 
             // Example of more detailed response
-//            return [
-//                'GuideNumber' => $channel->channel_number ?? $streamId, // Channel number (e.g., "100")
-//                'GuideName'   => $channel->title_custom ?? $channel->title, // Channel name
-//                'URL'         => $url, // Stream URL
-//                'HD'          => $is_hd ? 1 : 0, // HD flag
-//                'VideoCodec'  => 'H264', // Set based on your stream format
-//                'AudioCodec'  => 'AAC', // Set based on your stream format
-//                'Favorite'    => $favorite ? 1 : 0, // Favorite flag
-//                'DRM'         => 0, // Assuming no DRM
-//                'Streaming'   => 'direct', // Direct stream or transcoding
-//            ];
+            //            return [
+            //                'GuideNumber' => $channel->channel_number ?? $streamId, // Channel number (e.g., "100")
+            //                'GuideName'   => $channel->title_custom ?? $channel->title, // Channel name
+            //                'URL'         => $url, // Stream URL
+            //                'HD'          => $is_hd ? 1 : 0, // HD flag
+            //                'VideoCodec'  => 'H264', // Set based on your stream format
+            //                'AudioCodec'  => 'AAC', // Set based on your stream format
+            //                'Favorite'    => $favorite ? 1 : 0, // Favorite flag
+            //                'DRM'         => 0, // Assuming no DRM
+            //                'Streaming'   => 'direct', // Direct stream or transcoding
+            //            ];
         }));
     }
 
