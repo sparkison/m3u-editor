@@ -19,6 +19,8 @@ class PlaylistsRelationManager extends RelationManager
 
     protected static ?string $title = 'Assigned to';
 
+    protected $listeners = ['refreshRelation' => '$refresh'];
+    
     public function form(Form $form): Form
     {
         return $form

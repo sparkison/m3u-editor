@@ -60,6 +60,11 @@ class PlaylistAuthResource extends Resource
                 //     ->searchable()
                 //     ->sortable()
                 //     ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('playlists_count')
+                    ->label('Playlists')
+                    ->counts('playlists')
+                    ->toggleable()
+                    ->sortable(),
                 Tables\Columns\ToggleColumn::make('enabled')
                     ->toggleable()
                     ->tooltip('Toggle auth status')
@@ -100,37 +105,43 @@ class PlaylistAuthResource extends Resource
     {
         return [
             'index' => Pages\ListPlaylistAuths::route('/'),
-            'create' => Pages\CreatePlaylistAuth::route('/create'),
+            // 'create' => Pages\CreatePlaylistAuth::route('/create'),
             'edit' => Pages\EditPlaylistAuth::route('/{record}/edit'),
         ];
     }
 
     public static function getForm(): array
     {
+        $schema = [
+            Forms\Components\TextInput::make('name')
+                ->label('Name')
+                ->required()
+                ->helperText('Used to reference this auth internally.')
+                ->columnSpan(1),
+            Forms\Components\Toggle::make('enabled')
+                ->label('Enabled')
+                ->columnSpan(1)
+                ->inline(false)
+                ->default(true),
+            Forms\Components\TextInput::make('username')
+                ->label('Username')
+                ->required()
+                ->columnSpan(1),
+            Forms\Components\TextInput::make('password')
+                ->label('Password')
+                ->password()
+                ->required()
+                ->revealable()
+                ->columnSpan(1),
+        ];
         return [
+            Forms\Components\Grid::make()
+                ->hiddenOn(['edit']) // hide this field on the edit form
+                ->schema($schema)
+                ->columns(2),
             Forms\Components\Section::make('Playlist Auth')
-                ->description('Auth configuration')
-                ->schema([
-                    Forms\Components\TextInput::make('name')
-                        ->label('Name')
-                        ->required()
-                        ->columnSpan(1),
-                    Forms\Components\Toggle::make('enabled')
-                        ->label('Enabled')
-                        ->columnSpan(1)
-                        ->inline(false)
-                        ->default(true),
-                    Forms\Components\TextInput::make('username')
-                        ->label('Username')
-                        ->required()
-                        ->columnSpan(1),
-                    Forms\Components\TextInput::make('password')
-                        ->label('Password')
-                        ->password()
-                        ->required()
-                        ->revealable()
-                        ->columnSpan(1),
-                ])
+                ->hiddenOn(['create']) // hide this field on the create form
+                ->schema($schema)
                 ->columns(2),
         ];
     }

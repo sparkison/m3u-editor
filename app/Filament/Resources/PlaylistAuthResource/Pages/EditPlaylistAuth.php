@@ -16,4 +16,9 @@ class EditPlaylistAuth extends EditRecord
             Actions\DeleteAction::make(),
         ];
     }
+
+    protected function afterSave()
+    {
+        $this->dispatch('refreshRelation');
+    }
 }

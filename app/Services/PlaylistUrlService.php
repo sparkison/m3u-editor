@@ -36,7 +36,8 @@ class PlaylistUrlService
         // Return the results
         return [
             'm3u' => $m3uUrl,
-            'hdhr' => $hdhrUrl
+            'hdhr' => $hdhrUrl,
+            'authEnabled' => $playlistAuth ? true : false,
         ];
     }
 }
