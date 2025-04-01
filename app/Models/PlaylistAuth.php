@@ -2,9 +2,12 @@
 
 namespace App\Models;
 
+use App\Pivots\PlaylistAuthPivot;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 
 class PlaylistAuth extends Model
@@ -18,7 +21,7 @@ class PlaylistAuth extends Model
      */
     protected $casts = [
         'id' => 'integer',
-        // 'enabled' => 'boolean',
+        'enabled' => 'boolean',
         'user_id' => 'integer',
     ];
 
@@ -27,18 +30,24 @@ class PlaylistAuth extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function playlists(): MorphToMany
+    public function morph(): HasMany
     {
-        return $this->morphedByMany(Playlist::class, 'authenticatable');
+        return $this->hasMany(PlaylistAuthPivot::class, 'playlist_auth_id')
+            ->where('authenticatable_type', '!=', null); // Ensure it's a morph relation
     }
 
-    public function customPlaylists(): MorphToMany
+    public function playlists(): HasMany
     {
-        return $this->morphedByMany(CustomPlaylist::class, 'authenticatable');
+        return $this->morph()->where('authenticatable_type', Playlist::class);
     }
 
-    public function mergedPlaylists(): MorphToMany
+    public function customPlaylists(): HasMany
     {
-        return $this->morphedByMany(MergedPlaylist::class, 'authenticatable');
+        return $this->morph()->where('authenticatable_type', CustomPlaylist::class);
+    }
+
+    public function mergedPlaylists(): HasMany
+    {
+        return $this->morph()->where('authenticatable_type', MergedPlaylist::class);
     }
 }

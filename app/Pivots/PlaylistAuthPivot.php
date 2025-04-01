@@ -9,11 +9,11 @@ use App\Models\PlaylistAuth;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
-class AuthenticatablePivot extends Pivot
+class PlaylistAuthPivot extends Pivot
 {
     protected $table = 'authenticatables';
 
-    public function playlistAuths(): BelongsTo
+    public function playlistAuth(): BelongsTo
     {
         return $this->belongsTo(PlaylistAuth::class);
     }

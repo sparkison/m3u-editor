@@ -63,15 +63,10 @@ class PlaylistAuthResource extends Resource
                 //     ->searchable()
                 //     ->sortable()
                 //     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\IconColumn::make('enabled')
-                    ->label('Enabled')
-                    ->icon(fn(string $state): string => match ($state) {
-                        '1' => 'heroicon-o-check-circle',
-                        '0' => 'heroicon-o-minus-circle',
-                    })->color(fn(string $state): string => match ($state) {
-                        '1' => 'success',
-                        '0' => 'danger',
-                    })->toggleable()->sortable(),
+                Tables\Columns\ToggleColumn::make('enabled')
+                    ->toggleable()
+                    ->tooltip('Toggle auth status')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -100,7 +95,7 @@ class PlaylistAuthResource extends Resource
     public static function getRelations(): array
     {
         return [
-            // RelationManagers\PlaylistsRelationManager::class,
+            RelationManagers\PlaylistsRelationManager::class,
         ];
     }
 

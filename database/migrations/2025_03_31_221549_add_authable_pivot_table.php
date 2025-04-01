@@ -17,6 +17,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('playlist_auth_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
             $table->morphs('authenticatable');
+            $table->timestamps();
         });
 
         Schema::enableForeignKeyConstraints();
