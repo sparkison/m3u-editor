@@ -186,7 +186,7 @@ class PlaylistResource extends Resource
                     Tables\Actions\Action::make('Download M3U')
                         ->label('Download M3U')
                         ->icon('heroicon-o-arrow-down-tray')
-                        ->url(fn($record) => route('playlist.generate', ['uuid' => $record->uuid]))
+                        ->url(fn($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['m3u'])
                         ->openUrlInNewTab(),
                     Tables\Actions\Action::make('Download M3U')
                         ->label('Download EPG')
@@ -196,7 +196,7 @@ class PlaylistResource extends Resource
                     Tables\Actions\Action::make('HDHomeRun URL')
                         ->label('HDHomeRun URL')
                         ->icon('heroicon-o-arrow-top-right-on-square')
-                        ->url(fn($record) => route('playlist.hdhr.overview', ['uuid' => $record->uuid]))
+                        ->url(fn($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['hdhr'])
                         ->openUrlInNewTab(),
                     Tables\Actions\Action::make('reset')
                         ->label('Reset status')
@@ -292,6 +292,15 @@ class PlaylistResource extends Resource
                     Forms\Components\TextInput::make('name')
                         ->helperText('Enter the name of the playlist. Internal use only.')
                         ->required(),
+                    Forms\Components\Section::make('Manage Auth')
+                        ->description('When an Auth is assigned, regular playlist routes will return a "401 Forbidden" error unless username and password parameters are passed.')
+                        ->schema([
+                            Forms\Components\Select::make('auth')
+                                ->relationship('playlistAuths', 'playlist_auths.name')
+                                ->label('Assigned Auth(s)')
+                                ->multiple()
+                                ->searchable(),
+                        ])->hiddenOn(['create']),
                     Forms\Components\Section::make('Links')
                         ->description('These links are generated based on the current playlist configuration. Only enabled channels will be included.')
                         ->schema([
@@ -301,7 +310,7 @@ class PlaylistResource extends Resource
                             PlaylistEpgUrl::make('epg_url')
                                 ->columnSpan(2)
                                 ->dehydrated(false) // don't save the value in the database
-                        ])->hiddenOn(['create'])
+                        ])->hiddenOn(['create']),
                 ]),
 
             Forms\Components\Wizard\Step::make('Type')

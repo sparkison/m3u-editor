@@ -162,8 +162,7 @@ class PlaylistGenerateController extends Controller
         }
 
         return view('hdhr', [
-            'name' => $playlist->name,
-            'uuid' => $uuid,
+            'playlist' => $playlist,
         ]);
     }
 

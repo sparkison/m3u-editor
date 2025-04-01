@@ -1,9 +1,8 @@
 <div>
     @php($model = $getRecord()->model)
-    @php($playlistAuth = $getRecord()->playlistAuth)
-    @php($auth = '?username=' . $playlistAuth->username . '&password=' . $playlistAuth->password)
-    @php($m3uUrl = route('playlist.generate', ['uuid' => $model->uuid]) . $auth)
-    @php($hdhrUrl = route('playlist.hdhr.overview', ['uuid' => $model->uuid]) . $auth)
+    @php($urls = \App\Facades\PlaylistUrlFacade::getUrls($model))
+    @php($m3uUrl = $urls['m3u'])
+    @php($hdhrUrl = $urls['hdhr'])
     <div class="px-3 py-2 flex flex-col gap-4">
         <div class="text-sm flex flex-col">
             <p class="font-bold">

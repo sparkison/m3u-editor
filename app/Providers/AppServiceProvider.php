@@ -12,6 +12,7 @@ use App\Models\Epg;
 use App\Models\Group;
 use App\Models\Playlist;
 use App\Models\User;
+use App\Services\PlaylistUrlService;
 use App\Services\ProxyService;
 use App\Settings\GeneralSettings;
 use Illuminate\Database\Eloquent\Model;
@@ -261,6 +262,11 @@ class AppServiceProvider extends ServiceProvider
         // Register the proxy service
         $this->app->singleton('proxy', function () {
             return new ProxyService();
+        });
+
+        // Register the playlist url service
+        $this->app->singleton('playlistUrl', function () {
+            return new PlaylistUrlService();
         });
     }
 }
