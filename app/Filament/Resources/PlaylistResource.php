@@ -299,7 +299,9 @@ class PlaylistResource extends Resource
                                 ->relationship('playlistAuths', 'playlist_auths.name')
                                 ->label('Assigned Auth(s)')
                                 ->multiple()
-                                ->searchable(),
+                                ->searchable()
+                                ->preload()
+                                ->helperText('NOTE: only the first enabled auth will be used if multiple assigned.'),
                         ])->hiddenOn(['create']),
                     Forms\Components\Section::make('Links')
                         ->description('These links are generated based on the current playlist configuration. Only enabled channels will be included.')
