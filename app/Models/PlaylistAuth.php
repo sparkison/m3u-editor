@@ -30,24 +30,9 @@ class PlaylistAuth extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function morph(): HasMany
+    public function playlists(): HasMany
     {
         return $this->hasMany(PlaylistAuthPivot::class, 'playlist_auth_id')
             ->where('authenticatable_type', '!=', null); // Ensure it's a morph relation
-    }
-
-    public function playlists(): HasMany
-    {
-        return $this->morph()->where('authenticatable_type', Playlist::class);
-    }
-
-    public function customPlaylists(): HasMany
-    {
-        return $this->morph()->where('authenticatable_type', CustomPlaylist::class);
-    }
-
-    public function mergedPlaylists(): HasMany
-    {
-        return $this->morph()->where('authenticatable_type', MergedPlaylist::class);
     }
 }

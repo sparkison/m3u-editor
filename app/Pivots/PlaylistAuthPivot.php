@@ -18,21 +18,15 @@ class PlaylistAuthPivot extends Pivot
         return $this->belongsTo(PlaylistAuth::class);
     }
 
-    public function playlists(): BelongsTo
+    public function model(): BelongsTo
     {
-        return $this->belongsTo(Playlist::class, 'authenticatable_id')
-            ->where('authenticatable_type', Playlist::class);
-    }
-
-    public function customPlaylists(): BelongsTo
-    {
-        return $this->belongsTo(CustomPlaylist::class, 'authenticatable_id')
-            ->where('authenticatable_type', CustomPlaylist::class);
-    }
-
-    public function mergedPlaylists(): BelongsTo
-    {
-        return $this->belongsTo(MergedPlaylist::class, 'authenticatable_id')
-            ->where('authenticatable_type', MergedPlaylist::class);
+        switch ($this->authenticatable_type) {
+            case CustomPlaylist::class:
+                return $this->belongsTo(CustomPlaylist::class, 'authenticatable_id');
+            case MergedPlaylist::class:
+                return $this->belongsTo(MergedPlaylist::class, 'authenticatable_id');
+            default:
+                return $this->belongsTo(Playlist::class, 'authenticatable_id');
+        }
     }
 }
