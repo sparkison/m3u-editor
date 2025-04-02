@@ -65,6 +65,9 @@ class EpgGenerateController extends Controller
                             ? $channel->stream_id_custom ?? $channel->stream_id
                             : $channelNo;
 
+                        // Make sure TVG ID only contains characters and numbers
+                        $tvgId = preg_replace(config('dev.tvgid.regex'), '', $tvgId);
+
                         // Keep track of which EPGs have which channels mapped
                         // Need this to output the <programme> tags later
                         if (!array_key_exists($epgData->epg_id, $epgChannels)) {
@@ -84,7 +87,9 @@ class EpgGenerateController extends Controller
                         $title = $channel->title_custom ?? $channel->title;
                         echo '  <channel id="' . $tvgId . '">' . PHP_EOL;
                         echo '    <display-name lang="' . $epgData->lang . '">' . htmlspecialchars($title) . '</display-name>';
-                        echo '    <display-name>' . $channelNo . '</display-name>';
+                        if ($channelNo !== null) {
+                            echo '    <display-name>' . $channelNo . '</display-name>';
+                        }
                         if ($icon) {
                             echo PHP_EOL . '    <icon src="' . htmlspecialchars($icon) . '"/>';
                         }

@@ -16,5 +16,8 @@ return [
     'ffmpeg' => [
         'debug' => env('FFMPEG_DEBUG', false),
         'file' => env('FFMPEG_DEBUG_FILE', 'ffmpeg.log'),
+    ],
+    'tvgid' => [
+        'regex' => env('TVGID_REGEX', '/[^a-zA-Z0-9_\-\.]/'),
     ]
 ];

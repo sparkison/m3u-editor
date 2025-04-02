@@ -88,6 +88,9 @@ class PlaylistGenerateController extends Controller
                         $icon = $channel->logo ?? '';
                     }
 
+                    // Make sure TVG ID only contains characters and numbers
+                    $tvgId = preg_replace(config('dev.tvgid.regex'), '', $tvgId);
+
                     // Output the channel
                     echo "#EXTINF:-1 tvg-chno=\"$channelNo\" tvg-id=\"$tvgId\" timeshift=\"$timeshift\" tvg-name=\"$name\" tvg-logo=\"$icon\" group-title=\"$channel->group\"," . $title . "\n";
                     if ($channel->extvlcopt) {
