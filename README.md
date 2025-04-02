@@ -63,3 +63,15 @@ Or via Docker CLI:
 Access via: [http://localhost:36400](http://localhost:36400) (user = admin, password = admin)
 
 To ensure the data is saved across builds, link an empty volume to: `/var/www/config` within the container. This is where the `env` file will be stored, along with the sqlite database and the application log files.
+
+---
+
+## ⚖️ License  
+
+> m3u editor is licensed under **CC BY-NC-SA 4.0**:  
+
+- **BY**: Give credit where credit’s due.  
+- **NC**: No commercial use.  
+- **SA**: Share alike if you remix.  
+
+For full license details, see [LICENSE](https://creativecommons.org/licenses/by-nc-sa/4.0/).
