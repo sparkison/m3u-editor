@@ -6,9 +6,6 @@ A simple `m3u` playlist editor, similar to **xteve** or **threadfin**, with `epg
 
 Works with m3u, m3u8, m3u+ and Xtream codes api!
 
-> [!TIP]  
-> Has been tested on large playlist ([https://github.com/iptv-org/iptv](https://github.com/iptv-org/iptv)), with up to 10000+ channels. Note that larger lists will take longer to sync (it takes aproximately 1s for every 1000 channels.). If you are experiencing issues with your playlist, try the m3u playlist url provided in the link above to confirm it works to help rule out network or connectivity issues.
-
 ### Questions/issues/suggestions
 
 Feel free to [open an issue](https://github.com/sparkison/m3u-editor/issues/new?template=bug_report.md) on this repo, you can also join our Discord server to ask questions and get help, help others, suggest new ideas, and offer suggestions for improvements! 🎉
