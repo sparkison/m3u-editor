@@ -126,7 +126,7 @@ class EpgGenerateController extends Controller
                         echo '  <channel id="' . $tvgId . '">' . PHP_EOL;
                         echo '    <display-name>' . $title . '</display-name>';
                         if ($channelNo !== null) {
-                            echo '    <display-name>' . $channelNo . '</display-name>';
+                            echo PHP_EOL . '    <display-name>' . $channelNo . '</display-name>';
                         }
                         if ($icon) {
                             echo PHP_EOL . '    <icon src="' . $icon . '"/>';
@@ -234,8 +234,8 @@ class EpgGenerateController extends Controller
                             $endTime->addMinutes($dummyEpgLength);
 
                             // Format the start and end times
-                            $start = $startTime->format('YmdHis P');
-                            $end = $endTime->format('YmdHis P');
+                            $start = str_replace(':', '', $startTime->format('YmdHis P'));
+                            $end = str_replace(':', '', $endTime->format('YmdHis P'));
 
                             // Output the <programme> tag
                             echo '  <programme channel="' . $tvgId . '" start="' . $start . '" stop="' . $end . '">' . PHP_EOL;
