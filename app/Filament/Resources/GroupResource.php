@@ -246,8 +246,16 @@ class GroupResource extends Resource
                                 ->live()
                                 ->label('Group')
                                 ->helperText('Select the group you would like to move the channels to.')
-                                ->options(fn(Get $get, $record) => Group::where(['user_id' => auth()->id(), 'playlist_id' => $record->playlist_id])->get(['name', 'id'])->pluck('name', 'id'))
-                                ->searchable(),
+                                ->options(
+                                    fn() => Group::query()
+                                        ->with(['playlist'])
+                                        ->where(['user_id' => auth()->id()])
+                                        ->get(['name', 'id', 'playlist_id'])
+                                        ->transform(fn($group) => [
+                                            'id' => $group->id,
+                                            'name' => $group->name . ' (' . $group->playlist->name . ')',
+                                        ])->pluck('name', 'id')
+                                )->searchable(),
                         ])
                         ->action(function (Collection $records, array $data): void {
                             $group = Group::findOrFail($data['group']);
@@ -257,9 +265,10 @@ class GroupResource extends Resource
                                 // to reflect the new group
                                 if ($group->playlist_id !== $record->playlist_id) {
                                     Notification::make()
-                                        ->error()
-                                        ->title('Error')
-                                        ->body("Cannot move \"{$record->playlist->name}\" channels to \"{$group->name}\" as they belong to different playlists.")
+                                        ->warning()
+                                        ->title('Warning')
+                                        ->body("Cannot move \"{$group->name}\" to \"{$record->name}\" as they belong to different playlists.")
+                                        ->persistent()
                                         ->send();
                                     continue;
                                 }
