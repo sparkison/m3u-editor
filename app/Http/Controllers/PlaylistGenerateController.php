@@ -210,14 +210,23 @@ class PlaylistGenerateController extends Controller
 
         // Check if proxy enabled
         $proxyEnabled = $playlist->enable_proxy;
-        return response()->json($channels->transform(function (Channel $channel) use ($proxyEnabled) {
+        $idChannelBy = $playlist->id_channel_by;
+        $autoIncrement = $playlist->auto_channel_increment;
+        $channelNumber = $autoIncrement ? $playlist->channel_start - 1 : 0;
+        return response()->json($channels->transform(function (Channel $channel) use ($proxyEnabled, $idChannelBy, $autoIncrement, &$channelNumber) {
             $url = $channel->url_custom ?? $channel->url;
             if ($proxyEnabled) {
                 $url = route('stream', base64_encode((string)$channel->id));
             }
-            $streamId = $channel->stream_id_custom ?? $channel->stream_id;
+            $channelNo = $channel->channel;
+            if (!$channelNo && $autoIncrement) {
+                $channelNo = ++$channelNumber;
+            }
+            $tvgId = $idChannelBy === PlaylistChannelId::TvgId
+                ? $channel->stream_id_custom ?? $channel->stream_id
+                : $channelNo;
             return [
-                'GuideNumber' => $streamId,
+                'GuideNumber' => $tvgId,
                 'GuideName' => $channel->title_custom ?? $channel->title,
                 'URL' => $url,
             ];
