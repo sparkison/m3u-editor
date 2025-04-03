@@ -118,7 +118,7 @@ class EpgGenerateController extends Controller
                             'tvg_id' => $tvgId,
                             'channel_id' => $channel->id,
                             'channel_no' => $channelNo,
-                            'title' => $channel->title_custom ?? $channel->title,
+                            'title' => $title,
                             'icon' => $icon,
                         ];
 
