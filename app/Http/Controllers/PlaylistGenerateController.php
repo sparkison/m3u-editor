@@ -226,7 +226,7 @@ class PlaylistGenerateController extends Controller
                 ? $channel->stream_id_custom ?? $channel->stream_id
                 : $channelNo;
             return [
-                'GuideNumber' => $tvgId,
+                'GuideNumber' => (string)$tvgId,
                 'GuideName' => $channel->title_custom ?? $channel->title,
                 'URL' => $url,
             ];
