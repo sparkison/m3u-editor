@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Exception;
 use App\Models\Channel;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -46,22 +47,28 @@ class ChannelStreamController extends Controller
                     $cmd .= " -hide_banner -nostats -loglevel quiet 2>/dev/null";
                 }
                 $process = popen($cmd, 'r');
-
-                if ($process) {
-                    while (!feof($process)) {
-                        if (connection_aborted()) {
-                            pclose($process);
-                            return;
+                try {
+                    if ($process) {
+                        while (!feof($process)) {
+                            if (connection_aborted()) {
+                                pclose($process);
+                                return;
+                            }
+                            $data = fread($process, 8192); // Increased from 4096 to 8192
+                            if ($data === false) {
+                                break;
+                            }
+                            echo $data;
+                            flush();
                         }
-                        $data = fread($process, 8192); // Increased from 4096 to 8192
-                        if ($data === false) {
-                            break;
-                        }
-                        echo $data;
-                        flush();
+                        pclose($process);
+                        return;
                     }
+                } catch (Exception $e) {
                     pclose($process);
-                    return;
+                    error_log("FFmpeg error: " . $e->getMessage());
+                    // If there's an error, we can try the next stream URL
+                    continue;
                 }
             }
             echo "Error: No available streams.";
