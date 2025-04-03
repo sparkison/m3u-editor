@@ -294,6 +294,8 @@ class PlaylistResource extends Resource
                         ->required(),
                     Forms\Components\Section::make('Manage Auth')
                         ->description('When an Auth is assigned, regular playlist routes will return a "401 Forbidden" error unless username and password parameters are passed.')
+                        ->collapsible()
+                        ->collapsed(true)
                         ->schema([
                             Forms\Components\Select::make('auth')
                                 ->relationship('playlistAuths', 'playlist_auths.name')
@@ -491,7 +493,7 @@ class PlaylistResource extends Resource
                                 ->columnSpan(1)
                                 ->searchable()
                                 ->multiple()
-                                ->helperText('You will need to manually run the sync if updating the groups to import. If the list is empty, process the list and check again once complete.')
+                                ->helperText('NOTE: If the list is empty, sync the playlist and check again once complete.')
                                 ->options(function (Get $get): array {
                                     $options = [];
                                     foreach ($get('groups') ?? [] as $option) {
@@ -530,6 +532,8 @@ class PlaylistResource extends Resource
                     Forms\Components\Section::make('Playlist Output')
                         ->description('Determines how the playlist is output')
                         ->columnSpanFull()
+                        ->collapsible()
+                        ->collapsed(true)
                         ->columns(2)
                         ->schema([
                             Forms\Components\Toggle::make('auto_sort')
@@ -545,6 +549,28 @@ class PlaylistResource extends Resource
                                 ->live()
                                 ->default(false)
                                 ->helperText('If no channel number is set, output an automatically incrementing number.'),
+                            Forms\Components\TextInput::make('channel_start')
+                                ->helperText('The starting channel number.')
+                                ->columnSpan(1)
+                                ->rules(['min:1'])
+                                ->type('number')
+                                ->hidden(fn(Get $get): bool => !$get('auto_channel_increment'))
+                                ->required(),
+                        ]),
+                    Forms\Components\Section::make('EPG Output')
+                        ->description('EPG output options')
+                        ->columnSpanFull()
+                        ->collapsible()
+                        ->collapsed(true)
+                        ->columns(2)
+                        ->schema([
+                            Forms\Components\Toggle::make('dummy_epg')
+                                ->label('Enably dummy EPG')
+                                ->columnSpan(1)
+                                ->live()
+                                ->inline(false)
+                                ->default(false)
+                                ->helperText('When enabled, dummy EPG data will be generated for the next 5 days. Thus, it is possible to assign channels for which no EPG data is available. As program information, the channel name and the set program length are used.'),
                             Forms\Components\Select::make('id_channel_by')
                                 ->label('Preferred TVG ID output')
                                 ->helperText('How you would like to ID your channels in the EPG.')
@@ -555,17 +581,20 @@ class PlaylistResource extends Resource
                                 ->required()
                                 ->default('stream_id') // Default to stream_id
                                 ->columnSpan(1),
-                            Forms\Components\TextInput::make('channel_start')
-                                ->helperText('The starting channel number.')
+                            Forms\Components\TextInput::make('dummy_epg_length')
+                                ->label('Dummy program length (in minutes)')
                                 ->columnSpan(1)
                                 ->rules(['min:1'])
                                 ->type('number')
-                                ->hidden(fn(Get $get): bool => !$get('auto_channel_increment'))
+                                ->default(120)
+                                ->hidden(fn(Get $get): bool => !$get('dummy_epg'))
                                 ->required(),
                         ]),
                     Forms\Components\Section::make('Streaming Output')
                         ->description('Output processing options')
                         ->columnSpanFull()
+                        ->collapsible()
+                        ->collapsed(true)
                         ->columns(2)
                         ->schema([
                             Forms\Components\TextInput::make('streams')
@@ -584,8 +613,7 @@ class PlaylistResource extends Resource
                                 ->inline(false)
                                 ->default(false)
                                 ->helperText('When enabled, channel urls will be proxied through m3u editor and streamed via ffmpeg (m3u editor will act as your client, playing the channels directly and sending the content to your client).'),
-
-                        ])
+                        ]),
                 ]),
         ];
     }

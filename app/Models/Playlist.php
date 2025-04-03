@@ -28,6 +28,7 @@ class Playlist extends Model
         'user_id' => 'integer',
         'sync_time' => 'float',
         'processing' => 'boolean',
+        'dummy_epg' => 'boolean',
         'import_prefs' => 'array',
         'groups' => 'array',
         'xtream_config' => 'array',

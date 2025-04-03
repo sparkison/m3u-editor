@@ -11,6 +11,7 @@ use App\Models\CustomPlaylist;
 use App\Models\Epg;
 use App\Models\MergedPlaylist;
 use App\Models\Playlist;
+use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -42,6 +43,7 @@ class EpgGenerateController extends Controller
 
                 // Set up the channels
                 $epgChannels = [];
+                $dummyEpgChannels = [];
                 $channels = $playlist->channels()
                     ->where('enabled', true)
                     ->orderBy('sort')
@@ -49,25 +51,37 @@ class EpgGenerateController extends Controller
                     ->orderBy('title')
                     ->cursor();
 
+                // Get playlist settings
                 $channelNumber = $playlist->auto_channel_increment ? $playlist->channel_start - 1 : 0;
                 $idChannelBy = $playlist->id_channel_by;
+                $dummyEpgEnabled = $playlist->dummy_epg;
+                $dummyEpgLength = (int)$playlist->dummy_epg_length ?? 120; // Default to 120 minutes if not set
+
+                // Generate `<channel>` tags for each channel
                 foreach ($channels as $channel) {
+                    // Get/set the channel number
                     $channelNo = $channel->channel;
                     if (!$channelNo && $playlist->auto_channel_increment) {
                         $channelNo = ++$channelNumber;
                     }
 
+                    // Get the `tvg-id` based on the playlist setting
+                    $tvgId = $idChannelBy === PlaylistChannelId::TvgId
+                        ? $channel->stream_id_custom ?? $channel->stream_id
+                        : $channelNo;
+
+                    // Make sure TVG ID only contains characters and numbers
+                    $tvgId = preg_replace(config('dev.tvgid.regex'), '', $tvgId);
+
                     // Output the <channel> tag
-                    if ($channel->epgChannel) {
-                        // Get the EPG channel data
-                        $epgData = $channel->epgChannel;
-                        $tvgId = $idChannelBy === PlaylistChannelId::TvgId
-                            ? $channel->stream_id_custom ?? $channel->stream_id
-                            : $channelNo;
+                    $title = $channel->title_custom ?? $channel->title;
+                    $title = htmlspecialchars($title);
 
-                        // Make sure TVG ID only contains characters and numbers
-                        $tvgId = preg_replace(config('dev.tvgid.regex'), '', $tvgId);
+                    // Get the EPG channel data
+                    $epgData = $channel->epgChannel ?? null;
 
+                    // Output the <channel> tag
+                    if ($epgData) {
                         // Keep track of which EPGs have which channels mapped
                         // Need this to output the <programme> tags later
                         if (!array_key_exists($epgData->epg_id, $epgChannels)) {
@@ -84,14 +98,38 @@ class EpgGenerateController extends Controller
                         }
 
                         // Output the <channel> tag
-                        $title = $channel->title_custom ?? $channel->title;
                         echo '  <channel id="' . $tvgId . '">' . PHP_EOL;
-                        echo '    <display-name lang="' . $epgData->lang . '">' . htmlspecialchars($title) . '</display-name>';
+                        echo '    <display-name lang="' . $epgData->lang . '">' . $title . '</display-name>';
                         if ($channelNo !== null) {
                             echo '    <display-name>' . $channelNo . '</display-name>';
                         }
                         if ($icon) {
                             echo PHP_EOL . '    <icon src="' . htmlspecialchars($icon) . '"/>';
+                        }
+                        echo PHP_EOL . '  </channel>' . PHP_EOL;
+                    } else if ($dummyEpgEnabled) {
+                        // Get the icon
+                        $icon = $channel->logo ?? '';
+                        $icon = htmlspecialchars($icon);
+
+                        // Keep track of which channels need a dummy EPG program
+                        // Need this to output the <programme> tags later
+                        $dummyEpgChannels[] = [
+                            'tvg_id' => $tvgId,
+                            'channel_id' => $channel->id,
+                            'channel_no' => $channelNo,
+                            'title' => $channel->title_custom ?? $channel->title,
+                            'icon' => $icon,
+                        ];
+
+                        // Output the <channel> tag
+                        echo '  <channel id="' . $tvgId . '">' . PHP_EOL;
+                        echo '    <display-name>' . $title . '</display-name>';
+                        if ($channelNo !== null) {
+                            echo '    <display-name>' . $channelNo . '</display-name>';
+                        }
+                        if ($icon) {
+                            echo PHP_EOL . '    <icon src="' . $icon . '"/>';
                         }
                         echo PHP_EOL . '  </channel>' . PHP_EOL;
                     }
@@ -174,6 +212,42 @@ class EpgGenerateController extends Controller
                     }
                     // Close the XMLReader for this epg
                     $programReader->close();
+                }
+
+                // If dummy EPG channels, generate dummy programmes
+                if (count($dummyEpgChannels) > 0) {
+                    foreach ($dummyEpgChannels as $dummyEpgChannel) {
+                        $tvgId = $dummyEpgChannel['tvg_id'];
+                        $title = $dummyEpgChannel['title'];
+                        $icon = $dummyEpgChannel['icon'];
+                        $channelNo = $dummyEpgChannel['channel_no'];
+
+                        // Generate dummy programmes for the specified length
+                        $startTime = Carbon::now()
+                            ->startOf('day')
+                            ->subMinutes($dummyEpgLength);
+
+                        // Generate 5 days worth of EPG data, based on the `$dummyEpgLength`, which is how long the programme should last in minutes
+                        for ($i = 0; $i < (5 * 24 * 60) / $dummyEpgLength; $i++) {
+                            $startTime->addMinutes($dummyEpgLength);
+                            $endTime = clone $startTime;
+                            $endTime->addMinutes($dummyEpgLength);
+
+                            // Format the start and end times
+                            $start = $startTime->format('YmdHis P');
+                            $end = $endTime->format('YmdHis P');
+
+                            // Output the <programme> tag
+                            echo '  <programme channel="' . $tvgId . '" start="' . $start . '" stop="' . $end . '">' . PHP_EOL;
+                            echo '    <title>' . $title . '</title>' . PHP_EOL;
+                            if ($icon) {
+                                echo '    <icon src="' . $icon . '"/>' . PHP_EOL;
+                            }
+                            echo '    <desc>Dummy EPG programme for ' . $title . '</desc>' . PHP_EOL;
+                            echo '  </programme>' . PHP_EOL;
+                        }
+
+                    }
                 }
 
                 // Close it out

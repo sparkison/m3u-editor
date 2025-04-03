@@ -136,6 +136,8 @@ class MergedPlaylistResource extends Resource
                 ->helperText('Enter the name of the playlist. Internal use only.'),
             Forms\Components\Section::make('Manage Auth')
                 ->description('When an Auth is assigned, regular playlist routes will return a "401 Forbidden" error unless username and password parameters are passed.')
+                ->collapsible()
+                ->collapsed(true)
                 ->schema([
                     Forms\Components\Select::make('auth')
                         ->relationship('playlistAuths', 'playlist_auths.name')
@@ -172,18 +174,10 @@ class MergedPlaylistResource extends Resource
                     Forms\Components\Section::make('Playlist Output')
                         ->description('Determines how the playlist is output')
                         ->columnSpanFull()
+                        ->collapsible()
+                        ->collapsed(true)
                         ->columns(2)
                         ->schema([
-                            Forms\Components\Select::make('id_channel_by')
-                                ->label('Preferred TVG ID output')
-                                ->helperText('How you would like to ID your channels in the EPG.')
-                                ->options([
-                                    'stream_id' => 'TVG ID/Stream ID (default)',
-                                    'channel_id' => 'Channel Number',
-                                ])
-                                ->required()
-                                ->default('stream_id') // Default to stream_id
-                                ->columnSpan(1),
                             Forms\Components\Toggle::make('auto_channel_increment')
                                 ->label('Auto channel number increment')
                                 ->columnSpan(1)
@@ -199,9 +193,44 @@ class MergedPlaylistResource extends Resource
                                 ->hidden(fn(Get $get): bool => !$get('auto_channel_increment'))
                                 ->required(),
                         ]),
+                    Forms\Components\Section::make('EPG Output')
+                        ->description('EPG output options')
+                        ->columnSpanFull()
+                        ->collapsible()
+                        ->collapsed(true)
+                        ->columns(2)
+                        ->schema([
+                            Forms\Components\Toggle::make('dummy_epg')
+                                ->label('Enably dummy EPG')
+                                ->columnSpan(1)
+                                ->live()
+                                ->inline(false)
+                                ->default(false)
+                                ->helperText('When enabled, dummy EPG data will be generated for the next 5 days. Thus, it is possible to assign channels for which no EPG data is available. As program information, the channel name and the set program length are used.'),
+                            Forms\Components\Select::make('id_channel_by')
+                                ->label('Preferred TVG ID output')
+                                ->helperText('How you would like to ID your channels in the EPG.')
+                                ->options([
+                                    'stream_id' => 'TVG ID/Stream ID (default)',
+                                    'channel_id' => 'Channel Number',
+                                ])
+                                ->required()
+                                ->default('stream_id') // Default to stream_id
+                                ->columnSpan(1),
+                            Forms\Components\TextInput::make('dummy_epg_length')
+                                ->label('Dummy program length (in minutes)')
+                                ->columnSpan(1)
+                                ->rules(['min:1'])
+                                ->type('number')
+                                ->default(120)
+                                ->hidden(fn(Get $get): bool => !$get('dummy_epg'))
+                                ->required(),
+                        ]),
                     Forms\Components\Section::make('Streaming Output')
                         ->description('Output processing options')
                         ->columnSpanFull()
+                        ->collapsible()
+                        ->collapsed(true)
                         ->columns(2)
                         ->schema([
                             Forms\Components\TextInput::make('streams')

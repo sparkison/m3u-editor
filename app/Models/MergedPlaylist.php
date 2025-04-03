@@ -24,6 +24,7 @@ class MergedPlaylist extends Model
     protected $casts = [
         'id' => 'integer',
         'user_id' => 'integer',
+        'dummy_epg' => 'boolean',
         'id_channel_by' => PlaylistChannelId::class
     ];
 
