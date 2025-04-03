@@ -26,6 +26,9 @@ class ChannelStreamController extends Controller
         ini_set('implicit_flush', 1);
 
         // Find the channel by ID, else throw a 404
+        if (strpos($id, '==') === false) {
+            $id .= '=='; // Ensure padding for base64 decoding
+        }
         $channel = Channel::findOrFail(base64_decode($id));
 
         // Get the stream URL (could be multiple, allow for fallbacks)
