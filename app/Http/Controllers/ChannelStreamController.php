@@ -50,23 +50,34 @@ class ChannelStreamController extends Controller
                 } else {
                     $cmd .= " -hide_banner -nostats -loglevel quiet 2>/dev/null";
                 }
-                $process = popen($cmd, 'r');
+                $descriptorspec = [
+                    0 => ['pipe', 'r'],  // STDIN
+                    1 => ['pipe', 'w'],  // STDOUT
+                    2 => ['pipe', 'w'],  // STDERR
+                ];
+                $process = proc_open($cmd, $descriptorspec, $pipes);
+
                 try {
-                    if ($process) {
-                        while (!feof($process)) {
+                    if (is_resource($process)) {
+                        stream_set_blocking($pipes[1], false); // Non-blocking mode
+
+                        while (!feof($pipes[1])) {
                             if (connection_aborted()) {
-                                pclose($process);
+                                proc_terminate($process); // Forcefully stop FFmpeg
+                                proc_close($process);
                                 return;
                             }
-                            $data = fread($process, 8192); // Increased from 4096 to 8192
+
+                            $data = fread($pipes[1], 8192);
                             if ($data === false) {
                                 break;
                             }
+
                             echo $data;
                             flush();
                         }
-                        pclose($process);
-                        return;
+
+                        proc_close($process);
                     }
                 } catch (Exception $e) {
                     pclose($process);
