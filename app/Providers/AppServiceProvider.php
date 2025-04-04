@@ -33,6 +33,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecurityScheme;
+use Illuminate\Support\Facades\DB;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -49,6 +50,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Don't kill the app if the database hasn't been created.
+        try {
+            DB::connection('sqlite')->statement(
+                'PRAGMA synchronous = OFF;'
+            );
+        } catch (\Throwable $throwable) {
+            return;
+        }
+
         // Disable mass assignment protection (security handled by Filament)
         Model::unguard();
 

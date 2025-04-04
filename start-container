@@ -157,6 +157,10 @@ php artisan app:update-check
 echo "Optimizing configuration..."
 php artisan optimize
 
+# Set Sqlite WAL mode
+echo "Setting SQLite WAL mode..."
+php artisan sqlite:wal-enable sqlite
+
 # Run any pending migrations
 echo "Running migrations..."
 php artisan migrate --force
