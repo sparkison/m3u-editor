@@ -773,7 +773,6 @@ class ProcessM3uImport implements ShouldQueue
             });
 
             // Last job in the batch
-            dump('Chunking complete, max hit:' . $this->maxItemsHit);
             $jobs[] = new ProcessM3uImportComplete($userId, $playlistId, $groups, $batchNo, $start, $this->maxItemsHit);
             Bus::chain($jobs)
                 ->onConnection('redis') // force to use redis connection

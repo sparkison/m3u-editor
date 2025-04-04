@@ -45,8 +45,6 @@ class ProcessM3uImportComplete implements ShouldQueue
         $playlist = $user->playlists()->find($this->playlistId);
 
         // Send notification
-        dump('Finished, max hit:' . $this->maxHit);
-
         if ($this->maxHit) {
             $limit = config('dev.max_channels');
             Notification::make()
