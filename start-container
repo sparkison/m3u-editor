@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
 
+# Set runtime environment variables
+export APP_PORT="${APP_PORT:-36400}"
+export REVERB_PORT="${REVERB_PORT:-36800}"
+export SUPERVISOR_PHP_USER="${SUPERVISOR_PHP_USER:-root}"
+export TZ="${TZ:-UTC}"  # Set timezone, default to UTC
+
+# Set Supervisor commands dynamically
+export SUPERVISOR_PHP_COMMAND="${SUPERVISOR_PHP_COMMAND:-/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan octane:start --workers=4 --task-workers=6 --server=swoole --host=0.0.0.0 --port=$APP_PORT}"
+export QUEUE_PHP_COMMAND="${QUEUE_PHP_COMMAND:-/usr/bin/php /var/www/html/artisan horizon}"
+export WEBSOCKET_PHP_COMMAND="${WEBSOCKET_PHP_COMMAND:-/usr/bin/php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=$REVERB_PORT --no-interaction --no-ansi}"
+
 # Make sure correct user is set
 if [ "$SUPERVISOR_PHP_USER" != "root" ] && [ "$SUPERVISOR_PHP_USER" != "sail" ]; then
     echo "You should set SUPERVISOR_PHP_USER to either 'sail' or 'root'."
@@ -35,6 +46,21 @@ laravel_log_file="${log_dir}/laravel.log"
 # Not using these log files any longer
 reverb_log_file="${log_dir}/reverb.log"
 horizon_log_file="${log_dir}/horizon.log"
+
+# Setup timezone
+echo "⏰ Setting TZ..."
+if [ -f "/etc/localtime" ]; then
+    rm /etc/localtime
+fi
+cp /usr/share/zoneinfo/$TZ /etc/localtime
+echo $TZ > /etc/timezone
+if [ $? -ne 0 ]; then
+    echo "Failed to set timezone. Please check your TZ variable."
+    exit 1
+else
+    echo "📅 Timezone set to $TZ; current date and time: $(date)"
+fi
+echo ""
 
 # Create config directories
 if [ ! -d "${config_dir}" ]; then
@@ -126,6 +152,8 @@ rm -rf storage/logs
 ln -sf "${log_dir}" storage/
 
 # Link EPG and Playlist directories
+echo "🔗 Linking directories"
+echo ""
 if [ ! -d "storage/app/private/epg" ]; then
     echo "Linking EPG directory..."
     ln -sf "${epg_dir}" storage/app/private/epg
@@ -154,19 +182,20 @@ php artisan app:generate-key
 php artisan app:update-check
 
 # Optimizing configuration
-echo "Optimizing configuration..."
+echo "⚙️  Optimizing configuration..."
 php artisan optimize
 
 # Set Sqlite WAL mode
-echo "Setting SQLite WAL mode..."
+echo "🗂️  Setting SQLite WAL mode..."
 php artisan sqlite:wal-enable sqlite
+echo ""
 
 # Run any pending migrations
-echo "Running migrations..."
+echo "💾 Running migrations..."
 php artisan migrate --force
 
 # Install npm dependencies
-echo "Building assets..."
+echo "🛠️  Building assets..."
 npm install && npm run build
 
 if [ ! -d /.composer ]; then
