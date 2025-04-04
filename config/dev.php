@@ -16,6 +16,7 @@ return [
     'ffmpeg' => [
         'debug' => env('FFMPEG_DEBUG', false),
         'file' => env('FFMPEG_DEBUG_FILE', 'ffmpeg.log'),
+        'args' => env('FFMPEG_ARGS', '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'), // Default FFmpeg arguments for reconnection
     ],
     'tvgid' => [
         'regex' => env('TVGID_REGEX', '/[^a-zA-Z0-9_\-\.]/'),

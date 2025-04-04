@@ -43,7 +43,8 @@ class ChannelStreamController extends Controller
             ini_set('zlib.output_compression', 0);
 
             foreach ($streamUrls as $streamUrl) {
-                $cmd = "ffmpeg -re -i \"$streamUrl\" -c copy -f mpegts pipe:1 -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -timeout 100000000 -http_persistent 1";
+                $args = config('dev.ffmpeg.args');
+                $cmd = "ffmpeg -re -i \"$streamUrl\" -c copy -f mpegts pipe:1 $args";
                 if (config('dev.ffmpeg.debug')) {
                     $cmd .= " 2> " . storage_path('logs/' . config('dev.ffmpeg.file'));
                 } else {
