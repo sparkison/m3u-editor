@@ -61,7 +61,7 @@ class EpgGenerateController extends Controller
                 foreach ($channels as $channel) {
                     // Get/set the channel number
                     $channelNo = $channel->channel;
-                    if (!$channelNo && $playlist->auto_channel_increment) {
+                    if (!$channelNo && ($playlist->auto_channel_increment || $idChannelBy === PlaylistChannelId::ChannelId)) {
                         $channelNo = ++$channelNumber;
                     }
 
