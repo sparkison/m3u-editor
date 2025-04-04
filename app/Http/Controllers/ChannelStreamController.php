@@ -78,10 +78,14 @@ class ChannelStreamController extends Controller
                         }
 
                         proc_close($process);
+                        return;
                     }
                 } catch (Exception $e) {
-                    pclose($process);
+                    // Forcefully stop FFmpeg and log error
+                    proc_terminate($process);
+                    proc_close($process);
                     error_log("FFmpeg error: " . $e->getMessage());
+
                     // If there's an error, we can try the next stream URL
                     continue;
                 }
