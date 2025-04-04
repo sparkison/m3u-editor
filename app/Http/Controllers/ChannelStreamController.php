@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use Exception;
 use App\Models\Channel;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ChannelStreamController extends Controller
@@ -31,11 +30,9 @@ class ChannelStreamController extends Controller
         }
         $channel = Channel::findOrFail(base64_decode($id));
 
-        // Get the stream URL (could be multiple, allow for fallbacks)
-        $streamUrl = $channel->url_custom ?? $channel->url;
-        $streamUrls = [$streamUrl];
+        // Get the stream URLs (allow for multiple fallbacks)
+        $streamUrls = [$channel->url_custom ?? $channel->url];
 
-        // Stream the content directly from FFmpeg
         return new StreamedResponse(function () use ($streamUrls) {
             if (ob_get_level() > 0) {
                 flush();
@@ -50,43 +47,50 @@ class ChannelStreamController extends Controller
                 } else {
                     $cmd .= " -hide_banner -nostats -loglevel quiet 2>/dev/null";
                 }
-                $descriptorspec = [
-                    0 => ['pipe', 'r'],  // STDIN
-                    1 => ['pipe', 'w'],  // STDOUT
-                    2 => ['pipe', 'w'],  // STDERR
-                ];
-                $process = proc_open($cmd, $descriptorspec, $pipes);
 
                 try {
+                    // Setup the stream process
+                    $descriptorspec = [
+                        0 => ['pipe', 'r'],  // STDIN
+                        1 => ['pipe', 'w'],  // STDOUT
+                        2 => ['pipe', 'w'],  // STDERR
+                    ];
+                    $process = proc_open($cmd, $descriptorspec, $pipes);
+
                     if (is_resource($process)) {
+                        // Ensure process cleanup on request termination
+                        register_shutdown_function(function () use ($process) {
+                            if (is_resource($process)) {
+                                proc_terminate($process);
+                                proc_close($process);
+                            }
+                        });
+
                         stream_set_blocking($pipes[1], false); // Non-blocking mode
 
                         while (!feof($pipes[1])) {
-                            if (connection_aborted()) {
-                                proc_terminate($process); // Forcefully stop FFmpeg
-                                proc_close($process);
-                                return;
-                            }
-
-                            $data = fread($pipes[1], 8192);
-                            if ($data === false) {
-                                break;
-                            }
-
-                            echo $data;
+                            echo fread($pipes[1], 8192);
                             flush();
+
+                            if (function_exists('swoole_timer_after')) {
+                                swoole_timer_after(1000, function () use ($process) {
+                                    if (connection_aborted() && is_resource($process)) {
+                                        proc_terminate($process);
+                                        proc_close($process);
+                                    }
+                                });
+                            }
                         }
 
                         proc_close($process);
                         return;
                     }
                 } catch (Exception $e) {
-                    // Forcefully stop FFmpeg and log error
                     proc_terminate($process);
                     proc_close($process);
                     error_log("FFmpeg error: " . $e->getMessage());
 
-                    // If there's an error, we can try the next stream URL
+                    // Try next fallback URL if available
                     continue;
                 }
             }
@@ -96,42 +100,6 @@ class ChannelStreamController extends Controller
             'Connection' => 'keep-alive',
             'Cache-Control' => 'no-store, no-transform',
             'X-Accel-Buffering' => 'no', // Prevents Nginx from buffering
-        ]);
-    }
-
-    /**
-     * Stream an IPTV channel using HLS.
-     *
-     * @param Request $request
-     * @param int $id
-     *
-     * @return BinaryFileResponse
-     */
-    public function hls(Request $request, $id)
-    {
-        $channel = Channel::findOrFail(base64_decode($id));
-        $streamUrl = $channel->url_custom ?? $channel->url;
-
-        // Path for HLS files
-        $hlsDir = storage_path("app/public/hls/{$id}");
-        $hlsPlaylist = "{$hlsDir}/playlist.m3u8";
-
-        // Ensure directory exists
-        if (!file_exists($hlsDir) && !mkdir($hlsDir, 0777, true) && !is_dir($hlsDir)) {
-            throw new \RuntimeException(sprintf('Directory "%s" was not created', $hlsDir));
-        }
-
-        // FFmpeg command to generate HLS playlist and segments
-        $cmd = "ffmpeg -re -i \"$streamUrl\" -c:v libx264 -preset veryfast -b:v 800k -c:a aac -strict -2 -f hls -hls_time 5 -hls_list_size 10 -hls_flags delete_segments \"$hlsPlaylist\" > /dev/null 2>&1 &";
-
-        exec($cmd); // Run FFmpeg in the background
-
-        // Return HLS playlist file
-        return response()->file($hlsPlaylist, [
-            'Content-Type' => 'application/vnd.apple.mpegurl',
-            'Cache-Control' => 'no-cache, must-revalidate',
-            'Pragma' => 'no-cache',
-            'Expires' => '0',
         ]);
     }
 }
