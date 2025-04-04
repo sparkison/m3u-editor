@@ -140,7 +140,7 @@ class CustomPlaylistResource extends Resource
                 ->columnSpan(2)
                 ->helperText('Enter the name of the playlist. Internal use only.'),
             Forms\Components\Section::make('Manage Auth')
-                ->description('When an Auth is assigned, regular playlist routes will return a "401 Forbidden" error unless username and password parameters are passed.')
+                ->description('When an Auth is assigned, regular playlist routes will return a "401 Unauthorized" error unless username and password parameters are passed.')
                 ->collapsible()
                 ->collapsed(true)
                 ->schema([
