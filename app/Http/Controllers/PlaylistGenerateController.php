@@ -216,7 +216,7 @@ class PlaylistGenerateController extends Controller
         return response()->json($channels->transform(function (Channel $channel) use ($proxyEnabled, $idChannelBy, $autoIncrement, &$channelNumber) {
             $url = $channel->url_custom ?? $channel->url;
             if ($proxyEnabled) {
-                $url = route('stream', base64_encode((string)$channel->id));
+                $url = ProxyFacade::getProxyUrlForChannel($channel->id);
             }
             $channelNo = $channel->channel;
             if (!$channelNo && $autoIncrement) {

@@ -13,7 +13,7 @@ class ProxyService
     public function getProxyUrlForChannel($id)
     {
         $proxyUrlOverride = config('proxy.url_override');
-        $id = base64_encode((string)$id);
+        $id = rtrim(base64_encode($id), '=');
         if ($proxyUrlOverride) {
             $proxyUrlOverride = rtrim($proxyUrlOverride, '/');
             $port = config('app.port');
