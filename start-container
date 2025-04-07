@@ -7,7 +7,7 @@ export SUPERVISOR_PHP_USER="${SUPERVISOR_PHP_USER:-root}"
 export TZ="${TZ:-UTC}"  # Set timezone, default to UTC
 
 # Set Supervisor commands dynamically
-export SUPERVISOR_PHP_COMMAND="${SUPERVISOR_PHP_COMMAND:-/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan octane:start --workers=4 --task-workers=6 --server=swoole --host=0.0.0.0 --port=$APP_PORT}"
+export SUPERVISOR_PHP_COMMAND="${SUPERVISOR_PHP_COMMAND:-/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan octane:start --server=swoole --host=0.0.0.0 --port=$APP_PORT}"
 export QUEUE_PHP_COMMAND="${QUEUE_PHP_COMMAND:-/usr/bin/php /var/www/html/artisan horizon}"
 export WEBSOCKET_PHP_COMMAND="${WEBSOCKET_PHP_COMMAND:-/usr/bin/php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=$REVERB_PORT --no-interaction --no-ansi}"
 
