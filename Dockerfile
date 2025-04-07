@@ -1,35 +1,11 @@
 # Laravel (Alpine Edge build)
 FROM alpine:3.21.3
 
-# Set environment variables
-ENV WWWGROUP="sail"
-ENV APP_PORT=36400
-ENV REVERB_PORT=36800
-ENV TZ=UTC
-# ENV NODE_VERSION=22.12.0
-ENV SUPERVISOR_PHP_USER="root"
-#
-# Supervisord command to run the app services
-#
-
-# Run via Artisan
-# ENV SUPERVISOR_PHP_COMMAND="/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan serve --host=0.0.0.0 --port=$APP_PORT"
-
-# Run via Octane
-ENV SUPERVISOR_PHP_COMMAND="/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan octane:start --workers=4 --task-workers=6 --server=swoole --host=0.0.0.0 --port=$APP_PORT"
-
-# Queue worker
-# Laravel queue worker
-#ENV QUEUE_PHP_COMMAND="/usr/bin/php /var/www/html/artisan queue:work --queue=default,import --sleep=3 --tries=3"
-
-# Horizon queue worker
-ENV QUEUE_PHP_COMMAND="/usr/bin/php /var/www/html/artisan horizon"
-
-# Websockets
-ENV WEBSOCKET_PHP_COMMAND="/usr/bin/php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=$REVERB_PORT --no-interaction --no-ansi"
-
 # Set the working directory
 WORKDIR /var/www/html
+
+ARG WWWGROUP="sail"
+ARG WWWUSER="sail"
 
 # Install basic packages
 RUN apk update \
@@ -74,10 +50,7 @@ RUN apk --no-cache add \
 # COPY --from=node /usr/local/bin /usr/local/bin
 
 # https://wiki.alpinelinux.org/wiki/Setting_the_timezone
-RUN apk --no-cache add tzdata \
-    && cp /usr/share/zoneinfo/$TZ /etc/localtime \
-    && echo $TZ > /etc/timezone \
-    && echo date
+RUN apk --no-cache add tzdata
 
 # Install and configure bash
 RUN apk --no-cache add bash \
@@ -146,8 +119,5 @@ RUN addgroup $WWWGROUP \
     && adduser -h /var/www/html -s /bin/bash -G $WWWGROUP -D sail
 
 RUN chown -R sail:$WWWGROUP /var/www/html
-
-# Expose app port
-EXPOSE $APP_PORT
 
 ENTRYPOINT ["start-container"]
