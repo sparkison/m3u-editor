@@ -6,13 +6,13 @@ export REVERB_PORT="${REVERB_PORT:-36800}"
 export SUPERVISOR_PHP_USER="${SUPERVISOR_PHP_USER:-root}"
 export TZ="${TZ:-UTC}"  # Set timezone, default to UTC
 
-# If you want to pass app URL:
+# App URL:
 export APP_URL="${APP_URL:-http://localhost}"
 
-# Instead of Octane, we now define the php-fpm command
+# Define the php-fpm command
 export SUPERVISOR_PHP_COMMAND="${SUPERVISOR_PHP_COMMAND:-/usr/sbin/php-fpm84 -F}"
 
-# The queue and websockets remain the same.
+# The queue and websockets
 export QUEUE_PHP_COMMAND="${QUEUE_PHP_COMMAND:-/usr/bin/php /var/www/html/artisan horizon}"
 export WEBSOCKET_PHP_COMMAND="${WEBSOCKET_PHP_COMMAND:-/usr/bin/php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=$REVERB_PORT --no-interaction --no-ansi}"
 
