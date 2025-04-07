@@ -7,7 +7,6 @@ use App\Models\Channel;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\Support\Facades\Process;
-use Illuminate\Contracts\Process\ProcessResult;
 
 class ChannelStreamController extends Controller
 {
@@ -56,12 +55,10 @@ class ChannelStreamController extends Controller
                 }
 
                 // Start FFmpeg process with Laravel's Process facade
-                // Start FFmpeg process
                 $process = Process::start($cmd);
-                $pid = $process->id(); // Get the process ID
                 try {
                     while ($process->running()) {
-                        if ($this->shouldTerminate($pid)) {
+                        if (connection_aborted()) {
                             $process->signal(SIGKILL); // Kill FFmpeg process
                             return;
                         }
@@ -84,20 +81,5 @@ class ChannelStreamController extends Controller
             'Cache-Control' => 'no-store, no-transform',
             'X-Accel-Buffering' => 'no',
         ]);
-    }
-
-    /**
-     * Determine if we should terminate the FFmpeg process.
-     * Works with both Laravel Octane (Swoole) and traditional PHP-FPM.
-     */
-    private function shouldTerminate($pid): bool
-    {
-        if (app()->bound(\Laravel\Octane\Contracts\Client::class)) {
-            // Running under Octane (Swoole) - check manually if the process is still needed
-            return !posix_kill($pid, 0); // Check if process exists
-        } else {
-            // Traditional PHP-FPM, use connection_aborted()
-            return connection_aborted();
-        }
     }
 }
