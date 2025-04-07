@@ -18,8 +18,8 @@ export WEBSOCKET_PHP_COMMAND="${WEBSOCKET_PHP_COMMAND:-/usr/bin/php /var/www/htm
 
 # Update port in nginx config
 if [ -f /etc/nginx/conf.d/laravel.tmpl ]; then
-    echo "⚡️ Running app on port: $APP_PORT"
-    envsubst '${APP_PORT}' < /etc/nginx/conf.d/laravel.tmpl > /etc/nginx/conf.d/laravel.conf
+    echo "⚡️ Running app at: $APP_URL:$APP_PORT"
+    envsubst '${APP_PORT} ${APP_URL}' < /etc/nginx/conf.d/laravel.tmpl > /etc/nginx/conf.d/laravel.conf
 fi
 
 # Make sure correct user is set
