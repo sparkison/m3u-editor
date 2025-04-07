@@ -89,7 +89,7 @@ COPY ./docker/8.4/nginx/laravel.conf /etc/nginx/conf.d/laravel.tmpl
 COPY start-container /usr/local/bin/start-container
 RUN chmod +x /usr/local/bin/start-container
 
-# Pull your app’s code
+# Pull app code
 RUN git clone https://github.com/sparkison/m3u-editor.git /tmp/m3u-editor \
     && mv /tmp/m3u-editor/* /var/www/html \
     && mv /tmp/m3u-editor/.git /var/www/html/.git \
