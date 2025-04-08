@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 
 # Set runtime environment variables
+export WWWUSER="${WWWUSER:-sail}"
+export WWWGROUP="${WWWGROUP:-sail}"
+export PUID="${PUID:-1000}"
+export PGID="${PGID:-1000}"
 export APP_PORT="${APP_PORT:-36400}" # default 36400
 export REVERB_PORT="${REVERB_PORT:-36800}"
 export SUPERVISOR_PHP_USER="${SUPERVISOR_PHP_USER:-root}"
@@ -17,6 +21,9 @@ export QUEUE_PHP_COMMAND="${QUEUE_PHP_COMMAND:-/usr/bin/php /var/www/html/artisa
 export WEBSOCKET_PHP_COMMAND="${WEBSOCKET_PHP_COMMAND:-/usr/bin/php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=$REVERB_PORT --no-interaction --no-ansi}"
 
 # Update port in nginx config
+if [ -f /etc/nginx/nginx.tmpl ]; then
+    envsubst '${WWWUSER}' < /etc/nginx/nginx.tmpl > /etc/nginx/nginx.conf
+fi
 if [ -f /etc/nginx/conf.d/laravel.tmpl ]; then
     echo "⚡️ Running app at: $APP_URL:$APP_PORT"
     envsubst '${APP_PORT} ${APP_URL}' < /etc/nginx/conf.d/laravel.tmpl > /etc/nginx/conf.d/laravel.conf
@@ -145,6 +152,13 @@ npm install && npm run build
 # Ensure composer dir is writable
 [ ! -d /.composer ] && mkdir /.composer
 chmod -R ugo+rw /.composer
+
+
+# Setup user, group and permissions
+addgroup $WWWGROUP \
+    && adduser -h /var/www/html -s /bin/bash -G $WWWGROUP -D $WWWUSER
+
+chown -R $WWWUSER:$WWWGROUP /var/www/html
 
 # If passed custom commands, execute them, else run supervisord
 if [ $# -gt 0 ]; then
