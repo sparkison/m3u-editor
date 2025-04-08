@@ -21,7 +21,7 @@ export WEBSOCKET_PHP_COMMAND="${WEBSOCKET_PHP_COMMAND:-/usr/bin/php /var/www/htm
 
 # Update template files with variable values
 if [ -f /etc/php84/php-fpm.d/www.tmpl ]; then
-    envsubst '${PUID} ${PGID}' < /etc/php84/php-fpm.d/www.tmpl > /etc/php84/php-fpm.d/www.conf
+    envsubst '${WWWUSER} ${WWWGROUP}' < /etc/php84/php-fpm.d/www.tmpl > /etc/php84/php-fpm.d/www.conf
 fi
 if [ -f /etc/nginx/nginx.tmpl ]; then
     envsubst '${NGINX_USER}' < /etc/nginx/nginx.tmpl > /etc/nginx/nginx.conf
@@ -162,17 +162,17 @@ chmod -R ugo+rw /.composer
 
 
 # Setup user, group and permissions
-addgroup $PGID \
-    && adduser -h /var/www/html -s /bin/bash -G $PGID -D $PUID
+addgroup $WWWGROUP \
+    && adduser -h /var/www/html -s /bin/bash -G $WWWGROUP -D $WWWUSER
 
-chown -R $PUID:$PGID /var/www/html
+chown -R $WWWUSER:$WWWGROUP /var/www/html
 
 # If passed custom commands, execute them, else run supervisord
 if [ $# -gt 0 ]; then
     if [ "$SUPERVISOR_PHP_USER" = "root" ]; then
         exec "$@"
     else
-        exec gosu $PUID "$@"
+        exec gosu $WWWUSER "$@"
     fi
 else
     echo ""
