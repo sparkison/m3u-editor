@@ -3,8 +3,6 @@
 # Get/set runtime environment variables
 export PUID="${PUID:-1000}"
 export PGID="${PGID:-1000}"
-export WWWUSER="${WWWUSER:-m3ue}"
-export WWWGROUP="${WWWGROUP:-m3ue}"
 export SUPERVISOR_PHP_USER="${SUPERVISOR_PHP_USER:-root}"
 export NGINX_USER="${NGINX_USER:-root}"
 export APP_URL="${APP_URL:-http://localhost}"
@@ -21,7 +19,8 @@ export WEBSOCKET_PHP_COMMAND="${WEBSOCKET_PHP_COMMAND:-/usr/bin/php /var/www/htm
 
 # Update template files with variable values
 if [ -f /etc/php84/php-fpm.d/www.tmpl ]; then
-    envsubst '${WWWUSER} ${WWWGROUP}' < /etc/php84/php-fpm.d/www.tmpl > /etc/php84/php-fpm.d/www.conf
+    # Variables set in container
+    envsubst '' < /etc/php84/php-fpm.d/www.tmpl > /etc/php84/php-fpm.d/www.conf
 fi
 if [ -f /etc/nginx/nginx.tmpl ]; then
     envsubst '${NGINX_USER}' < /etc/nginx/nginx.tmpl > /etc/nginx/nginx.conf
@@ -159,13 +158,6 @@ npm install && npm run build
 # Ensure composer dir is writable
 [ ! -d /.composer ] && mkdir /.composer
 chmod -R ugo+rw /.composer
-
-
-# Setup user, group and permissions
-addgroup $WWWGROUP \
-    && adduser -h /var/www/html -s /bin/bash -G $WWWGROUP -D $WWWUSER
-
-chown -R $WWWUSER:$WWWGROUP /var/www/html
 
 # If passed custom commands, execute them, else run supervisord
 if [ $# -gt 0 ]; then

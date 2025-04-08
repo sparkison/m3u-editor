@@ -4,8 +4,8 @@ FROM alpine:3.21.3
 # Set the working directory
 WORKDIR /var/www/html
 
-ARG WWWGROUP="m3ue"
-ARG WWWUSER="m3ue"
+ENV WWWGROUP="m3ue"
+ENV WWWUSER="m3ue"
 
 # Install basic packages
 RUN apk update && apk --no-cache add \
@@ -101,6 +101,12 @@ RUN git clone https://github.com/sparkison/m3u-editor.git /tmp/m3u-editor \
 
 # Install composer dependencies
 RUN composer install --no-dev --no-interaction --no-progress
+
+# Setup user, group and permissions
+RUN addgroup $WWWGROUP \
+    && adduser -h /var/www/html -s /bin/bash -G $WWWGROUP -D $WWWUSER
+
+RUN chown -R $WWWUSER:$WWWGROUP /var/www/html
 
 # Final entrypoint
 ENTRYPOINT ["start-container"]
