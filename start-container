@@ -2,8 +2,8 @@
 
 # Get/set runtime environment variables
 export NGINX_USER=$WWWUSER # Set nginx user to www user
-export PUID="${PUID:-1000}"
-export PGID="${PGID:-1000}"
+# export PUID="${PUID:-1000}" # NOT CURRENTLY USED...
+# export PGID="${PGID:-1000}" # NOT CURRENTLY USED...
 export SUPERVISOR_PHP_USER="${SUPERVISOR_PHP_USER:-root}"
 export APP_URL="${APP_URL:-http://localhost}"
 export APP_PORT="${APP_PORT:-36400}" # default 36400
@@ -133,6 +133,10 @@ if [ ! -d "public/storage" ]; then
     php artisan storage:link
 fi
 
+# Set permissions
+chown -R "$WWWUSER:$WWWGROUP" "${config_dir}"
+chmod -R ug+rwX "${config_dir}"
+
 # Set app key if not set
 php artisan app:generate-key
 
@@ -154,21 +158,6 @@ php artisan migrate --force
 # Build assets
 echo "🛠️  Building assets..."
 npm install && npm run build
-
-# Check if PGID is provided and not zero
-if [ -n "$PGID" ] && [ "$PGID" -ne 0 ]; then
-    if getent group "$PGID" >/dev/null; then
-        # If PGID exists, get the group name
-        GROUP_NAME=$(getent group "$PGID" | cut -d: -f1)
-    else
-        # Create a new group with the specified PGID
-        GROUP_NAME="$PGID"
-        addgroup -g "$PGID" "$PGID"
-    fi
-
-    # Add the existing user to the group
-    adduser "$WWWUSER" "$GROUP_NAME"
-fi
 
 # Ensure composer dir is writable
 [ ! -d /.composer ] && mkdir /.composer
