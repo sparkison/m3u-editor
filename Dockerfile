@@ -4,8 +4,8 @@ FROM alpine:3.21.3
 # Set the working directory
 WORKDIR /var/www/html
 
-ARG WWWGROUP="sail"
-ARG WWWUSER="sail"
+ARG WWWGROUP="m3ue"
+ARG WWWUSER="m3ue"
 
 # Install basic packages
 RUN apk update && apk --no-cache add \
@@ -66,7 +66,7 @@ RUN apk --no-cache add \
     php84-pcntl \
     && ln -s /usr/bin/php84 /usr/bin/php
 
-COPY ./docker/8.4/php.ini /etc/php84/conf.d/99-sail.ini
+COPY ./docker/8.4/php.ini /etc/php84/conf.d/99-m3ue.ini
 
 # Configure supervisord
 RUN touch /var/run/supervisord.pid \
