@@ -148,7 +148,7 @@ php artisan sqlite:wal-enable sqlite
 echo ""
 
 # Run migrations
-echo "💾 Running migrations..."
+echo "💾  Running migrations..."
 php artisan migrate --force
 
 # Build assets
@@ -162,8 +162,8 @@ if [ -n "$PGID" ] && [ "$PGID" -ne 0 ]; then
         GROUP_NAME=$(getent group "$PGID" | cut -d: -f1)
     else
         # Create a new group with the specified PGID
-        GROUP_NAME="$WWWGROUP"
-        addgroup -g "$PGID" "$GROUP_NAME"
+        GROUP_NAME="$PGID"
+        addgroup -g "$PGID" "$PGID"
     fi
 
     # Add the existing user to the group
