@@ -107,6 +107,7 @@ RUN addgroup $WWWGROUP \
     && adduser -h /var/www/html -s /bin/bash -G $WWWGROUP -D $WWWUSER
 
 RUN chown -R $WWWUSER:$WWWGROUP /var/www/html
+RUN chown -R $WWWUSER:$WWWGROUP /var/lib/nginx/
 
 # Final entrypoint
 ENTRYPOINT ["start-container"]
