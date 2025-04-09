@@ -56,17 +56,17 @@ class ChannelStreamController extends Controller
 
                 // Continue trying until the client disconnects
                 while (!connection_aborted()) {
-                    $process = \Symfony\Component\Process\Process::fromShellCommandline($cmd);
+                    $process = SymphonyProcess::fromShellCommandline($cmd);
                     $process->setTimeout(null); // Make sure not to timeout prematurely
                     try {
                         $process->run(function ($type, $buffer) {
                             if (connection_aborted()) {
                                 throw new \Exception("Connection aborted by client.");
                             }
-                            if ($type === \Symfony\Component\Process\Process::OUT) {
+                            if ($type === SymphonyProcess::OUT) {
                                 echo $buffer;
                                 flush();
-                                // Optionally, insert a short sleep to further reduce CPU usage
+                                // Insert a short sleep to further reduce CPU usage
                                 usleep(10000);
                             }
                         });
