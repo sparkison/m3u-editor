@@ -34,6 +34,7 @@ class ChannelStreamController extends Controller
         $streamUrls = [
             $channel->url_custom ?? $channel->url,
             // Fallback to the custom URL if available (not yet implemented)
+            // ...
         ];
 
         return new StreamedResponse(function () use ($streamUrls) {
@@ -66,13 +67,12 @@ class ChannelStreamController extends Controller
                             if ($type === SymphonyProcess::OUT) {
                                 echo $buffer;
                                 flush();
-                                // Insert a short sleep to further reduce CPU usage
-                                usleep(10000);
+                                usleep(10000); // Reduce CPU usage
                             }
                         });
                     } catch (\Exception $e) {
-                        error_log("FFmpeg error, attempting to reconnect: " . $e->getMessage());
-                        // Optionally send a few newlines or a keep-alive comment to the client.
+                        // Log eror and attempt to reconnect.
+                        error_log("FFmpeg error: " . $e->getMessage());
                     }
                     // If we get here, the process ended.
                     if (connection_aborted()) {

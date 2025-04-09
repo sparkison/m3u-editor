@@ -6,9 +6,9 @@ export NGINX_USER=$WWWUSER # Set nginx user to www user
 # export PGID="${PGID:-1000}" # NOT CURRENTLY USED...
 export SUPERVISOR_PHP_USER="${SUPERVISOR_PHP_USER:-root}"
 export APP_URL="${APP_URL:-http://localhost}"
-export APP_PORT="${APP_PORT:-36400}" # default 36400
-export REVERB_PORT="${REVERB_PORT:-36800}" # default 36800
-export TZ="${TZ:-UTC}"  # Set timezone, default to UTC
+export APP_PORT="${APP_PORT:-36400}" # Default 36400
+export REVERB_PORT="${REVERB_PORT:-36800}" # Default 36800
+export TZ="${TZ:-UTC}" # Set timezone, default to UTC
 
 # Define the php-fpm command
 export SUPERVISOR_PHP_COMMAND="${SUPERVISOR_PHP_COMMAND:-/usr/sbin/php-fpm84 -F}"
@@ -38,7 +38,7 @@ if [ -f /etc/nginx/nginx.tmpl ]; then
     envsubst '${NGINX_USER}' < /etc/nginx/nginx.tmpl > /etc/nginx/nginx.conf
 fi
 if [ -f /etc/nginx/conf.d/laravel.tmpl ]; then
-    echo "⚡️ Running app at: $APP_URL:$APP_PORT"
+    echo "⚡️ Starting app at: $APP_URL:$APP_PORT"
     envsubst '${APP_PORT} ${APP_URL}' < /etc/nginx/conf.d/laravel.tmpl > /etc/nginx/conf.d/laravel.conf
 fi
 
