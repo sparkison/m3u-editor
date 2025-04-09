@@ -6,7 +6,6 @@ use Exception;
 use App\Models\Channel;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use Illuminate\Support\Facades\Process;
 use Symfony\Component\Process\Process as SymphonyProcess;
 
 class ChannelStreamController extends Controller
@@ -55,46 +54,31 @@ class ChannelStreamController extends Controller
                     $cmd .= " -hide_banner -nostats -loglevel quiet 2>/dev/null";
                 }
 
-                // Start FFmpeg process with Laravel's Process facade
-                // $process = Process::start($cmd);
-                // try {
-                //     while ($process->running()) {
-                //         if (connection_aborted()) {
-                //             $process->signal(SIGKILL); // Kill FFmpeg process
-                //             return;
-                //         }
-
-                //         echo $process->latestOutput();
-                //         flush();
-                //     }
-                //     return;
-                // } catch (Exception $e) {
-                //     $process->signal(SIGKILL); // Ensure process is terminated
-                //     error_log("FFmpeg error: " . $e->getMessage());
-                //     continue; // Try next stream URL
-                // }
-
-                // Start FFmpeg process with Symphony's Process class
-                $process = SymphonyProcess::fromShellCommandline($cmd);
-                try {
-                    $process->run(function ($type, $buffer) {
-                        // Check if the client has disconnected.
-                        if (connection_aborted()) {
-                            // Optionally throw an exception to break out of run()
-                            throw new \Exception("Connection aborted, terminating streaming.");
-                        }
-                        if ($type === SymphonyProcess::OUT) {
-                            echo $buffer;
-                            flush();
-                            // Optionally, insert a short sleep to further reduce CPU usage
-                            usleep(10000); // sleep for 10ms
-                        }
-                    });
-                    // Once the process has finished, we return.
-                    return;
-                } catch (\Exception $e) {
-                    error_log("FFmpeg error: " . $e->getMessage());
-                    continue; // Try the next stream URL if available.
+                // Continue trying until the client disconnects
+                while (!connection_aborted()) {
+                    $process = \Symfony\Component\Process\Process::fromShellCommandline($cmd);
+                    try {
+                        $process->run(function ($type, $buffer) {
+                            if (connection_aborted()) {
+                                throw new \Exception("Connection aborted by client.");
+                            }
+                            if ($type === \Symfony\Component\Process\Process::OUT) {
+                                echo $buffer;
+                                flush();
+                                // Optionally, insert a short sleep to further reduce CPU usage
+                                usleep(10000);
+                            }
+                        });
+                    } catch (\Exception $e) {
+                        error_log("FFmpeg error, attempting to reconnect: " . $e->getMessage());
+                        // Optionally send a few newlines or a keep-alive comment to the client.
+                    }
+                    // If we get here, the process ended.
+                    if (connection_aborted()) {
+                        return;
+                    }
+                    // Wait a short period before trying to reconnect.
+                    sleep(1);
                 }
             }
 
