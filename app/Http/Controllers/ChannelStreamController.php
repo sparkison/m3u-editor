@@ -57,6 +57,7 @@ class ChannelStreamController extends Controller
                 // Continue trying until the client disconnects
                 while (!connection_aborted()) {
                     $process = \Symfony\Component\Process\Process::fromShellCommandline($cmd);
+                    $process->setTimeout(null); // Make sure not to timeout prematurely
                     try {
                         $process->run(function ($type, $buffer) {
                             if (connection_aborted()) {
