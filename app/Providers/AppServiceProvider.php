@@ -31,6 +31,7 @@ use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecurityScheme;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\URL;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -58,6 +59,11 @@ class AppServiceProvider extends ServiceProvider
 
         // Disable mass assignment protection (security handled by Filament)
         Model::unguard();
+
+        // Check if app url contains https, and if so, force https
+        if (Str::contains(config('app.url'), 'https')) {
+            URL::forceScheme('https');
+        }
 
         // Setup the middleware
         $this->setupMiddleware();
