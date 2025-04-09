@@ -99,6 +99,9 @@ RUN git clone https://github.com/sparkison/m3u-editor.git /tmp/m3u-editor \
     && mv /tmp/m3u-editor/.env.example /var/www/html/.env.example \
     && rm -rf /tmp/m3u-editor
 
+# Configure git
+RUN git config --global --add safe.directory /var/www/html
+
 # Install composer dependencies
 RUN composer install --no-dev --no-interaction --no-progress
 

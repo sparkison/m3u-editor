@@ -17,19 +17,6 @@ export SUPERVISOR_PHP_COMMAND="${SUPERVISOR_PHP_COMMAND:-/usr/sbin/php-fpm84 -F}
 export QUEUE_PHP_COMMAND="${QUEUE_PHP_COMMAND:-/usr/bin/php /var/www/html/artisan horizon}"
 export WEBSOCKET_PHP_COMMAND="${WEBSOCKET_PHP_COMMAND:-/usr/bin/php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=$REVERB_PORT --no-interaction --no-ansi}"
 
-# Update template files with variable values
-if [ -f /etc/php84/php-fpm.d/www.tmpl ]; then
-    # Variables set in container
-    envsubst '${WWWUSER} ${WWWGROUP}' < /etc/php84/php-fpm.d/www.tmpl > /etc/php84/php-fpm.d/www.conf
-fi
-if [ -f /etc/nginx/nginx.tmpl ]; then
-    envsubst '${NGINX_USER}' < /etc/nginx/nginx.tmpl > /etc/nginx/nginx.conf
-fi
-if [ -f /etc/nginx/conf.d/laravel.tmpl ]; then
-    echo "⚡️ Running app at: $APP_URL:$APP_PORT"
-    envsubst '${APP_PORT} ${APP_URL}' < /etc/nginx/conf.d/laravel.tmpl > /etc/nginx/conf.d/laravel.conf
-fi
-
 # Make sure correct user is set
 if [ "$SUPERVISOR_PHP_USER" != "root" ] && [ "$SUPERVISOR_PHP_USER" != "m3ue" ]; then
     echo "You should set SUPERVISOR_PHP_USER to either 'm3ue' or 'root'."
@@ -42,10 +29,18 @@ if [ ! -f "/var/www/html/artisan" ]; then
     exit 1
 fi
 
-# Git pull the latest changes (optional)
-# echo "Pulling latest changes..."
-# git config --global --add safe.directory /var/www/html
-# git pull
+# Update template files with variable values
+if [ -f /etc/php84/php-fpm.d/www.tmpl ]; then
+    # Variables set in container
+    envsubst '${WWWUSER} ${WWWGROUP}' < /etc/php84/php-fpm.d/www.tmpl > /etc/php84/php-fpm.d/www.conf
+fi
+if [ -f /etc/nginx/nginx.tmpl ]; then
+    envsubst '${NGINX_USER}' < /etc/nginx/nginx.tmpl > /etc/nginx/nginx.conf
+fi
+if [ -f /etc/nginx/conf.d/laravel.tmpl ]; then
+    echo "⚡️ Running app at: $APP_URL:$APP_PORT"
+    envsubst '${APP_PORT} ${APP_URL}' < /etc/nginx/conf.d/laravel.tmpl > /etc/nginx/conf.d/laravel.conf
+fi
 
 # Check for configuration directories and files
 config_dir="/var/www/config"
@@ -63,6 +58,7 @@ laravel_log_file="${log_dir}/laravel.log"
 ffmpeg_log_file="${log_dir}/ffmpeg.log"
 nginx_log_file="${log_dir}/nginx.log"
 
+# Invalid log files, or files that will be created by the app
 swoole_log_file="${log_dir}/swoole_http.log"
 reverb_log_file="${log_dir}/reverb.log"
 horizon_log_file="${log_dir}/horizon.log"
@@ -78,7 +74,7 @@ echo ""
 
 # Create config directories if needed
 if [ ! -d "${config_dir}" ]; then
-    echo "Missing config directory, please mount it to /var/www/config"
+    echo "-- Missing config directory, please mount it to /var/www/config"
     exit 0
 fi
 [ ! -d "${db_dir}" ] && mkdir -p "${db_dir}"
@@ -89,7 +85,7 @@ fi
 
 # Create environment file if missing
 if [ ! -f "${env_file}" ]; then
-    echo "Missing environment file, creating now..."
+    echo "-- Missing environment file, creating now..."
     cp /var/www/html/.env.example "${env_file}"
 fi
 
