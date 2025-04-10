@@ -49,10 +49,13 @@ class ChannelStreamController extends Controller
             foreach ($streamUrls as $streamUrl) {
                 // Setup FFmpeg command
                 $cmd = "ffmpeg -re -i \"$streamUrl\" -c copy -f mpegts pipe:1 -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5";
+                $ffmpegLogPath = storage_path('logs/' . config('dev.ffmpeg.file'));
                 if (config('dev.ffmpeg.debug')) {
-                    $cmd .= " 2> " . storage_path('logs/' . config('dev.ffmpeg.file'));
+                    // Log everything
+                    $cmd .= " 2> " . $ffmpegLogPath;
                 } else {
-                    $cmd .= " -hide_banner -nostats -loglevel quiet 2>/dev/null";
+                    // Log only errors and hide stats
+                    $cmd .= " -hide_banner -nostats -loglevel error 2> " . $ffmpegLogPath;
                 }
 
                 // Continue trying until the client disconnects
