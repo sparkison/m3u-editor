@@ -53,7 +53,7 @@ networks: {}
 Or via Docker CLI:
 
 ```bash
- docker run --name m3u-editor -e PUID=1000 -e PGID=1000 -e TZ=Etc/UTC -e REVERB_HOST=localhost -v ./data:/var/www/config --restart unless-stopped -p 36400:36400 -p 36800:36800 sparkison/m3u-editor:latest 
+ docker run --name m3u-editor -e TZ=Etc/UTC -e APP_URL=http://localhost -e REVERB_HOST=localhost -e REVERB_SCHEME=http -v ./data:/var/www/config --restart unless-stopped -p 36400:36400 -p 36800:36800 sparkison/m3u-editor:latest 
 ```
 
 Access via: [http://localhost:36400](http://localhost:36400) (user = admin, password = admin)
