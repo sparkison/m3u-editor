@@ -38,7 +38,12 @@ if [ -f /etc/nginx/nginx.tmpl ]; then
     envsubst '${NGINX_USER}' < /etc/nginx/nginx.tmpl > /etc/nginx/nginx.conf
 fi
 if [ -f /etc/nginx/conf.d/laravel.tmpl ]; then
-    echo "⚡️ Starting app at: $APP_URL:$APP_PORT"
+    # If app url contains https, don't show port
+    if [[ "$APP_URL" == *"https"* ]]; then
+        echo "⚡️ Starting app at: $APP_URL"
+    else
+        echo "⚡️ Starting app at: $APP_URL:$APP_PORT"
+    fi
     envsubst '${APP_PORT} ${APP_URL}' < /etc/nginx/conf.d/laravel.tmpl > /etc/nginx/conf.d/laravel.conf
 fi
 
@@ -144,7 +149,6 @@ php artisan app:update-check
 
 # Optimize Laravel
 php artisan optimize
-php artisan config:cache
 
 # Set Sqlite WAL mode
 echo "🗂️ Enabling SQLite WAL mode..."
