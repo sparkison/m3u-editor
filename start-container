@@ -144,18 +144,19 @@ php artisan app:update-check
 
 # Optimize Laravel
 php artisan optimize
+php artisan config:cache
 
 # Set Sqlite WAL mode
-echo "🗂️  Enabling SQLite WAL mode..."
+echo "🗂️ Enabling SQLite WAL mode..."
 php artisan sqlite:wal-enable sqlite
 echo ""
 
 # Run migrations
-echo "💾  Running migrations..."
+echo "💾 Running migrations..."
 php artisan migrate --force
 
 # Build assets
-echo "🛠️  Building assets..."
+echo "🛠️ Building assets..."
 npm install && npm run build
 
 # Ensure composer dir is writable
