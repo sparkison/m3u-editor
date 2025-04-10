@@ -1,60 +1,39 @@
-# Laravel (Alpine Edge build)
+# Alpine
 FROM alpine:3.21.3
 
 # Set the working directory
 WORKDIR /var/www/html
 
-ARG WWWGROUP="sail"
-ARG WWWUSER="sail"
+ENV WWWGROUP="m3ue"
+ENV WWWUSER="m3ue"
 
 # Install basic packages
-RUN apk update \
-    && apk --no-cache add  \
-        coreutils \
-        supervisor \
-        nano \
-        wget \
-        curl \
-        curl-dev \
-        sqlite \
-        ca-certificates \
-        nodejs \
-        npm \
-        ffmpeg \
-        redis \
-        git
+RUN apk update && apk --no-cache add \
+    coreutils \
+    supervisor \
+    envsubst \
+    nano \
+    wget \
+    curl \
+    curl-dev \
+    sqlite \
+    ca-certificates \
+    nodejs \
+    npm \
+    ffmpeg \
+    redis \
+    git \
+    bash \
+    tzdata \
+    # nginx + php-fpm
+    nginx \
+    php84-cli \
+    php84-fpm \
+    php84-posix \
+    php84-dev
 
-# Install PHP 8.4
-RUN apk --no-cache add \
-        php84-cli php84-dev
-
-# Install PHP Swoole from prebuilt package
-RUN apk --no-cache add \
-    php84-posix php84-pecl-swoole
-
-# ...or Build Swoole with pecl
-# RUN apk --no-cache add \
-#         php84-dev php84-pear php84-openssl php84-sockets \
-#         gcc g++ musl-dev make \
-#     && ln -s /usr/bin/pecl84 /usr/bin/pecl
-# RUN pecl install \
-#     --configureoptions 'enable-openssl="no" enable-sockets="yes" enable-mysqlnd="no" enable-swoole-curl="yes"' \
-#     swoole
-
-# # Install specific Node version
-# FROM node:$NODE_VERSION-alpine AS node
-# COPY --from=node /usr/lib /usr/lib
-# COPY --from=node /usr/local/share /usr/local/share
-# COPY --from=node /usr/local/lib /usr/local/lib
-# COPY --from=node /usr/local/include /usr/local/include
-# COPY --from=node /usr/local/bin /usr/local/bin
-
-# https://wiki.alpinelinux.org/wiki/Setting_the_timezone
-RUN apk --no-cache add tzdata
-
-# Install and configure bash
-RUN apk --no-cache add bash \
-    && sed -i 's/bin\/ash/bin\/bash/g' /etc/passwd
+# If running via Swoole, uncomment below line
+# RUN apk --no-cache add php84-posix php84-pecl-swoole
 
 # Install CRON
 RUN touch crontab.tmp \
@@ -66,34 +45,35 @@ RUN touch crontab.tmp \
 COPY ./docker/8.4/redis.conf /etc/redis/redis.conf
 RUN chmod 0644 /etc/redis/redis.conf
 
-# Install and configure PHP extensions
+# Install and configure PHP extensions (adjust as needed)
 RUN apk --no-cache add \
-        php84-sqlite3 php84-gd php84-curl \
-        php84-intl php84-imap php84-mbstring \
-        php84-xml php84-zip php84-bcmath php84-soap \
-        php84-xmlreader php84-xmlwriter \
-        php84-iconv \
-        php84-ldap \
-        php84-tokenizer \
-        php84-msgpack \
-        php84-opcache \
-        php84-pdo_mysql \
-        php84-pdo_sqlite \
-        php84-phar \
-        php84-fileinfo \
-        php84-pecl-igbinary \
-        php84-pecl-pcov php84-pecl-imagick \
-        php84-pecl-redis \
-        php84-pcntl \
+    php84-sqlite3 php84-gd php84-curl \
+    php84-intl php84-imap php84-mbstring \
+    php84-xml php84-zip php84-bcmath php84-soap \
+    php84-xmlreader php84-xmlwriter \
+    php84-iconv \
+    php84-ldap \
+    php84-tokenizer \
+    php84-msgpack \
+    php84-opcache \
+    php84-pdo_mysql \
+    php84-pdo_sqlite \
+    php84-phar \
+    php84-fileinfo \
+    php84-pecl-igbinary \
+    php84-pecl-pcov php84-pecl-imagick \
+    php84-pecl-redis \
+    php84-pcntl \
     && ln -s /usr/bin/php84 /usr/bin/php
 
-COPY ./docker/8.4/php.ini /etc/php84/conf.d/99-sail.ini
+COPY ./docker/8.4/php.ini /etc/php84/conf.d/99-m3ue.ini
 
 # Configure supervisord
 RUN touch /var/run/supervisord.pid \
     && mkdir -p /etc/supervisor.d/conf.d \
     && mkdir -p /var/log/supervisor \
     && touch /var/log/supervisor/supervisord.log
+
 COPY ./docker/8.4/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Install composer
@@ -101,23 +81,36 @@ ENV COMPOSER_ALLOW_SUPERUSER=1
 ENV PATH=$PATH:/root/.composer/vendor/bin
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
+# Copy or create an nginx.conf if needed
+COPY ./docker/8.4/nginx/nginx.conf /etc/nginx/nginx.tmpl
+COPY ./docker/8.4/nginx/laravel.conf /etc/nginx/conf.d/laravel.tmpl
+
+# Configure PHP-FPM
+COPY ./docker/8.4/www.conf /etc/php84/php-fpm.d/www.tmpl
+
 # Configure container startup script
 COPY start-container /usr/local/bin/start-container
 RUN chmod +x /usr/local/bin/start-container
 
+# Pull app code
 RUN git clone https://github.com/sparkison/m3u-editor.git /tmp/m3u-editor \
     && mv /tmp/m3u-editor/* /var/www/html \
     && mv /tmp/m3u-editor/.git /var/www/html/.git \
     && mv /tmp/m3u-editor/.env.example /var/www/html/.env.example \
     && rm -rf /tmp/m3u-editor
 
+# Configure git
+RUN git config --global --add safe.directory /var/www/html
+
 # Install composer dependencies
 RUN composer install --no-dev --no-interaction --no-progress
 
-# Configure user for sail
+# Setup user, group and permissions
 RUN addgroup $WWWGROUP \
-    && adduser -h /var/www/html -s /bin/bash -G $WWWGROUP -D sail
+    && adduser -h /var/www/html -s /bin/bash -G $WWWGROUP -D $WWWUSER
 
-RUN chown -R sail:$WWWGROUP /var/www/html
+RUN chown -R $WWWUSER:$WWWGROUP /var/www/html
+RUN chown -R $WWWUSER:$WWWGROUP /var/lib/nginx/
 
+# Final entrypoint
 ENTRYPOINT ["start-container"]

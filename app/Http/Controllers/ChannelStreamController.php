@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use Exception;
 use App\Models\Channel;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\Process\Process as SymphonyProcess;
 
 class ChannelStreamController extends Controller
 {
@@ -20,102 +20,75 @@ class ChannelStreamController extends Controller
      */
     public function __invoke(Request $request, $id)
     {
-        // Prevent timeouts
+        // Prevent timeouts, etc.
         ini_set('max_execution_time', 0);
         ini_set('output_buffering', 'off');
         ini_set('implicit_flush', 1);
 
-        // Find the channel by ID, else throw a 404
+        // Find the channel by ID
         if (strpos($id, '==') === false) {
-            $id .= '=='; // Ensure padding for base64 decoding
+            $id .= '=='; // right pad to ensure proper decoding
         }
         $channel = Channel::findOrFail(base64_decode($id));
 
-        // Get the stream URL (could be multiple, allow for fallbacks)
-        $streamUrl = $channel->url_custom ?? $channel->url;
-        $streamUrls = [$streamUrl];
+        $streamUrls = [
+            $channel->url_custom ?? $channel->url,
+            // Fallback to the custom URL if available (not yet implemented)
+            // ...
+        ];
 
-        // Stream the content directly from FFmpeg
         return new StreamedResponse(function () use ($streamUrls) {
             if (ob_get_level() > 0) {
                 flush();
             }
+
+            // Disable output buffering to ensure real-time streaming
             ini_set('zlib.output_compression', 0);
 
+            // Loop through available streams...
             foreach ($streamUrls as $streamUrl) {
+                // Setup FFmpeg command
                 $cmd = "ffmpeg -re -i \"$streamUrl\" -c copy -f mpegts pipe:1 -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5";
                 if (config('dev.ffmpeg.debug')) {
                     $cmd .= " 2> " . storage_path('logs/' . config('dev.ffmpeg.file'));
                 } else {
                     $cmd .= " -hide_banner -nostats -loglevel quiet 2>/dev/null";
                 }
-                $process = popen($cmd, 'r');
-                try {
-                    if ($process) {
-                        while (!feof($process)) {
+
+                // Continue trying until the client disconnects
+                while (!connection_aborted()) {
+                    $process = SymphonyProcess::fromShellCommandline($cmd);
+                    $process->setTimeout(null); // Make sure not to timeout prematurely
+                    try {
+                        $process->run(function ($type, $buffer) {
                             if (connection_aborted()) {
-                                pclose($process);
-                                return;
+                                throw new \Exception("Connection aborted by client.");
                             }
-                            $data = fread($process, 8192); // Increased from 4096 to 8192
-                            if ($data === false) {
-                                break;
+                            if ($type === SymphonyProcess::OUT) {
+                                echo $buffer;
+                                flush();
+                                usleep(10000); // Reduce CPU usage
                             }
-                            echo $data;
-                            flush();
-                        }
-                        pclose($process);
+                        });
+                    } catch (\Exception $e) {
+                        // Log eror and attempt to reconnect.
+                        error_log("FFmpeg error: " . $e->getMessage());
+                    }
+                    // If we get here, the process ended.
+                    if (connection_aborted()) {
                         return;
                     }
-                } catch (Exception $e) {
-                    pclose($process);
-                    error_log("FFmpeg error: " . $e->getMessage());
-                    // If there's an error, we can try the next stream URL
-                    continue;
+                    // Wait a short period before trying to reconnect.
+                    sleep(1);
                 }
             }
+
             echo "Error: No available streams.";
         }, 200, [
             'Content-Type' => 'video/mp2t',
             'Connection' => 'keep-alive',
             'Cache-Control' => 'no-store, no-transform',
-            'X-Accel-Buffering' => 'no', // Prevents Nginx from buffering
-        ]);
-    }
-
-    /**
-     * Stream an IPTV channel using HLS.
-     *
-     * @param Request $request
-     * @param int $id
-     *
-     * @return BinaryFileResponse
-     */
-    public function hls(Request $request, $id)
-    {
-        $channel = Channel::findOrFail(base64_decode($id));
-        $streamUrl = $channel->url_custom ?? $channel->url;
-
-        // Path for HLS files
-        $hlsDir = storage_path("app/public/hls/{$id}");
-        $hlsPlaylist = "{$hlsDir}/playlist.m3u8";
-
-        // Ensure directory exists
-        if (!file_exists($hlsDir) && !mkdir($hlsDir, 0777, true) && !is_dir($hlsDir)) {
-            throw new \RuntimeException(sprintf('Directory "%s" was not created', $hlsDir));
-        }
-
-        // FFmpeg command to generate HLS playlist and segments
-        $cmd = "ffmpeg -re -i \"$streamUrl\" -c:v libx264 -preset veryfast -b:v 800k -c:a aac -strict -2 -f hls -hls_time 5 -hls_list_size 10 -hls_flags delete_segments \"$hlsPlaylist\" > /dev/null 2>&1 &";
-
-        exec($cmd); // Run FFmpeg in the background
-
-        // Return HLS playlist file
-        return response()->file($hlsPlaylist, [
-            'Content-Type' => 'application/vnd.apple.mpegurl',
-            'Cache-Control' => 'no-cache, must-revalidate',
-            'Pragma' => 'no-cache',
-            'Expires' => '0',
+            'X-Accel-Buffering' => 'no',
         ]);
     }
 }

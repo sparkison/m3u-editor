@@ -136,8 +136,10 @@ class PlaylistResource extends Resource
                     ->getStateUsing(function ($record) {
                         if ($record->xtream_status) {
                             try {
-                                $expires = Carbon::createFromTimestamp($record->xtream_status['user_info']['exp_date']);
-                                return $expires->toDayDateTimeString();
+                                if ($record->xtream_status['user_info']['exp_date'] ?? false) {
+                                    $expires = Carbon::createFromTimestamp($record->xtream_status['user_info']['exp_date']);
+                                    return $expires->toDayDateTimeString();
+                                }
                             } catch (\Exception $e) {
                             }
                         }
