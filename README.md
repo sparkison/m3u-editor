@@ -32,16 +32,12 @@ services:
     image: sparkison/m3u-editor:latest
     container_name: m3u-editor
     environment:
-      - PUID=1000
-      - PGID=1000
       - TZ=Etc/UTC
+      - APP_URL=http://localhost # or http://192.168.0.123 or https://your-custom-tld.com
       # This is used for websockets and in-app notifications
       # Set to your machine/container IP where m3u editor will be accessed, if not localhost
-      - REVERB_HOST=localhost
-      # Uncomment and set to URL or IP if not localhost. Use full url, including http(s)
-      #- APP_URL=http://localhost
-      # Uncomment and set to true if using HTTPS
-      #- OCTANE_HTTPS=false
+      - REVERB_HOST=localhost # or 192.168.0.123 or your-custom-tld.com
+      - REVERB_SCHEME=http # or https if using custom TLD with https
     volumes:
       # This will allow you to reuse the data across container recreates
       # Format is: <host_directory_path>:<container_path>
