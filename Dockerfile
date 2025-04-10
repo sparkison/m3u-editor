@@ -103,7 +103,7 @@ RUN git clone https://github.com/sparkison/m3u-editor.git /tmp/m3u-editor \
 RUN git config --global --add safe.directory /var/www/html
 
 # Install composer dependencies
-RUN composer install --no-dev --no-interaction --no-progress
+RUN composer install --no-dev --no-interaction --no-progress -o
 
 # Setup user, group and permissions
 RUN addgroup $WWWGROUP \
