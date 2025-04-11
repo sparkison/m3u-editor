@@ -31,13 +31,16 @@ class ChannelStreamController extends Controller
         }
         $channel = Channel::findOrFail(base64_decode($id));
 
+        $title = $channel->title_custom ?? $channel->title;
+        $title = strip_tags($title);
+
         $streamUrls = [
             $channel->url_custom ?? $channel->url,
             // Fallback to the custom URL if available (not yet implemented)
             // ...
         ];
 
-        return new StreamedResponse(function () use ($streamUrls) {
+        return new StreamedResponse(function () use ($streamUrls, $title) {
             if (ob_get_level() > 0) {
                 flush();
             }
@@ -48,8 +51,9 @@ class ChannelStreamController extends Controller
             // Loop through available streams...
             foreach ($streamUrls as $streamUrl) {
                 // Setup FFmpeg command
-                $cmd = "ffmpeg -re -i \"$streamUrl\" -c copy -f mpegts pipe:1 -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5";
+                $userAgent = config('dev.ffmpeg.user_agent');
                 $ffmpegLogPath = storage_path('logs/' . config('dev.ffmpeg.file'));
+                $cmd = "ffmpeg -re -i \"$streamUrl\" -c copy -f mpegts pipe:1 -user_agent \"$userAgent\" -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5";
                 if (config('dev.ffmpeg.debug')) {
                     // Log everything
                     $cmd .= " 2> " . $ffmpegLogPath;
@@ -58,7 +62,9 @@ class ChannelStreamController extends Controller
                     $cmd .= " -hide_banner -nostats -loglevel error 2> " . $ffmpegLogPath;
                 }
 
-                // Continue trying until the client disconnects
+                // Continue trying until the client disconnects, or max retries are reached
+                $maxRetries = config('dev.ffmpeg.max_retries');
+                $retries = 0;
                 while (!connection_aborted()) {
                     $process = SymphonyProcess::fromShellCommandline($cmd);
                     $process->setTimeout(null); // Make sure not to timeout prematurely
@@ -82,6 +88,12 @@ class ChannelStreamController extends Controller
                     // If we get here, the process ended.
                     if (connection_aborted()) {
                         return;
+                    }
+                    if (++$retries >= $maxRetries) {
+                        error_log("FFmpeg error: max retries of $maxRetries reached for stream for channel $title.");
+                        // Stop the process and break out of the loop
+                        $process->stop();
+                        break;
                     }
                     // Wait a short period before trying to reconnect.
                     sleep(1);
