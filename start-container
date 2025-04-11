@@ -1,32 +1,27 @@
 #!/usr/bin/env bash
 
 # Get/set runtime environment variables
-# export PUID="${PUID:-1000}" # NOT CURRENTLY USED...
-# export PGID="${PGID:-1000}" # NOT CURRENTLY USED...
+export PUID="${PUID:-1000}" # NOT CURRENTLY USED...
+export PGID="${PGID:-1000}" # NOT CURRENTLY USED...
 
 # Run NGINX/FPM as root
-export NGINX_USER='root'
-export FPMUSER='root'
-export FPMGROUP='root'
+export NGINX_USER="root"
+export FPMUSER="root"
+export FPMGROUP="root"
 
-export SUPERVISOR_PHP_USER="${SUPERVISOR_PHP_USER:-root}"
+# Run PHP as root (or m3ue)
+export SUPERVISOR_PHP_USER="root"
 export APP_URL="${APP_URL:-http://localhost}"
 export APP_PORT="${APP_PORT:-36400}" # Default 36400
 export REVERB_PORT="${REVERB_PORT:-36800}" # Default 36800
 export TZ="${TZ:-UTC}" # Set timezone, default to UTC
 
 # Define the php-fpm command (add "-R" flag to allow php-fpm to run as root)
-export SUPERVISOR_PHP_COMMAND="${SUPERVISOR_PHP_COMMAND:-/usr/sbin/php-fpm84 -F -R}"
+export SUPERVISOR_PHP_COMMAND="/usr/sbin/php-fpm84 -F -R"
 
 # The queue and websockets
-export QUEUE_PHP_COMMAND="${QUEUE_PHP_COMMAND:-/usr/bin/php /var/www/html/artisan horizon}"
-export WEBSOCKET_PHP_COMMAND="${WEBSOCKET_PHP_COMMAND:-/usr/bin/php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=$REVERB_PORT --no-interaction --no-ansi}"
-
-# Make sure correct user is set
-if [ "$SUPERVISOR_PHP_USER" != "root" ] && [ "$SUPERVISOR_PHP_USER" != "m3ue" ]; then
-    echo "You should set SUPERVISOR_PHP_USER to either 'm3ue' or 'root'."
-    exit 1
-fi
+export QUEUE_PHP_COMMAND="/usr/bin/php /var/www/html/artisan horizon"
+export WEBSOCKET_PHP_COMMAND="/usr/bin/php /var/www/html/artisan reverb:start --host=0.0.0.0 --port=$REVERB_PORT --no-interaction --no-ansi"
 
 # Make sure the laravel project is installed
 if [ ! -f "/var/www/html/artisan" ]; then
