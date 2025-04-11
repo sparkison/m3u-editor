@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 
 # Get/set runtime environment variables
-export NGINX_USER=$WWWUSER # Set nginx user to www user
+export NGINX_USER='root'
+export FPMUSER='root'
+export FPMGROUP='root'
 # export PUID="${PUID:-1000}" # NOT CURRENTLY USED...
 # export PGID="${PGID:-1000}" # NOT CURRENTLY USED...
 export SUPERVISOR_PHP_USER="${SUPERVISOR_PHP_USER:-root}"
@@ -11,7 +13,7 @@ export REVERB_PORT="${REVERB_PORT:-36800}" # Default 36800
 export TZ="${TZ:-UTC}" # Set timezone, default to UTC
 
 # Define the php-fpm command
-export SUPERVISOR_PHP_COMMAND="${SUPERVISOR_PHP_COMMAND:-/usr/sbin/php-fpm84 -F}"
+export SUPERVISOR_PHP_COMMAND="${SUPERVISOR_PHP_COMMAND:-/usr/sbin/php-fpm84 -F -R}"
 
 # The queue and websockets
 export QUEUE_PHP_COMMAND="${QUEUE_PHP_COMMAND:-/usr/bin/php /var/www/html/artisan horizon}"
@@ -32,7 +34,7 @@ fi
 # Update template files with variable values
 if [ -f /etc/php84/php-fpm.d/www.tmpl ]; then
     # Variables set in container
-    envsubst '${WWWUSER} ${WWWGROUP}' < /etc/php84/php-fpm.d/www.tmpl > /etc/php84/php-fpm.d/www.conf
+    envsubst '${FPMUSER} ${FPMGROUP}' < /etc/php84/php-fpm.d/www.tmpl > /etc/php84/php-fpm.d/www.conf
 fi
 if [ -f /etc/nginx/nginx.tmpl ]; then
     envsubst '${NGINX_USER}' < /etc/nginx/nginx.tmpl > /etc/nginx/nginx.conf
