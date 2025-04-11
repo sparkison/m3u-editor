@@ -142,10 +142,6 @@ if [ ! -d "public/storage" ]; then
     php artisan storage:link
 fi
 
-# Set permissions
-chown -R "$WWWUSER:$WWWGROUP" "${config_dir}"
-chmod -R ug+rwX "${config_dir}"
-
 # Set app key if not set
 php artisan app:generate-key
 
