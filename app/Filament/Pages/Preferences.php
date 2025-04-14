@@ -2,9 +2,11 @@
 
 namespace App\Filament\Pages;
 
+use App\Models\CustomPlaylist;
 use App\Settings\GeneralSettings;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Pages\SettingsPage;
 use Filament\Support\Enums\MaxWidth;
 use Forms\Components;
@@ -47,6 +49,27 @@ class Preferences extends SettingsPage
                     ->heading('Debugging')
                     ->description('Debug and development settings.')
                     ->headerActions([
+                        Forms\Components\Actions\Action::make('test_websocket')
+                            ->label('Test WebSocket')
+                            ->icon('heroicon-o-signal')
+                            ->iconPosition('after')
+                            ->color('gray')
+                            ->size('sm')
+                            ->form([
+                                Forms\Components\TextInput::make('message')
+                                    ->label('Message')
+                                    ->required()
+                                    ->default('Testing WebSocket connection')
+                                    ->helperText('This message will be sent to the WebSocket server, and displayed as a pop-up notification. If you do not see a notification shortly after sending, there is likely an issue with the WebSocket server configuration.'),
+                            ])
+                            ->action(function (array $data): void {
+                                Notification::make()
+                                    ->success()
+                                    ->title("WebSocket Connection Test")
+                                    ->body($data['message'])
+                                    ->persistent()
+                                    ->broadcast(auth()->user());
+                            }),
                         Forms\Components\Actions\Action::make('view_logs')
                             ->label('View Logs')
                             ->icon('heroicon-o-arrow-top-right-on-square')

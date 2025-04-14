@@ -31,3 +31,4 @@ docker-compose.yml
 DockerfileDev
 .rr.yaml
 rr
+websockets.sh

@@ -41,7 +41,7 @@ class TestBroadcasting extends Command
 
         $this->info('Testing broadcasting...');
         Notification::make()
-            ->danger()
+            ->success()
             ->title("Broadcast testing")
             ->body('Testing system broadcasting')
             ->broadcast($user);
