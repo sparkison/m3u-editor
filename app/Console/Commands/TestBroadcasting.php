@@ -30,8 +30,9 @@ class TestBroadcasting extends Command
         $users = User::get(['id', 'email']);
         if ($users->isEmpty()) {
             $this->info('No users found.');
-            return;
-        } else if ($users->count() === 1) {
+            return false;
+        }
+        if ($users->count() === 1) {
             $user = $users->first();
         } else {
             $user = $this->choice('Select a user to send the broadcast to:', $users->pluck('email')->toArray());
@@ -41,12 +42,12 @@ class TestBroadcasting extends Command
         $this->info('Testing broadcasting...');
         Notification::make()
             ->danger()
-            ->title("Boradcast testing")
+            ->title("Broadcast testing")
             ->body('Testing system broadcasting')
             ->broadcast($user);
 
         $this->info('Broadcast sent to: ' . $user->email);
         $this->info('Done.');
-        return 0;
+        return true;
     }
 }
