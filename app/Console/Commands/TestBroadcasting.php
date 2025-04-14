@@ -3,23 +3,24 @@
 namespace App\Console\Commands;
 
 use App\Models\User;
+use Filament\Notifications\Notification;
 use Illuminate\Console\Command;
 
-class ResetPassword extends Command
+class TestBroadcasting extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'app:reset-password';
+    protected $signature = 'app:test-broadcasting';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Reset the password for a user';
+    protected $description = 'Test broadcasting';
 
     /**
      * Execute the console command.
@@ -33,18 +34,19 @@ class ResetPassword extends Command
         } else if ($users->count() === 1) {
             $user = $users->first();
         } else {
-            $user = $this->choice('Select a user to reset the password for:', $users->pluck('email')->toArray());
+            $user = $this->choice('Select a user to send the broadcast to:', $users->pluck('email')->toArray());
             $user = $users->where('email', $user)->firstOrFail();
         }
 
-        $password = $this->ask('🔒 Enter the new password');
-        if (empty($password)) {
-            $this->error('Password cannot be empty.');
-            return;
-        }
-        $user->password = bcrypt($password);
-        $user->save();
-        $this->info('✅ Password reset successfully!');
-        $this->info('🔑 New password: ' . $password);
+        $this->info('Testing broadcasting...');
+        Notification::make()
+            ->danger()
+            ->title("Boradcast testing")
+            ->body('Testing system broadcasting')
+            ->broadcast($user);
+
+        $this->info('Broadcast sent to: ' . $user->email);
+        $this->info('Done.');
+        return 0;
     }
 }
