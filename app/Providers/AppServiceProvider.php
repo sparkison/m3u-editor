@@ -19,7 +19,6 @@ use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Opcodes\LogViewer\Facades\LogViewer;
 use Filament\Support\Facades\FilamentView;
 use Filament\View\PanelsRenderHook;
@@ -30,6 +29,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecurityScheme;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
 
@@ -130,11 +130,13 @@ class AppServiceProvider extends ServiceProvider
             // Process playlist on creation
             Playlist::created(fn(Playlist $playlist) => event(new PlaylistCreated($playlist)));
             Playlist::creating(function (Playlist $playlist) {
-                $playlist->user_id = auth()->id();
+                if (!$playlist->user_id) {
+                    $playlist->user_id = auth()->id();
+                }
                 if (!$playlist->sync_interval) {
                     $playlist->sync_interval = '24 hours';
                 }
-                $playlist->uuid = \Illuminate\Support\Str::orderedUuid()->toString();
+                $playlist->uuid = Str::orderedUuid()->toString();
                 return $playlist;
             });
             Playlist::updating(function (Playlist $playlist) {
@@ -154,11 +156,13 @@ class AppServiceProvider extends ServiceProvider
             // Process epg on creation
             Epg::created(fn(Epg $epg) => event(new EpgCreated($epg)));
             Epg::creating(function (Epg $epg) {
-                $epg->user_id = auth()->id();
+                if (!$epg->user_id) {
+                    $epg->user_id = auth()->id();
+                }
                 if (!$epg->sync_interval) {
                     $epg->sync_interval = '24 hours';
                 }
-                $epg->uuid = \Illuminate\Support\Str::orderedUuid()->toString();
+                $epg->uuid = Str::orderedUuid()->toString();
                 return $epg;
             });
             Epg::updating(function (Epg $epg) {
@@ -178,16 +182,20 @@ class AppServiceProvider extends ServiceProvider
             // Merged playlist
             // MergedPlaylist::created(fn(MergedPlaylist $mergedPlaylist) => /* ... */);
             MergedPlaylist::creating(function (MergedPlaylist $mergedPlaylist) {
-                $mergedPlaylist->user_id = auth()->id();
-                $mergedPlaylist->uuid = \Illuminate\Support\Str::orderedUuid()->toString();
+                if (!$mergedPlaylist->user_id) {
+                    $mergedPlaylist->user_id = auth()->id();
+                }
+                $mergedPlaylist->uuid = Str::orderedUuid()->toString();
                 return $mergedPlaylist;
             });
 
             // Custom playlist
             // CustomPlaylist::created(fn(CustomPlaylist $customPlaylist) => /* ... */);
             CustomPlaylist::creating(function (CustomPlaylist $customPlaylist) {
-                $customPlaylist->user_id = auth()->id();
-                $customPlaylist->uuid = \Illuminate\Support\Str::orderedUuid()->toString();
+                if (!$customPlaylist->user_id) {
+                    $customPlaylist->user_id = auth()->id();
+                }
+                $customPlaylist->uuid = Str::orderedUuid()->toString();
                 return $customPlaylist;
             });
 
@@ -246,8 +254,8 @@ class AppServiceProvider extends ServiceProvider
         Scramble::configure()
             ->routes(function (Route $route) {
                 return Str::startsWith($route->uri, [
-                    'playlist/', 
-                    'epg/', 
+                    'playlist/',
+                    'epg/',
                     'user/'
                 ]);
             })

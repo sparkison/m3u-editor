@@ -200,6 +200,30 @@ class PlaylistResource extends Resource
                         ->icon('heroicon-o-arrow-top-right-on-square')
                         ->url(fn($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['hdhr'])
                         ->openUrlInNewTab(),
+                    Tables\Actions\Action::make('Duplicate')
+                        ->label('Duplicate')
+                        ->form([
+                            Forms\Components\TextInput::make('name')
+                                ->label('Playlist name')
+                                ->required()
+                                ->helperText('This will be the name of the duplicated playlist.'),
+                        ])
+                        ->action(function ($record, $data) {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new \App\Jobs\DuplicatePlaylist($record, $data['name']));
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Playlist is being duplicated')
+                                ->body('Playlist is being duplicated in the background. You will be notified on completion.')
+                                ->duration(3000)
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-document-duplicate')
+                        ->modalIcon('heroicon-o-document-duplicate')
+                        ->modalDescription('Duplicate playlist now?')
+                        ->modalSubmitActionLabel('Yes, duplicate now'),
                     Tables\Actions\Action::make('reset')
                         ->label('Reset status')
                         ->icon('heroicon-o-arrow-uturn-left')
@@ -221,7 +245,6 @@ class PlaylistResource extends Resource
                                 ->duration(3000)
                                 ->send();
                         })
-                        // ->disabled(fn($record): bool => ! $record->auto_sync)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-uturn-left')
                         ->modalIcon('heroicon-o-arrow-uturn-left')
