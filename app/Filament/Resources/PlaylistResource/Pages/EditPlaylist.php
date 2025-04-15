@@ -56,7 +56,7 @@ class EditPlaylist extends EditRecord
                 Actions\Action::make('Download M3U')
                     ->label('Download EPG')
                     ->icon('heroicon-o-arrow-down-tray')
-                    ->url(fn($record) => route('epg.generate', ['uuid' => $record->uuid]))
+                    ->url(fn($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['epg'])
                     ->openUrlInNewTab(),
                 Actions\Action::make('HDHomeRun URL')
                     ->label('HDHomeRun URL')

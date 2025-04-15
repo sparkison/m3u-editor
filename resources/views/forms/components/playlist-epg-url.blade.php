@@ -1,5 +1,6 @@
 <x-dynamic-component :component="$getFieldWrapperView()" :field="$field">
-    @php($epgUrl = route('epg.generate', ['uuid' => $getRecord()->uuid]))
+    @php($urls = \App\Facades\PlaylistUrlFacade::getUrls($getRecord()))
+    @php($epgUrl = $urls['epg'])
     <div x-data="{ state: $wire.$entangle('{{ $getStatePath() }}') }">
         <a href="{{ $epgUrl }}" target="_blank"
             class="underline flex items-center gap-1 text-primary-500 hover:text-primary-700 dark:hover:text-primary-300">

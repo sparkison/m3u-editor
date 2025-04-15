@@ -45,7 +45,7 @@
         <li>Select the tuner and click <strong>Continue</strong>.</li>
         <li>Choose your location and allow Plex to fetch channel guide data.</li>
         <ul>
-            <li>If you've added an EPG and mapped it to this playlist, you can also manually add the EPG address: <strong>{{ route('epg.generate', $playlist->uuid) }}</strong></li>
+            <li>If you've added an EPG and mapped it to this playlist, you can also manually add the EPG address: <strong>{{ \App\Facades\PlaylistUrlFacade::getUrls($playlist)['epg'] }}</strong></li>
         </ul>
         <li>Map available channels and finish setup.</li>
         <li>Once completed, you can access live TV and schedule recordings through Plex.</li>

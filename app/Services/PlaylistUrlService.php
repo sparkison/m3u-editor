@@ -24,9 +24,17 @@ class PlaylistUrlService
         }
 
         // Get the base URLs
-        $m3uUrl = route('playlist.generate', ['uuid' => $playlist->uuid]);
-        $hdhrUrl = route('playlist.hdhr.overview', ['uuid' => $playlist->uuid]);
-
+        if ($playlist->short_urls_enabled) {
+            $shortUrls = collect($playlist->short_urls)->keyBy('type');
+            $m3uUrl = $shortUrls->get('m3u')['short_url'];
+            $hdhrUrl = $shortUrls->get('hdhr')['short_url'];
+            $epgUrl = $shortUrls->get('epg')['short_url'];
+        } else {
+            $m3uUrl = route('playlist.generate', ['uuid' => $playlist->uuid]);
+            $hdhrUrl = route('playlist.hdhr.overview', ['uuid' => $playlist->uuid]);
+            $epgUrl = route('epg.generate', ['uuid' => $playlist->uuid]);
+        }
+        
         // If auth set, append auth parameters to the URLs
         if ($auth) {
             $m3uUrl .= $auth;
@@ -37,6 +45,7 @@ class PlaylistUrlService
         return [
             'm3u' => $m3uUrl,
             'hdhr' => $hdhrUrl,
+            'epg' => $epgUrl,
             'authEnabled' => $playlistAuth ? true : false,
         ];
     }

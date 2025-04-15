@@ -193,7 +193,7 @@ class PlaylistResource extends Resource
                     Tables\Actions\Action::make('Download M3U')
                         ->label('Download EPG')
                         ->icon('heroicon-o-arrow-down-tray')
-                        ->url(fn($record) => route('epg.generate', ['uuid' => $record->uuid]))
+                        ->url(fn($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['epg'])
                         ->openUrlInNewTab(),
                     Tables\Actions\Action::make('HDHomeRun URL')
                         ->label('HDHomeRun URL')
@@ -327,6 +327,12 @@ class PlaylistResource extends Resource
             Forms\Components\Section::make('Links')
                 ->description('These links are generated based on the current playlist configuration. Only enabled channels will be included.')
                 ->schema([
+                    Forms\Components\Toggle::make('short_urls_enabled')
+                        ->label('Use Short URLs')
+                        ->helperText('When enabled, short URLs will be used for the playlist links. Save changes to generate the short URLs (or remove them).')
+                        ->columnSpan(2)
+                        ->inline(false)
+                        ->default(false),
                     PlaylistM3uUrl::make('m3u_url')
                         ->columnSpan(2)
                         ->dehydrated(false), // don't save the value in the database

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\PlaylistChannelId;
 use App\Pivots\MergedPlaylistPivot;
+use App\Traits\ShortUrlTrait;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\MorphToMany;
 class MergedPlaylist extends Model
 {
     use HasFactory;
+    use ShortUrlTrait;
 
     /**
      * The attributes that should be cast to native types.
@@ -25,6 +27,8 @@ class MergedPlaylist extends Model
         'id' => 'integer',
         'user_id' => 'integer',
         'dummy_epg' => 'boolean',
+        'short_urls' => 'array',
+        'short_urls_enabled' => 'boolean',
         'id_channel_by' => PlaylistChannelId::class
     ];
 

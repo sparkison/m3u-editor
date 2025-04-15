@@ -1,6 +1,5 @@
 <?php
 
-//Don't forget to change the namespace!
 namespace App\Traits;
 
 use Cron\CronExpression;

@@ -10,6 +10,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "ashallendesign/short-url": "^8.3",
         "cerbero/json-parser": "^1.1",
         "dedoc/scramble": "^0.12.11",
         "dragonmantank/cron-expression": "^3.4",

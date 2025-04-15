@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Enums\PlaylistChannelId;
 use App\Enums\PlaylistStatus;
+use App\Traits\ShortUrlTrait;
+use AshAllenDesign\ShortURL\Models\ShortURL;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\MorphToMany;
 class Playlist extends Model
 {
     use HasFactory;
+    use ShortUrlTrait;
 
     /**
      * The attributes that should be cast to native types.
@@ -33,6 +36,8 @@ class Playlist extends Model
         'groups' => 'array',
         'xtream_config' => 'array',
         'xtream_status' => 'array',
+        'short_urls' => 'array',
+        'short_urls_enabled' => 'boolean',
         'status' => PlaylistStatus::class,
         'id_channel_by' => PlaylistChannelId::class
     ];

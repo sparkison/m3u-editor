@@ -32,6 +32,8 @@ use Dedoc\Scramble\Support\Generator\SecurityScheme;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
+use AshAllenDesign\ShortURL\Classes\Builder as ShortUrl;
+use AshAllenDesign\ShortURL\Models\ShortURL as ModelsShortURL;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -143,6 +145,9 @@ class AppServiceProvider extends ServiceProvider
                 if (!$playlist->sync_interval) {
                     $playlist->sync_interval = '24 hours';
                 }
+                if ($playlist->isDirty('short_urls_enabled')) {
+                    $playlist->generateShortUrl();
+                }
                 return $playlist;
             });
             Playlist::deleting(function (Playlist $playlist) {
@@ -189,6 +194,12 @@ class AppServiceProvider extends ServiceProvider
                 $mergedPlaylist->uuid = Str::orderedUuid()->toString();
                 return $mergedPlaylist;
             });
+            MergedPlaylist::updating(function (MergedPlaylist $mergedPlaylist) {
+                if ($mergedPlaylist->isDirty('short_urls_enabled')) {
+                    $mergedPlaylist->generateShortUrl();
+                }
+                return $mergedPlaylist;
+            });
 
             // Custom playlist
             // CustomPlaylist::created(fn(CustomPlaylist $customPlaylist) => /* ... */);
@@ -197,6 +208,12 @@ class AppServiceProvider extends ServiceProvider
                     $customPlaylist->user_id = auth()->id();
                 }
                 $customPlaylist->uuid = Str::orderedUuid()->toString();
+                return $customPlaylist;
+            });
+            CustomPlaylist::updating(function (CustomPlaylist $customPlaylist) {
+                if ($customPlaylist->isDirty('short_urls_enabled')) {
+                    $customPlaylist->generateShortUrl();
+                }
                 return $customPlaylist;
             });
 
