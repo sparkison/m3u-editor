@@ -57,6 +57,7 @@ class DuplicatePlaylist implements ShouldQueue
                 $newGroup->playlist_id = $newPlaylist->id;
                 $newGroup->created_at = now();
                 $newGroup->updated_at = now();
+                $newGroup->save();
 
                 // Copy the group channels
                 foreach ($group->channels()->get() as $channel) {
