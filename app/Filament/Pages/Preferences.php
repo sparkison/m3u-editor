@@ -60,7 +60,7 @@ class Preferences extends SettingsPage
                                     ->label('Message')
                                     ->required()
                                     ->default('Testing WebSocket connection')
-                                    ->helperText('This message will be sent to the WebSocket server, and displayed as a pop-up notification. If you do not see a notification shortly after sending, there is likely an issue with the WebSocket server configuration.'),
+                                    ->helperText('This message will be sent to the WebSocket server, and displayed as a pop-up notification. If you do not see a notification shortly after sending, there is likely an issue with your WebSocket server configuration.'),
                             ])
                             ->action(function (array $data): void {
                                 Notification::make()
