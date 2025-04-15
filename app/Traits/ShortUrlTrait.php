@@ -12,7 +12,6 @@ trait ShortUrlTrait
     /**
      * Generate a short URL.
      *
-     * @param  string  $url
      * @return Model
      */
     public function generateShortUrl(): Model
@@ -29,7 +28,7 @@ trait ShortUrlTrait
                 $short_urls[] = [
                     'id' => $short->id,
                     'type' => $type,
-                    'short_url' => $short->default_short_url,
+                    'key' => $short->url_key,
                 ];
             }
             $this->short_urls = $short_urls;
