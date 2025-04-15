@@ -33,6 +33,7 @@ class PlaylistAuth extends Model
     public function playlists(): HasMany
     {
         return $this->hasMany(PlaylistAuthPivot::class, 'playlist_auth_id')
-            ->where('authenticatable_type', '!=', null); // Ensure it's a morph relation
+            ->where('authenticatable_type', '!=', null) // Ensure it's a morph relation
+            ->whereHas('model');
     }
 }
