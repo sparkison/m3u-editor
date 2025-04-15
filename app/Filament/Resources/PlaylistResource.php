@@ -304,342 +304,360 @@ class PlaylistResource extends Resource
         ];
     }
 
-    public static function getForm(): array
+    public static function getFormSections(): array
     {
-        return [];
-    }
-
-    public static function getFormSteps(): array
-    {
-        return [
-            Forms\Components\Wizard\Step::make('Name')
+        // Define the form fields for each section
+        $nameFields = [
+            Forms\Components\TextInput::make('name')
+                ->helperText('Enter the name of the playlist. Internal use only.')
+                ->required(),
+            Forms\Components\Section::make('Manage Auth')
+                ->description('When an Auth is assigned, regular playlist routes will return a "401 Unauthorized" error unless username and password parameters are passed.')
+                ->collapsible()
+                ->collapsed(true)
                 ->schema([
-                    Forms\Components\TextInput::make('name')
-                        ->helperText('Enter the name of the playlist. Internal use only.')
-                        ->required(),
-                    Forms\Components\Section::make('Manage Auth')
-                        ->description('When an Auth is assigned, regular playlist routes will return a "401 Unauthorized" error unless username and password parameters are passed.')
-                        ->collapsible()
-                        ->collapsed(true)
-                        ->schema([
-                            Forms\Components\Select::make('auth')
-                                ->relationship('playlistAuths', 'playlist_auths.name')
-                                ->label('Assigned Auth(s)')
-                                ->multiple()
-                                ->searchable()
-                                ->preload()
-                                ->helperText('NOTE: only the first enabled auth will be used if multiple assigned.'),
-                        ])->hiddenOn(['create']),
-                    Forms\Components\Section::make('Links')
-                        ->description('These links are generated based on the current playlist configuration. Only enabled channels will be included.')
-                        ->schema([
-                            PlaylistM3uUrl::make('m3u_url')
-                                ->columnSpan(2)
-                                ->dehydrated(false), // don't save the value in the database
-                            PlaylistEpgUrl::make('epg_url')
-                                ->columnSpan(2)
-                                ->dehydrated(false) // don't save the value in the database
-                        ])->hiddenOn(['create']),
-                ]),
-
-            Forms\Components\Wizard\Step::make('Type')
-                ->description('m3u8, Xtream, or local file')
+                    Forms\Components\Select::make('auth')
+                        ->relationship('playlistAuths', 'playlist_auths.name')
+                        ->label('Assigned Auth(s)')
+                        ->multiple()
+                        ->searchable()
+                        ->preload()
+                        ->helperText('NOTE: only the first enabled auth will be used if multiple assigned.'),
+                ])->hiddenOn(['create']),
+            Forms\Components\Section::make('Links')
+                ->description('These links are generated based on the current playlist configuration. Only enabled channels will be included.')
                 ->schema([
-                    Forms\Components\Grid::make()
-                        ->columns(2)
-                        ->columnSpanFull()
-                        ->schema([
-                            Forms\Components\ToggleButtons::make('xtream')
-                                ->label('Playlist type')
-                                ->grouped()
-                                ->options([
-                                    false => 'm3u8 url or local file',
-                                    true => 'Xtream API',
-                                ])
-                                ->icons([
-                                    false => 'heroicon-s-link',
-                                    true => 'heroicon-s-bolt',
-                                ])
-                                ->default(false)
-                                ->live(),
+                    PlaylistM3uUrl::make('m3u_url')
+                        ->columnSpan(2)
+                        ->dehydrated(false), // don't save the value in the database
+                    PlaylistEpgUrl::make('epg_url')
+                        ->columnSpan(2)
+                        ->dehydrated(false) // don't save the value in the database
+                ])->hiddenOn(['create']),
+        ];
 
-                            Forms\Components\TextInput::make('xtream_config.url')
-                                ->label('Xtream API URL')
-                                ->helperText('Enter the full url, using <url>:<port> format - without trailing slash (/).')
-                                ->prefixIcon('heroicon-m-globe-alt')
-                                ->maxLength(255)
-                                ->url()
-                                ->columnSpan(2)
-                                ->required()
-                                ->hidden(fn(Get $get): bool => !$get('xtream')),
+        $typeFields = [
+            Forms\Components\Grid::make()
+                ->columns(2)
+                ->columnSpanFull()
+                ->schema([
+                    Forms\Components\ToggleButtons::make('xtream')
+                        ->label('Playlist type')
+                        ->grouped()
+                        ->options([
+                            false => 'm3u8 url or local file',
+                            true => 'Xtream API',
+                        ])
+                        ->icons([
+                            false => 'heroicon-s-link',
+                            true => 'heroicon-s-bolt',
+                        ])
+                        ->default(false)
+                        ->live(),
 
-                            Forms\Components\Grid::make()
-                                ->columns(3)
-                                ->columnSpanFull()
-                                ->schema([
-                                    Forms\Components\TextInput::make('xtream_config.username')
-                                        ->label('Xtream API Username')
-                                        ->required()
-                                        ->columnSpan(1),
-                                    Forms\Components\TextInput::make('xtream_config.password')
-                                        ->label('Xtream API Password')
-                                        ->required()
-                                        ->columnSpan(1)
-                                        ->password()
-                                        ->revealable(),
-                                    Forms\Components\Select::make('xtream_config.output')
-                                        ->label('Output')
-                                        ->required()
-                                        ->columnSpan(1)
-                                        ->options([
-                                            'ts' => 'MPEG-TS (.ts)',
-                                            'm3u8' => 'HLS (.m3u8)',
-                                        ])->default('ts'),
-                                    Forms\Components\CheckboxList::make('xtream_config.import_options')
-                                        ->label('Additional categories & streams to import')
-                                        ->columnSpan(3)
-                                        ->options([
-                                            'vod' => 'VOD',
-                                            //'series' => 'Series',
-                                        ])->helperText('NOTE: Live categories & streams will be included by default'),
-                                ])->hidden(fn(Get $get): bool => !$get('xtream')),
-
-                            Forms\Components\TextInput::make('url')
-                                ->label('URL or Local file path')
-                                ->columnSpan(2)
-                                ->prefixIcon('heroicon-m-globe-alt')
-                                ->helperText('Enter the URL of the playlist file. If this is a local file, you can enter a full or relative path. If changing URL, the playlist will be re-imported. Use with caution as this could lead to data loss if the new playlist differs from the old one.')
-                                ->requiredWithout('uploads')
-                                ->rules([new CheckIfUrlOrLocalPath()])
-                                ->maxLength(255)
-                                ->hidden(fn(Get $get): bool => !!$get('xtream')),
-                            Forms\Components\FileUpload::make('uploads')
-                                ->label('File')
-                                ->columnSpan(2)
-                                ->disk('local')
-                                ->directory('playlist')
-                                ->helperText('Upload the playlist file. This will be used to import groups and channels.')
-                                ->rules(['file'])
-                                ->requiredWithout('url')
-                                ->hidden(fn(Get $get): bool => !!$get('xtream')),
-                        ]),
+                    Forms\Components\TextInput::make('xtream_config.url')
+                        ->label('Xtream API URL')
+                        ->helperText('Enter the full url, using <url>:<port> format - without trailing slash (/).')
+                        ->prefixIcon('heroicon-m-globe-alt')
+                        ->maxLength(255)
+                        ->url()
+                        ->columnSpan(2)
+                        ->required()
+                        ->hidden(fn(Get $get): bool => !$get('xtream')),
 
                     Forms\Components\Grid::make()
                         ->columns(3)
                         ->columnSpanFull()
                         ->schema([
-                            Forms\Components\TextInput::make('user_agent')
-                                ->helperText('User agent string to use for fetching the playlist.')
-                                ->default('Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13')
-                                ->columnSpan(2)
-                                ->required(),
-                            Forms\Components\Toggle::make('disable_ssl_verification')
-                                ->label('Disable SSL verification')
-                                ->helperText('Only disable this if you are having issues.')
-                                ->columnSpan(1)
-                                ->inline(false)
-                                ->default(false),
-                        ])
-                ]),
-
-            Forms\Components\Wizard\Step::make('Scheduling')
-                ->description('automatic sync settings')
-                ->schema([
-                    Forms\Components\Grid::make()
-                        ->columns(2)
-                        ->columnSpanFull()
-                        ->schema([
-                            Forms\Components\Grid::make()
-                                ->columns(3)
-                                ->columnSpanFull()
-                                ->schema([
-                                    Forms\Components\Toggle::make('auto_sync')
-                                        ->label('Automatically sync playlist')
-                                        ->helperText('When enabled, the playlist will be automatically re-synced at the specified interval.')
-                                        ->live()
-                                        ->columnSpan(2)
-                                        ->inline(false)
-                                        ->default(true),
-                                    Forms\Components\Select::make('sync_interval')
-                                        ->label('Sync Every')
-                                        ->helperText('Default is every 24hr if left empty.')
-                                        ->columnSpan(1)
-                                        ->options([
-                                            '8 hours' => '8 hours',
-                                            '12 hours' => '12 hours',
-                                            '24 hours' => '24 hours',
-                                            '2 days' => '2 days',
-                                            '3 days' => '3 days',
-                                            '1 week' => '1 week',
-                                            '2 weeks' => '2 weeks',
-                                            '1 month' => '1 month',
-                                        ])->hidden(fn(Get $get): bool => !$get('auto_sync')),
-                                ]),
-
-                            Forms\Components\DateTimePicker::make('synced')
-                                ->columnSpan(2)
-                                ->suffix('UTC')
-                                ->native(false)
-                                ->label('Last Synced')
-                                ->hidden(fn(Get $get, string $operation): bool => !$get('auto_sync') || $operation === 'create')
-                                ->helperText('Playlist will be synced at the specified interval. Timestamp is automatically updated after each sync. Set to any time in the past (or future) and the next sync will run when the defined interval has passed since the time set.'),
-                        ])
-                ]),
-
-            Forms\Components\Wizard\Step::make('Processing')
-                ->schema([
-                    Forms\Components\Grid::make()
-                        ->columns(2)
-                        ->columnSpanFull()
-                        ->schema([
-                            Forms\Components\Toggle::make('import_prefs.preprocess')
-                                ->label('Preprocess playlist')
-                                ->columnSpan(1)
-                                ->live()
-                                ->inline(true)
-                                ->default(false)
-                                ->helperText('When enabled, the playlist will be preprocessed before importing. You can then select which groups you would like to import.'),
-                            Forms\Components\Toggle::make('enable_channels')
-                                ->label('Enable new channels')
-                                ->columnSpan(1)
-                                ->inline(true)
-                                ->default(false)
-                                ->helperText('When enabled, newly added channels will be enabled by default.'),
-                            Forms\Components\Toggle::make('import_prefs.use_regex')
-                                ->label('Use regex for filtering')
-                                ->columnSpan(2)
-                                ->inline(true)
-                                ->live()
-                                ->default(false)
-                                ->helperText('When enabled, groups will be included based on regex pattern match instead of prefix.')
-                                ->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
-                            Forms\Components\Select::make('import_prefs.selected_groups')
-                                ->label('Groups to import')
-                                ->columnSpan(1)
-                                ->searchable()
-                                ->multiple()
-                                ->helperText('NOTE: If the list is empty, sync the playlist and check again once complete.')
-                                ->options(function (Get $get): array {
-                                    $options = [];
-                                    foreach ($get('groups') ?? [] as $option) {
-                                        $options[$option] = $option;
-                                    }
-                                    return $options;
-                                })
-                                ->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
-                            Forms\Components\TagsInput::make('import_prefs.included_group_prefixes')
-                                ->label(fn(Get $get) => !$get('import_prefs.use_regex') ? 'Group prefixes to import' : 'Regex patterns to import')
-                                ->helperText('Press [tab] or [return] to add item.')
-                                ->columnSpan(1)
-                                ->suggestions([
-                                    'US -',
-                                    'UK -',
-                                    'CA -',
-                                    '^(US|UK|CA)',
-                                    'Sports.*HD$',
-                                    '\[.*\]'
-                                ])
-                                ->splitKeys(['Tab', 'Return', ','])
-                                ->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
-                            Forms\Components\TagsInput::make('import_prefs.ignored_file_types')
-                                ->label('Ignored file types')
-                                ->helperText('Press [tab] or [return] to add item. You can ignore certain file types from being imported (.e.g.: ".mkv", ".mp4", etc.) This is useful for ignoring VOD or other unwanted content.')
-                                ->columnSpan(2)
-                                ->suggestions([
-                                    '.avi',
-                                    '.mkv',
-                                    '.mp4',
-                                ])->splitKeys(['Tab', 'Return', ',', ' ']),
-                        ]),
-                ]),
-            Forms\Components\Wizard\Step::make('Output')
-                ->schema([
-                    Forms\Components\Section::make('Playlist Output')
-                        ->description('Determines how the playlist is output')
-                        ->columnSpanFull()
-                        ->collapsible()
-                        ->collapsed(true)
-                        ->columns(2)
-                        ->schema([
-                            Forms\Components\Toggle::make('auto_sort')
-                                ->label('Automatically assign sort number based on playlist order')
-                                ->columnSpan(1)
-                                ->inline(false)
-                                ->default(true)
-                                ->helperText('NOTE: You will need to re-sync your playlist, or wait for the next scheduled sync, if changing this. This will overwrite any existing channel sort order customization for this playlist.'),
-                            Forms\Components\Toggle::make('auto_channel_increment')
-                                ->label('Auto channel number increment')
-                                ->columnSpan(1)
-                                ->inline(false)
-                                ->live()
-                                ->default(false)
-                                ->helperText('If no channel number is set, output an automatically incrementing number.'),
-                            Forms\Components\TextInput::make('channel_start')
-                                ->helperText('The starting channel number.')
-                                ->columnSpan(1)
-                                ->rules(['min:1'])
-                                ->type('number')
-                                ->hidden(fn(Get $get): bool => !$get('auto_channel_increment'))
-                                ->required(),
-                        ]),
-                    Forms\Components\Section::make('EPG Output')
-                        ->description('EPG output options')
-                        ->columnSpanFull()
-                        ->collapsible()
-                        ->collapsed(true)
-                        ->columns(2)
-                        ->schema([
-                            Forms\Components\Toggle::make('dummy_epg')
-                                ->label('Enably dummy EPG')
-                                ->columnSpan(1)
-                                ->live()
-                                ->inline(false)
-                                ->default(false)
-                                ->helperText('When enabled, dummy EPG data will be generated for the next 5 days. Thus, it is possible to assign channels for which no EPG data is available. As program information, the channel name and the set program length are used.'),
-                            Forms\Components\Select::make('id_channel_by')
-                                ->label('Preferred TVG ID output')
-                                ->helperText('How you would like to ID your channels in the EPG.')
-                                ->options([
-                                    'stream_id' => 'TVG ID/Stream ID (default)',
-                                    'channel_id' => 'Channel Number',
-                                ])
+                            Forms\Components\TextInput::make('xtream_config.username')
+                                ->label('Xtream API Username')
                                 ->required()
-                                ->default('stream_id') // Default to stream_id
                                 ->columnSpan(1),
-                            Forms\Components\TextInput::make('dummy_epg_length')
-                                ->label('Dummy program length (in minutes)')
+                            Forms\Components\TextInput::make('xtream_config.password')
+                                ->label('Xtream API Password')
+                                ->required()
                                 ->columnSpan(1)
-                                ->rules(['min:1'])
-                                ->type('number')
-                                ->default(120)
-                                ->hidden(fn(Get $get): bool => !$get('dummy_epg'))
-                                ->required(),
-                        ]),
-                    Forms\Components\Section::make('Streaming Output')
-                        ->description('Output processing options')
+                                ->password()
+                                ->revealable(),
+                            Forms\Components\Select::make('xtream_config.output')
+                                ->label('Output')
+                                ->required()
+                                ->columnSpan(1)
+                                ->options([
+                                    'ts' => 'MPEG-TS (.ts)',
+                                    'm3u8' => 'HLS (.m3u8)',
+                                ])->default('ts'),
+                            Forms\Components\CheckboxList::make('xtream_config.import_options')
+                                ->label('Additional categories & streams to import')
+                                ->columnSpan(3)
+                                ->options([
+                                    'vod' => 'VOD',
+                                    //'series' => 'Series',
+                                ])->helperText('NOTE: Live categories & streams will be included by default'),
+                        ])->hidden(fn(Get $get): bool => !$get('xtream')),
+
+                    Forms\Components\TextInput::make('url')
+                        ->label('URL or Local file path')
+                        ->columnSpan(2)
+                        ->prefixIcon('heroicon-m-globe-alt')
+                        ->helperText('Enter the URL of the playlist file. If this is a local file, you can enter a full or relative path. If changing URL, the playlist will be re-imported. Use with caution as this could lead to data loss if the new playlist differs from the old one.')
+                        ->requiredWithout('uploads')
+                        ->rules([new CheckIfUrlOrLocalPath()])
+                        ->maxLength(255)
+                        ->hidden(fn(Get $get): bool => !!$get('xtream')),
+                    Forms\Components\FileUpload::make('uploads')
+                        ->label('File')
+                        ->columnSpan(2)
+                        ->disk('local')
+                        ->directory('playlist')
+                        ->helperText('Upload the playlist file. This will be used to import groups and channels.')
+                        ->rules(['file'])
+                        ->requiredWithout('url')
+                        ->hidden(fn(Get $get): bool => !!$get('xtream')),
+                ]),
+
+            Forms\Components\Grid::make()
+                ->columns(3)
+                ->columnSpanFull()
+                ->schema([
+                    Forms\Components\TextInput::make('user_agent')
+                        ->helperText('User agent string to use for fetching the playlist.')
+                        ->default('Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13')
+                        ->columnSpan(2)
+                        ->required(),
+                    Forms\Components\Toggle::make('disable_ssl_verification')
+                        ->label('Disable SSL verification')
+                        ->helperText('Only disable this if you are having issues.')
+                        ->columnSpan(1)
+                        ->inline(false)
+                        ->default(false),
+                ])
+        ];
+
+        $schedulingFields = [
+            Forms\Components\Grid::make()
+                ->columns(2)
+                ->columnSpanFull()
+                ->schema([
+                    Forms\Components\Grid::make()
+                        ->columns(3)
                         ->columnSpanFull()
-                        ->collapsible()
-                        ->collapsed(true)
-                        ->columns(2)
                         ->schema([
-                            Forms\Components\TextInput::make('streams')
-                                ->helperText('Number of streams available (currently used for HDHR service).')
-                                ->columnSpan(1)
-                                ->rules(['min:1'])
-                                ->type('number')
-                                ->default(1) // Default to 1 stream
-                                ->required(),
-                            Forms\Components\Toggle::make('enable_proxy')
-                                ->label('Enable Proxy')
-                                ->hint(fn(Get $get): string => $get('enable_proxy') ? 'Proxied' : 'Not proxied')
-                                ->hintIcon(fn(Get $get): string => !$get('enable_proxy') ? 'heroicon-m-lock-open' : 'heroicon-m-lock-closed')
-                                ->columnSpan(1)
+                            Forms\Components\Toggle::make('auto_sync')
+                                ->label('Automatically sync playlist')
+                                ->helperText('When enabled, the playlist will be automatically re-synced at the specified interval.')
                                 ->live()
+                                ->columnSpan(2)
                                 ->inline(false)
-                                ->default(false)
-                                ->helperText('When enabled, channel urls will be proxied through m3u editor and streamed via ffmpeg (m3u editor will act as your client, playing the channels directly and sending the content to your client).'),
+                                ->default(true),
+                            Forms\Components\Select::make('sync_interval')
+                                ->label('Sync Every')
+                                ->helperText('Default is every 24hr if left empty.')
+                                ->columnSpan(1)
+                                ->options([
+                                    '8 hours' => '8 hours',
+                                    '12 hours' => '12 hours',
+                                    '24 hours' => '24 hours',
+                                    '2 days' => '2 days',
+                                    '3 days' => '3 days',
+                                    '1 week' => '1 week',
+                                    '2 weeks' => '2 weeks',
+                                    '1 month' => '1 month',
+                                ])->hidden(fn(Get $get): bool => !$get('auto_sync')),
                         ]),
+
+                    Forms\Components\DateTimePicker::make('synced')
+                        ->columnSpan(2)
+                        ->suffix('UTC')
+                        ->native(false)
+                        ->label('Last Synced')
+                        ->hidden(fn(Get $get, string $operation): bool => !$get('auto_sync') || $operation === 'create')
+                        ->helperText('Playlist will be synced at the specified interval. Timestamp is automatically updated after each sync. Set to any time in the past (or future) and the next sync will run when the defined interval has passed since the time set.'),
+                ])
+        ];
+
+        $processingFields = [
+            Forms\Components\Grid::make()
+                ->columns(2)
+                ->columnSpanFull()
+                ->schema([
+                    Forms\Components\Toggle::make('import_prefs.preprocess')
+                        ->label('Preprocess playlist')
+                        ->columnSpan(1)
+                        ->live()
+                        ->inline(true)
+                        ->default(false)
+                        ->helperText('When enabled, the playlist will be preprocessed before importing. You can then select which groups you would like to import.'),
+                    Forms\Components\Toggle::make('enable_channels')
+                        ->label('Enable new channels')
+                        ->columnSpan(1)
+                        ->inline(true)
+                        ->default(false)
+                        ->helperText('When enabled, newly added channels will be enabled by default.'),
+                    Forms\Components\Toggle::make('import_prefs.use_regex')
+                        ->label('Use regex for filtering')
+                        ->columnSpan(2)
+                        ->inline(true)
+                        ->live()
+                        ->default(false)
+                        ->helperText('When enabled, groups will be included based on regex pattern match instead of prefix.')
+                        ->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
+                    Forms\Components\Select::make('import_prefs.selected_groups')
+                        ->label('Groups to import')
+                        ->columnSpan(1)
+                        ->searchable()
+                        ->multiple()
+                        ->helperText('NOTE: If the list is empty, sync the playlist and check again once complete.')
+                        ->options(function (Get $get): array {
+                            $options = [];
+                            foreach ($get('groups') ?? [] as $option) {
+                                $options[$option] = $option;
+                            }
+                            return $options;
+                        })
+                        ->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
+                    Forms\Components\TagsInput::make('import_prefs.included_group_prefixes')
+                        ->label(fn(Get $get) => !$get('import_prefs.use_regex') ? 'Group prefixes to import' : 'Regex patterns to import')
+                        ->helperText('Press [tab] or [return] to add item.')
+                        ->columnSpan(1)
+                        ->suggestions([
+                            'US -',
+                            'UK -',
+                            'CA -',
+                            '^(US|UK|CA)',
+                            'Sports.*HD$',
+                            '\[.*\]'
+                        ])
+                        ->splitKeys(['Tab', 'Return', ','])
+                        ->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
+                    Forms\Components\TagsInput::make('import_prefs.ignored_file_types')
+                        ->label('Ignored file types')
+                        ->helperText('Press [tab] or [return] to add item. You can ignore certain file types from being imported (.e.g.: ".mkv", ".mp4", etc.) This is useful for ignoring VOD or other unwanted content.')
+                        ->columnSpan(2)
+                        ->suggestions([
+                            '.avi',
+                            '.mkv',
+                            '.mp4',
+                        ])->splitKeys(['Tab', 'Return', ',', ' ']),
                 ]),
         ];
+
+        $outputFields = [
+            Forms\Components\Section::make('Playlist Output')
+                ->description('Determines how the playlist is output')
+                ->columnSpanFull()
+                ->collapsible()
+                ->collapsed(true)
+                ->columns(2)
+                ->schema([
+                    Forms\Components\Toggle::make('auto_sort')
+                        ->label('Automatically assign sort number based on playlist order')
+                        ->columnSpan(1)
+                        ->inline(false)
+                        ->default(true)
+                        ->helperText('NOTE: You will need to re-sync your playlist, or wait for the next scheduled sync, if changing this. This will overwrite any existing channel sort order customization for this playlist.'),
+                    Forms\Components\Toggle::make('auto_channel_increment')
+                        ->label('Auto channel number increment')
+                        ->columnSpan(1)
+                        ->inline(false)
+                        ->live()
+                        ->default(false)
+                        ->helperText('If no channel number is set, output an automatically incrementing number.'),
+                    Forms\Components\TextInput::make('channel_start')
+                        ->helperText('The starting channel number.')
+                        ->columnSpan(1)
+                        ->rules(['min:1'])
+                        ->type('number')
+                        ->hidden(fn(Get $get): bool => !$get('auto_channel_increment'))
+                        ->required(),
+                ]),
+            Forms\Components\Section::make('EPG Output')
+                ->description('EPG output options')
+                ->columnSpanFull()
+                ->collapsible()
+                ->collapsed(true)
+                ->columns(2)
+                ->schema([
+                    Forms\Components\Toggle::make('dummy_epg')
+                        ->label('Enably dummy EPG')
+                        ->columnSpan(1)
+                        ->live()
+                        ->inline(false)
+                        ->default(false)
+                        ->helperText('When enabled, dummy EPG data will be generated for the next 5 days. Thus, it is possible to assign channels for which no EPG data is available. As program information, the channel name and the set program length are used.'),
+                    Forms\Components\Select::make('id_channel_by')
+                        ->label('Preferred TVG ID output')
+                        ->helperText('How you would like to ID your channels in the EPG.')
+                        ->options([
+                            'stream_id' => 'TVG ID/Stream ID (default)',
+                            'channel_id' => 'Channel Number',
+                        ])
+                        ->required()
+                        ->default('stream_id') // Default to stream_id
+                        ->columnSpan(1),
+                    Forms\Components\TextInput::make('dummy_epg_length')
+                        ->label('Dummy program length (in minutes)')
+                        ->columnSpan(1)
+                        ->rules(['min:1'])
+                        ->type('number')
+                        ->default(120)
+                        ->hidden(fn(Get $get): bool => !$get('dummy_epg'))
+                        ->required(),
+                ]),
+            Forms\Components\Section::make('Streaming Output')
+                ->description('Output processing options')
+                ->columnSpanFull()
+                ->collapsible()
+                ->collapsed(true)
+                ->columns(2)
+                ->schema([
+                    Forms\Components\TextInput::make('streams')
+                        ->helperText('Number of streams available (currently used for HDHR service).')
+                        ->columnSpan(1)
+                        ->rules(['min:1'])
+                        ->type('number')
+                        ->default(1) // Default to 1 stream
+                        ->required(),
+                    Forms\Components\Toggle::make('enable_proxy')
+                        ->label('Enable Proxy')
+                        ->hint(fn(Get $get): string => $get('enable_proxy') ? 'Proxied' : 'Not proxied')
+                        ->hintIcon(fn(Get $get): string => !$get('enable_proxy') ? 'heroicon-m-lock-open' : 'heroicon-m-lock-closed')
+                        ->columnSpan(1)
+                        ->live()
+                        ->inline(false)
+                        ->default(false)
+                        ->helperText('When enabled, channel urls will be proxied through m3u editor and streamed via ffmpeg (m3u editor will act as your client, playing the channels directly and sending the content to your client).'),
+                ]),
+        ];
+
+        // Return sections and fields
+        return [
+            'Name' => $nameFields,
+            'Type' => $typeFields,
+            'Scheduling' => $schedulingFields,
+            'Processing' => $processingFields,
+            'Output' => $outputFields,
+        ];
+    }
+
+    public static function getForm(): array
+    {
+        $sections = [];
+        foreach (self::getFormSections() as $section => $fields) {
+            $sections[] = Forms\Components\Section::make($section)
+                ->schema($fields);
+        }
+        return $sections;
+        return [];
+    }
+
+    public static function getFormSteps(): array
+    {
+        $wizard = [];
+        foreach (self::getFormSections() as $step => $fields) {
+            $wizard[] = Forms\Components\Wizard\Step::make($step)
+                ->schema($fields);
+        }
+        return $wizard;
     }
 }

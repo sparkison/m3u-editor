@@ -150,6 +150,7 @@ class AppServiceProvider extends ServiceProvider
                 if ($playlist->uploads && Storage::disk('local')->exists($playlist->uploads)) {
                     Storage::disk('local')->delete($playlist->uploads);
                 }
+                $playlist->playlistAuths()->detach();
                 return $playlist;
             });
 
