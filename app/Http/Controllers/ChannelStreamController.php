@@ -6,6 +6,7 @@ use Exception;
 use App\Models\Channel;
 use App\Settings\GeneralSettings;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Process\Process as SymphonyProcess;
 
@@ -31,14 +32,14 @@ class ChannelStreamController extends Controller
             $id .= '=='; // right pad to ensure proper decoding
         }
         $channel = Channel::findOrFail(base64_decode($id));
-
         $title = $channel->title_custom ?? $channel->title;
         $title = strip_tags($title);
 
+        // Setup streams array
         $streamUrls = [
-            $channel->url_custom ?? $channel->url,
-            // Fallback to the custom URL if available (not yet implemented)
-            // ...
+            $channel->url_custom ?? $channel->url
+            // leave this here for future use...
+            // @TODO: implement ability to assign fallback channels
         ];
 
         // Get user preferences
@@ -58,31 +59,40 @@ class ChannelStreamController extends Controller
             // Ignore
         }
         return new StreamedResponse(function () use ($streamUrls, $title, $settings) {
-            if (ob_get_level() > 0) {
-                flush();
+            while (ob_get_level()) {
+                ob_end_flush();
             }
+            flush();
 
             // Disable output buffering to ensure real-time streaming
             ini_set('zlib.output_compression', 0);
 
+            // Get user agent
+            $userAgent = $settings['ffmpeg_user_agent'];
+
             // Loop through available streams...
             foreach ($streamUrls as $streamUrl) {
                 // Setup FFmpeg command
-                $userAgent = $settings['ffmpeg_user_agent'];
-                $ffmpegLogPath = storage_path('logs/ffmpeg.log');
-                $cmd = "ffmpeg -re -i \"$streamUrl\" -c copy -f mpegts pipe:1 -user_agent \"$userAgent\" -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5";
+                $cmd = "ffmpeg -i \"$streamUrl\" -c copy -f mpegts -mpegts_flags +resend_headers+latm pipe:1 "
+                    . "-user_agent \"$userAgent\" -referer \"MyComputer\" -noautorotate "
+                    . "-fflags +nobuffer+discardcorruptts -flags low_delay -probesize 32 -analyzeduration 0 "
+                    // HW acceleration only works with Intel QuickSync (requires `/dev/dri` be mapped to the container)
+                    // Not using for now until we know if it's needed...
+                    // . "-init_hw_device qsv=dev1:hw_any,child_device=/dev/dri/renderD128 -filter_hw_device dev1 "
+                    . "-multiple_requests 1 -reconnect_on_network_error 1 -reconnect_on_http_error 5xx,4xx "
+                    . "-reconnect_streamed 1 -reconnect_delay_max 8 -use_wallclock_as_timestamps 1";
+
                 if (!$settings['ffmpeg_debug']) {
-                    // Log only errors and hide stats
                     $cmd .= " -hide_banner -nostats -loglevel error";
                 }
-                $cmd .= " 2> $ffmpegLogPath";
 
                 // Continue trying until the client disconnects, or max retries are reached
                 $maxRetries = $settings['ffmpeg_max_tries'];
                 $retries = 0;
                 while (!connection_aborted()) {
                     $process = SymphonyProcess::fromShellCommandline($cmd);
-                    $process->setTimeout(null); // Make sure not to timeout prematurely
+                    $process->setTimeout(0);
+                    $process->setIdleTimeout(0);
                     try {
                         $process->run(function ($type, $buffer) {
                             if (connection_aborted()) {
@@ -93,11 +103,15 @@ class ChannelStreamController extends Controller
                                 flush();
                                 usleep(10000); // Reduce CPU usage
                             }
+                            if ($type === SymphonyProcess::ERR) {
+                                Log::channel('ffmpeg')->error($buffer);
+                            }
                         });
                     } catch (\Exception $e) {
                         // Log eror and attempt to reconnect.
                         if (!connection_aborted()) {
-                            error_log("FFmpeg error - \"$title\": " . $e->getMessage());
+                            Log::channel('ffmpeg')
+                                ->error("Error streaming channel (\"$title\"): " . $e->getMessage());
                         }
                     }
                     // If we get here, the process ended.
@@ -105,9 +119,11 @@ class ChannelStreamController extends Controller
                         return;
                     }
                     if (++$retries >= $maxRetries) {
-                        error_log("FFmpeg error: max retries of $maxRetries reached for stream for channel $title.");
-                        // Stop the process and break out of the loop
-                        $process->stop();
+                        // Log error and stop trying this stream...
+                        Log::channel('ffmpeg')
+                            ->error("FFmpeg error: max retries of $maxRetries reached for stream for channel $title.");
+
+                        // ...break and try the next stream
                         break;
                     }
                     // Wait a short period before trying to reconnect.
@@ -120,6 +136,7 @@ class ChannelStreamController extends Controller
             'Content-Type' => 'video/mp2t',
             'Connection' => 'keep-alive',
             'Cache-Control' => 'no-store, no-transform',
+            'Content-Disposition' => "inline; filename=\"stream.ts\"",
             'X-Accel-Buffering' => 'no',
         ]);
     }
