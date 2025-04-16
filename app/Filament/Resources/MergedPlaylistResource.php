@@ -6,6 +6,7 @@ use App\Filament\Resources\MergedPlaylistResource\Pages;
 use App\Filament\Resources\MergedPlaylistResource\RelationManagers;
 use App\Forms\Components\PlaylistEpgUrl;
 use App\Forms\Components\PlaylistM3uUrl;
+use App\Forms\Components\MediaFlowProxyUrl;
 use App\Models\MergedPlaylist;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -175,6 +176,35 @@ class MergedPlaylistResource extends Resource
                         ->dehydrated(false) // don't save the value in the database
                 ])->hiddenOn(['create']),
         ];
+        if (PlaylistUrlFacade::mediaFlowProxyEnabled()) {
+            $schema[] = Forms\Components\Section::make('MediaFlow Proxy')
+                ->description('Your MediaFlow Proxy generated links – to disable clear the MediaFlow Proxy values from the app Settings page.')
+                ->collapsible()
+                ->collapsed(true)
+                ->headerActions([
+                    Forms\Components\Actions\Action::make('mfproxy_git')
+                        ->label('GitHub')
+                        ->icon('heroicon-o-arrow-top-right-on-square')
+                        ->iconPosition('after')
+                        ->color('gray')
+                        ->size('sm')
+                        ->url('https://github.com/mhdzumair/mediaflow-proxy')
+                        ->openUrlInNewTab(true),
+                    Forms\Components\Actions\Action::make('mfproxy_docs')
+                        ->label('Docs')
+                        ->icon('heroicon-o-arrow-top-right-on-square')
+                        ->iconPosition('after')
+                        ->size('sm')
+                        ->url(fn($record) => PlaylistUrlFacade::getMediaFlowProxyServerUrl($record) . '/docs')
+                        ->openUrlInNewTab(true),
+                ])
+                ->schema([
+                    MediaFlowProxyUrl::make('mediaflow_proxy_url')
+                        ->label('Proxied M3U URL')
+                        ->columnSpan(2)
+                        ->dehydrated(false) // don't save the value in the database
+                ]);
+        }
         return [
             Forms\Components\Grid::make()
                 ->hiddenOn(['edit']) // hide this field on the edit form
