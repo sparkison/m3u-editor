@@ -97,7 +97,7 @@ class ChannelStreamController extends Controller
                     } catch (\Exception $e) {
                         // Log eror and attempt to reconnect.
                         if (!connection_aborted()) {
-                            error_log("FFmpeg error: " . $e->getMessage());
+                            error_log("FFmpeg error - \"$title\": " . $e->getMessage());
                         }
                     }
                     // If we get here, the process ended.
