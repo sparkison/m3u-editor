@@ -376,7 +376,7 @@ class PlaylistResource extends Resource
                         ->label('Proxied M3U URL')
                         ->columnSpan(2)
                         ->dehydrated(false) // don't save the value in the database
-                ]);
+                ])->hiddenOn(['create']);
         }
 
         $typeFields = [
