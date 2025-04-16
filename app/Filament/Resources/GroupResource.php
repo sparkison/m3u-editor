@@ -32,6 +32,12 @@ class GroupResource extends Resource
         return ['name', 'name_internal'];
     }
 
+    public static function getGlobalSearchEloquentQuery(): Builder
+    {
+        return parent::getGlobalSearchEloquentQuery()
+            ->where('user_id', auth()->id());
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-queue-list';
 
     protected static ?string $navigationGroup = 'Playlist';

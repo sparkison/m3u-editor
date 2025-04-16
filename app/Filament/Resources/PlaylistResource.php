@@ -22,6 +22,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
+use App\Facades\PlaylistUrlFacade;
+use App\Forms\Components\MediaFlowProxyUrl;
 
 class PlaylistResource extends Resource
 {
@@ -188,17 +190,17 @@ class PlaylistResource extends Resource
                     Tables\Actions\Action::make('Download M3U')
                         ->label('Download M3U')
                         ->icon('heroicon-o-arrow-down-tray')
-                        ->url(fn($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['m3u'])
+                        ->url(fn($record) => PlaylistUrlFacade::getUrls($record)['m3u'])
                         ->openUrlInNewTab(),
                     Tables\Actions\Action::make('Download M3U')
                         ->label('Download EPG')
                         ->icon('heroicon-o-arrow-down-tray')
-                        ->url(fn($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['epg'])
+                        ->url(fn($record) => PlaylistUrlFacade::getUrls($record)['epg'])
                         ->openUrlInNewTab(),
                     Tables\Actions\Action::make('HDHomeRun URL')
                         ->label('HDHomeRun URL')
                         ->icon('heroicon-o-arrow-top-right-on-square')
-                        ->url(fn($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['hdhr'])
+                        ->url(fn($record) => PlaylistUrlFacade::getUrls($record)['hdhr'])
                         ->openUrlInNewTab(),
                     Tables\Actions\Action::make('Duplicate')
                         ->label('Duplicate')
@@ -326,6 +328,8 @@ class PlaylistResource extends Resource
                 ])->hiddenOn(['create']),
             Forms\Components\Section::make('Links')
                 ->description('These links are generated based on the current playlist configuration. Only enabled channels will be included.')
+                ->collapsible()
+                ->collapsed(false)
                 ->schema([
                     Forms\Components\Toggle::make('short_urls_enabled')
                         ->label('Use Short URLs')
@@ -334,13 +338,46 @@ class PlaylistResource extends Resource
                         ->inline(false)
                         ->default(false),
                     PlaylistM3uUrl::make('m3u_url')
+                        ->label('M3U URL')
                         ->columnSpan(2)
                         ->dehydrated(false), // don't save the value in the database
                     PlaylistEpgUrl::make('epg_url')
+                        ->label('EPG URL')
                         ->columnSpan(2)
                         ->dehydrated(false) // don't save the value in the database
                 ])->hiddenOn(['create']),
         ];
+
+        // See if MediaFlow Proxy is set up
+        if (PlaylistUrlFacade::mediaFlowProxyEnabled()) {
+            $nameFields[] = Forms\Components\Section::make('MediaFlow Proxy')
+                ->description('Your MediaFlow Proxy generated links – to disable clear the MediaFlow Proxy values from the app Settings page.')
+                ->collapsible()
+                ->collapsed(true)
+                ->headerActions([
+                    Forms\Components\Actions\Action::make('mfproxy_git')
+                        ->label('GitHub')
+                        ->icon('heroicon-o-arrow-top-right-on-square')
+                        ->iconPosition('after')
+                        ->color('gray')
+                        ->size('sm')
+                        ->url('https://github.com/mhdzumair/mediaflow-proxy')
+                        ->openUrlInNewTab(true),
+                    Forms\Components\Actions\Action::make('mfproxy_docs')
+                        ->label('Docs')
+                        ->icon('heroicon-o-arrow-top-right-on-square')
+                        ->iconPosition('after')
+                        ->size('sm')
+                        ->url(fn ($record) => PlaylistUrlFacade::getMediaFlowProxyServerUrl($record) . '/docs')
+                        ->openUrlInNewTab(true),
+                ])
+                ->schema([
+                    MediaFlowProxyUrl::make('mediaflow_proxy_url')
+                        ->label('Proxied M3U URL')
+                        ->columnSpan(2)
+                        ->dehydrated(false) // don't save the value in the database
+                ]);
+        }
 
         $typeFields = [
             Forms\Components\Grid::make()

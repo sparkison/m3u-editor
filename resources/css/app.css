@@ -1,7 +1,4 @@
-/*@tailwind base;*/
-/*@tailwind components;*/
-/*@tailwind utilities;*/
-/*@tailwind variants;*/
+@import '../../vendor/filament/filament/resources/css/theme.css';
 
 @import "./components/widgets.css";
 @import "./components/footer.css";

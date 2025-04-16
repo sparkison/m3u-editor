@@ -24,6 +24,12 @@ class EpgChannelResource extends Resource
         return ['name', 'display_name'];
     }
 
+    public static function getGlobalSearchEloquentQuery(): Builder
+    {
+        return parent::getGlobalSearchEloquentQuery()
+            ->where('user_id', auth()->id());
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-photo';
 
     protected static ?string $label = 'Channels';

@@ -36,7 +36,7 @@ class CopyPlaylist implements ShouldQueue
         foreach ($this->playlists as $playlistId) {
             $copy = Playlist::find($playlistId);
             if ($copy) {
-                $this->copyPlaylistToPlaylist($copy);
+                $copied = $this->copyPlaylistToPlaylist($copy);
             } else {
                 $this->failed[] = $playlistId;
                 Notification::make()
@@ -60,6 +60,12 @@ class CopyPlaylist implements ShouldQueue
             ->sendToDatabase($playlist->user);
     }
 
+    /**
+     * Copy the playlist to the given playlist.
+     * 
+     * @param Playlist $copy
+     * @return boolean
+     */
     private function copyPlaylistToPlaylist(Playlist $copy)
     {
         // Get the base playlist
@@ -70,8 +76,10 @@ class CopyPlaylist implements ShouldQueue
             // ...
 
             $this->copied[] = $copy->name;
+            return true;
         } catch (\Exception $e) {
             // ...
         }
+        return false;
     }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Exception;
 use App\Models\Channel;
+use App\Settings\GeneralSettings;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Process\Process as SymphonyProcess;
@@ -40,7 +41,23 @@ class ChannelStreamController extends Controller
             // ...
         ];
 
-        return new StreamedResponse(function () use ($streamUrls, $title) {
+        // Get user preferences
+        $userPreferences = app(GeneralSettings::class);
+        $settings = [
+            'ffmpeg_debug' => false,
+            'ffmpeg_max_tries' => 3,
+            'ffmpeg_user_agent' => 'VLC/3.0.21 LibVLC/3.0.21',
+        ];
+        try {
+            $settings = [
+                'ffmpeg_debug' => $userPreferences->ffmpeg_debug ?? $settings['ffmpeg_debug'],
+                'ffmpeg_max_tries' => $userPreferences->ffmpeg_max_tries ?? $settings['ffmpeg_max_tries'],
+                'ffmpeg_user_agent' => $userPreferences->ffmpeg_user_agent ?? $settings['ffmpeg_user_agent'],
+            ];
+        } catch (Exception $e) {
+            // Ignore
+        }
+        return new StreamedResponse(function () use ($streamUrls, $title, $settings) {
             if (ob_get_level() > 0) {
                 flush();
             }
@@ -51,10 +68,10 @@ class ChannelStreamController extends Controller
             // Loop through available streams...
             foreach ($streamUrls as $streamUrl) {
                 // Setup FFmpeg command
-                $userAgent = config('dev.ffmpeg.user_agent');
-                $ffmpegLogPath = storage_path('logs/' . config('dev.ffmpeg.file'));
+                $userAgent = $settings['ffmpeg_user_agent'];
+                $ffmpegLogPath = storage_path('logs/ffmpeg.log');
                 $cmd = "ffmpeg -re -i \"$streamUrl\" -c copy -f mpegts pipe:1 -user_agent \"$userAgent\" -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5";
-                if (config('dev.ffmpeg.debug')) {
+                if ($settings['ffmpeg_debug']) {
                     // Log everything
                     $cmd .= " 2> " . $ffmpegLogPath;
                 } else {
@@ -63,7 +80,7 @@ class ChannelStreamController extends Controller
                 }
 
                 // Continue trying until the client disconnects, or max retries are reached
-                $maxRetries = config('dev.ffmpeg.max_retries');
+                $maxRetries = $settings['ffmpeg_max_tries'];
                 $retries = 0;
                 while (!connection_aborted()) {
                     $process = SymphonyProcess::fromShellCommandline($cmd);

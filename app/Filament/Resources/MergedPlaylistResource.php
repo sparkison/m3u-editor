@@ -15,6 +15,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use App\Facades\PlaylistUrlFacade;
 
 class MergedPlaylistResource extends Resource
 {
@@ -25,6 +26,12 @@ class MergedPlaylistResource extends Resource
     public static function getGloballySearchableAttributes(): array
     {
         return ['name'];
+    }
+
+    public static function getGlobalSearchEloquentQuery(): Builder
+    {
+        return parent::getGlobalSearchEloquentQuery()
+            ->where('user_id', auth()->id());
     }
 
     protected static ?string $navigationIcon = 'heroicon-o-forward';
@@ -89,17 +96,17 @@ class MergedPlaylistResource extends Resource
                     Tables\Actions\Action::make('Download M3U')
                         ->label('Download M3U')
                         ->icon('heroicon-o-arrow-down-tray')
-                        ->url(fn($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['m3u'])
+                        ->url(fn($record) => PlaylistUrlFacade::getUrls($record)['m3u'])
                         ->openUrlInNewTab(),
                     Tables\Actions\Action::make('Download M3U')
                         ->label('Download EPG')
                         ->icon('heroicon-o-arrow-down-tray')
-                        ->url(fn($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['epg'])
+                        ->url(fn($record) => PlaylistUrlFacade::getUrls($record)['epg'])
                         ->openUrlInNewTab(),
                     Tables\Actions\Action::make('HDHomeRun URL')
                         ->label('HDHomeRun Url')
                         ->icon('heroicon-o-arrow-top-right-on-square')
-                        ->url(fn($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['hdhr'])
+                        ->url(fn($record) => PlaylistUrlFacade::getUrls($record)['hdhr'])
                         ->openUrlInNewTab(),
                     Tables\Actions\DeleteAction::make(),
                 ])->button()->hiddenLabel()
@@ -149,6 +156,8 @@ class MergedPlaylistResource extends Resource
                 ])->hiddenOn(['create']),
             Forms\Components\Section::make('Links')
                 ->description('These links are generated based on the current playlist configuration. Only enabled channels will be included.')
+                ->collapsible()
+                ->collapsed(false)
                 ->schema([
                     Forms\Components\Toggle::make('short_urls_enabled')
                         ->label('Use Short URLs')
@@ -157,9 +166,11 @@ class MergedPlaylistResource extends Resource
                         ->inline(false)
                         ->default(false),
                     PlaylistM3uUrl::make('m3u_url')
+                        ->label('M3U URL')
                         ->columnSpan(2)
                         ->dehydrated(false), // don't save the value in the database
                     PlaylistEpgUrl::make('epg_url')
+                        ->label('EPG URL')
                         ->columnSpan(2)
                         ->dehydrated(false) // don't save the value in the database
                 ])->hiddenOn(['create']),

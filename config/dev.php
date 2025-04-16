@@ -13,12 +13,6 @@ return [
         // Default admin email
         'admin@test.com'
     ],
-    'ffmpeg' => [
-        'debug' => env('FFMPEG_DEBUG', false),
-        'file' => 'ffmpeg.log', // env('FFMPEG_DEBUG_FILE', 'ffmpeg.log'),
-        'user_agent' => env('FFMPEG_USER_AGENT', 'VLC/3.0.21 LibVLC/3.0.21'),
-        'max_retries' => env('FFMPEG_MAX_RETRIES', 3),
-    ],
     'tvgid' => [
         'regex' => env('TVGID_REGEX', '/[^a-zA-Z0-9_\-\.]/'),
     ],

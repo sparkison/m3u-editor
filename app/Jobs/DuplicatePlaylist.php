@@ -35,7 +35,7 @@ class DuplicatePlaylist implements ShouldQueue
             $playlist = $this->playlist;
 
             // Create a new playlist
-            $newPlaylist = $playlist->replicate([
+            $newPlaylist = $playlist->replicate(except: [
                 'id',
                 'name',
                 'uuid',
@@ -50,7 +50,7 @@ class DuplicatePlaylist implements ShouldQueue
 
             // Copy the groups
             foreach ($playlist->groups()->get() as $group) {
-                $newGroup = $group->replicate([
+                $newGroup = $group->replicate(except: [
                     'id',
                     'playlist_id',
                 ]);
@@ -61,7 +61,7 @@ class DuplicatePlaylist implements ShouldQueue
 
                 // Copy the group channels
                 foreach ($group->channels()->get() as $channel) {
-                    $newChannel = $channel->replicate([
+                    $newChannel = $channel->replicate(except: [
                         'id',
                         'group_id',
                         'playlist_id',
@@ -76,7 +76,7 @@ class DuplicatePlaylist implements ShouldQueue
 
             // Attach the auth to this playlist
             foreach ($playlist->playlistAuths()->get() as $auth) {
-                $newPlaylist->playlistAuths()->attach($auth->id);
+                $newPlaylist->playlistAuths()->syncWithoutDetaching($auth->id);
             }
 
             // @TODO: Copy the uploaded file
