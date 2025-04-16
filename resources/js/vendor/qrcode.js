@@ -1,14 +1,16 @@
-import QRCode from 'easyqrcodejs'
+import QRCode from 'easyqrcodejs';
 
-// Wait for the DOM to be fully loaded before initializing QR codes
-document.addEventListener('DOMContentLoaded', function () {
-    const qrEls = document.querySelectorAll('.qr-code')
-    if (!qrEls.length) return
+function generateQRCodes() {
+    const qrEls = document.querySelectorAll('.qr-code');
     qrEls.forEach((el) => {
-        const text = el.getAttribute('data-text')
-        const size = el.getAttribute('data-size') || 128
-        const color = el.getAttribute('data-color') || '#ffffff'
-        const bgColor = el.getAttribute('data-bg-color') || '#000000'
+        // Clear any existing QR code to prevent duplication
+        el.innerHTML = '';
+
+        const text = el.getAttribute('data-text');
+        const size = parseInt(el.getAttribute('data-size')) || 128;
+        const color = el.getAttribute('data-color') || '#ffffff';
+        const bgColor = el.getAttribute('data-bg-color') || '#000000';
+
         new QRCode(el, {
             text,
             logo: '/logo.png',
@@ -16,7 +18,13 @@ document.addEventListener('DOMContentLoaded', function () {
             height: size,
             colorDark: bgColor,
             colorLight: color,
-            logoBackgroundTransparent: false
-        })
-    })
-})
+            logoBackgroundTransparent: false,
+        });
+    });
+}
+
+// Run on initial page load
+document.addEventListener('DOMContentLoaded', generateQRCodes);
+
+// Run after Livewire SPA navigation
+document.addEventListener('livewire:navigated', generateQRCodes);
