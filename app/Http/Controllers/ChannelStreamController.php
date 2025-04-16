@@ -71,13 +71,11 @@ class ChannelStreamController extends Controller
                 $userAgent = $settings['ffmpeg_user_agent'];
                 $ffmpegLogPath = storage_path('logs/ffmpeg.log');
                 $cmd = "ffmpeg -re -i \"$streamUrl\" -c copy -f mpegts pipe:1 -user_agent \"$userAgent\" -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5";
-                if ($settings['ffmpeg_debug']) {
-                    // Log everything
-                    $cmd .= " 2> " . $ffmpegLogPath;
-                } else {
+                if (!$settings['ffmpeg_debug']) {
                     // Log only errors and hide stats
-                    $cmd .= " -hide_banner -nostats -loglevel error 2> " . $ffmpegLogPath;
+                    $cmd .= " -hide_banner -nostats -loglevel error";
                 }
+                $cmd .= " 2> $ffmpegLogPath";
 
                 // Continue trying until the client disconnects, or max retries are reached
                 $maxRetries = $settings['ffmpeg_max_tries'];
