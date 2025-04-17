@@ -16,6 +16,7 @@ class ListCustomPlaylists extends ListRecords
     {
         return [
             Actions\CreateAction::make()
+                ->slideOver()
                 ->successRedirectUrl(fn($record): string => EditCustomPlaylist::getUrl(['record' => $record])),
         ];
     }

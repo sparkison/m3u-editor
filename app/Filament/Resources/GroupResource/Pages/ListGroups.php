@@ -29,7 +29,7 @@ class ListGroups extends ListRecords
                         ->success()
                         ->title('Group created')
                         ->body('You can now assign channels to this group from the Channels section.'),
-                )
+                )->slideOver()
         ];
     }
 

@@ -126,7 +126,7 @@ class EpgResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ActionGroup::make([
-                    Tables\Actions\EditAction::make(),
+                    Tables\Actions\EditAction::make()->slideOver(),
                     Tables\Actions\Action::make('process')
                         ->label('Process')
                         ->icon('heroicon-o-arrow-path')

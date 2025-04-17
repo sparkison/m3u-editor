@@ -242,7 +242,8 @@ class ChannelResource extends Resource
             ->actions([
                 Tables\Actions\EditAction::make()
                     ->button()
-                    ->hiddenLabel(),
+                    ->hiddenLabel()
+                    ->slideOver(),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

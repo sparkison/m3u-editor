@@ -14,6 +14,7 @@ class ListMergedPlaylists extends ListRecords
     {
         return [
             Actions\CreateAction::make()
+                ->slideOver()
                 ->successRedirectUrl(fn($record): string => EditMergedPlaylist::getUrl(['record' => $record])),
 
         ];
