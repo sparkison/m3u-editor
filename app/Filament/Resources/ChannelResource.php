@@ -542,9 +542,7 @@ class ChannelResource extends Resource
             // Customizable channel fields
             Forms\Components\Toggle::make('enabled')
                 ->columnSpan('full')
-                ->helperText('Toggle channel status')
-                ->inline(false)
-                ->required(),
+                ->helperText('Toggle channel status'),
             Forms\Components\Fieldset::make('General Settings')
                 ->schema([
                     Forms\Components\TextInput::make('title_custom')

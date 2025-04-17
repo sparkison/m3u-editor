@@ -13,7 +13,7 @@ class DisableMfa extends Command
      *
      * @var string
      */
-    protected $signature = 'app:disable-mfa {username}';
+    protected $signature = 'app:disable-mfa';
 
     /**
      * The console command description.
@@ -27,9 +27,18 @@ class DisableMfa extends Command
      */
     public function handle()
     {
-        $name = $this->argument('username');
-        $this->info("🔓 Disabling multi-factor authentication for \"$name\" ...");
-        $user = User::where('name', $name)->first();
+        $users = User::get(['id', 'email']);
+        if ($users->isEmpty()) {
+            $this->info('No users found.');
+            return false;
+        }
+        if ($users->count() === 1) {
+            $user = $users->first();
+        } else {
+            $user = $this->choice('Select a user to disable MFA for:', $users->pluck('email')->toArray());
+            $user = $users->where('email', $user)->firstOrFail();
+        }
+        $this->info("🔓 Disabling multi-factor authentication for \"$users->name\" ...");
         if ($user) {
             DB::table('breezy_sessions')->where([
                 ['authenticatable_id', $user->id],

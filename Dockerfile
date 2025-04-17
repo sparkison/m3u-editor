@@ -105,6 +105,10 @@ RUN git config --global --add safe.directory /var/www/html
 # Install composer dependencies
 RUN composer install --no-dev --no-interaction --no-progress -o
 
+# Create alias for `php artisan` command
+RUN echo -e '#!/bin/bash\n php artisan app:"$@"' > /usr/bin/m3ue && \
+    chmod +x /usr/bin/m3ue
+
 # Setup user, group and permissions
 RUN addgroup $WWWGROUP \
     && adduser -h /var/www/html -s /bin/bash -G $WWWGROUP -D $WWWUSER
