@@ -368,7 +368,7 @@ class PlaylistResource extends Resource
                         ->icon('heroicon-o-arrow-top-right-on-square')
                         ->iconPosition('after')
                         ->size('sm')
-                        ->url(fn ($record) => PlaylistUrlFacade::getMediaFlowProxyServerUrl($record) . '/docs')
+                        ->url(fn($record) => PlaylistUrlFacade::getMediaFlowProxyServerUrl($record) . '/docs')
                         ->openUrlInNewTab(true),
                 ])
                 ->schema([
@@ -409,34 +409,43 @@ class PlaylistResource extends Resource
                         ->hidden(fn(Get $get): bool => !$get('xtream')),
 
                     Forms\Components\Grid::make()
-                        ->columns(3)
                         ->columnSpanFull()
                         ->schema([
-                            Forms\Components\TextInput::make('xtream_config.username')
-                                ->label('Xtream API Username')
-                                ->required()
-                                ->columnSpan(1),
-                            Forms\Components\TextInput::make('xtream_config.password')
-                                ->label('Xtream API Password')
-                                ->required()
-                                ->columnSpan(1)
-                                ->password()
-                                ->revealable(),
-                            Forms\Components\Select::make('xtream_config.output')
-                                ->label('Output')
-                                ->required()
-                                ->columnSpan(1)
-                                ->options([
-                                    'ts' => 'MPEG-TS (.ts)',
-                                    'm3u8' => 'HLS (.m3u8)',
-                                ])->default('ts'),
-                            Forms\Components\CheckboxList::make('xtream_config.import_options')
-                                ->label('Additional categories & streams to import')
-                                ->columnSpan(3)
-                                ->options([
-                                    'vod' => 'VOD',
-                                    //'series' => 'Series',
-                                ])->helperText('NOTE: Live categories & streams will be included by default'),
+                            Forms\Components\Fieldset::make('Config')
+                                ->columns(3)
+                                ->schema([
+                                    Forms\Components\TextInput::make('xtream_config.username')
+                                        ->label('Xtream API Username')
+                                        ->required()
+                                        ->columnSpan(1),
+                                    Forms\Components\TextInput::make('xtream_config.password')
+                                        ->label('Xtream API Password')
+                                        ->required()
+                                        ->columnSpan(1)
+                                        ->password()
+                                        ->revealable(),
+                                    Forms\Components\Select::make('xtream_config.output')
+                                        ->label('Output')
+                                        ->required()
+                                        ->columnSpan(1)
+                                        ->options([
+                                            'ts' => 'MPEG-TS (.ts)',
+                                            'm3u8' => 'HLS (.m3u8)',
+                                        ])->default('ts'),
+                                    Forms\Components\CheckboxList::make('xtream_config.import_options')
+                                        ->label('Additional categories & streams to import')
+                                        ->columnSpan(2)
+                                        ->options([
+                                            'vod' => 'VOD',
+                                            //'series' => 'Series',
+                                        ])->helperText('NOTE: Live categories & streams will be included by default'),
+                                    Forms\Components\Toggle::make('xtream_config.import_epg')
+                                        ->label('Import EPG')
+                                        ->helperText('If your provider supports EPG, you can import it automatically.')
+                                        ->columnSpan(1)
+                                        ->inline(false)
+                                        ->default(true)
+                                ]),
                         ])->hidden(fn(Get $get): bool => !$get('xtream')),
 
                     Forms\Components\TextInput::make('url')

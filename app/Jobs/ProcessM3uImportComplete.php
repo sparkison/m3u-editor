@@ -99,6 +99,55 @@ class ProcessM3uImportComplete implements ShouldQueue
             $importPrefs = $playlist->import_prefs;
         }
 
+        // Check if creating EPG
+        $createEpg = $playlist->xtream
+            ? ($playlist->xtream_config['import_epg'] ?? false)
+            : null;
+        if ($createEpg) {
+            // Configure the EPG url
+            $baseUrl = str($playlist->xtream_config['url'])->replace(' ', '%20')->toString();
+            $username = urlencode($playlist->xtream_config['username']);
+            $password = $playlist->xtream_config['password'];
+            $epgUrl = "$baseUrl/xmltv.php?username=$username&password=$password";
+
+            // Make sure EPG doesn't already exist
+            $epg = $user->epgs()->where('url', $epgUrl)->first();
+            if (!$epg) {
+                $headers = @get_headers($epgUrl);
+                if (strpos($headers[0], '200') !== false) {
+                    // EPG found, create it
+                    $epg = $user->epgs()->create([
+                        'name' => $playlist->name . ' EPG',
+                        'url' => $epgUrl,
+                        'user_id' => $user->id,
+                    ]);
+                    $msg = "\"{$playlist->name}\" EPG was created and is syncing now.";
+                    Notification::make()
+                        ->success()
+                        ->title('EPG found for Playlist')
+                        ->body($msg)
+                        ->broadcast($playlist->user);
+                    Notification::make()
+                        ->success()
+                        ->title('EPG found for Playlist')
+                        ->body($msg)
+                        ->sendToDatabase($playlist->user);
+                } else {
+                    $msg = "\"{$playlist->name}\" EPG not found. Playlist was configured to auto-download EPG but no EPG was found using at the following url: \"$epgUrl\"";
+                    Notification::make()
+                        ->warning()
+                        ->title('No EPG found for Playlist')
+                        ->body($msg)
+                        ->broadcast($playlist->user);
+                    Notification::make()
+                        ->warning()
+                        ->title('No EPG found for Playlist')
+                        ->body($msg)
+                        ->sendToDatabase($playlist->user);
+                }
+            }
+        }
+
         // Update the playlist
         $playlist->update([
             'status' => PlaylistStatus::Completed,

@@ -342,11 +342,12 @@ class ProcessM3uImport implements ShouldQueue
                         if ($this->preprocess && !$this->shouldIncludeChannel($category['category_name'] ?? '')) {
                             continue;
                         }
+                        $extension = $item['container_extension'] ?? "mp4";
                         $channel = [
                             ...$channelFields,
                             'title' => $item['name'],
                             'name' => $item['name'],
-                            'url' => "$vodBaseUrl/{$item['stream_id']}." . $item['container_extension'] ?? "mp4",
+                            'url' => "$vodBaseUrl/{$item['stream_id']}." . $extension,
                             'logo' => $item['stream_icon'],
                             'group' => $category['category_name'] ?? '',
                             'group_internal' => $category['category_name'] ?? '',

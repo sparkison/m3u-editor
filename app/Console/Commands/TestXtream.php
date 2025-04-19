@@ -88,11 +88,12 @@ class TestXtream extends Command implements PromptsForMissingInput
                 $streamBaseUrl = "$baseUrl/$type/$user/$password";
                 LazyCollection::make($typeStreams)->each(function ($item) use ($streamBaseUrl, $categories, $channelFields) {
                     $category = $categories->firstWhere('category_id', $item['category_id']);
+                    $extension = $item['container_extension'] ?? "ts";
                     $channel = [
                         ...$channelFields,
                         'title' => $item['name'],
                         'name' => $item['name'],
-                        'url' => "$streamBaseUrl/{$item['stream_id']}." . $item['container_extension'] ?? "ts",
+                        'url' => "$streamBaseUrl/{$item['stream_id']}." . $extension,
                         'logo' => $item['stream_icon'],
                         'group' => $category['category_name'] ?? '',
                         'group_internal' => $category['category_name'] ?? '',
