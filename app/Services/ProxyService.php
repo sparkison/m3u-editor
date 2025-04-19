@@ -7,7 +7,7 @@ class ProxyService
     /**
      * Get the proxy URL for a channel
      *
-     * @param string $id
+     * @param string|int $id
      * @return string
      */
     public function getProxyUrlForChannel($id)
