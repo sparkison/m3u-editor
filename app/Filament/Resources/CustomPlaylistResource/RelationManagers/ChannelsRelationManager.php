@@ -108,14 +108,14 @@ class ChannelsRelationManager extends RelationManager
                     ->tooltip('Shift')
                     ->toggleable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('group')
-                    ->label('Default Group')
-                    ->toggleable()
-                    ->searchable()
-                    ->sortable(),
                 SpatieTagsColumn::make('tags')
                     ->label('Playlist Group')
                     ->type($ownerRecord->uuid)
+                    ->toggleable()
+                    ->searchable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('group')
+                    ->label('Default Group')
                     ->toggleable()
                     ->searchable()
                     ->sortable(),
