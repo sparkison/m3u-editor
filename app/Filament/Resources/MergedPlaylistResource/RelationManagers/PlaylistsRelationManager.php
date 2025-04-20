@@ -64,11 +64,14 @@ class PlaylistsRelationManager extends RelationManager
                 // ]),
             ])
             ->actions([
-                Tables\Actions\DetachAction::make(),
-            ])
+                Tables\Actions\DetachAction::make()
+                    ->icon('heroicon-o-x-circle')
+                    ->button()
+                    ->hiddenLabel(),
+            ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DetachBulkAction::make(),
+                    Tables\Actions\DetachBulkAction::make()->color('warning'),
                 ]),
             ]);
     }
