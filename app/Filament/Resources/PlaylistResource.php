@@ -637,7 +637,7 @@ class PlaylistResource extends Resource
                         ->live()
                         ->inline(false)
                         ->default(false)
-                        ->helperText('When enabled, dummy EPG data will be generated for the next 5 days. Thus, it is possible to assign channels for which no EPG data is available. As program information, the channel name and the set program length are used.'),
+                        ->helperText('When enabled, dummy EPG data will be generated for the next 5 days. Thus, it is possible to assign channels for which no EPG data is available. As program information, the channel title and the set program length are used.'),
                     Forms\Components\Select::make('id_channel_by')
                         ->label('Preferred TVG ID output')
                         ->helperText('How you would like to ID your channels in the EPG.')
