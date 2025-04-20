@@ -17,7 +17,6 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use App\Facades\PlaylistUrlFacade;
-use Filament\Forms\Components\SpatieTagsInput;
 
 class CustomPlaylistResource extends Resource
 {
@@ -129,6 +128,7 @@ class CustomPlaylistResource extends Resource
     {
         return [
             RelationManagers\ChannelsRelationManager::class,
+            RelationManagers\TagsRelationManager::class,
         ];
     }
 
@@ -164,7 +164,7 @@ class CustomPlaylistResource extends Resource
             Forms\Components\Section::make('Links')
                 ->description('These links are generated based on the current playlist configuration. Only enabled channels will be included.')
                 ->collapsible()
-                ->collapsed(false)
+                ->collapsed(true)
                 ->schema([
                     Forms\Components\Toggle::make('short_urls_enabled')
                         ->label('Use Short URLs')
@@ -311,16 +311,6 @@ class CustomPlaylistResource extends Resource
                     Forms\Components\Tabs\Tab::make('Output')
                         ->columns(2)
                         ->schema($outputScheme),
-                    Forms\Components\Tabs\Tab::make('Groups')
-                        ->columns(2)
-                        ->schema([
-                            SpatieTagsInput::make('tags')
-                                ->label('Groups')
-                                ->placeholder('Enter a group name')
-                                ->reorderable()
-                                ->type(fn($record): string => $record->uuid)
-                                ->splitKeys(['Tab', 'Return', ',', ' ']),
-                        ]),
                 ]),
         ];
     }

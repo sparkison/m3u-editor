@@ -158,7 +158,7 @@ class MergedPlaylistResource extends Resource
             Forms\Components\Section::make('Links')
                 ->description('These links are generated based on the current playlist configuration. Only enabled channels will be included.')
                 ->collapsible()
-                ->collapsed(false)
+                ->collapsed(true)
                 ->schema([
                     Forms\Components\Toggle::make('short_urls_enabled')
                         ->label('Use Short URLs')
