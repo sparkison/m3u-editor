@@ -73,8 +73,8 @@ class ProcessesRelationManager extends RelationManager
 
                 // @TODO: Add a select for the type of Event
 
-                Forms\Components\TextInput::make('playlist_auth_id')
-                    ->label('Playlist Auth ID')
+                Forms\Components\TextInput::make('post_process_id')
+                    ->label('Post Process ID')
                     ->default($this->ownerRecord->id)
                     ->hidden()
             ]);

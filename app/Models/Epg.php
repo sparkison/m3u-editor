@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Str;
 
 class Epg extends Model
@@ -50,5 +51,10 @@ class Epg extends Model
     public function epgMaps(): HasMany
     {
         return $this->hasMany(EpgMap::class);
+    }
+
+    public function postProcesses(): MorphToMany
+    {
+        return $this->morphToMany(PostProcess::class, 'processable');
     }
 }

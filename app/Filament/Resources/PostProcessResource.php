@@ -138,28 +138,29 @@ class PostProcessResource extends Resource
                 ->label('Webhook URL or Local file path')
                 ->columnSpan(2)
                 ->prefixIcon('heroicon-m-globe-alt')
+                ->placeholder(route('webhook.test.get'))
                 ->helperText('Enter the URL or process to call. If this is a local file, you can enter a full or relative path.')
                 ->required()
                 ->rules([new CheckIfUrlOrLocalPath()])
                 ->maxLength(255),
-            Forms\Components\ToggleButtons::make('metadata.get')
-                ->label('Request type')
-                ->grouped()
-                ->options([
-                    false => 'GET',
-                    true => 'POST',
-                ])
-                ->default(false)
-                ->live()
-                ->helperText('Only used when calling a URL. If using a local script, you can safely ignore this option.'),
-            Forms\Components\CheckboxList::make('metadata.post_attributes')
-                ->label('Post attributes')
-                ->options([
-                    'name' => 'Name',
-                    'uuid' => 'UUID',
-                    'url' => 'URL',
-                ])
-                ->hidden(fn(Get $get): bool => !$get('metadata.get')),
+            Forms\Components\Fieldset::make('Request Options')
+                ->schema([
+                    Forms\Components\ToggleButtons::make('metadata.get')
+                        ->label('Request type')
+                        ->grouped()
+                        ->options([
+                            false => 'GET',
+                            true => 'POST',
+                        ])
+                        ->default(false),
+                    Forms\Components\CheckboxList::make('metadata.post_attributes')
+                        ->label('Attributes')
+                        ->options([
+                            'name' => 'Name',
+                            'uuid' => 'UUID',
+                            'url' => 'URL',
+                        ])->helperText('If calling webhook URL, these attributes will be sent as GET or POST data. If using a local script, you can safely ignore this option.')
+                ]),
         ];
         return [
             Forms\Components\Grid::make()

@@ -86,4 +86,9 @@ class Playlist extends Model
     {
         return $this->morphToMany(PlaylistAuth::class, 'authenticatable');
     }
+
+    public function postProcesses(): MorphToMany
+    {
+        return $this->morphToMany(PostProcess::class, 'processable');
+    }
 }
