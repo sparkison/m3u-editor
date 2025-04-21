@@ -104,6 +104,7 @@ class PostProcessResource extends Resource
     {
         return [
             RelationManagers\ProcessesRelationManager::class,
+            RelationManagers\LogsRelationManager::class,
         ];
     }
 

@@ -16,6 +16,8 @@ return new class extends Migration
         Schema::create('post_process_logs', function (Blueprint $table) {
             $table->id();
             $table->foreignId('post_process_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
+            $table->string('name');
+            $table->string('type');
             $table->string('status');
             $table->string('message')->nullable();
             $table->timestamps();
