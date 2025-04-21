@@ -5,8 +5,10 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\PostProcessResource\Pages;
 use App\Filament\Resources\PostProcessResource\RelationManagers;
 use App\Models\PostProcess;
+use App\Rules\CheckIfUrlOrLocalPath;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -33,7 +35,7 @@ class PostProcessResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-o-rocket-launch';
 
     protected static ?string $label = 'Post Process';
-    protected static ?string $pluralLabel = 'Post Process';
+    protected static ?string $pluralLabel = 'Post Processing';
 
     protected static ?string $navigationGroup = 'Playlist';
 
@@ -52,19 +54,26 @@ class PostProcessResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextInputColumn::make('name')
+                // Tables\Columns\TextInputColumn::make('name')
+                //     ->label('Name')
+                //     ->rules(['min:0', 'max:255'])
+                //     ->required()
+                //     ->searchable()
+                //     ->toggleable(),
+                Tables\Columns\TextColumn::make('name')
                     ->label('Name')
-                    ->rules(['min:0', 'max:255'])
-                    ->tooltip('Channel name')
-                    ->placeholder(fn($record) => $record->name)
                     ->searchable()
                     ->toggleable(),
                 Tables\Columns\ToggleColumn::make('enabled')
                     ->toggleable()
-                    ->tooltip('Toggle channel status')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('event')
                     ->searchable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('processes_count')
+                    ->label('Items')
+                    ->counts('processes')
+                    ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
@@ -94,7 +103,7 @@ class PostProcessResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            RelationManagers\ProcessesRelationManager::class,
         ];
     }
 
@@ -109,14 +118,57 @@ class PostProcessResource extends Resource
 
     public static function getForm(): array
     {
-        return [
+        $schema = [
+            Forms\Components\Toggle::make('enabled')
+                ->default(true)
+                ->columnSpanFull(),
             Forms\Components\TextInput::make('name')
                 ->required()
                 ->maxLength(255),
-            Forms\Components\Toggle::make('enabled')
-                ->inline(false)
-                ->default(true)
-                ->required(),
+            Forms\Components\Select::make('event')
+                ->required()
+                ->options([
+                    'synced' => 'Synced',
+                    'created' => 'Created',
+                    'updated' => 'Updated',
+                    'deleted' => 'Deleted',
+                ]),
+            Forms\Components\TextInput::make('metadata.path')
+                ->label('Webhook URL or Local file path')
+                ->columnSpan(2)
+                ->prefixIcon('heroicon-m-globe-alt')
+                ->helperText('Enter the URL or process to call. If this is a local file, you can enter a full or relative path.')
+                ->required()
+                ->rules([new CheckIfUrlOrLocalPath()])
+                ->maxLength(255),
+            Forms\Components\ToggleButtons::make('metadata.get')
+                ->label('Request type')
+                ->grouped()
+                ->options([
+                    false => 'GET',
+                    true => 'POST',
+                ])
+                ->default(false)
+                ->live()
+                ->helperText('Only used when calling a URL. If using a local script, you can safely ignore this option.'),
+            Forms\Components\CheckboxList::make('metadata.post_attributes')
+                ->label('Post attributes')
+                ->options([
+                    'name' => 'Name',
+                    'uuid' => 'UUID',
+                    'url' => 'URL',
+                ])
+                ->hidden(fn(Get $get): bool => !$get('metadata.get')),
+        ];
+        return [
+            Forms\Components\Grid::make()
+                ->hiddenOn(['edit']) // hide this field on the edit form
+                ->schema($schema)
+                ->columns(2),
+            Forms\Components\Section::make('Post Process')
+                ->hiddenOn(['create']) // hide this field on the create form
+                ->schema($schema)
+                ->columns(2),
         ];
     }
 }

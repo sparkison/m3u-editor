@@ -13,6 +13,8 @@ class ListPostProcesses extends ListRecords
 {
     protected static string $resource = PostProcessResource::class;
 
+    protected ?string $subheading = 'Call webhooks or run local scripts after specific item events.';
+
     protected function getHeaderActions(): array
     {
         return [
@@ -22,6 +24,7 @@ class ListPostProcesses extends ListRecords
                     $data['user_id'] = auth()->id();
                     return $model::create($data);
                 })
+                ->slideOver()
                 ->successNotification(
                     Notification::make()
                         ->success()

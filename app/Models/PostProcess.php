@@ -32,7 +32,12 @@ class PostProcess extends Model
     public function processes(): HasMany
     {
         return $this->hasMany(PostProcessPivot::class, 'post_process_id')
-            ->where('authenticatable_type', '!=', null) // Ensure it's a morph relation
+            ->where('processable_type', '!=', null) // Ensure it's a morph relation
             ->whereHas('model');
+    }
+
+    public function logs(): HasMany
+    {
+        return $this->hasMany(PostProcessLog::class);
     }
 }
