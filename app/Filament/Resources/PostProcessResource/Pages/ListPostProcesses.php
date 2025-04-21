@@ -1,23 +1,22 @@
 <?php
 
-namespace App\Filament\Resources\PlaylistAuthResource\Pages;
+namespace App\Filament\Resources\PostProcessResource\Pages;
 
-use App\Filament\Resources\PlaylistAuthResource;
+use App\Filament\Resources\PostProcessResource;
 use Filament\Actions;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
-class ListPlaylistAuths extends ListRecords
+class ListPostProcesses extends ListRecords
 {
-    protected static string $resource = PlaylistAuthResource::class;
-
-    protected ?string $subheading = 'Create credentials and assign them to your Playlist for simple authentication.';
+    protected static string $resource = PostProcessResource::class;
 
     protected function getHeaderActions(): array
     {
         return [
+            // Actions\CreateAction::make(),
             Actions\CreateAction::make()
                 ->using(function (array $data, string $model): Model {
                     $data['user_id'] = auth()->id();
@@ -26,9 +25,10 @@ class ListPlaylistAuths extends ListRecords
                 ->successNotification(
                     Notification::make()
                         ->success()
-                        ->title('Playlist Auth created')
-                        ->body('You can now assign Playlists to this Auth.'),
-                )->successRedirectUrl(fn($record): string => EditPlaylistAuth::getUrl(['record' => $record])),
+                        ->title('Post Process created')
+                        ->body('You can now assign Playlists or EPGs.'),
+                )->successRedirectUrl(fn($record): string => EditPostProcess::getUrl(['record' => $record])),
+
         ];
     }
 
