@@ -33,7 +33,7 @@ class RestoreBackup implements ShouldQueue
             // Restore the selected backup
             Artisan::call('backup:restore', [
                 '--backup' => $this->backupPath,
-                //'--reset' => true, // reset DB before restore?
+                '--reset' => true, // reset DB before restore?
                 '--no-interaction' => true,
             ]);
 
