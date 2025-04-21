@@ -2,13 +2,13 @@
 
 namespace App\Models;
 
-use App\Pivots\PlaylistAuthPivot;
+use App\Pivots\PostProcessPivot;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class PlaylistAuth extends Model
+class PostProcess extends Model
 {
     use HasFactory;
 
@@ -21,6 +21,7 @@ class PlaylistAuth extends Model
         'id' => 'integer',
         'enabled' => 'boolean',
         'user_id' => 'integer',
+        'metadata' => 'array',
     ];
 
     public function user(): BelongsTo
@@ -28,9 +29,9 @@ class PlaylistAuth extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function playlists(): HasMany
+    public function processes(): HasMany
     {
-        return $this->hasMany(PlaylistAuthPivot::class, 'playlist_auth_id')
+        return $this->hasMany(PostProcessPivot::class, 'post_process_id')
             ->where('authenticatable_type', '!=', null) // Ensure it's a morph relation
             ->whereHas('model');
     }

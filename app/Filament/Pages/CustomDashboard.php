@@ -9,7 +9,7 @@ use Filament\Notifications\Notification;
 
 class CustomDashboard extends Dashboard
 {
-    protected static ?string $navigationIcon = 'heroicon-o-rocket-launch';
+    protected static ?string $navigationIcon = 'heroicon-o-tv';
 
     protected function getActions(): array
     {

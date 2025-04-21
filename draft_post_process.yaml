@@ -1,9 +1,9 @@
 models:
-  PlaylistAuth:
+  PostProcess:
     name: string
     enabled: boolean default:true
     user_id: id foreign:users
-    username: string
-    password: string
+    event: string
+    metadata: json
     relationships:
       belongsTo: User
