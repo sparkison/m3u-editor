@@ -163,6 +163,6 @@ class ProcessM3uImportComplete implements ShouldQueue
         ]);
 
         // Fire the playlist synced event
-        event(new SyncCompleted(playlist: $playlist));
+        event(new SyncCompleted($playlist));
     }
 }

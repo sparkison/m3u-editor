@@ -86,6 +86,6 @@ class ProcessEpgImportComplete implements ShouldQueue
         });
 
         // Fire the epg synced event
-        event(new SyncCompleted(epg: $epg));
+        event(new SyncCompleted($epg));
     }
 }

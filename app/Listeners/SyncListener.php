@@ -16,20 +16,20 @@ class SyncListener implements ShouldQueue
      */
     public function handle(SyncCompleted $event): void
     {
-        if ($event->playlist) {
-            $event->playlist->postProcesses()->where([
+        if ($event->model instanceof \App\Models\Playlist) {
+            $event->model->postProcesses()->where([
                 ['type', 'synced'],
                 ['enabled', true],
             ])->get()->each(function ($postProcess) use ($event) {
-                dispatch(new RunPostProcess($postProcess, $event->playlist));
+                dispatch(new RunPostProcess($postProcess, $event->model));
             });
         }
-        if ($event->epg) {
-            $event->epg->postProcesses()->where([
+        if ($event->model instanceof \App\Models\Epg) {
+            $event->model->postProcesses()->where([
                 ['type', 'synced'],
                 ['enabled', true],
             ])->get()->each(function ($postProcess) use ($event) {
-                dispatch(new RunPostProcess($postProcess, $event->epg));
+                dispatch(new RunPostProcess($postProcess, $event->model));
             });
         }
     }
