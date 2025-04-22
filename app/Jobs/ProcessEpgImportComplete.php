@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Enums\EpgStatus;
+use App\Events\SyncCompleted;
 use App\Models\EpgChannel;
 use App\Models\Job;
 use App\Models\User;
@@ -25,8 +26,7 @@ class ProcessEpgImportComplete implements ShouldQueue
         public int    $epgId,
         public string $batchNo,
         public Carbon $start,
-    )
-    {
+    ) {
         //
     }
 
@@ -85,5 +85,7 @@ class ProcessEpgImportComplete implements ShouldQueue
             ));
         });
 
+        // Fire the epg synced event
+        event(new SyncCompleted(epg: $epg));
     }
 }

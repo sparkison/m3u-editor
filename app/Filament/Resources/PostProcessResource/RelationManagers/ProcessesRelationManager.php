@@ -35,8 +35,6 @@ class ProcessesRelationManager extends RelationManager
                     ->helperText('The type of item to assign this post process to.')
                     ->options([
                         Playlist::class => 'Playlist',
-                        CustomPlaylist::class => 'Custom Playlist',
-                        MergedPlaylist::class => 'Merged Playlist',
                         Epg::class => 'EPG',
                     ])
                     ->default(Playlist::class) // Default to Playlists if no type is selected
@@ -48,20 +46,6 @@ class ProcessesRelationManager extends RelationManager
                     ->helperText('Select the Playlist you would like to assign this post process to.')
                     ->options(Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
                     ->hidden(fn($get) => $get('processable_type') !== Playlist::class)
-                    ->searchable(),
-                Forms\Components\Select::make('processable_id')
-                    ->required()
-                    ->label('Custom Playlist')
-                    ->helperText('Select the Playlist you would like to assign this post process to.')
-                    ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                    ->hidden(fn($get) => $get('processable_type') !== CustomPlaylist::class)
-                    ->searchable(),
-                Forms\Components\Select::make('processable_id')
-                    ->required()
-                    ->label('Merged Playlist')
-                    ->helperText('Select the Playlist you would like to assign this post process to.')
-                    ->options(MergedPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                    ->hidden(fn($get) => $get('processable_type') !== MergedPlaylist::class)
                     ->searchable(),
                 Forms\Components\Select::make('processable_id')
                     ->required()

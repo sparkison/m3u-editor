@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Enums\PlaylistStatus;
+use App\Events\SyncCompleted;
 use App\Models\Channel;
 use App\Models\Group;
 use App\Models\Job;
@@ -160,5 +161,8 @@ class ProcessM3uImportComplete implements ShouldQueue
             'import_prefs' => $importPrefs,
             'groups' => $this->groups,
         ]);
+
+        // Fire the playlist synced event
+        event(new SyncCompleted(playlist: $playlist));
     }
 }

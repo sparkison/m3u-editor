@@ -2,21 +2,21 @@
 
 namespace App\Events;
 
-use App\Models\MergedPlaylist;
+use App\Models\Epg;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class MergedPlaylistCreated
+class EpgDeleted
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     /**
      * Create a new event instance.
      * 
-     * @param MergedPlaylist $playlist
+     * @param Epg $epg
      */
     public function __construct(
-        public MergedPlaylist $playlist
+        public Epg $epg,
     ) {}
 }

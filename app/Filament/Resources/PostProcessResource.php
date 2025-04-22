@@ -154,12 +154,12 @@ class PostProcessResource extends Resource
                         ])
                         ->default(false),
                     Forms\Components\CheckboxList::make('metadata.post_attributes')
-                        ->label('Attributes')
+                        ->label('Request variables')
                         ->options([
                             'name' => 'Name',
                             'uuid' => 'UUID',
                             'url' => 'URL',
-                        ])->helperText('If calling webhook URL, these attributes will be sent as GET or POST data. If using a local script, you can safely ignore this option.')
+                        ])->helperText('If using a webhook URL, these attributes can be (optionally) sent as GET or POST data. If using a local script, you can safely ignore this option.')
                 ]),
         ];
         return [

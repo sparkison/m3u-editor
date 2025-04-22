@@ -2,21 +2,21 @@
 
 namespace App\Events;
 
-use App\Models\MergedPlaylist;
+use App\Models\Playlist;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class MergedPlaylistCreated
+class PlaylistUpdated
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     /**
      * Create a new event instance.
      * 
-     * @param MergedPlaylist $playlist
+     * @param Playlist $playlist
      */
     public function __construct(
-        public MergedPlaylist $playlist
+        public Playlist $playlist,
     ) {}
 }

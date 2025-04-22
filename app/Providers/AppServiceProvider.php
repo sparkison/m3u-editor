@@ -4,7 +4,11 @@ namespace App\Providers;
 
 use Exception;
 use App\Events\EpgCreated;
+use App\Events\EpgDeleted;
+use App\Events\EpgUpdated;
 use App\Events\PlaylistCreated;
+use App\Events\PlaylistDeleted;
+use App\Events\PlaylistUpdated;
 use App\Models\CustomPlaylist;
 use App\Models\MergedPlaylist;
 use App\Models\Epg;
@@ -32,8 +36,6 @@ use Dedoc\Scramble\Support\Generator\SecurityScheme;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
-use AshAllenDesign\ShortURL\Classes\Builder as ShortUrl;
-use AshAllenDesign\ShortURL\Models\ShortURL as ModelsShortURL;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -151,12 +153,14 @@ class AppServiceProvider extends ServiceProvider
                 }
                 return $playlist;
             });
+            Playlist::updated(fn (Playlist $playlist) => event(new PlaylistUpdated($playlist)));
             Playlist::deleting(function (Playlist $playlist) {
                 Storage::disk('local')->deleteDirectory($playlist->folder_path);
                 if ($playlist->uploads && Storage::disk('local')->exists($playlist->uploads)) {
                     Storage::disk('local')->delete($playlist->uploads);
                 }
                 $playlist->playlistAuths()->detach();
+                event(new PlaylistDeleted($playlist));
                 return $playlist;
             });
 
@@ -178,11 +182,13 @@ class AppServiceProvider extends ServiceProvider
                 }
                 return $epg;
             });
+            Epg::updated(fn(Epg $epg) => event(new EpgUpdated($epg)));
             Epg::deleting(function (Epg $epg) {
                 Storage::disk('local')->deleteDirectory($epg->folder_path);
                 if ($epg->uploads && Storage::disk('local')->exists($epg->uploads)) {
                     Storage::disk('local')->delete($epg->uploads);
                 }
+                event(new EpgDeleted($epg));
                 return $epg;
             });
 
