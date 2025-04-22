@@ -20,7 +20,7 @@ class SyncListener implements ShouldQueue
             $event->playlist->postProcesses()->where([
                 ['type', 'synced'],
                 ['enabled', true],
-            ])->each(function ($postProcess) use ($event) {
+            ])->get()->each(function ($postProcess) use ($event) {
                 dispatch(new RunPostProcess($postProcess, $event->playlist));
             });
         }
@@ -28,7 +28,7 @@ class SyncListener implements ShouldQueue
             $event->epg->postProcesses()->where([
                 ['type', 'synced'],
                 ['enabled', true],
-            ])->each(function ($postProcess) use ($event) {
+            ])->get()->each(function ($postProcess) use ($event) {
                 dispatch(new RunPostProcess($postProcess, $event->epg));
             });
         }

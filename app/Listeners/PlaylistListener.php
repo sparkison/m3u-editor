@@ -35,7 +35,7 @@ class PlaylistListener implements ShouldQueue
         $event->playlist->postProcesses()->where([
             ['type', 'created'],
             ['enabled', true],
-        ])->each(function ($postProcess) use ($event) {
+        ])->get()->each(function ($postProcess) use ($event) {
             dispatch(new RunPostProcess($postProcess, $event->playlist));
         });
     }
@@ -46,7 +46,7 @@ class PlaylistListener implements ShouldQueue
         $event->playlist->postProcesses()->where([
             ['type', 'updated'],
             ['enabled', true],
-        ])->each(function ($postProcess) use ($event) {
+        ])->get()->each(function ($postProcess) use ($event) {
             dispatch(new RunPostProcess($postProcess, $event->playlist));
         });
     }
@@ -57,7 +57,7 @@ class PlaylistListener implements ShouldQueue
         $event->playlist->postProcesses()->where([
             ['type', 'deleted'],
             ['enabled', true],
-        ])->each(function ($postProcess) use ($event) {
+        ])->get()->each(function ($postProcess) use ($event) {
             dispatch(new RunPostProcess($postProcess, $event->playlist));
         });
     }

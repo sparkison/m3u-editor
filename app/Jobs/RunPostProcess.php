@@ -31,6 +31,6 @@ class RunPostProcess implements ShouldQueue
      */
     public function handle(): void
     {
-        dump('Running post process job');
+        // ...
     }
 }

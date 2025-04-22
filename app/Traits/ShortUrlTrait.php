@@ -43,4 +43,21 @@ trait ShortUrlTrait
 
         return $this;
     }
+
+    /**
+     * Remove short URLs.
+     *
+     * @return Model
+     */
+    public function removeShortUrls(): Model
+    {
+        // Delete the short URLs that contain the playlist UUID
+        DB::table('short_urls')
+            ->whereRaw('destination_url LIKE ?', ['%' . $this->uuid . '%'])
+            ->delete();
+        // Set the short URLs to null
+        $this->short_urls = null;
+
+        return $this;
+    }
 }

@@ -134,6 +134,7 @@ class AppServiceProvider extends ServiceProvider
         try {
             // Process playlist on creation
             Playlist::created(fn(Playlist $playlist) => event(new PlaylistCreated($playlist)));
+            Playlist::updated(fn(Playlist $playlist) => event(new PlaylistUpdated($playlist)));
             Playlist::creating(function (Playlist $playlist) {
                 if (!$playlist->user_id) {
                     $playlist->user_id = auth()->id();
@@ -153,19 +154,21 @@ class AppServiceProvider extends ServiceProvider
                 }
                 return $playlist;
             });
-            Playlist::updated(fn (Playlist $playlist) => event(new PlaylistUpdated($playlist)));
             Playlist::deleting(function (Playlist $playlist) {
                 Storage::disk('local')->deleteDirectory($playlist->folder_path);
                 if ($playlist->uploads && Storage::disk('local')->exists($playlist->uploads)) {
                     Storage::disk('local')->delete($playlist->uploads);
                 }
+                $playlist->removeShortUrls();
                 $playlist->playlistAuths()->detach();
+                $playlist->postProcesses()->detach();
                 event(new PlaylistDeleted($playlist));
                 return $playlist;
             });
 
             // Process epg on creation
             Epg::created(fn(Epg $epg) => event(new EpgCreated($epg)));
+            Epg::updated(fn(Epg $epg) => event(new EpgUpdated($epg)));
             Epg::creating(function (Epg $epg) {
                 if (!$epg->user_id) {
                     $epg->user_id = auth()->id();
@@ -182,12 +185,12 @@ class AppServiceProvider extends ServiceProvider
                 }
                 return $epg;
             });
-            Epg::updated(fn(Epg $epg) => event(new EpgUpdated($epg)));
             Epg::deleting(function (Epg $epg) {
                 Storage::disk('local')->deleteDirectory($epg->folder_path);
                 if ($epg->uploads && Storage::disk('local')->exists($epg->uploads)) {
                     Storage::disk('local')->delete($epg->uploads);
                 }
+                $epg->postProcesses()->detach();
                 event(new EpgDeleted($epg));
                 return $epg;
             });
