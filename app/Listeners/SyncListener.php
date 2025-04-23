@@ -7,7 +7,7 @@ use App\Jobs\RunPostProcess;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 
-class SyncListener implements ShouldQueue
+class SyncListener
 {
     /**
      * Handle the event.
@@ -18,7 +18,7 @@ class SyncListener implements ShouldQueue
     {
         if ($event->model instanceof \App\Models\Playlist) {
             $event->model->postProcesses()->where([
-                ['type', 'synced'],
+                ['event', 'synced'],
                 ['enabled', true],
             ])->get()->each(function ($postProcess) use ($event) {
                 dispatch(new RunPostProcess($postProcess, $event->model));
@@ -26,7 +26,7 @@ class SyncListener implements ShouldQueue
         }
         if ($event->model instanceof \App\Models\Epg) {
             $event->model->postProcesses()->where([
-                ['type', 'synced'],
+                ['event', 'synced'],
                 ['enabled', true],
             ])->get()->each(function ($postProcess) use ($event) {
                 dispatch(new RunPostProcess($postProcess, $event->model));

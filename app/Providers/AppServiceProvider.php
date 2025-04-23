@@ -161,8 +161,8 @@ class AppServiceProvider extends ServiceProvider
                 }
                 $playlist->removeShortUrls();
                 $playlist->playlistAuths()->detach();
-                $playlist->postProcesses()->detach();
                 event(new PlaylistDeleted($playlist));
+                $playlist->postProcesses()->detach();
                 return $playlist;
             });
 
@@ -190,8 +190,8 @@ class AppServiceProvider extends ServiceProvider
                 if ($epg->uploads && Storage::disk('local')->exists($epg->uploads)) {
                     Storage::disk('local')->delete($epg->uploads);
                 }
-                $epg->postProcesses()->detach();
                 event(new EpgDeleted($epg));
+                $epg->postProcesses()->detach();
                 return $epg;
             });
 

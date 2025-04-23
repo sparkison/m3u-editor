@@ -6,7 +6,7 @@ use App\Events\CustomPlaylistCreated;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 
-class CustomPlaylistListener implements ShouldQueue
+class CustomPlaylistListener
 {
     /**
      * Handle the event.

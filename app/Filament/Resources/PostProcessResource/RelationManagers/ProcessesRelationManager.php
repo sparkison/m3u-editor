@@ -6,8 +6,8 @@ use App\Models\CustomPlaylist;
 use App\Models\Epg;
 use App\Models\MergedPlaylist;
 use App\Models\Playlist;
-use App\Tables\Columns\PlaylistAuthNameColumn;
-use App\Tables\Columns\PlaylistAuthUrlColumn;
+use App\Tables\Columns\PivotNameColumn;
+use App\Tables\Columns\PlaylistUrlColumn;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -69,7 +69,7 @@ class ProcessesRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('name')
             ->columns([
-                PlaylistAuthNameColumn::make('name')
+                PivotNameColumn::make('name')
                     ->label('Model'),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()

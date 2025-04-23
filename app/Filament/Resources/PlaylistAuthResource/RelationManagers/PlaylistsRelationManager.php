@@ -5,8 +5,8 @@ namespace App\Filament\Resources\PlaylistAuthResource\RelationManagers;
 use App\Models\CustomPlaylist;
 use App\Models\MergedPlaylist;
 use App\Models\Playlist;
-use App\Tables\Columns\PlaylistAuthNameColumn;
-use App\Tables\Columns\PlaylistAuthUrlColumn;
+use App\Tables\Columns\PivotNameColumn;
+use App\Tables\Columns\PlaylistUrlColumn;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -72,9 +72,9 @@ class PlaylistsRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('name')
             ->columns([
-                PlaylistAuthNameColumn::make('playlist_name')
+                PivotNameColumn::make('playlist_name')
                     ->label('Playlist'),
-                PlaylistAuthUrlColumn::make('playlist_url')
+                PlaylistUrlColumn::make('playlist_url')
                     ->label('Playlist URL')
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('created_at')

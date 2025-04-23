@@ -6,7 +6,7 @@ use App\Events\MergedPlaylistCreated;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 
-class MergedPlaylistListener implements ShouldQueue
+class MergedPlaylistListener
 {
     /**
      * Handle the event.

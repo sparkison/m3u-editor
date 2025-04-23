@@ -10,7 +10,7 @@ use App\Jobs\RunPostProcess;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 
-class EpgListener implements ShouldQueue
+class EpgListener
 {
     /**
      * Handle the event.
@@ -33,7 +33,7 @@ class EpgListener implements ShouldQueue
     {
         dispatch(new ProcessEpgImport($event->epg));
         $event->epg->postProcesses()->where([
-            ['type', 'created'],
+            ['event', 'created'],
             ['enabled', true],
         ])->get()->each(function ($postProcess) use ($event) {
             dispatch(new RunPostProcess($postProcess, $event->epg));
@@ -44,7 +44,7 @@ class EpgListener implements ShouldQueue
     {
         // Handle EPG updated event
         $event->epg->postProcesses()->where([
-            ['type', 'updated'],
+            ['event', 'updated'],
             ['enabled', true],
         ])->get()->each(function ($postProcess) use ($event) {
             dispatch(new RunPostProcess($postProcess, $event->epg));
@@ -55,7 +55,7 @@ class EpgListener implements ShouldQueue
     {
         // Handle EPG deleted event
         $event->epg->postProcesses()->where([
-            ['type', 'deleted'],
+            ['event', 'deleted'],
             ['enabled', true],
         ])->get()->each(function ($postProcess) use ($event) {
             dispatch(new RunPostProcess($postProcess, $event->epg));

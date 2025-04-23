@@ -10,7 +10,7 @@ use App\Jobs\RunPostProcess;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 
-class PlaylistListener implements ShouldQueue
+class PlaylistListener
 {
     /**
      * Handle the event.
@@ -19,6 +19,8 @@ class PlaylistListener implements ShouldQueue
      */
     public function handle(PlaylistCreated|PlaylistUpdated|PlaylistDeleted $event): void
     {
+        dump('PlaylistListener: ' . get_class($event));
+        
         // Check if created, updated, or deleted
         if ($event instanceof PlaylistCreated) {
             $this->handlePlaylistCreated($event);
@@ -33,7 +35,7 @@ class PlaylistListener implements ShouldQueue
     {
         dispatch(new ProcessM3uImport($event->playlist));
         $event->playlist->postProcesses()->where([
-            ['type', 'created'],
+            ['event', 'created'],
             ['enabled', true],
         ])->get()->each(function ($postProcess) use ($event) {
             dispatch(new RunPostProcess($postProcess, $event->playlist));
@@ -44,7 +46,7 @@ class PlaylistListener implements ShouldQueue
     {
         // Handle playlist updated event
         $event->playlist->postProcesses()->where([
-            ['type', 'updated'],
+            ['event', 'updated'],
             ['enabled', true],
         ])->get()->each(function ($postProcess) use ($event) {
             dispatch(new RunPostProcess($postProcess, $event->playlist));
@@ -55,7 +57,7 @@ class PlaylistListener implements ShouldQueue
     {
         // Handle playlist deleted event
         $event->playlist->postProcesses()->where([
-            ['type', 'deleted'],
+            ['event', 'deleted'],
             ['enabled', true],
         ])->get()->each(function ($postProcess) use ($event) {
             dispatch(new RunPostProcess($postProcess, $event->playlist));
