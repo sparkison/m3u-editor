@@ -63,11 +63,13 @@ class RunPostProcess implements ShouldQueue
                 // If results ok, log the results
                 if ($response->ok()) {
                     $title = "Post processing for \"$name\" completed successfully";
-                    $body = 'Results: ' . ($response->body() ?? '');
+                    $body = $response->body() ?? '';
                     PostProcessLog::create([
+                        'name' => $name,
+                        'type' => $postProcess->event,
                         'post_process_id' => $postProcess->id,
                         'status' => 'success',
-                        'message' => $title . '. ' . $body,
+                        'message' => $body,
                     ]);
                     Notification::make()
                         ->success()
@@ -81,11 +83,13 @@ class RunPostProcess implements ShouldQueue
                         ->sendToDatabase($user);
                 } else {
                     $title = "Error running post processing for \"$name\"";
-                    $body = 'Results: ' . ($response->body() ?? '');
+                    $body = $response->body() ?? '';
                     PostProcessLog::create([
+                        'name' => $name,
+                        'type' => $postProcess->event,
                         'post_process_id' => $postProcess->id,
                         'status' => 'error',
-                        'message' => $title . '. ' . $body,
+                        'message' => $body,
                     ]);
                     Notification::make()
                         ->danger()
@@ -122,11 +126,13 @@ class RunPostProcess implements ShouldQueue
                 if (!$hasErrors) {
                     // Success!
                     $title = "Post processing for \"$name\" completed successfully";
-                    $body = 'Results: ' . $output;
+                    $body = $output;
                     PostProcessLog::create([
+                        'name' => $name,
+                        'type' => $postProcess->event,
                         'post_process_id' => $postProcess->id,
                         'status' => 'success',
-                        'message' => $title . '. ' . $body,
+                        'message' => $body,
                     ]);
                     Notification::make()
                         ->success()
@@ -141,11 +147,13 @@ class RunPostProcess implements ShouldQueue
                 } else {
                     // Error running the script
                     $title = "Error running post processing for \"$name\"";
-                    $body = 'Results: ' . $errors;
+                    $body = $errors;
                     PostProcessLog::create([
+                        'name' => $name,
+                        'type' => $postProcess->event,
                         'post_process_id' => $postProcess->id,
                         'status' => 'error',
-                        'message' => $title . '. ' . $body,
+                        'message' => $body,
                     ]);
                     Notification::make()
                         ->danger()
@@ -164,6 +172,8 @@ class RunPostProcess implements ShouldQueue
             $error = "Error running post processing for \"$name\": " . $e->getMessage();
             Log::error($error);
             PostProcessLog::create([
+                'name' => $name,
+                'type' => $postProcess->event,
                 'post_process_id' => $postProcess->id,
                 'status' => 'error',
                 'message' => $error,

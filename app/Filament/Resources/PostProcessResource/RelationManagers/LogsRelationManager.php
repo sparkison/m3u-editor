@@ -26,11 +26,18 @@ class LogsRelationManager extends RelationManager
             ->recordTitleAttribute('name')
             ->defaultSort('created_at', 'desc')
             ->columns([
+                Tables\Columns\TextColumn::make('name')
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('status')
                     ->sortable()
                     ->badge()
                     ->toggleable()
                     ->color(fn($state) => $state === 'success' ? 'success' : 'danger'),
+                Tables\Columns\TextColumn::make('type')
+                    ->badge()
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('message')
                     ->wrap(),
                 Tables\Columns\TextColumn::make('created_at')
