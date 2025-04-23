@@ -134,14 +134,32 @@ class PostProcessResource extends Resource
                     'updated' => 'Updated',
                     'deleted' => 'Deleted',
                 ]),
+            Forms\Components\ToggleButtons::make('metadata.local')
+                ->label('Type')
+                ->grouped()
+                ->options([
+                    false => 'URL',
+                    true => 'Local file',
+                ])
+                ->icons([
+                    false => 'heroicon-s-link',
+                    true => 'heroicon-s-document',
+                ])
+                ->live()
+                ->default(false),
             Forms\Components\TextInput::make('metadata.path')
-                ->label('Webhook URL or Local file path')
+                ->label(fn(Get $get) => $get('metadata.local') ? 'Path' : 'URL')
                 ->columnSpan(2)
-                ->prefixIcon('heroicon-m-globe-alt')
+                ->prefixIcon(fn(Get $get) => $get('metadata.local') ? 'heroicon-o-document' : 'heroicon-o-globe-alt')
                 ->placeholder(route('webhook.test.get'))
-                ->helperText('Enter the URL or process to call. If this is a local file, you can enter a full or relative path.')
+                ->helperText(fn(Get $get) => $get('metadata.local') ? 'Path to local script' : 'Webhook URL')
                 ->required()
-                ->rules([new CheckIfUrlOrLocalPath()])
+                ->rules(fn(Get $get) => [
+                    new CheckIfUrlOrLocalPath(
+                        urlOnly: !$get('metadata.local'),
+                        localOnly: $get('metadata.local'),
+                    ),
+                ])
                 ->maxLength(255),
             Forms\Components\Fieldset::make('Request Options')
                 ->schema([
@@ -152,15 +170,16 @@ class PostProcessResource extends Resource
                             false => 'GET',
                             true => 'POST',
                         ])
-                        ->default(false),
+                        ->default(false)
+                        ->helperText('Send as GET or POST request.'),
                     Forms\Components\CheckboxList::make('metadata.post_attributes')
                         ->label('Request variables')
                         ->options([
                             'name' => 'Name',
                             'uuid' => 'UUID',
                             'url' => 'URL',
-                        ])->helperText('If using a webhook URL, these attributes can be (optionally) sent as GET or POST data. If using a local script, you can safely ignore this option.')
-                ]),
+                        ])->helperText('Attributes can be (optionally) sent as GET or POST data.')
+                ])->hidden(fn(Get $get) => !! $get('metadata.local')),
         ];
         return [
             Forms\Components\Grid::make()
