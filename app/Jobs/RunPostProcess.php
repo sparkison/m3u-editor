@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Facades\PlaylistUrlFacade;
+use App\Models\Epg;
 use App\Models\PostProcess;
 use App\Models\PostProcessLog;
 use Filament\Notifications\Notification;
@@ -52,7 +54,15 @@ class RunPostProcess implements ShouldQueue
                 $attributes = $metadata['post_attributes'] ?? [];
                 $queryVars = [];
                 foreach ($attributes as $key) {
-                    $queryVars[$key] = $this->model->{$key};
+                    if ($key === 'url') {
+                        if ($modelType === Epg::class) {
+                            $queryVars[$key] = route('epg.file', ['uuid' => $this->model->uuid]);
+                        } else {
+                            $queryVars[$key] = PlaylistUrlFacade::getUrls($this->model)['m3u'];
+                        }
+                    } else {
+                        $queryVars[$key] = $this->model->{$key};
+                    }
                 }
 
                 // Make the request
@@ -105,6 +115,18 @@ class RunPostProcess implements ShouldQueue
             } else {
                 // If the metadata is not a URL, then we're running a script
                 $cmd = $metadata['path'];
+                $args = $metadata['post_attributes'] ?? [];
+                foreach ($args as $key) {
+                    if ($key === 'url') {
+                        if ($modelType === Epg::class) {
+                            $cmd .= " -$key " . route('epg.file', ['uuid' => $this->model->uuid]);
+                        } else {
+                            $cmd .= " -$key " . PlaylistUrlFacade::getUrls($this->model)['m3u'];
+                        }
+                    } else {
+                        $cmd .= " -$key " . $this->model->{$key};
+                    }
+                }
                 $process = SymphonyProcess::fromShellCommandline($cmd);
                 $process->setTimeout(60);
                 $output = '';

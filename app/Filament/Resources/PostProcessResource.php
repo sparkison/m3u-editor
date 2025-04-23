@@ -151,7 +151,7 @@ class PostProcessResource extends Resource
                 ->label(fn(Get $get) => $get('metadata.local') ? 'Path' : 'URL')
                 ->columnSpan(2)
                 ->prefixIcon(fn(Get $get) => $get('metadata.local') ? 'heroicon-o-document' : 'heroicon-o-globe-alt')
-                ->placeholder(fn (Get $get) => $get('metadata.local') ? '/var/www/html/custom_script' : route('webhook.test.get'))
+                ->placeholder(fn(Get $get) => $get('metadata.local') ? '/var/www/html/custom_script' : route('webhook.test.get'))
                 ->helperText(fn(Get $get) => $get('metadata.local') ? 'Path to local file' : 'Webhook URL')
                 ->required()
                 ->rules(fn(Get $get) => [
@@ -180,6 +180,16 @@ class PostProcessResource extends Resource
                             'url' => 'URL',
                         ])->helperText('Attributes can be (optionally) sent as GET or POST data.')
                 ])->hidden(fn(Get $get) => !! $get('metadata.local')),
+            Forms\Components\Fieldset::make('Script Options')
+                ->schema([
+                    Forms\Components\CheckboxList::make('metadata.post_attributes')
+                        ->label('Arguments')
+                        ->options([
+                            'name' => '-name <NAME>',
+                            'uuid' => '-uuid <UUID>',
+                            'url' => '-url <URL>',
+                        ])->helperText('Additional arguments to pass to your script.')
+                ])->hidden(fn(Get $get) => ! $get('metadata.local')),
         ];
         return [
             Forms\Components\Grid::make()
