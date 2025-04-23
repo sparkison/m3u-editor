@@ -32,6 +32,10 @@ class PlaylistAuth extends Model
     {
         return $this->hasMany(PlaylistAuthPivot::class, 'playlist_auth_id')
             ->where('authenticatable_type', '!=', null) // Ensure it's a morph relation
-            ->whereHas('model');
+            ->whereHasMorph('authenticatable', [
+                CustomPlaylist::class,
+                MergedPlaylist::class,
+                Playlist::class,
+            ]);
     }
 }

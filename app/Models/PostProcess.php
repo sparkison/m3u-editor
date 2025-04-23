@@ -37,7 +37,10 @@ class PostProcess extends Model
     public function processes(): HasMany
     {
         return $this->hasMany(PostProcessPivot::class, 'post_process_id')
-            ->where('processable_type', '!=', null) // Ensure it's a morph relation
-            ->whereHas('model');
+            ->where('processable_type', '!=', null)
+            ->whereHasMorph('processable', [
+                Playlist::class,
+                Epg::class
+            ]);
     }
 }

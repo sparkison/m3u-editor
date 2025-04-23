@@ -7,6 +7,7 @@ use App\Models\CustomPlaylist;
 use App\Models\Playlist;
 use App\Models\PlaylistAuth;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
 class PlaylistAuthPivot extends Pivot
@@ -40,5 +41,10 @@ class PlaylistAuthPivot extends Pivot
             default:
                 return $this->belongsTo(Playlist::class, 'authenticatable_id');
         }
+    }
+
+    public function authenticatable(): MorphTo
+    {
+        return $this->morphTo();
     }
 }
