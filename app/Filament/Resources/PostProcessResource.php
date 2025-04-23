@@ -37,7 +37,7 @@ class PostProcessResource extends Resource
     protected static ?string $label = 'Post Process';
     protected static ?string $pluralLabel = 'Post Processing';
 
-    protected static ?string $navigationGroup = 'Playlist';
+    protected static ?string $navigationGroup = 'Tools';
 
     public static function getNavigationSort(): ?int
     {

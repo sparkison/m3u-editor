@@ -119,7 +119,7 @@ class Backups extends BaseBackups
 
     public static function getNavigationGroup(): ?string
     {
-        return null;
+        return 'Tools';
     }
 
     public function shouldDisplayStatusListRecords(): bool
