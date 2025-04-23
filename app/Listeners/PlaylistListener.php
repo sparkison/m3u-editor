@@ -14,13 +14,9 @@ class PlaylistListener
 {
     /**
      * Handle the event.
-     * 
-     * @param PlaylistCreated|PlaylistUpdated|PlaylistDeleted $event
      */
     public function handle(PlaylistCreated|PlaylistUpdated|PlaylistDeleted $event): void
-    {
-        dump('PlaylistListener: ' . get_class($event));
-        
+    {        
         // Check if created, updated, or deleted
         if ($event instanceof PlaylistCreated) {
             $this->handlePlaylistCreated($event);

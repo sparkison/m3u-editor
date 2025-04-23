@@ -10,8 +10,6 @@ class GroupListener
 {
     /**
      * Create the event listener.
-     * 
-     * @param Group $group
      */
     public function __construct(
         public Group $group,

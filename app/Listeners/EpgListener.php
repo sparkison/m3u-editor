@@ -14,8 +14,6 @@ class EpgListener
 {
     /**
      * Handle the event.
-     * 
-     * @param EpgCreated|EpgUpdated|EpgDeleted $event
      */
     public function handle(EpgCreated|EpgUpdated|EpgDeleted $event): void
     {

@@ -11,8 +11,6 @@ class SyncListener
 {
     /**
      * Handle the event.
-     * 
-     * @param SyncCompleted $event
      */
     public function handle(SyncCompleted $event): void
     {
