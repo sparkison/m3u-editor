@@ -2,8 +2,6 @@
 
 namespace App\Pivots;
 
-use App\Models\MergedPlaylist;
-use App\Models\CustomPlaylist;
 use App\Models\Epg;
 use App\Models\Playlist;
 use App\Models\PostProcess;

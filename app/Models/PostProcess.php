@@ -29,15 +29,15 @@ class PostProcess extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function processes(): HasMany
-    {
-        return $this->hasMany(PostProcessPivot::class)
-            ->where('processable_type', '!=', null) // Ensure it's a morph relation
-            ->whereHas('model');
-    }
-
     public function logs(): HasMany
     {
         return $this->hasMany(PostProcessLog::class);
+    }
+
+    public function processes(): HasMany
+    {
+        return $this->hasMany(PostProcessPivot::class, 'post_process_id')
+            ->where('processable_type', '!=', null) // Ensure it's a morph relation
+            ->whereHas('model');
     }
 }
