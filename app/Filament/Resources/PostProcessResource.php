@@ -151,8 +151,8 @@ class PostProcessResource extends Resource
                 ->label(fn(Get $get) => $get('metadata.local') ? 'Path' : 'URL')
                 ->columnSpan(2)
                 ->prefixIcon(fn(Get $get) => $get('metadata.local') ? 'heroicon-o-document' : 'heroicon-o-globe-alt')
-                ->placeholder(route('webhook.test.get'))
-                ->helperText(fn(Get $get) => $get('metadata.local') ? 'Path to local script' : 'Webhook URL')
+                ->placeholder(fn (Get $get) => $get('metadata.local') ? '/var/www/html/custom_script' : route('webhook.test.get'))
+                ->helperText(fn(Get $get) => $get('metadata.local') ? 'Path to local file' : 'Webhook URL')
                 ->required()
                 ->rules(fn(Get $get) => [
                     new CheckIfUrlOrLocalPath(
