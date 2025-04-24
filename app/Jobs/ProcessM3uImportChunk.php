@@ -45,6 +45,7 @@ class ProcessM3uImportChunk implements ShouldQueue
 
             // Add the channel for insert/update
             $groupId = $job->variables['groupId'];
+            $groupName = $job->variables['groupName'];
             foreach ($job->payload as $channel) {
                 // Make sure name is set
                 if (!isset($channel['name'])) {
@@ -54,6 +55,7 @@ class ProcessM3uImportChunk implements ShouldQueue
                 // Add the channel for insert/update
                 $bulk[] = [
                     ...$channel,
+                    'group' => $groupName ?? null,
                     'group_id' => $groupId ?? null,
                 ];
             }

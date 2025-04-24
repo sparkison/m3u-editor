@@ -131,9 +131,9 @@ class PostProcessResource extends Resource
                 ->options([
                     'synced' => 'Synced',
                     'created' => 'Created',
-                    'updated' => 'Updated',
+                    // 'updated' => 'Updated', // Can lead to a lot of calls! Updates are called during the sync process.
                     'deleted' => 'Deleted',
-                ]),
+                ])->default('synced'),
             Forms\Components\ToggleButtons::make('metadata.local')
                 ->label('Type')
                 ->grouped()

@@ -720,6 +720,7 @@ class ProcessM3uImport implements ShouldQueue
                         'payload' => $chunk->toArray(),
                         'variables' => [
                             'groupId' => $group->id,
+                            'groupName' => $group->name,
                             'playlistId' => $playlistId,
                         ]
                     ]);
