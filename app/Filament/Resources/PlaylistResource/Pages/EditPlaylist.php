@@ -11,7 +11,7 @@ use Filament\Resources\Pages\EditRecord;
 
 class EditPlaylist extends EditRecord
 {
-    use EditRecord\Concerns\HasWizard;
+    //use EditRecord\Concerns\HasWizard;
 
     protected static string $resource = PlaylistResource::class;
 

@@ -329,7 +329,7 @@ class PlaylistResource extends Resource
             Forms\Components\Section::make('Links')
                 ->description('These links are generated based on the current playlist configuration. Only enabled channels will be included.')
                 ->collapsible()
-                ->collapsed(false)
+                ->collapsed(true)
                 ->schema([
                     Forms\Components\Toggle::make('short_urls_enabled')
                         ->label('Use Short URLs')
@@ -695,13 +695,24 @@ class PlaylistResource extends Resource
 
     public static function getForm(): array
     {
-        $sections = [];
+        // $sections = [];
+        // foreach (self::getFormSections() as $section => $fields) {
+        //     $sections[] = Forms\Components\Section::make($section)
+        //         ->schema($fields);
+        // }
+        // return $sections;
+        // return [];
+
+        $tabs = [];
         foreach (self::getFormSections() as $section => $fields) {
-            $sections[] = Forms\Components\Section::make($section)
+            $tabs[] = Forms\Components\Tabs\Tab::make($section)
                 ->schema($fields);
         }
-        return $sections;
-        return [];
+        return [
+            Forms\Components\Tabs::make()
+                ->tabs($tabs)
+                ->columnSpanFull()
+        ];
     }
 
     public static function getFormSteps(): array
