@@ -194,8 +194,9 @@ class PostProcessResource extends Resource
                                 ->label('Value')
                                 ->required()
                                 ->options([
-                                    'name' => 'Name',
+                                    'id' => 'ID',
                                     'uuid' => 'UUID',
+                                    'name' => 'Name',
                                     'url' => 'URL',
                                     'status' => 'Status',
                                 ])->helperText('Value to use for this variable.'),
@@ -228,8 +229,9 @@ class PostProcessResource extends Resource
                                 ->label('Value')
                                 ->required()
                                 ->options([
-                                    'name' => 'Name',
+                                    'id' => 'ID',
                                     'uuid' => 'UUID',
+                                    'name' => 'Name',
                                     'url' => 'URL',
                                     'status' => 'Status',
                                 ])->helperText('Value to use for this variable.'),
