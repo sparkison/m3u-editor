@@ -129,7 +129,6 @@ class RunPostProcess implements ShouldQueue
                     }
                 }
 
-                dump($cmd);
                 $process = SymphonyProcess::fromShellCommandline($cmd);
                 $process->setTimeout(60);
                 $output = '';
