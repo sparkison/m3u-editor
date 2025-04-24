@@ -51,8 +51,8 @@ class RunPostProcess implements ShouldQueue
                 // Using true/false, false = GET, true = POST
                 $method = (bool)$metadata['get'] ? 'post' : 'get';
                 $url = $metadata['path'];
-                $attributes = $metadata['post_attributes'] ?? [];
                 $queryVars = [];
+                $attributes = $metadata['post_attributes'] ?? [];
                 foreach ($attributes as $key) {
                     if ($key === 'url') {
                         if ($modelType === Epg::class) {
@@ -115,24 +115,27 @@ class RunPostProcess implements ShouldQueue
             } else {
                 // If the metadata is not a URL, then we're running a script
                 $cmd = $metadata['path'];
-                $args = $metadata['post_attributes'] ?? [];
-                foreach ($args as $key) {
-                    if ($key === 'url') {
-                        if ($modelType === Epg::class) {
-                            $cmd .= " -l '" . route('epg.file', ['uuid' => $this->model->uuid]) . "'";
-                        } else {
-                            $cmd .= " -l '" . PlaylistUrlFacade::getUrls($this->model)['m3u'] . "'";
-                        }
-                    } else {
-                        $arg = substr($key, 0, 1);
-                        $cmd .= " -$arg '" . $this->model->{$key} . "'";
-                    }
-                }
-
                 $process = SymphonyProcess::fromShellCommandline($cmd);
                 $process->setTimeout(60);
+                $exportVars = [];
+                $vars = $metadata['script_vars'] ?? [];
+                foreach ($vars as $var) {
+                    if ($var['value'] === 'url') {
+                        if ($modelType === Epg::class) {
+                            $value = route('epg.file', ['uuid' => $this->model->uuid]);
+                        } else {
+                            $value = PlaylistUrlFacade::getUrls($this->model)['m3u'];
+                        }
+                    } else {
+                        $value = $this->model->{$var['value']};
+                    }
+                    $exportVars[$var['export_name']] = $value;
+                }
                 $output = '';
                 $errors = '';
+                if (count($exportVars) > 0) {
+                    $process->setEnv($exportVars);
+                }
                 $hasErrors = false;
                 $process->run(
                     function ($type, $buffer) use (&$output, &$hasErrors, &$errors) {

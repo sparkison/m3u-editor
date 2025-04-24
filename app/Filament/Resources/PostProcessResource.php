@@ -180,16 +180,37 @@ class PostProcessResource extends Resource
                             'url' => 'URL',
                         ])->helperText('Attributes can be (optionally) sent as GET or POST data.')
                 ])->hidden(fn(Get $get) => !! $get('metadata.local')),
-            Forms\Components\Fieldset::make('Script Options')
+            Forms\Components\Repeater::make('metadata.script_vars')
+                ->label('Export variables')
                 ->schema([
-                    Forms\Components\CheckboxList::make('metadata.post_attributes')
-                        ->label('Arguments')
+                    Forms\Components\TextInput::make('export_name')
+                        ->label('Export name')
+                        ->placeholder('VARIABLE_NAME')
+                        ->helperText('Name of the variable to export (no spaces are special characters). Example: VARIABLE_NAME can be used as $VARIABLE_NAME in your script.')
+                        ->datalist([
+                            'NAME',
+                            'UUID',
+                            'URL',
+                            'M3U_NAME',
+                            'M3U_UUID',
+                            'M3U_URL',
+                        ])
+                        ->alphaDash()
+                        ->ascii()
+                        ->required(),
+                    Forms\Components\Select::make('value')
+                        ->label('Value')
+                        ->required()
                         ->options([
-                            'name' => '-n <NAME>',
-                            'uuid' => '-u <UUID>',
-                            'url' => '-l <URL>',
-                        ])->helperText('Additional arguments to pass to your script.'),
-                ])->hidden(fn(Get $get) => ! $get('metadata.local')),
+                            'name' => 'Name',
+                            'uuid' => 'UUID',
+                            'url' => 'URL',
+                        ])->helperText('Value to use for this variable.'),
+                ])
+                ->columns(2)
+                ->columnSpanFull()
+                ->addActionLabel('Add named export')
+                ->hidden(fn(Get $get) => ! $get('metadata.local')),
         ];
         return [
             Forms\Components\Grid::make()
