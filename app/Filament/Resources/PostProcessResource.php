@@ -137,6 +137,7 @@ class PostProcessResource extends Resource
             Forms\Components\ToggleButtons::make('metadata.local')
                 ->label('Type')
                 ->grouped()
+                ->required()
                 ->options([
                     false => 'URL',
                     true => 'Local file',
@@ -166,6 +167,7 @@ class PostProcessResource extends Resource
                     Forms\Components\ToggleButtons::make('metadata.get')
                         ->label('Request type')
                         ->grouped()
+                        ->required()
                         ->options([
                             false => 'GET',
                             true => 'POST',
@@ -186,7 +188,7 @@ class PostProcessResource extends Resource
                     Forms\Components\TextInput::make('export_name')
                         ->label('Export name')
                         ->placeholder('VARIABLE_NAME')
-                        ->helperText('Name of the variable to export (no spaces are special characters). Example: VARIABLE_NAME can be used as $VARIABLE_NAME in your script.')
+                        ->helperText('Name of the variable to export. Example: VARIABLE_NAME can be used as $VARIABLE_NAME in your script.')
                         ->datalist([
                             'NAME',
                             'UUID',
