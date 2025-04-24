@@ -71,18 +71,45 @@ class ProcessM3uImportComplete implements ShouldQueue
                 ->sendToDatabase($playlist->user);
         }
 
-        // Clear out invalid groups (if any)
-        Group::where([
+        // Get the removed groups
+        $removedGroups = Group::where([
             ['custom', false],
             ['playlist_id', $playlist->id],
             ['import_batch_no', '!=', $this->batchNo],
-        ])->delete();
+        ]);
 
-        // Clear out invalid channels (if any)
-        Channel::where([
+        // Get the newly added groups
+        $newGroups = $playlist->groups()->where([
+            ['import_batch_no', $this->batchNo],
+            ['new', true],
+        ]);
+
+        // Get the removed channels
+        $removedChannels = Channel::where([
             ['playlist_id', $playlist->id],
             ['import_batch_no', '!=', $this->batchNo],
-        ])->delete();
+        ]);
+
+        // Get the newly added channels
+        $newChannels = $playlist->channels()->where([
+            ['import_batch_no', $this->batchNo],
+            ['new', true],
+        ]);
+
+        // dump([
+        //     'deleted_groups' => $removedGroups->get(['id', 'name'])->toArray(),
+        //     'new_groups' => $newGroups->get(['id', 'name'])->toArray(),
+        //     'deleted_channels' => $removedChannels->get(['id', 'name', 'title'])->toArray(),
+        //     'new_channels' => $newChannels->get(['id', 'name', 'title'])->toArray(),
+        // ]);
+
+        // Clear out invalid groups/channels (if any)
+        $removedGroups->delete();
+        $removedChannels->delete();
+
+        // Flag new groups and channels as not new
+        $newGroups->update(['new' => false]);
+        $newChannels->update(['new' => false]);
 
         // Clear out the jobs
         Job::where(['batch_no', $this->batchNo])->delete();

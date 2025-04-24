@@ -273,6 +273,7 @@ class ProcessM3uImport implements ShouldQueue
                 'playlist_id' => $playlistId,
                 'user_id' => $userId,
                 'import_batch_no' => $batchNo,
+                'new' => true,
                 'enabled' => $playlist->enable_channels,
             ];
 
@@ -475,6 +476,7 @@ class ProcessM3uImport implements ShouldQueue
                     'playlist_id' => $playlistId,
                     'user_id' => $userId,
                     'import_batch_no' => $batchNo,
+                    'new' => true,
                     'enabled' => $playlist->enable_channels,
                     'extvlcopt' => null,
                     'kodidrop' => null,
@@ -720,10 +722,12 @@ class ProcessM3uImport implements ShouldQueue
                         'playlist_id' => $playlistId,
                         'user_id' => $userId,
                         'import_batch_no' => $batchNo,
+                        'new' => true,
                     ]);
                 } else {
                     $group->update([
                         'import_batch_no' => $batchNo,
+                        'new' => false,
                     ]);
                 }
                 $channels->chunk(50)->each(function ($chunk) use ($playlistId, $batchNo, $group) {
@@ -788,7 +792,14 @@ class ProcessM3uImport implements ShouldQueue
             });
 
             // Last job in the batch
-            $jobs[] = new ProcessM3uImportComplete($userId, $playlistId, $groups, $batchNo, $start, $this->maxItemsHit);
+            $jobs[] = new ProcessM3uImportComplete(
+                userId: $userId,
+                playlistId: $playlistId,
+                groups: $groups,
+                batchNo: $batchNo,
+                start: $start,
+                maxHit: $this->maxItemsHit
+            );
             Bus::chain($jobs)
                 ->onConnection('redis') // force to use redis connection
                 ->onQueue('import')

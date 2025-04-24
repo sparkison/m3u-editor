@@ -73,6 +73,7 @@ class ProcessM3uImportChunk implements ShouldQueue
                 // 'channel', // user override
                 // 'enabled',
                 // 'epg_channel_id',
+                // 'new'
                 // ...only update the following fields
                 'sort',
                 'url',
