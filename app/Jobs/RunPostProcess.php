@@ -119,14 +119,17 @@ class RunPostProcess implements ShouldQueue
                 foreach ($args as $key) {
                     if ($key === 'url') {
                         if ($modelType === Epg::class) {
-                            $cmd .= " -$key " . route('epg.file', ['uuid' => $this->model->uuid]);
+                            $cmd .= " -l '" . route('epg.file', ['uuid' => $this->model->uuid]) . "'";
                         } else {
-                            $cmd .= " -$key " . PlaylistUrlFacade::getUrls($this->model)['m3u'];
+                            $cmd .= " -l '" . PlaylistUrlFacade::getUrls($this->model)['m3u'] . "'";
                         }
                     } else {
-                        $cmd .= " -$key " . $this->model->{$key};
+                        $arg = substr($key, 0, 1);
+                        $cmd .= " -$arg '" . $this->model->{$key} . "'";
                     }
                 }
+
+                dump($cmd);
                 $process = SymphonyProcess::fromShellCommandline($cmd);
                 $process->setTimeout(60);
                 $output = '';

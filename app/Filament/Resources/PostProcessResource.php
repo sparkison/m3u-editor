@@ -185,9 +185,9 @@ class PostProcessResource extends Resource
                     Forms\Components\CheckboxList::make('metadata.post_attributes')
                         ->label('Arguments')
                         ->options([
-                            'name' => '-name <NAME>',
-                            'uuid' => '-uuid <UUID>',
-                            'url' => '-url <URL>',
+                            'name' => '-n <NAME>',
+                            'uuid' => '-u <UUID>',
+                            'url' => '-l <URL>',
                         ])->helperText('Additional arguments to pass to your script.')
                 ])->hidden(fn(Get $get) => ! $get('metadata.local')),
         ];
