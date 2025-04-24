@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources;
 
-use App\Enums\EpgStatus;
+use App\Enums\Status;
 use App\Filament\Resources\EpgResource\Pages;
 use App\Filament\Resources\EpgResource\RelationManagers;
 use App\Models\Epg;
@@ -83,10 +83,10 @@ class EpgResource extends Resource
                     ->sortable()
                     ->toggleable()
                     ->badge()
-                    ->color(fn(EpgStatus $state) => $state->getColor()),
+                    ->color(fn(Status $state) => $state->getColor()),
                 ProgressColumn::make('progress')
                     ->sortable()
-                    ->poll(fn($record) => $record->status === EpgStatus::Processing || $record->status === EpgStatus::Pending ? '3s' : null)
+                    ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
                     ->toggleable(),
                 Tables\Columns\IconColumn::make('auto_sync')
                     ->label('Auto Sync')
@@ -132,7 +132,7 @@ class EpgResource extends Resource
                         ->icon('heroicon-o-arrow-path')
                         ->action(function ($record) {
                             $record->update([
-                                'status' => EpgStatus::Processing,
+                                'status' => Status::Processing,
                                 'progress' => 0,
                             ]);
                             app('Illuminate\Contracts\Bus\Dispatcher')
@@ -145,7 +145,7 @@ class EpgResource extends Resource
                                 ->duration(10000)
                                 ->send();
                         })
-                        ->disabled(fn($record): bool => $record->status === EpgStatus::Processing)
+                        ->disabled(fn($record): bool => $record->status === Status::Processing)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
@@ -162,7 +162,7 @@ class EpgResource extends Resource
                         ->color('warning')
                         ->action(function ($record) {
                             $record->update([
-                                'status' => EpgStatus::Pending,
+                                'status' => Status::Pending,
                                 'processing' => false,
                                 'progress' => 0,
                                 'synced' => null,
@@ -192,7 +192,7 @@ class EpgResource extends Resource
                         ->action(function (Collection $records): void {
                             foreach ($records as $record) {
                                 $record->update([
-                                    'status' => EpgStatus::Processing,
+                                    'status' => Status::Processing,
                                     'progress' => 0,
                                 ]);
                                 app('Illuminate\Contracts\Bus\Dispatcher')
@@ -216,7 +216,7 @@ class EpgResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])->checkIfRecordIsSelectableUsing(
-                fn($record): bool => $record->status !== EpgStatus::Processing,
+                fn($record): bool => $record->status !== Status::Processing,
             );
     }
 

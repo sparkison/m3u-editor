@@ -2,8 +2,8 @@
 
 namespace App\Jobs;
 
-use App\Enums\EpgStatus;
-use App\Enums\PlaylistStatus;
+use App\Enums\Status;
+use App\Enums\Status;
 use App\Models\Epg;
 use App\Models\EpgMap;
 use App\Models\Playlist;
@@ -33,20 +33,20 @@ class RestartQueue implements ShouldQueue
             Artisan::call('app:restart-queue');
 
             // Reset Playlist and EPGs that were in a processing state
-            Playlist::where('status', PlaylistStatus::Processing)
+            Playlist::where('status', Status::Processing)
                 ->orWhere('processing', true)
                 ->update([
-                    'status' => PlaylistStatus::Pending,
+                    'status' => Status::Pending,
                     'processing' => false,
                     'progress' => 0,
                     'channels' => 0,
                     'synced' => null,
                     'errors' => null,
                 ]);
-            Epg::where('status', EpgStatus::Processing)
+            Epg::where('status', Status::Processing)
                 ->orWhere('processing', true)
                 ->update([
-                    'status' => EpgStatus::Pending,
+                    'status' => Status::Pending,
                     'processing' => false,
                     'progress' => 0,
                     'synced' => null,
@@ -54,10 +54,10 @@ class RestartQueue implements ShouldQueue
                 ]);
 
             // Update EPG Maps
-            EpgMap::where('status', EpgStatus::Processing)
+            EpgMap::where('status', Status::Processing)
                 ->orWhere('processing', true)
                 ->update([
-                    'status' => EpgStatus::Failed,
+                    'status' => Status::Failed,
                     'processing' => false,
                     'progress' => 0,
                     'synced' => null,

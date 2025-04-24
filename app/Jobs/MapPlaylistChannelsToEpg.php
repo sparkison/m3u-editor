@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Enums\EpgStatus;
+use App\Enums\Status;
 use App\Services\SimilaritySearchService;
 use Throwable;
 use Exception;
@@ -80,7 +80,7 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
             $map->update([
                 'uuid' => $batchNo,
                 'progress' => 0,
-                'status' => EpgStatus::Processing,
+                'status' => Status::Processing,
                 'processing' => true,
                 'mapped_at' => now(),
             ]);
@@ -91,7 +91,7 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                 'playlist_id' => $playlist ? $playlist->id : null,
                 'user_id' => $epg->user_id,
                 'uuid' => $batchNo,
-                'status' => EpgStatus::Processing,
+                'status' => Status::Processing,
                 'processing' => true,
                 'override' => $this->force,
                 'recurring' => $this->recurring,
@@ -196,7 +196,7 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                         ->body($error)
                         ->sendToDatabase($epg->user);
                     $map->update([
-                        'status' => EpgStatus::Failed,
+                        'status' => Status::Failed,
                         'channels' => 0, // not using...
                         'errors' => $error,
                         'progress' => 100,
@@ -221,7 +221,7 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
 
             // Update the playlist
             $map->update([
-                'status' => EpgStatus::Failed,
+                'status' => Status::Failed,
                 'errors' => $e->getMessage(),
                 'progress' => 100,
                 'processing' => false,

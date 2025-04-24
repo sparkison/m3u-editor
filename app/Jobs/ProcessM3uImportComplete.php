@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Enums\PlaylistStatus;
+use App\Enums\Status;
 use App\Events\SyncCompleted;
 use App\Models\Channel;
 use App\Models\Group;
@@ -151,7 +151,7 @@ class ProcessM3uImportComplete implements ShouldQueue
 
         // Update the playlist
         $playlist->update([
-            'status' => PlaylistStatus::Completed,
+            'status' => Status::Completed,
             'channels' => 0, // not using...
             'synced' => now(),
             'errors' => null,

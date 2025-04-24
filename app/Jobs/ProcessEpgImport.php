@@ -5,7 +5,7 @@ namespace App\Jobs;
 use Exception;
 use XMLReader;
 use Throwable;
-use App\Enums\EpgStatus;
+use App\Enums\Status;
 use App\Models\Epg;
 use App\Models\Job;
 use Filament\Notifications\Notification;
@@ -66,7 +66,7 @@ class ProcessEpgImport implements ShouldQueue
         // Update the EPG status to processing
         $this->epg->update([
             'processing' => true,
-            'status' => EpgStatus::Processing,
+            'status' => Status::Processing,
             'errors' => null,
             'progress' => 0,
         ]);
@@ -145,7 +145,7 @@ class ProcessEpgImport implements ShouldQueue
 
                 // Update the EPG
                 $this->epg->update([
-                    'status' => EpgStatus::Failed,
+                    'status' => Status::Failed,
                     'synced' => now(),
                     'errors' => $error,
                     'progress' => 100,
@@ -271,7 +271,7 @@ class ProcessEpgImport implements ShouldQueue
                             ->body($error)
                             ->sendToDatabase($epg->user);
                         $epg->update([
-                            'status' => EpgStatus::Failed,
+                            'status' => Status::Failed,
                             'channels' => 0, // not using...
                             'synced' => now(),
                             'errors' => $error,
@@ -298,7 +298,7 @@ class ProcessEpgImport implements ShouldQueue
 
                 // Update the EPG
                 $this->epg->update([
-                    'status' => EpgStatus::Failed,
+                    'status' => Status::Failed,
                     'synced' => now(),
                     'errors' => $error,
                     'progress' => 100,
@@ -323,7 +323,7 @@ class ProcessEpgImport implements ShouldQueue
 
             // Update the EPG
             $this->epg->update([
-                'status' => EpgStatus::Failed,
+                'status' => Status::Failed,
                 'synced' => now(),
                 'errors' => $e->getMessage(),
                 'progress' => 100,

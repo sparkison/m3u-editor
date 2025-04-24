@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use App\Enums\PlaylistChannelId;
-use App\Enums\PlaylistStatus;
+use App\Enums\Status;
 use App\Traits\ShortUrlTrait;
 use AshAllenDesign\ShortURL\Models\ShortURL;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -38,7 +38,7 @@ class Playlist extends Model
         'xtream_status' => 'array',
         'short_urls' => 'array',
         'short_urls_enabled' => 'boolean',
-        'status' => PlaylistStatus::class,
+        'status' => Status::class,
         'id_channel_by' => PlaylistChannelId::class
     ];
 

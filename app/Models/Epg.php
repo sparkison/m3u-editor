@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Enums\EpgStatus;
+use App\Enums\Status;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -24,7 +24,7 @@ class Epg extends Model
         'synced' => 'datetime',
         'user_id' => 'integer',
         'uploads' => 'array',
-        'status' => EpgStatus::class,
+        'status' => Status::class,
         'processing' => 'boolean',
     ];
 

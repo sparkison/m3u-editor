@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Enums\EpgStatus;
+use App\Enums\Status;
 use App\Models\Epg;
 use App\Models\EpgMap;
 use App\Models\Job;
@@ -50,7 +50,7 @@ class MapEpgToChannelsComplete implements ShouldQueue
         // Update the map
         if ($map) {
             $map->update([
-                'status' => EpgStatus::Completed,
+                'status' => Status::Completed,
                 'errors' => null,
                 'sync_time' => $completedIn,
                 'channel_count' => $this->channelCount,

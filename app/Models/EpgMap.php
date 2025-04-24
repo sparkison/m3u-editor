@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Enums\EpgStatus;
+use App\Enums\Status;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -25,7 +25,7 @@ class EpgMap extends Model
         'epg_id' => 'integer',
         'channel_count' => 'integer',
         'mapped_count' => 'integer',
-        'status' => EpgStatus::class,
+        'status' => Status::class,
     ];
 
     public function user(): BelongsTo

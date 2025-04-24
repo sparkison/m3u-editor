@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Enums\EpgStatus;
+use App\Enums\Status;
 use App\Jobs\ProcessEpgImport;
 use App\Models\Epg;
 use Carbon\CarbonInterval;
@@ -41,7 +41,7 @@ class RefreshEpg extends Command
             $epgs = Epg::query()->where(
                 'status',
                 '!=',
-                EpgStatus::Processing,
+                Status::Processing,
             )->whereDate('synced', '<=', $eightHoursAgo);
             $count = $epgs->count();
             if ($count === 0) {

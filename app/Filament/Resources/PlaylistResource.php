@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources;
 
-use App\Enums\PlaylistStatus;
+use App\Enums\Status;
 use App\Filament\Resources\PlaylistResource\Pages;
 use App\Filament\Resources\PlaylistResource\RelationManagers;
 use App\Forms\Components\PlaylistEpgUrl;
@@ -105,10 +105,10 @@ class PlaylistResource extends Resource
                     ->sortable()
                     ->badge()
                     ->toggleable()
-                    ->color(fn(PlaylistStatus $state) => $state->getColor()),
+                    ->color(fn(Status $state) => $state->getColor()),
                 ProgressColumn::make('progress')
                     ->sortable()
-                    ->poll(fn($record) => $record->status === PlaylistStatus::Processing || $record->status === PlaylistStatus::Pending ? '3s' : null)
+                    ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
                     ->toggleable(),
                 Tables\Columns\IconColumn::make('auto_sync')
                     ->label('Auto Sync')
@@ -168,7 +168,7 @@ class PlaylistResource extends Resource
                         ->icon('heroicon-o-arrow-path')
                         ->action(function ($record) {
                             $record->update([
-                                'status' => PlaylistStatus::Processing,
+                                'status' => Status::Processing,
                                 'progress' => 0,
                             ]);
                             app('Illuminate\Contracts\Bus\Dispatcher')
@@ -181,7 +181,7 @@ class PlaylistResource extends Resource
                                 ->duration(10000)
                                 ->send();
                         })
-                        ->disabled(fn($record): bool => $record->status === PlaylistStatus::Processing)
+                        ->disabled(fn($record): bool => $record->status === Status::Processing)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
@@ -232,7 +232,7 @@ class PlaylistResource extends Resource
                         ->color('warning')
                         ->action(function ($record) {
                             $record->update([
-                                'status' => PlaylistStatus::Pending,
+                                'status' => Status::Pending,
                                 'processing' => false,
                                 'progress' => 0,
                                 'channels' => 0,
@@ -262,7 +262,7 @@ class PlaylistResource extends Resource
                         ->action(function (Collection $records): void {
                             foreach ($records as $record) {
                                 $record->update([
-                                    'status' => PlaylistStatus::Processing,
+                                    'status' => Status::Processing,
                                     'progress' => 0,
                                 ]);
                                 app('Illuminate\Contracts\Bus\Dispatcher')
@@ -286,7 +286,7 @@ class PlaylistResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])->checkIfRecordIsSelectableUsing(
-                fn($record): bool => $record->status !== PlaylistStatus::Processing,
+                fn($record): bool => $record->status !== Status::Processing,
             );
     }
 

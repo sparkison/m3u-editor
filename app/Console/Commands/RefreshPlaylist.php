@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Enums\PlaylistStatus;
+use App\Enums\Status;
 use App\Jobs\ProcessM3uImport;
 use App\Models\Playlist;
 use Carbon\CarbonInterval;
@@ -42,7 +42,7 @@ class RefreshPlaylist extends Command
             $playlists = Playlist::query()->where(
                 'status',
                 '!=',
-                PlaylistStatus::Processing,
+                Status::Processing,
             )->whereDate('synced', '<=', $eightHoursAgo);
             $count = $playlists->count();
             if ($count === 0) {

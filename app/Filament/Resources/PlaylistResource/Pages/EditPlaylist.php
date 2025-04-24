@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources\PlaylistResource\Pages;
 
-use App\Enums\PlaylistStatus;
+use App\Enums\Status;
 use App\Filament\Resources\PlaylistResource;
 use Filament\Actions;
 use Filament\Forms;
@@ -29,7 +29,7 @@ class EditPlaylist extends EditRecord
                     ->icon('heroicon-o-arrow-path')
                     ->action(function ($record) {
                         $record->update([
-                            'status' => PlaylistStatus::Processing,
+                            'status' => Status::Processing,
                             'progress' => 0,
                         ]);
                         app('Illuminate\Contracts\Bus\Dispatcher')
@@ -42,7 +42,7 @@ class EditPlaylist extends EditRecord
                             ->duration(10000)
                             ->send();
                     })
-                    ->disabled(fn($record): bool => $record->status === PlaylistStatus::Processing)
+                    ->disabled(fn($record): bool => $record->status === Status::Processing)
                     ->requiresConfirmation()
                     ->icon('heroicon-o-arrow-path')
                     ->modalIcon('heroicon-o-arrow-path')
@@ -93,7 +93,7 @@ class EditPlaylist extends EditRecord
                     ->color('warning')
                     ->action(function ($record) {
                         $record->update([
-                            'status' => PlaylistStatus::Pending,
+                            'status' => Status::Pending,
                             'processing' => false,
                             'progress' => 0,
                             'channels' => 0,

@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources;
 
-use App\Enums\EpgStatus;
+use App\Enums\Status;
 use App\Filament\Resources\EpgMapResource\Pages;
 use App\Filament\Resources\EpgMapResource\RelationManagers;
 use App\Models\EpgMap;
@@ -51,10 +51,10 @@ class EpgMapResource extends Resource
                     ->sortable()
                     ->badge()
                     ->toggleable()
-                    ->color(fn(EpgStatus $state) => $state->getColor()),
+                    ->color(fn(Status $state) => $state->getColor()),
                 ProgressColumn::make('progress')
                     ->sortable()
-                    ->poll(fn($record) => $record->status === EpgStatus::Processing || $record->status === EpgStatus::Pending ? '3s' : null)
+                    ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('channel_count')
                     ->toggleable()

@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use Throwable;
 use Exception;
-use App\Enums\PlaylistStatus;
+use App\Enums\Status;
 use App\Models\Group;
 use App\Models\Job;
 use App\Models\Playlist;
@@ -91,7 +91,7 @@ class ProcessM3uImport implements ShouldQueue
         // Update the playlist status to processing
         $this->playlist->update([
             'processing' => true,
-            'status' => PlaylistStatus::Processing,
+            'status' => Status::Processing,
             'errors' => null,
             'progress' => 0,
         ]);
@@ -128,7 +128,7 @@ class ProcessM3uImport implements ShouldQueue
 
         // Update the playlist
         $this->playlist->update([
-            'status' => PlaylistStatus::Failed,
+            'status' => Status::Failed,
             'synced' => now(),
             'errors' => $error,
             'progress' => 100,
@@ -380,7 +380,7 @@ class ProcessM3uImport implements ShouldQueue
 
             // Update the playlist
             $this->playlist->update([
-                'status' => PlaylistStatus::Failed,
+                'status' => Status::Failed,
                 'synced' => now(),
                 'errors' => $e->getMessage(),
                 'progress' => 100,
@@ -640,7 +640,7 @@ class ProcessM3uImport implements ShouldQueue
 
                 // Update the Playlist
                 $playlist->update([
-                    'status' => PlaylistStatus::Failed,
+                    'status' => Status::Failed,
                     'channels' => 0, // not using...
                     'synced' => now(),
                     'errors' => $error,
@@ -667,7 +667,7 @@ class ProcessM3uImport implements ShouldQueue
 
             // Update the playlist
             $this->playlist->update([
-                'status' => PlaylistStatus::Failed,
+                'status' => Status::Failed,
                 'synced' => now(),
                 'errors' => $e->getMessage(),
                 'progress' => 100,
@@ -743,7 +743,7 @@ class ProcessM3uImport implements ShouldQueue
             $completedIn = $start->diffInSeconds(now());
             $completedInRounded = round($completedIn, 2);
             $playlist->update([
-                'status' => PlaylistStatus::Completed,
+                'status' => Status::Completed,
                 'channels' => 0, // not using...
                 'synced' => now(),
                 'errors' => null,
@@ -792,7 +792,7 @@ class ProcessM3uImport implements ShouldQueue
                         ->body($error)
                         ->sendToDatabase($playlist->user);
                     $playlist->update([
-                        'status' => PlaylistStatus::Failed,
+                        'status' => Status::Failed,
                         'channels' => 0, // not using...
                         'synced' => now(),
                         'errors' => $error,

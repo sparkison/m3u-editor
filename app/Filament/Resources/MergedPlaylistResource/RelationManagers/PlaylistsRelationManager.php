@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources\MergedPlaylistResource\RelationManagers;
 
-use App\Enums\PlaylistStatus;
+use App\Enums\Status;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -42,7 +42,7 @@ class PlaylistsRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('status')
                     ->sortable()
                     ->badge()
-                    ->color(fn(PlaylistStatus $state) => $state->getColor()),
+                    ->color(fn(Status $state) => $state->getColor()),
                 Tables\Columns\TextColumn::make('synced')
                     ->label('Last Synced')
                     ->since()

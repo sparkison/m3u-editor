@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Enums\EpgStatus;
+use App\Enums\Status;
 use App\Events\SyncCompleted;
 use App\Models\EpgChannel;
 use App\Models\Job;
@@ -65,7 +65,7 @@ class ProcessEpgImportComplete implements ShouldQueue
 
         // Update the epg
         $epg->update([
-            'status' => EpgStatus::Completed,
+            'status' => Status::Completed,
             'synced' => now(),
             'errors' => null,
             'sync_time' => $completedIn,
