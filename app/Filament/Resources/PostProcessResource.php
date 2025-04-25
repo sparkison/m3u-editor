@@ -123,7 +123,8 @@ class PostProcessResource extends Resource
             Forms\Components\Toggle::make('enabled')
                 ->default(true)->helperText('Enable this post process'),
             Forms\Components\Toggle::make('metadata.send_failed')
-                ->default(false)->helperText('Send failed syncs too. Default is only successful syncs.'),
+                ->label('Process failed')
+                ->default(false)->helperText('Process on failed syncs too (default is only successful syncs).'),
             Forms\Components\TextInput::make('name')
                 ->required()
                 ->maxLength(255),

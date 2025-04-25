@@ -15,6 +15,8 @@ class SyncStatusesRelationManager extends RelationManager
 {
     protected static string $relationship = 'syncStatuses';
 
+    protected static ?string $title = 'Sync logs';
+
     public function form(Form $form): Form
     {
         return $form

@@ -705,6 +705,9 @@ class PlaylistResource extends Resource
 
         $tabs = [];
         foreach (self::getFormSections() as $section => $fields) {
+            if ($section === 'Name') {
+                $section = 'General';
+            }
             $tabs[] = Forms\Components\Tabs\Tab::make($section)
                 ->schema($fields);
         }
@@ -712,6 +715,7 @@ class PlaylistResource extends Resource
             Forms\Components\Tabs::make()
                 ->tabs($tabs)
                 ->columnSpanFull()
+                ->persistTabInQueryString()
         ];
     }
 
