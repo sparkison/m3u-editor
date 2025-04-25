@@ -67,6 +67,7 @@ class SyncStatusesRelationManager extends RelationManager
                                                 ->helperText('Total time to sync playlist (in seconds)'),
                                         ]),
                                     Infolists\Components\Tabs\Tab::make('Added groups')
+                                        ->badge(fn($record) => $record->sync_stats['added_groups'] ?? null)
                                         ->schema([
                                             Infolists\Components\RepeatableEntry::make('added_groups')
                                                 ->schema([
@@ -76,6 +77,7 @@ class SyncStatusesRelationManager extends RelationManager
                                                 ->columns(2)
                                         ]),
                                     Infolists\Components\Tabs\Tab::make('Added channels')
+                                        ->badge(fn($record) => $record->sync_stats['added_channels'] ?? null)
                                         ->schema([
                                             Infolists\Components\RepeatableEntry::make('added_channels')
                                                 ->schema([
@@ -85,6 +87,7 @@ class SyncStatusesRelationManager extends RelationManager
                                                 ->columns(2)
                                         ]),
                                     Infolists\Components\Tabs\Tab::make('Removed groups')
+                                        ->badge(fn($record) => $record->sync_stats['removed_groups'] ?? null)
                                         ->schema([
                                             Infolists\Components\RepeatableEntry::make('deleted_groups')
                                                 ->schema([
@@ -94,6 +97,7 @@ class SyncStatusesRelationManager extends RelationManager
                                                 ->columns(2)
                                         ]),
                                     Infolists\Components\Tabs\Tab::make('Removed channels')
+                                        ->badge(fn($record) => $record->sync_stats['removed_channels'] ?? null)
                                         ->schema([
                                             Infolists\Components\RepeatableEntry::make('deleted_channels')
                                                 ->schema([
