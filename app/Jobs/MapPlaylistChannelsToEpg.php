@@ -16,6 +16,7 @@ use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\LazyCollection;
 use Illuminate\Support\Str;
 
@@ -59,16 +60,7 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
         $epg = Epg::find($this->epg);
         if (!$epg) {
             $error = "Unable to map to the selected EPG, it no longer exists. Please select a different EPG and try again.";
-            Notification::make()
-                ->danger()
-                ->title("Error processing EPG channel mapping")
-                ->body('Please view your notifications for details.')
-                ->broadcast($epg->user);
-            Notification::make()
-                ->danger()
-                ->title("Error processing EPG channel mapping")
-                ->body($error)
-                ->sendToDatabase($epg->user);
+            Log::error("Error processing EPG mapping: {$error}");
             return;
         }
 

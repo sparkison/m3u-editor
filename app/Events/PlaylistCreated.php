@@ -15,8 +15,10 @@ class PlaylistCreated
      * Create a new event instance.
      * 
      * @param Playlist $playlist
+     * @param bool $isNew
      */
     public function __construct(
-        public Playlist $playlist
+        public Playlist $playlist,
+        public bool $isNew = false
     ) {}
 }

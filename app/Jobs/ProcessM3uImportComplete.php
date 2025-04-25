@@ -32,7 +32,8 @@ class ProcessM3uImportComplete implements ShouldQueue
         public array $groups,
         public string $batchNo,
         public Carbon $start,
-        public bool $maxHit = false
+        public bool $maxHit = false,
+        public bool $isNew = false,
     ) {
         //
     }
@@ -100,20 +101,27 @@ class ProcessM3uImportComplete implements ShouldQueue
             ['new', true],
         ]);
 
-        // Log it to the playlst sync statuses!
-        PlaylistSyncStatus::create([
-            'name' => $playlist->name,
-            'user_id' => $user->id,
-            'playlist_id' => $playlist->id,
-            'sync_stats' => [
-                'time' => $completedIn,
-                'time_rounded' => $completedInRounded,
-            ],
-            'deleted_groups' => $removedGroups->get(['id', 'name'])->toArray(),
-            'added_groups' => $newGroups->get(['id', 'name'])->toArray(),
-            'deleted_channels' => $removedChannels->get(['id', 'name', 'title'])->toArray(),
-            'added_channels' => $newChannels->get(['id', 'name', 'title'])->toArray(),
-        ]);
+        // If not a new playlist, sunc it to the playlst sync statuses!
+        if (!$this->isNew) {
+            PlaylistSyncStatus::create([
+                'name' => $playlist->name,
+                'user_id' => $user->id,
+                'playlist_id' => $playlist->id,
+                'sync_stats' => [
+                    'time' => $completedIn,
+                    'time_rounded' => $completedInRounded,
+                    'removed_groups' => $removedGroups->count(),
+                    'added_groups' => $newGroups->count(),
+                    'removed_channels' => $removedChannels->count(),
+                    'added_channels' => $newChannels->count(),
+                    'max_hit' => $this->maxHit,
+                ],
+                'deleted_groups' => $removedGroups->get(['id', 'name'])->toArray(),
+                'added_groups' => $newGroups->get(['id', 'name'])->toArray(),
+                'deleted_channels' => $removedChannels->get(['id', 'name', 'title'])->toArray(),
+                'added_channels' => $newChannels->get(['id', 'name', 'title'])->toArray(),
+            ]);
+        }
 
         // Clear out invalid groups/channels (if any)
         $removedGroups->delete();

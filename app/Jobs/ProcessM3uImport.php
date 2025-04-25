@@ -64,6 +64,7 @@ class ProcessM3uImport implements ShouldQueue
     public function __construct(
         public Playlist $playlist,
         public ?bool    $force = false,
+        public ?bool    $isNew = false,
     ) {
         $this->maxItems = config('dev.max_channels') + 1; // Maximum number of channels allowed for m3u import   
         $this->preprocess = $playlist->import_prefs['preprocess'] ?? false;
@@ -798,7 +799,8 @@ class ProcessM3uImport implements ShouldQueue
                 groups: $groups,
                 batchNo: $batchNo,
                 start: $start,
-                maxHit: $this->maxItemsHit
+                maxHit: $this->maxItemsHit,
+                isNew: $this->isNew,
             );
             Bus::chain($jobs)
                 ->onConnection('redis') // force to use redis connection

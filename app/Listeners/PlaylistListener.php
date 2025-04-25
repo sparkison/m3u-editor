@@ -16,7 +16,7 @@ class PlaylistListener
      * Handle the event.
      */
     public function handle(PlaylistCreated|PlaylistUpdated|PlaylistDeleted $event): void
-    {        
+    {
         // Check if created, updated, or deleted
         if ($event instanceof PlaylistCreated) {
             $this->handlePlaylistCreated($event);
@@ -29,7 +29,7 @@ class PlaylistListener
 
     private function handlePlaylistCreated(PlaylistCreated $event)
     {
-        dispatch(new ProcessM3uImport($event->playlist));
+        dispatch(new ProcessM3uImport(playlist: $event->playlist, isNew: $event->isNew));
         $event->playlist->postProcesses()->where([
             ['event', 'created'],
             ['enabled', true],
