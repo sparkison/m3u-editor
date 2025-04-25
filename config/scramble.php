@@ -65,7 +65,7 @@ return [
         /*
          * Use to fetch the credential policy for the Try It feature. Options are: omit, include (default), and same-origin
          */
-        'try_it_credentials_policy' => 'include',
+        'try_it_credentials_policy' => 'omit',
     ],
 
     /*
