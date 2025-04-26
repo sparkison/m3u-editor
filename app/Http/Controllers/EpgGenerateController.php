@@ -66,9 +66,20 @@ class EpgGenerateController extends Controller
                     }
 
                     // Get the `tvg-id` based on the playlist setting
-                    $tvgId = $idChannelBy === PlaylistChannelId::TvgId
-                        ? $channel->stream_id_custom ?? $channel->stream_id
-                        : $channelNo;
+                    switch ($idChannelBy) {
+                        case PlaylistChannelId::ChannelId:
+                            $tvgId = $channelNo;
+                            break;
+                        case PlaylistChannelId::Name:
+                            $tvgId = $channel->name_custom ?? $channel->name;
+                            break;
+                        case PlaylistChannelId::Title:
+                            $tvgId = $channel->title_custom ?? $channel->title;
+                            break;
+                        default:
+                            $tvgId = $channel->stream_id_custom ?? $channel->stream_id;
+                            break;
+                    }
 
                     // Make sure TVG ID only contains characters and numbers
                     $tvgId = preg_replace(config('dev.tvgid.regex'), '', $tvgId);
@@ -120,6 +131,8 @@ class EpgGenerateController extends Controller
                             'channel_no' => $channelNo,
                             'title' => $title,
                             'icon' => $icon,
+                            'group' => $channel->group ?? $channel->group_internal,
+                            'include_category' => $playlist->dummy_epg_category,
                         ];
 
                         // Output the <channel> tag
@@ -221,6 +234,8 @@ class EpgGenerateController extends Controller
                         $title = $dummyEpgChannel['title'];
                         $icon = $dummyEpgChannel['icon'];
                         $channelNo = $dummyEpgChannel['channel_no'];
+                        $group = $dummyEpgChannel['group'];
+                        $includeCategory = $dummyEpgChannel['include_category'];
 
                         // Generate dummy programmes for the specified length
                         $startTime = Carbon::now()
@@ -243,7 +258,10 @@ class EpgGenerateController extends Controller
                             if ($icon) {
                                 echo '    <icon src="' . $icon . '"/>' . PHP_EOL;
                             }
-                            echo '    <desc>Dummy EPG programme for ' . $title . '</desc>' . PHP_EOL;
+                            echo '    <desc>' . $title . '</desc>' . PHP_EOL;
+                            if ($includeCategory) {
+                                echo '    <category lang="en">' . $group . '</category>' . PHP_EOL;
+                            }
                             echo '  </programme>' . PHP_EOL;
                         }
 

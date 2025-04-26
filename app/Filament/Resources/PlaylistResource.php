@@ -644,18 +644,26 @@ class PlaylistResource extends Resource
                         ->options([
                             'stream_id' => 'TVG ID/Stream ID (default)',
                             'channel_id' => 'Channel Number',
+                            'name' => 'Channel Name',
+                            'title' => 'Channel Title',
                         ])
                         ->required()
                         ->default('stream_id') // Default to stream_id
                         ->columnSpan(1),
+                    Forms\Components\Toggle::make('dummy_epg_category')
+                        ->label('Channel group as category')
+                        ->columnSpan(1)
+                        ->inline(false)
+                        ->default(false)
+                        ->helperText('When enabled, the channel group will be assigned to the dummy EPG as a <category> tag.')
+                        ->hidden(fn(Get $get): bool => !$get('dummy_epg')),
                     Forms\Components\TextInput::make('dummy_epg_length')
                         ->label('Dummy program length (in minutes)')
                         ->columnSpan(1)
                         ->rules(['min:1'])
                         ->type('number')
                         ->default(120)
-                        ->hidden(fn(Get $get): bool => !$get('dummy_epg'))
-                        ->required(),
+                        ->hidden(fn(Get $get): bool => !$get('dummy_epg')),
                 ]),
             Forms\Components\Section::make('Streaming Output')
                 ->description('Output processing options')

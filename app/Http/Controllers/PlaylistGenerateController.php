@@ -88,9 +88,22 @@ class PlaylistGenerateController extends Controller
                             $group = $customGroup->getAttributeValue('name');
                         }
                     }
-                    $tvgId = $idChannelBy === PlaylistChannelId::TvgId
-                        ? $channel->stream_id_custom ?? $channel->stream_id
-                        : $channelNo;
+
+                    // Get the TVG ID
+                    switch ($idChannelBy) {
+                        case PlaylistChannelId::ChannelId:
+                            $tvgId = $channelNo;
+                            break;
+                        case PlaylistChannelId::Name:
+                            $tvgId = $channel->name_custom ?? $channel->name;
+                            break;
+                        case PlaylistChannelId::Title:
+                            $tvgId = $channel->title_custom ?? $channel->title;
+                            break;
+                        default:
+                            $tvgId = $channel->stream_id_custom ?? $channel->stream_id;
+                            break;
+                    }
 
                     // Get the icon
                     $icon = '';
@@ -234,9 +247,21 @@ class PlaylistGenerateController extends Controller
             if (!$channelNo && $autoIncrement) {
                 $channelNo = ++$channelNumber;
             }
-            $tvgId = $idChannelBy === PlaylistChannelId::TvgId
-                ? $channel->stream_id_custom ?? $channel->stream_id
-                : $channelNo;
+            // Get the TVG ID
+            switch ($idChannelBy) {
+                case PlaylistChannelId::ChannelId:
+                    $tvgId = $channelNo;
+                    break;
+                case PlaylistChannelId::Name:
+                    $tvgId = $channel->name_custom ?? $channel->name;
+                    break;
+                case PlaylistChannelId::Title:
+                    $tvgId = $channel->title_custom ?? $channel->title;
+                    break;
+                default:
+                    $tvgId = $channel->stream_id_custom ?? $channel->stream_id;
+                    break;
+            }
             return [
                 'GuideNumber' => (string)$tvgId,
                 'GuideName' => $channel->title_custom ?? $channel->title,
