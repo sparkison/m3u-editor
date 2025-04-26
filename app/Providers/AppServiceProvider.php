@@ -133,7 +133,7 @@ class AppServiceProvider extends ServiceProvider
         // Register the event listener
         try {
             // Process playlist on creation
-            Playlist::created(fn(Playlist $playlist) => event(new PlaylistCreated($playlist, isNew: true)));
+            Playlist::created(fn(Playlist $playlist) => event(new PlaylistCreated($playlist)));
             Playlist::updated(fn(Playlist $playlist) => event(new PlaylistUpdated($playlist)));
             Playlist::creating(function (Playlist $playlist) {
                 if (!$playlist->user_id) {

@@ -29,7 +29,7 @@ class PlaylistListener
 
     private function handlePlaylistCreated(PlaylistCreated $event)
     {
-        dispatch(new ProcessM3uImport(playlist: $event->playlist, isNew: $event->isNew));
+        dispatch(new ProcessM3uImport(playlist: $event->playlist, isNew: true));
         $event->playlist->postProcesses()->where([
             ['event', 'created'],
             ['enabled', true],
