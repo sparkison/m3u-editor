@@ -8,6 +8,9 @@ use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Session;
 
 class RestoreBackup implements ShouldQueue
 {
@@ -30,6 +33,11 @@ class RestoreBackup implements ShouldQueue
             // Flush the jobs table
             Job::truncate();
 
+            // Put app into maintenance mode
+            Artisan::call('down', [
+                '--refresh' => 15, // refresh in 15s
+            ]);
+
             // Restore the selected backup
             Artisan::call('backup:restore', [
                 '--backup' => $this->backupPath,
@@ -39,6 +47,15 @@ class RestoreBackup implements ShouldQueue
 
             // If restoring from an older version of the app, make sure we run migrations
             Artisan::call('migrate', ['--force' => true]);
+
+            // Clear invalid session data
+            DB::table('sessions')->truncate();
+
+            // Pause to allow the restore to complete
+            sleep(3);
+
+            // Bring app back up
+            Artisan::call('up');
 
             // Notify the admin that the backup was restored
             $user = User::whereIn('email', config('dev.admin_emails'))->first();
