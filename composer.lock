@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "251aba84dfce228e30204a8be5713682",
+    "content-hash": "f886630fcfb26c2c7e49bc1095c7973a",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -223,6 +223,72 @@
                 }
             ],
             "time": "2025-02-24T21:32:04+00:00"
+        },
+        {
+            "name": "aymanalhattami/filament-slim-scrollbar",
+            "version": "2.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/aymanalhattami/filament-slim-scrollbar.git",
+                "reference": "306e32e28e9506e5667c248d1f6a876339a7b4be"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/aymanalhattami/filament-slim-scrollbar/zipball/306e32e28e9506e5667c248d1f6a876339a7b4be",
+                "reference": "306e32e28e9506e5667c248d1f6a876339a7b4be",
+                "shasum": ""
+            },
+            "require": {
+                "filament/filament": "^3.0",
+                "spatie/laravel-package-tools": "^1.15"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.0",
+                "orchestra/testbench": "^9.0",
+                "pestphp/pest": "^3.0",
+                "phpstan/phpstan": "^1.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "FilamentSlimScrollbar": "Aymanalhattami\\FilamentSlimScrollbar\\FilamentSlimScrollbarFacade"
+                    },
+                    "providers": [
+                        "Aymanalhattami\\FilamentSlimScrollbar\\FilamentSlimScrollbarServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Aymanalhattami\\FilamentSlimScrollbar\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Ayman Alhattami",
+                    "email": "ayman.m.alhattami@gmail.com",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Slim scrollbar for sidebar scrollbar, table scrollbar, and any other scrollbar in the application.",
+            "homepage": "https://github.com/aymanalhattami/filament-slim-scrollbar",
+            "keywords": [
+                "aymanalhattami",
+                "css slim scrollbar",
+                "filament",
+                "filament-slim-scrollbar",
+                "pure css scrollbar"
+            ],
+            "support": {
+                "issues": "https://github.com/aymanalhattami/filament-slim-scrollbar/issues",
+                "source": "https://github.com/aymanalhattami/filament-slim-scrollbar/tree/2.1.0"
+            },
+            "time": "2025-02-03T14:21:04+00:00"
         },
         {
             "name": "bacon/bacon-qr-code",

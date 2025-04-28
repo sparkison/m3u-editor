@@ -11,6 +11,7 @@
     "require": {
         "php": "^8.2",
         "ashallendesign/short-url": "^8.3",
+        "aymanalhattami/filament-slim-scrollbar": "^2.1",
         "calebporzio/sushi": "^2.5",
         "cerbero/json-parser": "^1.1",
         "dedoc/scramble": "^0.12.11",
