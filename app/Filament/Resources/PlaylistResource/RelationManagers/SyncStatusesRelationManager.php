@@ -34,14 +34,26 @@ class SyncStatusesRelationManager extends RelationManager
                     ->searchable()
                     ->sortable()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('deleted_groups')
-                    ->getStateUsing(fn($record) => count($record->deleted_groups)),
-                Tables\Columns\TextColumn::make('added_groups')
-                    ->getStateUsing(fn($record) => count($record->added_groups)),
-                Tables\Columns\TextColumn::make('deleted_channels')
-                    ->getStateUsing(fn($record) => count($record->deleted_channels)),
-                Tables\Columns\TextColumn::make('added_channels')
-                    ->getStateUsing(fn($record) => count($record->added_channels)),
+                Tables\Columns\TextColumn::make('removed_groups_count')
+                    ->label('Removed Groups')
+                    ->counts('removedGroups')
+                    ->toggleable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('added_groups_count')
+                    ->label('Added Groups')
+                    ->counts('addedGroups')
+                    ->toggleable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('removed_channels_count')
+                    ->label('Removed Channels')
+                    ->counts('removedChannels')
+                    ->toggleable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('added_channels_count')
+                    ->label('Added Channels')
+                    ->counts('addedChannels')
+                    ->toggleable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Synced')
                     ->dateTime()
@@ -56,57 +68,11 @@ class SyncStatusesRelationManager extends RelationManager
                 Tables\Actions\ActionGroup::make([
                     Tables\Actions\ViewAction::make()
                         ->infolist([
-                            Infolists\Components\Tabs::make('Tabs')
-                                ->tabs([
-                                    Infolists\Components\Tabs\Tab::make('Stats')
-                                        ->schema([
-                                            Infolists\Components\TextEntry::make('name')
-                                                ->label('Playlist name'),
-                                            Infolists\Components\TextEntry::make('sync_stats.time_rounded')
-                                                ->label('Sync time')
-                                                ->helperText('Total time to sync playlist (in seconds)'),
-                                        ]),
-                                    Infolists\Components\Tabs\Tab::make('Added groups')
-                                        ->badge(fn($record) => $record->sync_stats['added_groups'] ?? null)
-                                        ->schema([
-                                            Infolists\Components\RepeatableEntry::make('added_groups')
-                                                ->schema([
-                                                    Infolists\Components\TextEntry::make('name')
-                                                        ->columnSpan(2),
-                                                ])
-                                                ->columns(2)
-                                        ]),
-                                    Infolists\Components\Tabs\Tab::make('Added channels')
-                                        ->badge(fn($record) => $record->sync_stats['added_channels'] ?? null)
-                                        ->schema([
-                                            Infolists\Components\RepeatableEntry::make('added_channels')
-                                                ->schema([
-                                                    Infolists\Components\TextEntry::make('title'),
-                                                    Infolists\Components\TextEntry::make('name'),
-                                                ])
-                                                ->columns(2)
-                                        ]),
-                                    Infolists\Components\Tabs\Tab::make('Removed groups')
-                                        ->badge(fn($record) => $record->sync_stats['removed_groups'] ?? null)
-                                        ->schema([
-                                            Infolists\Components\RepeatableEntry::make('deleted_groups')
-                                                ->schema([
-                                                    Infolists\Components\TextEntry::make('name')
-                                                        ->columnSpan(2),
-                                                ])
-                                                ->columns(2)
-                                        ]),
-                                    Infolists\Components\Tabs\Tab::make('Removed channels')
-                                        ->badge(fn($record) => $record->sync_stats['removed_channels'] ?? null)
-                                        ->schema([
-                                            Infolists\Components\RepeatableEntry::make('deleted_channels')
-                                                ->schema([
-                                                    Infolists\Components\TextEntry::make('title'),
-                                                    Infolists\Components\TextEntry::make('name'),
-                                                ])
-                                                ->columns(2)
-                                        ]),
-                                ])
+                            Infolists\Components\TextEntry::make('name')
+                                ->label('Playlist name'),
+                            Infolists\Components\TextEntry::make('sync_stats.time_rounded')
+                                ->label('Sync time')
+                                ->helperText('Total time to sync playlist (in seconds)'),
                         ])
                         ->slideOver(),
                     Tables\Actions\DeleteAction::make(),

@@ -1,7 +1,7 @@
 created:
-    - database/factories/PlaylistSyncStatusFactory.php
-    - database/migrations/2025_04_24_212113_create_playlist_sync_statuses_table.php
-    - app/Models/PlaylistSyncStatus.php
+    - database/factories/PlaylistSyncStatusLogFactory.php
+    - database/migrations/2025_04_28_170814_create_playlist_sync_status_logs_table.php
+    - app/Models/PlaylistSyncStatusLog.php
 models:
     User: { name: string, email: string, email_verified_at: 'datetime nullable', password: string, remember_token: 'string nullable' }
     Playlist: { name: string, uuid: uuid, url: string, status: 'enum:pending,processing,completed,failed default:pending', prefix: 'string nullable', channels: 'unsignedInteger default:0', synced: 'datetime nullable', errors: 'longText nullable', user_id: 'id foreign:users', relationships: { belongsTo: User, hasMany: 'Channel, Group' } }
@@ -16,3 +16,4 @@ models:
     PlaylistAuth: { name: string, enabled: 'boolean default:true', user_id: 'id foreign:users', username: string, password: string, relationships: { belongsTo: User, morphTo: Authenticatable } }
     PostProcess: { name: string, enabled: 'boolean default:true', user_id: 'id foreign:users', event: string, metadata: json, relationships: { belongsTo: User, morphTo: processable } }
     PlaylistSyncStatus: { name: string, user_id: 'id foreign:users', playlist_id: 'id foreign:playlists', deleted_groups: longtext, added_groups: longtext, deleted_channels: longtext, added_channels: longtext, relationships: { belongsTo: 'User, Playlist' } }
+    PlaylistSyncStatusLog: { name: string, user_id: 'id foreign:users', playlist_id: 'id foreign:playlists', playlist_sync_status_id: 'id foreign:playlist_sync_statuses', type: 'enum:group,channel,unknown default:unknown', status: 'enum:added,removed,unknown default:unknown', meta: json, relationships: { belongsTo: 'User, Playlist, PlaylistSyncStatus' } }

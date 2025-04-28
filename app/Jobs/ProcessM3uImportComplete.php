@@ -19,7 +19,7 @@ class ProcessM3uImportComplete implements ShouldQueue
     use Queueable;
 
     // Make sure the process logs are cleaned up
-    public int $maxLogs = 50;
+    public int $maxLogs = 25;
 
     public $deleteWhenMissingModels = true;
 
@@ -101,9 +101,9 @@ class ProcessM3uImportComplete implements ShouldQueue
             ['new', true],
         ]);
 
-        // If not a new playlist, sunc it to the playlst sync statuses!
+        // If not a new playlist, create a new playlst sync status!
         if (!$this->isNew) {
-            PlaylistSyncStatus::create([
+            $sync = PlaylistSyncStatus::create([
                 'name' => $playlist->name,
                 'user_id' => $user->id,
                 'playlist_id' => $playlist->id,
@@ -115,12 +115,50 @@ class ProcessM3uImportComplete implements ShouldQueue
                     'removed_channels' => $removedChannels->count(),
                     'added_channels' => $newChannels->count(),
                     'max_hit' => $this->maxHit,
-                ],
-                'deleted_groups' => $removedGroups->get(['id', 'name'])->toArray(),
-                'added_groups' => $newGroups->get(['id', 'name'])->toArray(),
-                'deleted_channels' => $removedChannels->get(['id', 'name', 'title'])->toArray(),
-                'added_channels' => $newChannels->get(['id', 'name', 'title'])->toArray(),
+                ]
             ]);
+
+            // Create the sync log entries
+            $removedGroups->cursor()->each(function ($group) use ($sync) {
+                $sync->logs()->create([
+                    'name' => $group->name,
+                    'type' => 'group',
+                    'status' => 'removed',
+                    'meta' => $group,
+                    'playlist_id' => $group->playlist_id,
+                    'user_id' => $group->user_id,
+                ]);
+            });
+            $newGroups->cursor()->each(function ($group) use ($sync) {
+                $sync->logs()->create([
+                    'name' => $group->name,
+                    'type' => 'group',
+                    'status' => 'added',
+                    'meta' => $group,
+                    'playlist_id' => $group->playlist_id,
+                    'user_id' => $group->user_id,
+                ]);
+            });
+            $removedChannels->cursor()->each(function ($channel) use ($sync) {
+                $sync->logs()->create([
+                    'name' => $channel->title,
+                    'type' => 'channel',
+                    'status' => 'removed',
+                    'meta' => $channel,
+                    'playlist_id' => $channel->playlist_id,
+                    'user_id' => $channel->user_id,
+                ]);
+            });
+            $newChannels->cursor()->each(function ($channel) use ($sync) {
+                $sync->logs()->create([
+                    'name' => $channel->title,
+                    'type' => 'channel',
+                    'status' => 'added',
+                    'meta' => $channel,
+                    'playlist_id' => $channel->playlist_id,
+                    'user_id' => $channel->user_id,
+                ]);
+            });
         }
 
         // Clear out invalid groups/channels (if any)

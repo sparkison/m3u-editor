@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PlaylistSyncStatus extends Model
 {
@@ -34,5 +35,46 @@ class PlaylistSyncStatus extends Model
     public function playlist(): BelongsTo
     {
         return $this->belongsTo(Playlist::class);
+    }
+
+    public function logs(): HasMany
+    {
+        return $this->hasMany(PlaylistSyncStatusLog::class);
+    }
+
+    public function removedGroups(): HasMany
+    {
+        return $this->logs()
+            ->where([
+                ['type', 'group'],
+                ['status', 'removed'],
+            ]);
+    }
+
+    public function addedGroups(): HasMany
+    {
+        return $this->logs()
+            ->where([
+                ['type', 'group'],
+                ['status', 'added'],
+            ]);
+    }
+
+    public function removedChannels(): HasMany
+    {
+        return $this->logs()
+            ->where([
+                ['type', 'channel'],
+                ['status', 'removed'],
+            ]);
+    }
+
+    public function addedChannels(): HasMany
+    {
+        return $this->logs()
+            ->where([
+                ['type', 'channel'],
+                ['status', 'added'],
+            ]);
     }
 }
