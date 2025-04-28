@@ -66,15 +66,7 @@ class SyncStatusesRelationManager extends RelationManager
             ->headerActions([])
             ->actions([
                 Tables\Actions\ActionGroup::make([
-                    Tables\Actions\ViewAction::make()
-                        ->infolist([
-                            Infolists\Components\TextEntry::make('name')
-                                ->label('Playlist name'),
-                            Infolists\Components\TextEntry::make('sync_stats.time_rounded')
-                                ->label('Sync time')
-                                ->helperText('Total time to sync playlist (in seconds)'),
-                        ])
-                        ->slideOver(),
+                    Tables\Actions\ViewAction::make()->slideOver(),
                     Tables\Actions\DeleteAction::make(),
                 ])->button()->hiddenLabel()
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
