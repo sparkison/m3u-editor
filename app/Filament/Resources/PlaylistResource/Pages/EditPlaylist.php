@@ -25,6 +25,7 @@ class EditPlaylist extends EditRecord
     {
         return [
             Actions\Action::make('Sync Logs')
+                ->label('Sync Logs')
                 ->color('gray')
                 ->icon('heroicon-m-arrows-right-left')
                 ->url(

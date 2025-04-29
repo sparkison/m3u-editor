@@ -15,6 +15,9 @@ class ViewPlaylistSyncStatus extends ViewRecord
 
     protected static string $resource = PlaylistSyncStatusResource::class;
 
+    protected static ?string $navigationLabel = 'Log details';
+    protected static ?string $title = 'Sync log details';
+
     protected function getHeaderActions(): array
     {
         return [];
