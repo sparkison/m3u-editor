@@ -22,7 +22,8 @@ class PlaylistSyncStatusResource extends Resource
     public static ?string $parentResource = PlaylistResource::class;
     public static function getRecordTitle(?Model $record): string|null|Htmlable
     {
-        return $record->title;
+        return $record->created_at;
+        // return $record->name;
     }
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
@@ -44,6 +45,11 @@ class PlaylistSyncStatusResource extends Resource
             ->recordTitleAttribute('name')
             ->defaultSort('created_at', 'desc')
             ->columns([
+                Tables\Columns\TextColumn::make('created_at')
+                    ->label('Synced')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('name')
                     ->label('Playlist Name')
                     ->searchable()
@@ -69,11 +75,6 @@ class PlaylistSyncStatusResource extends Resource
                     ->counts('addedChannels')
                     ->toggleable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('created_at')
-                    ->label('Synced')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(),
             ])
             ->filters([
                 //

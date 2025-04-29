@@ -27,13 +27,16 @@ class ViewPlaylistSyncStatus extends ViewRecord
                 Infolists\Components\Section::make('Sync Status')
                     ->description('General sync information')
                     ->columnSpanFull()
-                    ->columns(2)
+                    ->columns(3)
                     ->schema([
                         Infolists\Components\TextEntry::make('name')
                             ->label('Playlist name'),
                         Infolists\Components\TextEntry::make('sync_stats.time_rounded')
                             ->label('Sync time')
                             ->helperText('Total time to sync playlist (in seconds)'),
+                        Infolists\Components\TextEntry::make('created_at')
+                            ->label('Synced at')
+                            ->dateTime(),
                     ]),
             ]);
     }
