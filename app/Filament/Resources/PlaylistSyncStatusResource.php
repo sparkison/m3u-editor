@@ -55,14 +55,9 @@ class PlaylistSyncStatusResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('removed_groups_count')
-                    ->label('Removed Groups')
-                    ->counts('removedGroups')
-                    ->toggleable()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('added_groups_count')
-                    ->label('Added Groups')
-                    ->counts('addedGroups')
+                Tables\Columns\TextColumn::make('added_channels_count')
+                    ->label('Added Channels')
+                    ->counts('addedChannels')
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('removed_channels_count')
@@ -70,9 +65,14 @@ class PlaylistSyncStatusResource extends Resource
                     ->counts('removedChannels')
                     ->toggleable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('added_channels_count')
-                    ->label('Added Channels')
-                    ->counts('addedChannels')
+                Tables\Columns\TextColumn::make('added_groups_count')
+                    ->label('Added Groups')
+                    ->counts('addedGroups')
+                    ->toggleable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('removed_groups_count')
+                    ->label('Removed Groups')
+                    ->counts('removedGroups')
                     ->toggleable()
                     ->sortable(),
             ])

@@ -90,29 +90,34 @@ class LogsRelationManager extends RelationManager
 
     public function getTabs(): array
     {
-        return self::setupTabs();
+        $syncId = $this->getOwnerRecord()->getKey();
+        return self::setupTabs($syncId);
     }
 
-    public static function setupTabs(): array
+    public static function setupTabs(int $syncId): array
     {
         // Change count based on view
         $addedChannels = PlaylistSyncStatusLog::query()
             ->where([
+                'playlist_sync_status_id' => $syncId,
                 'type' => 'channel',
                 'status' => 'added',
             ])->count();
         $removedChannels = PlaylistSyncStatusLog::query()
             ->where([
+                'playlist_sync_status_id' => $syncId,
                 'type' => 'channel',
                 'status' => 'removed',
             ])->count();
         $addedGroups = PlaylistSyncStatusLog::query()
             ->where([
+                'playlist_sync_status_id' => $syncId,
                 'type' => 'group',
                 'status' => 'added',
             ])->count();
         $removedGroups = PlaylistSyncStatusLog::query()
             ->where([
+                'playlist_sync_status_id' => $syncId,
                 'type' => 'group',
                 'status' => 'removed',
             ])->count();
@@ -123,6 +128,7 @@ class LogsRelationManager extends RelationManager
                 ->badge($addedChannels)
                 ->badgeColor('success')
                 ->modifyQueryUsing(fn($query) => $query->where([
+                    'playlist_sync_status_id' => $syncId,
                     'type' => 'channel',
                     'status' => 'added',
                 ])),
@@ -130,6 +136,7 @@ class LogsRelationManager extends RelationManager
                 ->badge($removedChannels)
                 ->badgeColor('danger')
                 ->modifyQueryUsing(fn($query) => $query->where([
+                    'playlist_sync_status_id' => $syncId,
                     'type' => 'channel',
                     'status' => 'removed',
                 ])),
@@ -137,6 +144,7 @@ class LogsRelationManager extends RelationManager
                 ->badge($addedGroups)
                 ->badgeColor('success')
                 ->modifyQueryUsing(fn($query) => $query->where([
+                    'playlist_sync_status_id' => $syncId,
                     'type' => 'group',
                     'status' => 'added',
                 ])),
@@ -144,6 +152,7 @@ class LogsRelationManager extends RelationManager
                 ->badge($removedGroups)
                 ->badgeColor('danger')
                 ->modifyQueryUsing(fn($query) => $query->where([
+                    'playlist_sync_status_id' => $syncId,
                     'type' => 'group',
                     'status' => 'removed',
                 ])),
