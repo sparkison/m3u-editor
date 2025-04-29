@@ -23,7 +23,10 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
 use App\Facades\PlaylistUrlFacade;
+use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ListPlaylistSyncStatuses;
+use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ViewPlaylistSyncStatus;
 use App\Forms\Components\MediaFlowProxyUrl;
+use App\Models\PlaylistSyncStatus;
 
 class PlaylistResource extends Resource
 {
@@ -293,7 +296,7 @@ class PlaylistResource extends Resource
     public static function getRelations(): array
     {
         return [
-            RelationManagers\SyncStatusesRelationManager::class,
+            //
         ];
     }
 
@@ -703,14 +706,6 @@ class PlaylistResource extends Resource
 
     public static function getForm(): array
     {
-        // $sections = [];
-        // foreach (self::getFormSections() as $section => $fields) {
-        //     $sections[] = Forms\Components\Section::make($section)
-        //         ->schema($fields);
-        // }
-        // return $sections;
-        // return [];
-
         $tabs = [];
         foreach (self::getFormSections() as $section => $fields) {
             if ($section === 'Name') {
