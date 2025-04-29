@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PlaylistSyncStatusResource\Pages;
 
 use App\Filament\Resources\PlaylistSyncStatusResource;
+use App\Traits\HasParentResource;
 use Filament\Actions;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
@@ -10,6 +11,8 @@ use Filament\Resources\Pages\ViewRecord;
 
 class ViewPlaylistSyncStatus extends ViewRecord
 {
+    use HasParentResource;
+
     protected static string $resource = PlaylistSyncStatusResource::class;
 
     protected function getHeaderActions(): array
@@ -21,8 +24,10 @@ class ViewPlaylistSyncStatus extends ViewRecord
     {
         return $infolist
             ->schema([
-                Infolists\Components\Fieldset::make('sync_stats')
-                    ->label('Sync Stats')
+                Infolists\Components\Section::make('Sync Status')
+                    ->description('General sync information')
+                    ->columnSpanFull()
+                    ->columns(2)
                     ->schema([
                         Infolists\Components\TextEntry::make('name')
                             ->label('Playlist name'),

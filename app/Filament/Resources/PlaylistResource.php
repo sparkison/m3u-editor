@@ -23,16 +23,28 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
 use App\Facades\PlaylistUrlFacade;
+use App\Filament\Resources\PlaylistSyncStatusResource\Pages\CreatePlaylistSyncStatus;
+use App\Filament\Resources\PlaylistSyncStatusResource\Pages\EditPlaylistSyncStatus;
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ListPlaylistSyncStatuses;
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ViewPlaylistSyncStatus;
 use App\Forms\Components\MediaFlowProxyUrl;
 use App\Models\PlaylistSyncStatus;
+use Filament\Facades\Filament;
+use Filament\Tables\Actions\Action;
+use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Route;
 
 class PlaylistResource extends Resource
 {
     protected static ?string $model = Playlist::class;
 
     protected static ?string $recordTitleAttribute = 'name';
+
+    public static function getRecordTitle(?Model $record): string|null|Htmlable
+    {
+        return $record->name;
+    }
 
     public static function getGloballySearchableAttributes(): array
     {
@@ -303,9 +315,16 @@ class PlaylistResource extends Resource
     public static function getPages(): array
     {
         return [
+            // Playlists
             'index' => Pages\ListPlaylists::route('/'),
             'create' => Pages\CreatePlaylist::route('/create'),
             'edit' => Pages\EditPlaylist::route('/{record}/edit'),
+
+            // Playlist Sync Statuses
+            'playlist-sync-statuses.index' => ListPlaylistSyncStatuses::route('/{parent}/syncs'),
+            //'playlist-sync-statuses.create' => CreatePlaylistSyncStatus::route('/{parent}/syncs/create'),
+            'playlist-sync-statuses.view' => ViewPlaylistSyncStatus::route('/{parent}/syncs/{record}'),
+            //'playlist-sync-statuses.edit' => EditPlaylistSyncStatus::route('/{parent}/syncs/{record}/edit'),
         ];
     }
 

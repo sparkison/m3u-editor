@@ -4,7 +4,6 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages;
 use App\Filament\Resources\PlaylistSyncStatusResource\RelationManagers;
-use App\Models\Playlist;
 use App\Models\PlaylistSyncStatus;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -13,11 +12,18 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Database\Eloquent\Model;
 
 class PlaylistSyncStatusResource extends Resource
 {
     protected static ?string $model = PlaylistSyncStatus::class;
-    protected static ?string $parentResource = Playlist::class;
+
+    public static ?string $parentResource = PlaylistResource::class;
+    public static function getRecordTitle(?Model $record): string|null|Htmlable
+    {
+        return $record->title;
+    }
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
 
@@ -75,7 +81,13 @@ class PlaylistSyncStatusResource extends Resource
             ->headerActions([])
             ->actions([
                 Tables\Actions\ActionGroup::make([
-                    Tables\Actions\ViewAction::make()->slideOver(),
+                    Tables\Actions\ViewAction::make()
+                        ->url(
+                            fn(Pages\ListPlaylistSyncStatuses $livewire, Model $record): string => static::$parentResource::getUrl('playlist-sync-statuses.view', [
+                                'record' => $record,
+                                'parent' => $livewire->parent,
+                            ])
+                        ),
                     Tables\Actions\DeleteAction::make(),
                 ])->button()->hiddenLabel()
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
@@ -96,15 +108,5 @@ class PlaylistSyncStatusResource extends Resource
     public function getParentRelationshipKey(): string
     {
         return 'playlist_id';
-    }
-
-    public static function getPages(): array
-    {
-        return [
-            'view' => Pages\ViewPlaylistSyncStatus::route('/{record}'),
-            'index' => Pages\ListPlaylistSyncStatuses::route('/'),
-            // 'create' => Pages\CreatePlaylistSyncStatus::route('/create'),
-            // 'edit' => Pages\EditPlaylistSyncStatus::route('/{record}/edit'),
-        ];
     }
 }

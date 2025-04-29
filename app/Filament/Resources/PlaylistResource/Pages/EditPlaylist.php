@@ -4,6 +4,7 @@ namespace App\Filament\Resources\PlaylistResource\Pages;
 
 use App\Enums\Status;
 use App\Filament\Resources\PlaylistResource;
+use App\Models\Playlist;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Notifications\Notification;
@@ -23,6 +24,17 @@ class EditPlaylist extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            Actions\Action::make('Sync Logs')
+                ->color('gray')
+                ->icon('heroicon-m-arrows-right-left')
+                ->url(
+                    fn(Playlist $record): string => PlaylistResource::getUrl(
+                        name: 'playlist-sync-statuses.index',
+                        parameters: [
+                            'parent' => $record->id,
+                        ]
+                    )
+                ),
             Actions\ActionGroup::make([
                 Actions\Action::make('process')
                     ->label('Process')
