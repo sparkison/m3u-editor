@@ -52,8 +52,7 @@ class EpgGenerateController extends Controller
     /**
      * Generate the EPG XML file contents
      *
-     * @param string $uuid
-     * @return \Illuminate\Http\Response
+     * @param Playlist|MergedPlaylist|CustomPlaylist $playlist
      */
     private function generate($playlist)
     {
