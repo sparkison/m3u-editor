@@ -54,9 +54,6 @@ class RestoreBackup implements ShouldQueue
             // Pause to allow the restore to complete
             sleep(3);
 
-            // Bring app back up
-            Artisan::call('up');
-
             // Notify the admin that the backup was restored
             $user = User::whereIn('email', config('dev.admin_emails'))->first();
             if ($user) {
@@ -91,6 +88,9 @@ class RestoreBackup implements ShouldQueue
                     ->body($message)
                     ->sendToDatabase($user);
             }
+        } finally {
+            // Bring app back up
+            Artisan::call('up');
         }
     }
 }

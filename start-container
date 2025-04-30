@@ -146,6 +146,9 @@ php artisan app:update-check
 # Optimize Laravel
 php artisan optimize
 
+# Make sure app is "up"
+php artisan up
+
 # Set Sqlite WAL mode
 echo "🗂️ Enabling SQLite WAL mode..."
 php artisan sqlite:wal-enable sqlite
