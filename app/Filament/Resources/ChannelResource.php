@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\ChannelLogoType;
 use App\Facades\ProxyFacade;
 use App\Filament\Resources\ChannelResource\Pages;
+use App\Forms\Components\VideoPreview;
 use App\Models\Channel;
 use App\Models\CustomPlaylist;
 use App\Models\Epg;
@@ -543,6 +544,13 @@ class ChannelResource extends Resource
             Forms\Components\Toggle::make('enabled')
                 ->columnSpan('full')
                 ->helperText('Toggle channel status'),
+            Forms\Components\Fieldset::make('Preview')
+                ->schema([
+                    VideoPreview::make('preview')
+                        ->label('Click to play the stream')
+                        ->columnSpanFull()
+                        ->dehydrated(false), // don't save the value in the database
+                ]),
             Forms\Components\Fieldset::make('General Settings')
                 ->schema([
                     Forms\Components\TextInput::make('title_custom')

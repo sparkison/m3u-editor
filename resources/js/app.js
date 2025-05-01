@@ -6,3 +6,4 @@ import './echo'
 
 // Vendor
 import './vendor/qrcode'
+import './vendor/video'
