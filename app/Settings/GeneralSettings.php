@@ -19,6 +19,8 @@ class GeneralSettings extends Settings
     public ?string $mediaflow_proxy_url = null;
     public ?string $mediaflow_proxy_port = null;
     public ?string $mediaflow_proxy_password = null;
+    public ?string $mediaflow_proxy_user_agent = null;
+    public ?bool $mediaflow_proxy_playlist_user_agent = false;
 
     public static function group(): string
     {

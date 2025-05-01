@@ -89,7 +89,15 @@ class PlaylistUrlService
         }
 
         // Example structure: http://localhost:8888/proxy/hls/manifest.m3u8?d=YOUR_M3U_EDITOR_PLAYLIST_URL&api_password=YOUR_PROXY_API_PASSWORD
-        $m3uUrl = $proxyUrl . '/proxy/hls/manifest.m3u8?d=' . route('playlist.generate', ['uuid' => $playlist->uuid]);
+        $playlistRoute = route('playlist.generate', ['uuid' => $playlist->uuid]);
+        $m3uUrl = $proxyUrl . '/proxy/hls/manifest.m3u8?d=' . urlencode($playlistRoute);
+
+        // Check if we're adding user-agent headers
+        if ($settings['mediaflow_proxy_playlist_user_agent']) {
+            $m3uUrl .= '&h_user-agent=' . urlencode($playlist->user_agent);
+        } else if ($settings['mediaflow_proxy_user_agent']) {
+            $m3uUrl .= '&h_user-agent=' . urlencode($settings['mediaflow_proxy_user_agent']);
+        }
         $m3uUrl .= '&api_password=' . $settings['mediaflow_proxy_password'];
 
         // If auth set, append auth parameters to the URLs
@@ -127,12 +135,16 @@ class PlaylistUrlService
             'mediaflow_proxy_url' => null,
             'mediaflow_proxy_port' => null,
             'mediaflow_proxy_password' => null,
+            'mediaflow_proxy_user_agent' => null,
+            'mediaflow_proxy_playlist_user_agent' => null,
         ];
         try {
             $settings = [
                 'mediaflow_proxy_url' => $userPreferences->mediaflow_proxy_url ?? $settings['mediaflow_proxy_url'],
                 'mediaflow_proxy_port' => $userPreferences->mediaflow_proxy_port ?? $settings['mediaflow_proxy_port'],
                 'mediaflow_proxy_password' => $userPreferences->mediaflow_proxy_password ?? $settings['mediaflow_proxy_password'],
+                'mediaflow_proxy_user_agent' => $userPreferences->mediaflow_proxy_user_agent ?? $settings['mediaflow_proxy_user_agent'],
+                'mediaflow_proxy_playlist_user_agent' => $userPreferences->mediaflow_proxy_playlist_user_agent ?? $settings['mediaflow_proxy_playlist_user_agent'],
             ];
         } catch (Exception $e) {
             // Ignore
