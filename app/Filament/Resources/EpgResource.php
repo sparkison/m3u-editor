@@ -261,6 +261,16 @@ class EpgResource extends Resource
                         ->helperText('Default is every 24hr if left empty.')
                         ->columnSpan(1)
                         ->options([
+                            '15 minutes' => '15 minutes',
+                            '30 minutes' => '30 minutes',
+                            '45 minutes' => '45 minutes',
+                            '1 hour' => '1 hour',
+                            '2 hours' => '2 hours',
+                            '3 hours' => '3 hours',
+                            '4 hours' => '4 hours',
+                            '5 hours' => '5 hours',
+                            '6 hours' => '6 hours',
+                            '7 hours' => '7 hours',
                             '8 hours' => '8 hours',
                             '12 hours' => '12 hours',
                             '24 hours' => '24 hours',

@@ -10,6 +10,10 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::command('app:update-check')
     ->daily();
 
+// Cleanup old/stale job batches
+Schedule::command('app:flush-jobs-table')
+    ->twiceDaily();
+
 // Refresh playlists
 Schedule::command('app:refresh-playlist')
     ->everyFiveMinutes();
@@ -17,7 +21,3 @@ Schedule::command('app:refresh-playlist')
 // Refresh EPG
 Schedule::command('app:refresh-epg')
     ->everyFiveMinutes();
-
-// Cleanup old/stale job batches
-Schedule::command('app:flush-jobs-table')
-    ->twiceDaily();

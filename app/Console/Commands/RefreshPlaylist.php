@@ -38,12 +38,12 @@ class RefreshPlaylist extends Command
             $this->info('Dispatched playlist for refresh');
         } else {
             $this->info('Refreshing all playlists');
-            $eightHoursAgo = now()->subHours(8); // lowest interval
+            $fifteenMinutesAgo = now()->subMinutes(15); // lowest interval
             $playlists = Playlist::query()->where(
                 'status',
                 '!=',
                 Status::Processing,
-            )->whereDate('synced', '<=', $eightHoursAgo);
+            )->whereDate('synced', '<=', $fifteenMinutesAgo);
             $count = $playlists->count();
             if ($count === 0) {
                 $this->info('No playlists ready refresh');

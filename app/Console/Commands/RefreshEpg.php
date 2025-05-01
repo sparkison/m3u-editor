@@ -37,12 +37,12 @@ class RefreshEpg extends Command
             $this->info('Dispatched EPG for refresh');
         } else {
             $this->info('Refreshing all EPGs');
-            $eightHoursAgo = now()->subHours(8); // lowest interval
+            $fifteenMinutesAgo = now()->subMinutes(15); // lowest interval
             $epgs = Epg::query()->where(
                 'status',
                 '!=',
                 Status::Processing,
-            )->whereDate('synced', '<=', $eightHoursAgo);
+            )->whereDate('synced', '<=', $fifteenMinutesAgo);
             $count = $epgs->count();
             if ($count === 0) {
                 $this->info('No EPGs ready refresh');
