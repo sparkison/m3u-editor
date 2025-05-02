@@ -64,11 +64,7 @@ class SimilaritySearchService
         }
 
         // Fetch EPG channels
-        $epgChannels = $epg->channels()
-            ->where(function ($query) use ($normalizedChan) {
-                $query->whereRaw('LOWER(`channel_id`) like ?', ["%$normalizedChan%"])
-                    ->orWhereRaw('LOWER(`name`) like ?', ["%$normalizedChan%"]);
-            });
+        $epgChannels = $epg->channels();
 
         // Setup variables
         $bestScore = PHP_INT_MAX; // Levenshtein: lower is better
