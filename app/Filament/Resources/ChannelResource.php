@@ -5,7 +5,8 @@ namespace App\Filament\Resources;
 use App\Enums\ChannelLogoType;
 use App\Facades\ProxyFacade;
 use App\Filament\Resources\ChannelResource\Pages;
-use App\Forms\Components\VideoPreview;
+use App\Infolists\Components\VideoPreview;
+use App\Livewire\ChannelStreamStats;
 use App\Models\Channel;
 use App\Models\CustomPlaylist;
 use App\Models\Epg;
@@ -16,6 +17,8 @@ use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -242,6 +245,10 @@ class ChannelResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make()
+                    ->button()
+                    ->hiddenLabel()
+                    ->slideOver(),
+                Tables\Actions\ViewAction::make()
                     ->button()
                     ->hiddenLabel()
                     ->slideOver(),
@@ -532,9 +539,42 @@ class ChannelResource extends Resource
     {
         return [
             'index' => Pages\ListChannels::route('/'),
+            //'view' => Pages\ViewChannel::route('/{record}'),
             //'create' => Pages\CreateChannel::route('/create'),
             //'edit' => Pages\EditChannel::route('/{record}/edit'),
         ];
+    }
+
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist
+            ->schema([
+                VideoPreview::make('preview')
+                    ->columnSpanFull()
+                    ->hiddenLabel(),
+                Infolists\Components\Section::make('Channel Details')
+                    ->collapsible()
+                    ->collapsed()
+                    ->schema([
+                        Infolists\Components\TextEntry::make('url')
+                            ->label('URL'),
+                        Infolists\Components\TextEntry::make('proxy_url')
+                            ->label('Proxy URL'),
+                        Infolists\Components\TextEntry::make('stream_id')
+                            ->label('TVG ID'),
+                    ]),
+                Infolists\Components\Section::make('Stream Info')
+                    ->description('Click to load stream info')
+                    ->icon('heroicon-m-wifi')
+                    ->collapsible()
+                    ->collapsed()
+                    ->schema([
+                        Infolists\Components\Livewire::make(ChannelStreamStats::class)
+                            ->label('Stream Stats')
+                            ->columnSpanFull()
+                            ->lazy(),
+                    ]),
+            ]);
     }
 
     public static function getForm(): array
@@ -544,13 +584,6 @@ class ChannelResource extends Resource
             Forms\Components\Toggle::make('enabled')
                 ->columnSpan('full')
                 ->helperText('Toggle channel status'),
-            Forms\Components\Fieldset::make('Preview')
-                ->schema([
-                    VideoPreview::make('preview')
-                        ->label('Click to play the stream')
-                        ->columnSpanFull()
-                        ->dehydrated(false), // don't save the value in the database
-                ]),
             Forms\Components\Fieldset::make('General Settings')
                 ->schema([
                     Forms\Components\TextInput::make('title_custom')

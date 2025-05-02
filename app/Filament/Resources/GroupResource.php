@@ -343,6 +343,23 @@ class GroupResource extends Resource
             ]);
     }
 
+    public static function getRelations(): array
+    {
+        return [
+            ChannelsRelationManager::class,
+        ];
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' => Pages\ListGroups::route('/'),
+            'view' => Pages\ViewGroup::route('/{record}'),
+            // 'create' => Pages\CreateGroup::route('/create'),
+            // 'edit' => Pages\EditGroup::route('/{record}/edit'),
+        ];
+    }
+
     public static function infolist(Infolist $infolist): Infolist
     {
         // return parent::infolist($infolist);
@@ -359,23 +376,6 @@ class GroupResource extends Resource
                             ->url(fn($record) => PlaylistResource::getUrl('edit', ['record' => $record->playlist_id])),
                     ])
             ]);
-    }
-
-    public static function getRelations(): array
-    {
-        return [
-            ChannelsRelationManager::class,
-        ];
-    }
-
-    public static function getPages(): array
-    {
-        return [
-            'index' => Pages\ListGroups::route('/'),
-            'view' => Pages\ViewGroup::route('/{record}'),
-            // 'create' => Pages\CreateGroup::route('/create'),
-            // 'edit' => Pages\EditGroup::route('/{record}/edit'),
-        ];
     }
 
     public static function getForm(): array
