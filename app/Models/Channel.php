@@ -83,7 +83,7 @@ class Channel extends Model
             $process = SymphonyProcess::fromShellCommandline(
                 "ffprobe -v quiet -print_format json -show_streams {$url}"
             );
-            $process->setTimeout(15);
+            $process->setTimeout(10);
             $output = '';
             $errors = '';
             $hasErrors = false;
