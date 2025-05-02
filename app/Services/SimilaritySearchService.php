@@ -114,43 +114,7 @@ class SimilaritySearchService
             return $bestMatch;
         }
 
-        /**
-         * similar_text() for Fuzzy Matching
-         */
-        // foreach ($epgChannels->cursor() as $epgChannel) {
-        //     $normalizedEpg = empty($epgChannel->name)
-        //         ? $this->normalizeChannelName($epgChannel->channel_id)
-        //         : $this->normalizeChannelName($epgChannel->name);
-        //     if (!$normalizedEpg) continue;
-
-        //     // Calculate similarity (higher is better)
-        //     similar_text($normalizedChan, $normalizedEpg, $similarityScore);
-
-        //     // Apply region-based bonus
-        //     if ($regionCode && stripos(strtolower($epgChannel->channel_id . ' ' . $epgChannel->name), $regionCode) !== false) {
-        //         $similarityScore += 15; // Add bonus instead of subtracting
-        //     }
-
-        //     if ($similarityScore > $bestScore) { // Higher is better
-        //         $bestScore = $similarityScore;
-        //         $bestMatch = $epgChannel;
-        //     }
-
-        //     // Store candidate for embedding similarity if in borderline range
-        //     if ($similarityScore >= $this->bestFuzzyThreshold && $similarityScore < $this->upperFuzzyThreshold) {
-        //         $bestEpgForEmbedding = $epgChannel;
-        //     }
-        // }
-
-        // // If we have a best match with similarity > bestFuzzyThreshold, return it
-        // if ($bestMatch && $bestScore >= $this->bestFuzzyThreshold) {
-        //     if ($debug) {
-        //         Log::info("Channel {$channel->id} '{$fallbackName}' matched with EPG channel_id={$bestMatch->channel_id} (score={$bestScore})");
-        //     }
-        //     return $bestMatch;
-        // }
-
-        // **Cosine Similarity for Borderline Cases**
+        // ** Cosine Similarity for Borderline Cases **
         if ($bestEpgForEmbedding) {
             $chanVector = $this->textToVector($normalizedChan);
             $epgVector = $this->textToVector($this->normalizeChannelName($bestEpgForEmbedding->name));
