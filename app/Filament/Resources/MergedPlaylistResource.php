@@ -140,8 +140,11 @@ class MergedPlaylistResource extends Resource
         $schema = [
             Forms\Components\TextInput::make('name')
                 ->required()
-                ->columnSpan(2)
                 ->helperText('Enter the name of the playlist. Internal use only.'),
+            Forms\Components\TextInput::make('user_agent')
+                ->helperText('User agent string to use for making requests.')
+                ->default('Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13')
+                ->required(),
             Forms\Components\Section::make('Manage Auth')
                 ->description('When an Auth is assigned, regular playlist routes will return a "401 Unauthorized" error unless username and password parameters are passed.')
                 ->collapsible()
@@ -284,7 +287,6 @@ class MergedPlaylistResource extends Resource
                         ->inline(false)
                         ->default(false)
                         ->helperText('When enabled, playlists urls will be proxied through m3u editor and streamed via ffmpeg.'),
-
                 ])
         ];
         return [

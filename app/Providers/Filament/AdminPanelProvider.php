@@ -29,7 +29,6 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Blade;
-use Illuminate\Validation\Rules\Password;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Filament\Support\Enums\MaxWidth;
 use Hydrat\TableLayoutToggle\TableLayoutTogglePlugin;
@@ -87,7 +86,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->breadcrumbs($settings['show_breadcrumbs'])
             // Don't auto discover widgets, we'll manually register them
-            //->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
+            // ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
                 UpdateNoticeWidget::class,
                 AccountWidget::class,
@@ -114,12 +113,12 @@ class AdminPanelProvider extends PanelProvider
                     ->myProfileComponents([
                         'personal_info' => ProfileComponent::class
                     ])
-                //                    ->passwordUpdateRules(
-                //                        rules: [
-                //                            'min:4'
-                //                        ],
-                //                        requiresCurrentPassword: false
-                //                    ),
+                    // ->passwordUpdateRules(
+                    //     rules: [
+                    //         'min:4'
+                    //     ],
+                    //     requiresCurrentPassword: false
+                    // ),
             ])
             ->maxContentWidth($settings['content_width'])
             ->middleware([
