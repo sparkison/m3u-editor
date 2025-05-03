@@ -15,7 +15,16 @@ return new class extends Migration
     public function up(): void
     {
         // Remove duplicate rows
-        DB::statement('DELETE FROM channels WHERE id NOT IN (SELECT MIN(id) FROM channels GROUP BY `name`, `group`, `playlist_id`, `user_id`);');
+        DB::statement('
+            DELETE FROM channels 
+                WHERE id NOT IN (
+                    SELECT id FROM (
+                        SELECT MIN(id) as id 
+                        FROM channels 
+                        GROUP BY `name`, `group`, `playlist_id`, `user_id`
+                    ) AS temp_ids
+                )
+        ');
 
         // Add unique index
         Schema::table('channels', function (Blueprint $table) {

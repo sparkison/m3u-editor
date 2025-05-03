@@ -17,6 +17,7 @@ RUN apk update && apk --no-cache add \
     curl \
     curl-dev \
     sqlite \
+    mysql-client \
     ca-certificates \
     nodejs \
     npm \
