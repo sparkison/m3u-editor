@@ -17,7 +17,7 @@ class ChannelStreamStats extends Component
     public function placeholder()
     {
         return <<<'HTML'
-            <div>
+            <div class="flex items-center space-x-2">
                 <x-filament::loading-indicator class="h-5 w-5" />
                 <p>Fetching stream stats, hold tight...</p>
             </div>

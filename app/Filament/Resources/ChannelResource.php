@@ -555,13 +555,22 @@ class ChannelResource extends Resource
                 Infolists\Components\Section::make('Channel Details')
                     ->collapsible()
                     ->collapsed()
+                    ->columns(2)
                     ->schema([
                         Infolists\Components\TextEntry::make('url')
-                            ->label('URL'),
+                            ->label('URL')->columnSpanFull(),
                         Infolists\Components\TextEntry::make('proxy_url')
-                            ->label('Proxy URL'),
+                            ->label('Proxy URL')->columnSpanFull(),
                         Infolists\Components\TextEntry::make('stream_id')
-                            ->label('TVG ID'),
+                            ->label('ID'),
+                        Infolists\Components\TextEntry::make('title')
+                            ->label('Title'),
+                        Infolists\Components\TextEntry::make('name')
+                            ->label('Name'),
+                        Infolists\Components\TextEntry::make('channel')
+                            ->label('Channel'),
+                        Infolists\Components\TextEntry::make('group')
+                            ->label('Group'),
                     ]),
                 Infolists\Components\Section::make('Stream Info')
                     ->description('Click to load stream info')
