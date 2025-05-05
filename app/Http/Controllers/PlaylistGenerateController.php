@@ -117,7 +117,15 @@ class PlaylistGenerateController extends Controller
                     $tvgId = preg_replace(config('dev.tvgid.regex'), '', $tvgId);
 
                     // Output the channel
-                    echo "#EXTINF:-1 tvg-chno=\"$channelNo\" tvg-id=\"$tvgId\" timeshift=\"$timeshift\" tvg-name=\"$name\" tvg-logo=\"$icon\" group-title=\"$group\"," . $title . "\n";
+                    $extInf = "#EXTINF:-1";
+                    if ($channel->catchup) {
+                        $extInf .= " catchup=\"$channel->catchup\"";
+                    }
+                    if ($channel->catchup_source) {
+                        $extInf .= " catchup-source=\"$channel->catchup_source\"";
+                    }
+                    $extInf .= " tvg-chno=\"$channelNo\" tvg-id=\"$tvgId\" timeshift=\"$timeshift\" tvg-name=\"$name\" tvg-logo=\"$icon\" group-title=\"$group\"";
+                    echo "$extInf," . $title . "\n";
                     if ($channel->extvlcopt) {
                         foreach ($channel->extvlcopt as $extvlcopt) {
                             echo "#EXTVLCOPT:{$extvlcopt['key']}={$extvlcopt['value']}\n";

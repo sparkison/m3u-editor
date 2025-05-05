@@ -82,7 +82,9 @@ class ProcessM3uImportChunk implements ShouldQueue
                 'country', // should we update this? Not sure it's set anywhere...
                 'import_batch_no',
                 'extvlcopt',
-                'kodidrop'
+                'kodidrop',
+                'catchup',
+                'catchup_source',
             ]);
         }
     }

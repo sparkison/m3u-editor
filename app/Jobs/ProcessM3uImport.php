@@ -484,6 +484,8 @@ class ProcessM3uImport implements ShouldQueue
                     'enabled' => $playlist->enable_channels,
                     'extvlcopt' => null,
                     'kodidrop' => null,
+                    'catchup' => null,
+                    'catchup_source' => null,
                     'shift' => 0
                 ];
                 if ($autoSort) {
@@ -512,7 +514,9 @@ class ProcessM3uImport implements ShouldQueue
                         'lang' => 'tvg-language',
                         'country' => 'tvg-country',
                         'shift' => 'tvg-shift', // deprecated, use 'timeshift' instead
-                        'shift' => 'timeshift' // timeshift in hours, falls back to 'tvg-shift' if not set
+                        'shift' => 'timeshift', // timeshift in hours, falls back to 'tvg-shift' if not set
+                        'catchup' => 'catchup',
+                        'catchup_source' => 'catchup-source',
                     ];
 
                     // Parse the M3U file
