@@ -62,7 +62,7 @@ Route::get('/stream/{id}', \App\Http\Controllers\ChannelStreamController::class)
 
 // Stream an IPTV channel with HLS
 // 1. Kick off HLS generation and redirect to the playlist
-Route::get('stream/{id}/hls/start', [\App\Http\Controllers\ChannelStreamController::class, 'startHls'])
+Route::get('stream/{id}/hls', [\App\Http\Controllers\ChannelStreamController::class, 'startHls'])
     ->name('stream.hls.start');
 
 // 2. Serve playlist
