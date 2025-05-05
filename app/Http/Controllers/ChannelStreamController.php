@@ -8,6 +8,7 @@ use App\Settings\GeneralSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Process\Process as SymphonyProcess;
 // use Spatie\TemporaryDirectory\TemporaryDirectory;
@@ -168,16 +169,10 @@ class ChannelStreamController extends Controller
         $channel = Channel::findOrFail(base64_decode($id));
         $title = $channel->title_custom ?? $channel->title;
         $title = strip_tags($title);
+        $streamUrl = $channel->url_custom ?? $channel->url;
 
         $storageDir = storage_path("app/hls/{$channel->id}");
-        @mkdir($storageDir, 0755, true);
-
-        // Setup streams array
-        $streamUrls = [
-            $channel->url_custom ?? $channel->url
-            // leave this here for future use...
-            // @TODO: implement ability to assign fallback channels
-        ];
+        Storage::makeDirectory($storageDir);
 
         // Get user preferences
         $userPreferences = app(GeneralSettings::class);
@@ -198,11 +193,11 @@ class ChannelStreamController extends Controller
 
         // Get user agent
         $userAgent = $settings['ffmpeg_user_agent'];
-        $maxRetries = $settings['ffmpeg_max_tries'];
 
         // Only start one FFmpeg per channel at a time
-        $cacheKey = "hls_process_{$channel->id}";
-        if (! Cache::has($cacheKey) || ! Cache::get($cacheKey)->isRunning()) {
+        $cacheKey = "hls:pid:{$channel->id}";
+        $existingPid = Cache::get($cacheKey);
+        if (! $existingPid || ! posix_kill($existingPid, 0)) {
             $playlist = "{$storageDir}/stream.m3u8";
             $segment = "{$storageDir}/segment_%03d.ts";
 
@@ -224,7 +219,7 @@ class ChannelStreamController extends Controller
                     // Logging:
                     '%s',
                 $userAgent,                   // for -user_agent
-                $streamUrls[0],               // input URL
+                $streamUrl,                   // input URL
                 $segment,                     // segment filename 
                 $playlist,                    // playlist filename
                 $settings['ffmpeg_debug'] ? '' : '-hide_banner -nostats -loglevel error'
@@ -234,7 +229,7 @@ class ChannelStreamController extends Controller
             $process->setTimeout(null)->start();
 
             // Keep the Process object in cache so we can stop it later if needed
-            Cache::put($cacheKey, $process, now()->addMinutes(30));
+            Cache::forever($cacheKey, $process->getPid());
         }
 
         // Now redirect the client to the playlist URL
@@ -251,10 +246,22 @@ class ChannelStreamController extends Controller
      */
     public function servePlaylist(Request $request, $id)
     {
+        $cacheKeyPid = "hls:pid:{$id}";
+        $pid = Cache::get($cacheKeyPid);
         $path = storage_path("app/hls/{$id}/stream.m3u8");
 
+        // If FFmpeg is still running but playlist isn’t ready
+        if ($pid && posix_kill($pid, 0) && ! file_exists($path)) {
+            return response()->json([
+                'status'  => 'processing',
+                'message' => 'Playlist is being generated; try again shortly.',
+            ], 202);
+        }
+
+        // Otherwise, 404 if no playlist
         if (! file_exists($path)) {
-            abort(404, 'Playlist not found. Did HLS generation start?');
+            Log::channel('ffmpeg')->error("HLS playlist missing for channel {$id}");
+            abort(404, 'Playlist not found.');
         }
 
         return response()->file($path, [
@@ -273,13 +280,13 @@ class ChannelStreamController extends Controller
     public function serveSegment(Request $request, $id, $segment)
     {
         $path = storage_path("app/hls/{$id}/{$segment}");
+        abort_unless(file_exists($path), 404, 'Segment not found.');
 
-        if (! file_exists($path)) {
-            abort(404, 'Segment not found.');
-        }
+        // Update last-seen timestamp
+        Cache::put("hls:last_seen:{$id}", now(), now()->addMinutes(10));
 
-        // @TODO: implement cache for HLS viewers and add cleanup job to stop running ffmpeg processes...
-        // Cache::put("hls viewers:{$id}:" . session()->getId(), true, now()->addSeconds(10));
+        // Use a Redis set or tagged cache to track active IDs
+        Cache::tags('hls_active')->add($id, true, now()->addMinutes(10));
 
         return response()->file($path, [
             'Content-Type' => 'video/MP2T',
