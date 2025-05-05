@@ -72,27 +72,24 @@ class ChannelStreamController extends Controller
 
             // Loop through available streams...
             foreach ($streamUrls as $streamUrl) {
-                // Setup FFmpeg command
+                $cmd = sprintf(
+                    'ffmpeg ' .
+                        // Pre-input HTTP options:
+                        '-user_agent "%s" -referer "MyComputer" ' .
+                        '-multiple_requests 1 -reconnect_on_network_error 1 ' .
+                        '-reconnect_on_http_error 5xx,4xx -reconnect_streamed 1 ' .
+                        '-reconnect_delay_max 5 -noautorotate ' .
 
-                // @TODO: Testing new proxy command, find out if it works with all streams
-                // $cmd = "ffmpeg -i \"$streamUrl\" -c copy -f mpegts -mpegts_flags +resend_headers+latm pipe:1 "
-                //     . "-user_agent \"$userAgent\" -referer \"MyComputer\" -noautorotate "
-                //     . "-fflags +nobuffer+discardcorruptts -flags low_delay -probesize 32 -analyzeduration 0 "
-                //     // HW acceleration only works with Intel QuickSync (requires `/dev/dri` be mapped to the container)
-                //     // Not using for now until we know if it's needed...
-                //     // . "-init_hw_device qsv=dev1:hw_any,child_device=/dev/dri/renderD128 -filter_hw_device dev1 "
-                //     . "-multiple_requests 1 -reconnect_on_network_error 1 -reconnect_on_http_error 5xx,4xx "
-                //     . "-reconnect_streamed 1 -reconnect_delay_max 8 -use_wallclock_as_timestamps 1";
+                        // I/O options:
+                        '-re -i "%s" ' .
+                        '-c copy -f mpegts pipe:1 ' .
 
-                // Setup proxy command
-                $cmd = "ffmpeg -re -i \"$streamUrl\" -c copy -f mpegts pipe:1 "
-                    . "-user_agent \"$userAgent\" -referer \"MyComputer\" -noautorotate "
-                    . "-multiple_requests 1 -reconnect_on_network_error 1 -reconnect_on_http_error 5xx,4xx "
-                    . "-reconnect_streamed 1 -reconnect_delay_max 5";
-
-                if (!$settings['ffmpeg_debug']) {
-                    $cmd .= " -hide_banner -nostats -loglevel error";
-                }
+                        // Logging:
+                        '%s',
+                    $userAgent, // for -user_agent
+                    $streamUrl, // input URL
+                    $settings['ffmpeg_debug'] ? '' : '-hide_banner -nostats -loglevel error'
+                );
 
                 // Continue trying until the client disconnects, or max retries are reached
                 $maxRetries = $settings['ffmpeg_max_tries'];
