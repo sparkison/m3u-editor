@@ -5,6 +5,10 @@ use App\Http\Controllers\EpgGenerateController;
 use App\Http\Controllers\PlaylistGenerateController;
 use Illuminate\Support\Facades\Route;
 
+/*
+ * Playlist/EPG output routes
+ */
+
 // Generate M3U playlist from the playlist configuration
 Route::get('/{uuid}/playlist.m3u', PlaylistGenerateController::class)
     ->name('playlist.generate');
@@ -28,6 +32,11 @@ Route::get('/{uuid}/epg.xml', EpgGenerateController::class)
 Route::get('epgs/{uuid}/epg.xml', EpgFileController::class)
     ->name('epg.file');
 
+
+/*
+ * DEBUG routes
+ */
+
 // Test webhook endpoint
 Route::post('/webhook/test', \App\Http\Controllers\WebhookTestController::class)
     ->name('webhook.test.get');
@@ -43,9 +52,32 @@ Route::get('/phpinfo', function () {
     }
 });
 
+
+/*
+ * Proxy routes
+ */
+
 // Stream an IPTV channel
 Route::get('/stream/{id}', \App\Http\Controllers\ChannelStreamController::class)->name('stream');
-Route::get('/stream/hls/{id}', [\App\Http\Controllers\ChannelStreamController::class, 'hls'])->name('stream.hls');
+
+// Stream an IPTV channel with HLS
+// 1. Kick off HLS generation and redirect to the playlist
+Route::get('stream/{id}/hls/start', [\App\Http\Controllers\ChannelStreamController::class, 'startHls'])
+    ->name('stream.hls.start');
+
+// 2. Serve playlist
+Route::get('stream/{id}/hls/stream.m3u8', [\App\Http\Controllers\ChannelStreamController::class, 'servePlaylist'])
+    ->name('stream.hls.playlist');
+
+// 3. Serve segments (catch-all for any .ts file)
+Route::get('stream/{id}/hls/{segment}', [\App\Http\Controllers\ChannelStreamController::class, 'serveSegment'])
+    ->where('segment', 'segment_[0-9]{3}\.ts')
+    ->name('stream.hls.segment');
+
+
+/*
+ * API routes
+ */
 
 // API routes (for authenticated users only)
 Route::group(['middleware' => ['auth:sanctum']], function () {

@@ -6,9 +6,11 @@ use Exception;
 use App\Models\Channel;
 use App\Settings\GeneralSettings;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Process\Process as SymphonyProcess;
+// use Spatie\TemporaryDirectory\TemporaryDirectory;
 
 class ChannelStreamController extends Controller
 {
@@ -16,7 +18,7 @@ class ChannelStreamController extends Controller
      * Stream an IPTV channel.
      *
      * @param Request $request
-     * @param int $id
+     * @param int|string $id
      *
      * @return StreamedResponse
      */
@@ -69,6 +71,7 @@ class ChannelStreamController extends Controller
 
             // Get user agent
             $userAgent = $settings['ffmpeg_user_agent'];
+            $maxRetries = $settings['ffmpeg_max_tries'];
 
             // Loop through available streams...
             foreach ($streamUrls as $streamUrl) {
@@ -86,13 +89,12 @@ class ChannelStreamController extends Controller
 
                         // Logging:
                         '%s',
-                    $userAgent, // for -user_agent
-                    $streamUrl, // input URL
+                    $userAgent,                   // for -user_agent
+                    $streamUrl,                   // input URL
                     $settings['ffmpeg_debug'] ? '' : '-hide_banner -nostats -loglevel error'
                 );
 
                 // Continue trying until the client disconnects, or max retries are reached
-                $maxRetries = $settings['ffmpeg_max_tries'];
                 $retries = 0;
                 while (!connection_aborted()) {
                     $process = SymphonyProcess::fromShellCommandline($cmd);
@@ -120,6 +122,9 @@ class ChannelStreamController extends Controller
                     }
                     // If we get here, the process ended.
                     if (connection_aborted()) {
+                        if ($process->isRunning()) {
+                            $process->stop(1); // SIGTERM then SIGKILL
+                        }
                         return;
                     }
                     if (++$retries >= $maxRetries) {
@@ -131,7 +136,7 @@ class ChannelStreamController extends Controller
                         break;
                     }
                     // Wait a short period before trying to reconnect.
-                    sleep(1);
+                    sleep(min(8, $retries));
                 }
             }
 
@@ -142,6 +147,142 @@ class ChannelStreamController extends Controller
             'Cache-Control' => 'no-store, no-transform',
             'Content-Disposition' => "inline; filename=\"stream.ts\"",
             'X-Accel-Buffering' => 'no',
+        ]);
+    }
+
+    /**
+     * Launch (or re-launch) an FFmpeg HLS job for this channel,
+     * then redirect clients to the static .m3u8 URL.
+     * 
+     * @param Request $request
+     * @param int|string $id
+     * 
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function startHls(Request $request, $id)
+    {
+        // Find the channel by ID
+        if (strpos($id, '==') === false) {
+            $id .= '=='; // right pad to ensure proper decoding
+        }
+        $channel = Channel::findOrFail(base64_decode($id));
+        $title = $channel->title_custom ?? $channel->title;
+        $title = strip_tags($title);
+
+        $storageDir = storage_path("app/hls/{$channel->id}");
+        @mkdir($storageDir, 0755, true);
+
+        // Setup streams array
+        $streamUrls = [
+            $channel->url_custom ?? $channel->url
+            // leave this here for future use...
+            // @TODO: implement ability to assign fallback channels
+        ];
+
+        // Get user preferences
+        $userPreferences = app(GeneralSettings::class);
+        $settings = [
+            'ffmpeg_debug' => false,
+            'ffmpeg_max_tries' => 3,
+            'ffmpeg_user_agent' => 'VLC/3.0.21 LibVLC/3.0.21',
+        ];
+        try {
+            $settings = [
+                'ffmpeg_debug' => $userPreferences->ffmpeg_debug ?? $settings['ffmpeg_debug'],
+                'ffmpeg_max_tries' => $userPreferences->ffmpeg_max_tries ?? $settings['ffmpeg_max_tries'],
+                'ffmpeg_user_agent' => $userPreferences->ffmpeg_user_agent ?? $settings['ffmpeg_user_agent'],
+            ];
+        } catch (Exception $e) {
+            // Ignore
+        }
+
+        // Get user agent
+        $userAgent = $settings['ffmpeg_user_agent'];
+        $maxRetries = $settings['ffmpeg_max_tries'];
+
+        // Only start one FFmpeg per channel at a time
+        $cacheKey = "hls_process_{$channel->id}";
+        if (! Cache::has($cacheKey) || ! Cache::get($cacheKey)->isRunning()) {
+            $playlist = "{$storageDir}/stream.m3u8";
+            $segment = "{$storageDir}/segment_%03d.ts";
+
+            $cmd = sprintf(
+                'ffmpeg ' .
+                    // Pre-input HTTP options:
+                    '-user_agent "%s" -referer "MyComputer" ' .
+                    '-multiple_requests 1 -reconnect_on_network_error 1 ' .
+                    '-reconnect_on_http_error 5xx,4xx -reconnect_streamed 1 ' .
+                    '-reconnect_delay_max 5 -noautorotate ' .
+
+                    // I/O options:
+                    '-re -i "%s" ' .
+                    '-c:v libx264 -preset veryfast -g 48 -sc_threshold 0 ' .
+                    '-c:a aac -f hls -hls_time 4 -hls_list_size 6 ' .
+                    '-hls_flags delete_segments+append_list ' .
+                    '-hls_segment_filename %s %s ' .
+
+                    // Logging:
+                    '%s',
+                $userAgent,                   // for -user_agent
+                $streamUrls[0],               // input URL
+                $segment,                     // segment filename 
+                $playlist,                    // playlist filename
+                $settings['ffmpeg_debug'] ? '' : '-hide_banner -nostats -loglevel error'
+            );
+
+            $process = SymphonyProcess::fromShellCommandline($cmd);
+            $process->setTimeout(null)->start();
+
+            // Keep the Process object in cache so we can stop it later if needed
+            Cache::put($cacheKey, $process, now()->addMinutes(30));
+        }
+
+        // Now redirect the client to the playlist URL
+        return redirect()->route('stream.hls.playlist', ['id' => $channel->id]);
+    }
+
+    /**
+     * Serve the generated playlist as a static file.
+     * 
+     * @param Request $request
+     * @param int|string $id
+     * 
+     * @return \Illuminate\Http\Response
+     */
+    public function servePlaylist(Request $request, $id)
+    {
+        $path = storage_path("app/hls/{$id}/stream.m3u8");
+
+        if (! file_exists($path)) {
+            abort(404, 'Playlist not found. Did HLS generation start?');
+        }
+
+        return response()->file($path, [
+            'Content-Type' => 'application/vnd.apple.mpegurl',
+        ]);
+    }
+
+    /**
+     * Serve individual .ts segments.
+     * 
+     * @param Request $request
+     * @param int|string $id
+     * 
+     * @return \Illuminate\Http\Response
+     */
+    public function serveSegment(Request $request, $id, $segment)
+    {
+        $path = storage_path("app/hls/{$id}/{$segment}");
+
+        if (! file_exists($path)) {
+            abort(404, 'Segment not found.');
+        }
+
+        // @TODO: implement cache for HLS viewers and add cleanup job to stop running ffmpeg processes...
+        // Cache::put("hls viewers:{$id}:" . session()->getId(), true, now()->addSeconds(10));
+
+        return response()->file($path, [
+            'Content-Type' => 'video/MP2T',
         ]);
     }
 }
