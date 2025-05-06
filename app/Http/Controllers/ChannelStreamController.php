@@ -7,6 +7,7 @@ use App\Models\Channel;
 use App\Settings\GeneralSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -171,8 +172,8 @@ class ChannelStreamController extends Controller
         $title = strip_tags($title);
         $streamUrl = $channel->url_custom ?? $channel->url;
 
-        $storageDir = storage_path("app/hls/{$channel->id}");
-        Storage::makeDirectory($storageDir);
+        $storageDir = Storage::disk('app')->path("hls/{$channel->id}");
+        File::ensureDirectoryExists($storageDir, 0755);
 
         // Get user preferences
         $userPreferences = app(GeneralSettings::class);
@@ -197,7 +198,7 @@ class ChannelStreamController extends Controller
         // Only start one FFmpeg per channel at a time
         $cacheKey = "hls:pid:{$channel->id}";
         $existingPid = Cache::get($cacheKey);
-        if (! $existingPid || ! posix_kill($existingPid, 0)) {
+        if (!$existingPid || !$this->isFfmpeg($existingPid)) {
             $playlist = "{$storageDir}/stream.m3u8";
             $segment = "{$storageDir}/segment_%03d.ts";
 
@@ -225,14 +226,49 @@ class ChannelStreamController extends Controller
                 $settings['ffmpeg_debug'] ? '' : '-hide_banner -nostats -loglevel error'
             );
 
-            $process = SymphonyProcess::fromShellCommandline($cmd);
-            $process->setTimeout(null)->start();
+            // Tell proc_open to give us back a stderr pipe
+            $descriptors = [
+                0 => ['pipe', 'r'], // stdin (we won't use)
+                1 => ['pipe', 'w'], // stdout (we won't use)
+                2 => ['pipe', 'w'], // stderr (we will log)
+            ];
+            $pipes = [];
+            $process = proc_open($cmd, $descriptors, $pipes);
 
-            // Keep the Process object in cache so we can stop it later if needed
-            Cache::forever($cacheKey, $process->getPid());
+            if (!is_resource($process)) {
+                Log::channel('ffmpeg')->error("Failed to launch FFmpeg for channel {$channel->id}");
+                abort(500, 'Could not start stream.');
+            }
+
+            // Immediately close stdin/stdout
+            fclose($pipes[0]);
+            fclose($pipes[1]);
+
+            // Make stderr non-blocking
+            stream_set_blocking($pipes[2], false);
+
+            // Spawn a little "reader" that pulls from stderr and logs
+            $logger = Log::channel('ffmpeg');
+            $stderr = $pipes[2];
+
+            // Register shutdown function to ensure the pipe is drained
+            register_shutdown_function(function () use ($stderr, $process, $logger) {
+                while (!feof($stderr)) {
+                    $line = fgets($stderr);
+                    if ($line !== false) {
+                        $logger->error(trim($line));
+                    }
+                }
+                fclose($stderr);
+                proc_close($process);
+            });
+
+            // Cache the actual FFmpeg PID
+            $status = proc_get_status($process);
+            Cache::forever("hls:pid:{$channel->id}", $status['pid']);
         }
 
-        // Now redirect the client to the playlist URL
+        // Redirect the client to the playlist URL
         return redirect()->route('stream.hls.playlist', ['id' => $channel->id]);
     }
 
@@ -248,25 +284,35 @@ class ChannelStreamController extends Controller
     {
         $cacheKeyPid = "hls:pid:{$id}";
         $pid = Cache::get($cacheKeyPid);
-        $path = storage_path("app/hls/{$id}/stream.m3u8");
+        $path = Storage::disk('app')->path("hls/{$id}/stream.m3u8");
 
-        // If FFmpeg is still running but playlist isn’t ready
-        if ($pid && posix_kill($pid, 0) && ! file_exists($path)) {
-            return response()->json([
-                'status'  => 'processing',
-                'message' => 'Playlist is being generated; try again shortly.',
-            ], 202);
+        $maxAttempts = 10;
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            // If the playlist is ready, serve it immediately
+            if (file_exists($path)) {
+                return response()->file($path, [
+                    'Content-Type' => 'application/vnd.apple.mpegurl',
+                ]);
+            }
+
+            // On the last try, give up if FFmpeg isn’t running
+            if ($attempt === $maxAttempts) {
+                if (!$pid || !posix_kill($pid, 0)) {
+                    Log::channel('ffmpeg')
+                        ->error("FFmpeg process {$pid} is not running (or died) for channel {$id}");
+                    abort(404, 'Playlist not found.');
+                }
+
+                // If it *is* running but playlist never appeared, tell the client to retry
+                return response()->json([
+                    'status'  => 'processing',
+                    'message' => 'Playlist is being generated; try again shortly.',
+                ], 202);
+            }
+
+            // Otherwise, wait and retry
+            sleep(1);
         }
-
-        // Otherwise, 404 if no playlist
-        if (! file_exists($path)) {
-            Log::channel('ffmpeg')->error("HLS playlist missing for channel {$id}");
-            abort(404, 'Playlist not found.');
-        }
-
-        return response()->file($path, [
-            'Content-Type' => 'application/vnd.apple.mpegurl',
-        ]);
     }
 
     /**
@@ -279,7 +325,7 @@ class ChannelStreamController extends Controller
      */
     public function serveSegment(Request $request, $id, $segment)
     {
-        $path = storage_path("app/hls/{$id}/{$segment}");
+        $path = Storage::disk('app')->path("hls/{$id}/{$segment}");
         abort_unless(file_exists($path), 404, 'Segment not found.');
 
         // Update last-seen timestamp
@@ -291,5 +337,20 @@ class ChannelStreamController extends Controller
         return response()->file($path, [
             'Content-Type' => 'video/MP2T',
         ]);
+    }
+
+    /**
+     * Return true if $pid is alive and matches an ffmpeg command.
+     */
+    protected function isFfmpeg(int $pid): bool
+    {
+        $cmdlinePath = "/proc/{$pid}/cmdline";
+        if (! file_exists($cmdlinePath)) {
+            return false;
+        }
+
+        $cmd = @file_get_contents($cmdlinePath);
+        // FFmpeg’s binary name should appear first
+        return $cmd && strpos($cmd, 'ffmpeg') !== false;
     }
 }
