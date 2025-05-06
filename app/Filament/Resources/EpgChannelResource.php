@@ -69,7 +69,7 @@ class EpgChannelResource extends Resource
                     ->width('auto'),
                 Tables\Columns\TextInputColumn::make('display_name')
                     ->sortable()
-                    ->tooltip('Display Name')
+                    ->tooltip(fn($record) => $record->display_name)
                     ->toggleable()
                     ->searchable(),
                 Tables\Columns\TextColumn::make('name')
