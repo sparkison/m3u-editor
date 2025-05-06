@@ -80,7 +80,7 @@ class ChannelStreamController extends Controller
             ini_set('zlib.output_compression', 0);
 
             // Get user agent
-            $userAgent = $settings['ffmpeg_user_agent'];
+            $userAgent = escapeshellarg($settings['ffmpeg_user_agent']);
             $maxRetries = $settings['ffmpeg_max_tries'];
 
             // Loop through available streams...
