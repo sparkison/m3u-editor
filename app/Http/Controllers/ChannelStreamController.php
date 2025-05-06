@@ -21,6 +21,7 @@ class ChannelStreamController extends Controller
      *
      * @param Request $request
      * @param int|string $id
+     * @param string $format
      *
      * @return StreamedResponse
      */
