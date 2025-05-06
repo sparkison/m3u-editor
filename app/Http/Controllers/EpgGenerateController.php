@@ -126,6 +126,8 @@ class EpgGenerateController extends Controller
                     $icon = $epgData->icon ?? '';
                 } elseif ($channel->logo_type === ChannelLogoType::Channel) {
                     $icon = $channel->logo ?? '';
+                } else {
+                    $icon = url('/placeholder.png');
                 }
 
                 // Output the <channel> tag
@@ -141,6 +143,9 @@ class EpgGenerateController extends Controller
             } else if ($dummyEpgEnabled) {
                 // Get the icon
                 $icon = $channel->logo ?? '';
+                if (empty($icon)) {
+                    $icon = url('/placeholder.png');
+                }
                 $icon = htmlspecialchars($icon);
 
                 // Keep track of which channels need a dummy EPG program

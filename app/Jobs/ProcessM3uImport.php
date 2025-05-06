@@ -363,9 +363,6 @@ class ProcessM3uImport implements ShouldQueue
                         if ($autoSort) {
                             $channel['sort'] = $channelNo;
                         }
-                        if (!isset($channel['logo'])) {
-                            $channel['logo'] = url('/placeholder.png');
-                        }
                         yield $channel;
                     }
                 }
@@ -580,9 +577,6 @@ class ProcessM3uImport implements ShouldQueue
                             // Name is required, fallback to stream ID if available, otherwise set to title
                             // Channel will be skipped on import of not set to something...
                             $channel['title'] = $channel['stream_id'] ?? $channel['name'];
-                        }
-                        if (!isset($channel['logo'])) {
-                            $channel['logo'] = url('/placeholder.png');
                         }
 
                         // Get the channel group and determine if the channel should be included

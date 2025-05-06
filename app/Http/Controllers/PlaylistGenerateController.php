@@ -111,6 +111,8 @@ class PlaylistGenerateController extends Controller
                         $icon = $epgData->icon ?? '';
                     } elseif ($channel->logo_type === ChannelLogoType::Channel) {
                         $icon = $channel->logo ?? '';
+                    } else {
+                        $icon = url('/placeholder.png');
                     }
 
                     // Make sure TVG ID only contains characters and numbers
