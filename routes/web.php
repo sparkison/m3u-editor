@@ -60,19 +60,21 @@ Route::get('/phpinfo', function () {
 // Stream an IPTV channel
 Route::get('/stream/{id}/{format?}', \App\Http\Controllers\ChannelStreamController::class)->name('stream');
 
-// Stream an IPTV channel with HLS
-// 1. Kick off HLS generation and redirect to the playlist
-Route::get('stream/{id}/hls', [\App\Http\Controllers\ChannelStreamController::class, 'startHls'])
-    ->name('stream.hls.start');
+// DISABLED: Stream an IPTV channel with HLS
+// @TODO: More testing and cleanup needed... process is not killed properly
+// // Stream an IPTV channel with HLS
+// // 1. Kick off HLS generation and redirect to the playlist
+// Route::get('stream/{id}/hls', [\App\Http\Controllers\ChannelStreamController::class, 'startHls'])
+//     ->name('stream.hls.start');
 
-// 2. Serve playlist
-Route::get('stream/{id}/hls/stream.m3u8', [\App\Http\Controllers\ChannelStreamController::class, 'servePlaylist'])
-    ->name('stream.hls.playlist');
+// // 2. Serve playlist
+// Route::get('stream/{id}/hls/stream.m3u8', [\App\Http\Controllers\ChannelStreamController::class, 'servePlaylist'])
+//     ->name('stream.hls.playlist');
 
-// 3. Serve segments (catch-all for any .ts file)
-Route::get('stream/{id}/hls/{segment}', [\App\Http\Controllers\ChannelStreamController::class, 'serveSegment'])
-    ->where('segment', 'segment_[0-9]{3}\.ts')
-    ->name('stream.hls.segment');
+// // 3. Serve segments (catch-all for any .ts file)
+// Route::get('stream/{id}/hls/{segment}', [\App\Http\Controllers\ChannelStreamController::class, 'serveSegment'])
+//     ->where('segment', 'segment_[0-9]{3}\.ts')
+//     ->name('stream.hls.segment');
 
 
 /*
