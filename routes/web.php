@@ -58,7 +58,7 @@ Route::get('/phpinfo', function () {
  */
 
 // Stream an IPTV channel
-Route::get('/stream/{id}', \App\Http\Controllers\ChannelStreamController::class)->name('stream');
+Route::get('/stream/{id}/{format?}', \App\Http\Controllers\ChannelStreamController::class)->name('stream');
 
 // Stream an IPTV channel with HLS
 // 1. Kick off HLS generation and redirect to the playlist

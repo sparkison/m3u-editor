@@ -24,8 +24,13 @@ class ChannelStreamController extends Controller
      *
      * @return StreamedResponse
      */
-    public function __invoke(Request $request, $id)
+    public function __invoke(Request $request, $id, $format = 'mp2t')
     {
+        // Validate the format
+        if (!in_array($format, ['mp2t', 'mp4'])) {
+            abort(400, 'Invalid format specified.');
+        }
+
         // Prevent timeouts, etc.
         ini_set('max_execution_time', 0);
         ini_set('output_buffering', 'off');
@@ -62,7 +67,10 @@ class ChannelStreamController extends Controller
         } catch (Exception $e) {
             // Ignore
         }
-        return new StreamedResponse(function () use ($streamUrls, $title, $settings) {
+        $extension = $format === 'mp2t'
+            ? 'ts'
+            : $format;
+        return new StreamedResponse(function () use ($streamUrls, $title, $settings, $format) {
             while (ob_get_level()) {
                 ob_end_flush();
             }
@@ -76,6 +84,9 @@ class ChannelStreamController extends Controller
             $maxRetries = $settings['ffmpeg_max_tries'];
 
             // Loop through available streams...
+            $output = $format === 'mp2t'
+                ? '-c copy -f mpegts pipe:1'
+                : '-c:v copy -c:a copy -bsf:a aac_adtstoasc -f mp4 -movflags frag_keyframe+empty_moov+default_base_moof pipe:1';
             foreach ($streamUrls as $streamUrl) {
                 $cmd = sprintf(
                     'ffmpeg ' .
@@ -85,14 +96,17 @@ class ChannelStreamController extends Controller
                         '-reconnect_on_http_error 5xx,4xx -reconnect_streamed 1 ' .
                         '-reconnect_delay_max 5 -noautorotate ' .
 
-                        // I/O options:
+                        // Input:
                         '-re -i "%s" ' .
-                        '-c copy -f mpegts pipe:1 ' .
+
+                        // Output:
+                        '%s ' .
 
                         // Logging:
                         '%s',
                     $userAgent,                   // for -user_agent
                     $streamUrl,                   // input URL
+                    $output,                      // for -f
                     $settings['ffmpeg_debug'] ? '' : '-hide_banner -nostats -loglevel error'
                 );
 
@@ -144,10 +158,10 @@ class ChannelStreamController extends Controller
 
             echo "Error: No available streams.";
         }, 200, [
-            'Content-Type' => 'video/mp2t',
+            'Content-Type' => "video/$format",
             'Connection' => 'keep-alive',
             'Cache-Control' => 'no-store, no-transform',
-            'Content-Disposition' => "inline; filename=\"stream.ts\"",
+            'Content-Disposition' => "inline; filename=\"stream.$extension\"",
             'X-Accel-Buffering' => 'no',
         ]);
     }
@@ -198,6 +212,17 @@ class ChannelStreamController extends Controller
         // Only start one FFmpeg per channel at a time
         $cacheKey = "hls:pid:{$channel->id}";
         $existingPid = Cache::get($cacheKey);
+
+        // (Optionally) kill any currently running existing FFmpeg process
+        // if ($existingPid && $this->isFfmpeg($existingPid)) {
+        //     posix_kill($existingPid, SIGTERM);
+        //     sleep(1);
+        //     if (posix_kill($existingPid, 0)) {
+        //         posix_kill($existingPid, SIGKILL);
+        //     }
+        // }
+
+        // If no existing process, or it’s not FFmpeg, start a new one
         if (!$existingPid || !$this->isFfmpeg($existingPid)) {
             $playlist = "{$storageDir}/stream.m3u8";
             $segment = "{$storageDir}/segment_%03d.ts";
@@ -335,7 +360,7 @@ class ChannelStreamController extends Controller
         Cache::tags('hls_active')->add($id, true, now()->addMinutes(10));
 
         return response()->file($path, [
-            'Content-Type' => 'video/MP2T',
+            'Content-Type' => 'video/mp2t',
         ]);
     }
 
