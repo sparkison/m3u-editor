@@ -16,10 +16,6 @@ class ProxyService
         $id = rtrim(base64_encode($id), '=');
         if ($proxyUrlOverride) {
             $proxyUrlOverride = rtrim($proxyUrlOverride, '/');
-            $port = config('app.port');
-            if ($port && $port !== 80 && $port !== 443) {
-                return "$proxyUrlOverride:$port/stream/$id";
-            }
             return "$proxyUrlOverride/stream/$id";
         }
         return route('stream', ['id' => $id]);
