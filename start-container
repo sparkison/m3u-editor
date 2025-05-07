@@ -120,6 +120,8 @@ echo "" > "${nginx_log_file}"
 # Create mysqld error log file if missing
 if [ "${ENABLE_MYSQL}" = "true" ]; then
     [ ! -f "${mysql_log_file}" ] && touch "${mysql_log_file}"
+    chown -R ${WWWUSER}:${WWWGROUP} "${mysql_log_file}"
+    chmod 644 "${mysql_log_file}"
     echo "" > "${mysql_log_file}"
 else
     # If mysql not enabled and mysql log file exists, remove it
@@ -220,7 +222,7 @@ if [ $# -gt 0 ]; then
     if [ "$SUPERVISOR_PHP_USER" = "root" ]; then
         exec "$@"
     else
-        exec gosu $WWWUSER "$@"
+        exec su-exec $WWWUSER "$@"
     fi
 else
     echo ""
