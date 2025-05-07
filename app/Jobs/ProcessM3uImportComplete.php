@@ -8,6 +8,7 @@ use App\Models\Channel;
 use App\Models\Group;
 use App\Models\Job;
 use App\Models\PlaylistSyncStatus;
+use App\Models\PlaylistSyncStatusLog;
 use App\Models\User;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
@@ -119,46 +120,54 @@ class ProcessM3uImportComplete implements ShouldQueue
             ]);
 
             // Create the sync log entries
-            $removedGroups->cursor()->each(function ($group) use ($sync) {
-                $sync->logs()->create([
+            $bulk = [];
+            $removedGroups->cursor()->each(function ($group) use ($sync, &$bulk) {
+                $bulk[] = [
+                    'playlist_sync_status_id' => $sync->id,
                     'name' => $group->name,
                     'type' => 'group',
                     'status' => 'removed',
                     'meta' => $group,
                     'playlist_id' => $group->playlist_id,
                     'user_id' => $group->user_id,
-                ]);
+                ];
             });
-            $newGroups->cursor()->each(function ($group) use ($sync) {
-                $sync->logs()->create([
+            $newGroups->cursor()->each(function ($group) use ($sync, &$bulk) {
+                $bulk[] = [
+                    'playlist_sync_status_id' => $sync->id,
                     'name' => $group->name,
                     'type' => 'group',
                     'status' => 'added',
                     'meta' => $group,
                     'playlist_id' => $group->playlist_id,
                     'user_id' => $group->user_id,
-                ]);
+                ];
             });
-            $removedChannels->cursor()->each(function ($channel) use ($sync) {
-                $sync->logs()->create([
+            $removedChannels->cursor()->each(function ($channel) use ($sync, &$bulk) {
+                $bulk[] = [
+                    'playlist_sync_status_id' => $sync->id,
                     'name' => $channel->title,
                     'type' => 'channel',
                     'status' => 'removed',
                     'meta' => $channel,
                     'playlist_id' => $channel->playlist_id,
                     'user_id' => $channel->user_id,
-                ]);
+                ];
             });
-            $newChannels->cursor()->each(function ($channel) use ($sync) {
-                $sync->logs()->create([
+            $newChannels->cursor()->each(function ($channel) use ($sync, &$bulk) {
+                $bulk[] = [
+                    'playlist_sync_status_id' => $sync->id,
                     'name' => $channel->title,
                     'type' => 'channel',
                     'status' => 'added',
                     'meta' => $channel,
                     'playlist_id' => $channel->playlist_id,
                     'user_id' => $channel->user_id,
-                ]);
+                ];
             });
+            if (!empty($bulk)) {
+                PlaylistSyncStatusLog::insert($bulk);
+            }
         }
 
         // Clear out invalid groups/channels (if any)
