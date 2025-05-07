@@ -174,15 +174,15 @@ echo ""
 if [ "${ENABLE_MYSQL}" = "true" ]; then
     # Ensure socket and data directories exist with correct ownership
     mkdir -p /run/mysqld /var/lib/mysql
-    chown -R mysql:mysql /run/mysqld /var/lib/mysql
+    chown -R ${WWWUSER}:${WWWGROUP} /run/mysqld /var/lib/mysql
 
     if [ ! -d /var/lib/mysql/mysql ]; then
         echo "🐬 Initializing MySQL"
-        mariadb-install-db --silent --user=mysql --datadir=/var/lib/mysql
+        mariadb-install-db --silent --user=$WWWUSER --datadir=/var/lib/mysql
     fi
 
     # Start mysqld in background
-    su-exec mysql mariadbd --datadir=/var/lib/mysql --socket=/run/mysqld/mysqld.sock &
+    su-exec $WWWUSER mariadbd --datadir=/var/lib/mysql --socket=/run/mysqld/mysqld.sock &
     
     # Wait for it to accept connections
     until mariadb-admin ping --silent; do
