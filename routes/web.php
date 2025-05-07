@@ -62,8 +62,8 @@ Route::get('/phpinfo', function () {
 // Stream an IPTV channel
 Route::get('/stream/{id}/{format?}', \App\Http\Controllers\ChannelStreamController::class)->name('stream');
 
-// DISABLED: Stream an IPTV channel with HLS
-// @TODO: More testing and cleanup needed... process is not killed properly
+// Stream an IPTV channel with HLS
+// @TODO: More testing and cleanup needed... process is not killed properly, and takes too long to start
 // // Stream an IPTV channel with HLS
 // // 1. Kick off HLS generation and redirect to the playlist
 // Route::get('stream/{id}/hls', [\App\Http\Controllers\ChannelStreamController::class, 'startHls'])
