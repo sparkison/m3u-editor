@@ -9,6 +9,12 @@ export NGINX_USER="root"
 export FPMUSER="root"
 export FPMGROUP="root"
 
+# Check if MySQL enabled
+export ENABLE_MYSQL="${ENABLE_MYSQL:-false}"
+export MYSQL_DATABASE="${MYSQL_DATABASE:-m3ue}"
+export MYSQL_USER="${MYSQL_USER:-root}"
+export MYSQL_PASSWORD="${MYSQL_PASSWORD:-root}"
+
 # Run PHP as root (or m3ue)
 export SUPERVISOR_PHP_USER="root"
 export APP_URL="${APP_URL:-http://localhost}"
@@ -153,6 +159,39 @@ php artisan up
 echo "🗂️ Enabling SQLite WAL mode..."
 php artisan sqlite:wal-enable sqlite
 echo ""
+
+# Setup MySQL (if enabled)
+if [ "${ENABLE_MYSQL}" = "true" ]; then
+    # Ensure socket and data directories exist with correct ownership
+    mkdir -p /run/mysqld /var/lib/mysql
+    chown -R mysql:mysql /run/mysqld /var/lib/mysql
+
+    if [ ! -d /var/lib/mysql/mysql ]; then
+        echo "🐬 Initializing MySQL"
+        mariadb-install-db --silent --user=mysql --datadir=/var/lib/mysql
+    fi
+
+    # Start mysqld in background
+    su-exec mysql mariadbd --datadir=/var/lib/mysql --socket=/run/mysqld/mysqld.sock &
+    
+    # Wait for it to accept connections
+    until mariadb-admin ping --silent; do
+        echo "⏳ Waiting for DB to start..."
+        sleep 1
+    done
+
+    # Create database and user (idempotent)
+    mariadb -uroot <<-EOSQL
+        CREATE DATABASE IF NOT EXISTS \`${MYSQL_DATABASE}\`
+            DEFAULT CHARACTER SET utf8mb4
+            COLLATE utf8mb4_unicode_ci;
+
+        CREATE OR REPLACE USER '${MYSQL_USER}'@'localhost' IDENTIFIED BY '${MYSQL_PASSWORD}';
+
+        GRANT ALL ON \`${MYSQL_DATABASE}\`.* TO '${MYSQL_USER}'@'localhost' WITH GRANT OPTION;
+        FLUSH PRIVILEGES;
+EOSQL
+fi
 
 # Run migrations
 echo "💾 Running migrations..."

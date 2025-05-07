@@ -12,6 +12,7 @@ RUN apk update && apk --no-cache add \
     coreutils \
     supervisor \
     envsubst \
+    su-exec \
     nano \
     wget \
     curl \
@@ -32,6 +33,10 @@ RUN apk update && apk --no-cache add \
     php84-fpm \
     php84-posix \
     php84-dev
+
+# Install MariaDB server & client
+RUN apk --no-cache add \
+    mariadb mariadb-client
 
 # If running via Swoole, uncomment below line
 # RUN apk --no-cache add php84-posix php84-pecl-swoole
@@ -106,13 +111,23 @@ RUN git config --global --add safe.directory /var/www/html
 # Install composer dependencies
 RUN composer install --no-dev --no-interaction --no-progress -o
 
+# Setup user, group and permissions
+RUN addgroup $WWWGROUP \
+    && adduser -h /var/www/html -s /bin/bash -G $WWWGROUP -D $WWWUSER
+
 # Create alias for `php artisan` command
 RUN echo -e '#!/bin/bash\n php artisan app:"$@"' > /usr/bin/m3ue && \
     chmod +x /usr/bin/m3ue
 
-# Setup user, group and permissions
-RUN addgroup $WWWGROUP \
-    && adduser -h /var/www/html -s /bin/bash -G $WWWGROUP -D $WWWUSER
+# Create wrapper for MariaDB mysql and mysqladmin
+RUN printf '%s\n' \
+    '#!/bin/bash' \
+    'exec mariadb "$@"' > /usr/local/bin/mysql && chmod +x /usr/local/bin/mysql \
+ && printf '%s\n' \
+    '#!/bin/bash' \
+    'exec mariadb-admin "$@"' > /usr/local/bin/mysqladmin && chmod +x /usr/local/bin/mysqladmin
+
+COPY ./docker/8.4/my.cnf /etc/mysql/my.cnf
 
 RUN chown -R $WWWUSER:$WWWGROUP /var/www/html
 RUN chown -R $WWWUSER:$WWWGROUP /var/lib/nginx/
