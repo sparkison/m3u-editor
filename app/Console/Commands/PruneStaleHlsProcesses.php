@@ -2,61 +2,59 @@
 
 namespace App\Console\Commands;
 
+use Carbon\Carbon;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Redis;
 
 class PruneStaleHlsProcesses extends Command
 {
-    protected $signature = 'hls:prune {--threshold=30}';
+    protected $signature = 'hls:prune {--threshold=10}';
     protected $description = 'Stop FFmpeg for HLS streams with no segment requests recently';
 
     public function handle()
     {
-        $threshold = (int) $this->option('threshold'); // seconds
-        $now = now();
+        // Get the threshold from the command line option (default is 10 seconds)
+        $threshold = (int)$this->option('threshold');
 
-        // Scan Redis for all hls:last_seen:{channelId} keys
-        $cursor = null;
-        $pattern = 'hls:last_seen:*';
-        $lastSeenKeys = [];
+        // Fetch the list of active channel IDs from Redis
+        $activeIds = Redis::smembers('hls:active_ids');
+        $this->info("Found " . count($activeIds) . " active channel IDs");
 
-        do {
-            list($cursor, $matches) = Redis::scan($cursor, [
-                'match' => $pattern,
-                'count' => 100,
-            ]);
-            $lastSeenKeys = array_merge($lastSeenKeys, $matches);
-        } while ($cursor != 0);
-
-        // For each channel that has a last-seen key, decide if it’s stale
-        foreach ($lastSeenKeys as $key) {
-            // key = "hls:last_seen:{channelId}"
-            $channelId = basename(str_replace('hls:last_seen', '', $key), ':');
-
-            $lastSeen = Cache::get($key);
-            if (! $lastSeen || $now->diffInSeconds($lastSeen) > $threshold) {
-                // Stop the FFmpeg process
+        // For each active channel, check staleness
+        foreach ($activeIds as $channelId) {
+            $this->info("Checking channel {$channelId}");
+            $ts = Redis::get("hls:last_seen:{$channelId}");
+            if (! $ts) {
+                $this->info("⏰ No last-seen timestamp for {$channelId}");
+                continue;
+            }
+            $lastSeen = Carbon::createFromTimestamp((int) $ts);
+            if ($lastSeen->addSeconds($threshold)->isPast()) {
                 $pidKey = "hls:pid:{$channelId}";
-                $pid = Cache::pull($pidKey);
+                $pid = Redis::get($pidKey);
 
                 if ($pid && posix_kill($pid, 0)) {
-                    // graceful
+                    $this->info("🛑 Stopping PID {$pid} for channel {$channelId}");
                     posix_kill($pid, SIGTERM);
                     sleep(1);
-                    // force if still alive
                     if (posix_kill($pid, 0)) {
                         posix_kill($pid, SIGKILL);
                     }
-                    $this->info("Pruned HLS for channel {$channelId}, killed PID {$pid}");
+                } else {
+                    $this->info("❌ No running PID for channel {$channelId}");
                 }
 
-                // Cleanup HLS files
+                // Cleanup on-disk HLS files
                 File::deleteDirectory(storage_path("app/hls/{$channelId}"));
+                $this->info("🧹 Deleted files for channel {$channelId}");
 
-                // Remove stale cache entries
-                Cache::forget($key);
+                // Remove its Redis entries
+                Redis::del($pidKey, "hls:last_seen:{$channelId}");
+                Redis::srem('hls:active_ids', $channelId);
+                $this->info("✂️ Pruned channel {$channelId}");
+            } else {
+                $this->info("✅ Channel {$channelId} is still active");
             }
         }
     }

@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Process\Process as SymphonyProcess;
@@ -214,6 +215,11 @@ class ChannelStreamController extends Controller
         $cacheKey = "hls:pid:{$channel->id}";
         $existingPid = Cache::get($cacheKey);
 
+        /*
+         * NOTE: Opting to not kill existing FFmpeg processes
+         *       in case multiple clients connect to same channel.
+         *       May want to revisit this later.
+         */
         // (Optionally) kill any currently running existing FFmpeg process
         // if ($existingPid && $this->isFfmpeg($existingPid)) {
         //     posix_kill($existingPid, SIGTERM);
@@ -227,9 +233,13 @@ class ChannelStreamController extends Controller
         if (!$existingPid || !$this->isFfmpeg($existingPid)) {
             $playlist = "{$storageDir}/stream.m3u8";
             $segment = "{$storageDir}/segment_%03d.ts";
+            $segmentBaseUrl = url("/stream/hls/{$channel->id}") . '/';
 
             $cmd = sprintf(
                 'ffmpeg ' .
+                    // Optimization options:
+                    '-fflags nobuffer -flags low_delay ' .
+
                     // Pre-input HTTP options:
                     '-user_agent "%s" -referer "MyComputer" ' .
                     '-multiple_requests 1 -reconnect_on_network_error 1 ' .
@@ -238,16 +248,19 @@ class ChannelStreamController extends Controller
 
                     // I/O options:
                     '-re -i "%s" ' .
-                    '-c:v libx264 -preset veryfast -g 48 -sc_threshold 0 ' .
-                    '-c:a aac -f hls -hls_time 4 -hls_list_size 6 ' .
+                    '-c:v libx264 -preset veryfast -g 15 -keyint_min 15 -sc_threshold 0 ' .
+                    '-c:a aac -f hls -hls_time 1 -hls_list_size 4 ' .
                     '-hls_flags delete_segments+append_list ' .
-                    '-hls_segment_filename %s %s ' .
+                    '-use_wallclock_as_timestamps 1 ' .
+                    '-hls_segment_filename %s ' .
+                    '-hls_base_url %s %s ' .
 
                     // Logging:
                     '%s',
                 $userAgent,                   // for -user_agent
                 $streamUrl,                   // input URL
                 $segment,                     // segment filename 
+                $segmentBaseUrl,              // base URL for segments (want to make sure routed through the proxy to track active users)
                 $playlist,                    // playlist filename
                 $settings['ffmpeg_debug'] ? '' : '-hide_banner -nostats -loglevel error'
             );
@@ -330,10 +343,9 @@ class ChannelStreamController extends Controller
                 }
 
                 // If it *is* running but playlist never appeared, tell the client to retry
-                return response()->json([
-                    'status'  => 'processing',
-                    'message' => 'Playlist is being generated; try again shortly.',
-                ], 202);
+                return redirect()
+                    ->route('stream.hls.playlist', ['id' => $id])
+                    ->with('error', 'Playlist not ready yet. Please try again.');
             }
 
             // Otherwise, wait and retry
@@ -354,14 +366,14 @@ class ChannelStreamController extends Controller
         $path = Storage::disk('app')->path("hls/{$id}/{$segment}");
         abort_unless(file_exists($path), 404, 'Segment not found.');
 
-        // Update last-seen timestamp
-        Cache::put("hls:last_seen:{$id}", now(), now()->addMinutes(10));
+        // Record timestamp in Redis (never expires until we prune)
+        Redis::set("hls:last_seen:{$id}", now()->timestamp);
 
-        // Use a Redis set or tagged cache to track active IDs
-        Cache::tags('hls_active')->add($id, true, now()->addMinutes(10));
+        // Add to active IDs set
+        Redis::sadd('hls:active_ids', $id);
 
         return response()->file($path, [
-            'Content-Type' => 'video/mp2t',
+            'Content-Type' => 'video/MP2T',
         ]);
     }
 

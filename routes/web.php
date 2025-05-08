@@ -59,24 +59,23 @@ Route::get('/phpinfo', function () {
  * Proxy routes
  */
 
-// Stream an IPTV channel
+// Stream an IPTV channel (HLS)
+Route::group(['prefix' => 'stream/hls'], function () {
+    Route::get('{id}', [\App\Http\Controllers\ChannelStreamController::class, 'startHls'])
+        ->name('stream.hls.start');
+
+    // Serve playlist
+    Route::get('{id}/stream.m3u8', [\App\Http\Controllers\ChannelStreamController::class, 'servePlaylist'])
+        ->name('stream.hls.playlist');
+
+    // Serve segments (catch-all for any .ts file)
+    Route::get('{id}/{segment}', [\App\Http\Controllers\ChannelStreamController::class, 'serveSegment'])
+        ->where('segment', 'segment_[0-9]{3}\.ts')
+        ->name('stream.hls.segment');
+});
+
+// Stream an IPTV channel (MPEGTS)
 Route::get('/stream/{id}/{format?}', \App\Http\Controllers\ChannelStreamController::class)->name('stream');
-
-// Stream an IPTV channel with HLS
-// @TODO: More testing and cleanup needed... process is not killed properly, and takes too long to start
-// // Stream an IPTV channel with HLS
-// // 1. Kick off HLS generation and redirect to the playlist
-// Route::get('stream/{id}/hls', [\App\Http\Controllers\ChannelStreamController::class, 'startHls'])
-//     ->name('stream.hls.start');
-
-// // 2. Serve playlist
-// Route::get('stream/{id}/hls/stream.m3u8', [\App\Http\Controllers\ChannelStreamController::class, 'servePlaylist'])
-//     ->name('stream.hls.playlist');
-
-// // 3. Serve segments (catch-all for any .ts file)
-// Route::get('stream/{id}/hls/{segment}', [\App\Http\Controllers\ChannelStreamController::class, 'serveSegment'])
-//     ->where('segment', 'segment_[0-9]{3}\.ts')
-//     ->name('stream.hls.segment');
 
 
 /*

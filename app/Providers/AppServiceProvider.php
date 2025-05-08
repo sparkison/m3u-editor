@@ -54,9 +54,17 @@ class AppServiceProvider extends ServiceProvider
     {
         // Don't kill the app if the database hasn't been created.
         try {
-            DB::connection('sqlite')->statement(
-                'PRAGMA synchronous = OFF;'
-            );
+            foreach (['sqlite', 'jobs'] as $connection) {
+                DB::connection($connection)
+                    ->statement('
+                    PRAGMA synchronous = NORMAL;
+                    PRAGMA mmap_size = 134217728; -- 128 megabytes
+                    PRAGMA cache_size = 1000000000;
+                    PRAGMA foreign_keys = true;
+                    PRAGMA busy_timeout = 5000;
+                    PRAGMA temp_store = memory;
+                ');
+            }
         } catch (\Throwable $throwable) {
             return;
         }
