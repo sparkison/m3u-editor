@@ -8,6 +8,7 @@ export PGID="${PGID:-1000}" # NOT CURRENTLY USED...
 export NGINX_USER="root"
 export FPMUSER="root"
 export FPMGROUP="root"
+export FPMPORT="${FPMPORT:-9000}" # Default 9000
 
 # Check if MySQL enabled
 export ENABLE_MYSQL="${ENABLE_MYSQL:-false}"
@@ -38,7 +39,7 @@ fi
 # Update template files with variable values
 if [ -f /etc/php84/php-fpm.d/www.tmpl ]; then
     # Variables set in container
-    envsubst '${FPMUSER} ${FPMGROUP}' < /etc/php84/php-fpm.d/www.tmpl > /etc/php84/php-fpm.d/www.conf
+    envsubst '${FPMUSER} ${FPMGROUP} ${FPMPORT}' < /etc/php84/php-fpm.d/www.tmpl > /etc/php84/php-fpm.d/www.conf
 fi
 if [ -f /etc/nginx/nginx.tmpl ]; then
     envsubst '${NGINX_USER}' < /etc/nginx/nginx.tmpl > /etc/nginx/nginx.conf
@@ -50,7 +51,7 @@ if [ -f /etc/nginx/conf.d/laravel.tmpl ]; then
     else
         echo "⚡️ Starting app at: $APP_URL:$APP_PORT"
     fi
-    envsubst '${APP_PORT} ${APP_URL}' < /etc/nginx/conf.d/laravel.tmpl > /etc/nginx/conf.d/laravel.conf
+    envsubst '${APP_PORT} ${APP_URL} ${FPMPORT}' < /etc/nginx/conf.d/laravel.tmpl > /etc/nginx/conf.d/laravel.conf
 fi
 
 # Check for configuration directories and files
