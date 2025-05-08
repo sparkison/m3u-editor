@@ -127,7 +127,7 @@ RUN printf '%s\n' \
     '#!/bin/bash' \
     'exec mariadb-admin "$@"' > /usr/local/bin/mysqladmin && chmod +x /usr/local/bin/mysqladmin
 
-COPY ./docker/8.4/my.cnf /etc/mysql/my.cnf
+COPY ./docker/8.4/my.cnf /etc/mysql/my.tmpl
 
 RUN chown -R $WWWUSER:$WWWGROUP /var/www/html
 RUN chown -R $WWWUSER:$WWWGROUP /var/lib/nginx/

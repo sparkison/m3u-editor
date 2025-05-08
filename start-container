@@ -15,6 +15,7 @@ export ENABLE_MYSQL="${ENABLE_MYSQL:-false}"
 export MYSQL_DATABASE="${MYSQL_DATABASE:-m3ue}"
 export MYSQL_USER="${MYSQL_USER:-root}"
 export MYSQL_PASSWORD="${MYSQL_PASSWORD:-root}"
+export MYSQL_PORT="${MYSQL_PORT:-3306}" # Default 3306
 
 # Run PHP as root (or m3ue)
 export SUPERVISOR_PHP_USER="root"
@@ -43,6 +44,9 @@ if [ -f /etc/php84/php-fpm.d/www.tmpl ]; then
 fi
 if [ -f /etc/nginx/nginx.tmpl ]; then
     envsubst '${NGINX_USER}' < /etc/nginx/nginx.tmpl > /etc/nginx/nginx.conf
+fi
+if [ -f /etc/mysql/my.tmpl ]; then
+    envsubst '${MYSQL_PORT}' < /etc/mysql/my.tmpl > /etc/mysql/my.cnf
 fi
 if [ -f /etc/nginx/conf.d/laravel.tmpl ]; then
     # If app url contains https, don't show port
