@@ -21,3 +21,7 @@ Schedule::command('app:refresh-playlist')
 // Refresh EPG
 Schedule::command('app:refresh-epg')
     ->everyFiveMinutes();
+
+// Prune stale processes
+Schedule::command('app:hls-prune')
+    ->everyThirtySeconds();

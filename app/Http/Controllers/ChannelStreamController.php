@@ -161,6 +161,7 @@ class ChannelStreamController extends Controller
             echo "Error: No available streams.";
         }, 200, [
             'Content-Type' => "video/$format",
+            'Transfer-Encoding' => 'chunked',
             'Connection' => 'keep-alive',
             'Cache-Control' => 'no-store, no-transform',
             'Content-Disposition' => "inline; filename=\"stream.$extension\"",

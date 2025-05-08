@@ -4,12 +4,13 @@ namespace App\Console\Commands;
 
 use Carbon\Carbon;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Redis;
 
 class PruneStaleHlsProcesses extends Command
 {
-    protected $signature = 'hls:prune {--threshold=10}';
+    protected $signature = 'app:hls-prune {--threshold=10}';
     protected $description = 'Stop FFmpeg for HLS streams with no segment requests recently';
 
     public function handle()
@@ -32,7 +33,7 @@ class PruneStaleHlsProcesses extends Command
             $lastSeen = Carbon::createFromTimestamp((int) $ts);
             if ($lastSeen->addSeconds($threshold)->isPast()) {
                 $pidKey = "hls:pid:{$channelId}";
-                $pid = Redis::get($pidKey);
+                $pid = Cache::get($pidKey);
 
                 if ($pid && posix_kill($pid, 0)) {
                     $this->info("🛑 Stopping PID {$pid} for channel {$channelId}");
@@ -50,7 +51,8 @@ class PruneStaleHlsProcesses extends Command
                 $this->info("🧹 Deleted files for channel {$channelId}");
 
                 // Remove its Redis entries
-                Redis::del($pidKey, "hls:last_seen:{$channelId}");
+                Cache::forget($pidKey);
+                Redis::del("hls:last_seen:{$channelId}");
                 Redis::srem('hls:active_ids', $channelId);
                 $this->info("✂️ Pruned channel {$channelId}");
             } else {
