@@ -50,6 +50,12 @@ class ProcessEpgImportChunk implements ShouldQueue
                 ];
             }
 
+            // Deduplicate the channels
+            $bulk = collect($bulk)
+                ->unique(function ($item) {
+                    return $item['name'] . $item['channel_id'] . $item['epg_id'] . $item['user_id'];
+                })->toArray();
+
             // Upsert the channels
             EpgChannel::upsert($bulk, uniqueBy: ['name', 'channel_id', 'epg_id', 'user_id'], update: [
                 // Don't update the following fields...

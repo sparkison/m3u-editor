@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\LazyCollection;
 use Cerbero\JsonParser\JsonParser;
+use Illuminate\Support\Facades\Log;
 
 class ProcessM3uImport implements ShouldQueue
 {
@@ -811,6 +812,7 @@ class ProcessM3uImport implements ShouldQueue
                 ->onQueue('import')
                 ->catch(function (Throwable $e) use ($playlist) {
                     $error = "Error processing \"{$playlist->name}\": {$e->getMessage()}";
+                    Log::error($error);
                     Notification::make()
                         ->danger()
                         ->title("Error processing \"{$playlist->name}\"")

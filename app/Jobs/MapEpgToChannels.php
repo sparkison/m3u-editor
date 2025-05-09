@@ -52,6 +52,12 @@ class MapEpgToChannels implements ShouldQueue
                 ];
             }
 
+            // Deduplicate the channels
+            $bulk = collect($bulk)
+                ->unique(function ($item) {
+                    return $item['title'] . $item['name'] . $item['group_internal'] . $item['playlist_id'];
+                })->toArray();
+
             // Upsert the channels
             Channel::upsert($bulk, uniqueBy: ['title', 'name', 'group_internal', 'playlist_id'], update: [
                 // Don't update the following fields...

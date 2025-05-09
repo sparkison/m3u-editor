@@ -166,7 +166,9 @@ class ProcessM3uImportComplete implements ShouldQueue
                 ];
             });
             if (!empty($bulk)) {
-                PlaylistSyncStatusLog::insert($bulk);
+                foreach (array_chunk($bulk, 1000) as $chunk) {
+                    PlaylistSyncStatusLog::insert($chunk);
+                }
             }
         }
 
@@ -200,46 +202,60 @@ class ProcessM3uImportComplete implements ShouldQueue
             : null;
         if ($createEpg) {
             // Configure the EPG url
-            $baseUrl = str($playlist->xtream_config['url'])->replace(' ', '%20')->toString();
-            $username = urlencode($playlist->xtream_config['username']);
-            $password = $playlist->xtream_config['password'];
-            $epgUrl = "$baseUrl/xmltv.php?username=$username&password=$password";
+            try {
+                $baseUrl = str($playlist->xtream_config['url'])->replace(' ', '%20')->toString();
+                $username = urlencode($playlist->xtream_config['username']);
+                $password = $playlist->xtream_config['password'];
+                $epgUrl = "$baseUrl/xmltv.php?username=$username&password=$password";
 
-            // Make sure EPG doesn't already exist
-            $epg = $user->epgs()->where('url', $epgUrl)->first();
-            if (!$epg) {
-                $headers = @get_headers($epgUrl);
-                if (strpos($headers[0], '200') !== false) {
-                    // EPG found, create it
-                    $epg = $user->epgs()->create([
-                        'name' => $playlist->name . ' EPG',
-                        'url' => $epgUrl,
-                        'user_id' => $user->id,
-                    ]);
-                    $msg = "\"{$playlist->name}\" EPG was created and is syncing now.";
-                    Notification::make()
-                        ->success()
-                        ->title('EPG found for Playlist')
-                        ->body($msg)
-                        ->broadcast($playlist->user);
-                    Notification::make()
-                        ->success()
-                        ->title('EPG found for Playlist')
-                        ->body($msg)
-                        ->sendToDatabase($playlist->user);
-                } else {
-                    $msg = "\"{$playlist->name}\" EPG not found. Playlist was configured to auto-download EPG but no EPG was found using at the following url: \"$epgUrl\"";
-                    Notification::make()
-                        ->warning()
-                        ->title('No EPG found for Playlist')
-                        ->body($msg)
-                        ->broadcast($playlist->user);
-                    Notification::make()
-                        ->warning()
-                        ->title('No EPG found for Playlist')
-                        ->body($msg)
-                        ->sendToDatabase($playlist->user);
+                // Make sure EPG doesn't already exist
+                $epg = $user->epgs()->where('url', $epgUrl)->first();
+                if (!$epg) {
+                    $headers = @get_headers($epgUrl);
+                    if (strpos($headers[0], '200') !== false) {
+                        // EPG found, create it
+                        $epg = $user->epgs()->create([
+                            'name' => $playlist->name . ' EPG',
+                            'url' => $epgUrl,
+                            'user_id' => $user->id,
+                        ]);
+                        $msg = "\"{$playlist->name}\" EPG was created and is syncing now.";
+                        Notification::make()
+                            ->success()
+                            ->title('EPG found for Playlist')
+                            ->body($msg)
+                            ->broadcast($playlist->user);
+                        Notification::make()
+                            ->success()
+                            ->title('EPG found for Playlist')
+                            ->body($msg)
+                            ->sendToDatabase($playlist->user);
+                    } else {
+                        $msg = "\"{$playlist->name}\" EPG not found. Playlist was configured to auto-download EPG but no EPG was found using at the following url: \"$epgUrl\"";
+                        Notification::make()
+                            ->warning()
+                            ->title('No EPG found for Playlist')
+                            ->body($msg)
+                            ->broadcast($playlist->user);
+                        Notification::make()
+                            ->warning()
+                            ->title('No EPG found for Playlist')
+                            ->body($msg)
+                            ->sendToDatabase($playlist->user);
+                    }
                 }
+            } catch (\Exception $e) {
+                // Handle any exceptions that occur during EPG creation
+                Notification::make()
+                    ->error()
+                    ->title('EPG Creation Failed')
+                    ->body("Failed to create EPG for \"{$playlist->name}\". Error: {$e->getMessage()}")
+                    ->broadcast($playlist->user);
+                Notification::make()
+                    ->error()
+                    ->title('EPG Creation Failed')
+                    ->body("Failed to create EPG for \"{$playlist->name}\". Error: {$e->getMessage()}")
+                    ->sendToDatabase($playlist->user);
             }
         }
 
