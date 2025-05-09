@@ -11,6 +11,7 @@ export FPMGROUP="root"
 export FPMPORT="${FPMPORT:-9000}" # Default 9000
 
 # Check if MySQL enabled
+export PGDATA="/var/lib/postgresql/data"
 export ENABLE_POSTGRES="${ENABLE_POSTGRES:-false}"
 export PG_DATABASE="${PG_DATABASE:-m3ue}"
 export PG_USER="${PG_USER:-root}"
@@ -44,9 +45,6 @@ if [ -f /etc/php84/php-fpm.d/www.tmpl ]; then
 fi
 if [ -f /etc/nginx/nginx.tmpl ]; then
     envsubst '${NGINX_USER}' < /etc/nginx/nginx.tmpl > /etc/nginx/nginx.conf
-fi
-if [ -f /var/lib/postgresql/data/postgresql.tmpl ]; then
-    envsubst '${PG_PORT}' < /var/lib/postgresql/data/postgresql.tmpl > /var/lib/postgresql/data/postgresql.conf
 fi
 if [ -f /etc/nginx/conf.d/laravel.tmpl ]; then
     # If app url contains https, don't show port
@@ -167,30 +165,53 @@ php artisan sqlite:wal-enable jobs
 echo ""
 
 if [ "${ENABLE_POSTGRES}" = "true" ]; then
-  # Ensure data directory and ownership
-  mkdir -p /var/lib/postgresql/data
-  chown -R ${WWWUSER}:${WWWGROUP} /var/lib/postgresql/data
+  # Make sure `/run/postgresql` directory exists
+  mkdir -p /run/postgresql
+  chown postgres:postgres /run/postgresql
+  chmod 775 /run/postgresql
 
   # Initialize if first-run
-  if [ ! -s /var/lib/postgresql/data/PG_VERSION ]; then
-    su-exec $WWWUSER initdb -D /var/lib/postgresql/data
+  if [ ! -s "$PGDATA/PG_VERSION" ]; then
+    echo "🐘 Initializing PostgreSQL cluster..."
+    # Write the PG password to a secure file
+    pwfile="/tmp/.pg_pwfile"
+    echo "$PG_PASSWORD" > "$pwfile"
+    chown postgres:postgres "$pwfile"
+    chmod 600 "$pwfile"
+    su-exec postgres initdb \
+        --username="$PG_USER" \
+        --pwfile="$pwfile" \
+        -D "$PGDATA"
   fi
 
-  # Start the server under postgres user
-  su-exec $WWWUSER postgres \
-    -D /var/lib/postgresql/data \
-    -h 0.0.0.0 &
+  # Start PostgreSQL under postgres
+  echo "🐘 Starting PostgreSQL..."
+  su-exec postgres postgres \
+    -D "$PGDATA" \
+    -h "0.0.0.0" \
+    -p "$PG_PORT" &
 
-  # Wait for it to accept connections
-  until su-exec $WWWUSER psql -U "${PG_USER}" \
-      -c '\l' >/dev/null 2>&1; do
-    echo "⏳ Waiting for PostgreSQL..."
+  # Cleanup
+  rm -f "$pwfile"
+
+  # Wait for PostgreSQL to be ready
+  until su-exec postgres pg_isready -h localhost -p "$PG_PORT"; do
+    echo "⏳ Waiting for PostgreSQL to be ready..."
     sleep 1
   done
 
-  # Create database & user idempotently
+  # Create role and database
   su-exec postgres psql <<-EOSQL
-    CREATE ROLE ${PG_USER} LOGIN PASSWORD '${PG_PASSWORD}';
+    DO
+    \$\$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT FROM pg_catalog.pg_roles WHERE rolname = '${PG_USER}'
+      ) THEN
+        CREATE ROLE ${PG_USER} LOGIN PASSWORD '${PG_PASSWORD}';
+      END IF;
+    END
+    \$\$;
     CREATE DATABASE ${PG_DATABASE} OWNER ${PG_USER};
 EOSQL
 fi

@@ -31,18 +31,13 @@ RUN apk update && apk --no-cache add \
     php84-cli \
     php84-fpm \
     php84-posix \
+    php84-openssl \
     php84-dev
 
 # Install PostgreSQL server & client
 RUN apk update && apk add --no-cache \
     postgresql \
     postgresql-client
-
-# Ensure the postgres user exists (Alpine’s postgresql package does this by default)
-RUN adduser -D -h /var/lib/postgresql -s /bin/bash postgres
-
-# If running via Swoole, uncomment below line
-# RUN apk --no-cache add php84-posix php84-pecl-swoole
 
 # Install CRON
 RUN touch crontab.tmp \
@@ -97,15 +92,12 @@ COPY ./docker/8.4/nginx/laravel.conf /etc/nginx/conf.d/laravel.tmpl
 # Configure PHP-FPM
 COPY ./docker/8.4/www.conf /etc/php84/php-fpm.d/www.tmpl
 
-# Configure PostgreSQL
-COPY ./docker/8.4/postgresql.conf /var/lib/postgresql/data/postgresql.tmpl
-
 # Configure container startup script
 COPY start-container /usr/local/bin/start-container
 RUN chmod +x /usr/local/bin/start-container
 
 # Pull app code
-RUN git clone https://github.com/sparkison/m3u-editor.git /tmp/m3u-editor \
+RUN git clone -b experimental https://github.com/sparkison/m3u-editor.git /tmp/m3u-editor \
     && mv /tmp/m3u-editor/* /var/www/html \
     && mv /tmp/m3u-editor/.git /var/www/html/.git \
     && mv /tmp/m3u-editor/.env.example /var/www/html/.env.example \
@@ -126,7 +118,9 @@ RUN echo -e '#!/bin/bash\n php artisan app:"$@"' > /usr/bin/m3ue && \
     chmod +x /usr/bin/m3ue
 
 RUN chown -R $WWWUSER:$WWWGROUP /var/www/html
-RUN chown -R $WWWUSER:$WWWGROUP /var/lib/nginx/
+RUN chown -R $WWWUSER:$WWWGROUP /var/lib/nginx
+RUN chown -R postgres:postgres /var/lib/postgresql
+RUN mkdir -p /run/postgresql && chown -R postgres:postgres /run/postgresql
 
 # Final entrypoint
 ENTRYPOINT ["start-container"]
