@@ -108,15 +108,6 @@ class PlaylistResource extends Resource
                     ->description(fn(Playlist $record): string => "Enabled: {$record->enabled_channels_count}")
                     ->toggleable()
                     ->sortable(),
-                Tables\Columns\IconColumn::make('enable_proxy')
-                    ->label('Proxy')
-                    ->icon(fn(string $state): string => match ($state) {
-                        '1' => 'heroicon-o-shield-check',
-                        '0' => 'heroicon-o-shield-exclamation',
-                    })->color(fn(string $state): string => match ($state) {
-                        '1' => 'success',
-                        '0' => 'gray',
-                    })->toggleable()->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->sortable()
                     ->badge()
@@ -126,15 +117,16 @@ class PlaylistResource extends Resource
                     ->sortable()
                     ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
                     ->toggleable(),
-                Tables\Columns\IconColumn::make('auto_sync')
+                Tables\Columns\ToggleColumn::make('enable_proxy')
+                    ->label('Proxy')
+                    ->toggleable()
+                    ->tooltip('Toggle proxy status')
+                    ->sortable(),
+                Tables\Columns\ToggleColumn::make('auto_sync')
                     ->label('Auto Sync')
-                    ->icon(fn(string $state): string => match ($state) {
-                        '1' => 'heroicon-o-check-circle',
-                        '0' => 'heroicon-o-minus-circle',
-                    })->color(fn(string $state): string => match ($state) {
-                        '1' => 'success',
-                        '0' => 'danger',
-                    })->toggleable()->sortable(),
+                    ->toggleable()
+                    ->tooltip('Toggle auto-sync status')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('synced')
                     ->label('Last Synced')
                     ->since()

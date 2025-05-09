@@ -21,7 +21,7 @@ return new class extends Migration
             $table->enum('status', ["pending","processing","completed","failed"])->default('pending');
             $table->boolean('processing')->default(false);
             $table->float('progress')->default('0');
-            $table->dateTime('sync_time')->nullable();
+            $table->float('sync_time')->nullable();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
             $table->foreignId('epg_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
             $table->timestamps();

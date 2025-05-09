@@ -70,15 +70,11 @@ class MergedPlaylistResource extends Resource
                     ->description(fn(MergedPlaylist $record): string => "Enabled: {$record->enabled_channels_count}")
                     ->toggleable()
                     ->sortable(),
-                Tables\Columns\IconColumn::make('enable_proxy')
+                Tables\Columns\ToggleColumn::make('enable_proxy')
                     ->label('Proxy')
-                    ->icon(fn(string $state): string => match ($state) {
-                        '1' => 'heroicon-o-shield-check',
-                        '0' => 'heroicon-o-shield-exclamation',
-                    })->color(fn(string $state): string => match ($state) {
-                        '1' => 'success',
-                        '0' => 'gray',
-                    })->toggleable()->sortable(),
+                    ->toggleable()
+                    ->tooltip('Toggle proxy status')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

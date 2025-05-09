@@ -18,7 +18,6 @@ RUN apk update && apk --no-cache add \
     curl \
     curl-dev \
     sqlite \
-    mysql-client \
     ca-certificates \
     nodejs \
     npm \
@@ -34,9 +33,13 @@ RUN apk update && apk --no-cache add \
     php84-posix \
     php84-dev
 
-# Install MariaDB server & client
-RUN apk --no-cache add \
-    mariadb mariadb-client
+# Install PostgreSQL server & client
+RUN apk update && apk add --no-cache \
+    postgresql \
+    postgresql-client
+
+# Ensure the postgres user exists (Alpine’s postgresql package does this by default)
+RUN adduser -D -h /var/lib/postgresql -s /bin/bash postgres
 
 # If running via Swoole, uncomment below line
 # RUN apk --no-cache add php84-posix php84-pecl-swoole
@@ -62,8 +65,8 @@ RUN apk --no-cache add \
     php84-tokenizer \
     php84-msgpack \
     php84-opcache \
-    php84-pdo_mysql \
     php84-pdo_sqlite \
+    php84-pdo_pgsql \
     php84-phar \
     php84-fileinfo \
     php84-pecl-igbinary \
@@ -94,6 +97,9 @@ COPY ./docker/8.4/nginx/laravel.conf /etc/nginx/conf.d/laravel.tmpl
 # Configure PHP-FPM
 COPY ./docker/8.4/www.conf /etc/php84/php-fpm.d/www.tmpl
 
+# Configure PostgreSQL
+COPY ./docker/8.4/postgresql.conf /var/lib/postgresql/data/postgresql.tmpl
+
 # Configure container startup script
 COPY start-container /usr/local/bin/start-container
 RUN chmod +x /usr/local/bin/start-container
@@ -118,16 +124,6 @@ RUN addgroup $WWWGROUP \
 # Create alias for `php artisan` command
 RUN echo -e '#!/bin/bash\n php artisan app:"$@"' > /usr/bin/m3ue && \
     chmod +x /usr/bin/m3ue
-
-# Create wrapper for MariaDB mysql and mysqladmin
-RUN printf '%s\n' \
-    '#!/bin/bash' \
-    'exec mariadb "$@"' > /usr/local/bin/mysql && chmod +x /usr/local/bin/mysql \
- && printf '%s\n' \
-    '#!/bin/bash' \
-    'exec mariadb-admin "$@"' > /usr/local/bin/mysqladmin && chmod +x /usr/local/bin/mysqladmin
-
-COPY ./docker/8.4/my.cnf /etc/mysql/my.tmpl
 
 RUN chown -R $WWWUSER:$WWWGROUP /var/www/html
 RUN chown -R $WWWUSER:$WWWGROUP /var/lib/nginx/

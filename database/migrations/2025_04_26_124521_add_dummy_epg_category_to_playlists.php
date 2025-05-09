@@ -15,12 +15,6 @@ return new class extends Migration
             $table->boolean('dummy_epg_category')
                 ->default(false)
                 ->after('dummy_epg_length');
-            $table->enum('id_channel_by', [
-                'stream_id',
-                'channel_id',
-                'name',
-                'title',
-            ])->default('stream_id')->change();
         });
     }
 

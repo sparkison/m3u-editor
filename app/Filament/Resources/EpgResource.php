@@ -88,16 +88,11 @@ class EpgResource extends Resource
                     ->sortable()
                     ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
                     ->toggleable(),
-                Tables\Columns\IconColumn::make('auto_sync')
+                Tables\Columns\ToggleColumn::make('auto_sync')
                     ->label('Auto Sync')
                     ->toggleable()
-                    ->icon(fn(string $state): string => match ($state) {
-                        '1' => 'heroicon-o-check-circle',
-                        '0' => 'heroicon-o-minus-circle',
-                    })->color(fn(string $state): string => match ($state) {
-                        '1' => 'success',
-                        '0' => 'danger',
-                    })->sortable(),
+                    ->tooltip('Toggle auto-sync status')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('synced')
                     ->label('Last Synced')
                     ->since()

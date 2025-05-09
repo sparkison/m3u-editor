@@ -11,11 +11,11 @@ export FPMGROUP="root"
 export FPMPORT="${FPMPORT:-9000}" # Default 9000
 
 # Check if MySQL enabled
-export ENABLE_MYSQL="${ENABLE_MYSQL:-false}"
-export MYSQL_DATABASE="${MYSQL_DATABASE:-m3ue}"
-export MYSQL_USER="${MYSQL_USER:-root}"
-export MYSQL_PASSWORD="${MYSQL_PASSWORD:-root}"
-export MYSQL_PORT="${MYSQL_PORT:-3306}" # Default 3306
+export ENABLE_POSTGRES="${ENABLE_POSTGRES:-false}"
+export PG_DATABASE="${PG_DATABASE:-m3ue}"
+export PG_USER="${PG_USER:-root}"
+export PG_PASSWORD="${PG_PASSWORD:-root}"
+export PG_PORT="${PG_PORT:-5432}" # Default 5432
 
 # Run PHP as root (or m3ue)
 export SUPERVISOR_PHP_USER="root"
@@ -45,8 +45,8 @@ fi
 if [ -f /etc/nginx/nginx.tmpl ]; then
     envsubst '${NGINX_USER}' < /etc/nginx/nginx.tmpl > /etc/nginx/nginx.conf
 fi
-if [ -f /etc/mysql/my.tmpl ]; then
-    envsubst '${MYSQL_PORT}' < /etc/mysql/my.tmpl > /etc/mysql/my.cnf
+if [ -f /var/lib/postgresql/data/postgresql.tmpl ]; then
+    envsubst '${PG_PORT}' < /var/lib/postgresql/data/postgresql.tmpl > /var/lib/postgresql/data/postgresql.conf
 fi
 if [ -f /etc/nginx/conf.d/laravel.tmpl ]; then
     # If app url contains https, don't show port
@@ -73,7 +73,6 @@ websockets_log_file="${log_dir}/websocket.log"
 laravel_log_file="${log_dir}/laravel.log"
 ffmpeg_log_file="${log_dir}/ffmpeg.log"
 nginx_log_file="${log_dir}/nginx.log"
-mysql_log_file="${log_dir}/mysqld_err.log"
 
 # Invalid log files, or files that will be created by the app
 swoole_log_file="${log_dir}/swoole_http.log"
@@ -122,17 +121,6 @@ echo "" > "${websockets_log_file}"
 echo "" > "${ffmpeg_log_file}"
 echo "" > "${nginx_log_file}"
 
-# Create mysqld error log file if missing
-if [ "${ENABLE_MYSQL}" = "true" ]; then
-    [ ! -f "${mysql_log_file}" ] && touch "${mysql_log_file}"
-    chown -R ${WWWUSER}:${WWWGROUP} "${mysql_log_file}"
-    chmod 644 "${mysql_log_file}"
-    echo "" > "${mysql_log_file}"
-else
-    # If mysql not enabled and mysql log file exists, remove it
-    [ -f "${mysql_log_file}" ] && rm -f "${mysql_log_file}"
-fi
-
 # Cleanup
 [ -f "${swoole_log_file}" ] && rm -f "${swoole_log_file}"
 [ -f "${reverb_log_file}" ] && rm -f "${reverb_log_file}"
@@ -178,36 +166,32 @@ php artisan sqlite:wal-enable sqlite
 php artisan sqlite:wal-enable jobs
 echo ""
 
-# Setup MySQL (if enabled)
-if [ "${ENABLE_MYSQL}" = "true" ]; then
-    # Ensure socket and data directories exist with correct ownership
-    mkdir -p /run/mysqld /var/lib/mysql
-    chown -R ${WWWUSER}:${WWWGROUP} /run/mysqld /var/lib/mysql
+if [ "${ENABLE_POSTGRES}" = "true" ]; then
+  # Ensure data directory and ownership
+  mkdir -p /var/lib/postgresql/data
+  chown -R ${WWWUSER}:${WWWGROUP} /var/lib/postgresql/data
 
-    if [ ! -d /var/lib/mysql/mysql ]; then
-        echo "🐬 Initializing MySQL"
-        mariadb-install-db --silent --user=$WWWUSER --datadir=/var/lib/mysql
-    fi
+  # Initialize if first-run
+  if [ ! -s /var/lib/postgresql/data/PG_VERSION ]; then
+    su-exec $WWWUSER initdb -D /var/lib/postgresql/data
+  fi
 
-    # Start mysqld in background
-    su-exec $WWWUSER mariadbd --datadir=/var/lib/mysql --socket=/run/mysqld/mysqld.sock &
-    
-    # Wait for it to accept connections
-    until mariadb-admin ping --silent; do
-        echo "⏳ Waiting for DB to start..."
-        sleep 1
-    done
+  # Start the server under postgres user
+  su-exec $WWWUSER postgres \
+    -D /var/lib/postgresql/data \
+    -h 0.0.0.0 &
 
-    # Create database and user (idempotent)
-    mariadb -uroot <<-EOSQL
-        CREATE DATABASE IF NOT EXISTS \`${MYSQL_DATABASE}\`
-            DEFAULT CHARACTER SET utf8mb4
-            COLLATE utf8mb4_unicode_ci;
+  # Wait for it to accept connections
+  until su-exec $WWWUSER psql -U "${PG_USER}" \
+      -c '\l' >/dev/null 2>&1; do
+    echo "⏳ Waiting for PostgreSQL..."
+    sleep 1
+  done
 
-        CREATE OR REPLACE USER '${MYSQL_USER}'@'localhost' IDENTIFIED BY '${MYSQL_PASSWORD}';
-
-        GRANT ALL ON \`${MYSQL_DATABASE}\`.* TO '${MYSQL_USER}'@'localhost' WITH GRANT OPTION;
-        FLUSH PRIVILEGES;
+  # Create database & user idempotently
+  su-exec postgres psql <<-EOSQL
+    CREATE ROLE ${PG_USER} LOGIN PASSWORD '${PG_PASSWORD}';
+    CREATE DATABASE ${PG_DATABASE} OWNER ${PG_USER};
 EOSQL
 fi
 

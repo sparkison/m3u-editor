@@ -18,7 +18,7 @@ return new class extends Migration
         });
 
         // 2. copying the existing column values into new one
-        DB::statement("UPDATE `groups` SET `name_internal` = `name`");
+        DB::statement('UPDATE "groups" SET "name_internal" = "name"');
     }
 
     /**

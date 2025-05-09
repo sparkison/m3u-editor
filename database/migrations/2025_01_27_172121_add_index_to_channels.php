@@ -16,14 +16,14 @@ return new class extends Migration
     {
         // Remove duplicate rows
         DB::statement('
-            DELETE FROM channels 
+            DELETE FROM channels
                 WHERE id NOT IN (
-                    SELECT id FROM (
-                        SELECT MIN(id) as id 
-                        FROM channels 
-                        GROUP BY `name`, `group`, `playlist_id`, `user_id`
-                    ) AS temp_ids
-                )
+                SELECT id FROM (
+                    SELECT MIN(id) AS id
+                    FROM channels
+                    GROUP BY name, "group", playlist_id, user_id
+                ) AS temp_ids
+            );
         ');
 
         // Add unique index

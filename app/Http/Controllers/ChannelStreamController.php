@@ -13,7 +13,6 @@ use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Process\Process as SymphonyProcess;
-// use Spatie\TemporaryDirectory\TemporaryDirectory;
 
 class ChannelStreamController extends Controller
 {
@@ -161,7 +160,6 @@ class ChannelStreamController extends Controller
             echo "Error: No available streams.";
         }, 200, [
             'Content-Type' => "video/$format",
-            'Transfer-Encoding' => 'chunked',
             'Connection' => 'keep-alive',
             'Cache-Control' => 'no-store, no-transform',
             'Content-Disposition' => "inline; filename=\"stream.$extension\"",
@@ -210,7 +208,7 @@ class ChannelStreamController extends Controller
         }
 
         // Get user agent
-        $userAgent = $settings['ffmpeg_user_agent'];
+        $userAgent = escapeshellarg($settings['ffmpeg_user_agent']);
 
         // Only start one FFmpeg per channel at a time
         $cacheKey = "hls:pid:{$channel->id}";
@@ -374,7 +372,7 @@ class ChannelStreamController extends Controller
         Redis::sadd('hls:active_ids', $id);
 
         return response()->file($path, [
-            'Content-Type' => 'video/MP2T',
+            'Content-Type' => 'video/mp2t',
         ]);
     }
 

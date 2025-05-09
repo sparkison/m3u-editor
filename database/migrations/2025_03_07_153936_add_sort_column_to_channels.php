@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('channels', function (Blueprint $table) {
-            $table->unsignedInteger('sort')->after('group_id')->nullable();
+            $table->decimal('sort', 12, 4)
+                ->after('group_id')
+                ->nullable();
         });
     }
 

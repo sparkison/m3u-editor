@@ -91,9 +91,11 @@ class GroupResource extends Resource
                     ->icon(fn(string $state): string => match ($state) {
                         '1' => 'heroicon-o-check-circle',
                         '0' => 'heroicon-o-minus-circle',
+                        '' => 'heroicon-o-minus-circle',
                     })->color(fn(string $state): string => match ($state) {
                         '1' => 'success',
                         '0' => 'danger',
+                        '' => 'danger',
                     })->toggleable()->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
