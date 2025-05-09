@@ -23,7 +23,7 @@ class PostProcessResource extends Resource
 
     public static function getGloballySearchableAttributes(): array
     {
-        return ['name', 'username'];
+        return ['name'];
     }
 
     public static function getGlobalSearchEloquentQuery(): Builder
