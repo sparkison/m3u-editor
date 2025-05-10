@@ -24,6 +24,7 @@ class SimilaritySearchService
         "west",
         "hd",
         "uhd",
+        "fhd",
         "us",
         "usa",
         "not",
