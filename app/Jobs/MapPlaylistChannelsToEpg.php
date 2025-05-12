@@ -16,6 +16,7 @@ use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\LazyCollection;
 use Illuminate\Support\Str;
@@ -42,8 +43,7 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
         public ?bool  $force = false,
         public ?bool  $recurring = false,
         public ?int   $epgMapId = null,
-    )
-    {
+    ) {
         $this->similaritySearch = new SimilaritySearchService();
     }
 
@@ -122,8 +122,11 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                     $epgChannel = $epg->channels()
                         ->where('channel_id', '!=', '')
                         ->where(function ($sub) use ($channel) {
-                            return $sub->whereRaw('LOWER(`channel_id`) = ?', [strtolower(trim(($channel->stream_id)))])
-                                ->orWhereRaw('LOWER(`channel_id`) = ?', [strtolower(trim(($channel->name)))]);
+                            $search1 = strtolower(trim($channel->stream_id));
+                            $search2 = strtolower(trim($channel->name));
+                            return $sub
+                                ->whereRaw('LOWER(channel_id) = ?', [$search1])
+                                ->orWhereRaw('LOWER(channel_id) = ?', [$search2]);
                         })
                         ->select('id', 'channel_id')
                         ->first();
