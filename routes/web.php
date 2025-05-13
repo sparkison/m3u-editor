@@ -61,11 +61,7 @@ Route::get('/phpinfo', function () {
 
 // Stream an IPTV channel (HLS)
 Route::group(['prefix' => 'stream/hls'], function () {
-    Route::get('{id}', [\App\Http\Controllers\ChannelStreamController::class, 'startHls'])
-        ->name('stream.hls.start');
-
-    // Serve playlist
-    Route::get('{id}/stream.m3u8', [\App\Http\Controllers\ChannelStreamController::class, 'servePlaylist'])
+    Route::get('{id}/stream.m3u8', [\App\Http\Controllers\ChannelStreamController::class, 'startHls'])
         ->name('stream.hls.playlist');
 
     // Serve segments (catch-all for any .ts file)

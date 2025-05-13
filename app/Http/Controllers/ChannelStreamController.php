@@ -312,8 +312,8 @@ class ChannelStreamController extends Controller
             Redis::sadd('hls:active_ids', $channel->id);
         }
 
-        // Redirect the client to the playlist URL
-        return redirect()->route('stream.hls.playlist', ['id' => $channel->id]);
+        // Return the Playlist
+        return $this->servePlaylist($request, $id);
     }
 
     /**
@@ -324,7 +324,7 @@ class ChannelStreamController extends Controller
      * 
      * @return \Illuminate\Http\Response
      */
-    public function servePlaylist(Request $request, $id)
+    private function servePlaylist(Request $request, $id)
     {
         $cacheKeyPid = "hls:pid:{$id}";
         $pid = Cache::get($cacheKeyPid);
