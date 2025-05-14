@@ -7,7 +7,6 @@ use App\Models\Channel;
 use App\Services\HlsStreamService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Storage;
@@ -23,49 +22,50 @@ class ChannelHlsStreamController extends Controller
 
     /**
      * Launch (or re-launch) an FFmpeg HLS job for this channel,
-     * then redirect clients to the static .m3u8 URL.
+     * then send the contents of the .m3u8 file.
      * 
      * @param Request $request
-     * @param int|string $id
+     * @param int|string $encodedId
      * 
      * @return \Illuminate\Http\Response
      */
-    public function __invoke(Request $request, $id)
+    public function __invoke(Request $request, $encodedId)
     {
         // Find the channel by ID
-        if (strpos($id, '==') === false) {
-            $id .= '=='; // right pad to ensure proper decoding
+        if (strpos($encodedId, '==') === false) {
+            $encodedId .= '=='; // right pad to ensure proper decoding
         }
-        $channel = Channel::findOrFail(base64_decode($id));
+        $channel = Channel::findOrFail(base64_decode($encodedId));
+        $channelId = $channel->id;
+        $streamUrl = $channel->url_custom ?? $channel->url;
         $title = $channel->title_custom ?? $channel->title;
         $title = strip_tags($title);
-        $streamUrl = $channel->url_custom ?? $channel->url;
 
-        if (!$this->hlsService->isRunning($channel->id)) {
+        // Start stream, if not already running
+        if (!$this->hlsService->isRunning($channelId)) {
             try {
-                $this->hlsService->startStream($channel->id, $streamUrl);
-                Log::channel('ffmpeg')->info("Started HLS stream for channel {$channel->id} ({$title})");
+                $this->hlsService->startStream($channelId, $streamUrl);
+                Log::channel('ffmpeg')->info("Started HLS stream for channel {$channelId} ({$title})");
             } catch (Exception $e) {
-                Log::channel('ffmpeg')->error("Failed to start HLS stream for channel {$channel->id} ({$title}): {$e->getMessage()}");
+                Log::channel('ffmpeg')->error("Failed to start HLS stream for channel {$channelId} ({$title}): {$e->getMessage()}");
                 abort(500, 'Failed to start the stream.');
             }
         } else {
-            Log::channel('ffmpeg')->info("HLS stream already running for channel {$channel->id} ({$title})");
+            Log::channel('ffmpeg')->info("HLS stream already running for channel {$channelId} ({$title})");
         }
 
         // Return the Playlist
-        $pid = Cache::get("hls:pid:{$channel->id}");
-        $path = Storage::disk('app')->path("hls/{$id}/stream.m3u8");
+        $pid = Cache::get("hls:pid:{$channelId}");
+        $path = Storage::disk('app')->path("hls/{$channelId}/stream.m3u8");
         $maxAttempts = 10;
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
             // If the playlist is ready, serve it immediately
             if (file_exists($path)) {
-                return response()->stream(function ($path) {
-                    echo file_get_contents($path);
-                }, 200, [
-                    'Content-Type' => 'application/vnd.apple.mpegurl',
-                    'Cache-Control' => 'no-cache, no-transform',
-                    'Connection' => 'keep-alive',
+                return response('', 200, [
+                    'Content-Type'      => 'application/vnd.apple.mpegurl',
+                    'X-Accel-Redirect'  => "/internal/hls/{$channelId}/stream.m3u8",
+                    'Cache-Control'     => 'no-cache, no-transform',
+                    'Connection'        => 'keep-alive',
                 ]);
             }
 
@@ -73,13 +73,13 @@ class ChannelHlsStreamController extends Controller
             if ($attempt === $maxAttempts) {
                 if (!$pid || !posix_kill($pid, 0)) {
                     Log::channel('ffmpeg')
-                        ->error("FFmpeg process {$pid} is not running (or died) for channel {$id}");
+                        ->error("FFmpeg process {$pid} is not running (or died) for channel {$channelId}");
                     abort(404, 'Playlist not found.');
                 }
 
                 // If it *is* running but playlist never appeared, tell the client to retry
                 return redirect()
-                    ->route('stream.hls.playlist', ['id' => $id])
+                    ->route('stream.hls.playlist', ['encodedId' => $encodedId])
                     ->with('error', 'Playlist not ready yet. Please try again.');
             }
 
@@ -92,47 +92,30 @@ class ChannelHlsStreamController extends Controller
      * Serve individual .ts segments.
      * 
      * @param Request $request
-     * @param int|string $id
+     * @param int|string $channelId
      * 
      * @return \Illuminate\Http\Response
      */
-    public function serveSegment(Request $request, $id, $segment)
+    public function serveSegment(Request $request, $channelId, $segment)
     {
-        $path = Storage::disk('app')->path("hls/{$id}/{$segment}");
+        $path = Storage::disk('app')->path("hls/{$channelId}/{$segment}");
 
-        //abort_unless(file_exists($path), 404, 'Segment not found.');
         // If segment is not found, don't 404 as it will disconnect the stream, return empty 200 response
         if (!file_exists($path)) {
             return response('', 200);
         }
 
         // Record timestamp in Redis (never expires until we prune)
-        Redis::set("hls:last_seen:{$id}", now()->timestamp);
+        Redis::set("hls:last_seen:{$channelId}", now()->timestamp);
 
         // Add to active IDs set
-        Redis::sadd('hls:active_ids', $id);
+        Redis::sadd('hls:active_ids', $channelId);
 
-        return response()->stream(function () use ($path) {
-            echo file_get_contents($path);
-        }, 200, [
-            'Content-Type' => 'video/mp2t',
-            'Cache-Control' => 'no-cache, no-transform',
-            'Connection' => 'keep-alive',
+        return response('', 200, [
+            'Content-Type'     => 'video/mp2t',
+            'X-Accel-Redirect' => "/internal/hls/{$channelId}/{$segment}",
+            'Cache-Control'    => 'no-cache, no-transform',
+            'Connection'       => 'keep-alive',
         ]);
-    }
-
-    /**
-     * Return true if $pid is alive and matches an ffmpeg command.
-     */
-    protected function isFfmpeg(int $pid): bool
-    {
-        $cmdlinePath = "/proc/{$pid}/cmdline";
-        if (! file_exists($cmdlinePath)) {
-            return false;
-        }
-
-        $cmd = @file_get_contents($cmdlinePath);
-        // FFmpeg’s binary name should appear first
-        return $cmd && strpos($cmd, 'ffmpeg') !== false;
     }
 }

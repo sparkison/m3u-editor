@@ -21,30 +21,30 @@ class HlsStreamService
      */
     public function startStream($id, $streamUrl): int
     {
-        // Get user preferences
-        $userPreferences = app(GeneralSettings::class);
-        $settings = [
-            'ffmpeg_debug' => false,
-            'ffmpeg_max_tries' => 3,
-            'ffmpeg_user_agent' => 'VLC/3.0.21 LibVLC/3.0.21',
-        ];
-        try {
-            $settings = [
-                'ffmpeg_debug' => $userPreferences->ffmpeg_debug ?? $settings['ffmpeg_debug'],
-                'ffmpeg_max_tries' => $userPreferences->ffmpeg_max_tries ?? $settings['ffmpeg_max_tries'],
-                'ffmpeg_user_agent' => $userPreferences->ffmpeg_user_agent ?? $settings['ffmpeg_user_agent'],
-            ];
-        } catch (Exception $e) {
-            // Ignore
-        }
-
-        // Get user agent
-        $userAgent = escapeshellarg($settings['ffmpeg_user_agent']);
-
         // Only start one FFmpeg per channel at a time
         $cacheKey = "hls:pid:{$id}";
         $pid = Cache::get($cacheKey);
-        if (!$pid || !$this->isFfmpeg($pid)) {
+        if (!($pid && $this->isFfmpeg($pid))) {
+            // Get user preferences
+            $userPreferences = app(GeneralSettings::class);
+            $settings = [
+                'ffmpeg_debug' => false,
+                'ffmpeg_max_tries' => 3,
+                'ffmpeg_user_agent' => 'VLC/3.0.21 LibVLC/3.0.21',
+            ];
+            try {
+                $settings = [
+                    'ffmpeg_debug' => $userPreferences->ffmpeg_debug ?? $settings['ffmpeg_debug'],
+                    'ffmpeg_max_tries' => $userPreferences->ffmpeg_max_tries ?? $settings['ffmpeg_max_tries'],
+                    'ffmpeg_user_agent' => $userPreferences->ffmpeg_user_agent ?? $settings['ffmpeg_user_agent'],
+                ];
+            } catch (Exception $e) {
+                // Ignore
+            }
+
+            // Get user agent
+            $userAgent = escapeshellarg($settings['ffmpeg_user_agent']);
+
             // Setup the stream file paths
             $storageDir = Storage::disk('app')->path("hls/{$id}");
             File::ensureDirectoryExists($storageDir, 0755);
@@ -52,7 +52,7 @@ class HlsStreamService
             // Setup the stream URL
             $playlist = "{$storageDir}/stream.m3u8";
             $segment = "{$storageDir}/segment_%03d.ts";
-            $segmentBaseUrl = url("/stream/hls/{$id}") . '/';
+            $segmentBaseUrl = url("/api/stream/{$id}") . '/';
 
             $cmd = sprintf(
                 'ffmpeg ' .
@@ -69,7 +69,7 @@ class HlsStreamService
                     '-re -i "%s" ' .
                     '-c:v libx264 -preset veryfast -g 15 -keyint_min 15 -sc_threshold 0 ' .
                     '-c:a aac -f hls -hls_time 1 -hls_list_size 4 ' .
-                    '-hls_flags delete_segments+append_list ' .
+                    '-hls_flags delete_segments+append_list+independent_segments ' .
                     '-use_wallclock_as_timestamps 1 ' .
                     '-hls_segment_filename %s ' .
                     '-hls_base_url %s %s ' .
@@ -145,13 +145,14 @@ class HlsStreamService
     {
         $cacheKey = "hls:pid:{$id}";
         $pid = Cache::get($cacheKey);
-        $running = false;
+        $wasRunning = false;
         if ($pid && posix_kill($pid, 0) && $this->isFfmpeg($pid)) {
-            $running = true;
+            $wasRunning = true;
             // Attempt to gracefully stop the FFmpeg process
             posix_kill($pid, SIGTERM);
             sleep(1);
             if (posix_kill($pid, 0)) {
+                // If the process is still running after SIGTERM, force kill it
                 posix_kill($pid, SIGKILL);
             }
             Cache::forget($cacheKey);
@@ -166,7 +167,7 @@ class HlsStreamService
         // Remove from active IDs set
         Redis::srem('hls:active_ids', $id);
 
-        return $running;
+        return $wasRunning;
     }
 
     /**
@@ -199,6 +200,11 @@ class HlsStreamService
      */
     protected function isFfmpeg(int $pid): bool
     {
+        return true;
+
+        // TODO: This is a placeholder for the actual implementation.
+        //       Currently not working, seems like the process is not flagged correctly.
+        //       Need to do some more investigation.
         $cmdlinePath = "/proc/{$pid}/cmdline";
         if (! file_exists($cmdlinePath)) {
             return false;
