@@ -132,9 +132,14 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                         ->first();
 
                     // Of no direct match, attempt a similarity search
-                    if (!$epgChannel) {
-                        $epgChannel = $this->similaritySearch->findMatchingEpgChannel($channel, $epg);
-                    }
+                    // if (!$epgChannel) {
+                    //     // Only do this if the URL is not a .ts or .m3u8 file
+                    //     // as these are not suitable for similarity search
+                    //     // Consider other formats as VOD and ignore them
+                    //     if (Str::endsWith($channel->url, ['ts', 'm3u8'])) {
+                    //         $epgChannel = $this->similaritySearch->findMatchingEpgChannel($channel, $epg);
+                    //     }
+                    // }
 
                     // If EPG channel found, link it to the Playlist channel
                     if ($epgChannel) {
