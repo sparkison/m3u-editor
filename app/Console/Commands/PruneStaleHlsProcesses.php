@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Services\HlsStreamService;
 use Carbon\Carbon;
+use App\Services\HlsStreamService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Redis;
 
@@ -17,6 +17,7 @@ class PruneStaleHlsProcesses extends Command
     public function __construct(HlsStreamService $hlsStreamService)
     {
         $this->hlsService = $hlsStreamService;
+        parent::__construct();
     }
 
     public function handle()
