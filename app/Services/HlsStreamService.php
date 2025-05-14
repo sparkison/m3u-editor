@@ -24,7 +24,7 @@ class HlsStreamService
         // Only start one FFmpeg per channel at a time
         $cacheKey = "hls:pid:{$id}";
         $pid = Cache::get($cacheKey);
-        if (!($pid && $this->isFfmpeg($pid))) {
+        if (!($this->isRunning($id))) {
             // Get user preferences
             $userPreferences = app(GeneralSettings::class);
             $settings = [
@@ -146,7 +146,7 @@ class HlsStreamService
         $cacheKey = "hls:pid:{$id}";
         $pid = Cache::get($cacheKey);
         $wasRunning = false;
-        if ($pid && posix_kill($pid, 0) && $this->isFfmpeg($pid)) {
+        if ($this->isRunning($id)) {
             $wasRunning = true;
             // Attempt to gracefully stop the FFmpeg process
             posix_kill($pid, SIGTERM);
@@ -180,7 +180,7 @@ class HlsStreamService
     {
         $cacheKey = "hls:pid:{$id}";
         $pid = Cache::get($cacheKey);
-        return $pid && $this->isFfmpeg($pid);
+        return $pid && posix_kill($pid, 0) && $this->isFfmpeg($pid);
     }
 
     /**

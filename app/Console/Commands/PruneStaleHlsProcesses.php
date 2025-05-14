@@ -44,7 +44,7 @@ class PruneStaleHlsProcesses extends Command
                     $this->info("❌ Channel {$channelId} was not running, skipping");
                     continue;
                 } else {
-                    $this->info("✅ Channel {$channelId} was running and has been stopped");
+                    $this->info("❌ Channel {$channelId} was running and has been stopped");
                 }
             } else {
                 $this->info("✅ Channel {$channelId} is still active");
