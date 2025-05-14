@@ -1,0 +1,211 @@
+<?php
+
+namespace App\Services;
+
+use Exception;
+use App\Settings\GeneralSettings;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Facades\Storage;
+
+class HlsStreamService
+{
+    /**
+     * Start an HLS stream for the given channel.
+     *
+     * @param string $id
+     * @param string $streamUrl
+     * @return int The FFmpeg process ID
+     */
+    public function startStream($id, $streamUrl): int
+    {
+        // Get user preferences
+        $userPreferences = app(GeneralSettings::class);
+        $settings = [
+            'ffmpeg_debug' => false,
+            'ffmpeg_max_tries' => 3,
+            'ffmpeg_user_agent' => 'VLC/3.0.21 LibVLC/3.0.21',
+        ];
+        try {
+            $settings = [
+                'ffmpeg_debug' => $userPreferences->ffmpeg_debug ?? $settings['ffmpeg_debug'],
+                'ffmpeg_max_tries' => $userPreferences->ffmpeg_max_tries ?? $settings['ffmpeg_max_tries'],
+                'ffmpeg_user_agent' => $userPreferences->ffmpeg_user_agent ?? $settings['ffmpeg_user_agent'],
+            ];
+        } catch (Exception $e) {
+            // Ignore
+        }
+
+        // Get user agent
+        $userAgent = escapeshellarg($settings['ffmpeg_user_agent']);
+
+        // Only start one FFmpeg per channel at a time
+        $cacheKey = "hls:pid:{$id}";
+        $pid = Cache::get($cacheKey);
+        if (!$pid || !$this->isFfmpeg($pid)) {
+            // Setup the stream file paths
+            $storageDir = Storage::disk('app')->path("hls/{$id}");
+            File::ensureDirectoryExists($storageDir, 0755);
+
+            // Setup the stream URL
+            $playlist = "{$storageDir}/stream.m3u8";
+            $segment = "{$storageDir}/segment_%03d.ts";
+            $segmentBaseUrl = url("/stream/hls/{$id}") . '/';
+
+            $cmd = sprintf(
+                'ffmpeg ' .
+                    // Optimization options:
+                    '-fflags nobuffer -flags low_delay ' .
+
+                    // Pre-input HTTP options:
+                    '-user_agent "%s" -referer "MyComputer" ' .
+                    '-multiple_requests 1 -reconnect_on_network_error 1 ' .
+                    '-reconnect_on_http_error 5xx,4xx -reconnect_streamed 1 ' .
+                    '-reconnect_delay_max 5 -noautorotate ' .
+
+                    // I/O options:
+                    '-re -i "%s" ' .
+                    '-c:v libx264 -preset veryfast -g 15 -keyint_min 15 -sc_threshold 0 ' .
+                    '-c:a aac -f hls -hls_time 1 -hls_list_size 4 ' .
+                    '-hls_flags delete_segments+append_list ' .
+                    '-use_wallclock_as_timestamps 1 ' .
+                    '-hls_segment_filename %s ' .
+                    '-hls_base_url %s %s ' .
+
+                    // Logging:
+                    '%s',
+                $userAgent,                   // for -user_agent
+                $streamUrl,                   // input URL
+                $segment,                     // segment filename 
+                $segmentBaseUrl,              // base URL for segments (want to make sure routed through the proxy to track active users)
+                $playlist,                    // playlist filename
+                $settings['ffmpeg_debug'] ? '' : '-hide_banner -nostats -loglevel error'
+            );
+
+            // Tell proc_open to give us back a stderr pipe
+            $descriptors = [
+                0 => ['pipe', 'r'], // stdin (we won't use)
+                1 => ['pipe', 'w'], // stdout (we won't use)
+                2 => ['pipe', 'w'], // stderr (we will log)
+            ];
+            $pipes = [];
+            $process = proc_open($cmd, $descriptors, $pipes);
+
+            if (!is_resource($process)) {
+                Log::channel('ffmpeg')->error("Failed to launch FFmpeg for channel {$id}");
+                abort(500, 'Could not start stream.');
+            }
+
+            // Immediately close stdin/stdout
+            fclose($pipes[0]);
+            fclose($pipes[1]);
+
+            // Make stderr non-blocking
+            stream_set_blocking($pipes[2], false);
+
+            // Spawn a little "reader" that pulls from stderr and logs
+            $logger = Log::channel('ffmpeg');
+            $stderr = $pipes[2];
+
+            // Register shutdown function to ensure the pipe is drained
+            register_shutdown_function(function () use ($stderr, $process, $logger) {
+                while (!feof($stderr)) {
+                    $line = fgets($stderr);
+                    if ($line !== false) {
+                        $logger->error(trim($line));
+                    }
+                }
+                fclose($stderr);
+                proc_close($process);
+            });
+
+            // Cache the actual FFmpeg PID
+            $status = proc_get_status($process);
+            $pid = $status['pid'];
+            Cache::forever("hls:pid:{$id}", $pid);
+
+            // Record timestamp in Redis (never expires until we prune)
+            Redis::set("hls:last_seen:{$id}", now()->timestamp);
+
+            // Add to active IDs set
+            Redis::sadd('hls:active_ids', $id);
+        }
+        return $pid;
+    }
+
+    /**
+     * Stop FFmpeg for the given HLS stream channel (if currently running).
+     *
+     * @param string $id
+     * @return bool
+     */
+    public function stopStream($id): bool
+    {
+        $cacheKey = "hls:pid:{$id}";
+        $pid = Cache::get($cacheKey);
+        $running = false;
+        if ($pid && posix_kill($pid, 0) && $this->isFfmpeg($pid)) {
+            $running = true;
+            // Attempt to gracefully stop the FFmpeg process
+            posix_kill($pid, SIGTERM);
+            sleep(1);
+            if (posix_kill($pid, 0)) {
+                posix_kill($pid, SIGKILL);
+            }
+            Cache::forget($cacheKey);
+
+            // Cleanup on-disk HLS files
+            $storageDir = Storage::disk('app')->path("hls/{$id}");
+            File::deleteDirectory($storageDir);
+        } else {
+            Log::channel('ffmpeg')->warning("No running FFmpeg process for channel {$id} to stop.");
+        }
+
+        // Remove from active IDs set
+        Redis::srem('hls:active_ids', $id);
+
+        return $running;
+    }
+
+    /**
+     * Check if an HLS stream is currently running for the given channel ID.
+     *
+     * @param string $id
+     * @return bool
+     */
+    public function isRunning($id): bool
+    {
+        $cacheKey = "hls:pid:{$id}";
+        $pid = Cache::get($cacheKey);
+        return $pid && $this->isFfmpeg($pid);
+    }
+
+    /**
+     * Get the PID of the currently running HLS stream for the given channel ID.
+     *
+     * @param string $id
+     * @return bool
+     */
+    public function getPid($id): ?int
+    {
+        $cacheKey = "hls:pid:{$id}";
+        return Cache::get($cacheKey);
+    }
+
+    /**
+     * Return true if $pid is alive and matches an ffmpeg command.
+     */
+    protected function isFfmpeg(int $pid): bool
+    {
+        $cmdlinePath = "/proc/{$pid}/cmdline";
+        if (! file_exists($cmdlinePath)) {
+            return false;
+        }
+
+        $cmd = @file_get_contents($cmdlinePath);
+        // FFmpeg’s binary name should appear first
+        return $cmd && strpos($cmd, 'ffmpeg') !== false;
+    }
+}

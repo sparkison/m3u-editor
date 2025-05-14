@@ -2,16 +2,22 @@
 
 namespace App\Console\Commands;
 
+use App\Services\HlsStreamService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Redis;
 
 class PruneStaleHlsProcesses extends Command
 {
     protected $signature = 'app:hls-prune {--threshold=10}';
     protected $description = 'Stop FFmpeg for HLS streams with no segment requests recently';
+
+    private $hlsService;
+
+    public function __construct(HlsStreamService $hlsStreamService)
+    {
+        $this->hlsService = $hlsStreamService;
+    }
 
     public function handle()
     {
@@ -32,29 +38,13 @@ class PruneStaleHlsProcesses extends Command
             }
             $lastSeen = Carbon::createFromTimestamp((int) $ts);
             if ($lastSeen->addSeconds($threshold)->isPast()) {
-                $pidKey = "hls:pid:{$channelId}";
-                $pid = Cache::get($pidKey);
-
-                if ($pid && posix_kill($pid, 0)) {
-                    $this->info("🛑 Stopping PID {$pid} for channel {$channelId}");
-                    posix_kill($pid, SIGTERM);
-                    sleep(1);
-                    if (posix_kill($pid, 0)) {
-                        posix_kill($pid, SIGKILL);
-                    }
+                $wasRunning = $this->hlsService->stopStream($channelId);
+                if (!$wasRunning) {
+                    $this->info("❌ Channel {$channelId} was not running, skipping");
+                    continue;
                 } else {
-                    $this->info("❌ No running PID for channel {$channelId}");
+                    $this->info("✅ Channel {$channelId} was running and has been stopped");
                 }
-
-                // Cleanup on-disk HLS files
-                File::deleteDirectory(storage_path("app/hls/{$channelId}"));
-                $this->info("🧹 Deleted files for channel {$channelId}");
-
-                // Remove its Redis entries
-                Cache::forget($pidKey);
-                Redis::del("hls:last_seen:{$channelId}");
-                Redis::srem('hls:active_ids', $channelId);
-                $this->info("✂️ Pruned channel {$channelId}");
             } else {
                 $this->info("✅ Channel {$channelId} is still active");
             }

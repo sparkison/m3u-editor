@@ -15,6 +15,7 @@ use App\Models\Epg;
 use App\Models\Group;
 use App\Models\Playlist;
 use App\Models\User;
+use App\Services\HlsStreamService;
 use App\Services\PlaylistUrlService;
 use App\Services\ProxyService;
 use App\Settings\GeneralSettings;
@@ -316,5 +317,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton('playlistUrl', function () {
             return new PlaylistUrlService();
         });
+
+        // Register the HLS stream service
+        $this->app->singleton(HlsStreamService::class);
     }
 }

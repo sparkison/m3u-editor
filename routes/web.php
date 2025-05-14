@@ -59,19 +59,9 @@ Route::get('/phpinfo', function () {
  * Proxy routes
  */
 
-// Stream an IPTV channel (HLS)
-Route::group(['prefix' => 'stream/hls'], function () {
-    Route::get('{id}/stream.m3u8', [\App\Http\Controllers\ChannelStreamController::class, 'startHls'])
-        ->name('stream.hls.playlist');
-
-    // Serve segments (catch-all for any .ts file)
-    Route::get('{id}/{segment}', [\App\Http\Controllers\ChannelStreamController::class, 'serveSegment'])
-        ->where('segment', 'segment_[0-9]{3}\.ts')
-        ->name('stream.hls.segment');
-});
-
 // Stream an IPTV channel (MPEGTS)
-Route::get('/stream/{id}/{format?}', \App\Http\Controllers\ChannelStreamController::class)->name('stream');
+Route::get('/stream/{id}/{format?}', \App\Http\Controllers\ChannelStreamController::class)
+    ->name('stream');
 
 
 /*
