@@ -622,6 +622,19 @@ class ChannelResource extends Resource
                     Forms\Components\TextInput::make('shift')
                         ->columnSpan(1)
                         ->rules(['numeric', 'min:0']),
+                    Forms\Components\Hidden::make('group'),
+                    Forms\Components\Select::make('group_id')
+                        ->label('Group')
+                        ->options(fn($record) => Group::where('playlist_id', $record->playlist_id)->get(['name', 'id'])->pluck('name', 'id'))
+                        ->columnSpan(1)
+                        ->placeholder('Select a group')
+                        ->searchable()
+                        ->live()
+                        ->afterStateUpdated(function (Forms\Get $get, Forms\Set $set) {
+                            $group = Group::find($get('group_id'));
+                            $set('group', $group->name ?? null);
+                        })
+                        ->rules(['numeric', 'min:0']),
                 ]),
             Forms\Components\Fieldset::make('URL Settings')
                 ->schema([
