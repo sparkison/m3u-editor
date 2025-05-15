@@ -1,6 +1,6 @@
 <x-filament::modal icon="heroicon-o-qr-code" alignment="center">
     <x-slot name="trigger">
-        <x-filament::button icon="heroicon-m-qr-code" color="gray" size="xs">
+        <x-filament::button icon="heroicon-m-qr-code" color="gray">
             {{ $label ?? 'QR Code' }}
         </x-filament::button>
     </x-slot>

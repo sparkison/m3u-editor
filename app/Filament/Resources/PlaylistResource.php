@@ -347,39 +347,6 @@ class PlaylistResource extends Resource
             Forms\Components\TextInput::make('name')
                 ->helperText('Enter the name of the playlist. Internal use only.')
                 ->required(),
-            Forms\Components\Section::make('Manage Auth')
-                ->description('When an Auth is assigned, regular playlist routes will return a "401 Unauthorized" error unless username and password parameters are passed.')
-                ->collapsible()
-                ->collapsed(true)
-                ->schema([
-                    Forms\Components\Select::make('auth')
-                        ->relationship('playlistAuths', 'playlist_auths.name')
-                        ->label('Assigned Auth(s)')
-                        ->multiple()
-                        ->searchable()
-                        ->preload()
-                        ->helperText('NOTE: only the first enabled auth will be used if multiple assigned.'),
-                ])->hiddenOn(['create']),
-            Forms\Components\Section::make('Links')
-                ->description('These links are generated based on the current playlist configuration. Only enabled channels will be included.')
-                ->collapsible()
-                ->collapsed(true)
-                ->schema([
-                    Forms\Components\Toggle::make('short_urls_enabled')
-                        ->label('Use Short URLs')
-                        ->helperText('When enabled, short URLs will be used for the playlist links. Save changes to generate the short URLs (or remove them).')
-                        ->columnSpan(2)
-                        ->inline(false)
-                        ->default(false),
-                    PlaylistM3uUrl::make('m3u_url')
-                        ->label('M3U URL')
-                        ->columnSpan(2)
-                        ->dehydrated(false), // don't save the value in the database
-                    PlaylistEpgUrl::make('epg_url')
-                        ->label('EPG URL')
-                        ->columnSpan(2)
-                        ->dehydrated(false) // don't save the value in the database
-                ])->hiddenOn(['create']),
         ];
 
         // See if MediaFlow Proxy is set up
@@ -756,10 +723,54 @@ class PlaylistResource extends Resource
                 ->schema($fields);
         }
         return [
-            Forms\Components\Tabs::make()
-                ->tabs($tabs)
-                ->columnSpanFull()
-                ->persistTabInQueryString()
+            Forms\Components\Grid::make()
+                ->columns(5)
+                ->schema([
+                    Forms\Components\Tabs::make()
+                        ->tabs($tabs)
+                        ->columnSpan(3)
+                        ->persistTabInQueryString(),
+                    Forms\Components\Grid::make()
+                        ->columns(2)
+                        ->columnSpan(2)
+                        ->schema([
+                            Forms\Components\Section::make('Manage Auth')
+                                ->description('Add authentication to your playlist.')
+                                ->collapsible()
+                                ->collapsed(true)
+                                ->columnSpan(2)
+                                ->schema([
+                                    Forms\Components\Select::make('auth')
+                                        ->relationship('playlistAuths', 'playlist_auths.name')
+                                        ->label('Assigned Auth(s)')
+                                        ->multiple()
+                                        ->searchable()
+                                        ->preload()
+                                        ->helperText('NOTE: only the first enabled auth will be used if multiple assigned.'),
+                                ]),
+                            Forms\Components\Section::make('Links')
+                                ->collapsible()
+                                ->columnSpan(2)
+                                ->collapsed(false)
+                                ->schema([
+                                    Forms\Components\Toggle::make('short_urls_enabled')
+                                        ->label('Use Short URLs')
+                                        ->helperText('When enabled, short URLs will be used for the playlist links. Save changes to generate the short URLs (or remove them).')
+                                        ->columnSpan(2)
+                                        ->inline(false)
+                                        ->default(false),
+                                    PlaylistM3uUrl::make('m3u_url')
+                                        ->label('M3U URLs')
+                                        ->columnSpan(2)
+                                        ->dehydrated(false), // don't save the value in the database
+                                    PlaylistEpgUrl::make('epg_url')
+                                        ->label('EPG URLs')
+                                        ->columnSpan(2)
+                                        ->dehydrated(false) // don't save the value in the database
+                                ]),
+                        ])
+                ])->columnSpanFull(),
+
         ];
     }
 

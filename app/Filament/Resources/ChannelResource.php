@@ -647,12 +647,12 @@ class ChannelResource extends Resource
                         ->rules(['min:1'])
                         ->suffixAction(
                             Forms\Components\Actions\Action::make('copy')
-                                ->icon('heroicon-s-clipboard-document-check')
+                                ->icon('heroicon-s-eye')
                                 ->action(function (Get $get, $record, $state) {
                                     $url = $state ?? $get('url');
                                     $title = $record->title_custom ?? $record->title;
                                     Notification::make()
-                                        ->icon('heroicon-s-clipboard-document-check')
+                                        ->icon('heroicon-s-eye')
                                         ->title("$title - URL")
                                         ->success()
                                         ->body($url)
@@ -661,6 +661,12 @@ class ChannelResource extends Resource
                                 })
                         )
                         ->type('url'),
+                    // Forms\Components\TextInput::make('proxy_url')
+                    //     ->columnSpan(1)
+                    //     ->prefixIcon('heroicon-m-globe-alt')
+                    //     ->helperText("m3u editor proxy url for this channel.")
+                    //     ->readOnly()
+                    //     ->dehydrated(false), // don't save the value in the database
                     Forms\Components\TextInput::make('url_proxy')
                         ->label('Proxy URL')
                         ->columnSpan(1)
@@ -670,12 +676,12 @@ class ChannelResource extends Resource
                         ->disabled()
                         ->suffixAction(
                             Forms\Components\Actions\Action::make('copy')
-                                ->icon('heroicon-s-clipboard-document-check')
+                                ->icon('heroicon-s-eye')
                                 ->action(function ($record, $state) {
                                     $url = ProxyFacade::getProxyUrlForChannel($record->id);
                                     $title = $record->title_custom ?? $record->title;
                                     Notification::make()
-                                        ->icon('heroicon-s-clipboard-document-check')
+                                        ->icon('heroicon-s-eye')
                                         ->title("$title - Proxy URL")
                                         ->success()
                                         ->body($url)

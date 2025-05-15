@@ -17,6 +17,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use App\Facades\PlaylistUrlFacade;
+use Filament\Forms\FormsComponent;
 
 class CustomPlaylistResource extends Resource
 {
@@ -147,39 +148,6 @@ class CustomPlaylistResource extends Resource
                 ->helperText('User agent string to use for making requests.')
                 ->default('Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13')
                 ->required(),
-            Forms\Components\Section::make('Manage Auth')
-                ->description('When an Auth is assigned, regular playlist routes will return a "401 Unauthorized" error unless username and password parameters are passed.')
-                ->collapsible()
-                ->collapsed(true)
-                ->schema([
-                    Forms\Components\Select::make('auth')
-                        ->relationship('playlistAuths', 'playlist_auths.name')
-                        ->label('Assigned Auth(s)')
-                        ->multiple()
-                        ->searchable()
-                        ->preload()
-                        ->helperText('NOTE: only the first enabled auth will be used if multiple assigned.'),
-                ])->hiddenOn(['create']),
-            Forms\Components\Section::make('Links')
-                ->description('These links are generated based on the current playlist configuration. Only enabled channels will be included.')
-                ->collapsible()
-                ->collapsed(true)
-                ->schema([
-                    Forms\Components\Toggle::make('short_urls_enabled')
-                        ->label('Use Short URLs')
-                        ->helperText('When enabled, short URLs will be used for the playlist links. Save changes to generate the short URLs (or remove them).')
-                        ->columnSpan(2)
-                        ->inline(false)
-                        ->default(false),
-                    PlaylistM3uUrl::make('m3u_url')
-                        ->label('M3U URL')
-                        ->columnSpan(2)
-                        ->dehydrated(false), // don't save the value in the database
-                    PlaylistEpgUrl::make('epg_url')
-                        ->label('EPG URL')
-                        ->columnSpan(2)
-                        ->dehydrated(false) // don't save the value in the database
-                ])->hiddenOn(['create']),
         ];
         if (PlaylistUrlFacade::mediaFlowProxyEnabled()) {
             $schema[] = Forms\Components\Section::make('MediaFlow Proxy')
@@ -299,17 +267,59 @@ class CustomPlaylistResource extends Resource
                     ...$outputScheme
                 ])
                 ->columns(2),
-            Forms\Components\Tabs::make('tabs')
+            Forms\Components\Grid::make()
                 ->hiddenOn(['create']) // hide this field on the create form
-                ->columnSpanFull()
-                ->tabs([
-                    Forms\Components\Tabs\Tab::make('General')
+                ->columns(5)
+                ->schema([
+                    Forms\Components\Tabs::make('tabs')
+                        ->columnSpan(3)
+                        ->tabs([
+                            Forms\Components\Tabs\Tab::make('General')
+                                ->columns(2)
+                                ->schema($schema),
+                            Forms\Components\Tabs\Tab::make('Output')
+                                ->columns(2)
+                                ->schema($outputScheme),
+                        ]),
+                    Forms\Components\Grid::make()
                         ->columns(2)
-                        ->schema($schema),
-                    Forms\Components\Tabs\Tab::make('Output')
-                        ->columns(2)
-                        ->schema($outputScheme),
+                        ->columnSpan(2)
+                        ->schema([
+                            Forms\Components\Section::make('Manage Auth')
+                                ->description('Add authentication to your playlist.')
+                                ->collapsible()
+                                ->collapsed(true)
+                                ->schema([
+                                    Forms\Components\Select::make('auth')
+                                        ->relationship('playlistAuths', 'playlist_auths.name')
+                                        ->label('Assigned Auth(s)')
+                                        ->multiple()
+                                        ->searchable()
+                                        ->preload()
+                                        ->helperText('NOTE: only the first enabled auth will be used if multiple assigned.'),
+                                ]),
+                            Forms\Components\Section::make('Links')
+                                ->collapsible()
+                                ->collapsed(false)
+                                ->schema([
+                                    Forms\Components\Toggle::make('short_urls_enabled')
+                                        ->label('Use Short URLs')
+                                        ->helperText('When enabled, short URLs will be used for the playlist links. Save changes to generate the short URLs (or remove them).')
+                                        ->columnSpan(2)
+                                        ->inline(false)
+                                        ->default(false),
+                                    PlaylistM3uUrl::make('m3u_url')
+                                        ->label('M3U URL')
+                                        ->columnSpan(2)
+                                        ->dehydrated(false), // don't save the value in the database
+                                    PlaylistEpgUrl::make('epg_url')
+                                        ->label('EPG URL')
+                                        ->columnSpan(2)
+                                        ->dehydrated(false) // don't save the value in the database
+                                ])
+                        ]),
                 ]),
+
         ];
     }
 }
