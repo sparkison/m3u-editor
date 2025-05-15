@@ -86,6 +86,7 @@ class HlsStreamService
                     // Logging:
                     '%s',
                 $userAgent,                   // for -user_agent
+                $userArgs,                    // user defined options
                 $streamUrl,                   // input URL
                 $segment,                     // segment filename 
                 $segmentBaseUrl,              // base URL for segments (want to make sure routed through the proxy to track active users)
