@@ -22,8 +22,17 @@ export PG_PORT="${PG_PORT:-5432}" # Default 5432
 export SUPERVISOR_PHP_USER="root"
 export APP_URL="${APP_URL:-http://localhost}"
 export APP_PORT="${APP_PORT:-36400}" # Default 36400
+
+# Websockets
 export REVERB_PORT="${REVERB_PORT:-36800}" # Default 36800
-export TZ="${TZ:-UTC}" # Set timezone, default to UTC
+export BROADCAST_CONNECTION="${BROADCAST_CONNECTION:-reverb}"
+# If broadcast driver is null, set `VITE_WEBSOCKETS_DISABLED` to true
+if [ "$BROADCAST_CONNECTION" = "null" ]; then
+    export VITE_WEBSOCKETS_DISABLED="true"
+fi
+
+# Set timezone, default to UTC
+export TZ="${TZ:-UTC}"
 
 # Define the php-fpm command (add "-R" flag to allow php-fpm to run as root)
 export SUPERVISOR_PHP_COMMAND="/usr/sbin/php-fpm84 -F -R"
