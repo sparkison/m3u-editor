@@ -82,6 +82,9 @@ class ChannelStreamController extends Controller
 
             // Get user defined options
             $userArgs = config('proxy.ffmpeg_additional_args', '');
+            if (!empty($userArgs)) {
+                $userArgs .= ' ';
+            }
 
             // Loop through available streams...
             $output = $format === 'mp2t'

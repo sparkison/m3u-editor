@@ -45,6 +45,12 @@ class HlsStreamService
             // Get user agent
             $userAgent = escapeshellarg($settings['ffmpeg_user_agent']);
 
+            // Get user defined options
+            $userArgs = config('proxy.ffmpeg_additional_args', '');
+            if (!empty($userArgs)) {
+                $userArgs .= ' ';
+            }
+
             // Setup the stream file paths
             $storageDir = Storage::disk('app')->path("hls/{$id}");
             File::ensureDirectoryExists($storageDir, 0755);
@@ -64,6 +70,9 @@ class HlsStreamService
                     '-multiple_requests 1 -reconnect_on_network_error 1 ' .
                     '-reconnect_on_http_error 5xx,4xx -reconnect_streamed 1 ' .
                     '-reconnect_delay_max 5 -noautorotate ' .
+
+                    // User defined options:
+                    '%s' .
 
                     // I/O options:
                     '-re -i "%s" ' .
