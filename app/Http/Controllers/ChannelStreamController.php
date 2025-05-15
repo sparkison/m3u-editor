@@ -80,6 +80,9 @@ class ChannelStreamController extends Controller
             $userAgent = escapeshellarg($settings['ffmpeg_user_agent']);
             $maxRetries = $settings['ffmpeg_max_tries'];
 
+            // Get user defined options
+            $userArgs = config('proxy.ffmpeg_additional_args', '');
+
             // Loop through available streams...
             $output = $format === 'mp2t'
                 ? '-c copy -f mpegts pipe:1'
@@ -93,6 +96,9 @@ class ChannelStreamController extends Controller
                         '-reconnect_on_http_error 5xx,4xx -reconnect_streamed 1 ' .
                         '-reconnect_delay_max 5 -noautorotate ' .
 
+                        // User defined options:
+                        '%s' .
+
                         // Input:
                         '-re -i "%s" ' .
 
@@ -102,6 +108,7 @@ class ChannelStreamController extends Controller
                         // Logging:
                         '%s',
                     $userAgent,                   // for -user_agent
+                    $userArgs,                    // user defined options
                     $streamUrl,                   // input URL
                     $output,                      // for -f
                     $settings['ffmpeg_debug'] ? '' : '-hide_banner -nostats -loglevel error'
