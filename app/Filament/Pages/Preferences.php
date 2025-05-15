@@ -62,7 +62,7 @@ class Preferences extends SettingsPage
                                             ->label('Debug')
                                             ->columnSpan(1)
                                             ->inline(false)
-                                            ->helperText('When enabled FFmpeg will output verbose logging to the log file (/var/www/logs/ffmpeg.log). When disabled, FFmpeg will only log errors.'),
+                                            ->helperText('When enabled FFmpeg will output verbose logging to the log file (/var/www/logs/ffmpeg-YYYY-MM-DD.log). When disabled, FFmpeg will only log errors.'),
                                         Forms\Components\TextInput::make('ffmpeg_max_tries')
                                             ->label('Max tries')
                                             ->columnSpan(1)
@@ -109,10 +109,10 @@ class Preferences extends SettingsPage
                                             ->password()
                                             ->revealable(),
                                         Forms\Components\Toggle::make('mediaflow_proxy_playlist_user_agent')
-                                            ->label('Add playlist user agent')
+                                            ->label('Use playlist user agent')
                                             ->inline(false)
                                             ->live()
-                                            ->helperText('Appends the Playlist user agent as a query string.'),
+                                            ->helperText('Appends the Playlist user agent. Disable to use a custom user agent for all requests.'),
                                         Forms\Components\TextInput::make('mediaflow_proxy_user_agent')
                                             ->label('User agent')
                                             ->placeholder('VLC/3.0.21 LibVLC/3.0.21')
