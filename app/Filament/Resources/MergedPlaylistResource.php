@@ -280,8 +280,9 @@ class MergedPlaylistResource extends Resource
                         ->columns(2)
                         ->schema([
 
-                            Forms\Components\Section::make('Manage Auth')
-                                ->description('Add authentication to your playlist.')
+                            Forms\Components\Section::make('Auth')
+                                ->description('Add authentication to your playlist.')->icon('heroicon-m-key')
+                                ->icon('heroicon-m-key')
                                 ->collapsible()
                                 ->collapsed(true)
                                 ->schema([
@@ -294,6 +295,7 @@ class MergedPlaylistResource extends Resource
                                         ->helperText('NOTE: only the first enabled auth will be used if multiple assigned.'),
                                 ]),
                             Forms\Components\Section::make('Links')
+                                ->icon('heroicon-m-link')
                                 ->collapsible()
                                 ->collapsed(false)
                                 ->schema([

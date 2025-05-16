@@ -285,8 +285,9 @@ class CustomPlaylistResource extends Resource
                         ->columns(2)
                         ->columnSpan(2)
                         ->schema([
-                            Forms\Components\Section::make('Manage Auth')
+                            Forms\Components\Section::make('Auth')
                                 ->description('Add authentication to your playlist.')
+                                ->icon('heroicon-m-key')
                                 ->collapsible()
                                 ->collapsed(true)
                                 ->schema([
@@ -299,6 +300,7 @@ class CustomPlaylistResource extends Resource
                                         ->helperText('NOTE: only the first enabled auth will be used if multiple assigned.'),
                                 ]),
                             Forms\Components\Section::make('Links')
+                                ->icon('heroicon-m-link')
                                 ->collapsible()
                                 ->collapsed(false)
                                 ->schema([
