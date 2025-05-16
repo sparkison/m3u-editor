@@ -54,12 +54,19 @@ class ChannelStreamController extends Controller
             'ffmpeg_debug' => false,
             'ffmpeg_max_tries' => 3,
             'ffmpeg_user_agent' => 'VLC/3.0.21 LibVLC/3.0.21',
+            'ffmpeg_codec_video' => 'copy',
+            'ffmpeg_codec_audio' => 'copy',
+            'ffmpeg_codec_subtitles' => 'copy',
         ];
+
         try {
             $settings = [
                 'ffmpeg_debug' => $userPreferences->ffmpeg_debug ?? $settings['ffmpeg_debug'],
                 'ffmpeg_max_tries' => $userPreferences->ffmpeg_max_tries ?? $settings['ffmpeg_max_tries'],
                 'ffmpeg_user_agent' => $userPreferences->ffmpeg_user_agent ?? $settings['ffmpeg_user_agent'],
+                'ffmpeg_codec_video' => $userPreferences->ffmpeg_codec_video ?? $settings['ffmpeg_codec_video'],
+                'ffmpeg_codec_audio' => $userPreferences->ffmpeg_codec_audio ?? $settings['ffmpeg_codec_audio'],
+                'ffmpeg_codec_subtitles' => $userPreferences->ffmpeg_codec_subtitles ?? $settings['ffmpeg_codec_subtitles'],
             ];
         } catch (Exception $e) {
             // Ignore
@@ -87,13 +94,14 @@ class ChannelStreamController extends Controller
             }
 
             // Get ffmpeg output codec formats
-            $videoCodec = config('proxy.ffmpeg_codec_video') ?: 'copy';
-            $audioCodec = config('proxy.ffmpeg_codec_audio') ?: 'copy';
+            $videoCodec = config('proxy.ffmpeg_codec_video') ?: $settings['ffmpeg_codec_video'];
+            $audioCodec = config('proxy.ffmpeg_codec_audio') ?: $settings['ffmpeg_codec_audio'];
+            $subtitleCodec = config('proxy.ffmpeg_codec_subtitles') ?: $settings['ffmpeg_codec_subtitles'];
 
             // Loop through available streams...
             $output = $format === 'mp2t'
-                ? "-c:v $videoCodec -c:a $audioCodec -f mpegts pipe:1"
-                : "-c:v $videoCodec -c:a $audioCodec -bsf:a aac_adtstoasc -f mp4 -movflags frag_keyframe+empty_moov+default_base_moof pipe:1";
+                ? "-c:v $videoCodec -c:a $audioCodec -c:s $subtitleCodec -f mpegts pipe:1"
+                : "-c:v $videoCodec -c:a $audioCodec -bsf:a aac_adtstoasc -c:s $subtitleCodec -f mp4 -movflags frag_keyframe+empty_moov+default_base_moof pipe:1";
             foreach ($streamUrls as $streamUrl) {
                 $cmd = sprintf(
                     'ffmpeg ' .
