@@ -112,7 +112,7 @@ class CustomPlaylistResource extends Resource
                         ->url(fn($record) => PlaylistUrlFacade::getUrls($record)['hdhr'])
                         ->openUrlInNewTab(),
                     Tables\Actions\DeleteAction::make(),
-                ])->button()->hiddenLabel()
+                ])->button()->hiddenLabel()->size('sm')
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

@@ -212,7 +212,7 @@ class GroupResource extends Resource
 
                     Tables\Actions\DeleteAction::make()
                         ->hidden(fn($record) => !$record->custom),
-                ])->button()->hiddenLabel(),
+                ])->button()->hiddenLabel()->size('sm'),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

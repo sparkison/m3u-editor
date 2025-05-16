@@ -65,7 +65,7 @@ class EpgChannelResource extends Resource
                 Tables\Columns\ImageColumn::make('icon')
                     ->checkFileExistence(false)
                     ->toggleable()
-                    ->height(40)
+                    ->height(30)
                     ->width('auto'),
                 Tables\Columns\TextInputColumn::make('display_name')
                     ->sortable()
