@@ -86,10 +86,14 @@ class ChannelStreamController extends Controller
                 $userArgs .= ' ';
             }
 
+            // Get ffmpeg output codec formats
+            $videoCodec = config('proxy.ffmpeg_codec_video') ?: 'copy';
+            $audioCodec = config('proxy.ffmpeg_codec_audio') ?: 'copy';
+
             // Loop through available streams...
             $output = $format === 'mp2t'
-                ? '-c copy -f mpegts pipe:1'
-                : '-c:v copy -c:a copy -bsf:a aac_adtstoasc -f mp4 -movflags frag_keyframe+empty_moov+default_base_moof pipe:1';
+                ? "-c:v $videoCodec -c:a $audioCodec -f mpegts pipe:1"
+                : "-c:v $videoCodec -c:a $audioCodec -bsf:a aac_adtstoasc -f mp4 -movflags frag_keyframe+empty_moov+default_base_moof pipe:1";
             foreach ($streamUrls as $streamUrl) {
                 $cmd = sprintf(
                     'ffmpeg ' .
@@ -116,6 +120,8 @@ class ChannelStreamController extends Controller
                     $output,                      // for -f
                     $settings['ffmpeg_debug'] ? '' : '-hide_banner -nostats -loglevel error'
                 );
+
+                Log::channel('ffmpeg')->info("Streaming channel {$title} with command: {$cmd}");
 
                 // Continue trying until the client disconnects, or max retries are reached
                 $retries = 0;
