@@ -4,6 +4,8 @@ namespace App\Filament\Pages;
 
 use App\Models\CustomPlaylist;
 use App\Settings\GeneralSettings;
+use App\Services\FfmpegCodecService;
+use Livewire\Attributes\On;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -21,6 +23,49 @@ class Preferences extends SettingsPage
     protected static ?string $navigationLabel = 'Settings';
 
     protected static ?string $title = 'Settings';
+
+    public array $videoCodecs = [];
+    public array $audioCodecs = [];
+    public array $subtitleCodecs = [];
+
+    // Loads codec lists on mount and caches the values
+    public function mount(): void
+    {
+        parent::mount();
+
+        $codecs = app(FfmpegCodecService::class)->getEncoders();
+
+        $this->videoCodecs = $codecs['video'];
+        $this->audioCodecs = $codecs['audio'];
+        $this->subtitleCodecs = $codecs['subtitle'];
+    }
+
+    // Handles generation of the codec select fields
+    private function makeCodecSelect(string $label, string $field, string $property): Forms\Components\Select
+    {
+        $configKey = "proxy.{$field}";
+        $configValue = config($configKey);
+
+        return Forms\Components\Select::make($field)
+            ->label(ucwords($label) . ' codec')
+            ->helperText("Transcode {$label} streams to this codec.\nLeave blank to copy the original.")
+            ->allowHtml()
+            ->searchable()
+            ->noSearchResultsMessage('No codecs found.')
+            ->options(fn () => $this->{$property})
+            ->getSearchResultsUsing(function (string $search) use ($property): array {
+                return collect($this->{$property})
+                    ->filter(fn ($description, $codec) => str_contains(strtolower($codec), strtolower($search)))
+                    ->all();
+            })
+            ->getOptionLabelUsing(fn ($value): ?string => $value)
+            ->placeholder(fn () => empty($configValue) ? 'copy' : $configValue)
+            ->suffixIcon(fn () => !empty($configValue) ? 'heroicon-m-lock-closed' : null)
+            ->disabled(fn () => !empty($configValue))
+            ->hint(fn () => !empty($configValue) ? 'Already set by environment variable!' : null)
+            ->dehydrated(fn () => empty($configValue));
+    }
+
 
     public function form(Form $form): Form
     {
@@ -78,6 +123,9 @@ class Preferences extends SettingsPage
                                             ->default('VLC/3.0.21 LibVLC/3.0.21')
                                             ->placeholder('VLC/3.0.21 LibVLC/3.0.21')
                                             ->helperText(''),
+                                        $this->makeCodecSelect('video', 'ffmpeg_codec_video', 'videoCodecs'),
+                                        $this->makeCodecSelect('audio', 'ffmpeg_codec_audio', 'audioCodecs'),
+                                        $this->makeCodecSelect('subtitle', 'ffmpeg_codec_subtitles', 'subtitleCodecs'),
                                     ]),
                                 Forms\Components\Section::make('MediaFlow Proxy')
                                     ->description('If you have MediaFlow Proxy installed, you can use it to proxy your m3u editor playlist streams. When enabled, the app will auto-generate URLs for you to use via MediaFlow Proxy.')

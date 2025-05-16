@@ -16,6 +16,9 @@ class GeneralSettings extends Settings
     public ?string $ffmpeg_user_agent = 'VLC/3.0.21 LibVLC/3.0.21';
     public ?bool $ffmpeg_debug = false;
     public ?int $ffmpeg_max_tries = 3;
+    public ?string $ffmpeg_codec_video = null;
+    public ?string $ffmpeg_codec_audio = null;
+    public ?string $ffmpeg_codec_subtitles = null;
     public ?string $mediaflow_proxy_url = null;
     public ?string $mediaflow_proxy_port = null;
     public ?string $mediaflow_proxy_password = null;
