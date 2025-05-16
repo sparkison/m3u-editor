@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\Process\Process as SymphonyProcess;
 
 class HlsStreamService
 {
@@ -57,7 +58,6 @@ class HlsStreamService
 
             // Setup the stream URL
             $playlist = "{$storageDir}/stream.m3u8";
-            $stats = "{$storageDir}/stats.txt";
             $segment = "{$storageDir}/segment_%03d.ts";
             $segmentBaseUrl = url("/api/stream/{$id}") . '/';
 
@@ -65,9 +65,6 @@ class HlsStreamService
                 'ffmpeg ' .
                     // Optimization options:
                     '-fflags nobuffer -flags low_delay ' .
-
-                    // Progress tracking:
-                    '-progress %s ' .
 
                     // Pre-input HTTP options:
                     '-user_agent "%s" -referer "MyComputer" ' .
@@ -78,10 +75,18 @@ class HlsStreamService
                     // User defined options:
                     '%s' .
 
-                    // I/O options:
+                    // Input:
                     '-re -i "%s" ' .
-                    '-c:v libx264 -preset veryfast -g 15 -keyint_min 15 -sc_threshold 0 ' .
-                    '-c:a aac -f hls -hls_time 2 -hls_list_size 6 ' .
+
+                    // Progress tracking:
+                    '-progress pipe:2 ' .
+
+                    // Output options:
+                    '-preset veryfast -g 15 -keyint_min 15 -sc_threshold 0 ' .
+                    '%s ' . // output format
+
+                    // HLS options:
+                    '-f hls -hls_time 2 -hls_list_size 6 ' .
                     '-hls_flags delete_segments+append_list+independent_segments ' .
                     '-use_wallclock_as_timestamps 1 ' .
                     '-hls_segment_type fmp4 ' .
@@ -90,7 +95,6 @@ class HlsStreamService
 
                     // Logging:
                     '%s',
-                $stats,                       // for -progress
                 $userAgent,                   // for -user_agent
                 $userArgs,                    // user defined options
                 $streamUrl,                   // input URL
@@ -100,53 +104,106 @@ class HlsStreamService
                 $settings['ffmpeg_debug'] ? '' : '-hide_banner -nostats -loglevel error'
             );
 
-            // Tell proc_open to give us back a stderr pipe
-            $descriptors = [
-                0 => ['pipe', 'r'], // stdin (we won't use)
-                1 => ['pipe', 'w'], // stdout (we won't use)
-                2 => ['pipe', 'w'], // stderr (we will log)
-            ];
-            $pipes = [];
-            $process = proc_open($cmd, $descriptors, $pipes);
-
-            if (!is_resource($process)) {
+            $process = SymphonyProcess::fromShellCommandline($cmd);
+            $process->setTimeout(null);
+            $process->start();
+            if (!$process->isRunning()) {
                 Log::channel('ffmpeg')->error("Failed to launch FFmpeg for channel {$id}");
                 abort(500, 'Could not start stream.');
             }
 
-            // Immediately close stdin/stdout
-            fclose($pipes[0]);
-            fclose($pipes[1]);
+            // Start in non‑blocking mode *with* a callback for both STDOUT & STDERR
+            $process->start(function (int $type, string $buffer) use ($id) {
+                // Split incoming chunks into individual lines
+                $lines = preg_split('/\r?\n/', trim($buffer)) ?: [];
+                foreach ($lines as $line) {
+                    // Only concerned with STDERR (ffmpeg's progress output and errors)
+                    if ($type === SymphonyProcess::ERR) {
+                        // "progress" lines are always KEY=VALUE
+                        if (strpos($line, '=') !== false && preg_match('/^[a-z_]+=/', $line)) {
+                            list($key, $value) = explode('=', $line, 2);
 
-            // Make stderr non-blocking
-            stream_set_blocking($pipes[2], false);
+                            // push the metric value onto a Redis list and trim to last 20 points
+                            $listKey = "hls:hist:{$id}:{$key}";
+                            $timeKey = "hls:hist:{$id}:timestamps";
 
-            // Spawn a little "reader" that pulls from stderr and logs
-            $logger = Log::channel('ffmpeg');
-            $stderr = $pipes[2];
+                            // push the timestamp into a parallel list (once per loop)
+                            Redis::rpush($timeKey, now()->format('H:i:s'));
+                            Redis::ltrim($timeKey, -20, -1);
 
-            // Register shutdown function to ensure the pipe is drained
-            register_shutdown_function(function () use ($stderr, $process, $logger) {
-                while (!feof($stderr)) {
-                    $line = fgets($stderr);
-                    if ($line !== false) {
-                        $logger->error(trim($line));
+                            // push the metric value
+                            Redis::rpush($listKey, $value);
+                            Redis::ltrim($listKey, -20, -1);
+                        } elseif ($line !== '') {
+                            // anything else is a true ffmpeg log/error
+                            Log::channel('ffmpeg')->error($line);
+                        }
                     }
                 }
-                fclose($stderr);
-                proc_close($process);
             });
 
-            // Cache the actual FFmpeg PID
-            $status = proc_get_status($process);
-            $pid = $status['pid'];
+            // Immediately after start
+            if (! $process->isRunning()) {
+                Log::channel('ffmpeg')->error("Failed to launch FFmpeg for HLS stream {$id}");
+                abort(500, 'Could not start HLS stream.');
+            }
+
+            // Cache the PID, mark as active, etc.
+            $pid = $process->getPid();
             Cache::forever("hls:pid:{$id}", $pid);
-
-            // Record timestamp in Redis (never expires until we prune)
             Redis::set("hls:last_seen:{$id}", now()->timestamp);
-
-            // Add to active IDs set
             Redis::sadd('hls:active_ids', $id);
+
+            /*
+                // Tell proc_open to give us back a stderr pipe
+                $descriptors = [
+                    0 => ['pipe', 'r'], // stdin (we won't use)
+                    1 => ['pipe', 'w'], // stdout (we won't use)
+                    2 => ['pipe', 'w'], // stderr (we will log)
+                ];
+                $pipes = [];
+                $process = proc_open($cmd, $descriptors, $pipes);
+
+                if (!is_resource($process)) {
+                    Log::channel('ffmpeg')->error("Failed to launch FFmpeg for channel {$id}");
+                    abort(500, 'Could not start stream.');
+                }
+
+                // Immediately close stdin/stdout
+                fclose($pipes[0]);
+                fclose($pipes[1]);
+
+                // Make stderr non-blocking
+                stream_set_blocking($pipes[2], false);
+
+                // Spawn a little "reader" that pulls from stderr and logs
+                $logger = Log::channel('ffmpeg');
+                $stderr = $pipes[2];
+
+                // Register shutdown function to ensure the pipe is drained
+                register_shutdown_function(function () use ($stderr, $process, $logger) {
+                    while (!feof($stderr)) {
+                        $line = fgets($stderr);
+                        if ($line !== false) {
+                            $logger->error(trim($line));
+                        }
+                    }
+                    fclose($stderr);
+                    proc_close($process);
+                });
+
+                // Cache the actual FFmpeg PID
+                $status = proc_get_status($process);
+                $pid = $status['pid'];
+
+                Cache::forever("hls:pid:{$id}", $pid);
+
+                // Record timestamp in Redis (never expires until we prune)
+                Redis::set("hls:last_seen:{$id}", now()->timestamp);
+
+                // Add to active IDs set
+                Redis::sadd('hls:active_ids', $id);
+            */
         }
         return $pid;
     }
