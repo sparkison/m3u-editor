@@ -51,7 +51,8 @@ class ChannelHlsStreamController extends Controller
                 abort(500, 'Failed to start the stream.');
             }
         } else {
-            Log::channel('ffmpeg')->info("HLS stream already running for channel {$channelId} ({$title})");
+            // Stream is already running, no need to start it again
+            // Log::channel('ffmpeg')->info("HLS stream already running for channel {$channelId} ({$title})");
         }
 
         // Return the Playlist
@@ -100,10 +101,8 @@ class ChannelHlsStreamController extends Controller
     {
         $path = Storage::disk('app')->path("hls/{$channelId}/{$segment}");
 
-        // If segment is not found, don't 404 as it will disconnect the stream, return empty 200 response
-        if (!file_exists($path)) {
-            return response('', 200);
-        }
+        // If segment is not found, return 404 error
+        abort_unless(file_exists($path), 404, 'Segment not found.');
 
         // Record timestamp in Redis (never expires until we prune)
         Redis::set("hls:last_seen:{$channelId}", now()->timestamp);
