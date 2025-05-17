@@ -48,7 +48,7 @@ class Stats extends Page
         foreach ($clients as $client) {
             $widgets[] = StreamStatsChart::make([
                 'streamId'          => $client['channelId'],
-                'heading'           => "{$client['title']} (MPTS)",
+                'title'             => "{$client['title']} (MPTS)",
                 'subheading'        => $client['ip'],
                 'columnSpan'        => 4,
                 'pollingInterval'   => '1s',
