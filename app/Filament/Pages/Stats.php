@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Livewire\StreamStatsChart;
+use App\Models\Channel;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Redis;
 
@@ -16,16 +17,43 @@ class Stats extends Page
     protected static ?int    $navigationSort  = 99;
     protected static string  $view            = 'filament.pages.stats';
 
+    public static ?string $pollingInterval = '5s';
+
     protected function getHeaderWidgets(): array
     {
         // Fetch all currently streaming channel IDs
         $activeIds = Redis::smembers('mpts:active_ids');
+        if (empty($activeIds)) {
+            return [];
+        }
 
-        // Dynamically spawn one StreamStatsChart per channel
-        return collect($activeIds)
-            ->map(fn(string $id) => StreamStatsChart::make([
-                'streamId'   => $id,
-                'columnSpan' => 6, // optional: two widgets per row
-            ]))->toArray();
+        // Decode the channel IDs and IPs
+        $clients = [];
+        foreach ($activeIds as $clientKey) {
+            $keys = explode('::', $clientKey);
+            if (count($keys) !== 2) {
+                continue;
+            }
+            $channelId = $keys[1];
+            $channel = Channel::find($channelId);
+            $clients[] = [
+                'channelId' => $channelId,
+                'title'     => $channel?->title ?? 'Unknown',
+                'ip'        => $keys[0],
+            ];
+        }
+
+        // Dynamically spawn one StreamStatsChart per streaming channel/client
+        $widgets = [];
+        foreach ($clients as $client) {
+            $widgets[] = StreamStatsChart::make([
+                'streamId'          => $client['channelId'],
+                'heading'           => "{$client['title']} (MPTS)",
+                'subheading'        => $client['ip'],
+                'columnSpan'        => 4,
+                'pollingInterval'   => '1s',
+            ]);
+        }
+        return $widgets;
     }
 }

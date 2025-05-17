@@ -72,11 +72,27 @@ class ChannelStreamController extends Controller
         } catch (Exception $e) {
             // Ignore
         }
+        $ip = $request->ip();
         $channelId = $channel->id;
         $extension = $format === 'mp2t'
             ? 'ts'
             : $format;
-        return new StreamedResponse(function () use ($channelId, $streamUrls, $title, $settings, $format) {
+        return new StreamedResponse(function () use ($channelId, $streamUrls, $title, $settings, $format, $ip) {
+            $clientKey = "{$ip}::{$channelId}";
+
+            // Make sure PHP doesn’t ignore user aborts
+            ignore_user_abort(false);
+
+            // Register a shutdown function that ALWAYS runs when the script dies
+            register_shutdown_function(function () use ($clientKey) {
+                Redis::srem('mpts:active_ids', $clientKey);
+            });
+
+            // Mark as active
+            Redis::sadd('mpts:active_ids', $clientKey);
+            
+            // Clear any existing output buffers
+            // This is important for real-time streaming
             while (ob_get_level()) {
                 ob_end_flush();
             }
@@ -134,6 +150,7 @@ class ChannelStreamController extends Controller
                     $settings['ffmpeg_debug'] ? '' : '-hide_banner -nostats -loglevel error'
                 );
 
+                // Log the command for debugging
                 Log::channel('ffmpeg')->info("Streaming channel {$title} with command: {$cmd}");
 
                 // Continue trying until the client disconnects, or max retries are reached
@@ -142,9 +159,6 @@ class ChannelStreamController extends Controller
                     // Start the streaming process!
                     $process = SymphonyProcess::fromShellCommandline($cmd);
                     $process->setTimeout(null);
-
-                    // Add channel to active IDs set
-                    Redis::sadd('mpts:active_ids', $channelId);
                     try {
                         $process->run(function ($type, $buffer) use ($channelId, $format) {
                             if (connection_aborted()) {
@@ -160,7 +174,7 @@ class ChannelStreamController extends Controller
                                 $lines = preg_split('/\r?\n/', trim($buffer));
                                 foreach ($lines as $line) {
                                     // "progress" lines are always KEY=VALUE
-                                    if (strpos($line, '=') !== false && preg_match('/^[a-z_]+=/', $line)) {
+                                    if (strpos($line, '=') !== false) {
                                         list($key, $value) = explode('=', $line, 2);
                                         if (in_array($key, ['bitrate', 'fps', 'out_time_ms'])) {
                                             // push the metric value onto a Redis list and trim to last 20 points
@@ -189,9 +203,6 @@ class ChannelStreamController extends Controller
                                 ->error("Error streaming channel (\"$title\"): " . $e->getMessage());
                         }
                     }
-
-                    // Remove the process from Redis
-                    Redis::srem('mpts:active_ids', $channelId);
 
                     // If we get here, the process ended.
                     if (connection_aborted()) {

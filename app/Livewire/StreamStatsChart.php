@@ -8,16 +8,13 @@ use Illuminate\Support\Facades\Redis;
 
 class StreamStatsChart extends ChartWidget
 {
-    protected static ?string $heading = 'Chart';
+    protected static ?string $heading = 'MPTS Stream Stats';
     public static ?string $pollingInterval = '1s';
+    
     public string $streamId;
-    public ?Channel $channel = null;
 
     protected function getData(): array
     {
-        $this->channel = Channel::find($this->streamId);
-        self::$heading = $this->channel ? $this->channel->title : 'Stream Stats';
-
         // fetch the history lists
         $labels  = Redis::lrange("mpts:hist:{$this->streamId}:timestamps", 0, -1);
         $bitrate = Redis::lrange("mpts:hist:{$this->streamId}:bitrate",    0, -1);
