@@ -92,7 +92,7 @@ class ChannelStreamController extends Controller
 
             // Mark as active
             Redis::sadd('mpts:active_ids', $clientKey);
-            
+
             // Clear any existing output buffers
             // This is important for real-time streaming
             while (ob_get_level()) {
@@ -118,11 +118,14 @@ class ChannelStreamController extends Controller
             $audioCodec = config('proxy.ffmpeg_codec_audio') ?: $settings['ffmpeg_codec_audio'];
             $subtitleCodec = config('proxy.ffmpeg_codec_subtitles') ?: $settings['ffmpeg_codec_subtitles'];
 
-            // Loop through available streams...
+            // Set the output format and codecs
             $output = $format === 'mp2t'
                 ? "-c:v $videoCodec -c:a $audioCodec -c:s $subtitleCodec -f mpegts pipe:1"
                 : "-c:v $videoCodec -c:a $audioCodec -bsf:a aac_adtstoasc -c:s $subtitleCodec -f mp4 -movflags frag_keyframe+empty_moov+default_base_moof pipe:1";
+
+            // Loop through available streams...
             foreach ($streamUrls as $streamUrl) {
+                // Build the FFmpeg command
                 $cmd = sprintf(
                     'ffmpeg ' .
                         // Pre-input HTTP options:
