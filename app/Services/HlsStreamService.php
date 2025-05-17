@@ -32,12 +32,18 @@ class HlsStreamService
                 'ffmpeg_debug' => false,
                 'ffmpeg_max_tries' => 3,
                 'ffmpeg_user_agent' => 'VLC/3.0.21 LibVLC/3.0.21',
+                'ffmpeg_codec_video' => 'copy',
+                'ffmpeg_codec_audio' => 'copy',
+                'ffmpeg_codec_subtitles' => 'copy',
             ];
             try {
                 $settings = [
                     'ffmpeg_debug' => $userPreferences->ffmpeg_debug ?? $settings['ffmpeg_debug'],
                     'ffmpeg_max_tries' => $userPreferences->ffmpeg_max_tries ?? $settings['ffmpeg_max_tries'],
                     'ffmpeg_user_agent' => $userPreferences->ffmpeg_user_agent ?? $settings['ffmpeg_user_agent'],
+                    'ffmpeg_codec_video' => $userPreferences->ffmpeg_codec_video ?? $settings['ffmpeg_codec_video'],
+                    'ffmpeg_codec_audio' => $userPreferences->ffmpeg_codec_audio ?? $settings['ffmpeg_codec_audio'],
+                    'ffmpeg_codec_subtitles' => $userPreferences->ffmpeg_codec_subtitles ?? $settings['ffmpeg_codec_subtitles'],
                 ];
             } catch (Exception $e) {
                 // Ignore
@@ -52,6 +58,11 @@ class HlsStreamService
                 $userArgs .= ' ';
             }
 
+            // Get ffmpeg output codec formats
+            $videoCodec = config('proxy.ffmpeg_codec_video') ?: $settings['ffmpeg_codec_video'];
+            $audioCodec = config('proxy.ffmpeg_codec_audio') ?: $settings['ffmpeg_codec_audio'];
+            $subtitleCodec = config('proxy.ffmpeg_codec_subtitles') ?: $settings['ffmpeg_codec_subtitles'];
+
             // Setup the stream file paths
             $storageDir = Storage::disk('app')->path("hls/{$id}");
             File::ensureDirectoryExists($storageDir, 0755);
@@ -61,6 +72,8 @@ class HlsStreamService
             $segment = "{$storageDir}/segment_%03d.ts";
             $segmentBaseUrl = url("/api/stream/{$id}") . '/';
 
+            // Loop through available streams...
+            $output = "-c:v $videoCodec -c:a $audioCodec -bsf:a aac_adtstoasc -c:s $subtitleCodec";
             $cmd = sprintf(
                 'ffmpeg ' .
                     // Optimization options:
@@ -98,6 +111,7 @@ class HlsStreamService
                 $userAgent,                   // for -user_agent
                 $userArgs,                    // user defined options
                 $streamUrl,                   // input URL
+                $output,                      // output codec options
                 $segment,                     // segment filename 
                 $segmentBaseUrl,              // base URL for segments (want to make sure routed through the proxy to track active users)
                 $playlist,                    // playlist filename
@@ -106,34 +120,30 @@ class HlsStreamService
 
             $process = SymphonyProcess::fromShellCommandline($cmd);
             $process->setTimeout(null);
-            $process->start();
-            if (!$process->isRunning()) {
-                Log::channel('ffmpeg')->error("Failed to launch FFmpeg for channel {$id}");
-                abort(500, 'Could not start stream.');
-            }
 
             // Start in non‑blocking mode *with* a callback for both STDOUT & STDERR
-            $process->start(function (int $type, string $buffer) use ($id) {
+            $process->start(function ($type, $buffer) use ($id) {
                 // Split incoming chunks into individual lines
                 $lines = preg_split('/\r?\n/', trim($buffer)) ?: [];
                 foreach ($lines as $line) {
                     // Only concerned with STDERR (ffmpeg's progress output and errors)
                     if ($type === SymphonyProcess::ERR) {
                         // "progress" lines are always KEY=VALUE
-                        if (strpos($line, '=') !== false && preg_match('/^[a-z_]+=/', $line)) {
+                        if (strpos($line, '=') !== false) {
                             list($key, $value) = explode('=', $line, 2);
+                            if (in_array($key, ['bitrate', 'fps', 'out_time_ms'])) {
+                                // push the metric value onto a Redis list and trim to last 20 points
+                                $listKey = "hls:hist:{$id}:{$key}";
+                                $timeKey = "hls:hist:{$id}:timestamps";
 
-                            // push the metric value onto a Redis list and trim to last 20 points
-                            $listKey = "hls:hist:{$id}:{$key}";
-                            $timeKey = "hls:hist:{$id}:timestamps";
+                                // push the timestamp into a parallel list (once per loop)
+                                Redis::rpush($timeKey, now()->format('H:i:s'));
+                                Redis::ltrim($timeKey, -20, -1);
 
-                            // push the timestamp into a parallel list (once per loop)
-                            Redis::rpush($timeKey, now()->format('H:i:s'));
-                            Redis::ltrim($timeKey, -20, -1);
-
-                            // push the metric value
-                            Redis::rpush($listKey, $value);
-                            Redis::ltrim($listKey, -20, -1);
+                                // push the metric value
+                                Redis::rpush($listKey, $value);
+                                Redis::ltrim($listKey, -20, -1);
+                            }
                         } elseif ($line !== '') {
                             // anything else is a true ffmpeg log/error
                             Log::channel('ffmpeg')->error($line);
@@ -272,7 +282,7 @@ class HlsStreamService
      * Return true if $pid is alive and matches an ffmpeg command.
      */
     protected function isFfmpeg(int $pid): bool
-    {
+    {        
         return true;
 
         // TODO: This is a placeholder for the actual implementation.

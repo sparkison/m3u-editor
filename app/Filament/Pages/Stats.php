@@ -31,7 +31,7 @@ class Stats extends Page
         $clients = [];
         foreach ($activeIds as $clientKey) {
             $keys = explode('::', $clientKey);
-            if (count($keys) !== 2) {
+            if (count($keys) < 2) {
                 continue;
             }
             $channelId = $keys[1];

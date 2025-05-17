@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Support\Str;
 use Symfony\Component\Process\Process as SymphonyProcess;
 
 class ChannelStreamController extends Controller
@@ -73,12 +74,13 @@ class ChannelStreamController extends Controller
             // Ignore
         }
         $ip = $request->ip();
+        $streamId = Str::random(8);
         $channelId = $channel->id;
         $extension = $format === 'mp2t'
             ? 'ts'
             : $format;
-        return new StreamedResponse(function () use ($channelId, $streamUrls, $title, $settings, $format, $ip) {
-            $clientKey = "{$ip}::{$channelId}";
+        return new StreamedResponse(function () use ($channelId, $streamUrls, $title, $settings, $format, $ip, $streamId) {
+            $clientKey = "{$ip}::{$channelId}::{$streamId}";
 
             // Make sure PHP doesn’t ignore user aborts
             ignore_user_abort(false);
