@@ -69,7 +69,6 @@ class HlsStreamService
 
             // Setup the stream URL
             $playlist = "{$storageDir}/stream.m3u8";
-            $stats = "{$storageDir}/stats.txt";
             $segment = "{$storageDir}/segment_%03d.ts";
             $segmentBaseUrl = url("/api/stream/{$id}") . '/';
 
@@ -77,9 +76,6 @@ class HlsStreamService
                 'ffmpeg ' .
                     // Optimization options:
                     '-fflags nobuffer -flags low_delay ' .
-
-                    // Progress tracking:
-                    '-progress %s ' .
 
                     // Pre-input HTTP options:
                     '-user_agent "%s" -referer "MyComputer" ' .
@@ -107,7 +103,6 @@ class HlsStreamService
 
                     // Logging:
                     '%s',
-                $stats,                       // for -progress
                 $userAgent,                   // for -user_agent
                 $userArgs,                    // user defined options
                 $streamUrl,                   // input URL
