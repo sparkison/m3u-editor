@@ -12,7 +12,10 @@ class FfmpegCodecService
     public function getEncoders(): array
     {
         return Cache::remember('ffmpeg_encoders', 3600, function () {
-            $process = new Process(['ffmpeg', '-hide_banner', '-encoders']);
+
+            $ffmpegPath = getenv('FFMPEG_PATH') ?: 'ffmpeg';
+
+            $process = new Process([$ffmpegPath, '-hide_banner', '-encoders']);
 
             try {
                 $process->mustRun();
