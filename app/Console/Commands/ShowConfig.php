@@ -3,23 +3,35 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Arr;
 
 class ShowConfig extends Command
 {
-    protected $signature = 'config:show {key? : Only get this one key}';
-    protected $description = 'Shows the config';
+    protected $signature = 'config:show {keys?* : One or more config keys (dot notation allowed)}';
+    protected $description = 'Shows selected or all config values as a JSON blob.';
 
     public function handle()
     {
-        if ($specifiedKey = $this->argument('key')) {
-            $loop = [$specifiedKey => config($specifiedKey)];
+        $keys = $this->argument('keys');
+
+        $output = [];
+
+        if (empty($keys)) {
+            $output = config()->all();
         } else {
-            $loop = config()->all();
+            foreach ($keys as $key) {
+                $value = config($key);
+
+                if (is_null($value)) {
+                    $this->warn("Key not found: $key");
+                    continue;
+                }
+
+                Arr::set($output, $key, $value);
+            }
         }
-        foreach ($loop as $key => $config) {
-            $this->info($key);
-            $this->newLine();
-        }
+
+        $this->line(json_encode($output, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         return Command::SUCCESS;
     }
 }
