@@ -1,7 +1,7 @@
 <x-dynamic-component :component="$getEntryWrapperView()" :entry="$entry">
     @php($record = $getRecord())
     @php($url = $record->url_custom ?? $record->url)
-    @php($proxyUrl = App\Facades\ProxyFacade::getProxyUrlForChannel($record->id))
+    @php($proxyUrl = App\Facades\ProxyFacade::getProxyUrlForChannel($record->id, 'mpts'))
     @php($playerId = "channel_{$record->id}_preview")
     <div x-data="{ state: {}, player: null }">
         <div x-data x-init="
