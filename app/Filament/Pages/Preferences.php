@@ -105,7 +105,7 @@ class Preferences extends SettingsPage
                                         Forms\Components\TextInput::make('ffmpeg_user_agent')
                                             ->label('User agent')
                                             ->required()
-                                            ->columnSpan(1)
+                                            ->columnSpan(2)
                                             ->default('VLC/3.0.21 LibVLC/3.0.21')
                                             ->placeholder('VLC/3.0.21 LibVLC/3.0.21')
                                             ->helperText(''),
