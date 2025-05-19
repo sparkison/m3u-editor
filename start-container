@@ -4,13 +4,16 @@
 export PUID="${PUID:-1000}" # NOT CURRENTLY USED...
 export PGID="${PGID:-1000}" # NOT CURRENTLY USED...
 
+# Set Redis server port
+export REDIS_SERVER_PORT="${REDIS_SERVER_PORT:-6379}" # Default 6379
+
 # Run NGINX/FPM as root
 export NGINX_USER="root"
 export FPMUSER="root"
 export FPMGROUP="root"
 export FPMPORT="${FPMPORT:-9000}" # Default 9000
 
-# Check if MySQL enabled
+# Check if PostgreSQL enabled
 export PGDATA="/var/lib/postgresql/data"
 export ENABLE_POSTGRES="${ENABLE_POSTGRES:-false}"
 export PG_DATABASE="${PG_DATABASE:-m3ue}"
@@ -54,6 +57,9 @@ if [ -f /etc/php84/php-fpm.d/www.tmpl ]; then
 fi
 if [ -f /etc/nginx/nginx.tmpl ]; then
     envsubst '${NGINX_USER}' < /etc/nginx/nginx.tmpl > /etc/nginx/nginx.conf
+fi
+if [ -f /etc/redis/redis.tmpl ]; then
+    envsubst '${REDIS_SERVER_PORT}' < /etc/redis/redis.tmpl > /etc/redis/redis.conf
 fi
 if [ -f /etc/nginx/conf.d/laravel.tmpl ]; then
     # If app url contains https, don't show port
