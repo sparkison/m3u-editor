@@ -21,8 +21,6 @@ class HlsStreamService
      */
     public function startStream($id, $streamUrl): int
     {
-        $ffmpegPath = getenv('FFMPEG_PATH') ?: 'ffmpeg';
-
         // Only start one FFmpeg per channel at a time
         $cacheKey = "hls:pid:{$id}";
         $pid = Cache::get($cacheKey);
@@ -36,6 +34,7 @@ class HlsStreamService
                 'ffmpeg_codec_video' => 'copy',
                 'ffmpeg_codec_audio' => 'copy',
                 'ffmpeg_codec_subtitles' => 'copy',
+                'ffmpeg_path' => 'jellyfin-ffmpeg',
             ];
             try {
                 $settings = [
@@ -45,6 +44,7 @@ class HlsStreamService
                     'ffmpeg_codec_video' => $userPreferences->ffmpeg_codec_video ?? $settings['ffmpeg_codec_video'],
                     'ffmpeg_codec_audio' => $userPreferences->ffmpeg_codec_audio ?? $settings['ffmpeg_codec_audio'],
                     'ffmpeg_codec_subtitles' => $userPreferences->ffmpeg_codec_subtitles ?? $settings['ffmpeg_codec_subtitles'],
+                    'ffmpeg_path' => $userPreferences->ffmpeg_path ?? $settings['ffmpeg_path'],
                 ];
             } catch (Exception $e) {
                 // Ignore
@@ -52,6 +52,12 @@ class HlsStreamService
 
             // Get user agent
             $userAgent = escapeshellarg($settings['ffmpeg_user_agent']);
+
+            // Get ffmpeg path
+            $ffmpegPath = config('proxy.ffmpeg_path') ?: $settings['ffmpeg_path'];
+            if (empty($ffmpegPath)) {
+                $ffmpegPath = 'jellyfin-ffmpeg';
+            }
 
             // Get ffmpeg output codec formats
             $videoCodec = config('proxy.ffmpeg_codec_video') ?: $settings['ffmpeg_codec_video'];

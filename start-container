@@ -31,15 +31,6 @@ if [ "$BROADCAST_CONNECTION" = "null" ]; then
     export VITE_WEBSOCKETS_DISABLED="true"
 fi
 
-# FFMPEG
-# Alternatively use jellyfin-ffmpeg if enabled
-export FFMPEG_USE_JELLYFIN="${FFMPEG_USE_JELLYFIN:-false}"
-if [ "$FFMPEG_USE_JELLYFIN" = "true" ]; then
-    export FFMPEG_PATH="/usr/lib/jellyfin-ffmpeg/ffmpeg"
-else
-    export FFMPEG_PATH="/usr/bin/ffmpeg"
-fi
-
 # Set timezone, default to UTC
 export TZ="${TZ:-UTC}"
 

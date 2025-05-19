@@ -5,7 +5,6 @@ namespace App\Filament\Pages;
 use App\Models\CustomPlaylist;
 use App\Settings\GeneralSettings;
 use App\Services\FfmpegCodecService;
-use Livewire\Attributes\On;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -39,33 +38,6 @@ class Preferences extends SettingsPage
         $this->audioCodecs = $codecs['audio'];
         $this->subtitleCodecs = $codecs['subtitle'];
     }
-
-    // Handles generation of the codec select fields
-    private function makeCodecSelect(string $label, string $field, string $property): Forms\Components\Select
-    {
-        $configKey = "proxy.{$field}";
-        $configValue = config($configKey);
-
-        return Forms\Components\Select::make($field)
-            ->label(ucwords($label) . ' codec')
-            ->helperText("Transcode {$label} streams to this codec.\nLeave blank to copy the original.")
-            ->allowHtml()
-            ->searchable()
-            ->noSearchResultsMessage('No codecs found.')
-            ->options(fn () => $this->{$property})
-            ->getSearchResultsUsing(function (string $search) use ($property): array {
-                return collect($this->{$property})
-                    ->filter(fn ($description, $codec) => str_contains(strtolower($codec), strtolower($search)))
-                    ->all();
-            })
-            ->getOptionLabelUsing(fn ($value): ?string => $value)
-            ->placeholder(fn () => empty($configValue) ? 'copy' : $configValue)
-            ->suffixIcon(fn () => !empty($configValue) ? 'heroicon-m-lock-closed' : null)
-            ->disabled(fn () => !empty($configValue))
-            ->hint(fn () => !empty($configValue) ? 'Already set by environment variable!' : null)
-            ->dehydrated(fn () => empty($configValue));
-    }
-
 
     public function form(Form $form): Form
     {
@@ -105,9 +77,17 @@ class Preferences extends SettingsPage
                                     ->schema([
                                         Forms\Components\Toggle::make('ffmpeg_debug')
                                             ->label('Debug')
-                                            ->columnSpan(1)
-                                            ->inline(false)
+                                            ->columnSpanFull()
                                             ->helperText('When enabled FFmpeg will output verbose logging to the log file (/var/www/logs/ffmpeg-YYYY-MM-DD.log). When disabled, FFmpeg will only log errors.'),
+                                        Forms\Components\Select::make('ffmpeg_path')
+                                            ->label('FFmpeg')
+                                            ->columnSpanFull()
+                                            ->helperText('Which ffmpeg variant would you like to use.')
+                                            ->options([
+                                                'jellyfin-ffmpeg' => 'jellyfin-ffmpeg (default)',
+                                                'ffmpeg' => 'ffmpeg (v6)',
+                                            ])
+                                            ->placeholder('FFmpeg variant...'),
                                         Forms\Components\TextInput::make('ffmpeg_max_tries')
                                             ->label('Max tries')
                                             ->columnSpan(1)
@@ -242,5 +222,31 @@ class Preferences extends SettingsPage
                             ]),
                     ])
             ]);
+    }
+
+    // Handles generation of the codec select fields
+    private function makeCodecSelect(string $label, string $field, string $property): Forms\Components\Select
+    {
+        $configKey = "proxy.{$field}";
+        $configValue = config($configKey);
+
+        return Forms\Components\Select::make($field)
+            ->label(ucwords($label) . ' codec')
+            ->helperText("Transcode {$label} streams to this codec.\nLeave blank to copy the original.")
+            ->allowHtml()
+            ->searchable()
+            ->noSearchResultsMessage('No codecs found.')
+            ->options(fn() => $this->{$property})
+            ->getSearchResultsUsing(function (string $search) use ($property): array {
+                return collect($this->{$property})
+                    ->filter(fn($description, $codec) => str_contains(strtolower($codec), strtolower($search)))
+                    ->all();
+            })
+            ->getOptionLabelUsing(fn($value): ?string => $value)
+            ->placeholder(fn() => empty($configValue) ? 'copy' : $configValue)
+            ->suffixIcon(fn() => !empty($configValue) ? 'heroicon-m-lock-closed' : null)
+            ->disabled(fn() => !empty($configValue))
+            ->hint(fn() => !empty($configValue) ? 'Already set by environment variable!' : null)
+            ->dehydrated(fn() => empty($configValue));
     }
 }

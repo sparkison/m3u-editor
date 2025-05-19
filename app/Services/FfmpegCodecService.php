@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Settings\GeneralSettings;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
@@ -11,12 +12,13 @@ class FfmpegCodecService
 {
     public function getEncoders(): array
     {
-        return Cache::remember('ffmpeg_encoders', 3600, function () {
-
-            $ffmpegPath = getenv('FFMPEG_PATH') ?: 'ffmpeg';
-
+        $userPreferences = app(GeneralSettings::class);
+        $ffmpegPath = config('proxy.ffmpeg_path') ?: $userPreferences->ffmpeg_path;
+        if (empty($ffmpegPath)) {
+            $ffmpegPath = 'jellyfin-ffmpeg';
+        }
+        return Cache::remember('ffmpeg_encoders', 3600, function () use ($ffmpegPath) {
             $process = new Process([$ffmpegPath, '-hide_banner', '-encoders']);
-
             try {
                 $process->mustRun();
             } catch (ProcessFailedException $e) {
@@ -25,7 +27,6 @@ class FfmpegCodecService
             }
 
             $output = explode("\n", $process->getOutput());
-
             if (empty($output)) {
                 Log::error('FFmpeg encoders command returned no output.');
                 return [];
@@ -37,7 +38,6 @@ class FfmpegCodecService
             $videoCodecs = [];
             $audioCodecs = [];
             $subtitleCodecs = [];
-
             foreach ($output as $line) {
                 if (preg_match('/ ([AVS])([\.FXBSD]{5,6}) ([^=]\S+)\s+(.*)$/', $line, $matches)) {
                     [$_, $type, $flags, $codec, $description] = $matches;
@@ -56,7 +56,6 @@ class FfmpegCodecService
             asort($videoCodecs);
             asort($audioCodecs);
             asort($subtitleCodecs);
-
             return [
                 'video' => $videoCodecs,
                 'audio' => $audioCodecs,
