@@ -36,6 +36,7 @@ class HlsStreamService
                 'ffmpeg_codec_video' => 'libx264',
                 'ffmpeg_codec_audio' => 'aac',
                 'ffmpeg_codec_subtitles' => 'copy',
+                'ffmpeg_path' => 'jellyfin-ffmpeg',
             ];
             try {
                 $settings = [
@@ -45,6 +46,7 @@ class HlsStreamService
                     'ffmpeg_codec_video' => $userPreferences->ffmpeg_codec_video ?? $settings['ffmpeg_codec_video'],
                     'ffmpeg_codec_audio' => $userPreferences->ffmpeg_codec_audio ?? $settings['ffmpeg_codec_audio'],
                     'ffmpeg_codec_subtitles' => $userPreferences->ffmpeg_codec_subtitles ?? $settings['ffmpeg_codec_subtitles'],
+                    'ffmpeg_path' => $userPreferences->ffmpeg_path ?? $settings['ffmpeg_path'],
                 ];
             } catch (Exception $e) {
                 // Ignore
@@ -53,11 +55,17 @@ class HlsStreamService
             // Get user agent
             $userAgent = escapeshellarg($settings['ffmpeg_user_agent']);
 
+            // Get ffmpeg path
+            $ffmpegPath = config('proxy.ffmpeg_path') ?: $settings['ffmpeg_path'];
+            if (empty($ffmpegPath)) {
+                $ffmpegPath = 'jellyfin-ffmpeg';
+            }
+
             // Get ffmpeg output codec formats
             $videoCodec = config('proxy.ffmpeg_codec_video') ?: $settings['ffmpeg_codec_video'];
             $audioCodec = config('proxy.ffmpeg_codec_audio') ?: $settings['ffmpeg_codec_audio'];
             $subtitleCodec = config('proxy.ffmpeg_codec_subtitles') ?: $settings['ffmpeg_codec_subtitles'];
-            $outputFormat = "-c:v $videoCodec -c:a $audioCodec -c:s $subtitleCodec";
+            $outputFormat = "-c:v $videoCodec -c:a $audioCodec -bsf:a aac_adtstoasc -c:s $subtitleCodec";
 
             // Get user defined options
             $userArgs = config('proxy.ffmpeg_additional_args', '');
@@ -75,7 +83,7 @@ class HlsStreamService
             $segmentBaseUrl = url("/api/stream/{$id}") . '/';
 
             $cmd = sprintf(
-                'ffmpeg ' .
+                $ffmpegPath . ' ' .
                     // Optimization options:
                     '-fflags nobuffer -flags low_delay ' .
 
@@ -108,7 +116,7 @@ class HlsStreamService
                 $userArgs,                    // user defined options
                 $streamUrl,                   // input URL
                 $outputFormat,                // output format
-                $segment,                     // segment filename 
+                $segment,                     // segment filename
                 $segmentBaseUrl,              // base URL for segments (want to make sure routed through the proxy to track active users)
                 $playlist,                    // playlist filename
                 $settings['ffmpeg_debug'] ? '' : '-hide_banner -nostats -loglevel error'

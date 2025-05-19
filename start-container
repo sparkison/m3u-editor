@@ -196,7 +196,7 @@ if [ "${ENABLE_POSTGRES}" = "true" ]; then
   # Create socket dir and start Postgres
   mkdir -p /run/postgresql && chown $WWWUSER:$WWWGROUP /run/postgresql
   su-exec $WWWUSER postgres -D "$PGDATA" -h 0.0.0.0 -p "$PG_PORT" >> "${postgres_log_file}" 2>&1 &
-  
+
   # Wait until it's ready
   dots=""
   until su-exec $WWWUSER pg_isready -h localhost -p "$PG_PORT" --quiet; do

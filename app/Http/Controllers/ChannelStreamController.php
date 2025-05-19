@@ -59,6 +59,7 @@ class ChannelStreamController extends Controller
             'ffmpeg_codec_video' => 'copy',
             'ffmpeg_codec_audio' => 'copy',
             'ffmpeg_codec_subtitles' => 'copy',
+            'ffmpeg_path' => 'jellyfin-ffmpeg',
         ];
 
         try {
@@ -69,6 +70,7 @@ class ChannelStreamController extends Controller
                 'ffmpeg_codec_video' => $userPreferences->ffmpeg_codec_video ?? $settings['ffmpeg_codec_video'],
                 'ffmpeg_codec_audio' => $userPreferences->ffmpeg_codec_audio ?? $settings['ffmpeg_codec_audio'],
                 'ffmpeg_codec_subtitles' => $userPreferences->ffmpeg_codec_subtitles ?? $settings['ffmpeg_codec_subtitles'],
+                'ffmpeg_path' => $userPreferences->ffmpeg_path ?? $settings['ffmpeg_path'],
             ];
         } catch (Exception $e) {
             // Ignore
@@ -113,6 +115,12 @@ class ChannelStreamController extends Controller
                 $userArgs .= ' ';
             }
 
+            // Get ffmpeg path
+            $ffmpegPath = config('proxy.ffmpeg_path') ?: $settings['ffmpeg_path'];
+            if (empty($ffmpegPath)) {
+                $ffmpegPath = 'jellyfin-ffmpeg';
+            }
+
             // Get ffmpeg output codec formats
             $videoCodec = config('proxy.ffmpeg_codec_video') ?: $settings['ffmpeg_codec_video'];
             $audioCodec = config('proxy.ffmpeg_codec_audio') ?: $settings['ffmpeg_codec_audio'];
@@ -127,7 +135,7 @@ class ChannelStreamController extends Controller
             foreach ($streamUrls as $streamUrl) {
                 // Build the FFmpeg command
                 $cmd = sprintf(
-                    'ffmpeg ' .
+                    $ffmpegPath . ' ' .
                         // Pre-input HTTP options:
                         '-user_agent "%s" -referer "MyComputer" ' .
                         '-multiple_requests 1 -reconnect_on_network_error 1 ' .
