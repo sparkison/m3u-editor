@@ -48,7 +48,7 @@ RUN touch crontab.tmp \
 
 # Install Redis config
 COPY ./docker/8.4/redis.conf /etc/redis/redis.tmpl
-RUN chmod 0644 /etc/redis/redis.conf
+RUN chmod 0644 /etc/redis/redis.tmpl
 
 # Install and configure PHP extensions (adjust as needed)
 RUN apk --no-cache add \
