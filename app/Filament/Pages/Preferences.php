@@ -45,6 +45,7 @@ class Preferences extends SettingsPage
         return $form
             ->schema([
                 Forms\Components\Tabs::make()
+                    ->persistTabInQueryString()
                     ->columnSpanFull()
                     ->tabs([
                         Forms\Components\Tabs\Tab::make('Appearance')
