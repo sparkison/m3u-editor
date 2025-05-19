@@ -31,6 +31,15 @@ if [ "$BROADCAST_CONNECTION" = "null" ]; then
     export VITE_WEBSOCKETS_DISABLED="true"
 fi
 
+# FFMPEG
+# Alternatively use jellyfin-ffmpeg if enabled
+export FFMPEG_USE_JELLYFIN="${FFMPEG_USE_JELLYFIN:-false}"
+if [ "$FFMPEG_USE_JELLYFIN" = "true" ]; then
+    export FFMPEG_PATH="/usr/lib/jellyfin-ffmpeg/ffmpeg"
+else
+    export FFMPEG_PATH="/usr/bin/ffmpeg"
+fi
+
 # Set timezone, default to UTC
 export TZ="${TZ:-UTC}"
 
@@ -196,7 +205,7 @@ if [ "${ENABLE_POSTGRES}" = "true" ]; then
   # Create socket dir and start Postgres
   mkdir -p /run/postgresql && chown $WWWUSER:$WWWGROUP /run/postgresql
   su-exec $WWWUSER postgres -D "$PGDATA" -h 0.0.0.0 -p "$PG_PORT" >> "${postgres_log_file}" 2>&1 &
-  
+
   # Wait until it's ready
   dots=""
   until su-exec $WWWUSER pg_isready -h localhost -p "$PG_PORT" --quiet; do

@@ -21,6 +21,8 @@ class HlsStreamService
      */
     public function startStream($id, $streamUrl): int
     {
+        $ffmpegPath = getenv('FFMPEG_PATH') ?: 'ffmpeg';
+
         // Only start one FFmpeg per channel at a time
         $cacheKey = "hls:pid:{$id}";
         $pid = Cache::get($cacheKey);
@@ -73,7 +75,7 @@ class HlsStreamService
             $segmentBaseUrl = url("/api/stream/{$id}") . '/';
 
             $cmd = sprintf(
-                'ffmpeg ' .
+                $ffmpegPath . ' ' .
                     // Optimization options:
                     '-fflags nobuffer -flags low_delay ' .
 
@@ -107,7 +109,7 @@ class HlsStreamService
                 $userArgs,                    // user defined options
                 $streamUrl,                   // input URL
                 $outputFormat,                // output format
-                $segment,                     // segment filename 
+                $segment,                     // segment filename
                 $segmentBaseUrl,              // base URL for segments (want to make sure routed through the proxy to track active users)
                 $playlist,                    // playlist filename
                 $settings['ffmpeg_debug'] ? '' : '-hide_banner -nostats -loglevel error'

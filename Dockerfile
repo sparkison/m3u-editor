@@ -22,6 +22,7 @@ RUN apk update && apk --no-cache add \
     nodejs \
     npm \
     ffmpeg \
+    jellyfin-ffmpeg \
     redis \
     git \
     bash \
