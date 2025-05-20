@@ -200,13 +200,6 @@ class ChannelsRelationManager extends RelationManager
             ])
             ->headerActions([
                 Tables\Actions\AttachAction::make()
-                    ->recordSelectSearchColumns(['name'])
-                    ->recordSelectOptionsQuery(
-                        fn(Builder $query, $livewire) => $query
-                            ->select(['id', 'title', 'name'])
-                            ->where('user_id', $livewire->ownerRecord->user_id)
-                            ->orderBy('title')
-                    )
 
                 // Advanced attach when adding pivot values:
                 // Tables\Actions\AttachAction::make()->form(fn(Tables\Actions\AttachAction $action): array => [
