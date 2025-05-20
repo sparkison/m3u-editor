@@ -37,7 +37,12 @@ class PlaylistUrlService
             $m3uUrl = $m3uData ? url('/s/' . $m3uData['key']) : null;
             $hdhrUrl = $hdhrData ? url('/s/' . $hdhrData['key']) : null;
             $epgUrl = $epgData ? url('/s/' . $epgData['key']) : null;
-            $epgZipUrl = $epgZipData ? url('/s/' . $epgZipData['key']) : null;
+
+            // Since zipped url was added later, it might not be present in the short urls
+            // Default to the route if not found
+            $epgZipUrl = $epgZipData
+                ? url('/s/' . $epgZipData['key'])
+                : route('epg.generate.compressed', ['uuid' => $playlist->uuid]);
         } else {
             $m3uUrl = route('playlist.generate', ['uuid' => $playlist->uuid]);
             $hdhrUrl = route('playlist.hdhr.overview', ['uuid' => $playlist->uuid]);
