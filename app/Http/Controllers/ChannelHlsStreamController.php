@@ -11,6 +11,23 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Storage;
 
+/**
+ * Class ChannelHlsStreamController
+ * 
+ * This controller handles the HLS streaming for channels.
+ * It manages the starting of the FFmpeg process and serves the HLS playlist and segments.
+ * 
+ * NOTE: Using NGINX internal redirects for serving the playlist and segments.
+ *       If running locally, make sure to set up NGINX with the following configuration:
+ * 
+ * location /internal/hls/ {
+ *     internal;
+ *     alias [PROJECT_ROOT_PATH]/storage/app/hls/;
+ *     access_log off;
+ *     add_header Cache-Control no-cache;
+ * }
+ * 
+ */
 class ChannelHlsStreamController extends Controller
 {
     private $hlsService;
