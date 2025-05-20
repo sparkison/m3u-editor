@@ -112,12 +112,14 @@ class ChannelsRelationManager extends RelationManager
                     ->label('Playlist Group')
                     ->type($ownerRecord->uuid)
                     ->toggleable()
-                    ->searchable()
+                    // ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('group')
                     ->label('Default Group')
                     ->toggleable()
-                    ->searchable()
+                    ->searchable(query: function ($query, string $search): Builder {
+                        return $query->orWhereRaw('LOWER("group"::text) LIKE ?', ["%{$search}%"]);
+                    })
                     ->sortable(),
                 Tables\Columns\TextColumn::make('epgChannel.name')
                     ->label('EPG Channel')
@@ -198,7 +200,13 @@ class ChannelsRelationManager extends RelationManager
             ])
             ->headerActions([
                 Tables\Actions\AttachAction::make()
-                // ->preloadRecordSelect()
+                    ->recordSelectSearchColumns(['name'])
+                    ->recordSelectOptionsQuery(
+                        fn(Builder $query, $livewire) => $query
+                            ->select(['id', 'title', 'name'])
+                            ->where('user_id', $livewire->ownerRecord->user_id)
+                            ->orderBy('title')
+                    )
 
                 // Advanced attach when adding pivot values:
                 // Tables\Actions\AttachAction::make()->form(fn(Tables\Actions\AttachAction $action): array => [
