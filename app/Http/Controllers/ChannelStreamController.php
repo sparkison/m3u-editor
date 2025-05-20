@@ -50,16 +50,12 @@ class ChannelStreamController extends Controller
         $title = strip_tags($title);
 
         // Check if playlist is specified
-        $playlistType = null;
         if ($playlist) {
-            $playlistType = 'playlist';
             $playlist = Playlist::find($playlist);
             if (!$playlist) {
-                $playlistType = 'merged';
                 $playlist = MergedPlaylist::find($playlist);
             }
             if (!$playlist) {
-                $playlistType = 'custom';
                 $playlist = CustomPlaylist::findOrFail($playlist);
             }
         }
@@ -96,10 +92,20 @@ class ChannelStreamController extends Controller
         } catch (Exception $e) {
             // Ignore
         }
+
+        // Get user agent
+        $userAgent = escapeshellarg($settings['ffmpeg_user_agent']);
+        if ($playlist) {
+            $userAgent = escapeshellarg($playlist->user_agent ?? $userAgent);
+        }
+
+        // Determine the output format
         $extension = $format === 'mp2t'
             ? 'ts'
             : $format;
-        return new StreamedResponse(function () use ($streamUrls, $title, $settings, $format, $playlist) {
+
+        // Set the content type based on the format
+        return new StreamedResponse(function () use ($streamUrls, $title, $settings, $format, $userAgent) {
             while (ob_get_level()) {
                 ob_end_flush();
             }
@@ -108,11 +114,7 @@ class ChannelStreamController extends Controller
             // Disable output buffering to ensure real-time streaming
             ini_set('zlib.output_compression', 0);
 
-            // Get user agent
-            $userAgent = escapeshellarg($settings['ffmpeg_user_agent']);
-            if ($playlist) {
-                $userAgent = escapeshellarg($playlist->user_agent ?? $userAgent);
-            }
+            // Set the maximum number of retries
             $maxRetries = $settings['ffmpeg_max_tries'];
 
             // Get user defined options
@@ -163,6 +165,7 @@ class ChannelStreamController extends Controller
                     $settings['ffmpeg_debug'] ? '' : '-hide_banner -nostats -loglevel error'
                 );
 
+                // Output command for debugging
                 Log::channel('ffmpeg')->info("Streaming channel {$title} with command: {$cmd}");
 
                 // Continue trying until the client disconnects, or max retries are reached

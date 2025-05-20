@@ -80,7 +80,7 @@ class PlaylistGenerateController extends Controller
                     if ($proxyEnabled) {
                         $url = ProxyFacade::getProxyUrlForChannel(
                             id: $channel->id,
-                            format: 'mpts',
+                            format: 'mp2t',
                             playlist: $playlist->id
                         );
                     }
@@ -259,7 +259,7 @@ class PlaylistGenerateController extends Controller
             if ($proxyEnabled) {
                 $url = ProxyFacade::getProxyUrlForChannel(
                     id: $channel->id,
-                    format: 'mpts',
+                    format: 'mp2t',
                     playlist: $playlistId
                 );
             }

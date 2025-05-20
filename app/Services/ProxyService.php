@@ -12,7 +12,7 @@ class ProxyService
      * @param string|null $proxyUrlOverride
      * @return string
      */
-    public function getProxyUrlForChannel($id, $format = 'mpts', $playlist = null)
+    public function getProxyUrlForChannel($id, $format = 'mp2t', $playlist = null)
     {
         $proxyUrlOverride = config('proxy.url_override');
         $id = rtrim(base64_encode($id), '=');
