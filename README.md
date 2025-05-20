@@ -24,7 +24,7 @@ Check out the docs: [m3u editor docs](https://sparkison.github.io/m3u-editor-doc
 
 ## 🐳 Docker quick start
 
-View our [getting started](http://localhost:4000/docs/about/getting-started/#getting-started) docs to get up and running in minutes! 🥳
+View our [getting started](https://sparkison.github.io/m3u-editor-docs/docs/about/getting-started/) docs to get up and running in minutes! 🥳
 
 ---
 
