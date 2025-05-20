@@ -33,13 +33,7 @@ trait ShortUrlTrait
             }
             $this->short_urls = $short_urls;
         } else {
-            // Delete the short URLs that contain the playlist UUID
-            DB::table('short_urls')
-                ->where('destination_url', 'LIKE', "%{$this->uuid}%")
-                ->delete();
-
-            // Set the short URLs to null
-            $this->short_urls = null;
+            return $this->removeShortUrls();
         }
 
         return $this;
