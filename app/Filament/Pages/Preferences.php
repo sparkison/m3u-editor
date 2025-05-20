@@ -109,7 +109,7 @@ class Preferences extends SettingsPage
                                             ->columnSpan(2)
                                             ->default('VLC/3.0.21 LibVLC/3.0.21')
                                             ->placeholder('VLC/3.0.21 LibVLC/3.0.21')
-                                            ->helperText(''),
+                                            ->helperText('Fallback user agent (defaults to Playlist user agent when available).'),
                                         $this->makeCodecSelect('video', 'ffmpeg_codec_video', 'videoCodecs'),
                                         $this->makeCodecSelect('audio', 'ffmpeg_codec_audio', 'audioCodecs'),
                                         $this->makeCodecSelect('subtitle', 'ffmpeg_codec_subtitles', 'subtitleCodecs'),
