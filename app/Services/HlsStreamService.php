@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\CustomPlaylist;
+use App\Models\MergedPlaylist;
+use App\Models\Playlist;
 use Exception;
 use App\Settings\GeneralSettings;
 use Illuminate\Support\Facades\Cache;
@@ -18,10 +21,11 @@ class HlsStreamService
      * @param string $id
      * @param string $streamUrl
      * @param string $title
+     * @param string|null $playlist
      * 
      * @return int The FFmpeg process ID
      */
-    public function startStream($id, $streamUrl, $title): int
+    public function startStream($id, $streamUrl, $title, $playlist = null): int
     {
         // Only start one FFmpeg per channel at a time
         $cacheKey = "hls:pid:{$id}";
@@ -52,8 +56,26 @@ class HlsStreamService
                 // Ignore
             }
 
+            // Check if playlist is specified
+            $playlistType = null;
+            if ($playlist) {
+                $playlistType = 'playlist';
+                $playlist = Playlist::find($playlist);
+                if (!$playlist) {
+                    $playlistType = 'merged';
+                    $playlist = MergedPlaylist::find($playlist);
+                }
+                if (!$playlist) {
+                    $playlistType = 'custom';
+                    $playlist = CustomPlaylist::findOrFail($playlist);
+                }
+            }
+
             // Get user agent
             $userAgent = escapeshellarg($settings['ffmpeg_user_agent']);
+            if ($playlist) {
+                $userAgent = escapeshellarg($playlist->user_agent ?? $userAgent);
+            }
 
             // Get ffmpeg path
             $ffmpegPath = config('proxy.ffmpeg_path') ?: $settings['ffmpeg_path'];

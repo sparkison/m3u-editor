@@ -7,8 +7,8 @@ use Illuminate\Support\Facades\Redis;
 
 class StreamStatsChart extends ChartWidget
 {
-    protected static ?string $heading         = 'MPTS Stream Stats';
-    protected static ?string $description     = 'Bitrate and FPS stats for the MPTS stream.';
+    protected static ?string $heading         = 'MPEG-TS Stream Stats';
+    protected static ?string $description     = 'Bitrate and FPS stats for the MPEG-TS stream.';
     public static     ?string $pollingInterval = '1s';
 
     public string $title;

@@ -8,24 +8,37 @@ class ProxyService
      * Get the proxy URL for a channel
      *
      * @param string|int $id
-     * @param string|null $format
+     * @param string $format
+     * @param string|null $playlist
      * @return string
      */
-    public function getProxyUrlForChannel($id, $format = null)
+    public function getProxyUrlForChannel($id, $format = 'mp2t', $playlist = null)
     {
         $proxyUrlOverride = config('proxy.url_override');
-        $proxyFormat = $format ?? config('proxy.proxy_format', 'mpts');
+        $proxyFormat = $format ?? config('proxy.proxy_format', 'mp2t');
         $id = rtrim(base64_encode($id), '=');
         if ($proxyUrlOverride) {
             $proxyUrlOverride = rtrim($proxyUrlOverride, '/');
             if ($proxyFormat === 'hls') {
-                return "$proxyUrlOverride/api/stream/$id.m3u8";
+                $proxyUrlOverride = "$proxyUrlOverride/api/stream/$id";
+                if ($playlist) {
+                    $proxyUrlOverride .= "/$playlist";
+                }
+                return "$proxyUrlOverride/playlist.m3u8";
             } else {
-                return "$proxyUrlOverride/stream/$id";
+                $proxyUrlOverride = "$proxyUrlOverride/stream/$id/$format";
+                if ($playlist) {
+                    $proxyUrlOverride .= "/$playlist";
+                }
+                return $proxyUrlOverride;
             }
         }
         return $proxyFormat === 'hls'
             ? route('stream.hls.playlist', ['encodedId' => $id])
-            : route('stream', ['id' => $id]);
+            : route('stream', [
+                'encodedId' => $id,
+                'format' => $format,
+                'playlist' => $playlist
+            ]);
     }
 }
