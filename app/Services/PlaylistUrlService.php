@@ -12,7 +12,7 @@ class PlaylistUrlService
 {
     /**
      * Get URLs for the given playlist
-     * 
+     *
      * @param  Playlist|MergedPlaylist|CustomPlaylist $playlist
      * @return array
      */
@@ -28,10 +28,21 @@ class PlaylistUrlService
         // Get the base URLs
         if ($playlist->short_urls_enabled) {
             $shortUrls = collect($playlist->short_urls)->keyBy('type');
-            $m3uUrl = url('/s/' . $shortUrls->get('m3u')['key']);
-            $hdhrUrl = url('/s/' . $shortUrls->get('hdhr')['key']);
-            $epgUrl = url('/s/' . $shortUrls->get('epg')['key']);
-            $epgZipUrl = url('/s/' . $shortUrls->get('epg_zip')['key']);
+
+            $m3uData = $shortUrls->get('m3u');
+            $hdhrData = $shortUrls->get('hdhr');
+            $epgData = $shortUrls->get('epg');
+            $epgZipData = $shortUrls->get('epg_zip');
+
+            $m3uUrl = $m3uData ? url('/s/' . $m3uData['key']) : null;
+            $hdhrUrl = $hdhrData ? url('/s/' . $hdhrData['key']) : null;
+            $epgUrl = $epgData ? url('/s/' . $epgData['key']) : null;
+
+            // Since zipped url was added later, it might not be present in the short urls
+            // Default to the route if not found
+            $epgZipUrl = $epgZipData
+                ? url('/s/' . $epgZipData['key'])
+                : route('epg.generate.compressed', ['uuid' => $playlist->uuid]);
         } else {
             $m3uUrl = route('playlist.generate', ['uuid' => $playlist->uuid]);
             $hdhrUrl = route('playlist.hdhr.overview', ['uuid' => $playlist->uuid]);
@@ -41,8 +52,8 @@ class PlaylistUrlService
 
         // If auth set, append auth parameters to the URLs
         if ($auth) {
-            $m3uUrl .= $auth;
-            $hdhrUrl .= $auth;
+            if ($m3uUrl) $m3uUrl .= $auth;
+            if ($hdhrUrl) $hdhrUrl .= $auth;
         }
 
         // Return the results
@@ -57,7 +68,7 @@ class PlaylistUrlService
 
     /**
      * Get the media flow proxy server URL
-     * 
+     *
      * @return string
      */
     public function getMediaFlowProxyServerUrl()
@@ -72,7 +83,7 @@ class PlaylistUrlService
 
     /**
      * Get the media flow proxy URLs for the given playlist
-     * 
+     *
      * @param  Playlist|MergedPlaylist|CustomPlaylist $playlist
      * @return array
      */
@@ -117,7 +128,7 @@ class PlaylistUrlService
 
     /**
      * Determine if the media flow proxy is enabled
-     * 
+     *
      * @return boolean
      */
     public function mediaFlowProxyEnabled()
@@ -127,7 +138,7 @@ class PlaylistUrlService
 
     /**
      * Get the media flow settings
-     * 
+     *
      * @return array
      */
     public function getMediaFlowSettings(): array
