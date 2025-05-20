@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
+use Exception;
 use App\Models\CustomPlaylist;
 use App\Models\MergedPlaylist;
 use App\Models\Playlist;
-use Exception;
 use App\Settings\GeneralSettings;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
@@ -21,12 +21,16 @@ class HlsStreamService
      * @param string $id
      * @param string $streamUrl
      * @param string $title
-     * @param string|null $playlist
+     * @param string|null $encodedPlaylist
      * 
      * @return int The FFmpeg process ID
      */
-    public function startStream($id, $streamUrl, $title, $playlist = null): int
-    {
+    public function startStream(
+        $id,
+        $streamUrl,
+        $title,
+        $encodedPlaylist = null
+    ): int {
         // Only start one FFmpeg per channel at a time
         $cacheKey = "hls:pid:{$id}";
         $pid = Cache::get($cacheKey);
@@ -57,17 +61,18 @@ class HlsStreamService
             }
 
             // Check if playlist is specified
-            $playlistType = null;
-            if ($playlist) {
-                $playlistType = 'playlist';
-                $playlist = Playlist::find($playlist);
+            $playlist = null;
+            if ($encodedPlaylist) {
+                if (strpos($encodedPlaylist, '==') === false) {
+                    $encodedPlaylist .= '=='; // right pad to ensure proper decoding
+                }
+                $playlistId = base64_decode($encodedPlaylist);
+                $playlist = Playlist::where('uuid', $playlistId)->first();
                 if (!$playlist) {
-                    $playlistType = 'merged';
-                    $playlist = MergedPlaylist::find($playlist);
+                    $playlist = MergedPlaylist::where('uuid', $playlistId)->first();
                 }
                 if (!$playlist) {
-                    $playlistType = 'custom';
-                    $playlist = CustomPlaylist::findOrFail($playlist);
+                    $playlist = CustomPlaylist::where('uuid', $playlistId)->firstOrFail();
                 }
             }
 
@@ -100,7 +105,7 @@ class HlsStreamService
             File::ensureDirectoryExists($storageDir, 0755);
 
             // Setup the stream URL
-            $playlist = "{$storageDir}/stream.m3u8";
+            $m3uPlaylist = "{$storageDir}/stream.m3u8";
             $segment = "{$storageDir}/segment_%03d.ts";
             $segmentBaseUrl = url("/api/stream/{$id}") . '/';
 
@@ -140,7 +145,7 @@ class HlsStreamService
                 $outputFormat,                // output format
                 $segment,                     // segment filename
                 $segmentBaseUrl,              // base URL for segments (want to make sure routed through the proxy to track active users)
-                $playlist,                    // playlist filename
+                $m3uPlaylist,                 // playlist filename
                 $settings['ffmpeg_debug'] ? '' : '-hide_banner -nostats -loglevel error'
             );
 

@@ -9,10 +9,10 @@ use App\Models\MergedPlaylist;
 use App\Models\Playlist;
 use App\Settings\GeneralSettings;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use Illuminate\Support\Str;
 use Symfony\Component\Process\Process as SymphonyProcess;
 
 class ChannelStreamController extends Controller
@@ -22,7 +22,7 @@ class ChannelStreamController extends Controller
      *
      * @param Request $request
      * @param int|string $encodedId
-     * @param string|null $playlist
+     * @param string|null $encodedPlaylist
      * @param string $format
      *
      * @return StreamedResponse
@@ -31,7 +31,7 @@ class ChannelStreamController extends Controller
         Request $request,
         $encodedId,
         $format = 'mp2t',
-        $playlist = null
+        $encodedPlaylist = null
     ) {
         // Validate the format
         if (!in_array($format, ['mp2t', 'mp4'])) {
@@ -52,13 +52,18 @@ class ChannelStreamController extends Controller
         $title = strip_tags($title);
 
         // Check if playlist is specified
-        if ($playlist) {
-            $playlist = Playlist::find($playlist);
+        $playlist = null;
+        if ($encodedPlaylist) {
+            if (strpos($encodedPlaylist, '==') === false) {
+                $encodedPlaylist .= '=='; // right pad to ensure proper decoding
+            }
+            $playlistId = base64_decode($encodedPlaylist);
+            $playlist = Playlist::where('uuid', $playlistId)->first();
             if (!$playlist) {
-                $playlist = MergedPlaylist::find($playlist);
+                $playlist = MergedPlaylist::where('uuid', $playlistId)->first();
             }
             if (!$playlist) {
-                $playlist = CustomPlaylist::findOrFail($playlist);
+                $playlist = CustomPlaylist::where('uuid', $playlistId)->firstOrFail();
             }
         }
 
@@ -111,6 +116,7 @@ class ChannelStreamController extends Controller
 
         // Set the content type based on the format
         return new StreamedResponse(function () use ($channelId, $streamUrls, $title, $settings, $format, $ip, $streamId, $userAgent) {
+            // Set unique client key (order is used for stats output)
             $clientKey = "{$ip}::{$channelId}::{$streamId}";
 
             // Make sure PHP doesn't ignore user aborts
@@ -177,7 +183,7 @@ class ChannelStreamController extends Controller
                         '-re -i "%s" ' .
 
                         // Progress tracking:
-                        '-progress pipe:2 ' .
+                        // '-progress pipe:2 ' . // Disabled for now
 
                         // Output:
                         '%s ' .
@@ -214,26 +220,30 @@ class ChannelStreamController extends Controller
                                 // split out each line
                                 $lines = preg_split('/\r?\n/', trim($buffer));
                                 foreach ($lines as $line) {
-                                    // "progress" lines are always KEY=VALUE
-                                    if (strpos($line, '=') !== false) {
-                                        list($key, $value) = explode('=', $line, 2);
-                                        if (in_array($key, ['bitrate', 'fps', 'out_time_ms'])) {
-                                            // push the metric value onto a Redis list and trim to last 20 points
-                                            $listKey = "mpts:hist:{$channelId}:{$key}";
-                                            $timeKey = "mpts:hist:{$channelId}:timestamps";
+                                    // Use below, along with `-progress pipe:2`, to enable stream progress tracking...
+                                    /*
+                                        // "progress" lines are always KEY=VALUE
+                                        if (strpos($line, '=') !== false) {
+                                            list($key, $value) = explode('=', $line, 2);
+                                            if (in_array($key, ['bitrate', 'fps', 'out_time_ms'])) {
+                                                // push the metric value onto a Redis list and trim to last 20 points
+                                                $listKey = "mpts:hist:{$channelId}:{$key}";
+                                                $timeKey = "mpts:hist:{$channelId}:timestamps";
 
-                                            // push the timestamp into a parallel list (once per loop)
-                                            Redis::rpush($timeKey, now()->format('H:i:s'));
-                                            Redis::ltrim($timeKey, -20, -1);
+                                                // push the timestamp into a parallel list (once per loop)
+                                                Redis::rpush($timeKey, now()->format('H:i:s'));
+                                                Redis::ltrim($timeKey, -20, -1);
 
-                                            // push the metric value
-                                            Redis::rpush($listKey, $value);
-                                            Redis::ltrim($listKey, -20, -1);
+                                                // push the metric value
+                                                Redis::rpush($listKey, $value);
+                                                Redis::ltrim($listKey, -20, -1);
+                                            }
+                                        } elseif ($line !== '') {
+                                            // anything else is a true ffmpeg log/error
+                                            Log::channel('ffmpeg')->error($line);
                                         }
-                                    } elseif ($line !== '') {
-                                        // anything else is a true ffmpeg log/error
-                                        Log::channel('ffmpeg')->error($line);
-                                    }
+                                    */
+                                    Log::channel('ffmpeg')->error($line);
                                 }
                             }
                         });
