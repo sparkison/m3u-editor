@@ -10,12 +10,13 @@ models:
       hasMany: Series
 
   Series:
-    title: string
+    name: string
+    new: boolean default:true
+    import_batch_no: string
     user_id: id foreign:users
     playlist_id: id foreign:playlists
     category_id: id foreign:categories nullable
     source_category_id: unsignedInteger nullable
-    new: boolean default:true
     cover: string nullable
     plot: largeText nullable
     genre: string nullable
@@ -30,19 +31,38 @@ models:
     metadata: jsonb nullable
     relationships:
       belongsTo: User, Playlist
-      hasMany: Episodes
+      hasMany: Season
 
-  Episodes:
+  Season:
+    name: string
+    new: boolean default:true
+    import_batch_no: string
+    user_id: id foreign:users
+    playlist_id: id foreign:playlists
+    category_id: id foreign:categories nullable
+    series_id: id foreign:series
+    source_season_id: unsignedInteger nullable
+    season_number: unsignedInteger nullable
+    episode_count: unsignedInteger nullable
+    cover: string nullable
+    cover_big: string nullable
+    relationships:
+      belongsTo: User, Playlist, Series
+      hasMany: Episode
+
+  Episode:
     title: string
+    new: boolean default:true
+    import_batch_no: string
     user_id: id foreign:users
     playlist_id: id foreign:playlists
     series_id: id foreign:series
+    season_id: id foreign:seasons
     stream_id: string nullable
-    new: boolean default:true
     episode_num: unsignedInteger nullable
     container_extension: string nullable
     custom_sid: string nullable
     added: timestamp nullable
     season: unsignedInteger nullable
     relationships:
-      belongsTo: User, Series, Playlist
+      belongsTo: User, Playlist, Series, Season

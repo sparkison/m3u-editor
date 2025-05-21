@@ -141,13 +141,11 @@ class TestXtream extends Command implements PromptsForMissingInput
         $langIgnore = config('xtream.lang_strip');
         $detail = $xtream->getSeriesInfo($seriesId);
         $info = $detail['info'] ?? [];
-        $eps = $detail['episodes'] ?? [];
         $seriesName = Str::of($info['name'])->replace($langIgnore, '')->trim();
         $catFolder = Str::of($catName)->replace(' | ', ' - ')->trim();
 
         $this->info("[Series] {$seriesName}");
         $this->info("[Category] {$catFolder} [{$catId}]");
-        $this->line(json_encode($info, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-        $this->line(json_encode($eps, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $this->line(json_encode($detail, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
     }
 }
