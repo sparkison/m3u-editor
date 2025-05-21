@@ -2,9 +2,9 @@ models:
   Category:
     name: string
     name_internal: string
+    source_category_id: unsignedInteger nullable
     user_id: id foreign:users
     playlist_id: id foreign:playlists
-    source_category_id: unsignedInteger nullable
     relationships:
       belongsTo: User, Playlist
       hasMany: Series
@@ -12,11 +12,11 @@ models:
   Series:
     name: string
     new: boolean default:true
+    source_category_id: unsignedInteger nullable
     import_batch_no: string
     user_id: id foreign:users
     playlist_id: id foreign:playlists
     category_id: id foreign:categories nullable
-    source_category_id: unsignedInteger nullable
     cover: string nullable
     plot: largeText nullable
     genre: string nullable
@@ -36,12 +36,12 @@ models:
   Season:
     name: string
     new: boolean default:true
+    source_season_id: unsignedInteger nullable
     import_batch_no: string
     user_id: id foreign:users
     playlist_id: id foreign:playlists
     category_id: id foreign:categories nullable
     series_id: id foreign:series
-    source_season_id: unsignedInteger nullable
     season_number: unsignedInteger nullable
     episode_count: unsignedInteger nullable
     cover: string nullable
@@ -53,12 +53,12 @@ models:
   Episode:
     title: string
     new: boolean default:true
+    source_episode_id: unsignedInteger nullable
     import_batch_no: string
     user_id: id foreign:users
     playlist_id: id foreign:playlists
     series_id: id foreign:series
     season_id: id foreign:seasons
-    stream_id: string nullable
     episode_num: unsignedInteger nullable
     container_extension: string nullable
     custom_sid: string nullable
