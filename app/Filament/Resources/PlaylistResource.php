@@ -29,10 +29,12 @@ use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ListPlaylistSyncStat
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ViewPlaylistSyncStatus;
 use App\Forms\Components\MediaFlowProxyUrl;
 use App\Models\PlaylistSyncStatus;
+use App\Services\XtreamService;
 use Filament\Facades\Filament;
 use Filament\Tables\Actions\Action;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 use Illuminate\View\View;
 
@@ -392,9 +394,9 @@ class PlaylistResource extends Resource
                         ])
                         ->default(false)
                         ->live(),
-
                     Forms\Components\TextInput::make('xtream_config.url')
                         ->label('Xtream API URL')
+                        ->live()
                         ->helperText('Enter the full url, using <url>:<port> format - without trailing slash (/).')
                         ->prefixIcon('heroicon-m-globe-alt')
                         ->maxLength(255)
@@ -402,7 +404,6 @@ class PlaylistResource extends Resource
                         ->columnSpan(2)
                         ->required()
                         ->hidden(fn(Get $get): bool => !$get('xtream')),
-
                     Forms\Components\Grid::make()
                         ->columnSpanFull()
                         ->schema([
@@ -411,10 +412,12 @@ class PlaylistResource extends Resource
                                 ->schema([
                                     Forms\Components\TextInput::make('xtream_config.username')
                                         ->label('Xtream API Username')
+                                        ->live()
                                         ->required()
                                         ->columnSpan(1),
                                     Forms\Components\TextInput::make('xtream_config.password')
                                         ->label('Xtream API Password')
+                                        ->live()
                                         ->required()
                                         ->columnSpan(1)
                                         ->password()
@@ -430,16 +433,81 @@ class PlaylistResource extends Resource
                                     Forms\Components\CheckboxList::make('xtream_config.import_options')
                                         ->label('Additional categories & streams to import')
                                         ->columnSpan(2)
+                                        ->live()
                                         ->options([
                                             'vod' => 'VOD',
-                                            //'series' => 'Series',
+                                            'series' => 'Series',
                                         ])->helperText('NOTE: Live categories & streams will be included by default'),
                                     Forms\Components\Toggle::make('xtream_config.import_epg')
                                         ->label('Import EPG')
                                         ->helperText('If your provider supports EPG, you can import it automatically.')
                                         ->columnSpan(1)
                                         ->inline(false)
+                                        ->default(true),
+                                    Forms\Components\Toggle::make('xtream_config.import_all_series')
+                                        ->label('Import All Series')
+                                        ->live()
+                                        ->helperText('Disable to select specific series categories to import and sync.')
+                                        ->columnSpan(1)
+                                        ->inline(false)
                                         ->default(true)
+                                        ->hidden(fn(Get $get): bool => !in_array('series', $get('xtream_config.import_options') ?? [])),
+                                    Forms\Components\Select::make('xtream_config.series_type')
+                                        ->label('Series Categories')
+                                        ->columnSpan(2)
+                                        ->multiple()
+                                        ->options(function ($get) {
+                                            $xtremeUrl = $get('xtream_config.url');
+                                            $xtreamUser = $get('xtream_config.username');
+                                            $xtreamPass = $get('xtream_config.password');
+                                            if (!$xtremeUrl || !$xtreamUser || !$xtreamPass) {
+                                                return [];
+                                            }
+                                            $cacheKey = 'xtream_series_categories_' . md5($xtremeUrl . $xtreamUser . $xtreamPass);
+                                            $cachedCategories = Cache::remember($cacheKey, 5 * 60, function () use ($xtremeUrl, $xtreamUser, $xtreamPass) {
+                                                $service = new XtreamService();
+                                                $xtream = $service->init(xtream_config: [
+                                                    'url' => $xtremeUrl,
+                                                    'username' => $xtreamUser,
+                                                    'password' => $xtreamPass,
+                                                ]);
+                                                $seriesCategories = $xtream->getSeriesCategories();
+                                                return collect($seriesCategories)
+                                                    ->map(function ($category) {
+                                                        return [
+                                                            'label' => $category['category_name'],
+                                                            'value' => $category['category_id'],
+                                                        ];
+                                                    })->pluck('label', 'value')->toArray();
+                                            });
+                                            return $cachedCategories;
+                                        })
+                                        ->preload(false)
+                                        ->searchable()
+                                        ->helperText(
+                                            fn(Get $get): string => $get('xtream_config.url')
+                                                && $get('xtream_config.username')
+                                                && $get('xtream_config.password')
+                                                ? 'Select the series categories to import.'
+                                                : 'You must enter the Xtream API URL, username, and password first.'
+                                        )
+                                        ->suffixIcon(
+                                            fn(Get $get) => (! $get('xtream_config.url')
+                                                || ! $get('xtream_config.username')
+                                                || ! $get('xtream_config.password'))
+                                                ? 'heroicon-m-lock-closed'
+                                                : null
+                                        )
+                                        ->disabled(
+                                            fn(Get $get): bool => ! $get('xtream_config.url')
+                                                || ! $get('xtream_config.username')
+                                                || ! $get('xtream_config.password')
+                                        )
+                                        ->hidden(
+                                            fn(Get $get): bool =>
+                                            $get('xtream_config.import_all_series')
+                                                || ! in_array('series', $get('xtream_config.import_options') ?? [])
+                                        ),
                                 ]),
                         ])->hidden(fn(Get $get): bool => !$get('xtream')),
 

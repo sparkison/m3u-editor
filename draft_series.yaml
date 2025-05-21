@@ -1,0 +1,48 @@
+models:
+  Category:
+    name: string
+    name_internal: string
+    user_id: id foreign:users
+    playlist_id: id foreign:playlists
+    source_category_id: unsignedInteger nullable
+    relationships:
+      belongsTo: User, Playlist
+      hasMany: Series
+
+  Series:
+    title: string
+    user_id: id foreign:users
+    playlist_id: id foreign:playlists
+    category_id: id foreign:categories nullable
+    source_category_id: unsignedInteger nullable
+    new: boolean default:true
+    cover: string nullable
+    plot: largeText nullable
+    genre: string nullable
+    release_date: date nullable
+    cast: largeText nullable
+    director: string nullable
+    rating: string nullable
+    rating_5based: unsignedInteger nullable
+    backdrop_path: jsonb nullable
+    youtube_trailer: string nullable
+    enabled: boolean default:false
+    metadata: jsonb nullable
+    relationships:
+      belongsTo: User, Playlist
+      hasMany: Episodes
+
+  Episodes:
+    title: string
+    user_id: id foreign:users
+    playlist_id: id foreign:playlists
+    series_id: id foreign:series
+    stream_id: string nullable
+    new: boolean default:true
+    episode_num: unsignedInteger nullable
+    container_extension: string nullable
+    custom_sid: string nullable
+    added: timestamp nullable
+    season: unsignedInteger nullable
+    relationships:
+      belongsTo: User, Series, Playlist

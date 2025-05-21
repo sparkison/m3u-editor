@@ -38,7 +38,7 @@ class Xtream2Strm extends Command
         $this->playlist = $playlist;
         $xtream_config = $playlist->xtream_config;
 
-        $this->info('Xtream2STRM helper');
+        $this->info('Xtream helper');
         $this->info('Connecting to: ' . $xtream_config['url'] . '...');
 
         $xtream = $xtream->init(

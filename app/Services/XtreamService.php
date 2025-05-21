@@ -12,18 +12,37 @@ class XtreamService
     protected string $user;
     protected string $pass;
     protected int $retryLimit;
-    protected Playlist $playlist;
+    protected Playlist|null $playlist;
+    protected array|null $xtream_config;
 
-    public function init(Playlist $playlist, $retryLimit = 5): bool|self
-    {
-        if (!$playlist->xtream) {
+    public function init(
+        Playlist|null $playlist = null,
+        array|null $xtream_config = null,
+        $retryLimit = 5
+    ): bool|self {
+        // If Playlist, and not an xtream playlist, return false
+        if ($playlist && !$playlist->xtream) {
             return false;
         }
+
+        // Set Playlist and Xtream config
         $this->playlist = $playlist;
-        $xtream_config = $playlist->xtream_config;
-        $this->server = $xtream_config['url'] ?? '';
-        $this->user = $xtream_config['username'] ?? '';
-        $this->pass = $xtream_config['password'] ?? '';
+        $this->xtream_config = $xtream_config;
+
+        // Setup server, user, and pass
+        if ($playlist) {
+            $config = $playlist->xtream_config;
+            $this->server = $config['url'] ?? '';
+            $this->user = $config['username'] ?? '';
+            $this->pass = $config['password'] ?? '';
+        } else if ($xtream_config) {
+            $this->server = $xtream_config['url'] ?? '';
+            $this->user = $xtream_config['username'] ?? '';
+            $this->pass = $xtream_config['password'] ?? '';
+        } else {
+            return false;
+        }
+
         $this->retryLimit = $retryLimit;
 
         return $this;
@@ -31,12 +50,12 @@ class XtreamService
 
     protected function call(string $url)
     {
-        if (! $this->playlist) {
+        if (! ($this->playlist || $this->xtream_config)) {
             throw new \Exception('Playlist not initialized. Call init() first.');
         }
         $attempts = 0;
         do {
-            $user_agent = $this->playlist->user_agent ?? 'VLC/3.0.21 LibVLC/3.0.21';
+            $user_agent = $this->playlist?->user_agent ?? 'VLC/3.0.21 LibVLC/3.0.21';
             $response = Http::timeout(10)
                 ->withHeaders(['User-Agent' => $user_agent])
                 ->get($url);
