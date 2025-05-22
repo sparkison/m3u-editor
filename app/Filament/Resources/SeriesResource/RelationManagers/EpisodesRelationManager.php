@@ -2,8 +2,12 @@
 
 namespace App\Filament\Resources\SeriesResource\RelationManagers;
 
+use App\Infolists\Components\SeriesPreview;
+use App\Livewire\ChannelStreamStats;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -13,6 +17,11 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 class EpisodesRelationManager extends RelationManager
 {
     protected static string $relationship = 'episodes';
+
+    public function isReadOnly(): bool
+    {
+        return false;
+    }
 
     public function form(Form $form): Form
     {
@@ -38,6 +47,9 @@ class EpisodesRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('season.name')
                     ->label('Season Name')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('url')
+                    ->label('URL')
+                    ->toggleable(),
             ])
             ->filters([
                 //
@@ -46,10 +58,55 @@ class EpisodesRelationManager extends RelationManager
                 //
             ])
             ->actions([
-                // Tables\Actions\ViewAction::make()->hiddenLabel()->button(),
+                Tables\Actions\ViewAction::make()
+                    ->slideOver()
+                    ->hiddenLabel()
+                    ->button(),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
-                //
+                // @TODO - add download? Would need to generate streamlink files and compress then download...
             ]);
+    }
+
+    public function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist
+            ->schema([
+                SeriesPreview::make('preview')
+                    ->columnSpanFull()
+                    ->hiddenLabel(),
+                Infolists\Components\Section::make('Channel Details')
+                    ->collapsible()
+                    ->collapsed()
+                    ->columns(2)
+                    ->schema([
+                        Infolists\Components\TextEntry::make('series.name')
+                            ->label('Series'),
+                        Infolists\Components\TextEntry::make('season.name')
+                            ->label('Season'),
+                        Infolists\Components\TextEntry::make('title')
+                            ->label('Title'),
+                        Infolists\Components\TextEntry::make('episode_num')
+                            ->label('Episode'),
+                        Infolists\Components\TextEntry::make('url')
+                            ->label('URL')->columnSpanFull(),
+                    ]),
+                Infolists\Components\Section::make('Stream Info')
+                    ->description('Click to load stream info')
+                    ->icon('heroicon-m-wifi')
+                    ->collapsible()
+                    ->collapsed()
+                    ->schema([
+                        Infolists\Components\Livewire::make(ChannelStreamStats::class)
+                            ->label('Stream Stats')
+                            ->columnSpanFull()
+                            ->lazy(),
+                    ]),
+            ]);
+    }
+
+    public function getTabs(): array
+    {
+        return [];
     }
 }

@@ -1,0 +1,16 @@
+<x-dynamic-component :component="$getEntryWrapperView()" :entry="$entry">
+    @php($record = $getRecord())
+    @php($url = $record->url)
+    @php($playerId = "episode_{$record->id}_preview")
+    <div x-data="{ state: {}, player: null }">
+        <div x-data x-init="
+            player = videojs('{{ $playerId }}', { fluid: true, responsive: true });
+        " x-on:close-modal.window="player.dispose();">
+            <video-js id="{{ $playerId }}"
+                class="video-js vjs-fluid vjs-16-9 vjs-default-skin" 
+                preload="auto" data-setup="{}" controls>
+                <source src="{{ $url }}" type="video/{{ $record->container_extension }}">
+            </video-js>
+        </div>
+    </div>
+</x-dynamic-component>
