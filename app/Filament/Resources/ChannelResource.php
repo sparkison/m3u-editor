@@ -88,7 +88,6 @@ class ChannelResource extends Resource
             //                    ->label($isReordering ? 'Disable reordering' : 'Enable reordering'),
             //            )
             ->paginated([10, 25, 50, 100])
-            ->paginatedWhileReordering()
             ->defaultPaginationPageOption(25)
             ->columns([
                 Tables\Columns\ImageColumn::make('logo')

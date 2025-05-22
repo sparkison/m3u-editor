@@ -50,4 +50,9 @@ class Series extends Model
     {
         return $this->hasMany(Season::class);
     }
+
+    public function episodes(): HasMany
+    {
+        return $this->hasMany(Episode::class);
+    }
 }

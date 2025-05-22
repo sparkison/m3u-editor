@@ -30,6 +30,8 @@ class LogsRelationManager extends RelationManager
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
+            ->paginated([10, 25, 50, 100])
+            ->defaultPaginationPageOption(25)
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->label('Item Name')

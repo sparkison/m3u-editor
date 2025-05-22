@@ -19,7 +19,6 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
      * Create a new job instance.
      */
     public function __construct(
-        public Playlist $playlist,
         public Series $playlistSeries,
     ) {}
 
@@ -29,7 +28,8 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
     public function handle(XtreamService $xtream): void
     {
         // Initialize the Xtream API
-        $xtream = $xtream->init($this->playlist);
+        $playlist = $this->playlistSeries->playlist;
+        $xtream = $xtream->init($playlist);
         if (!$xtream) {
             return;
         }
@@ -46,8 +46,8 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
                 ->warning()
                 ->title('Series Sync Completed')
                 ->body("No episodes found for \"{$this->playlistSeries->name}\".")
-                ->broadcast($this->playlist->user)
-                ->sendToDatabase($this->playlist->user);
+                ->broadcast($playlist->user)
+                ->sendToDatabase($playlist->user);
             return;
         }
 
@@ -70,8 +70,8 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
                     'episode_count' => $seasonInfo['episode_count'] ?? 0,
                     'cover' => $seasonInfo['cover'] ?? null,
                     'cover_big' => $seasonInfo['cover_big'] ?? null,
-                    'user_id' => $this->playlist->user_id,
-                    'playlist_id' => $this->playlist->id,
+                    'user_id' => $playlist->user_id,
+                    'playlist_id' => $playlist->id,
                     'series_id' => $this->playlistSeries->id,
                     'category_id' => $playlistCategory->id,
                     'import_batch_no' => $batchNo,
@@ -99,8 +99,8 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
                     'title' => $ep['title'],
                     'source_episode_id' => (int) $ep['id'],
                     'import_batch_no' => $batchNo,
-                    'user_id' => $this->playlist->user_id,
-                    'playlist_id' => $this->playlist->id,
+                    'user_id' => $playlist->user_id,
+                    'playlist_id' => $playlist->id,
                     'series_id' => $this->playlistSeries->id,
                     'season_id' => $playlistSeason->id,
                     'episode_num' => (int) $ep['episode_num'],
@@ -133,7 +133,7 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
             ->success()
             ->title('Series Sync Completed')
             ->body("Series sync completed successfully for \"{$this->playlistSeries->name}\". Imported {$episodeCount} episodes.")
-            ->broadcast($this->playlist->user)
-            ->sendToDatabase($this->playlist->user);
+            ->broadcast($playlist->user)
+            ->sendToDatabase($playlist->user);
     }
 }

@@ -16,17 +16,17 @@ class Episode extends Model
      * @var array
      */
     protected $casts = [
-            'id' => 'integer',
-            'new' => 'boolean',
-            'source_episode_id' => 'integer',
-            'user_id' => 'integer',
-            'playlist_id' => 'integer',
-            'series_id' => 'integer',
-            'season_id' => 'integer',
-            'episode_num' => 'integer',
-            'added' => 'timestamp',
-            'season' => 'integer',
-        ];
+        'id' => 'integer',
+        'new' => 'boolean',
+        'source_episode_id' => 'integer',
+        'user_id' => 'integer',
+        'playlist_id' => 'integer',
+        'series_id' => 'integer',
+        'season_id' => 'integer',
+        'episode_num' => 'integer',
+        'added' => 'timestamp',
+        'season' => 'integer',
+    ];
 
     public function user(): BelongsTo
     {
