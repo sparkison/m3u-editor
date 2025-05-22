@@ -167,6 +167,7 @@ class ProcessM3uImportComplete implements ShouldQueue
             });
             if (!empty($bulk)) {
                 foreach (array_chunk($bulk, 1000) as $chunk) {
+                    usleep(10000); // Reduce the load on the database
                     PlaylistSyncStatusLog::insert($chunk);
                 }
             }
@@ -224,11 +225,7 @@ class ProcessM3uImportComplete implements ShouldQueue
                             ->success()
                             ->title('EPG found for Playlist')
                             ->body($msg)
-                            ->broadcast($playlist->user);
-                        Notification::make()
-                            ->success()
-                            ->title('EPG found for Playlist')
-                            ->body($msg)
+                            ->broadcast($playlist->user)
                             ->sendToDatabase($playlist->user);
                     } else {
                         $msg = "\"{$playlist->name}\" EPG not found. Playlist was configured to auto-download EPG but no EPG was found using at the following url: \"$epgUrl\"";
@@ -236,11 +233,7 @@ class ProcessM3uImportComplete implements ShouldQueue
                             ->warning()
                             ->title('No EPG found for Playlist')
                             ->body($msg)
-                            ->broadcast($playlist->user);
-                        Notification::make()
-                            ->warning()
-                            ->title('No EPG found for Playlist')
-                            ->body($msg)
+                            ->broadcast($playlist->user)
                             ->sendToDatabase($playlist->user);
                     }
                 }
@@ -250,11 +243,7 @@ class ProcessM3uImportComplete implements ShouldQueue
                     ->error()
                     ->title('EPG Creation Failed')
                     ->body("Failed to create EPG for \"{$playlist->name}\". Error: {$e->getMessage()}")
-                    ->broadcast($playlist->user);
-                Notification::make()
-                    ->error()
-                    ->title('EPG Creation Failed')
-                    ->body("Failed to create EPG for \"{$playlist->name}\". Error: {$e->getMessage()}")
+                    ->broadcast($playlist->user)
                     ->sendToDatabase($playlist->user);
             }
         }
@@ -279,6 +268,26 @@ class ProcessM3uImportComplete implements ShouldQueue
                 ->orderBy('created_at', 'asc')
                 ->limit($syncStatusQuery->count() - $this->maxLogs)
                 ->delete();
+        }
+
+        // Determine if importing series as well
+        if ($playlist->xtream_config['import_options'] ?? false) {
+            if (in_array('series', $playlist->xtream_config['import_options'] ?? [])) {
+                // Process series import
+                dispatch(new ProcessM3uImportSeries(
+                    playlist: $playlist,
+                    force: true,
+                    isNew: $this->isNew,
+                    batchNo: $this->batchNo,
+                ));
+                Notification::make()
+                    ->info()
+                    ->title('Syncing Series')
+                    ->body('Playlist is syncing series. This may take a while. Please check back later.')
+                    ->broadcast($playlist->user)
+                    ->sendToDatabase($playlist->user);
+                return; // Exit early if series import is enabled, sync complete event will be fired after series import completes
+            }
         }
 
         // Fire the playlist synced event

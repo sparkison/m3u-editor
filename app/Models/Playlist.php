@@ -96,4 +96,24 @@ class Playlist extends Model
     {
         return $this->hasMany(PlaylistSyncStatus::class);
     }
+
+    public function categories(): HasMany
+    {
+        return $this->hasMany(Category::class);
+    }
+
+    public function series(): HasMany
+    {
+        return $this->hasMany(Series::class);
+    }
+
+    public function seasons(): HasMany
+    {
+        return $this->hasMany(Season::class);
+    }
+
+    public function episodes(): HasMany
+    {
+        return $this->hasMany(Episode::class);
+    }
 }

@@ -38,7 +38,7 @@ class EditPlaylist extends EditRecord
                 ),
             Actions\ActionGroup::make([
                 Actions\Action::make('process')
-                    ->label('Process')
+                    ->label(fn($record): string => $record->xtream ? 'Process All' : 'Process')
                     ->icon('heroicon-o-arrow-path')
                     ->action(function ($record) {
                         $record->update([
@@ -60,6 +60,31 @@ class EditPlaylist extends EditRecord
                     ->icon('heroicon-o-arrow-path')
                     ->modalIcon('heroicon-o-arrow-path')
                     ->modalDescription('Process playlist now?')
+                    ->modalSubmitActionLabel('Yes, process now'),
+                Actions\Action::make('process_series')
+                    ->label('Process Series Only')
+                    ->icon('heroicon-o-arrow-path')
+                    ->action(function ($record) {
+                        $record->update([
+                            'status' => Status::Processing,
+                            'series_progress' => 0,
+                        ]);
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new \App\Jobs\ProcessM3uImportSeries($record, force: true));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Playlist is processing series')
+                            ->body('Playlist series are being processed in the background. Depending on the number of series and seasons being imported, this may take a while. You will be notified on completion.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->disabled(fn($record): bool => $record->status === Status::Processing)
+                    ->hidden(fn($record): bool => !$record->xtream)
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrow-path')
+                    ->modalIcon('heroicon-o-arrow-path')
+                    ->modalDescription('Process playlist series now?')
                     ->modalSubmitActionLabel('Yes, process now'),
                 Actions\Action::make('Download M3U')
                     ->label('Download M3U')
@@ -109,6 +134,7 @@ class EditPlaylist extends EditRecord
                             'status' => Status::Pending,
                             'processing' => false,
                             'progress' => 0,
+                            'series_progress' => 0,
                             'channels' => 0,
                             'synced' => null,
                             'errors' => null,

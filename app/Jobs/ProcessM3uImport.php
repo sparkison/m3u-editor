@@ -97,6 +97,7 @@ class ProcessM3uImport implements ShouldQueue
             'status' => Status::Processing,
             'errors' => null,
             'progress' => 0,
+            'series_progress' => 0,
         ]);
 
         // Determine if using Xtream API or M3U+

@@ -11,9 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('epg_channels', function (Blueprint $table) {
-            $table->text('display_name')->nullable()->change();
-            $table->text('icon')->nullable()->change();
+        Schema::table('series', function (Blueprint $table) {
+            $table->decimal('sort', 12, 4)
+                ->after('category_id')
+                ->nullable();
         });
     }
 
@@ -22,6 +23,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        //
+        Schema::table('series', function (Blueprint $table) {
+            //
+        });
     }
 };

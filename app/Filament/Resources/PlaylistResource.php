@@ -116,9 +116,15 @@ class PlaylistResource extends Resource
                     ->toggleable()
                     ->color(fn(Status $state) => $state->getColor()),
                 ProgressColumn::make('progress')
+                    ->label('Live & VOD Progress')
                     ->sortable()
                     ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
                     ->toggleable(),
+                ProgressColumn::make('series_progress')
+                    ->label('Series Progress')
+                    ->sortable()
+                    ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
+                    ->toggleable()->disabled(),
                 Tables\Columns\ToggleColumn::make('enable_proxy')
                     ->label('Proxy')
                     ->toggleable()
@@ -174,7 +180,7 @@ class PlaylistResource extends Resource
                 Tables\Actions\ActionGroup::make([
                     Tables\Actions\EditAction::make(),
                     Tables\Actions\Action::make('process')
-                        ->label('Process')
+                        ->label(fn($record): string => $record->xtream ? 'Process All' : 'Process')
                         ->icon('heroicon-o-arrow-path')
                         ->action(function ($record) {
                             $record->update([
@@ -196,6 +202,31 @@ class PlaylistResource extends Resource
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
                         ->modalDescription('Process playlist now?')
+                        ->modalSubmitActionLabel('Yes, process now'),
+                    Tables\Actions\Action::make('process_series')
+                        ->label('Process Series Only')
+                        ->icon('heroicon-o-arrow-path')
+                        ->action(function ($record) {
+                            $record->update([
+                                'status' => Status::Processing,
+                                'series_progress' => 0,
+                            ]);
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new \App\Jobs\ProcessM3uImportSeries($record, force: true));
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Playlist is processing series')
+                                ->body('Playlist series are being processed in the background. Depending on the number of series and seasons being imported, this may take a while. You will be notified on completion.')
+                                ->duration(10000)
+                                ->send();
+                        })
+                        ->disabled(fn($record): bool => $record->status === Status::Processing)
+                        ->hidden(fn($record): bool => !$record->xtream)
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-arrow-path')
+                        ->modalIcon('heroicon-o-arrow-path')
+                        ->modalDescription('Process playlist series now?')
                         ->modalSubmitActionLabel('Yes, process now'),
                     Tables\Actions\Action::make('Download M3U')
                         ->label('Download M3U')
@@ -258,6 +289,7 @@ class PlaylistResource extends Resource
                                 'status' => Status::Pending,
                                 'processing' => false,
                                 'progress' => 0,
+                                'series_progress' => 0,
                                 'channels' => 0,
                                 'synced' => null,
                                 'errors' => null,
@@ -452,8 +484,9 @@ class PlaylistResource extends Resource
                                         ->inline(false)
                                         ->default(true)
                                         ->hidden(fn(Get $get): bool => !in_array('series', $get('xtream_config.import_options') ?? [])),
-                                    Forms\Components\Select::make('xtream_config.series_type')
+                                    Forms\Components\Select::make('xtream_config.series_categories')
                                         ->label('Series Categories')
+                                        ->live()
                                         ->columnSpan(2)
                                         ->multiple()
                                         ->options(function ($get) {
@@ -464,7 +497,7 @@ class PlaylistResource extends Resource
                                                 return [];
                                             }
                                             $cacheKey = 'xtream_series_categories_' . md5($xtremeUrl . $xtreamUser . $xtreamPass);
-                                            $cachedCategories = Cache::remember($cacheKey, 5 * 60, function () use ($xtremeUrl, $xtreamUser, $xtreamPass) {
+                                            $cachedCategories = Cache::remember($cacheKey, 60 * 1, function () use ($xtremeUrl, $xtreamUser, $xtreamPass) {
                                                 $service = new XtreamService();
                                                 $xtream = $service->init(xtream_config: [
                                                     'url' => $xtremeUrl,

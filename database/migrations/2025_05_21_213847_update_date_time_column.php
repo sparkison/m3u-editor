@@ -11,9 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('epg_channels', function (Blueprint $table) {
-            $table->text('display_name')->nullable()->change();
-            $table->text('icon')->nullable()->change();
+        Schema::table('episodes', function (Blueprint $table) {
+            
+            $table->string('added')->nullable()->change();
         });
     }
 

@@ -1,7 +1,16 @@
 created:
-    - database/factories/PlaylistSyncStatusLogFactory.php
-    - database/migrations/2025_04_28_170814_create_playlist_sync_status_logs_table.php
-    - app/Models/PlaylistSyncStatusLog.php
+    - database/factories/CategoryFactory.php
+    - database/factories/SeriesFactory.php
+    - database/factories/SeasonFactory.php
+    - database/factories/EpisodeFactory.php
+    - database/migrations/2025_05_21_185308_create_categories_table.php
+    - database/migrations/2025_05_21_185309_create_series_table.php
+    - database/migrations/2025_05_21_185310_create_seasons_table.php
+    - database/migrations/2025_05_21_185311_create_episodes_table.php
+    - app/Models/Category.php
+    - app/Models/Series.php
+    - app/Models/Season.php
+    - app/Models/Episode.php
 models:
     User: { name: string, email: string, email_verified_at: 'datetime nullable', password: string, remember_token: 'string nullable' }
     Playlist: { name: string, uuid: uuid, url: string, status: 'enum:pending,processing,completed,failed default:pending', prefix: 'string nullable', channels: 'unsignedInteger default:0', synced: 'datetime nullable', errors: 'longText nullable', user_id: 'id foreign:users', relationships: { belongsTo: User, hasMany: 'Channel, Group' } }
@@ -17,3 +26,7 @@ models:
     PostProcess: { name: string, enabled: 'boolean default:true', user_id: 'id foreign:users', event: string, metadata: json, relationships: { belongsTo: User, morphTo: processable } }
     PlaylistSyncStatus: { name: string, user_id: 'id foreign:users', playlist_id: 'id foreign:playlists', deleted_groups: longtext, added_groups: longtext, deleted_channels: longtext, added_channels: longtext, relationships: { belongsTo: 'User, Playlist' } }
     PlaylistSyncStatusLog: { name: string, user_id: 'id foreign:users', playlist_id: 'id foreign:playlists', playlist_sync_status_id: 'id foreign:playlist_sync_statuses', type: 'enum:group,channel,unknown default:unknown', status: 'enum:added,removed,unknown default:unknown', meta: json, relationships: { belongsTo: 'User, Playlist, PlaylistSyncStatus' } }
+    Category: { name: string, name_internal: string, source_category_id: 'unsignedInteger nullable', user_id: 'id foreign:users', playlist_id: 'id foreign:playlists', relationships: { belongsTo: 'User, Playlist', hasMany: Series } }
+    Series: { name: string, new: 'boolean default:true', source_category_id: 'unsignedInteger nullable', import_batch_no: string, user_id: 'id foreign:users', playlist_id: 'id foreign:playlists', category_id: 'id foreign:categories nullable', cover: 'string nullable', plot: 'largeText nullable', genre: 'string nullable', release_date: 'date nullable', cast: 'largeText nullable', director: 'string nullable', rating: 'string nullable', rating_5based: 'unsignedInteger nullable', backdrop_path: 'jsonb nullable', youtube_trailer: 'string nullable', enabled: 'boolean default:false', metadata: 'jsonb nullable', relationships: { belongsTo: 'User, Playlist', hasMany: Season } }
+    Season: { name: string, new: 'boolean default:true', source_season_id: 'unsignedInteger nullable', import_batch_no: string, user_id: 'id foreign:users', playlist_id: 'id foreign:playlists', category_id: 'id foreign:categories nullable', series_id: 'id foreign:series', season_number: 'unsignedInteger nullable', episode_count: 'unsignedInteger nullable', cover: 'string nullable', cover_big: 'string nullable', relationships: { belongsTo: 'User, Playlist, Series', hasMany: Episode } }
+    Episode: { title: string, new: 'boolean default:true', source_episode_id: 'unsignedInteger nullable', import_batch_no: string, user_id: 'id foreign:users', playlist_id: 'id foreign:playlists', series_id: 'id foreign:series', season_id: 'id foreign:seasons', episode_num: 'unsignedInteger nullable', container_extension: 'string nullable', custom_sid: 'string nullable', added: 'timestamp nullable', season: 'unsignedInteger nullable', relationships: { belongsTo: 'User, Playlist, Series, Season' } }

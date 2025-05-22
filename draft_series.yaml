@@ -18,13 +18,13 @@ models:
     playlist_id: id foreign:playlists
     category_id: id foreign:categories nullable
     cover: string nullable
-    plot: largeText nullable
+    plot: longText nullable
     genre: string nullable
     release_date: date nullable
-    cast: largeText nullable
+    cast: longText nullable
     director: string nullable
     rating: string nullable
-    rating_5based: unsignedInteger nullable
+    rating_5based: double nullable
     backdrop_path: jsonb nullable
     youtube_trailer: string nullable
     enabled: boolean default:false
@@ -61,8 +61,9 @@ models:
     season_id: id foreign:seasons
     episode_num: unsignedInteger nullable
     container_extension: string nullable
+    url: text nullable
     custom_sid: string nullable
-    added: timestamp nullable
+    added: string nullable
     season: unsignedInteger nullable
     relationships:
       belongsTo: User, Playlist, Series, Season

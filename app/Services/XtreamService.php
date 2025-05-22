@@ -51,7 +51,7 @@ class XtreamService
     protected function call(string $url)
     {
         if (! ($this->playlist || $this->xtream_config)) {
-            throw new \Exception('Playlist not initialized. Call init() first.');
+            throw new \Exception('Config not initialized. Call init() first with Playlist or Xtream config array.');
         }
         $attempts = 0;
         do {
