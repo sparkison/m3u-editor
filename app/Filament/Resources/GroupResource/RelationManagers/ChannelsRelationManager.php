@@ -7,6 +7,7 @@ use App\Filament\Resources\ChannelResource\Pages\ListChannels;
 use App\Models\Channel;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Infolists\Infolist;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -22,10 +23,20 @@ class ChannelsRelationManager extends RelationManager
 
     protected $listeners = ['refreshRelation' => '$refresh'];
 
+    public function isReadOnly(): bool
+    {
+        return false;
+    }
+    
     public function form(Form $form): Form
     {
         return $form
             ->schema(ChannelResource::getForm());
+    }
+
+    public function infolist(Infolist $infolist): Infolist
+    {
+        return ChannelResource::infolist($infolist);
     }
 
     public function table(Table $table): Table
