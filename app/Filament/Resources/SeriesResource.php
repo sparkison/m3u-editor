@@ -79,6 +79,11 @@ class SeriesResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('genre')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('youtube_trailer')
+                    ->label('YouTube Trailer ID')
+                    ->url(fn($record): string => 'https://www.youtube.com/watch?v=' . $record->youtube_trailer)
+                    ->openUrlInNewTab()
+                    ->icon('heroicon-s-play'),
                 Tables\Columns\TextColumn::make('release_date')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('rating')
@@ -86,8 +91,6 @@ class SeriesResource extends Resource
                 Tables\Columns\TextColumn::make('rating_5based')
                     ->numeric()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('youtube_trailer')
-                    ->searchable(),
                 Tables\Columns\TextColumn::make('playlist.name')
                     ->numeric()
                     ->sortable(),
