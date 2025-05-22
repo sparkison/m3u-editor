@@ -55,10 +55,10 @@ class SeriesResource extends Resource
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
             ->columns([
-                Tables\Columns\TextColumn::make('name')
-                    ->searchable(),
                 Tables\Columns\ImageColumn::make('cover')
                     ->square()
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('name')
                     ->searchable(),
                 Tables\Columns\ToggleColumn::make('enabled')
                     ->toggleable()
@@ -125,7 +125,7 @@ class SeriesResource extends Resource
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
-                        ->modalDescription('Process series now?')
+                        ->modalDescription('Process series now? This will fetch all episodes and seasons for this series.')
                         ->modalSubmitActionLabel('Yes, process now'),
                 ])->button()->hiddenLabel()->size('sm'),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
@@ -152,7 +152,7 @@ class SeriesResource extends Resource
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
-                        ->modalDescription('Process selected series now?')
+                        ->modalDescription('Process selected series now? This will fetch all episodes and seasons for this series.')
                         ->modalSubmitActionLabel('Yes, process now'),
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),

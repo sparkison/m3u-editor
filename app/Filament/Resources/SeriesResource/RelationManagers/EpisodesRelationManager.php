@@ -33,7 +33,7 @@ class EpisodesRelationManager extends RelationManager
                 //
             ])
             ->actions([
-                Tables\Actions\ViewAction::make()->hiddenLabel()->button(),
+                // Tables\Actions\ViewAction::make()->hiddenLabel()->button(),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 //

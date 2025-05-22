@@ -33,7 +33,7 @@ class EditSeries extends EditRecord
                 ->requiresConfirmation()
                 ->icon('heroicon-o-arrow-path')
                 ->modalIcon('heroicon-o-arrow-path')
-                ->modalDescription('Process series now?')
+                ->modalDescription('Process series now? This will fetch all episodes and seasons for this series.')
                 ->modalSubmitActionLabel('Yes, process now'),
             Actions\DeleteAction::make(),
         ];
