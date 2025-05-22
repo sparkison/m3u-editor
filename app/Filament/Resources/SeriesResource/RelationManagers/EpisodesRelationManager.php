@@ -23,8 +23,21 @@ class EpisodesRelationManager extends RelationManager
     {
         return $table
             ->recordTitleAttribute('title')
+            ->modifyQueryUsing(function (Builder $query) {
+                $query->with(['season']);
+            })
+            ->defaultGroup('season')
+            ->defaultSort('episode_num', 'asc')
             ->columns([
-                Tables\Columns\TextColumn::make('title'),
+                Tables\Columns\TextColumn::make('title')
+                    ->sortable()
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('episode_num')
+                    ->label('Episode')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('season.name')
+                    ->label('Season Name')
+                    ->searchable(),
             ])
             ->filters([
                 //

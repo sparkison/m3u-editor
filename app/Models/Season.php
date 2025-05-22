@@ -17,16 +17,16 @@ class Season extends Model
      * @var array
      */
     protected $casts = [
-            'id' => 'integer',
-            'new' => 'boolean',
-            'source_season_id' => 'integer',
-            'user_id' => 'integer',
-            'playlist_id' => 'integer',
-            'category_id' => 'integer',
-            'series_id' => 'integer',
-            'season_number' => 'integer',
-            'episode_count' => 'integer',
-        ];
+        'id' => 'integer',
+        'new' => 'boolean',
+        'source_season_id' => 'integer',
+        'user_id' => 'integer',
+        'playlist_id' => 'integer',
+        'category_id' => 'integer',
+        'series_id' => 'integer',
+        'season_number' => 'integer',
+        'episode_count' => 'integer',
+    ];
 
     public function user(): BelongsTo
     {

@@ -28,9 +28,19 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
     public function handle(XtreamService $xtream): void
     {
         // Initialize the Xtream API
+        if (!$this->playlistSeries) {
+            return;
+        }
+
         $playlist = $this->playlistSeries->playlist;
         $xtream = $xtream->init($playlist);
         if (!$xtream) {
+            Notification::make()
+                ->danger()
+                ->title('Series Sync Failed')
+                ->body('Series has been deleted and no longer exists, unable to sync.')
+                ->broadcast($playlist->user)
+                ->sendToDatabase($playlist->user);
             return;
         }
 
@@ -95,8 +105,9 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
             foreach ($episodes as $ep) {
                 $episodeCount++;
                 $url = $xtream->buildSeriesUrl($ep['id'], $ep['container_extension']);
+                $title = preg_match('/S\d{2}E\d{2} - (.*)/', $ep['title'], $m) ? $m[1] : 'Unknown';
                 $bulk[] = [
-                    'title' => $ep['title'],
+                    'title' => $title,
                     'source_episode_id' => (int) $ep['id'],
                     'import_batch_no' => $batchNo,
                     'user_id' => $playlist->user_id,
