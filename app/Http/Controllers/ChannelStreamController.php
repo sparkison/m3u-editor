@@ -123,7 +123,10 @@ class ChannelStreamController extends Controller
             ignore_user_abort(false);
 
             // Register a shutdown function that ALWAYS runs when the script dies
-            register_shutdown_function(fn() => Redis::srem('mpts:active_ids', $clientKey));
+            register_shutdown_function(function() use ($clientKey, $title) {
+                Redis::srem('mpts:active_ids', $clientKey);
+                Log::channel('ffmpeg')->info("Streaming stopped for channel {$title}");
+            });
 
             // Mark as active
             Redis::sadd('mpts:active_ids', $clientKey);

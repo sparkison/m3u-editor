@@ -29,6 +29,7 @@ class Series extends Model
         'enabled' => 'boolean',
         'backdrop_path' => 'array',
         'metadata' => 'array',
+        'sync_settings' => 'array',
     ];
 
     public function user(): BelongsTo

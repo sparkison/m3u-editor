@@ -164,7 +164,7 @@ class ProcessM3uImport implements ShouldQueue
 
             // Get the Xtream API credentials
             $baseUrl = str($playlist->xtream_config['url'])->replace(' ', '%20')->toString();
-            $user = urlencode($playlist->xtream_config['username']);
+            $user = $playlist->xtream_config['username'];
             $password = $playlist->xtream_config['password'];
             $output = $playlist->xtream_config['output'] ?? 'ts';
             $categoriesToImport = $playlist->xtream_config['import_options'] ?? [];
