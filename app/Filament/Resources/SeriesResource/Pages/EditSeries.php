@@ -14,6 +14,7 @@ class EditSeries extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            Actions\ActionGroup::make([
             Actions\Action::make('process')
                 ->label('Process Series')
                 ->icon('heroicon-o-arrow-path')
@@ -35,7 +36,11 @@ class EditSeries extends EditRecord
                 ->modalIcon('heroicon-o-arrow-path')
                 ->modalDescription('Process series now? This will fetch all episodes and seasons for this series.')
                 ->modalSubmitActionLabel('Yes, process now'),
-            Actions\DeleteAction::make(),
+            Actions\DeleteAction::make()
+                ->modalIcon('heroicon-o-trash')
+                ->modalDescription('Are you sure you want to delete this series? This will delete all episodes and seasons for this series. This action cannot be undone.')
+                ->modalSubmitActionLabel('Yes, delete series'),
+            ])->button()
         ];
     }
 }
