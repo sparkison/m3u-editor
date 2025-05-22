@@ -13,7 +13,7 @@ class ListPostProcesses extends ListRecords
 {
     protected static string $resource = PostProcessResource::class;
 
-    protected ?string $subheading = 'Call webhooks or run local scripts after specific item events.';
+    protected ?string $subheading = 'Call webhooks, or run local scripts, after playlist sync completion.';
 
     protected function getHeaderActions(): array
     {

@@ -1,9 +1,0 @@
-models:
-  PostProcess:
-    name: string
-    enabled: boolean default:true
-    user_id: id foreign:users
-    event: string
-    metadata: json
-    relationships:
-      belongsTo: User

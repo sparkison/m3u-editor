@@ -1,7 +1,0 @@
-models:
-  PlaylistSyncStatus:
-    name: string
-    user_id: id foreign:users
-    playlist_id: id foreign:playlists
-    relationships:
-      belongsTo: User, Playlist
