@@ -80,7 +80,7 @@ class SeriesResource extends Resource
                 Tables\Columns\TextColumn::make('genre')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('youtube_trailer')
-                    ->label('YouTube Trailer ID')
+                    ->label('YouTube Trailer')
                     ->url(fn($record): string => 'https://www.youtube.com/watch?v=' . $record->youtube_trailer)
                     ->openUrlInNewTab()
                     ->icon('heroicon-s-play'),
