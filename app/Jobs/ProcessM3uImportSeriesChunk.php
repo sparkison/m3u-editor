@@ -47,7 +47,7 @@ class ProcessM3uImportSeriesChunk implements ShouldQueue
         // If the series doesn't exist, create it
         if (!$playlistSeries) {
             $playlistSeries = $this->playlist->series()->create([
-                'enabled' => true, // Enable the series by default
+                'enabled' => false, // Disable the series by default
                 'name' => $seriesName,
                 'source_series_id' => $seriesId,
                 'source_category_id' => $this->catId,
@@ -75,6 +75,11 @@ class ProcessM3uImportSeriesChunk implements ShouldQueue
                 'source_category_id' => $this->catId,
                 'import_batch_no' => $this->batchNo,
             ]);
+
+            // If series is enabled, dispatch a sync job to fetch episodes
+            if ($playlistSeries->enabled) {
+                dispatch(new ProcessM3uImportSeriesEpisodes($playlistSeries));
+            }
         }
 
         // Update the series progress

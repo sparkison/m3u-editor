@@ -131,6 +131,29 @@ class SeriesResource extends Resource
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\Action::make('process')
+                        ->label('Process Selected Series')
+                        ->icon('heroicon-o-arrow-path')
+                        ->action(function ($records) {
+                            foreach ($records as $record) {
+                                app('Illuminate\Contracts\Bus\Dispatcher')
+                                    ->dispatch(new \App\Jobs\ProcessM3uImportSeriesEpisodes(
+                                        playlistSeries: $record,
+                                    ));
+                            }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Series are being processed')
+                                ->body('You will be notified once complete.')
+                                ->duration(10000)
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-arrow-path')
+                        ->modalIcon('heroicon-o-arrow-path')
+                        ->modalDescription('Process selected series now?')
+                        ->modalSubmitActionLabel('Yes, process now'),
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
@@ -139,7 +162,7 @@ class SeriesResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            RelationManagers\EpisodesRelationManager::class,
         ];
     }
 
@@ -156,6 +179,9 @@ class SeriesResource extends Resource
     {
         return [
             Forms\Components\Section::make('Series Details')
+                ->description('Edit or add the series details')
+                ->collapsible()
+                ->collapsed()
                 ->schema([
                     Forms\Components\Grid::make(2)
                         ->schema([

@@ -11,6 +11,8 @@ class ListSeries extends ListRecords
 {
     protected static string $resource = SeriesResource::class;
 
+    protected ?string $subheading = 'NOTE: Only enabled series will be autmatically synced and updated on Playlist sync.';
+
     protected function getHeaderActions(): array
     {
         return [

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\SeriesResource\Pages;
 
 use App\Filament\Resources\SeriesResource;
 use Filament\Actions;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 
 class EditSeries extends EditRecord
@@ -13,6 +14,27 @@ class EditSeries extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            Actions\Action::make('process')
+                ->label('Process Series')
+                ->icon('heroicon-o-arrow-path')
+                ->action(function ($record) {
+                    app('Illuminate\Contracts\Bus\Dispatcher')
+                        ->dispatch(new \App\Jobs\ProcessM3uImportSeriesEpisodes(
+                            playlistSeries: $record,
+                        ));
+                })->after(function () {
+                    Notification::make()
+                        ->success()
+                        ->title('Series is being processed')
+                        ->body('You will be notified once complete.')
+                        ->duration(10000)
+                        ->send();
+                })
+                ->requiresConfirmation()
+                ->icon('heroicon-o-arrow-path')
+                ->modalIcon('heroicon-o-arrow-path')
+                ->modalDescription('Process series now?')
+                ->modalSubmitActionLabel('Yes, process now'),
             Actions\DeleteAction::make(),
         ];
     }
