@@ -209,14 +209,26 @@ class StreamController extends Controller
                 ? "-c:v $videoCodec -c:a $audioCodec -c:s $subtitleCodec -f mpegts pipe:1"
                 : "-ac 2 -f mp4 -movflags frag_keyframe+empty_moov+default_base_moof pipe:1";
 
+            // Determine if it's an MKV file by extension
+            $isMkv = stripos($streamUrl, '.mkv') !== false;
+
+            // Enhanced HTTP options for MKV files that often have connection issues
+            $httpOptions = "-user_agent \"$userAgent\" -referer \"MyComputer\" " .
+                '-multiple_requests 1 -reconnect_on_network_error 1 ' .
+                '-reconnect_on_http_error 5xx,4xx -reconnect_streamed 1 ' .
+                '-reconnect_delay_max 5';
+
+            // Add extra options for MKV files
+            if ($isMkv) {
+                $httpOptions .= ' -analyzeduration 10M -probesize 10M';
+            }
+            $httpOptions .= ' -noautorotate';
+
             // Build the FFmpeg command
             $cmd = sprintf(
                 $ffmpegPath . ' ' .
                     // Pre-input HTTP options:
-                    '-user_agent "%s" -referer "MyComputer" ' .
-                    '-multiple_requests 1 -reconnect_on_network_error 1 ' .
-                    '-reconnect_on_http_error 5xx,4xx -reconnect_streamed 1 ' .
-                    '-reconnect_delay_max 5 -noautorotate ' .
+                    '%s ' .
 
                     // User defined options:
                     '%s' .
@@ -232,7 +244,7 @@ class StreamController extends Controller
 
                     // Logging:
                     '%s',
-                $userAgent,                   // for -user_agent
+                $httpOptions,                 // HTTP options
                 $userArgs,                    // user defined options
                 $streamUrl,                   // input URL
                 $output,                      // for -f
