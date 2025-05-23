@@ -26,20 +26,20 @@ class PruneStaleHlsProcesses extends Command
         $threshold = (int)$this->option('threshold');
 
         // Fetch the list of active channel IDs from Redis
-        $activeIds = Redis::smembers('hls:active_ids');
-        $this->info("Found " . count($activeIds) . " active channel IDs");
+        $activeChannelIds = Redis::smembers('hls:active_channel_ids');
+        $this->info("Found " . count($activeChannelIds) . " active channel IDs");
 
         // For each active channel, check staleness
-        foreach ($activeIds as $channelId) {
+        foreach ($activeChannelIds as $channelId) {
             $this->info("Checking channel {$channelId}");
-            $ts = Redis::get("hls:last_seen:{$channelId}");
+            $ts = Redis::get("hls:channel_last_seen:{$channelId}");
             if (! $ts) {
                 $this->info("⏰ No last-seen timestamp for {$channelId}");
                 continue;
             }
             $lastSeen = Carbon::createFromTimestamp((int) $ts);
             if ($lastSeen->addSeconds($threshold)->isPast()) {
-                $wasRunning = $this->hlsService->stopStream($channelId);
+                $wasRunning = $this->hlsService->stopStream(type: 'channel', id: $channelId);
                 if (!$wasRunning) {
                     $this->info("❌ Channel {$channelId} was not running, skipping");
                     continue;

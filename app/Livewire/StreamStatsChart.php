@@ -17,9 +17,9 @@ class StreamStatsChart extends ChartWidget
 
     protected function getData(): array
     {
-        $labels  = Redis::lrange("mpts:hist:{$this->streamId}:timestamps", 0, -1);
-        $bitrate = array_map('floatval', Redis::lrange("mpts:hist:{$this->streamId}:bitrate", 0, -1));
-        $fps     = array_map('floatval', Redis::lrange("mpts:hist:{$this->streamId}:fps",     0, -1));
+        $labels  = Redis::lrange("mpts:channel_hist:{$this->streamId}:timestamps", 0, -1);
+        $bitrate = array_map('floatval', Redis::lrange("mpts:channel_hist:{$this->streamId}:bitrate", 0, -1));
+        $fps     = array_map('floatval', Redis::lrange("mpts:channel_hist:{$this->streamId}:fps",     0, -1));
 
         return [
             'labels'   => $labels ?: [],

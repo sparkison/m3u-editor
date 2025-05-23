@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Facade;
 
 /**
  * @method static string getProxyUrlForChannel(string $id)
+ * @method static string getProxyUrlForEpisode(string $id)
  */
 class ProxyFacade extends Facade
 {

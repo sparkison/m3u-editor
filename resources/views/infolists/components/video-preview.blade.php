@@ -5,7 +5,7 @@
     @php($playerId = "channel_{$record->id}_preview")
     <div x-data="{ state: {}, player: null }">
         <div x-data x-init="
-            player = videojs('{{ $playerId }}', { fluid: true, responsive: true, liveui: true });
+            player = videojs('{{ $playerId }}', { fluid: true, responsive: true });
             player.on('loadedmetadata', function() {
                 player.duration = function() { return Infinity; };
                 player.trigger('durationchange');

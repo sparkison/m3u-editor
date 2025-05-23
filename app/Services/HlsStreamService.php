@@ -15,6 +15,7 @@ class HlsStreamService
     /**
      * Start an HLS stream for the given channel.
      *
+     * @param string $type
      * @param string $id
      * @param string $streamUrl
      * @param string $title
@@ -23,15 +24,16 @@ class HlsStreamService
      * @return int The FFmpeg process ID
      */
     public function startStream(
+        $type,
         $id,
         $streamUrl,
         $title,
         $userAgent = null,
     ): int {
         // Only start one FFmpeg per channel at a time
-        $cacheKey = "hls:pid:{$id}";
+        $cacheKey = "hls:pid:{$type}:{$id}";
         $pid = Cache::get($cacheKey);
-        if (!($this->isRunning($id))) {
+        if (!($this->isRunning($type, $id))) {
             // Get user preferences
             $userPreferences = app(GeneralSettings::class);
             $settings = [
@@ -81,13 +83,19 @@ class HlsStreamService
             }
 
             // Setup the stream file paths
-            $storageDir = Storage::disk('app')->path("hls/{$id}");
+            if ($type === 'episode') {
+                $storageDir = Storage::disk('app')->path("hls/e/{$id}");
+            } else {
+                $storageDir = Storage::disk('app')->path("hls/{$id}");
+            }
             File::ensureDirectoryExists($storageDir, 0755);
 
             // Setup the stream URL
             $m3uPlaylist = "{$storageDir}/stream.m3u8";
             $segment = "{$storageDir}/segment_%03d.ts";
-            $segmentBaseUrl = url("/api/stream/{$id}") . '/';
+            $segmentBaseUrl = $type === 'channel'
+                ? url("/api/stream/{$id}") . '/'
+                : url("/api/stream/e/{$id}") . '/';
 
             $cmd = sprintf(
                 $ffmpegPath . ' ' .
@@ -172,13 +180,13 @@ class HlsStreamService
             // Cache the actual FFmpeg PID
             $status = proc_get_status($process);
             $pid = $status['pid'];
-            Cache::forever("hls:pid:{$id}", $pid);
+            Cache::forever("hls:pid:{$type}:{$id}", $pid);
 
             // Record timestamp in Redis (never expires until we prune)
-            Redis::set("hls:last_seen:{$id}", now()->timestamp);
+            Redis::set("hls:{$type}_last_seen:{$id}", now()->timestamp);
 
             // Add to active IDs set
-            Redis::sadd('hls:active_ids', $id);
+            Redis::sadd("hls:active_{$type}_ids", $id);
         }
         return $pid;
     }
@@ -186,15 +194,16 @@ class HlsStreamService
     /**
      * Stop FFmpeg for the given HLS stream channel (if currently running).
      *
+     * @param string $type
      * @param string $id
      * @return bool
      */
-    public function stopStream($id): bool
+    public function stopStream($type, $id): bool
     {
-        $cacheKey = "hls:pid:{$id}";
+        $cacheKey = "hls:pid:{$type}:{$id}";
         $pid = Cache::get($cacheKey);
         $wasRunning = false;
-        if ($this->isRunning($id)) {
+        if ($this->isRunning($type, $id)) {
             $wasRunning = true;
             // Attempt to gracefully stop the FFmpeg process
             posix_kill($pid, SIGTERM);
@@ -213,7 +222,7 @@ class HlsStreamService
         }
 
         // Remove from active IDs set
-        Redis::srem('hls:active_ids', $id);
+        Redis::srem("hls:active_{$type}_ids", $id);
 
         return $wasRunning;
     }
@@ -221,12 +230,13 @@ class HlsStreamService
     /**
      * Check if an HLS stream is currently running for the given channel ID.
      *
+     * @param string $type
      * @param string $id
      * @return bool
      */
-    public function isRunning($id): bool
+    public function isRunning($type, $id): bool
     {
-        $cacheKey = "hls:pid:{$id}";
+        $cacheKey = "hls:pid:{$type}:{$id}";
         $pid = Cache::get($cacheKey);
         return $pid && posix_kill($pid, 0) && $this->isFfmpeg($pid);
     }
@@ -234,12 +244,13 @@ class HlsStreamService
     /**
      * Get the PID of the currently running HLS stream for the given channel ID.
      *
+     * @param string $type
      * @param string $id
      * @return bool
      */
-    public function getPid($id): ?int
+    public function getPid($type, $id): ?int
     {
-        $cacheKey = "hls:pid:{$id}";
+        $cacheKey = "hls:pid:{$type}:{$id}";
         return Cache::get($cacheKey);
     }
 

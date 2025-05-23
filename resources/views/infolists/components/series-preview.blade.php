@@ -1,15 +1,20 @@
 <x-dynamic-component :component="$getEntryWrapperView()" :entry="$entry">
     @php($record = $getRecord())
     @php($url = $record->url)
+    @php($proxyUrl = App\Facades\ProxyFacade::getProxyUrlForEpisode($record->id, 'mp4'))
     @php($playerId = "episode_{$record->id}_preview")
     <div x-data="{ state: {}, player: null }">
         <div x-data x-init="
-            player = videojs('{{ $playerId }}', { fluid: true, responsive: true });
+            player = videojs('{{ $playerId }}', { fluid: true, responsive: true, liveui: true });
+            player.on('loadedmetadata', function() {
+                player.duration = function() { return Infinity; };
+                player.trigger('durationchange');
+            });
         " x-on:close-modal.window="player.dispose();">
             <video-js id="{{ $playerId }}"
                 class="video-js vjs-fluid vjs-16-9 vjs-default-skin" 
                 preload="auto" data-setup="{}" controls>
-                <source src="{{ $url }}" type="video/{{ $record->container_extension }}">
+                <source src="{{ $proxyUrl }}" type="video/mp4">
             </video-js>
         </div>
     </div>

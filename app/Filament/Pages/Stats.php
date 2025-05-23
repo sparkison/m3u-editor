@@ -24,14 +24,14 @@ class Stats extends Page
     protected function getHeaderWidgets(): array
     {
         // Fetch all currently streaming channel IDs
-        $activeIds = Redis::smembers('mpts:active_ids');
-        if (empty($activeIds)) {
+        $activeChannelIds = Redis::smembers('mpts:active_channel_ids');
+        if (empty($activeChannelIds)) {
             return [];
         }
 
         // Decode the channel IDs and IPs
         $clients = [];
-        foreach ($activeIds as $clientKey) {
+        foreach ($activeChannelIds as $clientKey) {
             $keys = explode('::', $clientKey);
             if (count($keys) < 2) {
                 continue;
