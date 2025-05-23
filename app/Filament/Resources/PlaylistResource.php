@@ -491,9 +491,18 @@ class PlaylistResource extends Resource
                                         ->multiple()
                                         ->options(function ($get) {
                                             $xtremeUrl = $get('xtream_config.url');
+                                            // Make sure valid url
+                                            if (!filter_var($xtremeUrl, FILTER_VALIDATE_URL)) {
+                                                return [];
+                                            }
                                             $xtreamUser = $get('xtream_config.username');
                                             $xtreamPass = $get('xtream_config.password');
                                             if (!$xtremeUrl || !$xtreamUser || !$xtreamPass) {
+                                                return [];
+                                            }
+                                            // Make sure URL returns 200
+                                            $response = @file_get_contents($xtremeUrl);
+                                            if ($response === false) {
                                                 return [];
                                             }
                                             $cacheKey = 'xtream_series_categories_' . md5($xtremeUrl . $xtreamUser . $xtreamPass);
