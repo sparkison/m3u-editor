@@ -140,10 +140,23 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
             );
         }
 
+        // Check if the playlist has .strm file sync enabled
+        $sync_settings = $this->playlistSeries->sync_settings;
+        $syncStrmFiles = $sync_settings['enabled'] ?? false;
+        if ($syncStrmFiles) {
+            // Dispatch the job to sync .strm files
+            dispatch(new SyncSeriesStrmFiles(series: $this->playlistSeries));
+        }
+        $body = "Series sync completed successfully for \"{$this->playlistSeries->name}\". Imported {$episodeCount} episodes.";
+        if ($syncStrmFiles) {
+            $body .= " .strm file sync is enabled, syncing now.";
+        } else {
+            $body .= " .strm file sync is not enabled.";
+        }
         Notification::make()
             ->success()
             ->title('Series Sync Completed')
-            ->body("Series sync completed successfully for \"{$this->playlistSeries->name}\". Imported {$episodeCount} episodes.")
+            ->body($body)
             ->broadcast($playlist->user)
             ->sendToDatabase($playlist->user);
     }

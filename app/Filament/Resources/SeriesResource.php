@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\SeriesResource\Pages;
 use App\Filament\Resources\SeriesResource\RelationManagers;
 use App\Models\Series;
+use App\Rules\CheckIfUrlOrLocalPath;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -117,7 +118,6 @@ class SeriesResource extends Resource
                     Tables\Actions\EditAction::make(),
                     Tables\Actions\Action::make('process')
                         ->label('Process Series')
-                        ->icon('heroicon-o-arrow-path')
                         ->action(function ($record) {
                             app('Illuminate\Contracts\Bus\Dispatcher')
                                 ->dispatch(new \App\Jobs\ProcessM3uImportSeriesEpisodes(
@@ -136,6 +136,27 @@ class SeriesResource extends Resource
                         ->modalIcon('heroicon-o-arrow-path')
                         ->modalDescription('Process series now? This will fetch all episodes and seasons for this series.')
                         ->modalSubmitActionLabel('Yes, process now'),
+                    Tables\Actions\Action::make('sync')
+                        ->label('Sync Series .strm files')
+                        ->action(function ($record) {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new \App\Jobs\SyncSeriesStrmFiles(
+                                    series: $record,
+                                ));
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Series .strm files are being synced')
+                                ->body('You will be notified once complete.')
+                                ->duration(10000)
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->modalIcon('heroicon-o-document-arrow-down')
+                        ->modalDescription('Sync series .strm files now? This will generate .strm files for this series at the path set for this series.')
+                        ->modalSubmitActionLabel('Yes, sync now')
+                        ->disabled(fn($record): bool => ! $record->sync_location),
                     Tables\Actions\DeleteAction::make()
                         ->modalIcon('heroicon-o-trash')
                         ->modalDescription('Are you sure you want to delete this series? This will delete all episodes and seasons for this series. This action cannot be undone.')
@@ -167,6 +188,28 @@ class SeriesResource extends Resource
                         ->modalIcon('heroicon-o-arrow-path')
                         ->modalDescription('Process selected series now? This will fetch all episodes and seasons for this series. This may take a while depending on the number of series selected.')
                         ->modalSubmitActionLabel('Yes, process now'),
+                    Tables\Actions\Action::make('sync')
+                        ->label('Sync Series .strm files')
+                        ->action(function ($records) {
+                            foreach ($records as $record) {
+                                app('Illuminate\Contracts\Bus\Dispatcher')
+                                    ->dispatch(new \App\Jobs\SyncSeriesStrmFiles(
+                                        series: $record,
+                                    ));
+                            }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('.strm files are being synced for selected series')
+                                ->body('You will be notified once complete.')
+                                ->duration(10000)
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->modalIcon('heroicon-o-document-arrow-down')
+                        ->modalDescription('Sync selected series .strm files now? This will generate .strm files for the selected series at the path set for the series.')
+                        ->modalSubmitActionLabel('Yes, sync now'),
                     Tables\Actions\BulkAction::make('enable')
                         ->label('Enable selected')
                         ->action(function (Collection $records): void {
@@ -235,42 +278,84 @@ class SeriesResource extends Resource
     public static function getForm(): array
     {
         return [
-            Forms\Components\Section::make('Series Details')
-                ->description('Edit or add the series details')
-                ->collapsible()
-                ->collapsed()
+            Forms\Components\Grid::make()
+                ->columns(4)
                 ->schema([
-                    Forms\Components\Grid::make(2)
+                    Forms\Components\Section::make('Series Details')
+                        ->columnSpan(2)
+                        ->icon('heroicon-o-pencil')
+                        ->description('Edit or add the series details')
+                        ->collapsible()
+                        ->collapsed()
                         ->schema([
-                            Forms\Components\TextInput::make('name')
-                                ->disabled()
-                                ->maxLength(255),
-                            Forms\Components\Toggle::make('enabled')
-                                ->inline(false)
-                                ->required(),
-                            Forms\Components\Select::make('category_id')
-                                ->relationship('category', 'name'),
-                            Forms\Components\TextInput::make('cover')
-                                ->maxLength(255),
-                            Forms\Components\Textarea::make('plot')
-                                ->columnSpanFull(),
-                            Forms\Components\TextInput::make('genre')
-                                ->maxLength(255),
-                            Forms\Components\DatePicker::make('release_date')
-                                ->label('Release Date'),
-                            Forms\Components\TextInput::make('rating')
-                                ->maxLength(255),
-                            Forms\Components\TextInput::make('rating_5based')
-                                ->label('Rating (5 based)')
-                                ->numeric(),
-                            Forms\Components\Textarea::make('cast')
-                                ->columnSpanFull(),
-                            Forms\Components\TextInput::make('director')
-                                ->maxLength(255),
-                            Forms\Components\TextInput::make('backdrop_path'),
-                            Forms\Components\TextInput::make('youtube_trailer')
-                                ->label('YouTube Trailer ID')
-                                ->maxLength(255),
+                            Forms\Components\Grid::make(2)
+                                ->schema([
+                                    Forms\Components\TextInput::make('name')
+                                        ->disabled()
+                                        ->maxLength(255),
+                                    Forms\Components\Toggle::make('enabled')
+                                        ->inline(false)
+                                        ->required(),
+                                    Forms\Components\Select::make('category_id')
+                                        ->relationship('category', 'name'),
+                                    Forms\Components\TextInput::make('cover')
+                                        ->maxLength(255),
+                                    Forms\Components\Textarea::make('plot')
+                                        ->columnSpanFull(),
+                                    Forms\Components\TextInput::make('genre')
+                                        ->maxLength(255),
+                                    Forms\Components\DatePicker::make('release_date')
+                                        ->label('Release Date'),
+                                    Forms\Components\TextInput::make('rating')
+                                        ->maxLength(255),
+                                    Forms\Components\TextInput::make('rating_5based')
+                                        ->label('Rating (5 based)')
+                                        ->numeric(),
+                                    Forms\Components\Textarea::make('cast')
+                                        ->columnSpanFull(),
+                                    Forms\Components\TextInput::make('director')
+                                        ->maxLength(255),
+                                    Forms\Components\TextInput::make('backdrop_path'),
+                                    Forms\Components\TextInput::make('youtube_trailer')
+                                        ->label('YouTube Trailer ID')
+                                        ->maxLength(255),
+                                ]),
+                        ]),
+                    Forms\Components\Section::make('Stream location file settings')
+                        ->columnSpan(2)
+                        ->icon('heroicon-o-cog')
+                        ->description('Generate .strm files and sync them to a local file path')
+                        ->collapsible()
+                        ->schema([
+                            Forms\Components\Grid::make(1)
+                                ->schema([
+                                    Forms\Components\Toggle::make('sync_settings.enabled')
+                                        ->live()
+                                        ->label('Enable .strm file generation'),
+                                    Forms\Components\Toggle::make('sync_settings.include_series')
+                                        ->label('Create series folder')
+                                        ->live()
+                                        ->default(true)
+                                        ->hidden(fn($get) => !$get('sync_settings.enabled')),
+                                    Forms\Components\Toggle::make('sync_settings.include_season')
+                                        ->label('Create season folders')
+                                        ->live()
+                                        ->default(true)
+                                        ->hidden(fn($get) => !$get('sync_settings.enabled')),
+                                    Forms\Components\TextInput::make('sync_location')
+                                        ->label('Series Sync Location')
+                                        ->live()
+                                        ->rules([new CheckIfUrlOrLocalPath(localOnly: true, isDirectory: true)])
+                                        ->helperText(
+                                            fn($get) => !$get('sync_settings.include_series')
+                                                ? 'File location: ' . $get('sync_location') . ($get('sync_settings.include_season') ?? false ? '/Season 01' : '') . '/S01E01 - Episode Title.strm'
+                                                : 'File location: ' . $get('sync_location') . '/Series Name' . ($get('sync_settings.include_season') ?? false ? '/Season 01' : '') . '/S01E01 - Episode Title.strm'
+                                        )
+                                        ->maxLength(255)
+                                        ->required()
+                                        ->hidden(fn($get) => !$get('sync_settings.enabled'))
+                                        ->placeholder('/usr/local/bin/streamlink'),
+                                ]),
                         ]),
                 ]),
         ];

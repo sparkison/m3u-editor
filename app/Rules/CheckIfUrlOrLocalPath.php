@@ -18,6 +18,7 @@ class CheckIfUrlOrLocalPath implements ValidationRule
     public function __construct(
         protected ?bool $urlOnly = false,
         protected ?bool $localOnly = false,
+        protected ?bool $isDirectory = false,
     ) {
         //
     }
@@ -43,8 +44,18 @@ class CheckIfUrlOrLocalPath implements ValidationRule
             if (!Str::isUrl($value)) {
                 $fail('Must be a valid url');
             }
-        } else if (!file_exists($value)) {
-            $fail('Must be a valid file path, unable to locate file at the provided path.');
+        } else {
+            if ($this->isDirectory) {
+                // Check if directory exists
+                if (!is_dir($value)) {
+                    $fail('Must be a valid directory path, unable to locate directory at the provided path.');
+                }
+            } else {
+                // Check if file exists
+                if (!file_exists($value)) {
+                    $fail('Must be a valid file path, unable to locate file at the provided path.');
+                }
+            }
         }
     }
 }
