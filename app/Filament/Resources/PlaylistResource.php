@@ -513,6 +513,11 @@ class PlaylistResource extends Resource
                                                     'username' => $xtreamUser,
                                                     'password' => $xtreamPass,
                                                 ]);
+                                                $userInfo = $xtream->authenticate();
+                                                if (! ($userInfo['auth'] ?? false)) {
+                                                    $this->error('Authentication failed.');
+                                                    return 1;
+                                                }
                                                 $seriesCategories = $xtream->getSeriesCategories();
                                                 return collect($seriesCategories)
                                                     ->map(function ($category) {
