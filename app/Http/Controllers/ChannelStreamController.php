@@ -87,7 +87,7 @@ class ChannelStreamController extends Controller
 
         // Generate a unique viewer ID for tracking
         $ip = $request->ip();
-        $viewerId = "{$ip}:" . Str::random(8);
+        $viewerId = $this->streamManager->addViewer($channelId, $format, $ip);
 
         // Set up extension and content type
         $extension = $format === 'mp2t' ? 'ts' : $format;
@@ -101,9 +101,6 @@ class ChannelStreamController extends Controller
                 $streamUrl,
                 $userAgent
             );
-
-            // Add this viewer to the tracking
-            $this->streamManager->addViewer($channelId, $format, $ip);
 
             // Register a shutdown function to remove the viewer when the connection ends
             register_shutdown_function(function () use ($channelId, $format, $viewerId) {
