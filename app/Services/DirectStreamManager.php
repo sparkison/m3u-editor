@@ -53,7 +53,7 @@ class DirectStreamManager
      */
     public function getPipePath(int $channelId, string $format): string
     {
-        $extension = $format === 'mp2t' ? 'ts' : $format;
+        $extension = $format === 'ts' ? 'ts' : $format;
         return Storage::disk('app')
             ->path("direct/stream_pipes/channel_{$channelId}.{$extension}");
     }
@@ -96,7 +96,7 @@ class DirectStreamManager
         $subtitleCodec = $settings['ffmpeg_codec_subtitles'] ?? 'copy';
 
         // Build FFmpeg output options based on format
-        $output = $format === 'mp2t'
+        $output = $format === 'ts'
             ? "-c:v {$videoCodec} -c:a {$audioCodec} -c:s {$subtitleCodec} -f mpegts"
             : "-c:v {$videoCodec} -c:a {$audioCodec} -bsf:a aac_adtstoasc -c:s {$subtitleCodec} -f mp4 -movflags frag_keyframe+empty_moov+default_base_moof";
 
@@ -197,13 +197,15 @@ class DirectStreamManager
     /**
      * Add a viewer to the stream
      */
-    public function addViewer(int $channelId, string $format, string $ip): void
+    public function addViewer(int $channelId, string $format, string $ip): string
     {
         $streamKey = "direct:stream:{$channelId}:{$format}";
         $viewerId = "{$ip}:" . uniqid();
 
         Redis::sadd("{$streamKey}:viewers", $viewerId);
         Redis::set("{$streamKey}:last_active", time());
+
+        return $viewerId;
     }
 
     /**

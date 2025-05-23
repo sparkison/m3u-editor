@@ -3,9 +3,6 @@
 namespace App\Services;
 
 use Exception;
-use App\Models\CustomPlaylist;
-use App\Models\MergedPlaylist;
-use App\Models\Playlist;
 use App\Settings\GeneralSettings;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
@@ -21,7 +18,7 @@ class HlsStreamService
      * @param string $id
      * @param string $streamUrl
      * @param string $title
-     * @param string|null $encodedPlaylist
+     * @param string|null $userAgent
      * 
      * @return int The FFmpeg process ID
      */
@@ -29,7 +26,7 @@ class HlsStreamService
         $id,
         $streamUrl,
         $title,
-        $encodedPlaylist = null
+        $userAgent = null,
     ): int {
         // Only start one FFmpeg per channel at a time
         $cacheKey = "hls:pid:{$id}";
@@ -60,26 +57,9 @@ class HlsStreamService
                 // Ignore
             }
 
-            // Check if playlist is specified
-            $playlist = null;
-            if ($encodedPlaylist) {
-                if (strpos($encodedPlaylist, '==') === false) {
-                    $encodedPlaylist .= '=='; // right pad to ensure proper decoding
-                }
-                $playlistId = base64_decode($encodedPlaylist);
-                $playlist = Playlist::where('uuid', $playlistId)->first();
-                if (!$playlist) {
-                    $playlist = MergedPlaylist::where('uuid', $playlistId)->first();
-                }
-                if (!$playlist) {
-                    $playlist = CustomPlaylist::where('uuid', $playlistId)->firstOrFail();
-                }
-            }
-
             // Get user agent
-            $userAgent = escapeshellarg($settings['ffmpeg_user_agent']);
-            if ($playlist) {
-                $userAgent = escapeshellarg($playlist->user_agent ?? $userAgent);
+            if (!$userAgent) {
+                $userAgent = escapeshellarg($settings['ffmpeg_user_agent']);
             }
 
             // Get ffmpeg path
@@ -269,10 +249,11 @@ class HlsStreamService
     protected function isFfmpeg(int $pid): bool
     {
         return true;
-
+        //
         // TODO: This is a placeholder for the actual implementation.
-        //       Currently not working, seems like the process is not flagged correctly.
-        //       Need to do some more investigation.
+        //       Currently not working, seems like the process is not flagged correctly (always false).
+        //       Need to do some more investigation...
+        //
         $cmdlinePath = "/proc/{$pid}/cmdline";
         if (! file_exists($cmdlinePath)) {
             return false;

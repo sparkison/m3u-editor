@@ -80,8 +80,7 @@ class PlaylistGenerateController extends Controller
                     if ($proxyEnabled) {
                         $url = ProxyFacade::getProxyUrlForChannel(
                             id: $channel->id,
-                            format: 'mp2t',
-                            playlist: $playlist->uuid
+                            format: 'ts'
                         );
                     }
                     if ($type === 'custom') {
@@ -253,14 +252,12 @@ class PlaylistGenerateController extends Controller
         $idChannelBy = $playlist->id_channel_by;
         $autoIncrement = $playlist->auto_channel_increment;
         $channelNumber = $autoIncrement ? $playlist->channel_start - 1 : 0;
-        $playlistUuid = $playlist->uuid;
-        return response()->json($channels->transform(function (Channel $channel) use ($proxyEnabled, $idChannelBy, $autoIncrement, $playlistUuid, &$channelNumber) {
+        return response()->json($channels->transform(function (Channel $channel) use ($proxyEnabled, $idChannelBy, $autoIncrement, &$channelNumber) {
             $url = $channel->url_custom ?? $channel->url;
             if ($proxyEnabled) {
                 $url = ProxyFacade::getProxyUrlForChannel(
                     id: $channel->id,
-                    format: 'mp2t',
-                    playlist: $playlistUuid
+                    format: 'ts'
                 );
             }
             $channelNo = $channel->channel;

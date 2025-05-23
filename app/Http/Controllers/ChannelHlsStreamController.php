@@ -55,18 +55,19 @@ class ChannelHlsStreamController extends Controller
         }
         $channel = Channel::findOrFail(base64_decode($encodedId));
         $channelId = $channel->id;
-        $streamUrl = $channel->url_custom ?? $channel->url;
         $title = $channel->title_custom ?? $channel->title;
-        $title = strip_tags($title);
 
         // Start stream, if not already running
         if (!$this->hlsService->isRunning($channelId)) {
+            $streamUrl = $channel->url_custom ?? $channel->url;
+            $title = strip_tags($title);
+            $playlist = $channel->playlist;
             try {
                 $this->hlsService->startStream(
                     id: $channelId,
                     streamUrl: $streamUrl,
                     title: $title,
-                    encodedPlaylist: $encodedPlaylist
+                    userAgent: $playlist->user_agent ?? null,
                 );
                 Log::channel('ffmpeg')->info("Started HLS stream for channel {$channelId} ({$title})");
             } catch (Exception $e) {
