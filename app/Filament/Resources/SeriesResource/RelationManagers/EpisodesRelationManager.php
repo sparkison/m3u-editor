@@ -58,10 +58,9 @@ class EpisodesRelationManager extends RelationManager
                 //
             ])
             ->actions([
-                Tables\Actions\ViewAction::make()
-                    ->slideOver()
+                Tables\Actions\ViewAction::make()->slideOver()
                     ->hiddenLabel()
-                    ->button(),
+                    ->button()->size('sm'),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 // @TODO - add download? Would need to generate streamlink files and compress then download...

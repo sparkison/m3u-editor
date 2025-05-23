@@ -226,7 +226,9 @@ class MergedPlaylistResource extends Resource
                         ->helperText('How you would like to ID your channels in the EPG.')
                         ->options([
                             'stream_id' => 'TVG ID/Stream ID (default)',
-                            'channel_id' => 'Channel Number',
+                            'channel_id' => 'Channel Number (recommended for HDHR)',
+                            'name' => 'Channel Name',
+                            'title' => 'Channel Title',
                         ])
                         ->required()
                         ->default('stream_id') // Default to stream_id

@@ -60,7 +60,7 @@ Route::get('/phpinfo', function () {
  */
 
 // Stream an IPTV channel (MPEGTS/MP4)
-Route::get('/stream/{encodedId}/{format?}', \App\Http\Controllers\ChannelStreamController::class)
+Route::get('/stream/{encodedId}.{format?}', \App\Http\Controllers\ChannelStreamController::class)
     ->name('stream');
 
 

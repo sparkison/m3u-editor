@@ -6,6 +6,7 @@ use App\Enums\ChannelLogoType;
 use App\Filament\Resources\ChannelResource;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
@@ -20,10 +21,20 @@ class ChannelsRelationManager extends RelationManager
 {
     protected static string $relationship = 'channels';
 
+    public function isReadOnly(): bool
+    {
+        return false;
+    }
+
     public function form(Form $form): Form
     {
         return $form
             ->schema([]);
+    }
+
+    public function infolist(Infolist $infolist): Infolist
+    {
+        return ChannelResource::infolist($infolist);
     }
 
     public function table(Table $table): Table
@@ -218,8 +229,10 @@ class ChannelsRelationManager extends RelationManager
                                 ->schema(ChannelResource::getForm())
                                 ->columns(2)
                         ]),
+                    Tables\Actions\ViewAction::make()
+                        ->slideOver(),
                     Tables\Actions\DetachAction::make()
-                ])->button()->hiddenLabel(),
+                ])->button()->hiddenLabel()->size('sm'),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
