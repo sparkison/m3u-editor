@@ -43,10 +43,11 @@ return new class extends Migration
             SourceGroup::upsert($inserts, uniqueBy: ['name', 'playlist_id'], update: []);
         });
 
-        // Remove the old groups column from playlists
-        Schema::table('playlists', function (Blueprint $table) {
-            $table->dropColumn('groups');
-        });
+        // Leave in case we need to revert at some point...
+        // // Remove the old groups column from playlists
+        // Schema::table('playlists', function (Blueprint $table) {
+        //     $table->dropColumn('groups');
+        // });
     }
 
     /**
