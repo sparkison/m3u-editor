@@ -282,6 +282,18 @@ class PlaylistResource extends Resource
                         ->modalIcon('heroicon-o-document-duplicate')
                         ->modalDescription('Duplicate playlist now?')
                         ->modalSubmitActionLabel('Yes, duplicate now'),
+                    Tables\Actions\Action::make('Sync Logs')
+                        ->label('View Sync Logs')
+                        ->color('gray')
+                        ->icon('heroicon-m-arrows-right-left')
+                        ->url(
+                            fn(Playlist $record): string => PlaylistResource::getUrl(
+                                name: 'playlist-sync-statuses.index',
+                                parameters: [
+                                    'parent' => $record->id,
+                                ]
+                            )
+                        ),
                     Tables\Actions\Action::make('reset')
                         ->label('Reset status')
                         ->icon('heroicon-o-arrow-uturn-left')
