@@ -36,6 +36,7 @@ use Filament\Tables\Actions\Action;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Illuminate\View\View;
 
@@ -502,8 +503,19 @@ class PlaylistResource extends Resource
                                                 return [];
                                             }
                                             // Make sure URL returns 200
-                                            $response = @file_get_contents($xtremeUrl);
-                                            if ($response === false) {
+                                            // Don't want to throw an error, but maybe cache for this url for the next 60 seconds, or until the url, user, or password changes
+                                            $errorCacheKey = 'xtream_series_categories_error_' . md5($xtremeUrl . $xtreamUser . $xtreamPass);
+                                            if (Cache::has($errorCacheKey)) {
+                                                return [];
+                                            }
+                                            try {
+                                                $response = Http::timeout(5)->get($xtremeUrl);
+                                                if ($response->failed()) {
+                                                    // Cache the error for 60 seconds
+                                                    Cache::put($errorCacheKey, true, 60);
+                                                    return [];
+                                                }
+                                            } catch (\Exception $e) {
                                                 return [];
                                             }
                                             $cacheKey = 'xtream_series_categories_' . md5($xtremeUrl . $xtreamUser . $xtreamPass);
@@ -516,8 +528,7 @@ class PlaylistResource extends Resource
                                                 ]);
                                                 $userInfo = $xtream->authenticate();
                                                 if (! ($userInfo['auth'] ?? false)) {
-                                                    $this->error('Authentication failed.');
-                                                    return 1;
+                                                    return [];
                                                 }
                                                 $seriesCategories = $xtream->getSeriesCategories();
                                                 return collect($seriesCategories)
@@ -684,9 +695,7 @@ class PlaylistResource extends Resource
                         ->helperText('NOTE: If the list is empty, sync the playlist and check again once complete.')
                         ->options(function ($record): array {
                             $groups = SourceGroup::where('playlist_id', $record->id)
-                                ->get()
-                                ->pluck('name', 'name')
-                                ->toArray();
+                                ->get()->pluck('name', 'name')->toArray();
                             foreach ($groups as $option) {
                                 $options[$option] = $option;
                             }

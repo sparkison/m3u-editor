@@ -198,7 +198,7 @@ class ProcessM3uImport implements ShouldQueue
             // Get the live categories
             $categoriesResponse = Http::withUserAgent($userAgent)
                 ->withOptions(['verify' => $verify])
-                ->timeout(60 * 5) // set timeout to five minute
+                ->timeout(60) // set timeout to one minute
                 ->throw()->get($liveCategories);
             if (!$categoriesResponse->ok()) {
                 $error = $categoriesResponse->body();
@@ -210,7 +210,7 @@ class ProcessM3uImport implements ShouldQueue
             // Get the live streams
             $liveStreamsResponse = Http::withUserAgent($userAgent)
                 ->withOptions(['verify' => $verify])
-                ->timeout(60 * 10) // set timeout to ten minute
+                ->timeout(60 * 5) // set timeout to five minute
                 ->throw()->get($liveStreams);
             if (!$liveStreamsResponse->ok()) {
                 $error = $liveStreamsResponse->body();
