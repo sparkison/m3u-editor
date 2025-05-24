@@ -72,6 +72,11 @@ class Playlist extends Model
         return $this->hasMany(Group::class);
     }
 
+    public function sourceGroups(): HasMany
+    {
+        return $this->hasMany(SourceGroup::class);
+    }
+
     public function mergedPlaylists(): BelongsToMany
     {
         return $this->belongsToMany(MergedPlaylist::class, 'merged_playlist_playlist');

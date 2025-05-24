@@ -9,6 +9,7 @@ use App\Events\SyncCompleted;
 use App\Models\Group;
 use App\Models\Job;
 use App\Models\Playlist;
+use App\Models\SourceGroup;
 use Carbon\Carbon;
 use M3uParser\M3uParser;
 use Filament\Notifications\Notification;
@@ -712,58 +713,33 @@ class ProcessM3uImport implements ShouldQueue
         // Get the playlist ID
         $playlistId = $playlist->id;
 
-        // Process the collection
-        $collection->groupBy('group')->chunk(10)->each(function (LazyCollection $grouped) use ($userId, $playlistId, $batchNo) {
-            $grouped->each(function ($channels, $groupName) use ($userId, $playlistId, $batchNo) {
-                // Add group and associated channels
-                $group = Group::where([
-                    'name_internal' => $groupName ?? '',
-                    'playlist_id' => $playlistId,
-                    'user_id' => $userId,
-                    'custom' => false,
-                ])->first();
-                if (!$group) {
-                    $group = Group::create([
-                        'name' => $groupName ?? '',
-                        'name_internal' => $groupName ?? '',
-                        'playlist_id' => $playlistId,
-                        'user_id' => $userId,
-                        'import_batch_no' => $batchNo,
-                        'new' => true,
-                    ]);
-                } else {
-                    $group->update([
-                        'import_batch_no' => $batchNo,
-                        'new' => false,
-                    ]);
-                }
-                $channels->chunk(50)->each(function ($chunk) use ($playlistId, $batchNo, $group) {
-                    Job::create([
-                        'title' => "Processing channel import for group: {$group->name}",
-                        'batch_no' => $batchNo,
-                        'payload' => $chunk->toArray(),
-                        'variables' => [
-                            'groupId' => $group->id,
-                            'groupName' => $group->name,
-                            'playlistId' => $playlistId,
-                        ]
-                    ]);
-                });
-            });
-        });
-
         // Remove duplicate groups
         $groups = array_values(array_unique($this->groups));
+
+        // Create the groups
+        foreach (array_chunk($groups, 50) as $chunk) {
+            SourceGroup::upsert(
+                collect($chunk)->map(function ($groupName) use ($playlistId) {
+                    return [
+                        'name' => $groupName,
+                        'playlist_id' => $playlistId,
+                    ];
+                })->toArray(),
+                uniqueBy: ['name', 'playlist_id'],
+                update: []
+            );
+        }
 
         // Update progress
         $playlist->update(['progress' => 15]);
 
-        // Check if preprocessing, and not groups selected yet
+        // Check if preprocessing, and no or prefixes groups selected yet
         if (
             $this->preprocess
             && count($this->selectedGroups) === 0
             && count($this->includedGroupPrefixes) === 0
         ) {
+            // Flag as complete and notify user
             $completedIn = $start->diffInSeconds(now());
             $completedInRounded = round($completedIn, 2);
             $playlist->update([
@@ -774,7 +750,6 @@ class ProcessM3uImport implements ShouldQueue
                 'sync_time' => $completedIn,
                 'progress' => 100,
                 'processing' => false,
-                'groups' => $groups,
             ]);
 
             // Send notification
@@ -790,6 +765,46 @@ class ProcessM3uImport implements ShouldQueue
                 ->body($message)
                 ->sendToDatabase($playlist->user);
         } else {
+            // Process the collection
+            $collection->groupBy('group')->chunk(10)->each(function (LazyCollection $grouped) use ($userId, $playlistId, $batchNo) {
+                $grouped->each(function ($channels, $groupName) use ($userId, $playlistId, $batchNo) {
+                    // Add group and associated channels
+                    $group = Group::where([
+                        'name_internal' => $groupName ?? '',
+                        'playlist_id' => $playlistId,
+                        'user_id' => $userId,
+                        'custom' => false,
+                    ])->first();
+                    if (!$group) {
+                        $group = Group::create([
+                            'name' => $groupName ?? '',
+                            'name_internal' => $groupName ?? '',
+                            'playlist_id' => $playlistId,
+                            'user_id' => $userId,
+                            'import_batch_no' => $batchNo,
+                            'new' => true,
+                        ]);
+                    } else {
+                        $group->update([
+                            'import_batch_no' => $batchNo,
+                            'new' => false,
+                        ]);
+                    }
+                    $channels->chunk(50)->each(function ($chunk) use ($playlistId, $batchNo, $group) {
+                        Job::create([
+                            'title' => "Processing channel import for group: {$group->name}",
+                            'batch_no' => $batchNo,
+                            'payload' => $chunk->toArray(),
+                            'variables' => [
+                                'groupId' => $group->id,
+                                'groupName' => $group->name,
+                                'playlistId' => $playlistId,
+                            ]
+                        ]);
+                    });
+                });
+            });
+
             // Get the jobs for the batch
             $jobs = [];
             $batchCount = Job::where('batch_no', $batchNo)->count();
@@ -802,7 +817,6 @@ class ProcessM3uImport implements ShouldQueue
             $jobs[] = new ProcessM3uImportComplete(
                 userId: $userId,
                 playlistId: $playlistId,
-                groups: $groups,
                 batchNo: $batchNo,
                 start: $start,
                 maxHit: $this->maxItemsHit,

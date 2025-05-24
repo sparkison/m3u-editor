@@ -29,6 +29,7 @@ use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ListPlaylistSyncStat
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ViewPlaylistSyncStatus;
 use App\Forms\Components\MediaFlowProxyUrl;
 use App\Models\PlaylistSyncStatus;
+use App\Models\SourceGroup;
 use App\Services\XtreamService;
 use Filament\Facades\Filament;
 use Filament\Tables\Actions\Action;
@@ -681,9 +682,12 @@ class PlaylistResource extends Resource
                         ->searchable()
                         ->multiple()
                         ->helperText('NOTE: If the list is empty, sync the playlist and check again once complete.')
-                        ->options(function (Get $get): array {
-                            $options = [];
-                            foreach ($get('groups') ?? [] as $option) {
+                        ->options(function ($record): array {
+                            $groups = SourceGroup::where('playlist_id', $record->id)
+                                ->get()
+                                ->pluck('name', 'name')
+                                ->toArray();
+                            foreach ($groups as $option) {
                                 $options[$option] = $option;
                             }
                             return $options;
