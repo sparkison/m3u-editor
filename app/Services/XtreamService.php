@@ -48,7 +48,7 @@ class XtreamService
         return $this;
     }
 
-    protected function call(string $url)
+    protected function call(string $url, int $timeout = 60 * 15)
     {
         if (! ($this->playlist || $this->xtream_config)) {
             throw new \Exception('Config not initialized. Call init() first with Playlist or Xtream config array.');
@@ -56,7 +56,7 @@ class XtreamService
         $attempts = 0;
         do {
             $user_agent = $this->playlist?->user_agent ?? 'VLC/3.0.21 LibVLC/3.0.21';
-            $response = Http::timeout(10)
+            $response = Http::timeout($timeout) // defaults to 15 minutes
                 ->withHeaders(['User-Agent' => $user_agent])
                 ->get($url);
 
@@ -87,7 +87,7 @@ class XtreamService
     {
         $url = $this->server
             . "/player_api.php?username={$this->user}&password={$this->pass}";
-        return $this->call($url)['user_info'] ?? [];
+        return $this->call(url: $url, timeout: 5)['user_info'] ?? []; // set short timeout
     }
 
     public function getVodCategories(): array
