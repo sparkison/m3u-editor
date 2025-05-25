@@ -305,7 +305,7 @@ class ProcessM3uImport implements ShouldQueue
                 $vodStreams,
                 $streamBaseUrl,
                 $vodBaseUrl,
-                $categories,
+                $liveCategories,
                 $vodCategories,
                 $channelFields,
                 $autoSort,
@@ -319,7 +319,7 @@ class ProcessM3uImport implements ShouldQueue
                         ++$channelNo;
 
                         // Get the category
-                        $category = $categories->firstWhere('category_id', $item['category_id']);
+                        $category = $liveCategories->firstWhere('category_id', $item['category_id']);
 
                         // Determine if the channel should be included
                         if ($this->preprocess && !$this->shouldIncludeChannel($category['category_name'] ?? '')) {
