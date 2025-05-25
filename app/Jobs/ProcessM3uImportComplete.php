@@ -255,23 +255,21 @@ class ProcessM3uImportComplete implements ShouldQueue
         }
 
         // Determine if importing series as well
-        if ($playlist->xtream_config['import_options'] ?? false) {
-            if (in_array('series', $playlist->xtream_config['import_options'] ?? [])) {
-                // Process series import
-                dispatch(new ProcessM3uImportSeries(
-                    playlist: $playlist,
-                    force: true,
-                    isNew: $this->isNew,
-                    batchNo: $this->batchNo,
-                ));
-                Notification::make()
-                    ->info()
-                    ->title('Syncing Series')
-                    ->body('Playlist is syncing series. This may take a while. Please check back later.')
-                    ->broadcast($playlist->user)
-                    ->sendToDatabase($playlist->user);
-                return; // Exit early if series import is enabled, sync complete event will be fired after series import completes
-            }
+        if ($playlist->series()->where('enabled', true)->exists()) {
+            // Process series import
+            dispatch(new ProcessM3uImportSeries(
+                playlist: $playlist,
+                force: true,
+                isNew: $this->isNew,
+                batchNo: $this->batchNo,
+            ));
+            Notification::make()
+                ->info()
+                ->title('Syncing Series')
+                ->body('Syncing playlist series now. This may take a while depending on how many series you have. Please check back later.')
+                ->broadcast($playlist->user)
+                ->sendToDatabase($playlist->user);
+            return; // Exit early if series import is enabled, sync complete event will be fired after series import completes
         }
 
         // Fire the playlist synced event

@@ -6,7 +6,6 @@ use Exception;
 use App\Enums\Status;
 use App\Events\SyncCompleted;
 use App\Models\Playlist;
-use App\Services\XtreamService;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Str;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -36,7 +35,7 @@ class ProcessM3uImportSeries implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(XtreamService $xtream): void
+    public function handle(): void
     {
         if (!$this->force) {
             // Don't update if currently processing
@@ -55,13 +54,6 @@ class ProcessM3uImportSeries implements ShouldQueue
             $this->batchNo = Str::orderedUuid()->toString();
         }
 
-        // Setup the Xtream service
-        $xtream = $xtream->init($this->playlist);
-        if (! $xtream) {
-            // @TODO - handle error and notify user
-            return;
-        }
-
         // Update the playlist status to processing
         $this->playlist->update([
             'processing' => true,
@@ -69,93 +61,21 @@ class ProcessM3uImportSeries implements ShouldQueue
             'errors' => null,
             'series_progress' => 0,
         ]);
-
-        $this->importSeries($xtream);
+        $this->importSeries();
     }
 
     /**
-     * Import series from Xtream API.
+     * Import/sync series episodes.
      */
-    public function importSeries(XtreamService $xtream): void
+    public function importSeries(): void
     {
         try {
-            // Check if importing all series, or just selected
-            $config = $this->playlist->xtream_config;
-            $cats = collect($xtream->getSeriesCategories());
-            if ($config['import_all_series'] ?? false) {
-                $categories = $cats
-                    ->map(fn($c) => $c['category_id'])
-                    ->pluck('category_id')
-                    ->toArray();
-            } else {
-                $categories = $this->playlist->xtream_config['series_categories'] ?? [];
-            }
-
-            // If categories are empty, finish and error
-            if (empty($categories)) {
-                // @TODO - handle error and notify user
-                return;
-            }
-
-            // Determine the progress update intervals
-            $total = $cats->count();
-            $progressInterval = (int) ($total / 100);
-            $progressInterval = max($progressInterval, 1);
-            $progress = 0;
-
-            // Get the series from the Xtream API
             $jobs = [];
-            foreach ($categories as $catId) {
-                // Update the progress
-                $progress += $progressInterval;
-                    $this->playlist->update([
-                    'series_progress' => (int) (($progress / $total) * 100),
-                ]);
-
-                // Get the series for the category, and the category details
-                $catId = (int) $catId;
-                $series = $xtream->getSeries($catId);
-                $category = $cats->where('category_id', $catId)->first();
-
-                // Make sure there are series to process
-                if (empty($series) || !$category) {
-                    // No series found for category, continue to next category
-                    // @TODO - notify user?
-                    continue;
-                }
-
-                // See if the category exists
-                $playlistCategory = $this->playlist
-                    ->categories()
-                    ->where('source_category_id', $catId)
-                    ->first();
-
-                // Create the category if it doesn't exist
-                if (!$playlistCategory) {
-                    $catName = $category['category_name'] ?? '';
-                    $catName = Str::of($catName)->replace(' | ', ' - ')->trim();
-                    $playlistCategory = $this->playlist
-                        ->categories()->create([
-                            'name' => $catName,
-                            'name_internal' => $catName,
-                            'user_id' => $this->playlist->user_id,
-                            'playlist_id' => $this->playlist->id,
-                            'source_category_id' => $catId,
-                        ]);
-                }
-
-                // Process each series
-                $seriesCount = count($series);
-                foreach ($series as $s) {
-                    $jobs[] = new ProcessM3uImportSeriesChunk(
-                        playlist: $this->playlist,
-                        series: $s,
-                        catId: $catId,
-                        count: ($total * $seriesCount) / 10,
-                        category: $playlistCategory,
-                        batchNo: $this->batchNo,
-                    );
-                }
+            $series = $this->playlist->series()->where('enabled', true)->cursor();
+            foreach ($series as $seriesItem) {
+                $jobs[] = new ProcessM3uImportSeriesEpisodes(
+                    playlistSeries: $seriesItem,
+                );
             }
             $jobs[] = new ProcessM3uImportSeriesComplete(
                 playlist: $this->playlist,

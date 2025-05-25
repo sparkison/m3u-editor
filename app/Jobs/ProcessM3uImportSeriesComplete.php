@@ -40,7 +40,7 @@ class ProcessM3uImportSeriesComplete implements ShouldQueue
         Notification::make()
             ->success()
             ->title('Series Sync Completed')
-            ->body("Playlist series sync completed successfully for \"{$this->playlist->name}\".")
+            ->body("Series sync completed successfully for playlist \"{$this->playlist->name}\".")
             ->broadcast($this->playlist->user)
             ->sendToDatabase($this->playlist->user);
     }

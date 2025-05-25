@@ -4,10 +4,13 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\SeriesResource\Pages;
 use App\Filament\Resources\SeriesResource\RelationManagers;
+use App\Models\Playlist;
 use App\Models\Series;
 use App\Rules\CheckIfUrlOrLocalPath;
+use App\Services\XtreamService;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -15,6 +18,8 @@ use Filament\Tables\Table;
 use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 
 class SeriesResource extends Resource
 {
@@ -270,7 +275,7 @@ class SeriesResource extends Resource
     {
         return [
             'index' => Pages\ListSeries::route('/'),
-            //'create' => Pages\CreateSeries::route('/create'),
+            'create' => Pages\CreateSeries::route('/create'),
             'edit' => Pages\EditSeries::route('/{record}/edit'),
         ];
     }
@@ -358,6 +363,148 @@ class SeriesResource extends Resource
                                 ]),
                         ]),
                 ]),
+        ];
+    }
+
+    public static function getFormSteps(): array
+    {
+        return [
+            Forms\Components\Wizard\Step::make('Playlist')
+                ->schema([
+                    Forms\Components\Select::make('playlist')
+                        ->required()
+                        ->label('Playlist')
+                        ->helperText('Select the playlist you would like to import series from.')
+                        ->options(Playlist::where([
+                            ['user_id', auth()->id()],
+                            ['xtream', true]
+                        ])->get(['name', 'id'])->pluck('name', 'id'))
+                        ->searchable(),
+                ]),
+            Forms\Components\Wizard\Step::make('Category')
+                ->schema([
+                    Forms\Components\Select::make('category')
+                        ->label('Series Category')
+                        ->live()
+                        ->required()
+                        ->searchable()
+                        ->columnSpanFull()
+                        ->options(function ($get) {
+                            $playlist = $get('playlist');
+                            if (!$playlist) {
+                                return [];
+                            }
+                            $xtreamConfig = Playlist::find($playlist)->xtream_config ?? [];
+                            $xtremeUrl = $xtreamConfig['url'] ?? '';
+                            $xtreamUser = $xtreamConfig['username'] ?? '';
+                            $xtreamPass = $xtreamConfig['password'] ?? '';
+                            $cacheKey = 'xtream_series_categories_' . md5($xtremeUrl . $xtreamUser . $xtreamPass);
+                            $cachedCategories = Cache::remember($cacheKey, 60 * 1, function () use ($xtremeUrl, $xtreamUser, $xtreamPass) {
+                                $service = new XtreamService();
+                                $xtream = $service->init(xtream_config: [
+                                    'url' => $xtremeUrl,
+                                    'username' => $xtreamUser,
+                                    'password' => $xtreamPass,
+                                ]);
+                                $userInfo = $xtream->authenticate();
+                                if (! ($userInfo['auth'] ?? false)) {
+                                    return [];
+                                }
+                                $seriesCategories = $xtream->getSeriesCategories();
+                                return collect($seriesCategories)
+                                    ->map(function ($category) {
+                                        return [
+                                            'label' => $category['category_name'],
+                                            'value' => $category['category_id'],
+                                        ];
+                                    })->pluck('label', 'value')->toArray();
+                            });
+                            return $cachedCategories;
+                        })
+                        ->helperText(
+                            fn(Get $get): string => $get('playlist')
+                                ? 'Which category would you like to add a series from.'
+                                : 'You must select a playlist first.'
+                        )
+                        ->disabled(fn(Get $get): bool => ! $get('playlist'))
+                        ->hidden(fn(Get $get): bool => ! $get('playlist'))
+                        ->afterStateUpdated(function ($get, $set, $state) {
+                            if ($state) {
+                                $playlist = $get('playlist');
+                                if (!$playlist) {
+                                    return;
+                                }
+                                $xtreamConfig = Playlist::find($playlist)->xtream_config ?? [];
+                                $xtremeUrl = $xtreamConfig['url'] ?? '';
+                                $xtreamUser = $xtreamConfig['username'] ?? '';
+                                $xtreamPass = $xtreamConfig['password'] ?? '';
+                                $cacheKey = 'xtream_series_categories_' . md5($xtremeUrl . $xtreamUser . $xtreamPass);
+                                $cachedCategories = Cache::get($cacheKey);
+
+                                if ($cachedCategories) {
+                                    $category = $cachedCategories[$state] ?? null;
+                                    if ($category) {
+                                        $set('category_name', $category);
+                                    }
+                                }
+                            }
+                        }),
+                    Forms\Components\TextInput::make('category_name')
+                        ->label('Category Name')
+                        ->helperText('Automatically set when selecting a category.')
+                        ->required()
+                        ->disabled()
+                        ->dehydrated(fn(): bool => true),
+                ]),
+            Forms\Components\Wizard\Step::make('Series to Import')
+                ->schema([
+                    Forms\Components\CheckboxList::make('series')
+                        ->label('Series to Import')
+                        ->required()
+                        ->searchable()
+                        ->columnSpanFull()
+                        ->columns(4)
+                        ->options(function ($get) {
+                            $playlist = $get('playlist');
+                            $category = $get('category');
+                            if (!$playlist) {
+                                return [];
+                            }
+                            $xtreamConfig = Playlist::find($playlist)->xtream_config ?? [];
+                            $xtremeUrl = $xtreamConfig['url'] ?? '';
+                            $xtreamUser = $xtreamConfig['username'] ?? '';
+                            $xtreamPass = $xtreamConfig['password'] ?? '';
+                            $cacheKey = 'xtream_category_series' . md5($xtremeUrl . $xtreamUser . $xtreamPass . $category);
+                            $cachedCategories = Cache::remember($cacheKey, 60 * 1, function () use ($xtremeUrl, $xtreamUser, $xtreamPass, $category) {
+                                $service = new XtreamService();
+                                $xtream = $service->init(xtream_config: [
+                                    'url' => $xtremeUrl,
+                                    'username' => $xtreamUser,
+                                    'password' => $xtreamPass,
+                                ]);
+                                $userInfo = $xtream->authenticate();
+                                if (! ($userInfo['auth'] ?? false)) {
+                                    return [];
+                                }
+                                $series = $xtream->getSeries($category);
+                                return collect($series)
+                                    ->map(function ($s) {
+                                        return [
+                                            'label' => $s['name'],
+                                            'value' => $s['series_id'],
+                                        ];
+                                    })->pluck('label', 'value')->toArray();
+                            });
+                            return $cachedCategories;
+                        })
+                        ->helperText(
+                            fn(Get $get): string => $get('playlist') && $get('category')
+                                ? 'Which series would you like to import.'
+                                : 'You must select a playlist and category first.'
+                        )
+                        ->disabled(fn(Get $get): bool => ! $get('playlist') || ! $get('category'))
+                        ->hidden(fn(Get $get): bool => ! $get('playlist') || ! $get('category')),
+                ])
         ];
     }
 }

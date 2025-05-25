@@ -195,32 +195,33 @@ class ProcessM3uImport implements ShouldQueue
             // Set the initial progress
             $initialProgress = 3; // start at 3%
 
-            // Get the live categories
-            $categoriesResponse = Http::withUserAgent($userAgent)
-                ->withOptions(['verify' => $verify])
-                ->timeout(60) // set timeout to one minute
-                ->throw()->get($liveCategories);
-            if (!$categoriesResponse->ok()) {
-                $error = $categoriesResponse->body();
-                $message = "Error processing Live categories: $error";
-                $this->sendError($message, $error);
-                return;
-            }
+            if (in_array('live', $categoriesToImport)) {
+                // Get the live categories
+                $categoriesResponse = Http::withUserAgent($userAgent)
+                    ->withOptions(['verify' => $verify])
+                    ->timeout(60) // set timeout to one minute
+                    ->throw()->get($liveCategories);
+                if (!$categoriesResponse->ok()) {
+                    $error = $categoriesResponse->body();
+                    $message = "Error processing Live categories: $error";
+                    $this->sendError($message, $error);
+                    return;
+                }
 
-            // Get the live streams
-            $liveStreamsResponse = Http::withUserAgent($userAgent)
-                ->withOptions(['verify' => $verify])
-                ->timeout(60 * 5) // set timeout to five minute
-                ->throw()->get($liveStreams);
-            if (!$liveStreamsResponse->ok()) {
-                $error = $liveStreamsResponse->body();
-                $message = "Error processing Live streams: $error";
-                $this->sendError($message, $error);
-                return;
+                $liveStreamsResponse = Http::withUserAgent($userAgent)
+                    ->withOptions(['verify' => $verify])
+                    ->timeout(60 * 5) // set timeout to five minute
+                    ->throw()->get($liveStreams);
+                if (!$liveStreamsResponse->ok()) {
+                    $error = $liveStreamsResponse->body();
+                    $message = "Error processing Live streams: $error";
+                    $this->sendError($message, $error);
+                    return;
+                }
+                $initialProgress += 3;
+                $playlist->update(['progress' => $initialProgress]);
+                $liveCategories = collect($categoriesResponse->json());
             }
-            $initialProgress += 3;
-            $playlist->update(['progress' => $initialProgress]);
-            $categories = collect($categoriesResponse->json());
 
             // If including VOD, get the categories
             if (in_array('vod', $categoriesToImport)) {
@@ -256,7 +257,9 @@ class ProcessM3uImport implements ShouldQueue
             $playlist->update(['progress' => $initialProgress]);
 
             // Update the groups array
-            $groups = $categories->pluck('category_name');
+            $groups = !is_string($liveCategories)
+                ? $liveCategories->pluck('category_name')
+                : collect([]);
             if (!is_string($vodCategories)) {
                 $groups = $groups->merge($vodCategories->pluck('category_name'));
             }
@@ -291,7 +294,7 @@ class ProcessM3uImport implements ShouldQueue
             }
 
             // Get the live streams
-            $liveStreams = JsonParser::parse($liveStreamsResponse->body());
+            $liveStreams = isset($liveStreamsResponse) ? JsonParser::parse($liveStreamsResponse->body()) : null;
             $vodStreams = isset($vodStreamsResponse) ? JsonParser::parse($vodStreamsResponse->body()) : null;
 
             // Process the live streams
@@ -309,33 +312,35 @@ class ProcessM3uImport implements ShouldQueue
                 $channelNo,
                 $output
             ) {
-                // Output the live streams first
-                foreach ($liveStreams as $item) {
-                    // Increment channel number
-                    ++$channelNo;
+                // If live streams, add them
+                if ($liveStreams) {
+                    foreach ($liveStreams as $item) {
+                        // Increment channel number
+                        ++$channelNo;
 
-                    // Get the category
-                    $category = $categories->firstWhere('category_id', $item['category_id']);
+                        // Get the category
+                        $category = $categories->firstWhere('category_id', $item['category_id']);
 
-                    // Determine if the channel should be included
-                    if ($this->preprocess && !$this->shouldIncludeChannel($category['category_name'] ?? '')) {
-                        continue;
+                        // Determine if the channel should be included
+                        if ($this->preprocess && !$this->shouldIncludeChannel($category['category_name'] ?? '')) {
+                            continue;
+                        }
+                        $channel = [
+                            ...$channelFields,
+                            'title' => $item['name'],
+                            'name' => $item['name'],
+                            'url' => "$streamBaseUrl/{$item['stream_id']}.$output",
+                            'logo' => $item['stream_icon'],
+                            'group' => $category['category_name'] ?? '',
+                            'group_internal' => $category['category_name'] ?? '',
+                            'stream_id' => $item['epg_channel_id'] ?? $item['stream_id'], // prefer EPG id for mapping, if set
+                            'channel' => $item['num'] ?? null,
+                        ];
+                        if ($autoSort) {
+                            $channel['sort'] = $channelNo;
+                        }
+                        yield $channel;
                     }
-                    $channel = [
-                        ...$channelFields,
-                        'title' => $item['name'],
-                        'name' => $item['name'],
-                        'url' => "$streamBaseUrl/{$item['stream_id']}.$output",
-                        'logo' => $item['stream_icon'],
-                        'group' => $category['category_name'] ?? '',
-                        'group_internal' => $category['category_name'] ?? '',
-                        'stream_id' => $item['epg_channel_id'] ?? $item['stream_id'], // prefer EPG id for mapping, if set
-                        'channel' => $item['num'] ?? null,
-                    ];
-                    if ($autoSort) {
-                        $channel['sort'] = $channelNo;
-                    }
-                    yield $channel;
                 }
 
                 // If VOD streams, add them
