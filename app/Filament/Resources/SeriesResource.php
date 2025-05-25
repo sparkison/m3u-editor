@@ -116,7 +116,17 @@ class SeriesResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                Tables\Filters\SelectFilter::make('playlist')
+                    ->relationship('playlist', 'name')
+                    ->multiple()
+                    ->preload()
+                    ->searchable(),
+                Tables\Filters\Filter::make('enabled')
+                    ->label('Series is enabled')
+                    ->toggle()
+                    ->query(function ($query) {
+                        return $query->where('enabled', true);
+                    }),
             ])
             ->actions([
                 Tables\Actions\ActionGroup::make([
