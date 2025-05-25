@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Tables\Columns\SpatieTagsColumn;
+use Illuminate\Support\Facades\DB;
 use Spatie\Tags\Tag;
 
 class ChannelsRelationManager extends RelationManager
@@ -129,7 +130,20 @@ class ChannelsRelationManager extends RelationManager
                     ->label('Default Group')
                     ->toggleable()
                     ->searchable(query: function ($query, string $search): Builder {
-                        return $query->orWhereRaw('LOWER("group"::text) LIKE ?', ["%{$search}%"]);
+                        $connection = $query->getConnection();
+                        $driver = $connection->getDriverName();
+
+                        switch ($driver) {
+                            case 'pgsql':
+                                return $query->orWhereRaw('LOWER("group"::text) LIKE ?', ["%{$search}%"]);
+                            case 'mysql':
+                                return $query->orWhereRaw('LOWER(`group`) LIKE ?', ["%{$search}%"]);
+                            case 'sqlite':
+                                return $query->orWhereRaw('LOWER(group) LIKE ?', ["%{$search}%"]);
+                            default:
+                                // Fallback using Laravel's database abstraction
+                                return $query->orWhere(DB::raw('LOWER(group)'), 'LIKE', "%{$search}%");
+                        }
                     })
                     ->sortable(),
                 Tables\Columns\TextColumn::make('epgChannel.name')
