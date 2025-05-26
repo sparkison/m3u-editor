@@ -34,9 +34,9 @@ class Preferences extends SettingsPage
 
         $codecs = app(FfmpegCodecService::class)->getEncoders();
 
-        $this->videoCodecs = $codecs['video'];
-        $this->audioCodecs = $codecs['audio'];
-        $this->subtitleCodecs = $codecs['subtitle'];
+        $this->videoCodecs = $codecs['video'] ?? [];
+        $this->audioCodecs = $codecs['audio'] ?? [];
+        $this->subtitleCodecs = $codecs['subtitle'] ?? [];
     }
 
     public function form(Form $form): Form
