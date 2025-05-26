@@ -27,7 +27,7 @@ setup_env_file() {
 
     # Configure database and queue settings
     set_env "DB_CONNECTION" "sqlite"
-    set_env "QUEUE_CONNECTION" "database"
+    set_env "QUEUE_CONNECTION" "redis"
     set_env "SESSION_DRIVER" "redis"
     set_env "CACHE_STORE" "redis"
 
@@ -144,6 +144,10 @@ else
   echo "SQLite database files exist. Running migrations..."
   ./vendor/bin/sail artisan migrate
 fi
+
+# Start Horizon queue worker in the background (inside the container)
+echo "Starting Horizon queue worker..."
+./vendor/bin/sail exec -d laravel.test php artisan horizon
 
 # Install Node.js dependencies
 echo "Installing Node.js dependencies..."
