@@ -259,19 +259,20 @@ class HlsStreamService
      */
     protected function isFfmpeg(int $pid): bool
     {
-        return true;
-        //
-        // TODO: This is a placeholder for the actual implementation.
-        //       Currently not working, seems like the process is not flagged correctly (always false).
-        //       Need to do some more investigation...
-        //
-        $cmdlinePath = "/proc/{$pid}/cmdline";
-        if (! file_exists($cmdlinePath)) {
-            return false;
+        // On Linux systems
+        if (PHP_OS_FAMILY === 'Linux' && file_exists("/proc/{$pid}/cmdline")) {
+            $cmdline = file_get_contents("/proc/{$pid}/cmdline");
+            return $cmdline && (strpos($cmdline, 'ffmpeg') !== false);
         }
 
-        $cmd = @file_get_contents($cmdlinePath);
-        // FFmpeg’s binary name should appear first
-        return $cmd && strpos($cmd, 'ffmpeg') !== false;
+        // On macOS/BSD systems
+        if (PHP_OS_FAMILY === 'Darwin' || PHP_OS_FAMILY === 'BSD') {
+            $output = [];
+            exec("ps -p {$pid} -o command=", $output);
+            return !empty($output) && strpos($output[0], 'ffmpeg') !== false;
+        }
+
+        // Default fallback (just check if process exists)
+        return posix_kill($pid, 0);
     }
 }
