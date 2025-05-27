@@ -256,6 +256,15 @@ class CustomPlaylistResource extends Resource
                 ->collapsed(true)
                 ->columns(2)
                 ->schema([
+                    Forms\Components\Toggle::make('enable_proxy')
+                        ->label('Enable Proxy')
+                        ->hint(fn(Get $get): string => $get('enable_proxy') ? 'Proxied' : 'Not proxied')
+                        ->hintIcon(fn(Get $get): string => !$get('enable_proxy') ? 'heroicon-m-lock-open' : 'heroicon-m-lock-closed')
+                        ->columnSpanFull()
+                        ->live()
+                        ->inline(false)
+                        ->default(false)
+                        ->helperText('When enabled, channel urls will be proxied through m3u editor and streamed via ffmpeg (m3u editor will act as your client, playing the channels directly and sending the content to your client).'),
                     Forms\Components\TextInput::make('streams')
                         ->helperText('Number of streams available (currently used for HDHR service).')
                         ->columnSpan(1)
@@ -263,15 +272,14 @@ class CustomPlaylistResource extends Resource
                         ->type('number')
                         ->default(1) // Default to 1 stream
                         ->required(),
-                    Forms\Components\Toggle::make('enable_proxy')
-                        ->label('Enable Proxy')
-                        ->hint(fn(Get $get): string => $get('enable_proxy') ? 'Proxied' : 'Not proxied')
-                        ->hintIcon(fn(Get $get): string => !$get('enable_proxy') ? 'heroicon-m-lock-open' : 'heroicon-m-lock-closed')
+                    Forms\Components\Select::make('proxy_options.output')
+                        ->label('Proxy Output Format')
+                        ->required()
                         ->columnSpan(1)
-                        ->live()
-                        ->inline(false)
-                        ->default(false)
-                        ->helperText('When enabled, playlists urls will be proxied through m3u editor and streamed via ffmpeg.'),
+                        ->options([
+                            'ts' => 'MPEG-TS (.ts)',
+                            'hls' => 'HLS (.m3u8)',
+                        ])->default('ts')->helperText('NOTE: Only HLS streaming supports multiple clients per stream.'),
                 ])
         ];
         return [

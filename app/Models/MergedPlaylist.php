@@ -28,6 +28,7 @@ class MergedPlaylist extends Model
         'user_id' => 'integer',
         'dummy_epg' => 'boolean',
         'short_urls' => 'array',
+        'proxy_options' => 'array',
         'short_urls_enabled' => 'boolean',
         'id_channel_by' => PlaylistChannelId::class
     ];

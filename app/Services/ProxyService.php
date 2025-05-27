@@ -21,7 +21,7 @@ class ProxyService
             if ($proxyFormat === 'hls') {
                 return "$proxyUrlOverride/api/stream/$id/playlist.m3u8";
             } else {
-                return "$proxyUrlOverride/stream/$id";
+                return "$proxyUrlOverride/stream/$id.ts";
             }
         }
 

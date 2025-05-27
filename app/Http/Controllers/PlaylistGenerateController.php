@@ -49,9 +49,12 @@ class PlaylistGenerateController extends Controller
             $proxyEnabled = $playlist->enable_proxy;
         }
 
+        // Check the proxy format
+        $format = $playlist->proxy_options['output'] ?? 'ts';
+
         // Get ll active channels
         return response()->stream(
-            function () use ($playlist, $proxyEnabled, $type) {
+            function () use ($playlist, $proxyEnabled, $type, $format) {
                 // Get all active channels
                 $channels = $playlist->channels()
                     ->where('enabled', true)
@@ -80,7 +83,7 @@ class PlaylistGenerateController extends Controller
                     if ($proxyEnabled) {
                         $url = ProxyFacade::getProxyUrlForChannel(
                             id: $channel->id,
-                            format: 'ts'
+                            format: $format
                         );
                     }
                     if ($type === 'custom') {
@@ -252,12 +255,16 @@ class PlaylistGenerateController extends Controller
         $idChannelBy = $playlist->id_channel_by;
         $autoIncrement = $playlist->auto_channel_increment;
         $channelNumber = $autoIncrement ? $playlist->channel_start - 1 : 0;
-        return response()->json($channels->transform(function (Channel $channel) use ($proxyEnabled, $idChannelBy, $autoIncrement, &$channelNumber) {
+
+        // Check the proxy format
+        $format = $playlist->proxy_options['output'] ?? 'ts';
+
+        return response()->json($channels->transform(function (Channel $channel) use ($proxyEnabled, $format, $idChannelBy, $autoIncrement, &$channelNumber) {
             $url = $channel->url_custom ?? $channel->url;
             if ($proxyEnabled) {
                 $url = ProxyFacade::getProxyUrlForChannel(
                     id: $channel->id,
-                    format: 'ts'
+                    format: $format
                 );
             }
             $channelNo = $channel->channel;

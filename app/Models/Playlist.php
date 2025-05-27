@@ -37,6 +37,7 @@ class Playlist extends Model
         'xtream_config' => 'array',
         'xtream_status' => 'array',
         'short_urls' => 'array',
+        'proxy_options' => 'array',
         'short_urls_enabled' => 'boolean',
         'status' => Status::class,
         'id_channel_by' => PlaylistChannelId::class
