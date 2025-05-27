@@ -27,7 +27,7 @@ class PruneStaleHlsProcesses extends Command
 
         // Fetch the list of active channel IDs from Redis
         $activeChannelIds = Redis::smembers('hls:active_channel_ids');
-        $activeEspisodeIds = Redis::smembers('hls:active_expisode_ids');
+        $activeEspisodeIds = Redis::smembers('hls:active_episode_ids');
 
         $this->info("Found " . count($activeChannelIds) . " active channel IDs");
         $this->info("Found " . count($activeEspisodeIds) . " active episode IDs");
