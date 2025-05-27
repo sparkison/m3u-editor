@@ -25,11 +25,6 @@ class ProcessM3uImportSeriesComplete implements ShouldQueue
      */
     public function handle(): void
     {
-        // Cleanup the series that no longer exist in the playlist
-        $this->playlist->series()
-            ->where('import_batch_no', '!=', $this->batchNo)
-            ->delete();
-
         // Update the playlist status to synced
         $this->playlist->update([
             'processing' => false,
