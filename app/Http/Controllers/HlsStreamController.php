@@ -235,7 +235,7 @@ class HlsStreamController extends Controller
         abort_unless(file_exists($path), 404, 'Segment not found.');
 
         // Record timestamp in Redis (never expires until we prune)
-        Redis::set("hls:episode:last_seen:{$episodeId}", now()->timestamp);
+        Redis::set("hls:episode_last_seen:{$episodeId}", now()->timestamp);
 
         // Add to active IDs set
         Redis::sadd('hls:active_episode_ids', $episodeId);

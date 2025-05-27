@@ -27,7 +27,10 @@ class PruneStaleHlsProcesses extends Command
 
         // Fetch the list of active channel IDs from Redis
         $activeChannelIds = Redis::smembers('hls:active_channel_ids');
+        $activeEspisodeIds = Redis::smembers('hls:active_expisode_ids');
+
         $this->info("Found " . count($activeChannelIds) . " active channel IDs");
+        $this->info("Found " . count($activeEspisodeIds) . " active episode IDs");
 
         // For each active channel, check staleness
         foreach ($activeChannelIds as $channelId) {
@@ -48,6 +51,28 @@ class PruneStaleHlsProcesses extends Command
                 }
             } else {
                 $this->info("✅ Channel {$channelId} is still active");
+            }
+        }
+
+        // For each active episode, check staleness
+        foreach ($activeEspisodeIds as $episodeId) {
+            $this->info("Checking episode {$episodeId}");
+            $ts = Redis::get("hls:episode_last_seen:{$episodeId}");
+            if (! $ts) {
+                $this->info("⏰ No last-seen timestamp for {$episodeId}");
+                continue;
+            }
+            $lastSeen = Carbon::createFromTimestamp((int) $ts);
+            if ($lastSeen->addSeconds($threshold)->isPast()) {
+                $wasRunning = $this->hlsService->stopStream(type: 'episode', id: $episodeId);
+                if (!$wasRunning) {
+                    $this->info("❌ Episode {$episodeId} was not running, skipping");
+                    continue;
+                } else {
+                    $this->info("❌ Episode {$episodeId} was running and has been stopped");
+                }
+            } else {
+                $this->info("✅ Episode {$episodeId} is still active");
             }
         }
     }
