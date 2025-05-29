@@ -744,7 +744,7 @@ class PlaylistResource extends Resource
                             'ts' => 'MPEG-TS (.ts)',
                             'hls' => 'HLS (.m3u8)',
                         ])
-                        ->default('ts')->helperText('NOTE: Only HLS streaming supports multiple clients per stream.')
+                        ->default('ts')->helperText('NOTE: Only HLS streaming supports multiple connections per stream. MPEG-TS creates a new stream for each connection.')
                         ->hidden(fn(Get $get): bool => !$get('enable_proxy')),
                 ]),
         ];
