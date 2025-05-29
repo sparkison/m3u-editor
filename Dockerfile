@@ -27,6 +27,11 @@ RUN apk update && apk --no-cache add \
     git \
     bash \
     tzdata \
+    # HW accelerated video encoding
+    libva \
+    libva-utils \
+    mesa-dri-gallium \
+    mesa-va-gallium \
     # nginx + php-fpm
     nginx \
     php84-cli \
@@ -34,6 +39,13 @@ RUN apk update && apk --no-cache add \
     php84-posix \
     php84-openssl \
     php84-dev
+
+# Add architecture-specific packages conditionally
+RUN if [ "$(uname -m)" = "x86_64" ]; then \
+        apk add --no-cache intel-media-driver libva-intel-driver; \
+    else \
+        echo "Skipping Intel-specific packages on $(uname -m) architecture"; \
+    fi
 
 # Install PostgreSQL server & client
 RUN apk update && apk add --no-cache \
