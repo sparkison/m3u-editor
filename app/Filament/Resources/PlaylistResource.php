@@ -610,14 +610,10 @@ class PlaylistResource extends Resource
                         ->searchable()
                         ->multiple()
                         ->helperText('NOTE: If the list is empty, sync the playlist and check again once complete.')
-                        ->options(function ($record): array {
-                            $groups = SourceGroup::where('playlist_id', $record->id)
-                                ->get()->pluck('name', 'name')->toArray();
-                            foreach ($groups as $option) {
-                                $options[$option] = $option;
-                            }
-                            return $options;
-                        })
+                        ->options(fn ($record): array => 
+                            SourceGroup::where('playlist_id', $record->id)
+                                ->get()->pluck('name', 'name')->toArray()
+                        )
                         ->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
                     Forms\Components\TagsInput::make('import_prefs.included_group_prefixes')
                         ->label(fn(Get $get) => !$get('import_prefs.use_regex') ? 'Group prefixes to import' : 'Regex patterns to import')
