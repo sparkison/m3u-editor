@@ -17,8 +17,8 @@ return new class extends Migration
             $table->string('name_internal')->after('name')->nullable();
         });
 
-        // 2. copying the existing column values into new one
-        DB::statement('UPDATE "groups" SET "name_internal" = "name"');
+        // 2. copying the existing column values into new one using Laravel's query builder
+        DB::table('groups')->update(['name_internal' => DB::raw('name')]);
     }
 
     /**
