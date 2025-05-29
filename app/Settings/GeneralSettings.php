@@ -16,7 +16,7 @@ class GeneralSettings extends Settings
     public ?string $ffmpeg_user_agent = 'VLC/3.0.21 LibVLC/3.0.21';
     public ?bool $ffmpeg_debug = false;
     public ?int $ffmpeg_max_tries = 3;
-    public ?string $ffmpeg_codec_video = null;
+    public ?string $ffmpeg_codec_video = '';
     public ?string $ffmpeg_codec_audio = null;
     public ?string $ffmpeg_codec_subtitles = null;
     public ?string $mediaflow_proxy_url = null;
@@ -25,6 +25,18 @@ class GeneralSettings extends Settings
     public ?string $mediaflow_proxy_user_agent = null;
     public ?bool $mediaflow_proxy_playlist_user_agent = false;
     public ?string $ffmpeg_path = null;
+
+    // VAAPI and QSV settings
+    public ?string $hardware_acceleration_method = 'none';
+    public ?string $ffmpeg_custom_command_template = null;
+    // public bool $ffmpeg_vaapi_enabled = false;
+    public ?string $ffmpeg_vaapi_device = null;
+    public ?string $ffmpeg_vaapi_video_filter = null;
+    // public bool $ffmpeg_qsv_enabled = false;
+    public ?string $ffmpeg_qsv_device = null;
+    public ?string $ffmpeg_qsv_video_filter = null;
+    public ?string $ffmpeg_qsv_encoder_options = null;
+    public ?string $ffmpeg_qsv_additional_args = null;
 
     public static function group(): string
     {

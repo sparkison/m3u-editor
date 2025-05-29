@@ -322,7 +322,7 @@ class AppServiceProvider extends ServiceProvider
         // Register the HLS stream service
         $this->app->singleton(HlsStreamService::class);
 
-        // Register the FFMpeg codec service
+        // Register the FFmpeg codec service
         $this->app->singleton(FfmpegCodecService::class);
     }
 }

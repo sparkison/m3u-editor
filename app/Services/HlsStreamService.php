@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use Exception;
-use App\Settings\GeneralSettings;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -34,108 +33,8 @@ class HlsStreamService
         $cacheKey = "hls:pid:{$type}:{$id}";
         $pid = Cache::get($cacheKey);
         if (!($this->isRunning($type, $id))) {
-            // Get user preferences
-            $userPreferences = app(GeneralSettings::class);
-            $settings = [
-                'ffmpeg_debug' => false,
-                'ffmpeg_max_tries' => 3,
-                'ffmpeg_user_agent' => 'VLC/3.0.21 LibVLC/3.0.21',
-                'ffmpeg_codec_video' => 'libx264',
-                'ffmpeg_codec_audio' => 'aac',
-                'ffmpeg_codec_subtitles' => 'copy',
-                'ffmpeg_path' => 'jellyfin-ffmpeg',
-            ];
-            try {
-                $settings = [
-                    'ffmpeg_debug' => $userPreferences->ffmpeg_debug ?? $settings['ffmpeg_debug'],
-                    'ffmpeg_max_tries' => $userPreferences->ffmpeg_max_tries ?? $settings['ffmpeg_max_tries'],
-                    'ffmpeg_user_agent' => $userPreferences->ffmpeg_user_agent ?? $settings['ffmpeg_user_agent'],
-                    'ffmpeg_codec_video' => $userPreferences->ffmpeg_codec_video ?? $settings['ffmpeg_codec_video'],
-                    'ffmpeg_codec_audio' => $userPreferences->ffmpeg_codec_audio ?? $settings['ffmpeg_codec_audio'],
-                    'ffmpeg_codec_subtitles' => $userPreferences->ffmpeg_codec_subtitles ?? $settings['ffmpeg_codec_subtitles'],
-                    'ffmpeg_path' => $userPreferences->ffmpeg_path ?? $settings['ffmpeg_path'],
-                ];
-            } catch (Exception $e) {
-                // Ignore
-            }
-
-            // Get user agent
-            if (!$userAgent) {
-                $userAgent = escapeshellarg($settings['ffmpeg_user_agent']);
-            }
-
-            // Get ffmpeg path
-            $ffmpegPath = config('proxy.ffmpeg_path') ?: $settings['ffmpeg_path'];
-            if (empty($ffmpegPath)) {
-                $ffmpegPath = 'jellyfin-ffmpeg';
-            }
-
-            // Get ffmpeg output codec formats
-            $videoCodec = config('proxy.ffmpeg_codec_video') ?: $settings['ffmpeg_codec_video'];
-            $audioCodec = config('proxy.ffmpeg_codec_audio') ?: $settings['ffmpeg_codec_audio'];
-            $subtitleCodec = config('proxy.ffmpeg_codec_subtitles') ?: $settings['ffmpeg_codec_subtitles'];
-            $outputFormat = "-c:v $videoCodec -c:a $audioCodec -bsf:a aac_adtstoasc -c:s $subtitleCodec";
-
-            // Get user defined options
-            $userArgs = config('proxy.ffmpeg_additional_args', '');
-            if (!empty($userArgs)) {
-                $userArgs .= ' ';
-            }
-
-            // Setup the stream file paths
-            if ($type === 'episode') {
-                $storageDir = Storage::disk('app')->path("hls/e/{$id}");
-            } else {
-                $storageDir = Storage::disk('app')->path("hls/{$id}");
-            }
-            File::ensureDirectoryExists($storageDir, 0755);
-
-            // Setup the stream URL
-            $m3uPlaylist = "{$storageDir}/stream.m3u8";
-            $segment = "{$storageDir}/segment_%03d.ts";
-            $segmentBaseUrl = $type === 'channel'
-                ? url("/api/stream/{$id}") . '/'
-                : url("/api/stream/e/{$id}") . '/';
-
-            $cmd = sprintf(
-                $ffmpegPath . ' ' .
-                    // Optimization options:
-                    '-fflags nobuffer -flags low_delay ' .
-
-                    // Pre-input HTTP options:
-                    '-user_agent "%s" -referer "MyComputer" ' .
-                    '-multiple_requests 1 -reconnect_on_network_error 1 ' .
-                    '-reconnect_on_http_error 5xx,4xx -reconnect_streamed 1 ' .
-                    '-reconnect_delay_max 5 -noautorotate ' .
-
-                    // User defined options:
-                    '%s' .
-
-                    // I/O options:
-                    '-re -i "%s" ' .
-
-                    // Output options:
-                    '-preset veryfast -g 15 -keyint_min 15 -sc_threshold 0 ' .
-                    '%s ' . // output format
-
-                    // HLS options:
-                    '-f hls -hls_time 2 -hls_list_size 6 ' .
-                    '-hls_flags delete_segments+append_list+independent_segments ' .
-                    '-use_wallclock_as_timestamps 1 ' .
-                    '-hls_segment_filename %s ' .
-                    '-hls_base_url %s %s ' .
-
-                    // Logging:
-                    '%s',
-                $userAgent,                   // for -user_agent
-                $userArgs,                    // user defined options
-                $streamUrl,                   // input URL
-                $outputFormat,                // output format
-                $segment,                     // segment filename
-                $segmentBaseUrl,              // base URL for segments (want to make sure routed through the proxy to track active users)
-                $m3uPlaylist,                 // playlist filename
-                $settings['ffmpeg_debug'] ? '' : '-hide_banner -nostats -loglevel error'
-            );
+            // Get the command
+            $cmd = $this->buildCmd($type, $id, $userAgent, $streamUrl);
 
             // Log the command for debugging
             Log::channel('ffmpeg')->info("Streaming channel {$title} with command: {$cmd}");
@@ -274,5 +173,233 @@ class HlsStreamService
 
         // Default fallback (just check if process exists)
         return posix_kill($pid, 0);
+    }
+
+    /**
+     * Build the FFmpeg command for HLS streaming.
+     *
+     * @param string $type
+     * @param string $id
+     * @param string|null $userAgent
+     * @param string $streamUrl
+     * 
+     * @return string The complete FFmpeg command
+     */
+    private function buildCmd(
+        $type,
+        $id,
+        $userAgent,
+        $streamUrl
+    ): string {
+        // Get default stream settings
+        $settings = ProxyService::getStreamSettings();
+        $customCommandTemplate = $settings['ffmpeg_custom_command_template'] ?? null;
+
+        // Setup the stream file paths
+        if ($type === 'episode') {
+            $storageDir = Storage::disk('app')->path("hls/e/{$id}");
+        } else {
+            $storageDir = Storage::disk('app')->path("hls/{$id}");
+        }
+        File::ensureDirectoryExists($storageDir, 0755);
+
+        // Setup the stream URL
+        $m3uPlaylist = "{$storageDir}/stream.m3u8";
+        $segment = "{$storageDir}/segment_%03d.ts";
+        $segmentBaseUrl = $type === 'channel'
+            ? url("/api/stream/{$id}") . '/'
+            : url("/api/stream/e/{$id}") . '/';
+
+        // Get ffmpeg path
+        $ffmpegPath = config('proxy.ffmpeg_path') ?: $settings['ffmpeg_path'];
+        if (empty($ffmpegPath)) {
+            $ffmpegPath = 'jellyfin-ffmpeg';
+        }
+
+        // Determine the effective video codec based on config and settings
+        $finalVideoCodec = ProxyService::determineVideoCodec(
+            config('proxy.ffmpeg_codec_video', null),
+            $settings['ffmpeg_codec_video'] ?? 'copy' // Default to 'copy' if not set
+        );
+
+        // Initialize Hardware Acceleration and Codec Specific Argument Variables
+        $hwaccelInitArgs = '';    // For -init_hw_device
+        $hwaccelInputArgs = '';   // For -hwaccel options before input (e.g., -hwaccel vaapi -hwaccel_output_format vaapi)
+        $videoFilterArgs = '';    // For -vf
+        $codecSpecificArgs = '';  // For encoder options like -profile:v, -preset, etc.
+        $outputVideoCodec = $finalVideoCodec; // This might be overridden by hw accel logic
+
+        // Get user agent
+        if (!$userAgent) {
+            $userAgent = escapeshellarg($settings['ffmpeg_user_agent']);
+        }
+
+        // Get user defined options
+        $userArgs = config('proxy.ffmpeg_additional_args', '');
+        if (!empty($userArgs)) {
+            $userArgs .= ' ';
+        }
+
+        // Command construction logic
+        if (empty($customCommandTemplate)) {
+            // VA-API Settings from GeneralSettings
+            $vaapiEnabled = (($settings['hardware_acceleration_method'] ?? 'none') === 'vaapi');
+            $vaapiDevice = escapeshellarg($settings['ffmpeg_vaapi_device'] ?? '/dev/dri/renderD128');
+            $vaapiFilterFromSettings = $settings['ffmpeg_vaapi_video_filter'] ?? '';
+
+            // QSV Settings from GeneralSettings
+            $qsvEnabled = (($settings['hardware_acceleration_method'] ?? 'none') === 'qsv');
+            $qsvDevice = escapeshellarg($settings['ffmpeg_qsv_device'] ?? '/dev/dri/renderD128');
+            $qsvFilterFromSettings = $settings['ffmpeg_qsv_video_filter'] ?? '';
+            $qsvEncoderOptions = $settings['ffmpeg_qsv_encoder_options'] ?? null;
+            $qsvAdditionalArgs = $settings['ffmpeg_qsv_additional_args'] ?? null;
+
+            $isVaapiCodec = str_contains($finalVideoCodec, '_vaapi');
+            $isQsvCodec = str_contains($finalVideoCodec, '_qsv');
+
+            if ($vaapiEnabled || $isVaapiCodec) {
+                $outputVideoCodec = $isVaapiCodec ? $finalVideoCodec : 'h264_vaapi'; // Default to h264_vaapi if only toggle is on
+
+                $hwaccelInitArgs = "-init_hw_device vaapi=va_device:{$vaapiDevice} -filter_hw_device va_device:{$vaapiDevice} ";
+
+                // These args are for full hardware acceleration (decode using VA-API)
+                $hwaccelInputArgs = "-hwaccel vaapi -hwaccel_device va_device -hwaccel_output_format vaapi ";
+
+                if (!empty($vaapiFilterFromSettings)) {
+                    $videoFilterArgs = "-vf '" . trim($vaapiFilterFromSettings, "'") . "' ";
+                } else {
+                    $videoFilterArgs = ""; // No default -vf filter
+                }
+                // If $vaapiFilterFromSettings is empty, no -vf is added here for VA-API.
+                // FFmpeg will handle conversions if possible, or fail if direct path isn't supported.
+
+            } elseif ($qsvEnabled || $isQsvCodec) {
+                // Only apply QSV if VA-API wasn't chosen/enabled
+                $outputVideoCodec = $isQsvCodec ? $finalVideoCodec : 'h264_qsv'; // Default to h264_qsv
+                $qsvDeviceName = 'qsv_hw'; // Internal FFmpeg label
+
+                $hwaccelInitArgs = "-init_hw_device qsv={$qsvDeviceName}:{$qsvDevice} ";
+                // These args are for full hardware acceleration (decode using QSV)
+                $hwaccelInputArgs = "-hwaccel qsv -hwaccel_device {$qsvDeviceName} -hwaccel_output_format qsv ";
+
+                if (!empty($qsvFilterFromSettings)) {
+                    // This filter is applied to frames already in QSV format
+                    $videoFilterArgs = "-vf '" . trim($qsvFilterFromSettings, "'") . "' ";
+                }
+                if (!empty($qsvEncoderOptions)) {
+                    $codecSpecificArgs = trim($qsvEncoderOptions) . " ";
+                }
+                if (!empty($qsvAdditionalArgs)) {
+                    $userArgs = trim($qsvAdditionalArgs) . ($userArgs ? " " . $userArgs : "");
+                }
+            }
+            // If neither VA-API nor QSV is applicable, $outputVideoCodec uses $finalVideoCodec (e.g. libx264 or copy)
+            // and $hwaccelInitArgs, $hwaccelInputArgs, $videoFilterArgs remain empty from hw accel logic.
+
+            // Get ffmpeg output codec formats
+            $audioCodec = config('proxy.ffmpeg_codec_audio') ?: $settings['ffmpeg_codec_audio'];
+            $subtitleCodec = config('proxy.ffmpeg_codec_subtitles') ?: $settings['ffmpeg_codec_subtitles'];
+            $outputFormat = "-c:v {$outputVideoCodec} " . ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "") . "-c:a {$audioCodec} -bsf:a aac_adtstoasc -c:s {$subtitleCodec}";
+
+            // Reconstruct FFmpeg Command (ensure $ffmpegPath is escaped if it can contain spaces, though unlikely for a binary name)
+            $cmd = escapeshellcmd($ffmpegPath) . ' ';
+            $cmd .= $hwaccelInitArgs;  // e.g., -init_hw_device (goes before input options that use it, but after global options)
+            $cmd .= $hwaccelInputArgs; // e.g., -hwaccel vaapi (these must go BEFORE the -i input)
+
+            $cmd .= '-fflags nobuffer -flags low_delay ';
+
+            // Use the user agent from settings, escape it. $userAgent parameter is ignored for now.
+            $cmd .= "-user_agent " . escapeshellarg($settings['ffmpeg_user_agent']) . " -referer \"MyComputer\" " .
+                '-multiple_requests 1 -reconnect_on_network_error 1 ' .
+                '-reconnect_on_http_error 5xx,4xx,509 -reconnect_streamed 1 ' .
+                '-reconnect_delay_max 5 -noautorotate ';
+
+            $cmd .= $userArgs; // User-defined global args from config/proxy.php or QSV additional args
+
+            $cmd .= '-re -i ' . escapeshellarg($streamUrl) . ' ';
+            $cmd .= $videoFilterArgs; // e.g., -vf 'scale_vaapi=format=nv12' or -vf 'vpp_qsv=format=nv12'
+
+            $cmd .= $outputFormat . ' ';
+        } else {
+            // Custom command template is provided
+            $cmd = $customCommandTemplate;
+
+            // Prepare placeholder values
+            $hwaccelInitArgsValue = '';
+            $hwaccelArgsValue = '';
+            $videoFilterArgsValue = '';
+
+            // QSV options
+            $qsvEncoderOptionsValue = $settings['ffmpeg_qsv_encoder_options'] ? escapeshellarg($settings['ffmpeg_qsv_encoder_options']) : '';
+            $qsvAdditionalArgsValue = $settings['ffmpeg_qsv_additional_args'] ? escapeshellarg($settings['ffmpeg_qsv_additional_args']) : '';
+
+            // Determine codec type
+            $isVaapiCodec = str_contains($finalVideoCodec, '_vaapi');
+            $isQsvCodec = str_contains($finalVideoCodec, '_qsv');
+
+            if ($settings['ffmpeg_vaapi_enabled'] ?? false) {
+                $finalVideoCodec = $isVaapiCodec ? $finalVideoCodec : 'h264_vaapi'; // Default to h264_vaapi if not already set
+                if (!empty($settings['ffmpeg_vaapi_device'])) {
+                    $hwaccelInitArgsValue = "-init_hw_device vaapi=va_device:" . escapeshellarg($settings['ffmpeg_vaapi_device']) . " -filter_hw_device va_device ";
+                    $hwaccelArgsValue = "-hwaccel vaapi -hwaccel_device va_device -hwaccel_output_format vaapi ";
+                }
+                if (!empty($settings['ffmpeg_vaapi_video_filter'])) {
+                    $videoFilterArgsValue = "-vf " . escapeshellarg(trim($settings['ffmpeg_vaapi_video_filter'], "'\",")) . " ";
+                }
+            } else if ($settings['ffmpeg_qsv_enabled'] ?? false) {
+                $finalVideoCodec = $isQsvCodec ? $finalVideoCodec : 'h264_qsv'; // Default to h264_qsv if not already set
+                if (!empty($settings['ffmpeg_qsv_device'])) {
+                    $hwaccelInitArgsValue = "-init_hw_device qsv=qsv_hw:" . escapeshellarg($settings['ffmpeg_qsv_device']) . " ";
+                    $hwaccelArgsValue = '-hwaccel qsv -hwaccel_device qsv_hw -hwaccel_output_format qsv ';
+                }
+                if (!empty($settings['ffmpeg_qsv_video_filter'])) {
+                    $videoFilterArgsValue = "-vf " . escapeshellarg(trim($settings['ffmpeg_qsv_video_filter'], "'\",")) . " ";
+                }
+
+                // Additional QSV specific options
+                $codecSpecificArgs = $settings['ffmpeg_qsv_encoder_options'] ? escapeshellarg($settings['ffmpeg_qsv_encoder_options']) : '';
+                if (!empty($settings['ffmpeg_qsv_additional_args'])) {
+                    $userArgs = trim($settings['ffmpeg_qsv_additional_args']) . ($userArgs ? " " . $userArgs : "");
+                }
+            }
+
+            $videoCodecForTemplate = $settings['ffmpeg_codec_video'] ?: 'copy';
+            $audioCodecForTemplate = $settings['ffmpeg_codec_audio'] ?: 'copy';
+            $subtitleCodecForTemplate = $settings['ffmpeg_codec_subtitles'] ?: 'copy';
+
+            $outputCommandSegment = "-c:v {$outputVideoCodec} " . ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "") . "-c:a {$audioCodecForTemplate} -bsf:a aac_adtstoasc -c:s {$subtitleCodecForTemplate}";
+
+            $videoCodecArgs = "-c:v {$videoCodecForTemplate}" . ($codecSpecificArgs ? " " . trim($codecSpecificArgs) : "");
+            $audioCodecArgs = "-c:a {$audioCodecForTemplate}";
+            $subtitleCodecArgs = "-c:s {$subtitleCodecForTemplate}";
+
+            // Perform replacements
+            $cmd = str_replace('{FFMPEG_PATH}', escapeshellcmd($ffmpegPath), $cmd);
+            $cmd = str_replace('{INPUT_URL}', escapeshellarg($streamUrl), $cmd);
+            $cmd = str_replace('{OUTPUT_OPTIONS}', $outputCommandSegment, $cmd);
+            $cmd = str_replace('{USER_AGENT}', $userAgent, $cmd); // $userAgent is already escaped
+            $cmd = str_replace('{REFERER}', escapeshellarg("MyComputer"), $cmd);
+            $cmd = str_replace('{HWACCEL_INIT_ARGS}', $hwaccelInitArgsValue, $cmd);
+            $cmd = str_replace('{HWACCEL_ARGS}', $hwaccelArgsValue, $cmd);
+            $cmd = str_replace('{VIDEO_FILTER_ARGS}', $videoFilterArgsValue, $cmd);
+            $cmd = str_replace('{VIDEO_CODEC_ARGS}', $videoCodecArgs, $cmd);
+            $cmd = str_replace('{AUDIO_CODEC_ARGS}', $audioCodecArgs, $cmd);
+            $cmd = str_replace('{SUBTITLE_CODEC_ARGS}', $subtitleCodecArgs, $cmd);
+            $cmd = str_replace('{QSV_ENCODER_OPTIONS}', $qsvEncoderOptionsValue, $cmd);
+            $cmd = str_replace('{QSV_ADDITIONAL_ARGS}', $qsvAdditionalArgsValue, $cmd);
+            $cmd = str_replace('{ADDITIONAL_ARGS}', $userArgs, $cmd); // If user wants to include general additional args
+        }
+
+        // ... rest of the options and command suffix ...
+        $cmd .= ' -f hls -hls_time 2 -hls_list_size 6 ' .
+            '-hls_flags delete_segments+append_list+independent_segments ' .
+            '-use_wallclock_as_timestamps 1 ' .
+            '-hls_segment_filename ' . escapeshellarg($segment) . ' ' .
+            '-hls_base_url ' . escapeshellarg($segmentBaseUrl) . ' ' .
+            escapeshellarg($m3uPlaylist) . ' ';
+
+        $cmd .= ($settings['ffmpeg_debug'] ? ' -loglevel verbose' : ' -hide_banner -nostats -loglevel error');
+
+        return $cmd;
     }
 }
