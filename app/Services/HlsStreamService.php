@@ -6,6 +6,7 @@ use Exception;
 use App\Models\Channel;
 use App\Exceptions\SourceNotResponding;
 use App\Exceptions\SourceSpeedBelowThreshold;
+use App\Models\Episode;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -416,7 +417,7 @@ class HlsStreamService
      * This method also tracks connections, performs pre-checks using ffprobe, and monitors for slow speed.
      *
      * @param string $type
-     * @param Channel $channel The Channel model instance
+     * @param Channel|Episode $channel The Channel model instance
      * @param string $streamUrl The URL to stream from
      * @param string $title The title of the channel
      * 
@@ -424,13 +425,25 @@ class HlsStreamService
      */
     public function startStreamWithFailover(
         string $type,
-        Channel $channel,
+        Channel|Episode $model,
         string $streamUrl,
         string $title
     ): ?int {
         // Get the failover channels (if any)
-        $sourceChannel = $channel;
-        $streams = collect([$channel])->concat($channel->failoverChannels);
+        $sourceChannel = $model;
+        $streams = collect([$model]);
+        if ($type === 'channel') {
+            $streams->concat($model->failoverChannels);
+        }
+
+        // Record timestamp in Redis (never expires until we prune)
+        Redis::set("hls:{$type}_last_seen:{$model->id}", now()->timestamp);
+
+        // Add to active IDs set
+        Redis::sadd("hls:active_{$type}_ids", $model->id);
+
+        // Track the base stream ID, failover will place content in the same folder to prevent redirects
+        $modelId = $model->id;
 
         // Loop over the failover channels and grab the first one that works.
         foreach ($streams as $stream) {
@@ -444,7 +457,7 @@ class HlsStreamService
                 if ($sourceChannel->id === $stream->id) {
                     Log::channel('ffmpeg')->info("Skipping source ID {$title} ({$sourceChannel->id}) for as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
                 } else {
-                    Log::channel('ffmpeg')->info("Skipping Failover Channel {$stream->name} for source {$title} ({$sourceChannel->id}) as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
+                    Log::channel('ffmpeg')->info("Skipping Failover {$type} {$stream->name} for source {$title} ({$sourceChannel->id}) as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
                 }
                 continue;
             }
@@ -474,10 +487,9 @@ class HlsStreamService
             }
 
             // Setup streams array
-            $streamUrl = $stream->url_custom ?? $channel->url;
+            $streamUrl = $model->url_custom ?? $model->url;
 
             // Determine the output format
-            $channelId = $stream->id;
             $userAgent = $playlist->user_agent ?? null;
 
             try {
@@ -487,7 +499,7 @@ class HlsStreamService
                 // Attempt to start the stream and monitor for slow speed
                 return $this->startStreamWithSpeedCheck(
                     type: $type,
-                    id: $stream->id,
+                    id: $modelId,
                     streamUrl: $streamUrl,
                     title: $title,
                     userAgent: $userAgent,
@@ -519,8 +531,8 @@ class HlsStreamService
         }
 
         // If no streams were successful, log and return null
-        Log::channel('ffmpeg')->error("All streams failed for {$type} {$channelId} ({$title}).");
-        return null;
+        Log::channel('ffmpeg')->error("All streams failed for {$type} {$modelId} ({$title}).");
+        throw new Exception("No valid stream found for {$type} {$modelId} ({$title}).");
     }
 
     /**
@@ -553,7 +565,8 @@ class HlsStreamService
 
         // Track the PID for `isRunning()`
         $pid = $process->getPid();
-        Cache::forever("hls:pid:{$type}:{$id}", $pid);
+        $cacheKey = "hls:pid:{$type}:{$id}";
+        Cache::forever($cacheKey, $pid);
 
         $lowSpeedCount = 0;
         while ($process->isRunning()) {
@@ -570,6 +583,8 @@ class HlsStreamService
                         $lowSpeedCount++;
                         Log::channel('ffmpeg')->warning("Low speed count for [{$title}]: {$lowSpeedCount}");
                         if ($lowSpeedCount >= 3) {
+                            $process->stop();
+                            Cache::forget($cacheKey);
                             throw new SourceSpeedBelowThreshold("Low speed threshold reached for {$title}. Speed: {$speed}");
                         }
                     }
@@ -583,6 +598,7 @@ class HlsStreamService
         }
 
         if (!$process->isSuccessful()) {
+            Cache::forget($cacheKey);
             throw new Exception("FFmpeg process failed for [{$title}]: " . $process->getErrorOutput());
         }
         Log::channel('ffmpeg')->info("Streaming {$type} {$title} with command: {$cmd}");

@@ -150,7 +150,7 @@ class HlsStreamController extends Controller
             try {
                 $this->hlsService->startStreamWithFailover(
                     type: $type,
-                    channel: $model,
+                    model: $model,
                     streamUrl: $streamUrl,
                     title: $title
                 );
