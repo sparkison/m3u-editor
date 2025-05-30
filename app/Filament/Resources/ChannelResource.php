@@ -73,7 +73,7 @@ class ChannelResource extends Resource
             })
             ->modifyQueryUsing(function (Builder $query) {
                 $query->with(['epgChannel', 'playlist'])
-                    ->withCount(['channelFailovers']);
+                    ->withCount(['failovers']);
             })
             ->deferLoading()
             ->paginated([10, 25, 50, 100])
@@ -100,11 +100,11 @@ class ChannelResource extends Resource
                     ->tooltip(fn($record) => $record->playlist->auto_sort ? 'Playlist auto-sort enabled; disable to change' : 'Channel sort order')
                     ->disabled(fn($record) => $record->playlist->auto_sort)
                     ->toggleable(),
-                // Tables\Columns\TextColumn::make('channelFailovers_count')
-                //     ->label('Failovers')
-                //     ->counts('channelFailovers')
-                //     ->toggleable()
-                //     ->sortable(),
+                Tables\Columns\TextColumn::make('failovers_count')
+                    ->label('Failovers')
+                    ->counts('failovers')
+                    ->toggleable()
+                    ->sortable(),
                 Tables\Columns\TextInputColumn::make('stream_id_custom')
                     ->label('ID')
                     ->rules(['min:0', 'max:255'])
@@ -723,7 +723,7 @@ class ChannelResource extends Resource
                 ]),
             Forms\Components\Fieldset::make('Failover Channels')
                 ->schema([
-                    Forms\Components\Repeater::make('channelFailovers')
+                    Forms\Components\Repeater::make('failovers')
                         ->relationship()
                         ->label('')
                         ->reorderable()

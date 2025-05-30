@@ -62,7 +62,7 @@ class Channel extends Model
         return $this->belongsToMany(CustomPlaylist::class, 'channel_custom_playlist');
     }
 
-    public function channelFailovers()
+    public function failovers()
     {
         return $this->hasMany(ChannelFailover::class, 'channel_id');
     }
