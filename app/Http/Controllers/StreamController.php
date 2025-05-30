@@ -47,28 +47,28 @@ class StreamController extends Controller
 
         // Get the failover channels (if any)
         $sourceChannel = $channel;
-        $failoverChannels = collect([$channel])->concat($channel->failoverChannels);
-        $streamCount = $failoverChannels->count();
+        $streams = collect([$channel])->concat($channel->failoverChannels);
+        $streamCount = $streams->count();
 
         // Loop over the failover channels and grab the first one that works.
-        foreach ($failoverChannels as $failoverChannel) {
+        foreach ($streams as $stream) {
             // Get the title for the channel
-            $title = $failoverChannel->title_custom ?? $failoverChannel->title;
+            $title = $stream->title_custom ?? $stream->title;
             $title = strip_tags($title);
 
             // Make sure we have a valid source channel
-            $badSourceCacheKey = self::BAD_SOURCE_CACHE_PREFIX . $failoverChannel->id;
+            $badSourceCacheKey = self::BAD_SOURCE_CACHE_PREFIX . $stream->id;
             if (Redis::exists($badSourceCacheKey)) {
-                if ($sourceChannel->id !== $failoverChannel->id) {
+                if ($sourceChannel->id === $stream->id) {
                     Log::channel('ffmpeg')->info("Skipping source ID {$title} ({$sourceChannel->id}) for as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
                 } else {
-                    Log::channel('ffmpeg')->info("Skipping Failover Channel {$failoverChannel->name} for source {$title} ({$sourceChannel->id}) as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
+                    Log::channel('ffmpeg')->info("Skipping Failover Channel {$stream->name} for source {$title} ({$sourceChannel->id}) as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
                 }
                 continue;
             }
 
             // Check if playlist is specified
-            $playlist = $failoverChannel->playlist;
+            $playlist = $stream->playlist;
 
             // Keep track of the active streams for this playlist using optimistic locking pattern
             $activeStreamsKey = "mpts:active_streams:{$playlist->id}";
@@ -92,12 +92,12 @@ class StreamController extends Controller
             }
 
             // Setup streams array
-            $streamUrl = $failoverChannel->url_custom ?? $channel->url;
+            $streamUrl = $stream->url_custom ?? $channel->url;
 
             // Determine the output format
             $ip = $request->ip();
             $streamId = uniqid();
-            $channelId = $failoverChannel->id;
+            $channelId = $stream->id;
             $contentType = $format === 'ts' ? 'video/MP2T' : 'video/mp4';
 
             // Start the stream for the current source (primary or failover channel)
@@ -257,7 +257,7 @@ class StreamController extends Controller
         // Get the low speed threshold
         $lowSpeedThreshold = null;
         if ($failoverSupport) {
-            $lowSpeedThreshold = config('proxy.ffmpeg_low_speed_threshold', 0.9);
+            $lowSpeedThreshold = (float) config('proxy.ffmpeg_low_speed_threshold', 0.9);
         }
 
         // Get user agent
@@ -403,9 +403,9 @@ class StreamController extends Controller
                             $lines = preg_split('/\r?\n/', trim($buffer));
                             foreach ($lines as $line) {
                                 if (preg_match('/speed=\s*([0-9\.]+x)/', $line, $matches)) {
-                                    $speed = $matches[1];
+                                    $speed = (float) $matches[1];
                                     Log::channel('ffmpeg')->info("FFmpeg speed: {$speed}");
-                                    if ((float)$speed < (float)$lowSpeedThreshold && (float)$speed > 0.0) {
+                                    if ($speed < $lowSpeedThreshold && $speed > 0.0) {
                                         $lowSpeedCount++;
                                         Log::channel('ffmpeg')->warning("Low speed count for [{$title}]: {$lowSpeedCount}");
                                         if ($lowSpeedCount >= 3) {
