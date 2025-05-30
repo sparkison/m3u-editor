@@ -86,7 +86,10 @@ class Channel extends Model
      */
     public function getProxyUrlAttribute(): string
     {
-        return ProxyFacade::getProxyUrlForChannel($this->id);
+        return ProxyFacade::getProxyUrlForChannel(
+            $this->id,
+            $this->playlist->proxy_options['output'] ?? 'ts'
+        );
     }
 
     /**

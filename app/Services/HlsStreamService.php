@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\Process\Process as SymfonyProcess;
 
 class HlsStreamService
 {
@@ -401,5 +402,166 @@ class HlsStreamService
         $cmd .= ($settings['ffmpeg_debug'] ? ' -loglevel verbose' : ' -hide_banner -nostats -loglevel error');
 
         return $cmd;
+    }
+
+    /**
+     * Start an HLS stream with failover support for the given channel.
+     * This method also tracks connections, performs pre-checks using ffprobe, and monitors for slow speed.
+     *
+     * @param string $type
+     * @param string $id
+     * @param array $streamUrls List of stream URLs to try (primary and failover sources)
+     * @param string $title
+     * @param string|null $userAgent
+     * @param int $maxConnections Maximum allowed connections for the stream
+     * @param float|null $lowSpeedThreshold Threshold for low speed detection
+     * 
+     * @return int|null The FFmpeg process ID or null if no valid stream was found
+     */
+    public function startStreamWithFailover(
+        $type,
+        $id,
+        array $streamUrls,
+        $title,
+        $userAgent = null,
+        $maxConnections = 0,
+        $lowSpeedThreshold = null
+    ): ?int {
+        $activeStreamsKey = "hls:active_streams:{$type}:{$id}";
+
+        // Increment active streams count
+        $activeStreams = Redis::incr($activeStreamsKey);
+
+        // Ensure active streams count is valid
+        if ($activeStreams <= 0) {
+            Redis::set($activeStreamsKey, 1);
+            $activeStreams = 1;
+        }
+
+        // Check if max connections are exceeded
+        if ($maxConnections > 0 && $activeStreams > $maxConnections) {
+            Redis::decr($activeStreamsKey);
+            Log::channel('ffmpeg')->info("Max connections reached for {$type} {$id} ({$title}).");
+            return null;
+        }
+
+        foreach ($streamUrls as $streamUrl) {
+            try {
+                // Run pre-check with ffprobe
+                $this->runPreCheck($streamUrl, $userAgent, $title);
+
+                // Attempt to start the stream and monitor for slow speed
+                return $this->startStreamWithSpeedCheck(
+                    $type,
+                    $id,
+                    $streamUrl,
+                    $title,
+                    $userAgent,
+                    $lowSpeedThreshold
+                );
+            } catch (Exception $e) {
+                // Log the failure and try the next stream
+                Log::channel('ffmpeg')->error("Failed to start stream for URL {$streamUrl}: {$e->getMessage()}");
+                continue;
+            }
+        }
+
+        // Decrement active streams count if all fail
+        Redis::decr($activeStreamsKey);
+
+        // If no streams were successful, log and return null
+        Log::channel('ffmpeg')->error("All streams failed for {$type} {$id} ({$title}).");
+        return null;
+    }
+
+    /**
+     * Start a stream and monitor for slow speed.
+     *
+     * @param string $type
+     * @param string $id
+     * @param string $streamUrl
+     * @param string $title
+     * @param string|null $userAgent
+     * @param float|null $lowSpeedThreshold
+     * 
+     * @return int The FFmpeg process ID
+     * @throws Exception If the stream fails or speed drops below the threshold
+     */
+    private function startStreamWithSpeedCheck(
+        $type,
+        $id,
+        $streamUrl,
+        $title,
+        $userAgent = null,
+        $lowSpeedThreshold = null
+    ): int {
+        $cmd = $this->buildCmd($type, $id, $userAgent, $streamUrl);
+        Log::channel('ffmpeg')->info("[STREAM] Starting FFmpeg command for [{$title}]: {$cmd}");
+
+        $process = SymfonyProcess::fromShellCommandline($cmd);
+        $process->setTimeout(null);
+        $process->start(); // Start the process in the background
+
+        // Track the PID for isRunning()
+        $pid = $process->getPid();
+        Cache::forever("hls:pid:{$type}:{$id}", $pid);
+
+        $lowSpeedCount = 0;
+        while ($process->isRunning()) {
+            $output = $process->getIncrementalErrorOutput();
+
+            // Monitor speed from FFmpeg logs
+            if (preg_match_all('/speed=\s*([0-9\.]+)x/', $output, $matches)) {
+                foreach ($matches[1] as $speedValue) {
+                    $speed = (float) $speedValue;
+                    Log::channel('ffmpeg')->info("[STREAM] Speed for [{$title}]: {$speed}x");
+
+                    if ($lowSpeedThreshold !== null && $speed < $lowSpeedThreshold) {
+                        $lowSpeedCount++;
+                        Log::channel('ffmpeg')->warning("[STREAM] Low speed detected for [{$title}]: {$speed}x (Count: {$lowSpeedCount})");
+
+                        if ($lowSpeedCount >= 3) {
+                            $process->stop(); // Stop the process if speed is too low
+                            throw new Exception("Low speed threshold reached for [{$title}].");
+                        }
+                    } else {
+                        $lowSpeedCount = 0; // Reset count if speed is acceptable
+                    }
+                }
+            }
+            usleep(100000); // Sleep for 100ms to reduce CPU usage
+        }
+
+        if (!$process->isSuccessful()) {
+            throw new Exception("FFmpeg process failed for [{$title}]: " . $process->getErrorOutput());
+        }
+        Log::channel('ffmpeg')->info("[STREAM] FFmpeg process started successfully for [{$title}].");
+
+        return $pid;
+    }
+
+    /**
+     * Run a pre-check using ffprobe to validate the stream.
+     *
+     * @param string $streamUrl
+     * @param string|null $userAgent
+     * @param string $title
+     * 
+     * @throws Exception If the pre-check fails
+     */
+    private function runPreCheck($streamUrl, $userAgent, $title)
+    {
+        $ffprobePath = config('proxy.ffprobe_path', 'ffprobe');
+        $cmd = "$ffprobePath -v quiet -print_format json -show_streams -select_streams v:0 -user_agent " . escapeshellarg($userAgent) . " " . escapeshellarg($streamUrl);
+        Log::channel('ffmpeg')->info("[PRE-CHECK] Executing ffprobe command for [{$title}]: {$cmd}");
+
+        $process = SymfonyProcess::fromShellCommandline($cmd);
+        $process->setTimeout(5);
+        $process->run();
+        if (!$process->isSuccessful()) {
+            throw new Exception("ffprobe failed for {$title}: " . $process->getErrorOutput());
+        }
+
+        Log::channel('ffmpeg')->info("[PRE-CHECK] ffprobe successful for [{$title}].");
     }
 }

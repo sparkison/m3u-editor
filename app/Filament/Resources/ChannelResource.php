@@ -671,14 +671,20 @@ class ChannelResource extends Resource
                         ->label('Proxy URL')
                         ->columnSpan(1)
                         ->prefixIcon('heroicon-m-globe-alt')
-                        ->placeholder(fn($record) => ProxyFacade::getProxyUrlForChannel($record->id))
+                        ->placeholder(fn($record) => ProxyFacade::getProxyUrlForChannel(
+                            $record->id,
+                            $record->playlist->proxy_options['output'] ?? 'ts'
+                        ))
                         ->helperText("m3u editor proxy url.")
                         ->disabled()
                         ->suffixAction(
                             Forms\Components\Actions\Action::make('copy')
                                 ->icon('heroicon-s-eye')
                                 ->action(function ($record, $state) {
-                                    $url = ProxyFacade::getProxyUrlForChannel($record->id);
+                                    $url = ProxyFacade::getProxyUrlForChannel(
+                                        $record->id,
+                                        $record->playlist->proxy_options['output'] ?? 'ts'
+                                    );
                                     $title = $record->title_custom ?? $record->title;
                                     Notification::make()
                                         ->icon('heroicon-s-eye')
