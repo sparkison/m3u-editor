@@ -71,7 +71,7 @@ class StreamController extends Controller
             $playlist = $stream->playlist;
 
             // Keep track of the active streams for this playlist using optimistic locking pattern
-            $activeStreamsKey = "mpts:active_streams:{$playlist->id}";
+            $activeStreamsKey = "active_streams:{$playlist->id}";
 
             // First increment the counter
             $activeStreams = Redis::incr($activeStreamsKey);
@@ -131,9 +131,13 @@ class StreamController extends Controller
                 continue;
             } catch (Exception $e) {
                 // Log the error and abort
-                Redis::decr($activeStreamsKey);
                 Log::channel('ffmpeg')->error("Error streaming channel {$title}: " . $e->getMessage());
-                abort(503, 'Failed to start stream.');
+                Redis::setex($badSourceCacheKey, self::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
+
+                // Try the next failover channel
+                continue;
+            } finally {
+                Redis::decr($activeStreamsKey);
             }
         }
 
@@ -173,7 +177,7 @@ class StreamController extends Controller
         $playlist = $episode->playlist;
 
         // Keep track of the active streams for this playlist using optimistic locking pattern
-        $activeStreamsKey = "mpts:active_streams:{$playlist->id}";
+        $activeStreamsKey = "active_streams:{$playlist->id}";
 
         // First increment the counter
         $activeStreams = Redis::incr($activeStreamsKey);
@@ -404,7 +408,7 @@ class StreamController extends Controller
                             foreach ($lines as $line) {
                                 if (preg_match('/speed=\s*([0-9\.]+x)/', $line, $matches)) {
                                     $speed = (float) $matches[1];
-                                    Log::channel('ffmpeg')->info("FFmpeg speed: {$speed}");
+                                    Log::channel('ffmpeg')->info("Speed for [{$title}]: {$speed}x");
                                     if ($speed < $lowSpeedThreshold && $speed > 0.0) {
                                         $lowSpeedCount++;
                                         Log::channel('ffmpeg')->warning("Low speed count for [{$title}]: {$lowSpeedCount}");
