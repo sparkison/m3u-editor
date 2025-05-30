@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use Exception;
 use App\Exceptions\SourceNotResponding;
 use App\Exceptions\SourceSpeedBelowThreshold;
-use Exception;
 use App\Models\Channel;
 use App\Models\Episode;
 use App\Services\ProxyService;
