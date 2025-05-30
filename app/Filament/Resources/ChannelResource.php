@@ -667,12 +667,6 @@ class ChannelResource extends Resource
                                 })
                         )
                         ->type('url'),
-                    // Forms\Components\TextInput::make('proxy_url')
-                    //     ->columnSpan(1)
-                    //     ->prefixIcon('heroicon-m-globe-alt')
-                    //     ->helperText("m3u editor proxy url for this channel.")
-                    //     ->readOnly()
-                    //     ->dehydrated(false), // don't save the value in the database
                     Forms\Components\TextInput::make('url_proxy')
                         ->label('Proxy URL')
                         ->columnSpan(1)
