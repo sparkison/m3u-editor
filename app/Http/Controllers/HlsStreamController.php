@@ -147,14 +147,12 @@ class HlsStreamController extends Controller
         // Start stream, if not already running
         if (!$this->hlsService->isRunning(type: $type, id: $model->id)) {
             $title = strip_tags($title);
-            $playlist = $model->playlist;
             try {
-                $this->hlsService->startStream(
+                $this->hlsService->startStreamWithFailover(
                     type: $type,
-                    id: $model->id,
+                    channel: $model,
                     streamUrl: $streamUrl,
-                    title: $title,
-                    userAgent: $playlist->user_agent ?? null,
+                    title: $title
                 );
                 Log::channel('ffmpeg')->info("Started HLS stream for $type {$model->id} ({$title})");
             } catch (Exception $e) {
