@@ -96,6 +96,261 @@ class HlsStreamService
     }
 
     /**
+     * Start an HLS stream with failover support for the given channel.
+     * This method also tracks connections, performs pre-checks using ffprobe, and monitors for slow speed.
+     *
+     * @param string $type
+     * @param Channel|Episode $model The Channel model instance
+     * @param string $streamUrl The URL to stream from
+     * @param string $title The title of the channel
+     */
+    public function startStreamWithFailover(
+        string $type,
+        Channel|Episode $model,
+        string $streamUrl,
+        string $title
+    ): void {
+        // Get the failover channels (if any)
+        $streams = collect([$model]);
+        if ($type === 'channel') {
+            $streams->concat($model->failoverChannels);
+        }
+
+        // Record timestamp in Redis (never expires until we prune)
+        Redis::set("hls:{$type}_last_seen:{$model->id}", now()->timestamp);
+
+        // Add to active IDs set
+        Redis::sadd("hls:active_{$type}_ids", $model->id);
+
+        // Get the title for the channel
+        $title = $type === 'channel'
+            ? $model->title_custom ?? $model->title
+            : $model->title;
+        $title = strip_tags($title);
+
+        // Loop over the failover channels and grab the first one that works.
+        foreach ($streams as $stream) {
+            // Make sure we have a valid source channel
+            $badSourceCacheKey = ProxyService::BAD_SOURCE_CACHE_PREFIX . $stream->id;
+            if (Redis::exists($badSourceCacheKey)) {
+                if ($model->id === $stream->id) {
+                    Log::channel('ffmpeg')->info("Skipping source ID {$title} ({$model->id}) for as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
+                } else {
+                    Log::channel('ffmpeg')->info("Skipping Failover {$type} {$stream->name} for source {$title} ({$model->id}) as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
+                }
+                continue;
+            }
+
+            // Check if playlist is specified
+            $playlist = $stream->playlist;
+
+            // Keep track of the active streams for this playlist using optimistic locking pattern
+            $activeStreamsKey = "active_streams:{$playlist->id}";
+
+            // First increment the counter
+            $activeStreams = Redis::incr($activeStreamsKey);
+
+            // Make sure we haven't gone negative for any reason, this should never be 0 or less
+            if ($activeStreams <= 0) {
+                Redis::set($activeStreamsKey, 1);
+                $activeStreams = 1;
+            }
+            Log::channel('ffmpeg')->info("Active streams for playlist {$playlist->id}: {$activeStreams} (after increment)");
+
+            // Then check if we're over limit
+            if ($playlist->available_streams > 0 && $activeStreams > $playlist->available_streams) {
+                // We're over limit, so decrement and skip
+                Redis::decr($activeStreamsKey);
+                Log::channel('ffmpeg')->info("Max streams reached for playlist {$playlist->name} ({$playlist->id}). Skipping channel {$title}.");
+                continue;
+            }
+
+            // Setup streams array
+            $streamUrl = $type === 'channel'
+                ? $model->url_custom ?? $model->url
+                : $model->url;
+
+            // Determine the output format
+            $userAgent = $playlist->user_agent ?? null;
+            try {
+                // Run pre-check with ffprobe
+                $this->runPreCheck($streamUrl, $userAgent, $title);
+
+                // Attempt to start the stream
+                $this->startStreamWithSpeedCheck(
+                    type: $type, // 'channel' or 'episode'
+                    model: $model, // Peg to the base model
+                    streamId: $stream->id, // Use the failover channel ID
+                    streamUrl: $streamUrl, // Could be different based on the failover status
+                    title: $title, // Peg to the base model
+                    userAgent: $userAgent, // Dynamic, pulled from the source playlist user agent settings
+                    playlistId: $playlist->id, // Use the playlist ID for tracking
+                );
+            } catch (SourceSpeedBelowThreshold $e) {
+                // Log the error and cache the bad source
+                Log::channel('ffmpeg')->error("Source speed below threshold for channel {$title}: " . $e->getMessage());
+                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
+
+                // Try the next failover channel
+                continue;
+            } catch (SourceNotResponding $e) {
+                // Log the error and cache the bad source
+                Log::channel('ffmpeg')->error("Source not responding for channel {$title}: " . $e->getMessage());
+                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
+
+                // Try the next failover channel
+                continue;
+            } catch (Exception $e) {
+                // Log the error and abort
+                Log::channel('ffmpeg')->error("Error streaming channel {$title}: " . $e->getMessage());
+                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
+
+                // Try the next failover channel
+                continue;
+            }
+        }
+    }
+
+    /**
+     * Start a stream and monitor for slow speed.
+     *
+     * @param string $type
+     * @param Channel|Episode $model
+     * @param int $streamId
+     * @param string $streamUrl
+     * @param string $title
+     * @param int $playlistId
+     * @param string|null $userAgent
+     * 
+     * @return int The FFmpeg process ID
+     * @throws Exception If the stream fails or speed drops below the threshold
+     */
+    private function startStreamWithSpeedCheck(
+        string $type,
+        Channel|Episode $model,
+        int $streamId,
+        string $streamUrl,
+        string $title,
+        int $playlistId,
+        string|null $userAgent,
+    ): int {
+        // Setup the stream
+        $cmd = $this->buildCmd($type, $model->id, $userAgent, $streamUrl);
+
+        // Use proc_open approach similar to startStream
+        $descriptors = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $pipes = [];
+        $process = proc_open($cmd, $descriptors, $pipes);
+
+        if (!is_resource($process)) {
+            throw new Exception("Failed to launch FFmpeg for {$title}");
+        }
+
+        // Close stdin/stdout
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+
+        // Make stderr non-blocking
+        stream_set_blocking($pipes[2], false);
+
+        // Get the PID and cache it
+        $status = proc_get_status($process);
+        $pid = $status['pid'];
+        $cacheKey = "hls:pid:{$type}:{$model->id}";
+        Cache::forever($cacheKey, $pid);
+
+        // Set up a monitor function that checks speed but doesn't block
+        register_shutdown_function(function () use (
+            $pipes,
+            $process,
+            $type,
+            $model,
+            $title,
+            $pid,
+            $streamId,
+            $streamUrl,
+            $playlistId
+        ) {
+            $stderr = $pipes[2];
+            $lowSpeedCount = 0;
+            $lowSpeedThreshold = (float) config('proxy.ffmpeg_low_speed_threshold', 0.9);
+
+            while (!feof($stderr)) {
+                $line = fgets($stderr);
+                if ($line !== false) {
+                    // Speed check logic similar to your existing code
+                    if (preg_match('/speed=\s*([0-9\.]+x)/', $line, $matches)) {
+                        $speed = (float) $matches[1];
+                        Log::channel('ffmpeg')->info("Speed for [{$title}]: {$speed}x");
+                        if ($speed < $lowSpeedThreshold && $speed > 0.0) {
+                            $lowSpeedCount++;
+                            Log::channel('ffmpeg')->warning("Low speed count for [{$title}]: {$lowSpeedCount}");
+                            if ($lowSpeedCount >= 3) {
+                                // Debug
+                                Log::channel('ffmpeg')->error("Low speed threshold reached for {$title}. Speed: {$speed}");
+
+                                // If we hit the low speed threshold, stop the process
+                                posix_kill($pid, SIGTERM);
+
+                                // Cache the bad source for future reference
+                                Redis::setex(ProxyService::BAD_SOURCE_CACHE_PREFIX . $streamId, ProxyService::BAD_SOURCE_CACHE_MINUTES * 60, "Low speed threshold reached for {$title}. Speed: {$speed}");
+
+                                // And call the `startStreamWithFailover` method again to try next stream (if there are any available)
+                                $this->startStreamWithFailover($type, $model, $streamUrl, $title);
+                                break;
+                            }
+                        }
+                    } else {
+                        Log::channel('ffmpeg')->error(trim($line));
+                    }
+                }
+            }
+
+            // Close the stderr pipe and clean up
+            fclose($stderr);
+            proc_close($process);
+
+            // Remove the cached PID
+            Cache::forget("hls:pid:{$type}:{$model->id}");
+
+            // Decrement the active viewer count for the playlist
+            Redis::decr("active_streams:{$playlistId}");
+        });
+
+        Log::channel('ffmpeg')->info("Streaming {$type} {$title} with command: {$cmd}");
+        return $pid;
+    }
+
+    /**
+     * Run a pre-check using ffprobe to validate the stream.
+     *
+     * @param string $streamUrl
+     * @param string|null $userAgent
+     * @param string $title
+     * 
+     * @throws Exception If the pre-check fails
+     */
+    private function runPreCheck($streamUrl, $userAgent, $title)
+    {
+        $ffprobePath = config('proxy.ffprobe_path', 'ffprobe');
+        $cmd = "$ffprobePath -v quiet -print_format json -show_streams -select_streams v:0 -user_agent " . escapeshellarg($userAgent) . " " . escapeshellarg($streamUrl);
+        Log::channel('ffmpeg')->info("[PRE-CHECK] Executing ffprobe command for [{$title}]: {$cmd}");
+
+        $process = SymfonyProcess::fromShellCommandline($cmd);
+        $process->setTimeout(5);
+        $process->run();
+        if (!$process->isSuccessful()) {
+            throw new SourceNotResponding("ffprobe failed for {$title}: " . $process->getErrorOutput());
+        }
+
+        Log::channel('ffmpeg')->info("[PRE-CHECK] ffprobe successful for [{$title}].");
+    }
+
+    /**
      * Stop FFmpeg for the given HLS stream channel (if currently running).
      *
      * @param string $type
@@ -406,224 +661,5 @@ class HlsStreamService
         $cmd .= ($settings['ffmpeg_debug'] ? ' -loglevel verbose' : ' -hide_banner -nostats -loglevel error');
 
         return $cmd;
-    }
-
-    /**
-     * Start an HLS stream with failover support for the given channel.
-     * This method also tracks connections, performs pre-checks using ffprobe, and monitors for slow speed.
-     *
-     * @param string $type
-     * @param Channel|Episode $channel The Channel model instance
-     * @param string $streamUrl The URL to stream from
-     * @param string $title The title of the channel
-     */
-    public function startStreamWithFailover(
-        string $type,
-        Channel|Episode $model,
-        string $streamUrl,
-        string $title
-    ): ?int {
-        // Get the failover channels (if any)
-        $streams = collect([$model]);
-        if ($type === 'channel') {
-            $streams->concat($model->failoverChannels);
-        }
-
-        // Record timestamp in Redis (never expires until we prune)
-        Redis::set("hls:{$type}_last_seen:{$model->id}", now()->timestamp);
-
-        // Add to active IDs set
-        Redis::sadd("hls:active_{$type}_ids", $model->id);
-
-        // Track the base stream ID, failover will place content in the same folder to prevent redirects
-        $modelId = $model->id;
-
-        // Get the title for the channel
-        $title = $type === 'channel'
-            ? $model->title_custom ?? $model->title
-            : $model->title;
-        $title = strip_tags($title);
-
-        // Loop over the failover channels and grab the first one that works.
-        foreach ($streams as $stream) {
-            // Make sure we have a valid source channel
-            $badSourceCacheKey = ProxyService::BAD_SOURCE_CACHE_PREFIX . $stream->id;
-            if (Redis::exists($badSourceCacheKey)) {
-                if ($model->id === $stream->id) {
-                    Log::channel('ffmpeg')->info("Skipping source ID {$title} ({$model->id}) for as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
-                } else {
-                    Log::channel('ffmpeg')->info("Skipping Failover {$type} {$stream->name} for source {$title} ({$model->id}) as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
-                }
-                continue;
-            }
-
-            // Check if playlist is specified
-            $playlist = $stream->playlist;
-
-            // Keep track of the active streams for this playlist using optimistic locking pattern
-            $activeStreamsKey = "active_streams:{$playlist->id}";
-
-            // First increment the counter
-            $activeStreams = Redis::incr($activeStreamsKey);
-
-            // Make sure we haven't gone negative for any reason, this should never be 0 or less
-            if ($activeStreams <= 0) {
-                Redis::set($activeStreamsKey, 1);
-                $activeStreams = 1;
-            }
-            Log::channel('ffmpeg')->info("Active streams for playlist {$playlist->id}: {$activeStreams} (after increment)");
-
-            // Then check if we're over limit
-            if ($playlist->available_streams > 0 && $activeStreams > $playlist->available_streams) {
-                // We're over limit, so decrement and skip
-                Redis::decr($activeStreamsKey);
-                Log::channel('ffmpeg')->info("Max streams reached for playlist {$playlist->name} ({$playlist->id}). Skipping channel {$title}.");
-                continue;
-            }
-
-            // Setup streams array
-            $streamUrl = $type === 'channel'
-                ? $model->url_custom ?? $model->url
-                : $model->url;
-
-            // Determine the output format
-            $userAgent = $playlist->user_agent ?? null;
-            try {
-                // Run pre-check with ffprobe
-                $this->runPreCheck($streamUrl, $userAgent, $title);
-
-                // Attempt to start the stream
-                $this->startStreamWithSpeedCheck(
-                    type: $type, // 'channel' or 'episode'
-                    id: $modelId, // Peg to the base model
-                    streamUrl: $streamUrl, // Could be different based on the failover status
-                    title: $title, // Peg to the base model
-                    userAgent: $userAgent, // Dynamic, pulled from the source playlist user agent settings
-                );
-            } catch (SourceSpeedBelowThreshold $e) {
-                // Log the error and cache the bad source
-                Log::channel('ffmpeg')->error("Source speed below threshold for channel {$title}: " . $e->getMessage());
-                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
-
-                // Try the next failover channel
-                continue;
-            } catch (SourceNotResponding $e) {
-                // Log the error and cache the bad source
-                Log::channel('ffmpeg')->error("Source not responding for channel {$title}: " . $e->getMessage());
-                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
-
-                // Try the next failover channel
-                continue;
-            } catch (Exception $e) {
-                // Log the error and abort
-                Log::channel('ffmpeg')->error("Error streaming channel {$title}: " . $e->getMessage());
-                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
-
-                // Try the next failover channel
-                continue;
-            } finally {
-                Redis::decr($activeStreamsKey);
-            }
-        }
-
-        // If no streams were successful, log and return null
-        Log::channel('ffmpeg')->error("All streams failed for {$type} {$modelId} ({$title}).");
-        throw new Exception("No valid stream found for {$type} {$modelId} ({$title}).");
-    }
-
-    /**
-     * Start a stream and monitor for slow speed.
-     *
-     * @param string $type
-     * @param string $id
-     * @param string $streamUrl
-     * @param string $title
-     * @param string|null $userAgent
-     * 
-     * @return int The FFmpeg process ID
-     * @throws Exception If the stream fails or speed drops below the threshold
-     */
-    private function startStreamWithSpeedCheck(
-        $type,
-        $id,
-        $streamUrl,
-        $title,
-        $userAgent
-    ): int {
-        // Setup the stream
-        $cmd = $this->buildCmd($type, $id, $userAgent, $streamUrl);
-        $lowSpeedThreshold = (float) config('proxy.ffmpeg_low_speed_threshold', 0.9);
-
-        // Setup and start the process
-        $process = SymfonyProcess::fromShellCommandline($cmd);
-        $process->setTimeout(null);
-        $process->start(); // Use `start()` to make sure we're running in the background
-
-        // Track the PID for `isRunning()`
-        $pid = $process->getPid();
-        $cacheKey = "hls:pid:{$type}:{$id}";
-        Cache::forever($cacheKey, $pid);
-
-        $lowSpeedCount = 0;
-        while ($process->isRunning()) {
-            // Get the buffer output
-            $buffer = $process->getIncrementalErrorOutput();
-            
-            // split out each line
-            $lines = preg_split('/\r?\n/', trim($buffer));
-            foreach ($lines as $line) {
-                if (preg_match('/speed=\s*([0-9\.]+x)/', $line, $matches)) {
-                    $speed = (float) $matches[1];
-                    Log::channel('ffmpeg')->info("Speed for [{$title}]: {$speed}x");
-                    if ($speed < $lowSpeedThreshold && $speed > 0.0) {
-                        $lowSpeedCount++;
-                        Log::channel('ffmpeg')->warning("Low speed count for [{$title}]: {$lowSpeedCount}");
-                        if ($lowSpeedCount >= 3) {
-                            $process->stop();
-                            Cache::forget($cacheKey);
-                            throw new SourceSpeedBelowThreshold("Low speed threshold reached for {$title}. Speed: {$speed}");
-                        }
-                    }
-                } elseif (!empty(trim($line))) {
-                    // It's not a speed update, log as original error/info based on context
-                    // For now, continue logging as error if it's not an empty line from stderr
-                    Log::channel('ffmpeg')->error($line);
-                }
-            }
-            usleep(100000); // Sleep for 100ms to reduce CPU usage
-        }
-
-        if (!$process->isSuccessful()) {
-            Cache::forget($cacheKey);
-            throw new Exception("FFmpeg process failed for [{$title}]: " . $process->getErrorOutput());
-        }
-        Log::channel('ffmpeg')->info("Streaming {$type} {$title} with command: {$cmd}");
-
-        return $pid;
-    }
-
-    /**
-     * Run a pre-check using ffprobe to validate the stream.
-     *
-     * @param string $streamUrl
-     * @param string|null $userAgent
-     * @param string $title
-     * 
-     * @throws Exception If the pre-check fails
-     */
-    private function runPreCheck($streamUrl, $userAgent, $title)
-    {
-        $ffprobePath = config('proxy.ffprobe_path', 'ffprobe');
-        $cmd = "$ffprobePath -v quiet -print_format json -show_streams -select_streams v:0 -user_agent " . escapeshellarg($userAgent) . " " . escapeshellarg($streamUrl);
-        Log::channel('ffmpeg')->info("[PRE-CHECK] Executing ffprobe command for [{$title}]: {$cmd}");
-
-        $process = SymfonyProcess::fromShellCommandline($cmd);
-        $process->setTimeout(5);
-        $process->run();
-        if (!$process->isSuccessful()) {
-            throw new SourceNotResponding("ffprobe failed for {$title}: " . $process->getErrorOutput());
-        }
-
-        Log::channel('ffmpeg')->info("[PRE-CHECK] ffprobe successful for [{$title}].");
     }
 }
