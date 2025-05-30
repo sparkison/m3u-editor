@@ -731,7 +731,7 @@ class ChannelResource extends Resource
                         ->orderColumn('sort')
                         ->schema([
                             Forms\Components\Select::make('channel_failover_id')
-                                ->label('Backup Channel')
+                                ->label('Failover Channel')
                                 ->options(function ($state, $record) {
                                     // Get the current channel ID to exclude it from options
                                     $channelId = $record?->id ?? null;
