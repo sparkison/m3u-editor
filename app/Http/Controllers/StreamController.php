@@ -16,10 +16,6 @@ use Symfony\Component\Process\Process as SymfonyProcess;
 
 class StreamController extends Controller
 {
-    // Cache configuration for bad sources
-    private const BAD_SOURCE_CACHE_MINUTES = 5;
-    private const BAD_SOURCE_CACHE_PREFIX = 'failover:bad_source:';
-
     /**
      * Stream a channel.
      *
@@ -57,7 +53,7 @@ class StreamController extends Controller
             $title = strip_tags($title);
 
             // Make sure we have a valid source channel
-            $badSourceCacheKey = self::BAD_SOURCE_CACHE_PREFIX . $stream->id;
+            $badSourceCacheKey = ProxyService::BAD_SOURCE_CACHE_PREFIX . $stream->id;
             if (Redis::exists($badSourceCacheKey)) {
                 if ($sourceChannel->id === $stream->id) {
                     Log::channel('ffmpeg')->info("Skipping source ID {$title} ({$sourceChannel->id}) for as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
@@ -118,21 +114,21 @@ class StreamController extends Controller
             } catch (SourceSpeedBelowThreshold $e) {
                 // Log the error and cache the bad source
                 Log::channel('ffmpeg')->error("Source speed below threshold for channel {$title}: " . $e->getMessage());
-                Redis::setex($badSourceCacheKey, self::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
+                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
 
                 // Try the next failover channel
                 continue;
             } catch (SourceNotResponding $e) {
                 // Log the error and cache the bad source
                 Log::channel('ffmpeg')->error("Source not responding for channel {$title}: " . $e->getMessage());
-                Redis::setex($badSourceCacheKey, self::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
+                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
 
                 // Try the next failover channel
                 continue;
             } catch (Exception $e) {
                 // Log the error and abort
                 Log::channel('ffmpeg')->error("Error streaming channel {$title}: " . $e->getMessage());
-                Redis::setex($badSourceCacheKey, self::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
+                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
 
                 // Try the next failover channel
                 continue;

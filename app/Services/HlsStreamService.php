@@ -16,10 +16,6 @@ use Symfony\Component\Process\Process as SymfonyProcess;
 
 class HlsStreamService
 {
-    // Cache configuration for bad sources
-    private const BAD_SOURCE_CACHE_MINUTES = 5;
-    private const BAD_SOURCE_CACHE_PREFIX = 'failover:bad_source:';
-
     /**
      * Start an HLS stream for the given channel.
      *
@@ -420,8 +416,6 @@ class HlsStreamService
      * @param Channel|Episode $channel The Channel model instance
      * @param string $streamUrl The URL to stream from
      * @param string $title The title of the channel
-     * 
-     * @return int|null The FFmpeg process ID or null if no valid stream was found
      */
     public function startStreamWithFailover(
         string $type,
@@ -430,7 +424,6 @@ class HlsStreamService
         string $title
     ): ?int {
         // Get the failover channels (if any)
-        $sourceChannel = $model;
         $streams = collect([$model]);
         if ($type === 'channel') {
             $streams->concat($model->failoverChannels);
@@ -445,19 +438,21 @@ class HlsStreamService
         // Track the base stream ID, failover will place content in the same folder to prevent redirects
         $modelId = $model->id;
 
+        // Get the title for the channel
+        $title = $type === 'channel'
+            ? $model->title_custom ?? $model->title
+            : $model->title;
+        $title = strip_tags($title);
+
         // Loop over the failover channels and grab the first one that works.
         foreach ($streams as $stream) {
-            // Get the title for the channel
-            $title = $stream->title_custom ?? $stream->title;
-            $title = strip_tags($title);
-
             // Make sure we have a valid source channel
-            $badSourceCacheKey = self::BAD_SOURCE_CACHE_PREFIX . $stream->id;
+            $badSourceCacheKey = ProxyService::BAD_SOURCE_CACHE_PREFIX . $stream->id;
             if (Redis::exists($badSourceCacheKey)) {
-                if ($sourceChannel->id === $stream->id) {
-                    Log::channel('ffmpeg')->info("Skipping source ID {$title} ({$sourceChannel->id}) for as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
+                if ($model->id === $stream->id) {
+                    Log::channel('ffmpeg')->info("Skipping source ID {$title} ({$model->id}) for as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
                 } else {
-                    Log::channel('ffmpeg')->info("Skipping Failover {$type} {$stream->name} for source {$title} ({$sourceChannel->id}) as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
+                    Log::channel('ffmpeg')->info("Skipping Failover {$type} {$stream->name} for source {$title} ({$model->id}) as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
                 }
                 continue;
             }
@@ -487,41 +482,42 @@ class HlsStreamService
             }
 
             // Setup streams array
-            $streamUrl = $model->url_custom ?? $model->url;
+            $streamUrl = $type === 'channel'
+                ? $model->url_custom ?? $model->url
+                : $model->url;
 
             // Determine the output format
             $userAgent = $playlist->user_agent ?? null;
-
             try {
                 // Run pre-check with ffprobe
                 $this->runPreCheck($streamUrl, $userAgent, $title);
 
-                // Attempt to start the stream and monitor for slow speed
-                return $this->startStreamWithSpeedCheck(
-                    type: $type,
-                    id: $modelId,
-                    streamUrl: $streamUrl,
-                    title: $title,
-                    userAgent: $userAgent,
+                // Attempt to start the stream
+                $this->startStreamWithSpeedCheck(
+                    type: $type, // 'channel' or 'episode'
+                    id: $modelId, // Peg to the base model
+                    streamUrl: $streamUrl, // Could be different based on the failover status
+                    title: $title, // Peg to the base model
+                    userAgent: $userAgent, // Dynamic, pulled from the source playlist user agent settings
                 );
             } catch (SourceSpeedBelowThreshold $e) {
                 // Log the error and cache the bad source
                 Log::channel('ffmpeg')->error("Source speed below threshold for channel {$title}: " . $e->getMessage());
-                Redis::setex($badSourceCacheKey, self::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
+                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
 
                 // Try the next failover channel
                 continue;
             } catch (SourceNotResponding $e) {
                 // Log the error and cache the bad source
                 Log::channel('ffmpeg')->error("Source not responding for channel {$title}: " . $e->getMessage());
-                Redis::setex($badSourceCacheKey, self::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
+                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
 
                 // Try the next failover channel
                 continue;
             } catch (Exception $e) {
                 // Log the error and abort
                 Log::channel('ffmpeg')->error("Error streaming channel {$title}: " . $e->getMessage());
-                Redis::setex($badSourceCacheKey, self::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
+                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
 
                 // Try the next failover channel
                 continue;
@@ -572,7 +568,7 @@ class HlsStreamService
         while ($process->isRunning()) {
             // Get the buffer output
             $buffer = $process->getIncrementalErrorOutput();
-
+            
             // split out each line
             $lines = preg_split('/\r?\n/', trim($buffer));
             foreach ($lines as $line) {

@@ -7,6 +7,10 @@ use Exception;
 
 class ProxyService
 {
+    // Cache configuration for bad sources
+    public const BAD_SOURCE_CACHE_MINUTES = 5;
+    public const BAD_SOURCE_CACHE_PREFIX = 'failover:bad_source:';
+
     /**
      * Get the proxy URL for a channel
      *
