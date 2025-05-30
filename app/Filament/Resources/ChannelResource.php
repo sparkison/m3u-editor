@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\ChannelLogoType;
 use App\Facades\ProxyFacade;
 use App\Filament\Resources\ChannelResource\Pages;
+use App\Filament\Resources\ChannelResource\RelationManagers;
 use App\Infolists\Components\VideoPreview;
 use App\Livewire\ChannelStreamStats;
 use App\Models\Channel;
@@ -112,6 +113,11 @@ class ChannelResource extends Resource
                     ->tooltip(fn($record) => $record->playlist->auto_sort ? 'Playlist auto-sort enabled; disable to change' : 'Channel sort order')
                     ->disabled(fn($record) => $record->playlist->auto_sort)
                     ->toggleable(),
+                // Tables\Columns\TextColumn::make('channelFailovers_count')
+                //     ->label('Failover Channels')
+                //     ->counts('channelFailovers')
+                //     ->toggleable()
+                //     ->sortable(),
                 Tables\Columns\TextInputColumn::make('stream_id_custom')
                     ->label('ID')
                     ->rules(['min:0', 'max:255'])
@@ -546,7 +552,7 @@ class ChannelResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            // 
         ];
     }
 
@@ -556,7 +562,7 @@ class ChannelResource extends Resource
             'index' => Pages\ListChannels::route('/'),
             //'view' => Pages\ViewChannel::route('/{record}'),
             //'create' => Pages\CreateChannel::route('/create'),
-            //'edit' => Pages\EditChannel::route('/{record}/edit'),
+            // 'edit' => Pages\EditChannel::route('/{record}/edit'),
         ];
     }
 
@@ -727,6 +733,44 @@ class ChannelResource extends Resource
                             'epg' => 'EPG',
                         ])
                         ->columnSpan(1),
+                ]),
+            Forms\Components\Fieldset::make('Failover Channels')
+                ->schema([
+                    Forms\Components\Repeater::make('channelFailovers')
+                        ->relationship()
+                        ->label('')
+                        ->reorderable()
+                        ->reorderableWithButtons()
+                        ->orderColumn('sort')
+                        ->schema([
+                            Forms\Components\Select::make('channel_failover_id')
+                                ->label('Backup Channel')
+                                ->options(function ($state, $record) {
+                                    // Get the current channel ID to exclude it from options
+                                    $channelId = $record?->id ?? null;
+                                    $channels = \App\Models\Channel::where('enabled', true)
+                                        ->withoutEagerLoads()
+                                        ->with('playlist')
+                                        ->when($channelId, function ($query) use ($channelId) {
+                                            return $query->where('id', '!=', $channelId);
+                                        })
+                                        ->limit(25)
+                                        ->get();
+
+                                    // Create options array
+                                    $options = [];
+                                    foreach ($channels as $channel) {
+                                        $displayTitle = $channel->title_custom ?: $channel->title;
+                                        $playlistName = $channel->playlist->name ?? 'Unknown';
+                                        $options[$channel->id] = "{$displayTitle} [{$playlistName}]";
+                                    }
+
+                                    return $options;
+                                })->searchable()->required(),
+                        ])
+                        ->columns(1)
+                        ->columnSpanFull()
+                        ->defaultItems(0)
                 ])
         ];
     }

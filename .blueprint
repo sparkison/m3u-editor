@@ -1,0 +1,6 @@
+created:
+    - database/factories/ChannelFailoverFactory.php
+    - database/migrations/2025_05_30_131848_create_channel_failovers_table.php
+    - app/Models/ChannelFailover.php
+models:
+    ChannelFailover: { user_id: 'id foreign', channel_id: 'id foreign', channel_failover_id: 'id foreign:channels', sort: 'unsigned integer', metadata: jsonb }

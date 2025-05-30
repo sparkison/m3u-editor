@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process as SymphonyProcess;
 use Spatie\Tags\HasTags;
@@ -59,6 +60,23 @@ class Channel extends Model
     public function customPlaylists(): BelongsToMany
     {
         return $this->belongsToMany(CustomPlaylist::class, 'channel_custom_playlist');
+    }
+
+    public function channelFailovers()
+    {
+        return $this->hasMany(ChannelFailover::class, 'channel_id');
+    }
+
+    public function failoverChannels(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            Channel::class, // Deploy
+            ChannelFailover::class, // Environment
+            'channel_id', // Foreign key on the environments table...
+            'id', // Foreign key on the deployments table...
+            'id', // Local key on the projects table...
+            'channel_failover_id' // Local key on the environments table...
+        );
     }
 
     /**

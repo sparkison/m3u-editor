@@ -1,0 +1,7 @@
+models:
+  ChannelFailover:
+    user_id: id foreign
+    channel_id: id foreign
+    channel_failover_id: id foreign:channels
+    sort: unsigned integer
+    metadata: jsonb

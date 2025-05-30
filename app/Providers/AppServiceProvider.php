@@ -9,6 +9,7 @@ use App\Events\EpgUpdated;
 use App\Events\PlaylistCreated;
 use App\Events\PlaylistDeleted;
 use App\Events\PlaylistUpdated;
+use App\Models\ChannelFailover;
 use App\Models\CustomPlaylist;
 use App\Models\MergedPlaylist;
 use App\Models\Epg;
@@ -246,6 +247,15 @@ class AppServiceProvider extends ServiceProvider
                         ->update(['group' => $group->name]);
                 }
             });
+
+            // Failover channels
+            ChannelFailover::creating(function (ChannelFailover $channelFailover) {
+                if (!$channelFailover->user_id) {
+                    $channelFailover->user_id = auth()->id();
+                }
+                return $channelFailover;
+            });
+
         } catch (\Throwable $e) {
             // Log the error
             report($e);
