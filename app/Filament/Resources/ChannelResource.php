@@ -9,6 +9,7 @@ use App\Filament\Resources\ChannelResource\RelationManagers;
 use App\Infolists\Components\VideoPreview;
 use App\Livewire\ChannelStreamStats;
 use App\Models\Channel;
+use App\Models\ChannelFailover;
 use App\Models\CustomPlaylist;
 use App\Models\Epg;
 use App\Models\Group;
@@ -71,24 +72,10 @@ class ChannelResource extends Resource
                 return $action->button()->label('Filters');
             })
             ->modifyQueryUsing(function (Builder $query) {
-                $query->with(['epgChannel', 'playlist']);
+                $query->with(['epgChannel', 'playlist'])
+                    ->withCount(['channelFailovers']);
             })
             ->deferLoading()
-            //            ->contentGrid(fn() => $livewire->isListLayout()
-            //                ? null
-            //                : [
-            //                    'md' => 2,
-            //                    'lg' => 3,
-            //                    'xl' => 4,
-            //                    '2xl' => 5,
-            //                ])
-            //            ->reorderable('sort', $relationId !== null)
-            //            ->reorderRecordsTriggerAction(
-            //                fn(Tables\Actions\Action $action, bool $isReordering) => $action
-            //                    ->button()
-            //                    ->tooltip('')
-            //                    ->label($isReordering ? 'Disable reordering' : 'Enable reordering'),
-            //            )
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
             ->columns([
@@ -114,7 +101,7 @@ class ChannelResource extends Resource
                     ->disabled(fn($record) => $record->playlist->auto_sort)
                     ->toggleable(),
                 // Tables\Columns\TextColumn::make('channelFailovers_count')
-                //     ->label('Failover Channels')
+                //     ->label('Failovers')
                 //     ->counts('channelFailovers')
                 //     ->toggleable()
                 //     ->sortable(),
@@ -748,14 +735,15 @@ class ChannelResource extends Resource
                                 ->options(function ($state, $record) {
                                     // Get the current channel ID to exclude it from options
                                     $channelId = $record?->id ?? null;
-                                    $channels = \App\Models\Channel::where('enabled', true)
+                                    $channels = \App\Models\Channel::query()
                                         ->withoutEagerLoads()
                                         ->with('playlist')
                                         ->when($channelId, function ($query) use ($channelId) {
                                             return $query->where('id', '!=', $channelId);
                                         })
-                                        ->limit(25)
-                                        ->get();
+                                        ->when($state, function ($query) use ($state) {
+                                            return $query->where('id', '=', $state);
+                                        })->limit(50)->get();
 
                                     // Create options array
                                     $options = [];
