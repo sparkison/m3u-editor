@@ -518,9 +518,6 @@ class HlsStreamService
             }
         }
 
-        // Decrement active streams count if all fail
-        Redis::decr($activeStreamsKey);
-
         // If no streams were successful, log and return null
         Log::channel('ffmpeg')->error("All streams failed for {$type} {$channelId} ({$title}).");
         return null;
