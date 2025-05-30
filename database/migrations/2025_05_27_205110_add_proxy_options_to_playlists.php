@@ -30,5 +30,11 @@ return new class extends Migration
         Schema::table('playlists', function (Blueprint $table) {
             $table->dropColumn('proxy_options');
         });
+        Schema::table('custom_playlists', function (Blueprint $table) {
+            $table->dropColumn('proxy_options');
+        });
+        Schema::table('merged_playlists', function (Blueprint $table) {
+            $table->dropColumn('proxy_options');
+        });
     }
 };
