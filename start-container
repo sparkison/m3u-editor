@@ -168,6 +168,9 @@ php artisan app:generate-key
 # Check for updates
 php artisan app:update-check
 
+# Clear ffmpeg and process cache
+php artisan app:flush-ffmpeg-process-cache
+
 # Optimize Laravel
 php artisan optimize
 

@@ -3,11 +3,10 @@
 namespace App\Http\Controllers;
 
 use Exception;
-use App\Exceptions\SourceNotResponding;
-use App\Exceptions\SourceSpeedBelowThreshold;
 use App\Models\Channel;
 use App\Models\Episode;
 use App\Services\ProxyService;
+use App\Exceptions\SourceNotResponding;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
@@ -111,24 +110,17 @@ class StreamController extends Controller
                     failoverSupport: $streamCount > 1,
                     streamKey: $activeStreamsKey
                 );
-            } catch (SourceSpeedBelowThreshold $e) {
-                // Log the error and cache the bad source
-                Log::channel('ffmpeg')->error("Source speed below threshold for channel {$title}: " . $e->getMessage());
-                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
-
-                // Try the next failover channel
-                continue;
             } catch (SourceNotResponding $e) {
                 // Log the error and cache the bad source
                 Log::channel('ffmpeg')->error("Source not responding for channel {$title}: " . $e->getMessage());
-                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
+                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, $e->getMessage());
 
                 // Try the next failover channel
                 continue;
             } catch (Exception $e) {
                 // Log the error and abort
                 Log::channel('ffmpeg')->error("Error streaming channel {$title}: " . $e->getMessage());
-                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
+                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, $e->getMessage());
 
                 // Try the next failover channel
                 continue;
@@ -401,19 +393,8 @@ class StreamController extends Controller
                             // split out each line
                             $lines = preg_split('/\r?\n/', trim($buffer));
                             foreach ($lines as $line) {
-                                if (preg_match('/speed=\s*([0-9\.]+x)/', $line, $matches)) {
-                                    $speed = (float) $matches[1];
-                                    Log::channel('ffmpeg')->info("Speed for [{$title}]: {$speed}x");
-                                    if ($speed < $lowSpeedThreshold && $speed > 0.0) {
-                                        $lowSpeedCount++;
-                                        Log::channel('ffmpeg')->warning("Low speed count for [{$title}]: {$lowSpeedCount}");
-                                        if ($lowSpeedCount >= 3) {
-                                            throw new SourceSpeedBelowThreshold("Low speed threshold reached for {$title}. Speed: {$speed}");
-                                        }
-                                    }
-                                } elseif (!empty(trim($line))) {
-                                    // It's not a speed update, log as original error/info based on context
-                                    // For now, continue logging as error if it's not an empty line from stderr
+                                if (!empty(trim($line))) {
+                                    // Log the line if it's not empty
                                     Log::channel('ffmpeg')->error($line);
                                 }
 

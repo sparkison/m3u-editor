@@ -6,7 +6,6 @@ use Exception;
 use App\Models\Channel;
 use App\Models\Episode;
 use App\Exceptions\SourceNotResponding;
-use App\Exceptions\SourceSpeedBelowThreshold;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -186,24 +185,17 @@ class HlsStreamService
                     userAgent: $userAgent, // Dynamic, pulled from the source playlist user agent settings
                     playlistId: $playlist->id, // Use the playlist ID for tracking
                 );
-            } catch (SourceSpeedBelowThreshold $e) {
-                // Log the error and cache the bad source
-                Log::channel('ffmpeg')->error("Source speed below threshold for channel {$title}: " . $e->getMessage());
-                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
-
-                // Try the next failover channel
-                continue;
             } catch (SourceNotResponding $e) {
                 // Log the error and cache the bad source
                 Log::channel('ffmpeg')->error("Source not responding for channel {$title}: " . $e->getMessage());
-                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
+                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, $e->getMessage());
 
                 // Try the next failover channel
                 continue;
             } catch (Exception $e) {
                 // Log the error and abort
                 Log::channel('ffmpeg')->error("Error streaming channel {$title}: " . $e->getMessage());
-                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_MINUTES * 60, $e->getMessage());
+                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, $e->getMessage());
 
                 // Try the next failover channel
                 continue;
@@ -250,76 +242,55 @@ class HlsStreamService
             throw new Exception("Failed to launch FFmpeg for {$title}");
         }
 
-        // Close stdin/stdout
+        // Immediately close stdin/stdout
         fclose($pipes[0]);
         fclose($pipes[1]);
 
         // Make stderr non-blocking
         stream_set_blocking($pipes[2], false);
 
-        // Get the PID and cache it
-        $status = proc_get_status($process);
-        $pid = $status['pid'];
-        $cacheKey = "hls:pid:{$type}:{$model->id}";
-        Cache::forever($cacheKey, $pid);
+        // Spawn a little "reader" that pulls from stderr and logs
+        $logger = Log::channel('ffmpeg');
+        $stderr = $pipes[2];
 
-        // Set up a monitor function that checks speed but doesn't block
+        // Get the PID and cache it
+        $cacheKey = "hls:pid:{$type}:{$model->id}";
+
+        // Register shutdown function to ensure the pipe is drained
         register_shutdown_function(function () use (
-            $pipes,
+            $stderr,
             $process,
+            $logger,
             $type,
             $model,
-            $title,
-            $pid,
-            $streamId,
-            $streamUrl,
             $playlistId
         ) {
-            $stderr = $pipes[2];
-            $lowSpeedCount = 0;
-            $lowSpeedThreshold = (float) config('proxy.ffmpeg_low_speed_threshold', 0.9);
-
             while (!feof($stderr)) {
                 $line = fgets($stderr);
                 if ($line !== false) {
-                    // Speed check logic similar to your existing code
-                    if (preg_match('/speed=\s*([0-9\.]+x)/', $line, $matches)) {
-                        $speed = (float) $matches[1];
-                        Log::channel('ffmpeg')->info("Speed for [{$title}]: {$speed}x");
-                        if ($speed < $lowSpeedThreshold && $speed > 0.0) {
-                            $lowSpeedCount++;
-                            Log::channel('ffmpeg')->warning("Low speed count for [{$title}]: {$lowSpeedCount}");
-                            if ($lowSpeedCount >= 3) {
-                                // Debug
-                                Log::channel('ffmpeg')->error("Low speed threshold reached for {$title}. Speed: {$speed}");
-
-                                // If we hit the low speed threshold, stop the process
-                                posix_kill($pid, SIGTERM);
-
-                                // Cache the bad source for future reference
-                                Redis::setex(ProxyService::BAD_SOURCE_CACHE_PREFIX . $streamId, ProxyService::BAD_SOURCE_CACHE_MINUTES * 60, "Low speed threshold reached for {$title}. Speed: {$speed}");
-
-                                // And call the `startStreamWithFailover` method again to try next stream (if there are any available)
-                                $this->startStreamWithFailover($type, $model, $streamUrl, $title);
-                                break;
-                            }
-                        }
-                    } else {
-                        Log::channel('ffmpeg')->error(trim($line));
-                    }
+                    $logger->error(trim($line));
                 }
             }
-
-            // Close the stderr pipe and clean up
             fclose($stderr);
             proc_close($process);
 
             // Remove the cached PID
-            Cache::forget("hls:pid:{$type}:{$model->id}");
+            $this->stopStream($type, $model->id);
 
             // Decrement the active viewer count for the playlist
             Redis::decr("active_streams:{$playlistId}");
         });
+
+        // Cache the actual FFmpeg PID
+        $status = proc_get_status($process);
+        $pid = $status['pid'];
+        Cache::forever($cacheKey, $pid);
+
+        // Record timestamp in Redis (never expires until we prune)
+        Redis::set("hls:{$type}_last_seen:{$model->id}", now()->timestamp);
+
+        // Add to active IDs set
+        Redis::sadd("hls:active_{$type}_ids", $model->id);
 
         Log::channel('ffmpeg')->info("Streaming {$type} {$title} with command: {$cmd}");
         return $pid;
