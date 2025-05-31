@@ -28,7 +28,8 @@ class ListSeries extends ListRecords
                             playlist: $data['playlist'],
                             catId: $data['category'],
                             catName: $data['category_name'],
-                            series: $data['series'],
+                            series: $data['series'] ?? [],
+                            importAll: $data['import_all'] ?? false,
                         ));
                 })->after(function () {
                     Notification::make()

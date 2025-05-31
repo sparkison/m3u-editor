@@ -468,6 +468,17 @@ class SeriesResource extends Resource
                 ]),
             Forms\Components\Wizard\Step::make('Series to Import')
                 ->schema([
+                    Forms\Components\Toggle::make('import_all')
+                        ->label('Import All Series')
+                        ->live()
+                        ->helperText('If enabled, all series in the selected category will be imported.')
+                        ->default(false)
+                        ->columnSpanFull()
+                        ->afterStateUpdated(function (Get $get, $set) {
+                            if ($get('import_all')) {
+                                $set('series', []);
+                            }
+                        }),
                     Forms\Components\CheckboxList::make('series')
                         ->label('Series to Import')
                         ->required()
@@ -486,8 +497,7 @@ class SeriesResource extends Resource
                             $xtreamPass = $xtreamConfig['password'] ?? '';
                             $cacheKey = 'xtream_category_series' . md5($xtremeUrl . $xtreamUser . $xtreamPass . $category);
                             $cachedCategories = Cache::remember($cacheKey, 60 * 1, function () use ($xtremeUrl, $xtreamUser, $xtreamPass, $category) {
-                                $service = new XtreamService();
-                                $xtream = $service->init(xtream_config: [
+                                $xtream = XtreamService::make(xtream_config: [
                                     'url' => $xtremeUrl,
                                     'username' => $xtreamUser,
                                     'password' => $xtreamPass,
@@ -512,8 +522,8 @@ class SeriesResource extends Resource
                                 ? 'Which series would you like to import.'
                                 : 'You must select a playlist and category first.'
                         )
-                        ->disabled(fn(Get $get): bool => ! $get('playlist') || ! $get('category'))
-                        ->hidden(fn(Get $get): bool => ! $get('playlist') || ! $get('category')),
+                        ->disabled(fn(Get $get): bool => ! $get('playlist') || ! $get('category') || $get('import_all'))
+                        ->hidden(fn(Get $get): bool => ! $get('playlist') || ! $get('category') || $get('import_all')),
                 ])
         ];
     }

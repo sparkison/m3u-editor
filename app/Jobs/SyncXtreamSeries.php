@@ -20,6 +20,7 @@ class SyncXtreamSeries implements ShouldQueue
         public int $catId,
         public string $catName,
         public array $series,
+        public bool $importAll = false,
     ) {}
 
     /**
@@ -58,6 +59,12 @@ class SyncXtreamSeries implements ShouldQueue
                 ]);
         }
 
+        if ($this->importAll) {
+            // If importAll is true, we need to import all series from the category
+            $this->series = collect($xtream->getSeries($this->catId))
+                ->pluck('series_id')
+                ->toArray();
+        }
         foreach ($this->series as $seriesId) {
             // Check if the series exists for the playlist
             $playlistSeries = $playlist->series()
