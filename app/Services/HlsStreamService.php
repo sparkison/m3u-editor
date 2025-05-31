@@ -135,7 +135,7 @@ class HlsStreamService
         // Loop over the failover channels and grab the first one that works.
         foreach ($streams as $stream) {
             // Make sure we have a valid source channel
-            $badSourceCacheKey = ProxyService::BAD_SOURCE_CACHE_PREFIX . $stream->id;
+            $badSourceCacheKey = ProxyService::BAD_SOURCE_CACHE_PREFIX . $stream->id . ':' . $playlist->id;
             if (Redis::exists($badSourceCacheKey)) {
                 if ($model->id === $stream->id) {
                     Log::channel('ffmpeg')->info("Skipping source ID {$title} ({$model->id}) for as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));

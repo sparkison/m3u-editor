@@ -52,7 +52,7 @@ class StreamController extends Controller
             $title = strip_tags($title);
 
             // Make sure we have a valid source channel
-            $badSourceCacheKey = ProxyService::BAD_SOURCE_CACHE_PREFIX . $stream->id;
+            $badSourceCacheKey = ProxyService::BAD_SOURCE_CACHE_PREFIX . $stream->id . ':' . $playlist->id;
             if (Redis::exists($badSourceCacheKey)) {
                 if ($sourceChannel->id === $stream->id) {
                     Log::channel('ffmpeg')->info("Skipping source ID {$title} ({$sourceChannel->id}) for as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
