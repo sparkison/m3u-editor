@@ -28,10 +28,8 @@ class FlushFfmpegProcessCache extends Command
     public function handle()
     {
         $this->info('🗑️ Flushing FFmpeg process cache...');
-        Redis::del('hls:active_channel_ids');
-        Redis::del('hls:active_episode_ids');
-        Redis::del('hls:channel_last_seen:*');
-        Redis::del('hls:episode_last_seen:*');
-        Redis::del(ProxyService::BAD_SOURCE_CACHE_PREFIX . '*');
+
+        // Flush the Redis cache for FFmpeg processes
+        Redis::connection('default')->flushdb();
     }
 }
