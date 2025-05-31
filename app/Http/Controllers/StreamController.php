@@ -79,7 +79,9 @@ class StreamController extends Controller
             Log::channel('ffmpeg')->info("Active streams for playlist {$playlist->id}: {$activeStreams} (after increment)");
 
             // Then check if we're over limit
-            if ($playlist->available_streams > 0 && $activeStreams > $playlist->available_streams) {
+            // Ignore for MP4 since those will be requests from Video.js
+            // Video.js will make a request for the metadate before loading the stream, so can use twp connections in a short amount of time
+            if ($format !== 'mp4' && $playlist->available_streams > 0 && $activeStreams > $playlist->available_streams) {
                 // We're over limit, so decrement and skip
                 Redis::decr($activeStreamsKey);
                 Log::channel('ffmpeg')->info("Max streams reached for playlist {$playlist->name} ({$playlist->id}). Skipping channel {$title}.");
@@ -128,7 +130,6 @@ class StreamController extends Controller
         }
 
         // Out of streams to try
-        Redis::decr($activeStreamsKey);
         Log::channel('ffmpeg')->error("No available streams for channel {$channel->id} ({$channel->title}).");
         abort(503, 'No valid streams found for this channel.');
     }
@@ -177,7 +178,9 @@ class StreamController extends Controller
         Log::channel('ffmpeg')->info("Active streams for playlist {$playlist->id}: {$activeStreams} (after increment)");
 
         // Then check if we're over limit
-        if ($playlist->available_streams > 0 && $activeStreams > $playlist->available_streams) {
+        // Ignore for MP4 since those will be requests from Video.js
+        // Video.js will make a request for the metadate before loading the stream, so can use twp connections in a short amount of time
+        if ($format !== 'mp4' && $playlist->available_streams > 0 && $activeStreams > $playlist->available_streams) {
             // We're over limit, so decrement and skip
             Redis::decr($activeStreamsKey);
             Log::channel('ffmpeg')->info("Max streams reached for playlist {$playlist->name} ({$playlist->id}). Aborting episode {$title}.");
