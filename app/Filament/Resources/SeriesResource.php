@@ -470,8 +470,10 @@ class SeriesResource extends Resource
                 ->schema([
                     Forms\Components\Toggle::make('import_all')
                         ->label('Import All Series')
+                        ->onColor('warning')
+                        ->hint('Use with caution')
                         ->live()
-                        ->helperText('If enabled, all series in the selected category will be imported.')
+                        ->helperText('If enabled, all series in the selected category will be imported. Use with caution as this will make a lot of requests to your provider. It is recomended to import only the series you want to watch.')
                         ->default(false)
                         ->columnSpanFull()
                         ->afterStateUpdated(function (Get $get, $set) {
