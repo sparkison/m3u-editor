@@ -245,12 +245,6 @@ class StreamController extends Controller
         // Get user preferences
         $settings = ProxyService::getStreamSettings();
 
-        // Get the low speed threshold
-        $lowSpeedThreshold = null;
-        if ($failoverSupport) {
-            $lowSpeedThreshold = (float) config('proxy.ffmpeg_low_speed_threshold', 0.9);
-        }
-
         // Get user agent
         $userAgent = escapeshellarg($userAgent) ?: escapeshellarg($settings['ffmpeg_user_agent']);
 
@@ -317,8 +311,7 @@ class StreamController extends Controller
             $format,
             $ip,
             $streamId,
-            $userAgent,
-            $lowSpeedThreshold
+            $userAgent
         ) {
             // Set unique client key (order is used for stats output)
             $clientKey = "{$ip}::{$modelId}::{$streamId}::{$type}";
@@ -369,7 +362,6 @@ class StreamController extends Controller
                 $process = SymfonyProcess::fromShellCommandline($cmd);
                 $process->setTimeout(null);
                 $streamType = $type;
-                $lowSpeedCount = 0;
                 try {
                     $process->run(function ($type, $buffer) use (
                         $modelId,
@@ -377,9 +369,7 @@ class StreamController extends Controller
                         $format,
                         $streamType,
                         $streamKey,
-                        $clientKey,
-                        $lowSpeedThreshold,
-                        &$lowSpeedCount,
+                        $clientKey
                     ) {
                         if (connection_aborted()) {
                             throw new \Exception("Connection aborted by client.");
