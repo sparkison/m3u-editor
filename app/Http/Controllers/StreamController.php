@@ -522,8 +522,8 @@ class StreamController extends Controller
                 if (!empty($settings['ffmpeg_qsv_video_filter'])) {
                     $videoFilterArgs = "-vf " . escapeshellarg(trim($settings['ffmpeg_qsv_video_filter'], "'\",")) . " ";
                 } else {
-                    // Simplified filter chain for QSV
-                    $videoFilterArgs = "-vf 'format=nv12,hwupload=extra_hw_frames=64' ";
+                    // Default QSV video filter, matches user's working example
+                    $videoFilterArgs = "-vf 'hwupload=extra_hw_frames=64,scale_qsv=format=nv12' ";
                 }
 
                 // Additional QSV specific options
@@ -559,9 +559,6 @@ class StreamController extends Controller
 
             // User defined general options:
             $cmd .= $userArgs;
-
-            // Codec specific additional arguments (e.g. QSV specific):
-            $cmd .= $codecSpecificArgs;
 
             // Input:
             if ($format === 'ts') {

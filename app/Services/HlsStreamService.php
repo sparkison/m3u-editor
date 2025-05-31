@@ -543,9 +543,15 @@ class HlsStreamService
                 if (!empty($qsvFilterFromSettings)) {
                     // This filter is applied to frames already in QSV format
                     $videoFilterArgs = "-vf '" . trim($qsvFilterFromSettings, "'") . "' ";
+                } else {
+                    // Add default QSV video filter for HLS if not set by user
+                    $videoFilterArgs = "-vf 'hwupload=extra_hw_frames=64,scale_qsv=format=nv12' ";
                 }
-                if (!empty($qsvEncoderOptions)) {
+                if (!empty($qsvEncoderOptions)) { // $qsvEncoderOptions = $settings['ffmpeg_qsv_encoder_options']
                     $codecSpecificArgs = trim($qsvEncoderOptions) . " ";
+                } else {
+                    // Default QSV encoder options for HLS if not set by user
+                    $codecSpecificArgs = "-preset medium -global_quality 23 "; // Ensure trailing space
                 }
                 if (!empty($qsvAdditionalArgs)) {
                     $userArgs = trim($qsvAdditionalArgs) . ($userArgs ? " " . $userArgs : "");
