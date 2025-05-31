@@ -398,6 +398,79 @@ class ChannelResource extends Resource
                         ->modalIcon('heroicon-o-photo')
                         ->modalDescription('Update the preferred icon for the selected channel(s).')
                         ->modalSubmitActionLabel('Update now'),
+
+                    Tables\Actions\BulkAction::make('failover')
+                        ->label('Add as failover')
+                        ->form([
+                            Forms\Components\Select::make('master_channel_id')
+                                ->label('Master Channel')
+                                ->options(function ($state) {
+                                    // Get the current channel ID to exclude it from options
+                                    $channels = \App\Models\Channel::query()
+                                        ->withoutEagerLoads()
+                                        ->with('playlist')
+                                        ->when($state, function ($query) use ($state) {
+                                            return $query->where('id', '=', $state);
+                                        })->limit(100)->get();
+
+                                    // Create options array
+                                    $options = [];
+                                    foreach ($channels as $channel) {
+                                        $displayTitle = $channel->title_custom ?: $channel->title;
+                                        $playlistName = $channel->playlist->name ?? 'Unknown';
+                                        $options[$channel->id] = "{$displayTitle} [{$playlistName}]";
+                                    }
+
+                                    return $options;
+                                })
+                                ->searchable()
+                                ->getSearchResultsUsing(function (string $search) {
+                                    // Always include the selected value if it exists
+                                    $channels = \App\Models\Channel::query()
+                                        ->withoutEagerLoads()
+                                        ->with('playlist')
+                                        ->where(function ($query) use ($search) {
+                                            $query->where('title', 'like', "%{$search}%")
+                                                ->orWhere('title_custom', 'like', "%{$search}%")
+                                                ->orWhere('name', 'like', "%{$search}%")
+                                                ->orWhere('name_custom', 'like', "%{$search}%");
+                                        })
+                                        ->limit(50) // Reasonable limit for search results
+                                        ->get();
+
+                                    // Create options array
+                                    $options = [];
+                                    foreach ($channels as $channel) {
+                                        $displayTitle = $channel->title_custom ?: $channel->title;
+                                        $playlistName = $channel->playlist->name ?? 'Unknown';
+                                        $options[$channel->id] = "{$displayTitle} [{$playlistName}]";
+                                    }
+
+                                    return $options;
+                                })
+                                ->required(),
+                        ])
+                        ->action(function (Collection $records, array $data): void {
+                            foreach ($records as $record) {
+                                ChannelFailover::updateOrCreate([
+                                    'channel_id' => $data['master_channel_id'],
+                                    'channel_failover_id' =>  $record->id,
+                                ]);
+                            }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Channels as failover')
+                                ->body('The selected channels have been added as failovers.')
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-arrow-path-rounded-square')
+                        ->modalIcon('heroicon-o-arrow-path-rounded-square')
+                        ->modalDescription('Add the selected channel(s) to the chosen channel as failover sources.')
+                        ->modalSubmitActionLabel('Add failovers now'),
+
                     Tables\Actions\BulkAction::make('find-replace')
                         ->label('Find & Replace')
                         ->form([

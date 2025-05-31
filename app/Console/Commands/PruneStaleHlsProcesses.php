@@ -44,7 +44,7 @@ class PruneStaleHlsProcesses extends Command
             if ($lastSeen->addSeconds($threshold)->isPast()) {
                 $wasRunning = $this->hlsService->stopStream(type: 'channel', id: $channelId);
                 if (!$wasRunning) {
-                    $this->info("❌ Channel {$channelId} was not running, skipping");
+                    $this->info("❌ Channel {$channelId} was not running");
                     continue;
                 } else {
                     $this->info("❌ Channel {$channelId} was running and has been stopped");
@@ -66,7 +66,7 @@ class PruneStaleHlsProcesses extends Command
             if ($lastSeen->addSeconds($threshold)->isPast()) {
                 $wasRunning = $this->hlsService->stopStream(type: 'episode', id: $episodeId);
                 if (!$wasRunning) {
-                    $this->info("❌ Episode {$episodeId} was not running, skipping");
+                    $this->info("❌ Episode {$episodeId} was not running");
                     continue;
                 } else {
                     $this->info("❌ Episode {$episodeId} was running and has been stopped");
