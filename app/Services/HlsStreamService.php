@@ -50,7 +50,12 @@ class HlsStreamService
                 2 => ['pipe', 'w'], // stderr (we will log)
             ];
             $pipes = [];
-            $process = proc_open($cmd, $descriptors, $pipes);
+            if ($type === 'episode') {
+                $workindDir = Storage::disk('app')->path("hls/e/{$id}");
+            } else {
+                $workindDir = Storage::disk('app')->path("hls/{$id}");
+            }
+            $process = proc_open($cmd, $descriptors, $pipes, $workindDir);
 
             if (!is_resource($process)) {
                 Log::channel('ffmpeg')->error("Failed to launch FFmpeg for channel {$id}");
@@ -233,7 +238,12 @@ class HlsStreamService
             2 => ['pipe', 'w'],
         ];
         $pipes = [];
-        $process = proc_open($cmd, $descriptors, $pipes);
+        if ($type === 'episode') {
+            $workindDir = Storage::disk('app')->path("hls/e/{$model->id}");
+        } else {
+            $workindDir = Storage::disk('app')->path("hls/{$model->id}");
+        }
+        $process = proc_open($cmd, $descriptors, $pipes, $workindDir);
 
         if (!is_resource($process)) {
             throw new Exception("Failed to launch FFmpeg for {$title}");
@@ -342,7 +352,11 @@ class HlsStreamService
             Cache::forget($cacheKey);
 
             // Cleanup on-disk HLS files
-            $storageDir = Storage::disk('app')->path("hls/{$id}");
+            if ($type === 'episode') {
+                $storageDir = Storage::disk('app')->path("hls/e/{$id}");
+            } else {
+                $storageDir = Storage::disk('app')->path("hls/{$id}");
+            }
             File::deleteDirectory($storageDir);
         } else {
             Log::channel('ffmpeg')->warning("No running FFmpeg process for channel {$id} to stop.");
