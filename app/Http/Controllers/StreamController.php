@@ -89,7 +89,7 @@ class StreamController extends Controller
             }
 
             // Setup streams array
-            $streamUrl = $stream->url_custom ?? $channel->url;
+            $streamUrl = $stream->url_custom ?? $stream->url;
 
             // Determine the output format
             $ip = $request->ip();
