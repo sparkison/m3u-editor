@@ -559,7 +559,11 @@ class HlsStreamService
             // Get ffmpeg output codec formats
             $audioCodec = config('proxy.ffmpeg_codec_audio') ?: $settings['ffmpeg_codec_audio'];
             $subtitleCodec = config('proxy.ffmpeg_codec_subtitles') ?: $settings['ffmpeg_codec_subtitles'];
-            $outputFormat = "-c:v {$outputVideoCodec} " . ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "") . "-c:a {$audioCodec} -bsf:a aac_adtstoasc -c:s {$subtitleCodec}";
+
+            // Get ffmpeg output codec formats
+            $outputFormat = "-c:v {$outputVideoCodec} " .
+                ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "") .
+                "-c:a {$audioCodec} -c:s {$subtitleCodec}";
 
             // Reconstruct FFmpeg Command (ensure $ffmpegPath is escaped if it can contain spaces, though unlikely for a binary name)
             $cmd = escapeshellcmd($ffmpegPath) . ' ';
@@ -627,7 +631,9 @@ class HlsStreamService
             $audioCodecForTemplate = $settings['ffmpeg_codec_audio'] ?: 'copy';
             $subtitleCodecForTemplate = $settings['ffmpeg_codec_subtitles'] ?: 'copy';
 
-            $outputCommandSegment = "-c:v {$outputVideoCodec} " . ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "") . "-c:a {$audioCodecForTemplate} -bsf:a aac_adtstoasc -c:s {$subtitleCodecForTemplate}";
+            $outputCommandSegment = "-c:v {$outputVideoCodec} " .
+                ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "") .
+                "-c:a {$audioCodecForTemplate} -c:s {$subtitleCodecForTemplate}";
 
             $videoCodecArgs = "-c:v {$videoCodecForTemplate}" . ($codecSpecificArgs ? " " . trim($codecSpecificArgs) : "");
             $audioCodecArgs = "-c:a {$audioCodecForTemplate}";
@@ -651,8 +657,9 @@ class HlsStreamService
         }
 
         // ... rest of the options and command suffix ...
-        $cmd .= ' -f hls -hls_time 2 -hls_list_size 6 ' .
+        $cmd .= ' -f hls -hls_time 4 -hls_list_size 15 ' .
             '-hls_flags delete_segments+append_list+independent_segments ' .
+            '-start_at_zero 1 -hls_playlist_type event ' .
             '-use_wallclock_as_timestamps 1 ' .
             '-hls_segment_filename ' . escapeshellarg($segment) . ' ' .
             '-hls_base_url ' . escapeshellarg($segmentBaseUrl) . ' ' .
