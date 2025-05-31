@@ -51,8 +51,11 @@ class StreamController extends Controller
             $title = $stream->title_custom ?? $stream->title;
             $title = strip_tags($title);
 
+            // Check if playlist is specified
+            $playlist = $stream->playlist;
+
             // Make sure we have a valid source channel
-            $badSourceCacheKey = ProxyService::BAD_SOURCE_CACHE_PREFIX . $stream->id . ':' . $stream->playlist->id;
+            $badSourceCacheKey = ProxyService::BAD_SOURCE_CACHE_PREFIX . $stream->id . ':' . $playlist->id;
             if (Redis::exists($badSourceCacheKey)) {
                 if ($sourceChannel->id === $stream->id) {
                     Log::channel('ffmpeg')->info("Skipping source ID {$title} ({$sourceChannel->id}) for as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
@@ -61,9 +64,6 @@ class StreamController extends Controller
                 }
                 continue;
             }
-
-            // Check if playlist is specified
-            $playlist = $stream->playlist;
 
             // Keep track of the active streams for this playlist using optimistic locking pattern
             $activeStreamsKey = "active_streams:{$playlist->id}";

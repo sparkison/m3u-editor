@@ -42,7 +42,7 @@ RUN apk update && apk --no-cache add \
 
 # Add architecture-specific packages conditionally
 RUN if [ "$(uname -m)" = "x86_64" ]; then \
-        apk add --no-cache intel-media-driver libva-intel-driver; \
+        apk add --no-cache intel-media-driver libva-intel-driver intel-media-sdk; \
     else \
         echo "Skipping Intel-specific packages on $(uname -m) architecture"; \
     fi
