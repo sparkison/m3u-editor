@@ -15,31 +15,6 @@ class XtreamService
     protected Playlist|null $playlist;
     protected array|null $xtream_config;
 
-    /**
-     * Factory method to create an instance of XtreamService.
-     *
-     * @param Playlist|null $playlist
-     * @param array|null $xtream_config
-     * @param int $retryLimit Number of retries for HTTP requests
-     * @return XtreamService
-     */
-    public static function make(
-        Playlist|null $playlist = null,
-        array|null $xtream_config = null,
-        $retryLimit = 5
-    ): self {
-        $instance = new self();
-        return $instance->init($playlist, $xtream_config, $retryLimit);
-    }
-
-    /**
-     * Initialize the XtreamService with a Playlist or Xtream config.
-     *
-     * @param Playlist|null $playlist
-     * @param array|null $xtream_config
-     * @param int $retryLimit Number of retries for HTTP requests
-     * @return bool|self Returns false if initialization fails, otherwise returns the instance.
-     */
     public function init(
         Playlist|null $playlist = null,
         array|null $xtream_config = null,
