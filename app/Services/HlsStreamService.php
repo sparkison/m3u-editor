@@ -134,8 +134,11 @@ class HlsStreamService
 
         // Loop over the failover channels and grab the first one that works.
         foreach ($streams as $stream) {
+            // Check if playlist is specified
+            $playlist = $stream->playlist; // Moved $playlist assignment here
+
             // Make sure we have a valid source channel
-            $badSourceCacheKey = ProxyService::BAD_SOURCE_CACHE_PREFIX . $stream->id . ':' . $playlist->id;
+            $badSourceCacheKey = ProxyService::BAD_SOURCE_CACHE_PREFIX . $stream->id . ':' . $playlist->id; // Now $playlist is defined
             if (Redis::exists($badSourceCacheKey)) {
                 if ($model->id === $stream->id) {
                     Log::channel('ffmpeg')->info("Skipping source ID {$title} ({$model->id}) for as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
@@ -144,9 +147,6 @@ class HlsStreamService
                 }
                 continue;
             }
-
-            // Check if playlist is specified
-            $playlist = $stream->playlist;
 
             // Keep track of the active streams for this playlist using optimistic locking pattern
             $activeStreamsKey = "active_streams:{$playlist->id}";
