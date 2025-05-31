@@ -802,29 +802,23 @@ class ChannelResource extends Resource
                         ->reorderable()
                         ->reorderableWithButtons()
                         ->orderColumn('sort')
-                        ->schema([
+                        ->simple(
                             Forms\Components\Select::make('channel_failover_id')
                                 ->label('Failover Channel')
                                 ->options(function ($state, $record) {
                                     // Get the current channel ID to exclude it from options
-                                    $channelId = $record?->id ?? null;
-                                    $channels = \App\Models\Channel::query()
-                                        ->withoutEagerLoads()
-                                        ->with('playlist')
-                                        ->where('id', '!=', $channelId)
-                                        ->when($state, function ($query) use ($state) {
-                                            return $query->where('id', '=', $state);
-                                        })->limit(100)->get();
-
-                                    // Create options array
-                                    $options = [];
-                                    foreach ($channels as $channel) {
-                                        $displayTitle = $channel->title_custom ?: $channel->title;
-                                        $playlistName = $channel->playlist->name ?? 'Unknown';
-                                        $options[$channel->id] = "{$displayTitle} [{$playlistName}]";
+                                    if (!$state) {
+                                        return [];
+                                    }
+                                    $channel = \App\Models\Channel::find($state);
+                                    if (!$channel) {
+                                        return [];
                                     }
 
-                                    return $options;
+                                    // Return the single channel as the only results if not searching
+                                    $displayTitle = $channel->title_custom ?: $channel->title;
+                                    $playlistName = $channel->playlist->name ?? 'Unknown';
+                                    return [$channel->id => "{$displayTitle} [{$playlistName}]"];
                                 })
                                 ->searchable()
                                 ->getSearchResultsUsing(function (string $search, $record) {
@@ -854,10 +848,10 @@ class ChannelResource extends Resource
                                     }
 
                                     return $options;
-                                })
-                                ->required(),
-                        ])
+                                })->required()
+                        )
                         ->columns(1)
+                        ->addActionLabel('Add failover channel')
                         ->columnSpanFull()
                         ->defaultItems(0)
                 ])
