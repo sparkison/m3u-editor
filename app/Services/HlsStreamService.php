@@ -117,7 +117,7 @@ class HlsStreamService
         // Get the failover channels (if any)
         $streams = collect([$model]);
         if ($type === 'channel') {
-            $streams->concat($model->failoverChannels);
+            $streams = $streams->concat($model->failoverChannels);
         }
 
         // Record timestamp in Redis (never expires until we prune)
