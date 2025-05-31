@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Redis;
 
 class PruneStaleHlsProcesses extends Command
 {
-    protected $signature = 'app:hls-prune {--threshold=10}';
+    protected $signature = 'app:hls-prune {--threshold=15}';
     protected $description = 'Stop FFmpeg for HLS streams with no segment requests recently';
 
     private $hlsService;
