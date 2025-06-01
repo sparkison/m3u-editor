@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('groups', function (Blueprint $table) {
-            $table->integer('sort_order')->default(9999);
+            $table->decimal('sort_order', 12, 4)->default(9999);
         });
     }
 
