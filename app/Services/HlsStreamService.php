@@ -570,10 +570,18 @@ class HlsStreamService
             $audioCodec = config('proxy.ffmpeg_codec_audio') ?: $settings['ffmpeg_codec_audio'];
             $subtitleCodec = config('proxy.ffmpeg_codec_subtitles') ?: $settings['ffmpeg_codec_subtitles'];
 
-            // Get ffmpeg output codec formats
+            // Start building ffmpeg output codec formats
             $outputFormat = "-c:v {$outputVideoCodec} " .
-                ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "") .
-                "-c:a {$audioCodec} -c:s {$subtitleCodec}";
+                ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : ""); // Ensure space if codecSpecificArgs exists
+
+            // Add audio codec
+            $outputFormat .= "-c:a {$audioCodec} "; // Add space after audio codec
+
+            // Conditionally add subtitle codec
+            if (!empty($subtitleCodec)) {
+                $outputFormat .= "-c:s {$subtitleCodec}";
+            }
+            $outputFormat = trim($outputFormat); // Trim trailing space if subtitle codec is not added
 
             // Reconstruct FFmpeg Command (ensure $ffmpegPath is escaped if it can contain spaces, though unlikely for a binary name)
             $cmd = escapeshellcmd($ffmpegPath) . ' ';
