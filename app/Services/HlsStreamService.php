@@ -572,16 +572,18 @@ class HlsStreamService
 
             // Start building ffmpeg output codec formats
             $outputFormat = "-c:v {$outputVideoCodec} " .
-                ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : ""); // Ensure space if codecSpecificArgs exists
+                ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "");
 
-            // Add audio codec
-            $outputFormat .= "-c:a {$audioCodec} "; // Add space after audio codec
+            // Conditionally add audio codec
+            if (!empty($audioCodec)) {
+                $outputFormat .= "-c:a {$audioCodec} ";
+            }
 
             // Conditionally add subtitle codec
             if (!empty($subtitleCodec)) {
-                $outputFormat .= "-c:s {$subtitleCodec}";
+                $outputFormat .= "-c:s {$subtitleCodec} ";
             }
-            $outputFormat = trim($outputFormat); // Trim trailing space if subtitle codec is not added
+            $outputFormat = trim($outputFormat); // Trim trailing space
 
             // Reconstruct FFmpeg Command (ensure $ffmpegPath is escaped if it can contain spaces, though unlikely for a binary name)
             $cmd = escapeshellcmd($ffmpegPath) . ' ';
