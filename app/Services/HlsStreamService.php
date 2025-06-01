@@ -274,11 +274,11 @@ class HlsStreamService
             fclose($stderr);
             proc_close($process);
 
-            // Remove the cached PID
-            $this->stopStream($type, $model->id);
-
             // Decrement the active viewer count for the playlist
             Redis::decr("active_streams:{$playlistId}");
+
+            // Remove the cached PID
+            $this->stopStream($type, $model->id);
         });
 
         // Cache the actual FFmpeg PID
