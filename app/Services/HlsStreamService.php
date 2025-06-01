@@ -111,8 +111,8 @@ class HlsStreamService
     public function startStreamWithFailover(
         string $type,
         Channel|Episode $model, // This $model is the *original* requested channel/episode
-        string $streamUrl,    // This $streamUrl is the URL of the *original* model
-        string $title         // This $title is the title of the *original* model
+        string $streamUrl,      // This $streamUrl is the URL of the *original* model
+        string $title           // This $title is the title of the *original* model
     ): void {
         // Get the failover channels (if any)
         $streams = collect([$model]);
@@ -185,14 +185,20 @@ class HlsStreamService
                 return; // Exit after successfully starting a stream
 
             } catch (SourceNotResponding $e) {
-                Log::channel('ffmpeg')->error("Source not responding for {$type} {$currentStreamTitle} (ID: {$stream->id}) on playlist {$playlist->id}: " . $e->getMessage());
+                // Log the error and cache the bad source
+                Redis::decr($activeStreamsKey);
+                Log::channel('ffmpeg')->error("Source not responding for channel {$title}: " . $e->getMessage());
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, $e->getMessage());
-                Redis::decr($activeStreamsKey); // Decrement active streams since this one failed
+
+                // Try the next failover channel
                 continue;
             } catch (Exception $e) {
-                Log::channel('ffmpeg')->error("Error streaming {$type} {$currentStreamTitle} (ID: {$stream->id}) on playlist {$playlist->id}: " . $e->getMessage());
+                // Log the error and abort
+                Redis::decr($activeStreamsKey);
+                Log::channel('ffmpeg')->error("Error streaming channel {$title}: " . $e->getMessage());
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, $e->getMessage());
-                Redis::decr($activeStreamsKey); // Decrement active streams since this one failed
+
+                // Try the next failover channel
                 continue;
             }
         }

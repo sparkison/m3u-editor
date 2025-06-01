@@ -114,6 +114,7 @@ class StreamController extends Controller
                 );
             } catch (SourceNotResponding $e) {
                 // Log the error and cache the bad source
+                Redis::decr($activeStreamsKey);
                 Log::channel('ffmpeg')->error("Source not responding for channel {$title}: " . $e->getMessage());
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, $e->getMessage());
 
@@ -121,6 +122,7 @@ class StreamController extends Controller
                 continue;
             } catch (Exception $e) {
                 // Log the error and abort
+                Redis::decr($activeStreamsKey);
                 Log::channel('ffmpeg')->error("Error streaming channel {$title}: " . $e->getMessage());
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, $e->getMessage());
 
