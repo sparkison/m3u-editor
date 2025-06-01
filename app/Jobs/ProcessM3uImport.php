@@ -534,6 +534,13 @@ class ProcessM3uImport implements ShouldQueue
                         ++$channelNo;
 
                         $url = $item->getPath();
+                        if (is_string($url)) {
+                            if (str_starts_with($url, 'http//')) {
+                                $url = 'http://' . substr($url, strlen('http//'));
+                            } elseif (str_starts_with($url, 'https//')) {
+                                $url = 'https://' . substr($url, strlen('https//'));
+                            }
+                        }
                         foreach ($excludeFileTypes as $excludeFileType) {
                             if (str_ends_with($url, $excludeFileType)) {
                                 continue 2;
