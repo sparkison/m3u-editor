@@ -770,9 +770,15 @@ class ProcessM3uImport implements ShouldQueue
                 ->body($message)
                 ->sendToDatabase($playlist->user);
         } else {
+            // Setup group sort, if Playlist auto sort is enabled
+            $groupOrder = null;
+            if ($playlist->auto_sort) {
+                $groupOrder = 1;
+            }
+
             // Process the collection
-            $collection->groupBy('group')->chunk(10)->each(function (LazyCollection $grouped) use ($userId, $playlistId, $batchNo) {
-                $grouped->each(function ($channels, $groupName) use ($userId, $playlistId, $batchNo) {
+            $collection->groupBy('group')->chunk(10)->each(function (LazyCollection $grouped) use ($userId, $playlistId, $batchNo, &$groupOrder) {
+                $grouped->each(function ($channels, $groupName) use ($userId, $playlistId, $batchNo, &$groupOrder) {
                     // Add group and associated channels
                     $group = Group::where([
                         'name_internal' => $groupName ?? '',
@@ -781,19 +787,27 @@ class ProcessM3uImport implements ShouldQueue
                         'custom' => false,
                     ])->first();
                     if (!$group) {
-                        $group = Group::create([
+                        $data = [
                             'name' => $groupName ?? '',
                             'name_internal' => $groupName ?? '',
                             'playlist_id' => $playlistId,
                             'user_id' => $userId,
                             'import_batch_no' => $batchNo,
                             'new' => true,
-                        ]);
+                        ];
+                        if ($groupOrder !== null) {
+                            $data['sort_order'] = $groupOrder++;
+                        }
+                        $group = Group::create($data);
                     } else {
-                        $group->update([
+                        $data = [
                             'import_batch_no' => $batchNo,
                             'new' => false,
-                        ]);
+                        ];
+                        if ($groupOrder !== null) {
+                            $data['sort_order'] = $groupOrder++;
+                        }
+                        $group->update($data);
                     }
                     $channels->chunk(50)->each(function ($chunk) use ($playlistId, $batchNo, $group) {
                         Job::create([

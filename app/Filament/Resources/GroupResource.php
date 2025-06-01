@@ -70,11 +70,12 @@ class GroupResource extends Resource
                     ->toggleable(),
                 Tables\Columns\TextInputColumn::make('sort_order')
                     ->label('Sort Order')
-                    ->numeric()
-                    ->rules(['integer', 'min:0'])
-                    ->default(9999)
-                    ->placeholder('9999')
+                    ->rules(['min:0'])
+                    ->type('number')
+                    ->placeholder('Sort Order')
                     ->sortable()
+                    ->tooltip(fn($record) => $record->playlist->auto_sort ? 'Playlist auto-sort enabled; disable to change' : 'Group sort order')
+                    ->disabled(fn($record) => $record->playlist->auto_sort)
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('name_internal')
                     ->label('Default name')
