@@ -26,6 +26,8 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: sparkison/m3u-editor:experimental-amd64
+          provenance: false
+          sbom: false
 
   push-arm64:
     name: Publish experimental m3u-editor Docker image (arm64)
@@ -49,6 +51,8 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: sparkison/m3u-editor:experimental-arm64
+          provenance: false
+          sbom: false
 
   push-manifest:
     name: Push Docker Manifest for experimental
