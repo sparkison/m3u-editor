@@ -4,8 +4,8 @@ on:
     branches: [experimental]
 
 jobs:
-  push:
-    name: Publish experimental m3u-editor Docker image
+  push-amd64:
+    name: Publish experimental m3u-editor Docker image (amd64)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -20,9 +20,61 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       
-      - name: Build and push
+      - name: Build and push amd64
         uses: docker/build-push-action@v5
         with:
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
-          tags: sparkison/m3u-editor:experimental
+          tags: sparkison/m3u-editor:experimental-amd64
+
+  push-arm64:
+    name: Publish experimental m3u-editor Docker image (arm64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Build and push arm64
+        uses: docker/build-push-action@v5
+        with:
+          platforms: linux/arm64
+          push: true
+          tags: sparkison/m3u-editor:experimental-arm64
+
+  push-manifest:
+    name: Push Docker Manifest for experimental
+    runs-on: ubuntu-latest
+    needs: [push-amd64, push-arm64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create manifest list
+        run: |
+          docker manifest create sparkison/m3u-editor:experimental \
+            sparkison/m3u-editor:experimental-amd64 \
+            sparkison/m3u-editor:experimental-arm64
+      
+      - name: Push manifest list
+        run: docker manifest push sparkison/m3u-editor:experimental
