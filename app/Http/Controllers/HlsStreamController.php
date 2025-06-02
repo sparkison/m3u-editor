@@ -146,7 +146,34 @@ class HlsStreamController extends Controller
     ) {
         $actualStreamingModel = $model; // Initialize with the original model
 
-        if (!$this->hlsService->isRunning(type: $type, id: $model->id)) {
+        // First check if there's already a cached mapping for this original model to an active stream
+        $streamMappingKey = "hls:stream_mapping:{$type}:{$model->id}";
+        $activeStreamId = Cache::get($streamMappingKey);
+        
+        if ($activeStreamId && $this->hlsService->isRunning($type, $activeStreamId)) {
+            // There's an active stream for a mapped channel, use that
+            if ($activeStreamId != $model->id) {
+                // It's a failover channel that's running
+                if ($type === 'channel') {
+                    $actualStreamingModel = Channel::find($activeStreamId);
+                } else {
+                    $actualStreamingModel = Episode::find($activeStreamId);
+                }
+                if ($actualStreamingModel) {
+                    $logTitle = strip_tags($title);
+                    Log::channel('ffmpeg')->info("HLS Stream: Found existing failover stream for original $type ID {$model->id} ({$logTitle}). Using active $type ID {$actualStreamingModel->id} (" . ($actualStreamingModel->title_custom ?? $actualStreamingModel->title) . ").");
+                } else {
+                    // The mapped model doesn't exist anymore, clear the mapping
+                    Cache::forget($streamMappingKey);
+                    $activeStreamId = null;
+                }
+            } else {
+                Log::channel('ffmpeg')->info("HLS Stream: Found existing stream for $type ID {$model->id} (" . strip_tags($title) . ").");
+            }
+        }
+
+        // If no active stream found, try to start one
+        if (!$activeStreamId || !$this->hlsService->isRunning($type, $activeStreamId)) {
             $logTitle = strip_tags($title); // Use original title for initial logging
             try {
                 // Attempt to start the stream, potentially with failover
@@ -159,6 +186,10 @@ class HlsStreamController extends Controller
 
                 if ($returnedModel) {
                     $actualStreamingModel = $returnedModel; // This is the model that is actually streaming
+                    
+                    // Cache the mapping between original model and actual streaming model
+                    Cache::put($streamMappingKey, $actualStreamingModel->id, now()->addHours(24));
+                    
                     Log::channel('ffmpeg')->info("HLS Stream: Original request for $type ID {$model->id} ({$logTitle}). Actual streaming $type ID {$actualStreamingModel->id} (" . ($actualStreamingModel->title_custom ?? $actualStreamingModel->title) . ").");
                 } else {
                     // No stream (primary or failover) could be started
@@ -169,10 +200,6 @@ class HlsStreamController extends Controller
                 Log::channel('ffmpeg')->error("HLS Stream: Exception while trying to start stream for $type ID {$model->id} ({$logTitle}): {$e->getMessage()}");
                 abort(503, 'Service unavailable. Error during stream startup.');
             }
-        } else {
-            // Stream was already running for the original $model->id, so $actualStreamingModel remains $model
-            // Log explicitly that we are using an existing stream for the (potentially original) model ID.
-            Log::channel('ffmpeg')->info("HLS Stream: Found existing stream for $type ID {$actualStreamingModel->id} (" . strip_tags($title) . ").");
         }
 
         // Use $actualStreamingModel->id for PID and path
@@ -187,7 +214,6 @@ class HlsStreamController extends Controller
         $maxAttempts = 10;
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
             if (file_exists($m3u8Path)) {
-                Log::channel('ffmpeg')->info("HLS Stream: Playlist found for $type ID {$actualStreamingModel->id} on attempt {$attempt}. Path: {$m3u8Path}");
                 return response('', 200, [
                     'Content-Type'      => 'application/vnd.apple.mpegurl',
                     'X-Accel-Redirect'  => "/internal/hls/$pathPrefix{$actualStreamingModel->id}/stream.m3u8",

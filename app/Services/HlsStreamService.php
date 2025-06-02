@@ -122,6 +122,19 @@ class HlsStreamService
             $streams = $streams->concat($model->failoverChannels);
         }
 
+        // First check if any of the streams (including failovers) are already running
+        foreach ($streams as $stream) {
+            if ($this->isRunning($type, $stream->id)) {
+                $existingStreamTitle = $type === 'channel'
+                    ? ($stream->title_custom ?? $stream->title)
+                    : $stream->title;
+                $existingStreamTitle = strip_tags($existingStreamTitle);
+                
+                Log::channel('ffmpeg')->info("HLS Stream: Found existing running stream for $type ID {$stream->id} ({$existingStreamTitle}) - reusing for original request {$model->id} ({$title}).");
+                return $stream; // Return the already running stream
+            }
+        }
+
         // Record timestamp in Redis for the original model (never expires until we prune)
         Redis::set("hls:{$type}_last_seen:{$model->id}", now()->timestamp);
 
@@ -389,6 +402,16 @@ class HlsStreamService
 
         // Remove from active IDs set
         Redis::srem("hls:active_{$type}_ids", $id);
+
+        // Clean up any stream mappings that point to this stopped stream
+        $mappingPattern = "hls:stream_mapping:{$type}:*";
+        $mappingKeys = Redis::keys($mappingPattern);
+        foreach ($mappingKeys as $key) {
+            if (Cache::get($key) == $id) {
+                Cache::forget($key);
+                Log::channel('ffmpeg')->info("Cleaned up stream mapping: {$key} -> {$id}");
+            }
+        }
 
         return $wasRunning;
     }
