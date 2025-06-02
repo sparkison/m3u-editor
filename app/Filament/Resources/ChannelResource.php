@@ -407,11 +407,8 @@ class ChannelResource extends Resource
                                 Forms\Components\Select::make('master_channel_id')
                                     ->label('Master Channel')
                                     ->options(function ($state) use ($selectedRecordIds) {
-                                        $channelsQuery = \App\Models\Channel::query()
-                                            ->with('playlist');
-
+                                        $channelsQuery = \App\Models\Channel::query()->with('playlist');
                                         $initialChannels = $channelsQuery->limit(100)->get()->keyBy('id');
-
                                         if ($state) {
                                             // If $state is present, ensure this channel is loaded and part of the initial set for processing.
                                             // This is crucial if $state is not within the limit(100) but needs to be an option.
@@ -425,7 +422,6 @@ class ChannelResource extends Resource
 
                                         $selectedOptions = [];
                                         $regularOptions = [];
-
                                         foreach ($initialChannels as $channel) {
                                             $displayTitle = $channel->title_custom ?: $channel->title;
                                             $playlistName = $channel->playlist->name ?? 'Unknown';
