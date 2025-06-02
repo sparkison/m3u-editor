@@ -299,8 +299,8 @@ class HlsStreamService
             // Decrement the active viewer count for the playlist
             Redis::decr("active_streams:{$playlistId}");
 
-            // Remove the cached PID
-            $this->stopStream($type, $model->id);
+            // Clean up the stream without decrementing again (to avoid double decrement)
+            $this->cleanupStreamResources($type, $model->id);
         });
 
         // Cache the actual FFmpeg PID
@@ -400,6 +400,32 @@ class HlsStreamService
             Log::channel('ffmpeg')->warning("No running FFmpeg process for channel {$id} to stop.");
         }
 
+        // Decrement the active streams count for the playlist
+        try {
+            if ($type === 'channel') {
+                $model = Channel::find($id);
+            } else {
+                $model = Episode::find($id);
+            }
+            
+            if ($model && $model->playlist) {
+                $activeStreamsKey = "active_streams:{$model->playlist->id}";
+                $currentCount = Redis::decr($activeStreamsKey);
+                
+                // Ensure count doesn't go negative
+                if ($currentCount < 0) {
+                    Redis::set($activeStreamsKey, 0);
+                    $currentCount = 0;
+                }
+                
+                Log::channel('ffmpeg')->info("Decremented active streams for playlist {$model->playlist->id}: {$currentCount} (after decrement for {$type} {$id})");
+            } else {
+                Log::channel('ffmpeg')->warning("Could not find {$type} {$id} or its playlist to decrement active streams count");
+            }
+        } catch (Exception $e) {
+            Log::channel('ffmpeg')->error("Error decrementing active streams count for {$type} {$id}: " . $e->getMessage());
+        }
+
         // Remove from active IDs set
         Redis::srem("hls:active_{$type}_ids", $id);
 
@@ -414,6 +440,38 @@ class HlsStreamService
         }
 
         return $wasRunning;
+    }
+
+    /**
+     * Clean up stream resources without decrementing active streams count.
+     * This is used internally by shutdown functions to avoid double decrementing.
+     *
+     * @param string $type
+     * @param string $id
+     * @return void
+     */
+    private function cleanupStreamResources($type, $id): void
+    {
+        $cacheKey = "hls:pid:{$type}:{$id}";
+        
+        // Remove the cached PID
+        Cache::forget($cacheKey);
+
+        // Remove from active IDs set
+        Redis::srem("hls:active_{$type}_ids", $id);
+
+        // Clean up any stream mappings that point to this stopped stream
+        $mappingPattern = "hls:stream_mapping:{$type}:*";
+        $mappingKeys = Redis::keys($mappingPattern);
+        foreach ($mappingKeys as $key) {
+            if (Cache::get($key) == $id) {
+                Cache::forget($key);
+                Log::channel('ffmpeg')->info("Cleaned up stream mapping: {$key} -> {$id}");
+            }
+        }
+
+        // Note: Active streams count decrementing is handled by the caller
+        Log::channel('ffmpeg')->info("Cleaned up stream resources for {$type} {$id}");
     }
 
     /**
