@@ -51,11 +51,11 @@ class HlsStreamService
             ];
             $pipes = [];
             if ($type === 'episode') {
-                $workindDir = Storage::disk('app')->path("hls/e/{$id}");
+                $workingDir = Storage::disk('app')->path("hls/e/{$id}");
             } else {
-                $workindDir = Storage::disk('app')->path("hls/{$id}");
+                $workingDir = Storage::disk('app')->path("hls/{$id}");
             }
-            $process = proc_open($cmd, $descriptors, $pipes, $workindDir);
+            $process = proc_open($cmd, $descriptors, $pipes, $workingDir);
 
             if (!is_resource($process)) {
                 Log::channel('ffmpeg')->error("Failed to launch FFmpeg for channel {$id}");
@@ -129,7 +129,7 @@ class HlsStreamService
                     ? ($stream->title_custom ?? $stream->title)
                     : $stream->title;
                 $existingStreamTitle = strip_tags($existingStreamTitle);
-                
+
                 Log::channel('ffmpeg')->info("HLS Stream: Found existing running stream for $type ID {$stream->id} ({$existingStreamTitle}) - reusing for original request {$model->id} ({$title}).");
                 return $stream; // Return the already running stream
             }
@@ -193,8 +193,8 @@ class HlsStreamService
                     model: $stream, // Pass the current $stream object
                     streamUrl: $currentAttemptStreamUrl, // Pass the URL of the current $stream
                     title: $currentStreamTitle, // Pass the title of the current $stream
+                    playlistId: $playlist->id,
                     userAgent: $userAgent,
-                    playlistId: $playlist->id
                 );
                 Log::channel('ffmpeg')->info("Successfully started HLS stream for {$type} {$currentStreamTitle} (ID: {$stream->id}) on playlist {$playlist->id}.");
                 return $stream; // Return the successful stream object
@@ -254,11 +254,11 @@ class HlsStreamService
         ];
         $pipes = [];
         if ($type === 'episode') {
-            $workindDir = Storage::disk('app')->path("hls/e/{$model->id}");
+            $workingDir = Storage::disk('app')->path("hls/e/{$model->id}");
         } else {
-            $workindDir = Storage::disk('app')->path("hls/{$model->id}");
+            $workingDir = Storage::disk('app')->path("hls/{$model->id}");
         }
-        $process = proc_open($cmd, $descriptors, $pipes, $workindDir);
+        $process = proc_open($cmd, $descriptors, $pipes, $workingDir);
 
         if (!is_resource($process)) {
             throw new Exception("Failed to launch FFmpeg for {$title}");
@@ -296,11 +296,8 @@ class HlsStreamService
             fclose($stderr);
             proc_close($process);
 
-            // Decrement the active viewer count for the playlist
-            Redis::decr("active_streams:{$playlistId}");
-
             // Clean up the stream without decrementing again (to avoid double decrement)
-            $this->cleanupStreamResources($type, $model->id);
+            $this->cleanupStreamResources($type, $model->id, $playlistId);
         });
 
         // Cache the actual FFmpeg PID
@@ -380,12 +377,19 @@ class HlsStreamService
         $wasRunning = false;
         if ($this->isRunning($type, $id)) {
             $wasRunning = true;
-            // Attempt to gracefully stop the FFmpeg process
+
+            // Give process time to cleanup gracefully
             posix_kill($pid, SIGTERM);
-            sleep(1);
+            $attempts = 0;
+            while ($attempts < 30 && posix_kill($pid, 0)) {
+                usleep(100000); // 100ms
+                $attempts++;
+            }
+
+            // Force kill if still running
             if (posix_kill($pid, 0)) {
-                // If the process is still running after SIGTERM, force kill it
                 posix_kill($pid, SIGKILL);
+                Log::channel('ffmpeg')->warning("Force killed FFmpeg process {$pid} for {$type} {$id}");
             }
             Cache::forget($cacheKey);
 
@@ -407,17 +411,17 @@ class HlsStreamService
             } else {
                 $model = Episode::find($id);
             }
-            
+
             if ($model && $model->playlist) {
                 $activeStreamsKey = "active_streams:{$model->playlist->id}";
                 $currentCount = Redis::decr($activeStreamsKey);
-                
+
                 // Ensure count doesn't go negative
                 if ($currentCount < 0) {
                     Redis::set($activeStreamsKey, 0);
                     $currentCount = 0;
                 }
-                
+
                 Log::channel('ffmpeg')->info("Decremented active streams for playlist {$model->playlist->id}: {$currentCount} (after decrement for {$type} {$id})");
             } else {
                 Log::channel('ffmpeg')->warning("Could not find {$type} {$id} or its playlist to decrement active streams count");
@@ -450,10 +454,10 @@ class HlsStreamService
      * @param string $id
      * @return void
      */
-    private function cleanupStreamResources($type, $id): void
+    private function cleanupStreamResources($type, $id, $playlistId): void
     {
         $cacheKey = "hls:pid:{$type}:{$id}";
-        
+
         // Remove the cached PID
         Cache::forget($cacheKey);
 
@@ -469,6 +473,9 @@ class HlsStreamService
                 Log::channel('ffmpeg')->info("Cleaned up stream mapping: {$key} -> {$id}");
             }
         }
+
+        // Remove the active streams count for the playlist
+        Redis::decr("active_streams:{$playlistId}");
 
         // Note: Active streams count decrementing is handled by the caller
         Log::channel('ffmpeg')->info("Cleaned up stream resources for {$type} {$id}");
@@ -577,11 +584,6 @@ class HlsStreamService
         $codecSpecificArgs = '';  // For encoder options like -profile:v, -preset, etc.
         $outputVideoCodec = $finalVideoCodec; // This might be overridden by hw accel logic
 
-        // Get user agent
-        if (!$userAgent) {
-            $userAgent = escapeshellarg($settings['ffmpeg_user_agent']);
-        }
-
         // Get user defined options
         $userArgs = config('proxy.ffmpeg_additional_args', '');
         if (!empty($userArgs)) {
@@ -676,12 +678,13 @@ class HlsStreamService
 
             // Low-latency flags for better HLS performance
             $cmd .= '-fflags nobuffer -flags low_delay -avoid_negative_ts disabled ';
-            
+
             // Input analysis optimization for faster stream start
             $cmd .= '-analyzeduration 1M -probesize 1M -max_delay 500000 ';
 
             // Use the user agent from settings, escape it. $userAgent parameter is ignored for now.
-            $cmd .= "-user_agent " . escapeshellarg($settings['ffmpeg_user_agent']) . " -referer \"MyComputer\" " .
+            $effectiveUserAgent = $userAgent ?: $settings['ffmpeg_user_agent'];
+            $cmd .= "-user_agent " . escapeshellarg($effectiveUserAgent) . " -referer \"MyComputer\" " .
                 '-multiple_requests 1 -reconnect_on_network_error 1 ' .
                 '-reconnect_on_http_error 5xx,4xx,509 -reconnect_streamed 1 ' .
                 '-reconnect_delay_max 2 -noautorotate ';

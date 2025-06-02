@@ -260,8 +260,17 @@ class HlsStreamController extends Controller
         $pathPrefix = $type === 'channel' ? '' : 'e/';
         $path = Storage::disk('app')->path("hls/$pathPrefix{$modelId}/{$segment}");
 
-        // If segment is not found, return 404 error
-        abort_unless(file_exists($path), 404, 'Segment not found.');
+        // Check if the segment file exists
+        if (!file_exists($path)) {
+            Log::channel('ffmpeg')->error("HLS Stream: Segment not found for $type ID {$modelId}. Path: {$path}. Segment: {$segment}");
+            
+            // Return an empty response, empty segments is normal during startup
+            return response('Segment not found', 404, [
+                'Content-Type' => 'video/MP2T',
+                'Cache-Control' => 'no-cache, no-transform',
+                'Connection' => 'keep-alive',
+            ]);
+        }
 
         Redis::transaction(function () use ($type, $modelId) {
             // Record timestamp in Redis (never expires until we prune)
