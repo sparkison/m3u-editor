@@ -32,10 +32,15 @@ jobs:
       - name: Build and push amd64
         uses: docker/build-push-action@v5
         with:
+          context: .
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta-amd64.outputs.tags }}
           labels: ${{ steps.meta-amd64.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+          sbom: false
 
   release-arm64:
     name: Publish m3u-editor Docker image (arm64)
@@ -65,10 +70,15 @@ jobs:
       - name: Build and push arm64
         uses: docker/build-push-action@v5
         with:
+          context: .
           platforms: linux/arm64
           push: true
           tags: ${{ steps.meta-arm64.outputs.tags }}
           labels: ${{ steps.meta-arm64.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+          sbom: false
 
   push-manifest:
     name: Push Docker Manifest for release
