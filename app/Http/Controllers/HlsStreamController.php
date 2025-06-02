@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Exception;
 use App\Models\Channel;
 use App\Models\Episode;
+use App\Settings\GeneralSettings;
 use App\Services\HlsStreamService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -184,7 +185,11 @@ class HlsStreamController extends Controller
 
         Log::channel('ffmpeg')->info("HLS Stream: Checking for playlist for $type ID {$actualStreamingModel->id}. Path: {$m3u8Path}. PID found from cache key '{$pidCacheKey}': " . ($pid ?: 'None'));
 
-        $maxAttempts = 10;
+        // Get configurable loop parameters
+        $settings = app(GeneralSettings::class);
+        $maxAttempts = $settings->hls_playlist_max_attempts ?? 10;
+        $sleepSeconds = $settings->hls_playlist_sleep_seconds ?? 1.0;
+
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
             if (file_exists($m3u8Path)) {
                 Log::channel('ffmpeg')->info("HLS Stream: Playlist found for $type ID {$actualStreamingModel->id} on attempt {$attempt}. Path: {$m3u8Path}");
@@ -215,7 +220,7 @@ class HlsStreamController extends Controller
                     ->route($route, ['encodedId' => $encodedId])
                     ->with('error', 'Playlist not ready yet. Please try again.');
             }
-            sleep(1);
+            usleep((int)($sleepSeconds * 1000000));
         }
     }
 

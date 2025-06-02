@@ -25,6 +25,10 @@ class GeneralSettings extends Settings
     public ?string $mediaflow_proxy_user_agent = null;
     public ?bool $mediaflow_proxy_playlist_user_agent = false;
     public ?string $ffmpeg_path = null;
+    public ?int $ffmpeg_hls_time = 4;
+    public ?int $ffmpeg_ffprobe_timeout = 5;
+    public ?int $hls_playlist_max_attempts = 10;
+    public ?float $hls_playlist_sleep_seconds = 1.0;
 
     // VAAPI and QSV settings
     public ?string $hardware_acceleration_method = 'none';
