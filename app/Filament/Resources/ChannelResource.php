@@ -408,7 +408,6 @@ class ChannelResource extends Resource
                                     ->label('Master Channel')
                                     ->options(function ($state) use ($selectedRecordIds) {
                                         $channelsQuery = \App\Models\Channel::query()
-                                            ->withoutEagerLoads()
                                             ->with('playlist');
 
                                         $initialChannels = $channelsQuery->limit(100)->get()->keyBy('id');
@@ -451,23 +450,26 @@ class ChannelResource extends Resource
                                     ->searchable()
                                     ->getSearchResultsUsing(function (string $search) use ($selectedRecordIds) {
                                         $searchedChannels = \App\Models\Channel::query()
-                                            ->withoutEagerLoads()
-                                            ->with('playlist')
+                                            ->with('playlist') // Ensure playlist is loaded for the label
                                             ->where(function ($query) use ($search) {
                                                 $query->where('title', 'like', "%{$search}%")
                                                     ->orWhere('title_custom', 'like', "%{$search}%")
                                                     ->orWhere('name', 'like', "%{$search}%")
                                                     ->orWhere('name_custom', 'like', "%{$search}%");
                                             })
-                                            ->limit(50)
+                                            ->limit(50) // Keep a reasonable limit
                                             ->get();
 
                                         $searchSelectedOptions = [];
                                         $searchRegularOptions = [];
 
+                                        if ($searchedChannels->isEmpty()) {
+                                            return []; // Return empty if no channels match search
+                                        }
+
                                         foreach ($searchedChannels as $channel) {
                                             $displayTitle = $channel->title_custom ?: $channel->title;
-                                            $playlistName = $channel->playlist->name ?? 'Unknown';
+                                            $playlistName = $channel->playlist->name ?? 'Unknown'; // Requires 'playlist' to be eager loaded
                                             $label = "{$displayTitle} [{$playlistName}]";
 
                                             if (in_array($channel->id, $selectedRecordIds)) {
