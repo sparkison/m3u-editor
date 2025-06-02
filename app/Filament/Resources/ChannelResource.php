@@ -244,11 +244,23 @@ class ChannelResource extends Resource
                     ->query(function ($query) {
                         return $query->where('enabled', true);
                     }),
+                Tables\Filters\Filter::make('disabled')
+                    ->label('Channel is disabled')
+                    ->toggle()
+                    ->query(function ($query) {
+                        return $query->where('enabled', false);
+                    }),
                 Tables\Filters\Filter::make('mapped')
                     ->label('EPG is mapped')
                     ->toggle()
                     ->query(function ($query) {
                         return $query->where('epg_channel_id', '!=', null);
+                    }),
+                Tables\Filters\Filter::make('un_mapped')
+                    ->label('EPG is not mapped')
+                    ->toggle()
+                    ->query(function ($query) {
+                        return $query->where('epg_channel_id', '=', null);
                     }),
             ])
             ->actions([
