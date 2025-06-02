@@ -408,22 +408,26 @@ class ChannelResource extends Resource
                                     ->label('Master Channel')
                                     ->options(function ($state) use ($selectedRecordIds) {
                                         $channelsQuery = \App\Models\Channel::query()
-                                            ->withAnyTags(['top', 'priority'])
                                             ->withoutEagerLoads()
                                             ->with('playlist');
 
-                                        // Handle $state for initial load if a value is already selected
+                                        $initialChannels = $channelsQuery->limit(100)->get()->keyBy('id');
+
                                         if ($state) {
-                                            $channelsQuery->orWhere('id', '=', $state);
+                                            // If $state is present, ensure this channel is loaded and part of the initial set for processing.
+                                            // This is crucial if $state is not within the limit(100) but needs to be an option.
+                                            if (!$initialChannels->has($state)) {
+                                                $stateChannel = \App\Models\Channel::query()->with('playlist')->find($state);
+                                                if ($stateChannel) {
+                                                    $initialChannels->put($stateChannel->id, $stateChannel);
+                                                }
+                                            }
                                         }
 
-                                        $allMasterChannels = $channelsQuery->limit(100)->get();
-
-                                        $options = [];
                                         $selectedOptions = [];
                                         $regularOptions = [];
 
-                                        foreach ($allMasterChannels as $channel) {
+                                        foreach ($initialChannels as $channel) {
                                             $displayTitle = $channel->title_custom ?: $channel->title;
                                             $playlistName = $channel->playlist->name ?? 'Unknown';
                                             $label = "{$displayTitle} [{$playlistName}]";
@@ -434,26 +438,19 @@ class ChannelResource extends Resource
                                                 $regularOptions[$channel->id] = $label;
                                             }
                                         }
-                                        // Array union preserves keys, selected first, and ensures $state selected value is preserved if it was already loaded
-                                        if ($state && isset($regularOptions[$state])) {
-                                             $selectedStateOption = [$state => $regularOptions[$state]];
-                                             unset($regularOptions[$state]);
-                                             $options = $selectedStateOption + $selectedOptions + $regularOptions;
-                                        } else if ($state && isset($selectedOptions[$state])) {
-                                            // if $state is already a [SELECTED] one, ensure it's prioritized before other selected
-                                            $prioritizedSelectedOption = [$state => $selectedOptions[$state]];
-                                            unset($selectedOptions[$state]);
-                                            $options = $prioritizedSelectedOption + $selectedOptions + $regularOptions;
+
+                                        // Prioritize $state if it exists, ensuring it's correctly formatted.
+                                        $finalOptions = $selectedOptions + $regularOptions; // Selected options come first.
+                                        if ($state && isset($finalOptions[$state])) {
+                                            $stateOption = [$state => $finalOptions[$state]];
+                                            unset($finalOptions[$state]); // Remove to avoid duplication
+                                            $finalOptions = $stateOption + $finalOptions; // Add $state option to the beginning
                                         }
-                                        else {
-                                            $options = $selectedOptions + $regularOptions;
-                                        }
-                                        return $options;
+                                        return $finalOptions;
                                     })
                                     ->searchable()
                                     ->getSearchResultsUsing(function (string $search) use ($selectedRecordIds) {
                                         $searchedChannels = \App\Models\Channel::query()
-                                            ->withAnyTags(['top', 'priority'])
                                             ->withoutEagerLoads()
                                             ->with('playlist')
                                             ->where(function ($query) use ($search) {
@@ -465,9 +462,8 @@ class ChannelResource extends Resource
                                             ->limit(50)
                                             ->get();
 
-                                        $options = [];
-                                        $selectedOptions = [];
-                                        $regularOptions = [];
+                                        $searchSelectedOptions = [];
+                                        $searchRegularOptions = [];
 
                                         foreach ($searchedChannels as $channel) {
                                             $displayTitle = $channel->title_custom ?: $channel->title;
@@ -475,13 +471,12 @@ class ChannelResource extends Resource
                                             $label = "{$displayTitle} [{$playlistName}]";
 
                                             if (in_array($channel->id, $selectedRecordIds)) {
-                                                $selectedOptions[$channel->id] = "[SELECTED] " . $label;
+                                                $searchSelectedOptions[$channel->id] = "[SELECTED] " . $label;
                                             } else {
-                                                $regularOptions[$channel->id] = $label;
+                                                $searchRegularOptions[$channel->id] = $label;
                                             }
                                         }
-                                        $options = $selectedOptions + $regularOptions; // Array union preserves keys, selected first
-                                        return $options;
+                                        return $searchSelectedOptions + $searchRegularOptions;
                                     })
                                     ->required(),
                             ];
