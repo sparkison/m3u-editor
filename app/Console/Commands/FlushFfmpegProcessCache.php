@@ -29,7 +29,7 @@ class FlushFfmpegProcessCache extends Command
     {
         $this->info('🗑️ Flushing FFmpeg process cache.');
 
-        // Flush the Redis cache for FFmpeg processes
+        // Flush the Redis store (FFmpeg processes mgmt., cache, etc.)
         Redis::flushdb();
     }
 }

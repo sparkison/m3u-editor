@@ -276,9 +276,6 @@ EOSQL
   fi
 fi
 
-# Clear ffmpeg and process cache
-php artisan app:flush-ffmpeg-process-cache
-
 # Run migrations
 echo "💾 Running migrations..."
 php artisan migrate --force
