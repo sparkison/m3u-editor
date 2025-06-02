@@ -455,7 +455,8 @@ class ChannelResource extends Resource
                                                 $query->where('title', 'like', "%{$search}%")
                                                     ->orWhere('title_custom', 'like', "%{$search}%")
                                                     ->orWhere('name', 'like', "%{$search}%")
-                                                    ->orWhere('name_custom', 'like', "%{$search}%");
+                                                    ->orWhere('name_custom', 'like', "%{$search}%")
+                                                    ->orWhere('stream_id', 'like', "%{$search}%"); // Added stream_id
                                             })
                                             ->limit(50) // Keep a reasonable limit
                                             ->get();
