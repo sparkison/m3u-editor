@@ -113,7 +113,7 @@ class HlsStreamService
         Channel|Episode $model, // This $model is the *original* requested channel/episode
         string $streamUrl,      // This $streamUrl is the URL of the *original* model
         string $title           // This $title is the title of the *original* model
-    ): void {
+    ): ?object { // Changed return type
         // Get the failover channels (if any)
         $streams = collect([$model]);
         if ($type === 'channel' && $model instanceof Channel) { // Ensure $model is a Channel for failoverChannels
@@ -182,7 +182,7 @@ class HlsStreamService
                     playlistId: $playlist->id
                 );
                 Log::channel('ffmpeg')->info("Successfully started HLS stream for {$type} {$currentStreamTitle} (ID: {$stream->id}) on playlist {$playlist->id}.");
-                return; // Exit after successfully starting a stream
+                return $stream; // MODIFICATION: Return the successful stream object
 
             } catch (SourceNotResponding $e) {
                 // Log the error and cache the bad source
@@ -204,6 +204,7 @@ class HlsStreamService
         }
         // If loop finishes, no stream was successfully started
         Log::channel('ffmpeg')->error("No available (HLS) streams for {$type} {$title} (Original Model ID: {$model->id}) after trying all sources.");
+        return null; // MODIFICATION: Return null if no stream started
     }
 
     /**
@@ -570,10 +571,20 @@ class HlsStreamService
             $audioCodec = config('proxy.ffmpeg_codec_audio') ?: $settings['ffmpeg_codec_audio'];
             $subtitleCodec = config('proxy.ffmpeg_codec_subtitles') ?: $settings['ffmpeg_codec_subtitles'];
 
-            // Get ffmpeg output codec formats
+            // Start building ffmpeg output codec formats
             $outputFormat = "-c:v {$outputVideoCodec} " .
-                ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "") .
-                "-c:a {$audioCodec} -c:s {$subtitleCodec}";
+                ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "");
+
+            // Conditionally add audio codec
+            if (!empty($audioCodec)) {
+                $outputFormat .= "-c:a {$audioCodec} ";
+            }
+
+            // Conditionally add subtitle codec
+            if (!empty($subtitleCodec)) {
+                $outputFormat .= "-c:s {$subtitleCodec} ";
+            }
+            $outputFormat = trim($outputFormat); // Trim trailing space
 
             // Reconstruct FFmpeg Command (ensure $ffmpegPath is escaped if it can contain spaces, though unlikely for a binary name)
             $cmd = escapeshellcmd($ffmpegPath) . ' ';

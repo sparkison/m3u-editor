@@ -401,60 +401,99 @@ class ChannelResource extends Resource
 
                     Tables\Actions\BulkAction::make('failover')
                         ->label('Add as failover')
-                        ->form([
-                            Forms\Components\Select::make('master_channel_id')
-                                ->label('Master Channel')
-                                ->options(function ($state) {
-                                    // Get the current channel ID to exclude it from options
-                                    $channels = \App\Models\Channel::query()
-                                        ->withoutEagerLoads()
-                                        ->with('playlist')
-                                        ->when($state, function ($query) use ($state) {
-                                            return $query->where('id', '=', $state);
-                                        })->limit(100)->get();
+                        ->form(function (Collection $records) { // $records here are the selected table records
+                            $selectedRecordIds = $records->pluck('id')->toArray();
+                            return [
+                                Forms\Components\Select::make('master_channel_id')
+                                    ->label('Master Channel')
+                                    ->options(function ($state) use ($selectedRecordIds) {
+                                        $channelsQuery = \App\Models\Channel::query()
+                                            ->with('playlist');
 
-                                    // Create options array
-                                    $options = [];
-                                    foreach ($channels as $channel) {
-                                        $displayTitle = $channel->title_custom ?: $channel->title;
-                                        $playlistName = $channel->playlist->name ?? 'Unknown';
-                                        $options[$channel->id] = "{$displayTitle} [{$playlistName}]";
-                                    }
+                                        $initialChannels = $channelsQuery->limit(100)->get()->keyBy('id');
 
-                                    return $options;
-                                })
-                                ->searchable()
-                                ->getSearchResultsUsing(function (string $search) {
-                                    // Always include the selected value if it exists
-                                    $channels = \App\Models\Channel::query()
-                                        ->withoutEagerLoads()
-                                        ->with('playlist')
-                                        ->where(function ($query) use ($search) {
-                                            $query->where('title', 'like', "%{$search}%")
-                                                ->orWhere('title_custom', 'like', "%{$search}%")
-                                                ->orWhere('name', 'like', "%{$search}%")
-                                                ->orWhere('name_custom', 'like', "%{$search}%");
-                                        })
-                                        ->limit(50) // Reasonable limit for search results
-                                        ->get();
+                                        if ($state) {
+                                            // If $state is present, ensure this channel is loaded and part of the initial set for processing.
+                                            // This is crucial if $state is not within the limit(100) but needs to be an option.
+                                            if (!$initialChannels->has($state)) {
+                                                $stateChannel = \App\Models\Channel::query()->with('playlist')->find($state);
+                                                if ($stateChannel) {
+                                                    $initialChannels->put($stateChannel->id, $stateChannel);
+                                                }
+                                            }
+                                        }
 
-                                    // Create options array
-                                    $options = [];
-                                    foreach ($channels as $channel) {
-                                        $displayTitle = $channel->title_custom ?: $channel->title;
-                                        $playlistName = $channel->playlist->name ?? 'Unknown';
-                                        $options[$channel->id] = "{$displayTitle} [{$playlistName}]";
-                                    }
+                                        $selectedOptions = [];
+                                        $regularOptions = [];
 
-                                    return $options;
-                                })
-                                ->required(),
-                        ])
+                                        foreach ($initialChannels as $channel) {
+                                            $displayTitle = $channel->title_custom ?: $channel->title;
+                                            $playlistName = $channel->playlist->name ?? 'Unknown';
+                                            $label = "{$displayTitle} [{$playlistName}]";
+
+                                            if (in_array($channel->id, $selectedRecordIds)) {
+                                                $selectedOptions[$channel->id] = "[SELECTED] " . $label;
+                                            } else {
+                                                $regularOptions[$channel->id] = $label;
+                                            }
+                                        }
+
+                                        // Prioritize $state if it exists, ensuring it's correctly formatted.
+                                        $finalOptions = $selectedOptions + $regularOptions; // Selected options come first.
+                                        if ($state && isset($finalOptions[$state])) {
+                                            $stateOption = [$state => $finalOptions[$state]];
+                                            unset($finalOptions[$state]); // Remove to avoid duplication
+                                            $finalOptions = $stateOption + $finalOptions; // Add $state option to the beginning
+                                        }
+                                        return $finalOptions;
+                                    })
+                                    ->searchable()
+                                    ->getSearchResultsUsing(function (string $search) use ($selectedRecordIds) {
+                                        $searchedChannels = \App\Models\Channel::query()
+                                            ->with('playlist') // Ensure playlist is loaded for the label
+                                            ->where(function ($query) use ($search) {
+                                                $query->where('title', 'like', "%{$search}%")
+                                                    ->orWhere('title_custom', 'like', "%{$search}%")
+                                                    ->orWhere('name', 'like', "%{$search}%")
+                                                    ->orWhere('name_custom', 'like', "%{$search}%")
+                                                    ->orWhere('stream_id', 'like', "%{$search}%"); // Added stream_id
+                                            })
+                                            ->limit(50) // Keep a reasonable limit
+                                            ->get();
+
+                                        $searchSelectedOptions = [];
+                                        $searchRegularOptions = [];
+
+                                        if ($searchedChannels->isEmpty()) {
+                                            return []; // Return empty if no channels match search
+                                        }
+
+                                        foreach ($searchedChannels as $channel) {
+                                            $displayTitle = $channel->title_custom ?: $channel->title;
+                                            $playlistName = $channel->playlist->name ?? 'Unknown'; // Requires 'playlist' to be eager loaded
+                                            $label = "{$displayTitle} [{$playlistName}]";
+
+                                            if (in_array($channel->id, $selectedRecordIds)) {
+                                                $searchSelectedOptions[$channel->id] = "[SELECTED] " . $label;
+                                            } else {
+                                                $searchRegularOptions[$channel->id] = $label;
+                                            }
+                                        }
+                                        return $searchSelectedOptions + $searchRegularOptions;
+                                    })
+                                    ->required(),
+                            ];
+                        })
                         ->action(function (Collection $records, array $data): void {
-                            foreach ($records as $record) {
+                            // Filter out the master channel from the records to be added as failovers
+                            $failoverRecords = $records->filter(function ($record) use ($data) {
+                                return $record->id !== $data['master_channel_id'];
+                            });
+
+                            foreach ($failoverRecords as $record) {
                                 ChannelFailover::updateOrCreate([
                                     'channel_id' => $data['master_channel_id'],
-                                    'channel_failover_id' =>  $record->id,
+                                    'channel_failover_id' => $record->id,
                                 ]);
                             }
                         })->after(function () {
