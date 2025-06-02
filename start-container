@@ -169,9 +169,6 @@ php artisan app:generate-key
 # Check for updates
 php artisan app:update-check
 
-# Clear ffmpeg and process cache
-php artisan app:flush-ffmpeg-process-cache
-
 # Optimize Laravel
 php artisan optimize
 
@@ -278,6 +275,9 @@ CREATE DATABASE "${PG_DATABASE}"
 EOSQL
   fi
 fi
+
+# Clear ffmpeg and process cache
+php artisan app:flush-ffmpeg-process-cache
 
 # Run migrations
 echo "💾 Running migrations..."
