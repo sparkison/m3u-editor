@@ -161,7 +161,7 @@ class HlsStreamController extends Controller
                 }
                 if ($actualStreamingModel) {
                     $logTitle = strip_tags($title);
-                    Log::channel('ffmpeg')->info("HLS Stream: Found existing failover stream for original $type ID {$model->id} ({$logTitle}). Using active $type ID {$actualStreamingModel->id} (" . ($actualStreamingModel->title_custom ?? $actualStreamingModel->title) . ").");
+                    // Log::channel('ffmpeg')->info("HLS Stream: Found existing failover stream for original $type ID {$model->id} ({$logTitle}). Using active $type ID {$actualStreamingModel->id} (" . ($actualStreamingModel->title_custom ?? $actualStreamingModel->title) . ").");
                 } else {
                     // The mapped model doesn't exist anymore, clear the mapping
                     Cache::forget($streamMappingKey);
@@ -209,7 +209,7 @@ class HlsStreamController extends Controller
         $pathPrefix = $type === 'channel' ? '' : 'e/';
         $m3u8Path = Storage::disk('app')->path("hls/$pathPrefix{$actualStreamingModel->id}/stream.m3u8");
 
-        Log::channel('ffmpeg')->info("HLS Stream: Checking for playlist for $type ID {$actualStreamingModel->id}. Path: {$m3u8Path}. PID found from cache key '{$pidCacheKey}': " . ($pid ?: 'None'));
+        // Log::channel('ffmpeg')->info("HLS Stream: Checking for playlist for $type ID {$actualStreamingModel->id}. Path: {$m3u8Path}. PID found from cache key '{$pidCacheKey}': " . ($pid ?: 'None'));
 
         $maxAttempts = 10;
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {

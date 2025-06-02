@@ -616,13 +616,17 @@ class HlsStreamService
             $cmd .= $hwaccelInitArgs;  // e.g., -init_hw_device (goes before input options that use it, but after global options)
             $cmd .= $hwaccelInputArgs; // e.g., -hwaccel vaapi (these must go BEFORE the -i input)
 
-            $cmd .= '-fflags nobuffer -flags low_delay ';
+            // Low-latency flags for better HLS performance
+            $cmd .= '-fflags nobuffer -flags low_delay -avoid_negative_ts disabled ';
+            
+            // Input analysis optimization for faster stream start
+            $cmd .= '-analyzeduration 1M -probesize 1M -max_delay 500000 ';
 
             // Use the user agent from settings, escape it. $userAgent parameter is ignored for now.
             $cmd .= "-user_agent " . escapeshellarg($settings['ffmpeg_user_agent']) . " -referer \"MyComputer\" " .
                 '-multiple_requests 1 -reconnect_on_network_error 1 ' .
                 '-reconnect_on_http_error 5xx,4xx,509 -reconnect_streamed 1 ' .
-                '-reconnect_delay_max 5 -noautorotate ';
+                '-reconnect_delay_max 2 -noautorotate ';
 
             $cmd .= $userArgs; // User-defined global args from config/proxy.php or QSV additional args
 
@@ -703,9 +707,10 @@ class HlsStreamService
         }
 
         // ... rest of the options and command suffix ...
-        $cmd .= ' -f hls -hls_time 4 -hls_list_size 15 ' .
-            '-hls_flags delete_segments+append_list+independent_segments ' .
-            '-use_wallclock_as_timestamps 1 ' .
+        $cmd .= ' -f hls -hls_time 2 -hls_list_size 6 ' .
+            '-hls_flags delete_segments+append_list+independent_segments+split_by_time ' .
+            '-use_wallclock_as_timestamps 1 -start_number 0 ' .
+            '-hls_allow_cache 0 -hls_segment_type mpegts ' .
             '-hls_segment_filename ' . escapeshellarg($segment) . ' ' .
             '-hls_base_url ' . escapeshellarg($segmentBaseUrl) . ' ' .
             escapeshellarg($m3uPlaylist) . ' ';
