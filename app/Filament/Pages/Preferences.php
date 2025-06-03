@@ -159,7 +159,16 @@ class Preferences extends SettingsPage
                                                         }
                                                     }
                                                 }
-                                            }),
+                                            })
+                                            ->suffixAction(
+                                                Forms\Components\Actions\Action::make('about_hardware_acceleration')
+                                                    ->icon('heroicon-m-information-circle')
+                                                    ->modalContent(view('modals.hardware-accel-info'))
+                                                    ->modalHeading('About Hardware Acceleration')
+                                                    ->modalWidth('xl')
+                                                    ->modalSubmitAction(false)
+                                                    ->modalCancelAction(fn($action) => $action->label('Close'))
+                                            ),
 
                                         Forms\Components\TextInput::make('ffmpeg_vaapi_device')
                                             ->label('VA-API Device Path')
