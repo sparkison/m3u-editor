@@ -29,6 +29,7 @@ class TagsRelationManager extends RelationManager
                 Forms\Components\TextInput::make('name.en')
                     ->label('Name')
                     ->required()
+                    ->columnSpanFull()
                     ->maxLength(255),
             ]);
     }
@@ -61,6 +62,7 @@ class TagsRelationManager extends RelationManager
                         $ownerRecord->attachTag($tag);
                         return $tag;
                     })
+                    ->modalWidth('md')
                     ->successNotification(
                         Notification::make()
                             ->success()
