@@ -524,12 +524,18 @@ class ChannelResource extends Resource
                                     }
                                     return $finalResults;
                                 })
-                                ->getOptionLabel(function ($value, $label) {
-                                    if (str()->startsWith($label, 'BOLD::')) {
-                                        return new \Illuminate\Support\HtmlString('<strong>' . str_replace('BOLD::', '', $label) . '</strong>');
-                                    }
-                                    return $label;
-                                })
+                               // The following getOptionLabel call was temporarily commented out.
+                               // It was identified as a potential trigger for the error:
+                               // "Typed property Filament\Forms\Components\Component::$container must not be accessed before initialization"
+                               // when used within this bulk action's Select component.
+                               // See issue #reported container initialization error in failover bulk action.
+                               // Removing this allows the form to load, though 'BOLD::' prefixes might appear in labels.
+                               // ->getOptionLabel(function ($value, $label) { // Temporarily removed to test container initialization error
+                               //     if (str()->startsWith($label, 'BOLD::')) {
+                               //         return new \Illuminate\Support\HtmlString('<strong>' . str_replace('BOLD::', '', $label) . '</strong>');
+                               //     }
+                               //     return $label;
+                               // })
                                 ->required(),
                             ];
                         })
