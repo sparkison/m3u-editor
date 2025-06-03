@@ -686,26 +686,31 @@ class ChannelResource extends Resource
                         ->rules(['min:1', 'max:255']),
                     Forms\Components\TextInput::make('name_custom')
                         ->label('Name')
+                        ->hint('tvg-name')
                         ->placeholder(fn(Get $get) => $get('name'))
                         ->helperText("Leave empty to use playlist default value.")
                         ->columnSpan(1)
                         ->rules(['min:1', 'max:255']),
                     Forms\Components\TextInput::make('stream_id_custom')
                         ->label('ID')
+                        ->hint('tvg-id')
                         ->columnSpan(1)
                         ->placeholder(fn(Get $get) => $get('stream_id'))
                         ->helperText("Leave empty to use playlist default value.")
                         ->rules(['min:1', 'max:255']),
                     Forms\Components\TextInput::make('channel')
                         ->label('Channel No.')
+                        ->hint('tvg-chno')
                         ->columnSpan(1)
                         ->rules(['numeric', 'min:0']),
                     Forms\Components\TextInput::make('shift')
+                        ->hint('timeshift')
                         ->columnSpan(1)
                         ->rules(['numeric', 'min:0']),
                     Forms\Components\Hidden::make('group'),
                     Forms\Components\Select::make('group_id')
                         ->label('Group')
+                        ->hint('group-title')
                         ->options(fn($record) => Group::where('playlist_id', $record->playlist_id)->get(['name', 'id'])->pluck('name', 'id'))
                         ->columnSpan(1)
                         ->placeholder('Select a group')
@@ -774,6 +779,7 @@ class ChannelResource extends Resource
                         ->type('url'),
                     Forms\Components\TextInput::make('logo')
                         ->label('Icon')
+                        ->hint('tvg-logo')
                         ->columnSpan(1)
                         ->prefixIcon('heroicon-m-globe-alt')
                         ->url(),
