@@ -410,7 +410,6 @@ class ChannelResource extends Resource
                         ->modalIcon('heroicon-o-photo')
                         ->modalDescription('Update the preferred icon for the selected channel(s).')
                         ->modalSubmitActionLabel('Update now'),
-
                     Tables\Actions\BulkAction::make('failover')
                         ->label('Add as failover')
                         ->form(function (Collection $records) { // $records here are the selected table records
@@ -426,8 +425,8 @@ class ChannelResource extends Resource
                                         ->pluck('channel_id')
                                         ->toArray();
 
-                                    // Combine selected IDs and master IDs, remove duplicates
-                                    $eligibleChannelIds = array_unique(array_merge($selectedRecordIds, $masterChannelIds));
+                                    // Exclude selected records from being eligible options (prevent infinite loop)
+                                    $eligibleChannelIds = array_diff($masterChannelIds, $selectedRecordIds);
 
                                     $query = \App\Models\Channel::query()->with('playlist');
 
@@ -447,38 +446,25 @@ class ChannelResource extends Resource
                                     if ($state) {
                                         if (!$initialChannels->has($state)) {
                                             // If $state is present but not in the eligible list (e.g. pre-selected from a previous context)
-                                            // fetch it to ensure it's a valid option.
-                                            $stateChannel = \App\Models\Channel::query()->with('playlist')->find($state);
-                                            if ($stateChannel) {
-                                                $initialChannels->put($stateChannel->id, $stateChannel);
+                                            // fetch it to ensure it's a valid option only if it's not a selected record
+                                            if (!in_array($state, $selectedRecordIds)) {
+                                                $stateChannel = \App\Models\Channel::query()->with('playlist')->find($state);
+                                                if ($stateChannel) {
+                                                    $initialChannels->put($stateChannel->id, $stateChannel);
+                                                }
                                             }
                                         }
                                     }
 
-                                    $structuredOptions = [];
+                                    $finalOptions = [];
                                     foreach ($initialChannels as $channel) {
                                         $displayTitle = $channel->title_custom ?: $channel->title;
                                         $playlistName = $channel->playlist->name ?? 'Unknown';
                                         $label = "{$displayTitle} [{$playlistName}]";
                                         
-                                        $isBold = in_array($channel->id, $selectedRecordIds);
-                                        
-                                        $structuredOptions[] = ['id' => $channel->id, 'label' => $label, 'is_bold' => $isBold, 'is_state' => ($state == $channel->id)];
+                                        $finalOptions[$channel->id] = $label;
                                     }
-
-                                    // Sort: state first, then bold, then regular
-                                    usort($structuredOptions, function ($a, $b) {
-                                        if ($a['is_state']) return -1;
-                                        if ($b['is_state']) return 1;
-                                        if ($a['is_bold'] && !$b['is_bold']) return -1;
-                                        if (!$a['is_bold'] && $b['is_bold']) return 1;
-                                        return strcmp($a['label'], $b['label']); // Alphabetical for same-boldness
-                                    });
-
-                                    $finalOptions = [];
-                                    foreach ($structuredOptions as $opt) {
-                                        $finalOptions[$opt['id']] = $opt['is_bold'] ? "<strong>{$opt['label']}</strong>" : $opt['label'];
-                                    }
+                                    
                                     return $finalOptions;
                                 })
                                 ->searchable()
@@ -487,7 +473,9 @@ class ChannelResource extends Resource
                                         ->distinct()
                                         ->pluck('channel_id')
                                         ->toArray();
-                                    $eligibleSearchChannelIds = array_unique(array_merge($selectedRecordIds, $masterChannelIds));
+                                    
+                                    // Exclude selected records from search results (prevent infinite loop)
+                                    $eligibleSearchChannelIds = array_diff($masterChannelIds, $selectedRecordIds);
 
                                     $searchedChannelsQuery = \App\Models\Channel::query()
                                         ->with('playlist')
@@ -507,31 +495,17 @@ class ChannelResource extends Resource
                                     
                                     $searchedChannels = $searchedChannelsQuery->limit(50)->get();
                                     
-                                    $structuredSearchResults = [];
+                                    $finalResults = [];
                                     foreach ($searchedChannels as $channel) {
                                         $displayTitle = $channel->title_custom ?: $channel->title;
                                         $playlistName = $channel->playlist->name ?? 'Unknown';
                                         $label = "{$displayTitle} [{$playlistName}]";
-
-                                        $isBold = in_array($channel->id, $selectedRecordIds);
                                         
-                                        $structuredSearchResults[] = ['id' => $channel->id, 'label' => $label, 'is_bold' => $isBold];
+                                        $finalResults[$channel->id] = $label;
                                     }
-
-                                    // Sort: bold first, then regular
-                                    usort($structuredSearchResults, function ($a, $b) {
-                                        if ($a['is_bold'] && !$b['is_bold']) return -1;
-                                        if (!$a['is_bold'] && $b['is_bold']) return 1;
-                                        return strcmp($a['label'], $b['label']);
-                                    });
-
-                                    $finalResults = [];
-                                    foreach ($structuredSearchResults as $item) {
-                                        $finalResults[$item['id']] = $item['is_bold'] ? "<strong>{$item['label']}</strong>" : $item['label'];
-                                    }
+                                    
                                     return $finalResults;
                                 })
-                                ->allowHtml()
                                 ->required(),
                             ];
                         })
