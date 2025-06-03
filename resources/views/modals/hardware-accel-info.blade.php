@@ -17,7 +17,7 @@ devices:
     <br>
     <code>
         docker exec -it m3u-editor ls -l /dev/dri
-    </pre>
+    </code>
     <br>
     <br>
     If you see a list of devices like <strong>card0</strong>, <strong>renderD128</strong>, etc., then hardware acceleration is set up correctly.
