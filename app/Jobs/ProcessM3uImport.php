@@ -725,68 +725,25 @@ class ProcessM3uImport implements ShouldQueue
         // Get the playlist ID
         $playlistId = $playlist->id;
 
-        // Remove duplicate groups
-        $groups = array_values(array_unique($this->groups));
-
-        // Create the groups
-        foreach (array_chunk($groups, 50) as $chunk) {
-            SourceGroup::upsert(
-                collect($chunk)->map(function ($groupName) use ($playlistId) {
-                    return [
-                        'name' => $groupName,
-                        'playlist_id' => $playlistId,
-                    ];
-                })->toArray(),
-                uniqueBy: ['name', 'playlist_id'],
-                update: []
-            );
-        }
-
         // Update progress
         $playlist->update(['progress' => 15]);
 
-        // Check if preprocessing, and no or prefixes groups selected yet
-        if (
-            $this->preprocess
+        // Setup group sort, if Playlist auto sort is enabled
+        $groupOrder = null;
+        if ($playlist->auto_sort) {
+            $groupOrder = 1;
+        }
+
+        // Determine if we should create the channels and groups in the database
+        $preProcessing = $this->preprocess
             && count($this->selectedGroups) === 0
-            && count($this->includedGroupPrefixes) === 0
-        ) {
-            // Flag as complete and notify user
-            $completedIn = $start->diffInSeconds(now());
-            $completedInRounded = round($completedIn, 2);
-            $playlist->update([
-                'status' => Status::Completed,
-                'channels' => 0, // not using...
-                'synced' => now(),
-                'errors' => null,
-                'sync_time' => $completedIn,
-                'progress' => 100,
-                'processing' => false,
-            ]);
+            && count($this->includedGroupPrefixes) === 0;
 
-            // Send notification
-            $message = "\"{$playlist->name}\" has been preprocessed successfully. You can now select the groups you would like to import and process the playlist again to import your selected groups. Preprocessing completed in {$completedInRounded} seconds.";
-            Notification::make()
-                ->success()
-                ->title('Playlist Preprocessing Completed')
-                ->body($message)
-                ->broadcast($playlist->user);
-            Notification::make()
-                ->success()
-                ->title('Playlist Preprocessing Completed')
-                ->body($message)
-                ->sendToDatabase($playlist->user);
-        } else {
-            // Setup group sort, if Playlist auto sort is enabled
-            $groupOrder = null;
-            if ($playlist->auto_sort) {
-                $groupOrder = 1;
-            }
-
-            // Process the collection
-            $collection->groupBy('group')->chunk(10)->each(function (LazyCollection $grouped) use ($userId, $playlistId, $batchNo, &$groupOrder) {
-                $grouped->each(function ($channels, $groupName) use ($userId, $playlistId, $batchNo, &$groupOrder) {
-                    // Add group and associated channels
+        // Process the collection
+        $collection->groupBy('group')->chunk(10)->each(function (LazyCollection $grouped) use ($userId, $playlistId, $batchNo, $preProcessing, &$groupOrder) {
+            $grouped->each(function ($channels, $groupName) use ($userId, $playlistId, $batchNo, $preProcessing, &$groupOrder) {
+                // Add group and associated channels
+                if (!$preProcessing) {
                     $group = Group::where([
                         'name_internal' => $groupName ?? '',
                         'playlist_id' => $playlistId,
@@ -828,53 +785,101 @@ class ProcessM3uImport implements ShouldQueue
                             ]
                         ]);
                     });
-                });
+                }
             });
+        });
 
-            // Get the jobs for the batch
-            $jobs = [];
-            $batchCount = Job::where('batch_no', $batchNo)->count();
-            $jobsBatch = Job::where('batch_no', $batchNo)->select('id')->cursor();
-            $jobsBatch->chunk(100)->each(function ($chunk) use (&$jobs, $batchCount) {
-                $jobs[] = new ProcessM3uImportChunk($chunk->pluck('id')->toArray(), $batchCount);
-            });
+        // Remove duplicate groups
+        $groups = array_values(array_unique($this->groups));
 
-            // Last job in the batch
-            $jobs[] = new ProcessM3uImportComplete(
-                userId: $userId,
-                playlistId: $playlistId,
-                batchNo: $batchNo,
-                start: $start,
-                maxHit: $this->maxItemsHit,
-                isNew: $this->isNew,
+        // Create the source groups
+        // Need to call AFTER the channel loop has been executed
+        foreach (array_chunk($groups, 50) as $chunk) {
+            SourceGroup::upsert(
+                collect($chunk)->map(function ($groupName) use ($playlistId) {
+                    return [
+                        'name' => $groupName,
+                        'playlist_id' => $playlistId,
+                    ];
+                })->toArray(),
+                uniqueBy: ['name', 'playlist_id'],
+                update: []
             );
-            Bus::chain($jobs)
-                ->onConnection('redis') // force to use redis connection
-                ->onQueue('import')
-                ->catch(function (Throwable $e) use ($playlist) {
-                    $error = "Error processing \"{$playlist->name}\": {$e->getMessage()}";
-                    Log::error($error);
-                    Notification::make()
-                        ->danger()
-                        ->title("Error processing \"{$playlist->name}\"")
-                        ->body('Please view your notifications for details.')
-                        ->broadcast($playlist->user);
-                    Notification::make()
-                        ->danger()
-                        ->title("Error processing \"{$playlist->name}\"")
-                        ->body($error)
-                        ->sendToDatabase($playlist->user);
-                    $playlist->update([
-                        'status' => Status::Failed,
-                        'channels' => 0, // not using...
-                        'synced' => now(),
-                        'errors' => $error,
-                        'progress' => 100,
-                        'processing' => false,
-                    ]);
-                    event(new SyncCompleted($playlist));
-                })->dispatch();
         }
+
+        // Check if preprocessing, and no prefixes or groups selected yet
+        if ($preProcessing) {
+            // Flag as complete and notify user
+            $completedIn = $start->diffInSeconds(now());
+            $completedInRounded = round($completedIn, 2);
+            $playlist->update([
+                'status' => Status::Completed,
+                'channels' => 0, // not using...
+                'synced' => now(),
+                'errors' => null,
+                'sync_time' => $completedIn,
+                'progress' => 100,
+                'processing' => false,
+            ]);
+
+            // Send notification
+            $message = "\"{$playlist->name}\" has been preprocessed successfully. You can now select the groups you would like to import and process the playlist again to import your selected groups. Preprocessing completed in {$completedInRounded} seconds.";
+            Notification::make()
+                ->success()
+                ->title('Playlist Preprocessing Completed')
+                ->body($message)
+                ->broadcast($playlist->user);
+            Notification::make()
+                ->success()
+                ->title('Playlist Preprocessing Completed')
+                ->body($message)
+                ->sendToDatabase($playlist->user);
+            return;
+        }
+
+        // Get the jobs for the batch
+        $jobs = [];
+        $batchCount = Job::where('batch_no', $batchNo)->count();
+        $jobsBatch = Job::where('batch_no', $batchNo)->select('id')->cursor();
+        $jobsBatch->chunk(100)->each(function ($chunk) use (&$jobs, $batchCount) {
+            $jobs[] = new ProcessM3uImportChunk($chunk->pluck('id')->toArray(), $batchCount);
+        });
+
+        // Last job in the batch
+        $jobs[] = new ProcessM3uImportComplete(
+            userId: $userId,
+            playlistId: $playlistId,
+            batchNo: $batchNo,
+            start: $start,
+            maxHit: $this->maxItemsHit,
+            isNew: $this->isNew,
+        );
+        Bus::chain($jobs)
+            ->onConnection('redis') // force to use redis connection
+            ->onQueue('import')
+            ->catch(function (Throwable $e) use ($playlist) {
+                $error = "Error processing \"{$playlist->name}\": {$e->getMessage()}";
+                Log::error($error);
+                Notification::make()
+                    ->danger()
+                    ->title("Error processing \"{$playlist->name}\"")
+                    ->body('Please view your notifications for details.')
+                    ->broadcast($playlist->user);
+                Notification::make()
+                    ->danger()
+                    ->title("Error processing \"{$playlist->name}\"")
+                    ->body($error)
+                    ->sendToDatabase($playlist->user);
+                $playlist->update([
+                    'status' => Status::Failed,
+                    'channels' => 0, // not using...
+                    'synced' => now(),
+                    'errors' => $error,
+                    'progress' => 100,
+                    'processing' => false,
+                ]);
+                event(new SyncCompleted($playlist));
+            })->dispatch();
     }
 
     /**

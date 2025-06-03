@@ -36,6 +36,7 @@ fi
 
 # Set timezone, default to UTC
 export TZ="${TZ:-UTC}"
+export APP_TIMEZONE="${TZ}"
 
 # Define the php-fpm command (add "-R" flag to allow php-fpm to run as root)
 export SUPERVISOR_PHP_COMMAND="/usr/sbin/php-fpm84 -F -R"
@@ -167,9 +168,6 @@ php artisan app:generate-key
 
 # Check for updates
 php artisan app:update-check
-
-# Clear ffmpeg and process cache
-php artisan app:flush-ffmpeg-process-cache
 
 # Optimize Laravel
 php artisan optimize

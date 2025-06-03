@@ -147,7 +147,34 @@ class HlsStreamController extends Controller
     ) {
         $actualStreamingModel = $model; // Initialize with the original model
 
-        if (!$this->hlsService->isRunning(type: $type, id: $model->id)) {
+        // First check if there's already a cached mapping for this original model to an active stream
+        $streamMappingKey = "hls:stream_mapping:{$type}:{$model->id}";
+        $activeStreamId = Cache::get($streamMappingKey);
+        
+        if ($activeStreamId && $this->hlsService->isRunning($type, $activeStreamId)) {
+            // There's an active stream for a mapped channel, use that
+            if ($activeStreamId != $model->id) {
+                // It's a failover channel that's running
+                if ($type === 'channel') {
+                    $actualStreamingModel = Channel::find($activeStreamId);
+                } else {
+                    $actualStreamingModel = Episode::find($activeStreamId);
+                }
+                if ($actualStreamingModel) {
+                    $logTitle = strip_tags($title);
+                    // Log::channel('ffmpeg')->info("HLS Stream: Found existing failover stream for original $type ID {$model->id} ({$logTitle}). Using active $type ID {$actualStreamingModel->id} (" . ($actualStreamingModel->title_custom ?? $actualStreamingModel->title) . ").");
+                } else {
+                    // The mapped model doesn't exist anymore, clear the mapping
+                    Cache::forget($streamMappingKey);
+                    $activeStreamId = null;
+                }
+            } else {
+                Log::channel('ffmpeg')->info("HLS Stream: Found existing stream for $type ID {$model->id} (" . strip_tags($title) . ").");
+            }
+        }
+
+        // If no active stream found, try to start one
+        if (!$activeStreamId || !$this->hlsService->isRunning($type, $activeStreamId)) {
             $logTitle = strip_tags($title); // Use original title for initial logging
             try {
                 // Attempt to start the stream, potentially with failover
@@ -160,6 +187,10 @@ class HlsStreamController extends Controller
 
                 if ($returnedModel) {
                     $actualStreamingModel = $returnedModel; // This is the model that is actually streaming
+                    
+                    // Cache the mapping between original model and actual streaming model
+                    Cache::put($streamMappingKey, $actualStreamingModel->id, now()->addHours(24));
+                    
                     Log::channel('ffmpeg')->info("HLS Stream: Original request for $type ID {$model->id} ({$logTitle}). Actual streaming $type ID {$actualStreamingModel->id} (" . ($actualStreamingModel->title_custom ?? $actualStreamingModel->title) . ").");
                 } else {
                     // No stream (primary or failover) could be started
@@ -170,10 +201,6 @@ class HlsStreamController extends Controller
                 Log::channel('ffmpeg')->error("HLS Stream: Exception while trying to start stream for $type ID {$model->id} ({$logTitle}): {$e->getMessage()}");
                 abort(503, 'Service unavailable. Error during stream startup.');
             }
-        } else {
-            // Stream was already running for the original $model->id, so $actualStreamingModel remains $model
-            // Log explicitly that we are using an existing stream for the (potentially original) model ID.
-            Log::channel('ffmpeg')->info("HLS Stream: Found existing stream for $type ID {$actualStreamingModel->id} (" . strip_tags($title) . ").");
         }
 
         // Use $actualStreamingModel->id for PID and path
@@ -183,7 +210,7 @@ class HlsStreamController extends Controller
         $pathPrefix = $type === 'channel' ? '' : 'e/';
         $m3u8Path = Storage::disk('app')->path("hls/$pathPrefix{$actualStreamingModel->id}/stream.m3u8");
 
-        Log::channel('ffmpeg')->info("HLS Stream: Checking for playlist for $type ID {$actualStreamingModel->id}. Path: {$m3u8Path}. PID found from cache key '{$pidCacheKey}': " . ($pid ?: 'None'));
+        // Log::channel('ffmpeg')->info("HLS Stream: Checking for playlist for $type ID {$actualStreamingModel->id}. Path: {$m3u8Path}. PID found from cache key '{$pidCacheKey}': " . ($pid ?: 'None'));
 
         // Get configurable loop parameters
         $settings = app(GeneralSettings::class);
@@ -192,7 +219,6 @@ class HlsStreamController extends Controller
 
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
             if (file_exists($m3u8Path)) {
-                Log::channel('ffmpeg')->info("HLS Stream: Playlist found for $type ID {$actualStreamingModel->id} on attempt {$attempt}. Path: {$m3u8Path}");
                 return response('', 200, [
                     'Content-Type'      => 'application/vnd.apple.mpegurl',
                     'X-Accel-Redirect'  => "/internal/hls/$pathPrefix{$actualStreamingModel->id}/stream.m3u8",
@@ -215,6 +241,7 @@ class HlsStreamController extends Controller
                 $route = $type === 'channel'
                     ? 'stream.hls.playlist'
                     : 'stream.hls.episode';
+
                 // The redirect should still use the original encodedId as that's what the client initially requested.
                 return redirect()
                     ->route($route, ['encodedId' => $encodedId])
@@ -238,8 +265,17 @@ class HlsStreamController extends Controller
         $pathPrefix = $type === 'channel' ? '' : 'e/';
         $path = Storage::disk('app')->path("hls/$pathPrefix{$modelId}/{$segment}");
 
-        // If segment is not found, return 404 error
-        abort_unless(file_exists($path), 404, 'Segment not found.');
+        // Check if the segment file exists
+        if (!file_exists($path)) {
+            Log::channel('ffmpeg')->error("HLS Stream: Segment not found for $type ID {$modelId}. Path: {$path}. Segment: {$segment}");
+            
+            // Return an empty response, empty segments is normal during startup
+            return response('Segment not found', 404, [
+                'Content-Type' => 'video/MP2T',
+                'Cache-Control' => 'no-cache, no-transform',
+                'Connection' => 'keep-alive',
+            ]);
+        }
 
         Redis::transaction(function () use ($type, $modelId) {
             // Record timestamp in Redis (never expires until we prune)

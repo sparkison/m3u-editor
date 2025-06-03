@@ -244,11 +244,23 @@ class ChannelResource extends Resource
                     ->query(function ($query) {
                         return $query->where('enabled', true);
                     }),
+                Tables\Filters\Filter::make('disabled')
+                    ->label('Channel is disabled')
+                    ->toggle()
+                    ->query(function ($query) {
+                        return $query->where('enabled', false);
+                    }),
                 Tables\Filters\Filter::make('mapped')
                     ->label('EPG is mapped')
                     ->toggle()
                     ->query(function ($query) {
                         return $query->where('epg_channel_id', '!=', null);
+                    }),
+                Tables\Filters\Filter::make('un_mapped')
+                    ->label('EPG is not mapped')
+                    ->toggle()
+                    ->query(function ($query) {
+                        return $query->where('epg_channel_id', '=', null);
                     }),
             ])
             ->actions([
@@ -407,6 +419,7 @@ class ChannelResource extends Resource
                                 Forms\Components\Select::make('master_channel_id')
                                     ->label('Master Channel')
                                     ->options(function ($state) use ($selectedRecordIds) {
+
                                     // Get IDs of channels that are already masters
                                     $masterChannelIds = \App\Models\ChannelFailover::query()
                                         ->distinct()
@@ -911,9 +924,10 @@ class ChannelResource extends Resource
                                             $query->where('title', 'like', "%{$search}%")
                                                 ->orWhere('title_custom', 'like', "%{$search}%")
                                                 ->orWhere('name', 'like', "%{$search}%")
-                                                ->orWhere('name_custom', 'like', "%{$search}%");
+                                                ->orWhere('name_custom', 'like', "%{$search}%")
+                                                ->orWhere('stream_id', 'like', "%{$search}%");
                                         })
-                                        ->limit(50) // Reasonable limit for search results
+                                        ->limit(50) // Keep a reasonable limit
                                         ->get();
 
                                     // Create options array
