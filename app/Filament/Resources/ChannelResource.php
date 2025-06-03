@@ -464,7 +464,7 @@ class ChannelResource extends Resource
 
                                     $finalOptions = [];
                                     foreach ($structuredOptions as $opt) {
-                                        $finalOptions[$opt['id']] = ($opt['is_bold'] ? 'BOLD::' : '') . $opt['label'];
+                                        $finalOptions[$opt['id']] = $opt['is_bold'] ? "<strong>{$opt['label']}</strong>" : $opt['label'];
                                     }
                                     return $finalOptions;
                                 })
@@ -514,16 +514,11 @@ class ChannelResource extends Resource
 
                                     $finalResults = [];
                                     foreach ($structuredSearchResults as $item) {
-                                        $finalResults[$item['id']] = ($item['is_bold'] ? 'BOLD::' : '') . $item['label'];
+                                        $finalResults[$item['id']] = $item['is_bold'] ? "<strong>{$item['label']}</strong>" : $item['label'];
                                     }
                                     return $finalResults;
                                 })
-                                ->getOptionLabel(function ($value, $label) {
-                                    if (str()->startsWith($label, 'BOLD::')) {
-                                        return new \Illuminate\Support\HtmlString('<strong>' . str_replace('BOLD::', '', $label) . '</strong>');
-                                    }
-                                    return $label;
-                                })
+                                ->allowHtml()
                                 ->required(),
                             ];
                         })
