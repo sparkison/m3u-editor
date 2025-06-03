@@ -412,99 +412,37 @@ class ChannelResource extends Resource
                         ->modalSubmitActionLabel('Update now'),
                     Tables\Actions\BulkAction::make('failover')
                         ->label('Add as failover')
-                        ->form(function (Collection $records) { // $records here are the selected table records
-                            $selectedRecordIds = $records->pluck('id')->toArray();
+                        ->form(function (Collection $records) {
+                    $existingFailoverIds = $records->pluck('id')->toArray();
                             return [
                                 Forms\Components\Select::make('master_channel_id')
                                     ->label('Master Channel')
-                                    ->options(function ($state) use ($selectedRecordIds) {
-
-                                        // Get IDs of channels that are already masters
-                                        $masterChannelIds = \App\Models\ChannelFailover::query()
-                                            ->distinct()
-                                            ->pluck('channel_id')
-                                            ->toArray();
-
-                                        // Exclude selected records from being eligible options (prevent infinite loop)
-                                        $eligibleChannelIds = array_diff($masterChannelIds, $selectedRecordIds);
-
-                                        $query = \App\Models\Channel::query()->with('playlist');
-
-                                        if (!empty($eligibleChannelIds)) {
-                                            $query->whereIn('id', $eligibleChannelIds);
-                                        } else {
-                                            // If no eligible IDs, and no state, effectively return no options
-                                            // If state exists, it will be handled below.
-                                            if (!$state) {
-                                                return [];
-                                            }
-                                            $query->whereRaw('0=1'); // Ensure query returns nothing if no eligible and no state
-                                        }
-
-                                        $initialChannels = $query->get()->keyBy('id');
-
-                                        if ($state) {
-                                            if (!$initialChannels->has($state)) {
-                                                // If $state is present but not in the eligible list (e.g. pre-selected from a previous context)
-                                                // fetch it to ensure it's a valid option only if it's not a selected record
-                                                if (!in_array($state, $selectedRecordIds)) {
-                                                    $stateChannel = \App\Models\Channel::query()->with('playlist')->find($state);
-                                                    if ($stateChannel) {
-                                                        $initialChannels->put($stateChannel->id, $stateChannel);
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        $finalOptions = [];
-                                        foreach ($initialChannels as $channel) {
-                                            $displayTitle = $channel->title_custom ?: $channel->title;
-                                            $playlistName = $channel->playlist->name ?? 'Unknown';
-                                            $label = "{$displayTitle} [{$playlistName}]";
-
-                                            $finalOptions[$channel->id] = $label;
-                                        }
-
-                                        return $finalOptions;
-                                    })
+                                    ->options([]) // no options until search
                                     ->searchable()
-                                    ->getSearchResultsUsing(function (string $search) use ($selectedRecordIds) {
-                                        $masterChannelIds = \App\Models\ChannelFailover::query()
-                                            ->distinct()
-                                            ->pluck('channel_id')
-                                            ->toArray();
-
-                                        // Exclude selected records from search results (prevent infinite loop)
-                                        $eligibleSearchChannelIds = array_diff($masterChannelIds, $selectedRecordIds);
-
-                                        $searchedChannelsQuery = \App\Models\Channel::query()
+                                    ->getSearchResultsUsing(function (string $search) use ($existingFailoverIds) {
+                                        $channels = Channel::query()
+                                            ->withoutEagerLoads()
                                             ->with('playlist')
+                                            ->whereNotIn('id', $existingFailoverIds)
                                             ->where(function ($query) use ($search) {
                                                 $query->where('title', 'like', "%{$search}%")
                                                     ->orWhere('title_custom', 'like', "%{$search}%")
                                                     ->orWhere('name', 'like', "%{$search}%")
                                                     ->orWhere('name_custom', 'like', "%{$search}%")
                                                     ->orWhere('stream_id', 'like', "%{$search}%");
-                                            });
+                                            })
+                                            ->limit(50) // Keep a reasonable limit
+                                            ->get();
 
-                                        if (!empty($eligibleSearchChannelIds)) {
-                                            $searchedChannelsQuery->whereIn('id', $eligibleSearchChannelIds);
-                                        } else {
-                                            return [];
-                                        }
-
-                                        $searchedChannels = $searchedChannelsQuery->limit(50)->get();
-
-                                        $finalResults = [];
-                                        foreach ($searchedChannels as $channel) {
+                                        // Create options array
+                                        $options = [];
+                                        foreach ($channels as $channel) {
                                             $displayTitle = $channel->title_custom ?: $channel->title;
                                             $playlistName = $channel->playlist->name ?? 'Unknown';
-                                            $label = "{$displayTitle} [{$playlistName}]";
-
-                                            $finalResults[$channel->id] = $label;
+                                            $options[$channel->id] = "{$displayTitle} [{$playlistName}]";
                                         }
 
-                                        return $finalResults;
+                                        return $options;
                                     })
                                     ->required(),
                             ];
@@ -898,7 +836,7 @@ class ChannelResource extends Resource
                                     }
 
                                     // Always include the selected value if it exists
-                                    $channels = \App\Models\Channel::query()
+                                    $channels = Channel::query()
                                         ->withoutEagerLoads()
                                         ->with('playlist')
                                         ->whereNotIn('id', $existingFailoverIds)
