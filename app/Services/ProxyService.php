@@ -9,7 +9,6 @@ class ProxyService
 {
     // Cache configuration for bad sources
     public const BAD_SOURCE_CACHE_SECONDS = 10;
-    public const BAD_SOURCE_CACHE_MINUTES = 5;
     public const BAD_SOURCE_CACHE_PREFIX = 'failover:bad_source:';
 
     /**

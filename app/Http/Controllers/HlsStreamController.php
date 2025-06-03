@@ -61,7 +61,6 @@ class HlsStreamController extends Controller
             type: 'channel',
             encodedId: $encodedId,
             model: $channel,
-            streamUrl: $channel->url_custom ?? $channel->url,
             title: $channel->title_custom ?? $channel->title
         );
     }
@@ -105,7 +104,6 @@ class HlsStreamController extends Controller
             type: 'episode',
             encodedId: $encodedId,
             model: $episode,
-            streamUrl: $episode->url,
             title: $episode->title
         );
     }
@@ -133,7 +131,6 @@ class HlsStreamController extends Controller
      * @param string $type 'channel' or 'episode'
      * @param string $encodedId Base64 encoded ID of the channel or episode
      * @param mixed $model The Channel or Episode model instance
-     * @param string $streamUrl The URL to stream from
      * @param string $title The title of the channel or episode
      * 
      * @return \Illuminate\Http\Response
@@ -142,7 +139,6 @@ class HlsStreamController extends Controller
         $type,
         $encodedId,
         $model,
-        $streamUrl,
         $title
     ) {
         $actualStreamingModel = $model; // Initialize with the original model
@@ -181,7 +177,6 @@ class HlsStreamController extends Controller
                 $returnedModel = $this->hlsService->startStreamWithFailover(
                     type: $type,
                     model: $model, // Pass original model to startStreamWithFailover
-                    streamUrl: $streamUrl,
                     title: $logTitle
                 );
 

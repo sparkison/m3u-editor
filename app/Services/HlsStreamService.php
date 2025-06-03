@@ -105,15 +105,13 @@ class HlsStreamService
      *
      * @param string $type
      * @param Channel|Episode $model The Channel model instance
-     * @param string $streamUrl The URL to stream from
      * @param string $title The title of the channel
      */
     public function startStreamWithFailover(
         string $type,
         Channel|Episode $model, // This $model is the *original* requested channel/episode
-        string $streamUrl,      // This $streamUrl is the URL of the *original* model
         string $title           // This $title is the title of the *original* model
-    ): ?object { // Changed return type
+    ): ?object {
         // Get stream settings, including the ffprobe timeout
         $streamSettings = ProxyService::getStreamSettings();
         $ffprobeTimeout = $streamSettings['ffmpeg_ffprobe_timeout'] ?? 5; // Default to 5 if not set
@@ -780,8 +778,9 @@ class HlsStreamService
         // Get HLS time from settings or use default
         $hlsTime = $settings['ffmpeg_hls_time'] ?? 4;
         $hlsListSize = 15; // Kept as a variable for future configurability
-      
-        $cmd .= ' -f hls -hls_time {$hlsTime} -hls_list_size {$hlsListSize} ' .
+
+        // ... rest of the options and command suffix ...
+        $cmd .= " -f hls -hls_time {$hlsTime} -hls_list_size {$hlsListSize} " .
             '-hls_flags delete_segments+append_list+independent_segments+split_by_time ' .
             '-use_wallclock_as_timestamps 1 -start_number 0 ' .
             '-hls_allow_cache 0 -hls_segment_type mpegts ' .
