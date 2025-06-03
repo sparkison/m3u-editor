@@ -894,6 +894,12 @@ class ChannelResource extends Resource
                                         ->pluck('channel_failover_id')
                                         ->toArray();
 
+                                    // Get parent record ID to exclude it from search results
+                                    $parentRecordId = $livewire->mountedTableActionsData[0]['id'] ?? null;
+                                    if ($parentRecordId) {
+                                        $existingFailoverIds[] = $parentRecordId;
+                                    }
+
                                     // Always include the selected value if it exists
                                     $channels = \App\Models\Channel::query()
                                         ->withoutEagerLoads()
