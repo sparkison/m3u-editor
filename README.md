@@ -10,6 +10,8 @@ Works with m3u, m3u8, m3u+ and Xtream codes api!
 
 Feel free to [open an issue](https://github.com/sparkison/m3u-editor/issues/new?template=bug_report.md) on this repo, you can also join our Discord server to ask questions and get help, help others, suggest new ideas, and offer suggestions for improvements! 🎉
 
+### Join us on Discord
+
 [![](https://dcbadge.limes.pink/api/server/rS3abJ5dz7)](https://discord.gg/rS3abJ5dz7)
 
 ## Prerequisites
