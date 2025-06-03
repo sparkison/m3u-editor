@@ -860,9 +860,6 @@ class ChannelResource extends Resource
                 ]),
             Forms\Components\Fieldset::make('Failover Channels')
                 ->schema([
-                    Forms\Components\TextInput::make('channel_id')
-                        ->hidden() // hidden, only used for reference
-                        ->dehydrated(false), // don't populate the DB with value
                     Forms\Components\Repeater::make('failovers')
                         ->relationship()
                         ->label('')
