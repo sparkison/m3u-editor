@@ -419,78 +419,120 @@ class ChannelResource extends Resource
                                 Forms\Components\Select::make('master_channel_id')
                                     ->label('Master Channel')
                                     ->options(function ($state) use ($selectedRecordIds) {
-                                        $channelsQuery = \App\Models\Channel::query()->with('playlist');
-                                        $initialChannels = $channelsQuery->limit(100)->get()->keyBy('id');
-                                        if ($state) {
-                                            // If $state is present, ensure this channel is loaded and part of the initial set for processing.
-                                            // This is crucial if $state is not within the limit(100) but needs to be an option.
-                                            if (!$initialChannels->has($state)) {
-                                                $stateChannel = \App\Models\Channel::query()->with('playlist')->find($state);
-                                                if ($stateChannel) {
-                                                    $initialChannels->put($stateChannel->id, $stateChannel);
-                                                }
+
+                                    // Get IDs of channels that are already masters
+                                    $masterChannelIds = \App\Models\ChannelFailover::query()
+                                        ->distinct()
+                                        ->pluck('channel_id')
+                                        ->toArray();
+
+                                    // Combine selected IDs and master IDs, remove duplicates
+                                    $eligibleChannelIds = array_unique(array_merge($selectedRecordIds, $masterChannelIds));
+
+                                    $query = \App\Models\Channel::query()->with('playlist');
+
+                                    if (!empty($eligibleChannelIds)) {
+                                        $query->whereIn('id', $eligibleChannelIds);
+                                    } else {
+                                        // If no eligible IDs, and no state, effectively return no options
+                                        // If state exists, it will be handled below.
+                                        if (!$state) {
+                                            return [];
+                                        }
+                                        $query->whereRaw('0=1'); // Ensure query returns nothing if no eligible and no state
+                                    }
+                                    
+                                    $initialChannels = $query->get()->keyBy('id');
+
+                                    if ($state) {
+                                        if (!$initialChannels->has($state)) {
+                                            // If $state is present but not in the eligible list (e.g. pre-selected from a previous context)
+                                            // fetch it to ensure it's a valid option.
+                                            $stateChannel = \App\Models\Channel::query()->with('playlist')->find($state);
+                                            if ($stateChannel) {
+                                                $initialChannels->put($stateChannel->id, $stateChannel);
                                             }
                                         }
+                                    }
 
-                                        $selectedOptions = [];
-                                        $regularOptions = [];
-                                        foreach ($initialChannels as $channel) {
-                                            $displayTitle = $channel->title_custom ?: $channel->title;
-                                            $playlistName = $channel->playlist->name ?? 'Unknown';
-                                            $label = "{$displayTitle} [{$playlistName}]";
+                                    $structuredOptions = [];
+                                    foreach ($initialChannels as $channel) {
+                                        $displayTitle = $channel->title_custom ?: $channel->title;
+                                        $playlistName = $channel->playlist->name ?? 'Unknown';
+                                        $label = "{$displayTitle} [{$playlistName}]";
+                                        
+                                        $isBold = in_array($channel->id, $selectedRecordIds);
+                                        
+                                        $structuredOptions[] = ['id' => $channel->id, 'label' => $label, 'is_bold' => $isBold, 'is_state' => ($state == $channel->id)];
+                                    }
 
-                                            if (in_array($channel->id, $selectedRecordIds)) {
-                                                $selectedOptions[$channel->id] = "[SELECTED] " . $label;
-                                            } else {
-                                                $regularOptions[$channel->id] = $label;
-                                            }
-                                        }
+                                    // Sort: state first, then bold, then regular
+                                    usort($structuredOptions, function ($a, $b) {
+                                        if ($a['is_state']) return -1;
+                                        if ($b['is_state']) return 1;
+                                        if ($a['is_bold'] && !$b['is_bold']) return -1;
+                                        if (!$a['is_bold'] && $b['is_bold']) return 1;
+                                        return strcmp($a['label'], $b['label']); // Alphabetical for same-boldness
+                                    });
 
-                                        // Prioritize $state if it exists, ensuring it's correctly formatted.
-                                        $finalOptions = $selectedOptions + $regularOptions; // Selected options come first.
-                                        if ($state && isset($finalOptions[$state])) {
-                                            $stateOption = [$state => $finalOptions[$state]];
-                                            unset($finalOptions[$state]); // Remove to avoid duplication
-                                            $finalOptions = $stateOption + $finalOptions; // Add $state option to the beginning
-                                        }
-                                        return $finalOptions;
-                                    })
-                                    ->searchable()
-                                    ->getSearchResultsUsing(function (string $search) use ($selectedRecordIds) {
-                                        $searchedChannels = \App\Models\Channel::query()
-                                            ->withoutEagerLoads()
-                                            ->with('playlist')
-                                            ->where(function ($query) use ($search) {
-                                                $query->where('title', 'like', "%{$search}%")
-                                                    ->orWhere('title_custom', 'like', "%{$search}%")
-                                                    ->orWhere('name', 'like', "%{$search}%")
-                                                    ->orWhere('name_custom', 'like', "%{$search}%")
-                                                    ->orWhere('stream_id', 'like', "%{$search}%");
-                                            })
-                                            ->limit(50) // Keep a reasonable limit
-                                            ->get();
+                                    $finalOptions = [];
+                                    foreach ($structuredOptions as $opt) {
+                                        $finalOptions[$opt['id']] = $opt['is_bold'] ? "<strong>{$opt['label']}</strong>" : $opt['label'];
+                                    }
+                                    return $finalOptions;
+                                })
+                                ->searchable()
+                                ->getSearchResultsUsing(function (string $search) use ($selectedRecordIds) {
+                                    $masterChannelIds = \App\Models\ChannelFailover::query()
+                                        ->distinct()
+                                        ->pluck('channel_id')
+                                        ->toArray();
+                                    $eligibleSearchChannelIds = array_unique(array_merge($selectedRecordIds, $masterChannelIds));
 
-                                        $searchSelectedOptions = [];
-                                        $searchRegularOptions = [];
+                                    $searchedChannelsQuery = \App\Models\Channel::query()
+                                        ->with('playlist')
+                                        ->where(function ($query) use ($search) {
+                                            $query->where('title', 'like', "%{$search}%")
+                                                ->orWhere('title_custom', 'like', "%{$search}%")
+                                                ->orWhere('name', 'like', "%{$search}%")
+                                                ->orWhere('name_custom', 'like', "%{$search}%")
+                                                ->orWhere('stream_id', 'like', "%{$search}%");
+                                        });
 
-                                        if ($searchedChannels->isEmpty()) {
-                                            return []; // Return empty if no channels match search
-                                        }
+                                    if (!empty($eligibleSearchChannelIds)) {
+                                        $searchedChannelsQuery->whereIn('id', $eligibleSearchChannelIds);
+                                    } else {
+                                         return []; 
+                                    }
+                                    
+                                    $searchedChannels = $searchedChannelsQuery->limit(50)->get();
+                                    
+                                    $structuredSearchResults = [];
+                                    foreach ($searchedChannels as $channel) {
+                                        $displayTitle = $channel->title_custom ?: $channel->title;
+                                        $playlistName = $channel->playlist->name ?? 'Unknown';
+                                        $label = "{$displayTitle} [{$playlistName}]";
 
-                                        foreach ($searchedChannels as $channel) {
-                                            $displayTitle = $channel->title_custom ?: $channel->title;
-                                            $playlistName = $channel->playlist->name ?? 'Unknown'; // Requires 'playlist' to be eager loaded
-                                            $label = "{$displayTitle} [{$playlistName}]";
+                                        $isBold = in_array($channel->id, $selectedRecordIds);
+                                        
+                                        $structuredSearchResults[] = ['id' => $channel->id, 'label' => $label, 'is_bold' => $isBold];
+                                    }
 
-                                            if (in_array($channel->id, $selectedRecordIds)) {
-                                                $searchSelectedOptions[$channel->id] = "[SELECTED] " . $label;
-                                            } else {
-                                                $searchRegularOptions[$channel->id] = $label;
-                                            }
-                                        }
-                                        return $searchSelectedOptions + $searchRegularOptions;
-                                    })
-                                    ->required(),
+                                    // Sort: bold first, then regular
+                                    usort($structuredSearchResults, function ($a, $b) {
+                                        if ($a['is_bold'] && !$b['is_bold']) return -1;
+                                        if (!$a['is_bold'] && $b['is_bold']) return 1;
+                                        return strcmp($a['label'], $b['label']);
+                                    });
+
+                                    $finalResults = [];
+                                    foreach ($structuredSearchResults as $item) {
+                                        $finalResults[$item['id']] = $item['is_bold'] ? "<strong>{$item['label']}</strong>" : $item['label'];
+                                    }
+                                    return $finalResults;
+                                })
+                                ->allowHtml()
+                                ->required(),
                             ];
                         })
                         ->action(function (Collection $records, array $data): void {

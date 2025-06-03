@@ -128,6 +128,8 @@ class ProxyService
                 'ffmpeg_codec_audio' => $userPreferences->ffmpeg_codec_audio ?? $settings['ffmpeg_codec_audio'],
                 'ffmpeg_codec_subtitles' => $userPreferences->ffmpeg_codec_subtitles ?? $settings['ffmpeg_codec_subtitles'],
                 'ffmpeg_path' => $userPreferences->ffmpeg_path ?? $settings['ffmpeg_path'],
+                'ffmpeg_hls_time' => $userPreferences->ffmpeg_hls_time ?? 4,
+                'ffmpeg_ffprobe_timeout' => $userPreferences->ffmpeg_ffprobe_timeout ?? 5,
 
                 // HW acceleration settings
                 'hardware_acceleration_method' => $userPreferences->hardware_acceleration_method ?? $settings['hardware_acceleration_method'],

@@ -113,7 +113,11 @@ class HlsStreamService
         Channel|Episode $model, // This $model is the *original* requested channel/episode
         string $streamUrl,      // This $streamUrl is the URL of the *original* model
         string $title           // This $title is the title of the *original* model
-    ): ?object {
+    ): ?object { // Changed return type
+        // Get stream settings, including the ffprobe timeout
+        $streamSettings = ProxyService::getStreamSettings();
+        $ffprobeTimeout = $streamSettings['ffmpeg_ffprobe_timeout'] ?? 5; // Default to 5 if not set
+
         // Get the failover channels (if any)
         $streams = collect([$model]);
 
@@ -186,7 +190,8 @@ class HlsStreamService
 
             $userAgent = $playlist->user_agent ?? null;
             try {
-                $this->runPreCheck($currentAttemptStreamUrl, $userAgent, $currentStreamTitle);
+                // Pass the ffprobe timeout to runPreCheck
+                $this->runPreCheck($currentAttemptStreamUrl, $userAgent, $currentStreamTitle, $ffprobeTimeout);
 
                 $this->startStreamWithSpeedCheck(
                     type: $type,
@@ -321,16 +326,17 @@ class HlsStreamService
      * @param string $streamUrl
      * @param string|null $userAgent
      * @param string $title
+     * @param int $ffprobeTimeout The timeout for the ffprobe process in seconds
      * 
      * @throws Exception If the pre-check fails
      */
-    private function runPreCheck($streamUrl, $userAgent, $title)
+    private function runPreCheck($streamUrl, $userAgent, $title, int $ffprobeTimeout)
     {
         $ffprobePath = config('proxy.ffprobe_path', 'ffprobe');
         $cmd = "$ffprobePath -v quiet -print_format json -show_streams -select_streams v:0 -user_agent " . escapeshellarg($userAgent) . " " . escapeshellarg($streamUrl);
-        Log::channel('ffmpeg')->info("[PRE-CHECK] Executing ffprobe command for [{$title}]: {$cmd}");
+        Log::channel('ffmpeg')->info("[PRE-CHECK] Executing ffprobe command for [{$title}] with timeout {$ffprobeTimeout}s: {$cmd}");
         $precheckProcess = SymfonyProcess::fromShellCommandline($cmd);
-        $precheckProcess->setTimeout(5);
+        $precheckProcess->setTimeout($ffprobeTimeout);
         try {
             $precheckProcess->run();
             if (!$precheckProcess->isSuccessful()) {
@@ -691,7 +697,11 @@ class HlsStreamService
 
             $cmd .= $userArgs; // User-defined global args from config/proxy.php or QSV additional args
 
-            $cmd .= '-re -i ' . escapeshellarg($streamUrl) . ' ';
+            // Conditionally add -re based on stream type
+            if ($type !== 'episode') {
+                $cmd .= '-re ';
+            }
+            $cmd .= '-i ' . escapeshellarg($streamUrl) . ' ';
             $cmd .= $videoFilterArgs; // e.g., -vf 'scale_vaapi=format=nv12' or -vf 'vpp_qsv=format=nv12'
 
             $cmd .= $outputFormat . ' ';
@@ -767,8 +777,11 @@ class HlsStreamService
             $cmd = str_replace('{ADDITIONAL_ARGS}', $userArgs, $cmd); // If user wants to include general additional args
         }
 
-        // ... rest of the options and command suffix ...
-        $cmd .= ' -f hls -hls_time 2 -hls_list_size 6 ' .
+        // Get HLS time from settings or use default
+        $hlsTime = $settings['ffmpeg_hls_time'] ?? 4;
+        $hlsListSize = 15; // Kept as a variable for future configurability
+      
+        $cmd .= ' -f hls -hls_time {$hlsTime} -hls_list_size {$hlsListSize} ' .
             '-hls_flags delete_segments+append_list+independent_segments+split_by_time ' .
             '-use_wallclock_as_timestamps 1 -start_number 0 ' .
             '-hls_allow_cache 0 -hls_segment_type mpegts ' .

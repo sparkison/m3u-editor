@@ -93,6 +93,35 @@ class Preferences extends SettingsPage
                                             ->default('VLC/3.0.21 LibVLC/3.0.21')
                                             ->placeholder('VLC/3.0.21 LibVLC/3.0.21')
                                             ->helperText('Fallback user agent (defaults to the streams Playlist user agent, when set).'),
+                                        Forms\Components\TextInput::make('ffmpeg_hls_time')
+                                            ->label('HLS Time (seconds)')
+                                            ->columnSpan(1)
+                                            ->type('number')
+                                            ->minValue(1)
+                                            ->default(4)
+                                            ->helperText('Target HLS segment duration in seconds. Default: 4.'),
+                                        Forms\Components\TextInput::make('ffmpeg_ffprobe_timeout')
+                                            ->label('FFprobe Timeout (seconds)')
+                                            ->columnSpan(1)
+                                            ->type('number')
+                                            ->minValue(1)
+                                            ->default(5)
+                                            ->helperText('Timeout for ffprobe pre-check in seconds. Default: 5.'),
+                                        Forms\Components\TextInput::make('hls_playlist_max_attempts')
+                                            ->label('HLS Playlist Max Wait Attempts')
+                                            ->columnSpan(1)
+                                            ->type('number')
+                                            ->minValue(1)
+                                            ->default(10)
+                                            ->helperText('Max attempts to wait for HLS playlist. Default: 10.'),
+                                        Forms\Components\TextInput::make('hls_playlist_sleep_seconds')
+                                            ->label('HLS Playlist Wait Sleep (seconds)')
+                                            ->columnSpan(1)
+                                            ->type('number')
+                                            ->step('0.1')
+                                            ->minValue(0.1)
+                                            ->default(1.0)
+                                            ->helperText('Seconds to sleep between playlist checks. Default: 1.0s.'),
 
                                     ]),
                                 Forms\Components\Section::make('Advanced FFmpeg Settings')
