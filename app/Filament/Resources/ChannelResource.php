@@ -413,7 +413,7 @@ class ChannelResource extends Resource
                     Tables\Actions\BulkAction::make('failover')
                         ->label('Add as failover')
                         ->form(function (Collection $records) {
-                    $existingFailoverIds = $records->pluck('id')->toArray();
+                            $existingFailoverIds = $records->pluck('id')->toArray();
                             return [
                                 Forms\Components\Select::make('master_channel_id')
                                     ->label('Master Channel')

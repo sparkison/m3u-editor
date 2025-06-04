@@ -408,32 +408,6 @@ class HlsStreamService
             Log::channel('ffmpeg')->warning("No running FFmpeg process for channel {$id} to stop.");
         }
 
-        // Decrement the active streams count for the playlist
-        try {
-            if ($type === 'channel') {
-                $model = Channel::find($id);
-            } else {
-                $model = Episode::find($id);
-            }
-
-            if ($model && $model->playlist) {
-                $activeStreamsKey = "active_streams:{$model->playlist->id}";
-                $currentCount = Redis::decr($activeStreamsKey);
-
-                // Ensure count doesn't go negative
-                if ($currentCount < 0) {
-                    Redis::set($activeStreamsKey, 0);
-                    $currentCount = 0;
-                }
-
-                Log::channel('ffmpeg')->info("Decremented active streams for playlist {$model->playlist->id}: {$currentCount} (after decrement for {$type} {$id})");
-            } else {
-                Log::channel('ffmpeg')->warning("Could not find {$type} {$id} or its playlist to decrement active streams count");
-            }
-        } catch (Exception $e) {
-            Log::channel('ffmpeg')->error("Error decrementing active streams count for {$type} {$id}: " . $e->getMessage());
-        }
-
         // Remove from active IDs set
         Redis::srem("hls:active_{$type}_ids", $id);
 
@@ -685,6 +659,9 @@ class HlsStreamService
 
             // Input analysis optimization for faster stream start
             $cmd .= '-analyzeduration 1M -probesize 1M -max_delay 500000 ';
+            
+            // Better error handling
+            $cmd .= '-err_detect ignore_err -ignore_unknown ';
 
             // Use the user agent from settings, escape it. $userAgent parameter is ignored for now.
             $effectiveUserAgent = $userAgent ?: $settings['ffmpeg_user_agent'];
@@ -781,7 +758,7 @@ class HlsStreamService
 
         // ... rest of the options and command suffix ...
         $cmd .= " -f hls -hls_time {$hlsTime} -hls_list_size {$hlsListSize} " .
-            '-hls_flags delete_segments+append_list+independent_segments+split_by_time ' .
+            '-hls_flags delete_segments+append_list+split_by_time ' .
             '-use_wallclock_as_timestamps 1 -start_number 0 ' .
             '-hls_allow_cache 0 -hls_segment_type mpegts ' .
             '-hls_segment_filename ' . escapeshellarg($segment) . ' ' .
