@@ -122,7 +122,7 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                     // as these are not suitable for similarity search
                     // Consider other formats as VOD and ignore them
                     $epgChannel = null;
-                    if (!Str::endsWith($channel->url, ['ts', 'm3u8'])) {
+                    if (Str::endsWith($channel->url, ['ts', 'm3u8'])) {
                         // Get the EPG channel
                         $epgChannel = $epg->channels()
                             ->where('channel_id', '!=', '')
