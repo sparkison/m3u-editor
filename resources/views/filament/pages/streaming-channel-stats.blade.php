@@ -6,7 +6,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 @foreach ($statsData as $stat)
                     <x-filament::card>
-                        <h3 class="text-lg font-semibold">{{ $stat['channelName'] ?? 'N/A' }}</h3>
+                        <h3 class="text-lg font-semibold">{{ $stat['itemName'] ?? 'N/A' }} ({{ $stat['itemType'] ?? 'N/A' }})</h3>
                         <p>Playlist: {{ $stat['playlistName'] ?? 'N/A' }}</p>
                         <p>Streams: {{ $stat['activeStreams'] ?? 'N/A' }} / {{ $stat['maxStreams'] ?? 'N/A' }}</p>
                         <p>Codec: {{ $stat['codec'] ?? 'N/A' }}</p>

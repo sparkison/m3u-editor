@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\Channel;
+use App\Models\Episode; // Added
 use App\Models\Playlist;
 use App\Services\ProxyService;
 use Filament\Pages\Page;
@@ -32,76 +33,96 @@ class StreamingChannelStats extends Page
     protected function getStatsData(): array
     {
         $stats = [];
-        // Fetch active channel stream IDs from Redis
+        $activeItems = [];
+
         $activeChannelIds = Redis::smembers('hls:active_channel_ids');
         Log::info('Active HLS Channel IDs from Redis: ', $activeChannelIds ?: []);
+        foreach ($activeChannelIds as $id) {
+            $activeItems[] = ['id' => $id, 'type' => 'channel'];
+        }
 
-        foreach ($activeChannelIds as $originalChannelId) {
-            $actualStreamingChannelId = Cache::get("hls:stream_mapping:channel:{$originalChannelId}") ?: $originalChannelId;
-            $channel = Channel::find($actualStreamingChannelId);
+        $activeEpisodeIds = Redis::smembers('hls:active_episode_ids');
+        Log::info('Active HLS Episode IDs from Redis: ', $activeEpisodeIds ?: []);
+        foreach ($activeEpisodeIds as $id) {
+            $activeItems[] = ['id' => $id, 'type' => 'episode'];
+        }
 
-            // Get last seen for original channel ID - needs to be available even if channel or playlist is missing later
-            $lastSeenTimestamp = Redis::get("hls:channel_last_seen:{$originalChannelId}");
-            // $lastSeenValue will be the raw timestamp (integer string from Redis) or null
+        if (empty($activeItems)) {
+            return [];
+        }
+
+        foreach ($activeItems as $item) {
+            $originalModelId = $item['id'];
+            $modelType = $item['type']; // 'channel' or 'episode'
+            $model = null;
+            $itemName = 'Unknown Item';
+
+            // Resolve actual streaming ID (failover)
+            $actualStreamingModelId = Cache::get("hls:stream_mapping:{$modelType}:{$originalModelId}");
+            if (!$actualStreamingModelId) {
+                $actualStreamingModelId = $originalModelId;
+            }
+
+            if ($modelType === 'channel') {
+                $model = Channel::find($actualStreamingModelId);
+                $itemName = $model ? ($model->title_custom ?? $model->title) : "Channel ID: {$actualStreamingModelId} (Not Found)";
+            } elseif ($modelType === 'episode') {
+                $model = Episode::find($actualStreamingModelId);
+                if ($model && $model->series) { // Ensure model and series relation exists
+                    $itemName = $model->series->title . " - S" . $model->season_num . "E" . $model->episode_num . " - " . $model->title;
+                } elseif ($model) { // Model exists but no series
+                     $itemName = "Ep. " . $model->title;
+                } else { // Model not found
+                    $itemName = "Episode ID: {$actualStreamingModelId} (Not Found)";
+                }
+            }
+
+            // Last seen should be fetched regardless of model found, using original ID and type
+            $lastSeenTimestamp = Redis::get("hls:{$modelType}_last_seen:{$originalModelId}");
             $lastSeenValue = $lastSeenTimestamp ?: null;
 
-            if (!$channel) {
-                Log::warning("StreamingChannelStats: Channel not found for ID {$actualStreamingChannelId} (original ID: {$originalChannelId})");
-                // Add a basic entry if channel is not found
+            if (!$model) {
+                Log::warning("StreamingChannelStats: Model not found for type {$modelType}, ID {$actualStreamingModelId} (original ID: {$originalModelId})");
                 $stats[] = [
-                    'channelName' => "ID: {$actualStreamingChannelId} (Not Found)",
-                    'playlistName' => 'N/A',
+                    'itemName' => $itemName,
+                    'itemType' => ucfirst($modelType),
+                    'playlistName' => 'N/A (Model missing)',
                     'activeStreams' => 'N/A',
                     'maxStreams' => 'N/A',
-                    'codec' => 'N/A', // Combined field will be N/A
-                    // No 'hwAccel' key
+                    'codec' => 'N/A',
                     'resolution' => 'N/A',
-                    'lastSeen' => $lastSeenValue, // Use raw timestamp or null
-                    'isBadSource' => false, // Cannot determine bad source without channel/playlist
+                    'lastSeen' => $lastSeenValue, // lastSeen is available
+                    'isBadSource' => false, // Cannot determine without model/playlist
                 ];
                 continue;
             }
 
-            $playlist = $channel->playlist;
+            $playlist = $model->playlist;
+
+            $activeStreamsOnPlaylist = 'N/A';
+            $maxStreamsDisplay = 'N/A';
             $isBadSource = false; // Default
 
-            if (!$playlist) {
-                Log::warning("StreamingChannelStats: Playlist not found for Channel ID {$channel->id}");
-                $stats[] = [
-                    'channelName' => $channel->title_custom ?? $channel->title,
-                    'playlistName' => 'N/A (Playlist missing)',
-                    'activeStreams' => 'N/A',
-                    'maxStreams' => 'N/A',
-                    'codec' => 'N/A', // No codec info if playlist (and thus settings for it) is missing
-                    // No 'hwAccel' key
-                    'resolution' => 'N/A',
-                    'lastSeen' => $lastSeenValue, // Use raw timestamp or null
-                    'isBadSource' => $isBadSource,
-                ];
-                continue;
+            if ($playlist) {
+                $activeStreamsOnPlaylist = Redis::get("active_streams:{$playlist->id}") ?? 0;
+                $maxStreamsOnPlaylist = $playlist->available_streams ?? 'N/A';
+                $maxStreamsDisplay = ($maxStreamsOnPlaylist == 0 && is_numeric($maxStreamsOnPlaylist)) ? '∞' : $maxStreamsOnPlaylist;
+                if ($maxStreamsOnPlaylist === 'N/A') $maxStreamsDisplay = 'N/A';
+
+                $badSourceCacheKey = "mfp:bad_source:{$model->id}:{$playlist->id}"; // Use $model->id
+                $isBadSource = Redis::exists($badSourceCacheKey);
+            } else {
+                 Log::warning("StreamingChannelStats: Playlist not found for {$modelType} ID {$model->id}");
             }
 
-            // Check bad source using actual streaming channel ID and its playlist
-            $badSourceCacheKey = "mfp:bad_source:{$channel->id}:{$playlist->id}";
-            $isBadSource = Redis::exists($badSourceCacheKey);
-
-            $activeStreamsOnPlaylist = Redis::get("active_streams:{$playlist->id}") ?? 0;
-            $maxStreamsOnPlaylist = $playlist->available_streams ?? 'N/A';
-
-            // Format maxStreams
-            $maxStreamsDisplay = ($maxStreamsOnPlaylist == 0 && is_numeric($maxStreamsOnPlaylist)) ? '∞' : $maxStreamsOnPlaylist;
-            if ($maxStreamsOnPlaylist === 'N/A') { // Handles if available_streams was null
-                $maxStreamsDisplay = 'N/A';
-            }
-
-            // Determine codec and HW Accel
+            // Codec and HW Accel determination
             $settings = ProxyService::getStreamSettings();
             $hwAccelMethod = $settings['hardware_acceleration_method'] ?? 'none';
             $finalVideoCodec = ProxyService::determineVideoCodec(
                 config('proxy.ffmpeg_codec_video', null),
                 $settings['ffmpeg_codec_video'] ?? 'copy'
             );
-            $outputVideoCodec = $finalVideoCodec; // Default
+            $outputVideoCodec = $finalVideoCodec;
 
             $isVaapiCodec = str_contains($finalVideoCodec, '_vaapi');
             $isQsvCodec = str_contains($finalVideoCodec, '_qsv');
@@ -112,25 +133,14 @@ class StreamingChannelStats extends Page
                 $outputVideoCodec = $isQsvCodec ? $finalVideoCodec : 'h264_qsv';
             }
 
-            // New combined codec and HW accel string logic
             $formattedCodecString = 'N/A';
-
             if ($outputVideoCodec === 'copy') {
                 $formattedCodecString = 'copy (source)';
             } elseif ($outputVideoCodec !== 'N/A' && $outputVideoCodec !== null) {
-                $baseCodec = $outputVideoCodec;
-                // Remove _qsv or _vaapi from baseCodec if present, as HW status will be added
-                $baseCodec = str_replace(['_qsv', '_vaapi'], '', $baseCodec);
-
+                $baseCodec = str_replace(['_qsv', '_vaapi'], '', $outputVideoCodec);
                 $hwStatus = 'HW None';
-                if ($hwAccelMethod === 'qsv') {
-                    $hwStatus = 'HW QSV';
-                } elseif ($hwAccelMethod === 'vaapi') {
-                    $hwStatus = 'HW VAAPI';
-                }
-
-                // If the outputVideoCodec *already* implies a specific hardware (e.g., h264_qsv),
-                // and the hwAccelMethod matches, ensure the status reflects that.
+                if ($hwAccelMethod === 'qsv') $hwStatus = 'HW QSV';
+                elseif ($hwAccelMethod === 'vaapi') $hwStatus = 'HW VAAPI';
                 if (str_contains($outputVideoCodec, '_qsv') && $hwAccelMethod === 'qsv') {
                      $baseCodec = str_replace('_qsv', '', $outputVideoCodec);
                      $hwStatus = 'HW QSV';
@@ -140,22 +150,21 @@ class StreamingChannelStats extends Page
                 }
                 $formattedCodecString = "{$baseCodec} ({$hwStatus})";
             }
-            // If $channel was null previously, this logic path won't be hit.
-            // If $outputVideoCodec determination resulted in 'N/A', $formattedCodecString remains 'N/A'.
+
 
             $stats[] = [
-                'channelName' => $channel->title_custom ?? $channel->title,
-                'playlistName' => $playlist->name,
+                'itemName' => $itemName,
+                'itemType' => ucfirst($modelType),
+                'playlistName' => $playlist ? $playlist->name : 'N/A (Playlist missing)',
                 'activeStreams' => $activeStreamsOnPlaylist,
                 'maxStreams' => $maxStreamsDisplay,
-                'codec' => $formattedCodecString, // Use the new combined string
-                // 'hwAccel' key is now removed
-                'resolution' => 'N/A',
-                'lastSeen' => $lastSeenValue, // Use raw timestamp or null
+                'codec' => $formattedCodecString,
+                'resolution' => 'N/A', // Still deferred
+                'lastSeen' => $lastSeenValue,
                 'isBadSource' => $isBadSource,
             ];
         }
-        Log::info('Processed statsData: ', $stats);
+        Log::info('Processed statsData (including episodes): ', $stats);
         return $stats;
     }
 }
