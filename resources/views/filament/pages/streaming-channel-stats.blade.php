@@ -14,14 +14,12 @@
                         <h4 class="mt-2 font-semibold text-md">Source Video Details:</h4>
                         <p>Resolution: {{ $stat['resolution'] ?? 'N/A' }}</p>
                         <p>Full Codec Name: {{ $stat['video_codec_long_name'] ?? 'N/A' }}</p>
-                        <p>Color Range: {{ $stat['video_color_range'] ?? 'N/A' }}</p>
-                        <p>Color Space: {{ $stat['video_color_space'] ?? 'N/A' }}</p>
-                        <p>Color Transfer: {{ $stat['video_color_transfer'] ?? 'N/A' }}</p>
-                        <p>Color Primaries: {{ $stat['video_color_primaries'] ?? 'N/A' }}</p>
                         @if (!empty($stat['video_tags']) && is_array($stat['video_tags']))
                             <p>Video Tags:
                                 @foreach($stat['video_tags'] as $key => $value)
-                                    <span class="text-xs">{{ strtoupper(is_string($key) ? $key : '') }}: {{ is_scalar($value) ? $value : json_encode($value) }}; </span>
+                                    @if(!(strtoupper((string)$key) === 'VARIANT_BITRATE' && (string)$value === '0'))
+                                        <span class="text-xs">{{ strtoupper((string)$key) }}: {{ is_array($value) ? json_encode($value) : $value }}; </span>
+                                    @endif
                                 @endforeach
                             </p>
                         @endif
@@ -34,20 +32,26 @@
                         @if (!empty($stat['audio_tags']) && is_array($stat['audio_tags']))
                             <p>Audio Tags:
                                 @foreach($stat['audio_tags'] as $key => $value)
-                                    <span class="text-xs">{{ strtoupper(is_string($key) ? $key : '') }}: {{ is_scalar($value) ? $value : json_encode($value) }}; </span>
+                                    @if(!(strtoupper((string)$key) === 'VARIANT_BITRATE' && (string)$value === '0'))
+                                        <span class="text-xs">{{ strtoupper((string)$key) }}: {{ is_array($value) ? json_encode($value) : $value }}; </span>
+                                    @endif
                                 @endforeach
                             </p>
                         @endif
 
                         <h4 class="mt-2 font-semibold text-md">Source Format Details:</h4>
-                        <p>Duration: {{ $stat['format_duration'] ?? 'N/A' }}</p>
-                        <p>Size: {{ $stat['format_size'] ?? 'N/A' }}</p>
-                        <p>Bitrate: {{ $stat['format_bit_rate'] ?? 'N/A' }}</p>
-                        <p>Stream Count: {{ $stat['format_nb_streams'] ?? 'N/A' }}</p>
+                        @if (($stat['itemType'] ?? '') === 'Episode')
+                            <p>Duration: {{ $stat['format_duration'] ?? 'N/A' }}</p>
+                            <p>Size: {{ $stat['format_size'] ?? 'N/A' }}</p>
+                            <p>Bitrate: {{ $stat['format_bit_rate'] ?? 'N/A' }}</p>
+                        @endif
+                        <p>Stream Count (in source): {{ $stat['format_nb_streams'] ?? 'N/A' }}</p>
                         @if (!empty($stat['format_tags']) && is_array($stat['format_tags']))
                             <p>Format Tags:
                                 @foreach($stat['format_tags'] as $key => $value)
-                                    <span class="text-xs">{{ strtoupper(is_string($key) ? $key : '') }}: {{ is_scalar($value) ? $value : json_encode($value) }}; </span>
+                                    @if(!(strtoupper((string)$key) === 'VARIANT_BITRATE' && (string)$value === '0'))
+                                        <span class="text-xs">{{ strtoupper((string)$key) }}: {{ is_array($value) ? json_encode($value) : $value }}; </span>
+                                    @endif
                                 @endforeach
                             </p>
                         @endif
