@@ -282,6 +282,9 @@ class ProcessM3uImport implements ShouldQueue
                 'import_batch_no' => $batchNo,
                 'new' => true,
                 'enabled' => $playlist->enable_channels,
+                'catchup' => null,
+                'catchup_source' => null,
+                'shift' => 0
             ];
 
             // Update progress
@@ -335,6 +338,8 @@ class ProcessM3uImport implements ShouldQueue
                             'group_internal' => $category['category_name'] ?? '',
                             'stream_id' => $item['epg_channel_id'] ?? $item['stream_id'], // prefer EPG id for mapping, if set
                             'channel' => $item['num'] ?? null,
+                            'catchup' => $item['tv_archive'] ?? null,
+                            'shift' => $item['tv_archive_duration'] ?? 0
                         ];
                         if ($autoSort) {
                             $channel['sort'] = $channelNo;
