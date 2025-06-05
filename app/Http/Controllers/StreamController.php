@@ -7,6 +7,7 @@ use App\Models\Channel;
 use App\Models\Episode;
 use App\Services\ProxyService;
 use App\Exceptions\SourceNotResponding;
+use App\Traits\TracksActiveStreams;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
@@ -15,6 +16,8 @@ use Symfony\Component\Process\Process as SymfonyProcess;
 
 class StreamController extends Controller
 {
+    use TracksActiveStreams;
+
     /**
      * Stream a channel.
      *
@@ -66,24 +69,14 @@ class StreamController extends Controller
             }
 
             // Keep track of the active streams for this playlist using optimistic locking pattern
-            $activeStreamsKey = "active_streams:{$playlist->id}";
-
-            // First increment the counter
-            $activeStreams = Redis::incr($activeStreamsKey);
-
-            // Make sure we haven't gone negative for any reason, this should never be 0 or less
-            if ($activeStreams <= 0) {
-                Redis::set($activeStreamsKey, 1);
-                $activeStreams = 1;
-            }
-            Log::channel('ffmpeg')->info("Active streams for playlist {$playlist->id}: {$activeStreams} (after increment)");
+            $activeStreams = $this->incrementActiveStreams($playlist->id);
 
             // Then check if we're over limit
             // Ignore for MP4 since those will be requests from Video.js
             // Video.js will make a request for the metadate before loading the stream, so can use twp connections in a short amount of time
-            if ($format !== 'mp4' && $playlist->available_streams > 0 && $activeStreams > $playlist->available_streams) {
+            if ($format !== 'mp4' && $this->wouldExceedStreamLimit($playlist->id, $playlist->available_streams, $activeStreams)) {
                 // We're over limit, so decrement and skip
-                Redis::decr($activeStreamsKey);
+                $this->decrementActiveStreams($playlist->id);
                 Log::channel('ffmpeg')->info("Max streams reached for playlist {$playlist->name} ({$playlist->id}). Skipping channel {$title}.");
                 continue;
             }
@@ -110,11 +103,11 @@ class StreamController extends Controller
                     contentType: $contentType,
                     userAgent: $playlist->user_agent ?? null,
                     failoverSupport: $streamCount > 1,
-                    streamKey: $activeStreamsKey
+                    playlistId: $playlist->id
                 );
             } catch (SourceNotResponding $e) {
                 // Log the error and cache the bad source
-                Redis::decr($activeStreamsKey);
+                $this->decrementActiveStreams($playlist->id);
                 Log::channel('ffmpeg')->error("Source not responding for channel {$title}: " . $e->getMessage());
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, $e->getMessage());
 
@@ -122,7 +115,7 @@ class StreamController extends Controller
                 continue;
             } catch (Exception $e) {
                 // Log the error and abort
-                Redis::decr($activeStreamsKey);
+                $this->decrementActiveStreams($playlist->id);
                 Log::channel('ffmpeg')->error("Error streaming channel {$title}: " . $e->getMessage());
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, $e->getMessage());
 
@@ -167,24 +160,14 @@ class StreamController extends Controller
         $playlist = $episode->playlist;
 
         // Keep track of the active streams for this playlist using optimistic locking pattern
-        $activeStreamsKey = "active_streams:{$playlist->id}";
-
-        // First increment the counter
-        $activeStreams = Redis::incr($activeStreamsKey);
-
-        // Make sure we haven't gone negative for any reason, this should never be 0 or less
-        if ($activeStreams <= 0) {
-            Redis::set($activeStreamsKey, 1);
-            $activeStreams = 1;
-        }
-        Log::channel('ffmpeg')->info("Active streams for playlist {$playlist->id}: {$activeStreams} (after increment)");
+        $activeStreams = $this->incrementActiveStreams($playlist->id);
 
         // Then check if we're over limit
         // Ignore for MP4 since those will be requests from Video.js
         // Video.js will make a request for the metadate before loading the stream, so can use twp connections in a short amount of time
-        if ($format !== 'mp4' && $playlist->available_streams > 0 && $activeStreams > $playlist->available_streams) {
+        if ($format !== 'mp4' && $this->wouldExceedStreamLimit($playlist->id, $playlist->available_streams, $activeStreams)) {
             // We're over limit, so decrement and skip
-            Redis::decr($activeStreamsKey);
+            $this->decrementActiveStreams($playlist->id);
             Log::channel('ffmpeg')->info("Max streams reached for playlist {$playlist->name} ({$playlist->id}). Aborting episode {$title}.");
             abort(503, 'Max streams reached for this playlist.');
         }
@@ -208,7 +191,8 @@ class StreamController extends Controller
             ip: $ip,
             streamId: $streamId,
             contentType: $contentType,
-            userAgent: $playlist->user_agent ?? null
+            userAgent: $playlist->user_agent ?? null,
+            playlistId: $playlist->id
         );
     }
 
@@ -225,7 +209,7 @@ class StreamController extends Controller
      * @param string $contentType
      * @param string|null $userAgent
      * @param bool $failoverSupport Whether to support failover streams
-     * @param string|null $streamKey Optional key for tracking active streams
+     * @param int|null $playlistId Optional playlist ID for tracking active streams
      *
      * @return StreamedResponse
      */
@@ -240,7 +224,7 @@ class StreamController extends Controller
         $contentType,
         $userAgent,
         $failoverSupport = false,
-        $streamKey = null
+        $playlistId = null
     ) {
         // Prevent timeouts, etc.
         ini_set('max_execution_time', 0);
@@ -309,7 +293,7 @@ class StreamController extends Controller
         return new StreamedResponse(function () use (
             $modelId,
             $type,
-            $streamKey,
+            $playlistId,
             $streamUrl,
             $title,
             $settings,
@@ -325,11 +309,12 @@ class StreamController extends Controller
             ignore_user_abort(false);
 
             // Register a shutdown function that ALWAYS runs when the script dies
-            register_shutdown_function(function () use ($clientKey, $streamKey, $type, $title) {
+            $self = $this;
+            register_shutdown_function(function () use ($clientKey, $playlistId, $type, $title, $self) {
                 Redis::srem('mpts:active_ids', $clientKey);
-                if ($streamKey) {
-                    // Decrement the active streams count
-                    Redis::decr($streamKey);
+                if ($playlistId) {
+                    // Decrement the active streams count using the trait
+                    $self->decrementActiveStreams($playlistId);
                 }
                 Log::channel('ffmpeg')->info("Streaming stopped for {$type} {$title}");
             });
@@ -373,7 +358,7 @@ class StreamController extends Controller
                         $title,
                         $format,
                         $streamType,
-                        $streamKey,
+                        $playlistId,
                         $clientKey
                     ) {
                         if (connection_aborted()) {

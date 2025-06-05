@@ -7,6 +7,7 @@ use App\Models\Channel;
 use App\Models\Episode;
 use App\Settings\GeneralSettings;
 use App\Services\HlsStreamService;
+use App\Traits\TracksActiveStreams;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -32,6 +33,8 @@ use Illuminate\Support\Facades\Storage;
  */
 class HlsStreamController extends Controller
 {
+    use TracksActiveStreams;
+
     private $hlsService;
 
     public function __construct(HlsStreamService $hlsStreamService)
@@ -174,9 +177,9 @@ class HlsStreamController extends Controller
             $logTitle = strip_tags($title); // Use original title for initial logging
             try {
                 // Attempt to start the stream, potentially with failover
-                $returnedModel = $this->hlsService->startStreamWithFailover(
+                $returnedModel = $this->hlsService->startStream(
                     type: $type,
-                    model: $model, // Pass original model to startStreamWithFailover
+                    model: $model, // Pass original model to startStream
                     title: $logTitle
                 );
 

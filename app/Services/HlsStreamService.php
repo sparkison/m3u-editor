@@ -6,6 +6,7 @@ use Exception;
 use App\Models\Channel;
 use App\Models\Episode;
 use App\Exceptions\SourceNotResponding;
+use App\Traits\TracksActiveStreams;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -15,89 +16,7 @@ use Symfony\Component\Process\Process as SymfonyProcess;
 
 class HlsStreamService
 {
-    /**
-     * Start an HLS stream for the given channel.
-     *
-     * @param string $type
-     * @param string $id
-     * @param string $streamUrl
-     * @param string $title
-     * @param string|null $userAgent
-     * 
-     * @return int The FFmpeg process ID
-     */
-    public function startStream(
-        $type,
-        $id,
-        $streamUrl,
-        $title,
-        $userAgent = null,
-    ): int {
-        // Only start one FFmpeg per channel at a time
-        $cacheKey = "hls:pid:{$type}:{$id}";
-        $pid = Cache::get($cacheKey);
-        if (!($this->isRunning($type, $id))) {
-            // Get the command
-            $cmd = $this->buildCmd($type, $id, $userAgent, $streamUrl);
-
-            // Log the command for debugging
-            Log::channel('ffmpeg')->info("Streaming channel {$title} with command: {$cmd}");
-
-            // Tell proc_open to give us back a stderr pipe
-            $descriptors = [
-                0 => ['pipe', 'r'], // stdin (we won't use)
-                1 => ['pipe', 'w'], // stdout (we won't use)
-                2 => ['pipe', 'w'], // stderr (we will log)
-            ];
-            $pipes = [];
-            if ($type === 'episode') {
-                $workingDir = Storage::disk('app')->path("hls/e/{$id}");
-            } else {
-                $workingDir = Storage::disk('app')->path("hls/{$id}");
-            }
-            $process = proc_open($cmd, $descriptors, $pipes, $workingDir);
-
-            if (!is_resource($process)) {
-                Log::channel('ffmpeg')->error("Failed to launch FFmpeg for channel {$id}");
-                abort(500, 'Could not start stream.');
-            }
-
-            // Immediately close stdin/stdout
-            fclose($pipes[0]);
-            fclose($pipes[1]);
-
-            // Make stderr non-blocking
-            stream_set_blocking($pipes[2], false);
-
-            // Spawn a little "reader" that pulls from stderr and logs
-            $logger = Log::channel('ffmpeg');
-            $stderr = $pipes[2];
-
-            // Register shutdown function to ensure the pipe is drained
-            register_shutdown_function(function () use ($stderr, $process, $logger) {
-                while (!feof($stderr)) {
-                    $line = fgets($stderr);
-                    if ($line !== false) {
-                        $logger->error(trim($line));
-                    }
-                }
-                fclose($stderr);
-                proc_close($process);
-            });
-
-            // Cache the actual FFmpeg PID
-            $status = proc_get_status($process);
-            $pid = $status['pid'];
-            Cache::forever("hls:pid:{$type}:{$id}", $pid);
-
-            // Record timestamp in Redis (never expires until we prune)
-            Redis::set("hls:{$type}_last_seen:{$id}", now()->timestamp);
-
-            // Add to active IDs set
-            Redis::sadd("hls:active_{$type}_ids", $id);
-        }
-        return $pid;
-    }
+    use TracksActiveStreams;
 
     /**
      * Start an HLS stream with failover support for the given channel.
@@ -107,7 +26,7 @@ class HlsStreamService
      * @param Channel|Episode $model The Channel model instance
      * @param string $title The title of the channel
      */
-    public function startStreamWithFailover(
+    public function startStream(
         string $type,
         Channel|Episode $model, // This $model is the *original* requested channel/episode
         string $title           // This $title is the title of the *original* model
@@ -166,17 +85,12 @@ class HlsStreamService
             }
 
             // Keep track of the active streams for this playlist using optimistic locking pattern
-            $activeStreamsKey = "active_streams:{$playlist->id}";
-            $activeStreams = Redis::incr($activeStreamsKey);
+            $activeStreams = $this->incrementActiveStreams($playlist->id);
 
-            if ($activeStreams <= 0) {
-                Redis::set($activeStreamsKey, 1);
-                $activeStreams = 1;
-            }
-            Log::channel('ffmpeg')->info("Active streams for playlist {$playlist->id}: {$activeStreams} (after increment)");
-
-            if ($playlist->available_streams > 0 && $activeStreams > $playlist->available_streams) {
-                Redis::decr($activeStreamsKey);
+            // Then check if we're over limit
+            if ($this->wouldExceedStreamLimit($playlist->id, $playlist->available_streams, $activeStreams)) {
+                // We're over limit, so decrement and skip
+                $this->decrementActiveStreams($playlist->id);
                 Log::channel('ffmpeg')->info("Max streams reached for playlist {$playlist->name} ({$playlist->id}). Skipping channel {$currentStreamTitle}.");
                 continue;
             }
@@ -204,7 +118,7 @@ class HlsStreamService
 
             } catch (SourceNotResponding $e) {
                 // Log the error and cache the bad source
-                Redis::decr($activeStreamsKey);
+                $this->decrementActiveStreams($playlist->id);
                 Log::channel('ffmpeg')->error("Source not responding for channel {$title}: " . $e->getMessage());
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, $e->getMessage());
 
@@ -212,7 +126,7 @@ class HlsStreamService
                 continue;
             } catch (Exception $e) {
                 // Log the error and abort
-                Redis::decr($activeStreamsKey);
+                $this->decrementActiveStreams($playlist->id);
                 Log::channel('ffmpeg')->error("Error streaming channel {$title}: " . $e->getMessage());
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, $e->getMessage());
 
@@ -282,13 +196,15 @@ class HlsStreamService
         $cacheKey = "hls:pid:{$type}:{$model->id}";
 
         // Register shutdown function to ensure the pipe is drained
+        $self = $this;
         register_shutdown_function(function () use (
             $stderr,
             $process,
             $logger,
             $type,
             $model,
-            $playlistId
+            $playlistId,
+            $self
         ) {
             while (!feof($stderr)) {
                 $line = fgets($stderr);
@@ -300,7 +216,7 @@ class HlsStreamService
             proc_close($process);
 
             // Clean up the stream without decrementing again (to avoid double decrement)
-            $this->cleanupStreamResources($type, $model->id, $playlistId);
+            $self->cleanupStreamResources($type, $model->id, $playlistId);
         });
 
         // Cache the actual FFmpeg PID
@@ -379,6 +295,15 @@ class HlsStreamService
         $cacheKey = "hls:pid:{$type}:{$id}";
         $pid = Cache::get($cacheKey);
         $wasRunning = false;
+        
+        // Get the model to access playlist for stream count decrementing
+        $model = null;
+        if ($type === 'channel') {
+            $model = Channel::find($id);
+        } elseif ($type === 'episode') {
+            $model = Episode::find($id);
+        }
+        
         if ($this->isRunning($type, $id)) {
             $wasRunning = true;
 
@@ -404,6 +329,11 @@ class HlsStreamService
                 $storageDir = Storage::disk('app')->path("hls/{$id}");
             }
             File::deleteDirectory($storageDir);
+            
+            // Decrement active streams count if we have the model and playlist
+            if ($model && $model->playlist) {
+                $this->decrementActiveStreams($model->playlist->id);
+            }
         } else {
             Log::channel('ffmpeg')->warning("No running FFmpeg process for channel {$id} to stop.");
         }
@@ -452,10 +382,10 @@ class HlsStreamService
             }
         }
 
-        // Remove the active streams count for the playlist
-        Redis::decr("active_streams:{$playlistId}");
+        // Remove the active streams count for the playlist using the trait
+        $this->decrementActiveStreams($playlistId);
 
-        // Note: Active streams count decrementing is handled by the caller
+        // Note: Active streams count decrementing is handled by the trait
         Log::channel('ffmpeg')->info("Cleaned up stream resources for {$type} {$id}");
     }
 
