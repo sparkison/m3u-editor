@@ -250,7 +250,9 @@ class HlsStreamService
     private function runPreCheck(string $modelType, $modelId, $streamUrl, $userAgent, $title, int $ffprobeTimeout)
     {
         $ffprobePath = config('proxy.ffprobe_path', 'ffprobe');
-        $cmd = "$ffprobePath -v quiet -print_format json -show_streams -select_streams v:0 -user_agent " . escapeshellarg($userAgent) . " " . escapeshellarg($streamUrl);
+        // Updated command to include -show_format and remove -select_streams to get all streams for detailed info
+        $cmd = "$ffprobePath -v quiet -print_format json -show_streams -show_format -user_agent " . escapeshellarg($userAgent) . " " . escapeshellarg($streamUrl);
+
         Log::channel('ffmpeg')->info("[PRE-CHECK] Executing ffprobe command for [{$title}] with timeout {$ffprobeTimeout}s: {$cmd}");
         $precheckProcess = SymfonyProcess::fromShellCommandline($cmd);
         $precheckProcess->setTimeout($ffprobeTimeout);
@@ -263,30 +265,75 @@ class HlsStreamService
             Log::channel('ffmpeg')->info("[PRE-CHECK] ffprobe successful for source [{$title}].");
 
             // Check channel health
-            $ffprobeOutput = $precheckProcess->getOutput();
-            $streamInfo = json_decode($ffprobeOutput, true);
-            if (json_last_error() === JSON_ERROR_NONE && isset($streamInfo['streams'])) {
-                foreach ($streamInfo['streams'] as $stream) {
-                    if (isset($stream['codec_type']) && $stream['codec_type'] === 'video') {
-                        $codecName = $stream['codec_name'] ?? 'N/A';
-                        $pixFmt = $stream['pix_fmt'] ?? 'N/A';
-                        $width = $stream['width'] ?? 'N/A';
-                        $height = $stream['height'] ?? 'N/A';
-                        $profile = $stream['profile'] ?? 'N/A';
-                        $level = $stream['level'] ?? 'N/A';
-                        Log::channel('ffmpeg')->info("[PRE-CHECK] Source [{$title}] video stream: Codec: {$codecName}, Format: {$pixFmt}, Resolution: {$width}x{$height}, Profile: {$profile}, Level: {$level}");
+            $ffprobeJsonOutput = $precheckProcess->getOutput();
+            $streamInfo = json_decode($ffprobeJsonOutput, true);
+            $extractedDetails = [];
 
-                        if ($width !== 'N/A' && $height !== 'N/A') {
-                            $resolutionString = "{$width}x{$height}";
-                            $cacheKey = "streaminfo:resolution:{$modelType}:{$modelId}";
-                            Redis::setex($cacheKey, 86400, $resolutionString); // Cache for 24 hours
-                            Log::channel('ffmpeg')->info("[PRE-CHECK] Cached resolution for {$modelType} ID {$modelId}: {$resolutionString}");
+            if (json_last_error() === JSON_ERROR_NONE && !empty($streamInfo)) {
+                // Format Section
+                if (isset($streamInfo['format'])) {
+                    $format = $streamInfo['format'];
+                    $extractedDetails['format'] = [
+                        'duration' => $format['duration'] ?? null,
+                        'size' => $format['size'] ?? null,
+                        'bit_rate' => $format['bit_rate'] ?? null,
+                        'nb_streams' => $format['nb_streams'] ?? null,
+                        'tags' => $format['tags'] ?? [],
+                    ];
+                }
+
+                $videoStreamFound = false;
+                $audioStreamFound = false;
+
+                if (isset($streamInfo['streams']) && is_array($streamInfo['streams'])) {
+                    foreach ($streamInfo['streams'] as $stream) {
+                        if (!$videoStreamFound && isset($stream['codec_type']) && $stream['codec_type'] === 'video') {
+                            $extractedDetails['video'] = [
+                                'codec_long_name' => $stream['codec_long_name'] ?? null,
+                                'width' => $stream['width'] ?? null,
+                                'height' => $stream['height'] ?? null,
+                                'color_range' => $stream['color_range'] ?? null,
+                                'color_space' => $stream['color_space'] ?? null,
+                                'color_transfer' => $stream['color_transfer'] ?? null,
+                                'color_primaries' => $stream['color_primaries'] ?? null,
+                                'tags' => $stream['tags'] ?? [],
+                            ];
+                            $logResolution = ($stream['width'] ?? 'N/A') . 'x' . ($stream['height'] ?? 'N/A');
+                            Log::channel('ffmpeg')->info(
+                                "[PRE-CHECK] Source [{$title}] video stream: " .
+                                "Codec: " . ($stream['codec_name'] ?? 'N/A') . ", " .
+                                "Format: " . ($stream['pix_fmt'] ?? 'N/A') . ", " .
+                                "Resolution: " . $logResolution . ", " .
+                                "Profile: " . ($stream['profile'] ?? 'N/A') . ", " .
+                                "Level: " . ($stream['level'] ?? 'N/A')
+                            );
+                            $videoStreamFound = true;
+                        } elseif (!$audioStreamFound && isset($stream['codec_type']) && $stream['codec_type'] === 'audio') {
+                            $extractedDetails['audio'] = [
+                                'codec_name' => $stream['codec_name'] ?? null,
+                                'profile' => $stream['profile'] ?? null,
+                                'channels' => $stream['channels'] ?? null,
+                                'channel_layout' => $stream['channel_layout'] ?? null,
+                                'tags' => $stream['tags'] ?? [],
+                            ];
+                            $audioStreamFound = true;
                         }
-                        break;
+                        if ($videoStreamFound && $audioStreamFound) {
+                            break;
+                        }
                     }
                 }
+
+                // Remove the old individual resolution cache key as it's now part of the JSON blob
+                Redis::del("streaminfo:resolution:{$modelType}:{$modelId}");
+
+                if (!empty($extractedDetails)) {
+                    $detailsCacheKey = "streaminfo:details:{$modelType}:{$modelId}";
+                    Redis::setex($detailsCacheKey, 86400, json_encode($extractedDetails)); // Cache for 24 hours
+                    Log::channel('ffmpeg')->info("[PRE-CHECK] Cached detailed streaminfo for {$modelType} ID {$modelId}.");
+                }
             } else {
-                Log::channel('ffmpeg')->warning("[PRE-CHECK] Could not decode ffprobe JSON output or no streams found for [{$title}]. Output: " . $ffprobeOutput);
+                Log::channel('ffmpeg')->warning("[PRE-CHECK] Could not decode ffprobe JSON output for [{$title}]. Output: " . $ffprobeJsonOutput);
             }
         } catch (Exception $e) {
             throw new SourceNotResponding("failed_ffprobe_exception (" . $e->getMessage() . ")");

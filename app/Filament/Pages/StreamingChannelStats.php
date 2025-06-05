@@ -56,7 +56,6 @@ class StreamingChannelStats extends Page
             $modelType = $item['type']; // 'channel' or 'episode'
             $model = null;
             $itemName = 'Unknown Item';
-            $resolutionDisplay = 'N/A'; // Default resolution
 
             // Resolve actual streaming ID (failover)
             $actualStreamingModelId = Cache::get("hls:stream_mapping:{$modelType}:{$originalModelId}");
@@ -78,9 +77,40 @@ class StreamingChannelStats extends Page
                 }
             }
 
-            // Last seen should be fetched regardless of model found, using original ID and type
             $lastSeenTimestamp = Redis::get("hls:{$modelType}_last_seen:{$originalModelId}");
             $lastSeenValue = $lastSeenTimestamp ?: null;
+
+            // Fetch detailed stream information
+            $detailsCacheKey = "streaminfo:details:{$modelType}:{$actualStreamingModelId}";
+            $detailsJson = Redis::get($detailsCacheKey);
+            $streamDetails = $detailsJson ? json_decode($detailsJson, true) : [];
+
+            // Video Details
+            $videoInfo = $streamDetails['video'] ?? [];
+            $resolutionDisplay = ($videoInfo['width'] ?? 'N/A') . 'x' . ($videoInfo['height'] ?? 'N/A');
+            if ($resolutionDisplay === 'N/AxN/A') $resolutionDisplay = 'N/A';
+            $codecLongName = $videoInfo['codec_long_name'] ?? 'N/A';
+            $colorRange = $videoInfo['color_range'] ?? 'N/A';
+            $colorSpace = $videoInfo['color_space'] ?? 'N/A';
+            $colorTransfer = $videoInfo['color_transfer'] ?? 'N/A';
+            $colorPrimaries = $videoInfo['color_primaries'] ?? 'N/A';
+            $videoTags = $videoInfo['tags'] ?? [];
+
+            // Audio Details
+            $audioInfo = $streamDetails['audio'] ?? [];
+            $audioCodec = $audioInfo['codec_name'] ?? 'N/A';
+            $audioProfile = $audioInfo['profile'] ?? 'N/A';
+            $audioChannels = $audioInfo['channels'] ?? 'N/A';
+            $audioChannelLayout = $audioInfo['channel_layout'] ?? 'N/A';
+            $audioTags = $audioInfo['tags'] ?? [];
+
+            // Format Details
+            $formatInfo = $streamDetails['format'] ?? [];
+            $formatDuration = ($formatInfo['duration'] ?? null) ? gmdate("H:i:s", (int)$formatInfo['duration']) : 'N/A';
+            $formatSize = ($formatInfo['size'] ?? null) ? round($formatInfo['size'] / (1024*1024), 2) . ' MB' : 'N/A';
+            $formatBitRate = ($formatInfo['bit_rate'] ?? null) ? round($formatInfo['bit_rate'] / 1000, 0) . ' kbps' : 'N/A';
+            $formatNbStreams = $formatInfo['nb_streams'] ?? 'N/A';
+            $formatTags = $formatInfo['tags'] ?? [];
 
             if (!$model) {
                 Log::warning("StreamingChannelStats: Model not found for type {$modelType}, ID {$actualStreamingModelId} (original ID: {$originalModelId})");
@@ -88,22 +118,20 @@ class StreamingChannelStats extends Page
                     'itemName' => $itemName,
                     'itemType' => ucfirst($modelType),
                     'playlistName' => 'N/A (Model missing)',
-                    'activeStreams' => 'N/A',
-                    'maxStreams' => 'N/A',
-                    'codec' => 'N/A',
-                    'resolution' => 'N/A', // Model not found, so resolution is N/A
+                    'activeStreams' => 'N/A', 'maxStreams' => 'N/A', 'codec' => 'N/A',
+                    'resolution' => 'N/A', 'video_codec_long_name' => 'N/A', 'video_color_range' => 'N/A',
+                    'video_color_space' => 'N/A', 'video_color_transfer' => 'N/A', 'video_color_primaries' => 'N/A',
+                    'video_tags' => [], 'audio_codec_name' => 'N/A', 'audio_profile' => 'N/A',
+                    'audio_channels' => 'N/A', 'audio_channel_layout' => 'N/A', 'audio_tags' => [],
+                    'format_duration' => 'N/A', 'format_size' => 'N/A', 'format_bit_rate' => 'N/A',
+                    'format_nb_streams' => 'N/A', 'format_tags' => [],
                     'lastSeen' => $lastSeenValue,
                     'isBadSource' => false,
                 ];
                 continue;
             }
 
-            // Fetch resolution if model exists
-            $resolutionCacheKey = "streaminfo:resolution:{$modelType}:{$actualStreamingModelId}";
-            $resolutionDisplay = Redis::get($resolutionCacheKey) ?? 'N/A';
-
             $playlist = $model->playlist;
-
             $activeStreamsOnPlaylist = 'N/A';
             $maxStreamsDisplay = 'N/A';
             $isBadSource = false;
@@ -113,7 +141,6 @@ class StreamingChannelStats extends Page
                 $maxStreamsOnPlaylist = $playlist->available_streams ?? 'N/A';
                 $maxStreamsDisplay = ($maxStreamsOnPlaylist == 0 && is_numeric($maxStreamsOnPlaylist)) ? '∞' : $maxStreamsOnPlaylist;
                 if ($maxStreamsOnPlaylist === 'N/A') $maxStreamsDisplay = 'N/A';
-
                 $badSourceCacheKey = "mfp:bad_source:{$model->id}:{$playlist->id}";
                 $isBadSource = Redis::exists($badSourceCacheKey);
             } else {
@@ -127,7 +154,6 @@ class StreamingChannelStats extends Page
                 $settings['ffmpeg_codec_video'] ?? 'copy'
             );
             $outputVideoCodec = $finalVideoCodec;
-
             $isVaapiCodec = str_contains($finalVideoCodec, '_vaapi');
             $isQsvCodec = str_contains($finalVideoCodec, '_qsv');
 
@@ -162,7 +188,23 @@ class StreamingChannelStats extends Page
                 'activeStreams' => $activeStreamsOnPlaylist,
                 'maxStreams' => $maxStreamsDisplay,
                 'codec' => $formattedCodecString,
-                'resolution' => $resolutionDisplay, // Use the fetched value
+                'resolution' => $resolutionDisplay,
+                'video_codec_long_name' => $codecLongName,
+                'video_color_range' => $colorRange,
+                'video_color_space' => $colorSpace,
+                'video_color_transfer' => $colorTransfer,
+                'video_color_primaries' => $colorPrimaries,
+                'video_tags' => $videoTags,
+                'audio_codec_name' => $audioCodec,
+                'audio_profile' => $audioProfile,
+                'audio_channels' => $audioChannels,
+                'audio_channel_layout' => $audioChannelLayout,
+                'audio_tags' => $audioTags,
+                'format_duration' => $formatDuration,
+                'format_size' => $formatSize,
+                'format_bit_rate' => $formatBitRate,
+                'format_nb_streams' => $formatNbStreams,
+                'format_tags' => $formatTags,
                 'lastSeen' => $lastSeenValue,
                 'isBadSource' => $isBadSource,
             ];

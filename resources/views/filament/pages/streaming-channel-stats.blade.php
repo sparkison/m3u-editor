@@ -8,10 +8,51 @@
                     <x-filament::card>
                         <h3 class="text-lg font-semibold">{{ $stat['itemName'] ?? 'N/A' }} ({{ $stat['itemType'] ?? 'N/A' }})</h3>
                         <p>Playlist: {{ $stat['playlistName'] ?? 'N/A' }}</p>
-                        <p>Streams: {{ $stat['activeStreams'] ?? 'N/A' }} / {{ $stat['maxStreams'] ?? 'N/A' }}</p>
-                        <p>Codec: {{ $stat['codec'] ?? 'N/A' }}</p>
+                        <p>Streams on Playlist: {{ $stat['activeStreams'] ?? 'N/A' }} / {{ $stat['maxStreams'] ?? 'N/A' }}</p>
+                        <p>Output Codec: {{ $stat['codec'] ?? 'N/A' }}</p>
+
+                        <h4 class="mt-2 font-semibold text-md">Source Video Details:</h4>
                         <p>Resolution: {{ $stat['resolution'] ?? 'N/A' }}</p>
-                        <p>Last Seen: <span class="relative-timestamp" data-timestamp="{{ $stat['lastSeen'] }}">{{ $stat['lastSeen'] ? 'Loading...' : 'N/A' }}</span></p>
+                        <p>Full Codec Name: {{ $stat['video_codec_long_name'] ?? 'N/A' }}</p>
+                        <p>Color Range: {{ $stat['video_color_range'] ?? 'N/A' }}</p>
+                        <p>Color Space: {{ $stat['video_color_space'] ?? 'N/A' }}</p>
+                        <p>Color Transfer: {{ $stat['video_color_transfer'] ?? 'N/A' }}</p>
+                        <p>Color Primaries: {{ $stat['video_color_primaries'] ?? 'N/A' }}</p>
+                        @if (!empty($stat['video_tags']) && is_array($stat['video_tags']))
+                            <p>Video Tags:
+                                @foreach($stat['video_tags'] as $key => $value)
+                                    <span class="text-xs">{{ strtoupper(is_string($key) ? $key : '') }}: {{ is_scalar($value) ? $value : json_encode($value) }}; </span>
+                                @endforeach
+                            </p>
+                        @endif
+
+                        <h4 class="mt-2 font-semibold text-md">Source Audio Details (First Stream):</h4>
+                        <p>Codec: {{ $stat['audio_codec_name'] ?? 'N/A' }}</p>
+                        <p>Profile: {{ $stat['audio_profile'] ?? 'N/A' }}</p>
+                        <p>Channels: {{ $stat['audio_channels'] ?? 'N/A' }}</p>
+                        <p>Layout: {{ $stat['audio_channel_layout'] ?? 'N/A' }}</p>
+                        @if (!empty($stat['audio_tags']) && is_array($stat['audio_tags']))
+                            <p>Audio Tags:
+                                @foreach($stat['audio_tags'] as $key => $value)
+                                    <span class="text-xs">{{ strtoupper(is_string($key) ? $key : '') }}: {{ is_scalar($value) ? $value : json_encode($value) }}; </span>
+                                @endforeach
+                            </p>
+                        @endif
+
+                        <h4 class="mt-2 font-semibold text-md">Source Format Details:</h4>
+                        <p>Duration: {{ $stat['format_duration'] ?? 'N/A' }}</p>
+                        <p>Size: {{ $stat['format_size'] ?? 'N/A' }}</p>
+                        <p>Bitrate: {{ $stat['format_bit_rate'] ?? 'N/A' }}</p>
+                        <p>Stream Count: {{ $stat['format_nb_streams'] ?? 'N/A' }}</p>
+                        @if (!empty($stat['format_tags']) && is_array($stat['format_tags']))
+                            <p>Format Tags:
+                                @foreach($stat['format_tags'] as $key => $value)
+                                    <span class="text-xs">{{ strtoupper(is_string($key) ? $key : '') }}: {{ is_scalar($value) ? $value : json_encode($value) }}; </span>
+                                @endforeach
+                            </p>
+                        @endif
+
+                        <p class="mt-2">Last Seen: <span class="relative-timestamp" data-timestamp="{{ $stat['lastSeen'] }}">{{ $stat['lastSeen'] ? 'Loading...' : 'N/A' }}</span></p>
                         @if ($stat['isBadSource'] ?? false)
                             <p class="text-red-500">Bad Source: Yes</p>
                         @endif
@@ -66,15 +107,6 @@
             // Update every 30 seconds
             setInterval(updateRelativeTimes, 30000);
         });
-        // It's also good practice to call this if Livewire updates part of the page,
-        // for example, by listening to Livewire hooks if this page uses Livewire polling
-        // for other data, which might re-render these spans.
-        // However, Filament's default page polling might re-render the whole component,
-        // re-initializing these. If this script is within the polled component,
-        // `DOMContentLoaded` might not be the best trigger after initial load.
-        // For now, this setup will work for initial load and basic interval.
-        // If Filament's polling re-renders this part, the 'Loading...' will briefly show
-        // then JS will update it.
     </script>
     @endpush
 </x-filament-panels::page>
