@@ -66,13 +66,27 @@ class TestXtream extends Command implements PromptsForMissingInput
             return 1;
         }
 
-        $choice = $this->choice('Type S(eries) or M(ovies)', ['S', 'M'], 0);
+        $choice = $this->choice('Type S(eries), M(ovies), or I(nfo)', ['S', 'M', 'I'], 0);
         match (Str::upper($choice)) {
             'S' => $this->processSeries($xtream),
             'M' => $this->processMovies($xtream),
+            'I' => $this->getInfo($xtream),
         };
 
         return 0;
+    }
+
+    protected function getInfo(XtreamService $xtream)
+    {
+        $this->info('Fetching Xtream info...');
+        $info = $xtream->authenticate();
+        if (empty($info)) {
+            $this->error('No information available from Xtream service.');
+            return;
+        }
+
+        $this->line(json_encode($info, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $this->info('Xtream info fetched successfully.');
     }
 
     protected function processMovies(XtreamService $xtream)

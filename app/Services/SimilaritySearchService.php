@@ -69,9 +69,11 @@ class SimilaritySearchService
         // We don't want to loop over every single channel, 
         // so let's just grab the first few relevent matches
         $epgChannels = $epg->channels()
-            ->where('name', 'like', "%{$normalizedChan}%")
-            ->orWhere('channel_id', 'like', "%{$normalizedChan}%")
-            ->orWhere('display_name', 'like', "%{$normalizedChan}%");
+            ->where(function ($query) use ($normalizedChan) {
+                $query->whereRaw('LOWER(`channel_id`) like ?', ["%$normalizedChan%"])
+                    ->orWhereRaw('LOWER(`name`) like ?', ["%$normalizedChan%"])
+                    ->orWhereRaw('LOWER(`display_name`) like ?', ["%$normalizedChan%"]);
+            });
 
         // Setup variables
         $bestScore = PHP_INT_MAX; // Levenshtein: lower is better
