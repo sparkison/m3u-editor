@@ -56,6 +56,7 @@ class StreamingChannelStats extends Page
             $modelType = $item['type']; // 'channel' or 'episode'
             $model = null;
             $itemName = 'Unknown Item';
+            $resolutionDisplay = 'N/A'; // Default resolution
 
             // Resolve actual streaming ID (failover)
             $actualStreamingModelId = Cache::get("hls:stream_mapping:{$modelType}:{$originalModelId}");
@@ -90,18 +91,22 @@ class StreamingChannelStats extends Page
                     'activeStreams' => 'N/A',
                     'maxStreams' => 'N/A',
                     'codec' => 'N/A',
-                    'resolution' => 'N/A',
-                    'lastSeen' => $lastSeenValue, // lastSeen is available
-                    'isBadSource' => false, // Cannot determine without model/playlist
+                    'resolution' => 'N/A', // Model not found, so resolution is N/A
+                    'lastSeen' => $lastSeenValue,
+                    'isBadSource' => false,
                 ];
                 continue;
             }
+
+            // Fetch resolution if model exists
+            $resolutionCacheKey = "streaminfo:resolution:{$modelType}:{$actualStreamingModelId}";
+            $resolutionDisplay = Redis::get($resolutionCacheKey) ?? 'N/A';
 
             $playlist = $model->playlist;
 
             $activeStreamsOnPlaylist = 'N/A';
             $maxStreamsDisplay = 'N/A';
-            $isBadSource = false; // Default
+            $isBadSource = false;
 
             if ($playlist) {
                 $activeStreamsOnPlaylist = Redis::get("active_streams:{$playlist->id}") ?? 0;
@@ -109,13 +114,12 @@ class StreamingChannelStats extends Page
                 $maxStreamsDisplay = ($maxStreamsOnPlaylist == 0 && is_numeric($maxStreamsOnPlaylist)) ? '∞' : $maxStreamsOnPlaylist;
                 if ($maxStreamsOnPlaylist === 'N/A') $maxStreamsDisplay = 'N/A';
 
-                $badSourceCacheKey = "mfp:bad_source:{$model->id}:{$playlist->id}"; // Use $model->id
+                $badSourceCacheKey = "mfp:bad_source:{$model->id}:{$playlist->id}";
                 $isBadSource = Redis::exists($badSourceCacheKey);
             } else {
                  Log::warning("StreamingChannelStats: Playlist not found for {$modelType} ID {$model->id}");
             }
 
-            // Codec and HW Accel determination
             $settings = ProxyService::getStreamSettings();
             $hwAccelMethod = $settings['hardware_acceleration_method'] ?? 'none';
             $finalVideoCodec = ProxyService::determineVideoCodec(
@@ -151,7 +155,6 @@ class StreamingChannelStats extends Page
                 $formattedCodecString = "{$baseCodec} ({$hwStatus})";
             }
 
-
             $stats[] = [
                 'itemName' => $itemName,
                 'itemType' => ucfirst($modelType),
@@ -159,7 +162,7 @@ class StreamingChannelStats extends Page
                 'activeStreams' => $activeStreamsOnPlaylist,
                 'maxStreams' => $maxStreamsDisplay,
                 'codec' => $formattedCodecString,
-                'resolution' => 'N/A', // Still deferred
+                'resolution' => $resolutionDisplay, // Use the fetched value
                 'lastSeen' => $lastSeenValue,
                 'isBadSource' => $isBadSource,
             ];

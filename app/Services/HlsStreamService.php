@@ -103,7 +103,8 @@ class HlsStreamService
             $userAgent = $playlist->user_agent ?? null;
             try {
                 // Pass the ffprobe timeout to runPreCheck
-                $this->runPreCheck($currentAttemptStreamUrl, $userAgent, $currentStreamTitle, $ffprobeTimeout);
+                // Pass $type and $stream->id for caching stream info
+                $this->runPreCheck($type, $stream->id, $currentAttemptStreamUrl, $userAgent, $currentStreamTitle, $ffprobeTimeout);
 
                 $this->startStreamWithSpeedCheck(
                     type: $type,
@@ -240,11 +241,13 @@ class HlsStreamService
      * @param string $streamUrl
      * @param string|null $userAgent
      * @param string $title
+     * @param string $modelType // Added: 'channel' or 'episode'
+     * @param int|string $modelId    // Added: ID of the channel or episode
      * @param int $ffprobeTimeout The timeout for the ffprobe process in seconds
      * 
      * @throws Exception If the pre-check fails
      */
-    private function runPreCheck($streamUrl, $userAgent, $title, int $ffprobeTimeout)
+    private function runPreCheck(string $modelType, $modelId, $streamUrl, $userAgent, $title, int $ffprobeTimeout)
     {
         $ffprobePath = config('proxy.ffprobe_path', 'ffprobe');
         $cmd = "$ffprobePath -v quiet -print_format json -show_streams -select_streams v:0 -user_agent " . escapeshellarg($userAgent) . " " . escapeshellarg($streamUrl);
@@ -272,6 +275,13 @@ class HlsStreamService
                         $profile = $stream['profile'] ?? 'N/A';
                         $level = $stream['level'] ?? 'N/A';
                         Log::channel('ffmpeg')->info("[PRE-CHECK] Source [{$title}] video stream: Codec: {$codecName}, Format: {$pixFmt}, Resolution: {$width}x{$height}, Profile: {$profile}, Level: {$level}");
+
+                        if ($width !== 'N/A' && $height !== 'N/A') {
+                            $resolutionString = "{$width}x{$height}";
+                            $cacheKey = "streaminfo:resolution:{$modelType}:{$modelId}";
+                            Redis::setex($cacheKey, 86400, $resolutionString); // Cache for 24 hours
+                            Log::channel('ffmpeg')->info("[PRE-CHECK] Cached resolution for {$modelType} ID {$modelId}: {$resolutionString}");
+                        }
                         break;
                     }
                 }
