@@ -56,7 +56,7 @@
                             </p>
                         @endif
 
-                        <p class="mt-2">Last Seen: <span class="relative-timestamp" data-timestamp="{{ $stat['lastSeen'] }}">{{ $stat['lastSeen'] ? 'Loading...' : 'N/A' }}</span></p>
+                        <p class="mt-2">Uptime: <span class="relative-timestamp" data-timestamp="{{ $stat['processStartTime'] }}">{{ $stat['processStartTime'] ? 'Loading...' : 'N/A' }}</span></p>
                         @if ($stat['isBadSource'] ?? false)
                             <p class="text-red-500">Bad Source: Yes</p>
                         @endif

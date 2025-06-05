@@ -223,9 +223,18 @@ class HlsStreamService
         // Cache the actual FFmpeg PID
         $status = proc_get_status($process);
         $pid = $status['pid'];
+        // $cacheKey is "hls:pid:{$type}:{$model->id}" which is correct for the PID
         Cache::forever($cacheKey, $pid);
 
+        // Store the process start time
+        $startTimeCacheKey = "streaminfo:starttime:{$type}:{$model->id}";
+        $currentTime = now()->timestamp;
+        Redis::setex($startTimeCacheKey, 604800, $currentTime); // 7 days TTL
+        Log::channel('ffmpeg')->info("Stored ffmpeg process start time for {$type} ID {$model->id} at {$currentTime}");
+
         // Record timestamp in Redis (never expires until we prune)
+        // This key represents when the startStream method was last invoked for this model,
+        // which is different from the ffmpeg process actual start time. Keep for now.
         Redis::set("hls:{$type}_last_seen:{$model->id}", now()->timestamp);
 
         // Add to active IDs set
@@ -238,11 +247,11 @@ class HlsStreamService
     /**
      * Run a pre-check using ffprobe to validate the stream.
      *
+     * @param string $modelType // 'channel' or 'episode'
+     * @param int|string $modelId    // ID of the channel or episode
      * @param string $streamUrl
      * @param string|null $userAgent
      * @param string $title
-     * @param string $modelType // Added: 'channel' or 'episode'
-     * @param int|string $modelId    // Added: ID of the channel or episode
      * @param int $ffprobeTimeout The timeout for the ffprobe process in seconds
      * 
      * @throws Exception If the pre-check fails
@@ -378,6 +387,8 @@ class HlsStreamService
                 Log::channel('ffmpeg')->warning("Force killed FFmpeg process {$pid} for {$type} {$id}");
             }
             Cache::forget($cacheKey);
+            Redis::del("streaminfo:starttime:{$type}:{$id}"); // Added
+            Redis::del("streaminfo:details:{$type}:{$id}"); // Also remove details on stop
 
             // Cleanup on-disk HLS files
             if ($type === 'episode') {
@@ -417,6 +428,7 @@ class HlsStreamService
      *
      * @param string $type
      * @param string $id
+     * @param int $playlistId
      * @return void
      */
     private function cleanupStreamResources($type, $id, $playlistId): void
@@ -425,6 +437,8 @@ class HlsStreamService
 
         // Remove the cached PID
         Cache::forget($cacheKey);
+        Redis::del("streaminfo:starttime:{$type}:{$id}"); // Added
+        Redis::del("streaminfo:details:{$type}:{$id}"); // Also remove details on cleanup
 
         // Remove from active IDs set
         Redis::srem("hls:active_{$type}_ids", $id);

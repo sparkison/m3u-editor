@@ -3,8 +3,8 @@
 namespace App\Filament\Pages;
 
 use App\Models\Channel;
-use App\Models\Episode; // Added
-use App\Models\Playlist;
+use App\Models\Episode;
+use App\Models\Playlist; // Should be present if Playlist model is used
 use App\Services\ProxyService;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Cache;
@@ -21,12 +21,10 @@ class StreamingChannelStats extends Page
 
     protected static string $view = 'filament.pages.streaming-channel-stats';
 
-    // We can add properties to hold data later
     public $statsData = [];
 
     public function mount(): void
     {
-        // Data fetching logic will go here in a later step
         $this->statsData = $this->getStatsData();
     }
 
@@ -68,17 +66,18 @@ class StreamingChannelStats extends Page
                 $itemName = $model ? ($model->title_custom ?? $model->title) : "Channel ID: {$actualStreamingModelId} (Not Found)";
             } elseif ($modelType === 'episode') {
                 $model = Episode::find($actualStreamingModelId);
-                if ($model && $model->series) { // Ensure model and series relation exists
+                if ($model && $model->series) {
                     $itemName = $model->series->title . " - S" . $model->season_num . "E" . $model->episode_num . " - " . $model->title;
-                } elseif ($model) { // Model exists but no series
+                } elseif ($model) {
                      $itemName = "Ep. " . $model->title;
-                } else { // Model not found
+                } else {
                     $itemName = "Episode ID: {$actualStreamingModelId} (Not Found)";
                 }
             }
 
-            $lastSeenTimestamp = Redis::get("hls:{$modelType}_last_seen:{$originalModelId}");
-            $lastSeenValue = $lastSeenTimestamp ?: null;
+            // Fetch process start time
+            $startTimeKey = "streaminfo:starttime:{$modelType}:{$actualStreamingModelId}";
+            $processStartTime = Redis::get($startTimeKey) ?: null;
 
             // Fetch detailed stream information
             $detailsCacheKey = "streaminfo:details:{$modelType}:{$actualStreamingModelId}";
@@ -119,13 +118,14 @@ class StreamingChannelStats extends Page
                     'itemType' => ucfirst($modelType),
                     'playlistName' => 'N/A (Model missing)',
                     'activeStreams' => 'N/A', 'maxStreams' => 'N/A', 'codec' => 'N/A',
-                    'resolution' => 'N/A', 'video_codec_long_name' => 'N/A', 'video_color_range' => 'N/A',
-                    'video_color_space' => 'N/A', 'video_color_transfer' => 'N/A', 'video_color_primaries' => 'N/A',
-                    'video_tags' => [], 'audio_codec_name' => 'N/A', 'audio_profile' => 'N/A',
-                    'audio_channels' => 'N/A', 'audio_channel_layout' => 'N/A', 'audio_tags' => [],
-                    'format_duration' => 'N/A', 'format_size' => 'N/A', 'format_bit_rate' => 'N/A',
-                    'format_nb_streams' => 'N/A', 'format_tags' => [],
-                    'lastSeen' => $lastSeenValue,
+                    'resolution' => $resolutionDisplay, // Will be N/A if model not found, but details might have been fetched if ID existed
+                    'video_codec_long_name' => $codecLongName, 'video_color_range' => $colorRange,
+                    'video_color_space' => $colorSpace, 'video_color_transfer' => $colorTransfer, 'video_color_primaries' => $colorPrimaries,
+                    'video_tags' => $videoTags, 'audio_codec_name' => $audioCodec, 'audio_profile' => $audioProfile,
+                    'audio_channels' => $audioChannels, 'audio_channel_layout' => $audioChannelLayout, 'audio_tags' => $audioTags,
+                    'format_duration' => $formatDuration, 'format_size' => $formatSize, 'format_bit_rate' => $formatBitRate,
+                    'format_nb_streams' => $formatNbStreams, 'format_tags' => $formatTags,
+                    'processStartTime' => $processStartTime,
                     'isBadSource' => false,
                 ];
                 continue;
@@ -205,7 +205,7 @@ class StreamingChannelStats extends Page
                 'format_bit_rate' => $formatBitRate,
                 'format_nb_streams' => $formatNbStreams,
                 'format_tags' => $formatTags,
-                'lastSeen' => $lastSeenValue,
+                'processStartTime' => $processStartTime,
                 'isBadSource' => $isBadSource,
             ];
         }
