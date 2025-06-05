@@ -5,7 +5,6 @@ namespace App\Filament\Pages;
 use App\Models\Channel;
 use App\Models\Playlist;
 use App\Services\ProxyService;
-use Carbon\Carbon;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -43,7 +42,8 @@ class StreamingChannelStats extends Page
 
             // Get last seen for original channel ID - needs to be available even if channel or playlist is missing later
             $lastSeenTimestamp = Redis::get("hls:channel_last_seen:{$originalChannelId}");
-            $lastSeenDisplay = $lastSeenTimestamp ? Carbon::createFromTimestamp($lastSeenTimestamp)->format('Y-m-d H:i:s') : 'N/A';
+            // $lastSeenValue will be the raw timestamp (integer string from Redis) or null
+            $lastSeenValue = $lastSeenTimestamp ?: null;
 
             if (!$channel) {
                 Log::warning("StreamingChannelStats: Channel not found for ID {$actualStreamingChannelId} (original ID: {$originalChannelId})");
@@ -56,7 +56,7 @@ class StreamingChannelStats extends Page
                     'codec' => 'N/A', // Combined field will be N/A
                     // No 'hwAccel' key
                     'resolution' => 'N/A',
-                    'lastSeen' => $lastSeenDisplay,
+                    'lastSeen' => $lastSeenValue, // Use raw timestamp or null
                     'isBadSource' => false, // Cannot determine bad source without channel/playlist
                 ];
                 continue;
@@ -75,7 +75,7 @@ class StreamingChannelStats extends Page
                     'codec' => 'N/A', // No codec info if playlist (and thus settings for it) is missing
                     // No 'hwAccel' key
                     'resolution' => 'N/A',
-                    'lastSeen' => $lastSeenDisplay,
+                    'lastSeen' => $lastSeenValue, // Use raw timestamp or null
                     'isBadSource' => $isBadSource,
                 ];
                 continue;
@@ -151,7 +151,7 @@ class StreamingChannelStats extends Page
                 'codec' => $formattedCodecString, // Use the new combined string
                 // 'hwAccel' key is now removed
                 'resolution' => 'N/A',
-                'lastSeen' => $lastSeenDisplay,
+                'lastSeen' => $lastSeenValue, // Use raw timestamp or null
                 'isBadSource' => $isBadSource,
             ];
         }
