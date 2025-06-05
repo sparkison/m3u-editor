@@ -130,6 +130,11 @@ class ChannelResource extends Resource
                     ->toggleable()
                     ->tooltip('Toggle channel status')
                     ->sortable(),
+                Tables\Columns\ToggleColumn::make('is_fallback_candidate')
+                    ->label('Fallback Candidate')
+                    ->toggleable()
+                    ->tooltip('Mark channel as potential fallback for similarity matching')
+                    ->sortable(),
                 Tables\Columns\TextInputColumn::make('channel')
                     ->rules(['numeric', 'min:0'])
                     ->type('number')
@@ -606,7 +611,52 @@ class ChannelResource extends Resource
                         ->icon('heroicon-o-x-circle')
                         ->modalIcon('heroicon-o-x-circle')
                         ->modalDescription('Disable the selected channel(s) now?')
-                        ->modalSubmitActionLabel('Yes, disable now')
+                        ->modalSubmitActionLabel('Yes, disable now'),
+                    Tables\Actions\BulkAction::make('similarity_matching')
+                        ->label('Auto-match fallbacks')
+                        ->form([
+                            Forms\Components\Section::make('Similarity Matching Options')
+                                ->description('Automatically find and create fallback relationships for similar channels')
+                                ->schema([
+                                    Forms\Components\Placeholder::make('info')
+                                        ->content('This will analyze selected channels and create fallback relationships with channels marked as "fallback candidates" based on name similarity. Primary channels (not marked as fallback candidates) will be matched with similar fallback candidate channels.')
+                                        ->columnSpanFull(),
+                                    Forms\Components\Slider::make('min_threshold')
+                                        ->label('Minimum Similarity Threshold')
+                                        ->default(0.75)
+                                        ->min(0.5)
+                                        ->max(1.0)
+                                        ->step(0.05)
+                                        ->helperText('Higher values require more exact matches. Recommended: 0.75'),
+                                    Forms\Components\Toggle::make('overwrite_existing')
+                                        ->label('Overwrite Existing Failovers')
+                                        ->default(false)
+                                        ->helperText('If enabled, will remove existing failover relationships before creating new ones'),
+                                ])
+                        ])
+                        ->action(function (Collection $records, array $data): void {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new \App\Jobs\BulkChannelSimilarityMatchingJob(
+                                    channelIds: $records->pluck('id')->toArray(),
+                                    userId: auth()->id(),
+                                    options: [
+                                        'min_threshold' => $data['min_threshold'] ?? 0.75,
+                                        'overwrite_existing' => $data['overwrite_existing'] ?? false,
+                                    ]
+                                ));
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Channel Similarity Matching Started')
+                                ->body('Automatic fallback matching is running in the background. You will be notified when complete.')
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-puzzle-piece')
+                        ->modalIcon('heroicon-o-puzzle-piece')
+                        ->modalDescription('Automatically match selected channels with similar fallback candidates based on name similarity.')
+                        ->modalSubmitActionLabel('Start matching')
                 ]),
             ]);
     }
@@ -622,6 +672,7 @@ class ChannelResource extends Resource
     {
         return [
             'index' => Pages\ListChannels::route('/'),
+            'duplicate-finder' => Pages\DuplicateFinder::route('/duplicate-finder'),
             //'view' => Pages\ViewChannel::route('/{record}'),
             //'create' => Pages\CreateChannel::route('/create'),
             // 'edit' => Pages\EditChannel::route('/{record}/edit'),
@@ -676,6 +727,10 @@ class ChannelResource extends Resource
             Forms\Components\Toggle::make('enabled')
                 ->columnSpan('full')
                 ->helperText('Toggle channel status'),
+            Forms\Components\Toggle::make('is_fallback_candidate')
+                ->label('Fallback Candidate')
+                ->columnSpan('full')
+                ->helperText('Mark this channel as available for automatic fallback matching'),
             Forms\Components\Fieldset::make('General Settings')
                 ->schema([
                     Forms\Components\TextInput::make('title_custom')

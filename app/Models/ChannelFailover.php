@@ -10,6 +10,17 @@ class ChannelFailover extends Model
 {
     use HasFactory;
 
+    protected $fillable = [
+        'user_id',
+        'channel_id', 
+        'channel_failover_id',
+        'sort',
+        'metadata',
+        'auto_matched',
+        'match_quality',
+        'match_type'
+    ];
+
     /**
      * The attributes that should be cast to native types.
      *
@@ -21,6 +32,8 @@ class ChannelFailover extends Model
         'channel_id' => 'integer',
         'channel_failover_id' => 'integer',
         'metadata' => 'array',
+        'auto_matched' => 'boolean',
+        'match_quality' => 'decimal:4',
     ];
 
     public function user(): BelongsTo

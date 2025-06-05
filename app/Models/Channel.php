@@ -34,6 +34,7 @@ class Channel extends Model
         'extvlcopt' => 'array',
         'kodidrop' => 'array',
         'logo_type' => ChannelLogoType::class,
+        'is_fallback_candidate' => 'boolean',
     ];
 
     public function user(): BelongsTo

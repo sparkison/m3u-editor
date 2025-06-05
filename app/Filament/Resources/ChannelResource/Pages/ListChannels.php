@@ -227,6 +227,14 @@ class ListChannels extends ListRecords
                         //     });
                     })
             ])->button()->label('Actions'),
+            Actions\Action::make('duplicate_finder')
+                ->label('Find Duplicates')
+                ->icon('heroicon-o-document-duplicate')
+                ->color('warning')
+                ->action(function () {
+                    $this->redirectRoute('filament.admin.resources.channels.duplicate-finder');
+                })
+                ->button(),
         ];
     }
 
