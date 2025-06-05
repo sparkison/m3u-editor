@@ -563,13 +563,7 @@ class StreamController extends Controller
             $cmd .= $userArgs;
 
             // Input:
-            if ($format === 'ts') {
-                // For TS format, we use -re to read the input at its native frame rate
-                $cmd .= '-re -i ' . escapeshellarg($streamUrl) . ' ';
-            } else {
-                // For MP4 format, we can read it normally
-                $cmd .= '-i ' . escapeshellarg($streamUrl) . ' ';
-            }
+            $cmd .= '-i ' . escapeshellarg($streamUrl) . ' ';
 
             // Video Filter arguments:
             $cmd .= $videoFilterArgs;
