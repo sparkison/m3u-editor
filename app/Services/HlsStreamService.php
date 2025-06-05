@@ -215,10 +215,7 @@ class HlsStreamService
             fclose($stderr);
             proc_close($process);
 
-            // Decrement active streams count for natural stream endings
-            $self->decrementActiveStreams($playlistId);
-            
-            // Clean up the stream resources (without decrementing again)
+            // Clean up the stream without decrementing again (to avoid double decrement)
             $self->cleanupStreamResources($type, $model->id, $playlistId);
         });
 
@@ -333,8 +330,10 @@ class HlsStreamService
             }
             File::deleteDirectory($storageDir);
             
-            // Do NOT decrement active streams here as it will be handled by the shutdown function
-            // to avoid double decrementing
+            // Decrement active streams count if we have the model and playlist
+            if ($model && $model->playlist) {
+                $this->decrementActiveStreams($model->playlist->id);
+            }
         } else {
             Log::channel('ffmpeg')->warning("No running FFmpeg process for channel {$id} to stop.");
         }
@@ -383,8 +382,10 @@ class HlsStreamService
             }
         }
 
-        // DO NOT decrement active streams here - this is handled by the calling method
-        // to avoid double decrementing when stopStream() is called
+        // Remove the active streams count for the playlist using the trait
+        $this->decrementActiveStreams($playlistId);
+
+        // Note: Active streams count decrementing is handled by the trait
         Log::channel('ffmpeg')->info("Cleaned up stream resources for {$type} {$id}");
     }
 

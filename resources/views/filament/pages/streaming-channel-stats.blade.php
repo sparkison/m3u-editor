@@ -12,7 +12,9 @@
                         <p>Codec: {{ $stat['codec'] ?? 'N/A' }}</p>
                         <p>Resolution: {{ $stat['resolution'] ?? 'N/A' }}</p>
                         <p>Last Seen: <span class="relative-timestamp" data-timestamp="{{ $stat['lastSeen'] }}">{{ $stat['lastSeen'] ? 'Loading...' : 'N/A' }}</span></p>
-                        <p>Bad Source: {{ ($stat['isBadSource'] ?? false) ? 'Yes' : 'No' }}</p>
+                        @if ($stat['isBadSource'] ?? false)
+                            <p class="text-red-500">Bad Source: Yes</p>
+                        @endif
                     </x-filament::card>
                 @endforeach
             </div>
