@@ -10,7 +10,6 @@
                         <p>Playlist: {{ $stat['playlistName'] ?? 'N/A' }}</p>
                         <p>Streams: {{ $stat['activeStreams'] ?? 'N/A' }} / {{ $stat['maxStreams'] ?? 'N/A' }}</p>
                         <p>Codec: {{ $stat['codec'] ?? 'N/A' }}</p>
-                            <p>HW Accel: {{ $stat['hwAccel'] ?? 'N/A' }}</p> {{-- Add this line --}}
                         <p>Resolution: {{ $stat['resolution'] ?? 'N/A' }}</p>
                         <p>Last Seen: {{ $stat['lastSeen'] ?? 'N/A' }}</p>
                         <p>Bad Source: {{ ($stat['isBadSource'] ?? false) ? 'Yes' : 'No' }}</p>

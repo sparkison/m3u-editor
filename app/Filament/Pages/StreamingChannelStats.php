@@ -41,14 +41,26 @@ class StreamingChannelStats extends Page
             $actualStreamingChannelId = Cache::get("hls:stream_mapping:channel:{$originalChannelId}") ?: $originalChannelId;
             $channel = Channel::find($actualStreamingChannelId);
 
-            if (!$channel) {
-                Log::warning("StreamingChannelStats: Channel not found for ID {$actualStreamingChannelId} (original ID: {$originalChannelId})");
-                continue;
-            }
-
-            // Get last seen for original channel ID
+            // Get last seen for original channel ID - needs to be available even if channel or playlist is missing later
             $lastSeenTimestamp = Redis::get("hls:channel_last_seen:{$originalChannelId}");
             $lastSeenDisplay = $lastSeenTimestamp ? Carbon::createFromTimestamp($lastSeenTimestamp)->format('Y-m-d H:i:s') : 'N/A';
+
+            if (!$channel) {
+                Log::warning("StreamingChannelStats: Channel not found for ID {$actualStreamingChannelId} (original ID: {$originalChannelId})");
+                // Add a basic entry if channel is not found
+                $stats[] = [
+                    'channelName' => "ID: {$actualStreamingChannelId} (Not Found)",
+                    'playlistName' => 'N/A',
+                    'activeStreams' => 'N/A',
+                    'maxStreams' => 'N/A',
+                    'codec' => 'N/A', // Combined field will be N/A
+                    // No 'hwAccel' key
+                    'resolution' => 'N/A',
+                    'lastSeen' => $lastSeenDisplay,
+                    'isBadSource' => false, // Cannot determine bad source without channel/playlist
+                ];
+                continue;
+            }
 
             $playlist = $channel->playlist;
             $isBadSource = false; // Default
@@ -60,11 +72,11 @@ class StreamingChannelStats extends Page
                     'playlistName' => 'N/A (Playlist missing)',
                     'activeStreams' => 'N/A',
                     'maxStreams' => 'N/A',
-                    'codec' => 'N/A',
-                    'hwAccel' => 'N/A',
+                    'codec' => 'N/A', // No codec info if playlist (and thus settings for it) is missing
+                    // No 'hwAccel' key
                     'resolution' => 'N/A',
                     'lastSeen' => $lastSeenDisplay,
-                    'isBadSource' => $isBadSource, // Will be false as playlist is missing
+                    'isBadSource' => $isBadSource,
                 ];
                 continue;
             }
@@ -78,17 +90,19 @@ class StreamingChannelStats extends Page
 
             // Format maxStreams
             $maxStreamsDisplay = ($maxStreamsOnPlaylist == 0 && is_numeric($maxStreamsOnPlaylist)) ? '∞' : $maxStreamsOnPlaylist;
-            if ($maxStreamsOnPlaylist === 'N/A') {
+            if ($maxStreamsOnPlaylist === 'N/A') { // Handles if available_streams was null
                 $maxStreamsDisplay = 'N/A';
             }
 
+            // Determine codec and HW Accel
             $settings = ProxyService::getStreamSettings();
             $hwAccelMethod = $settings['hardware_acceleration_method'] ?? 'none';
             $finalVideoCodec = ProxyService::determineVideoCodec(
                 config('proxy.ffmpeg_codec_video', null),
                 $settings['ffmpeg_codec_video'] ?? 'copy'
             );
-            $outputVideoCodec = $finalVideoCodec;
+            $outputVideoCodec = $finalVideoCodec; // Default
+
             $isVaapiCodec = str_contains($finalVideoCodec, '_vaapi');
             $isQsvCodec = str_contains($finalVideoCodec, '_qsv');
 
@@ -98,54 +112,50 @@ class StreamingChannelStats extends Page
                 $outputVideoCodec = $isQsvCodec ? $finalVideoCodec : 'h264_qsv';
             }
 
-            $codecDisplay = ($outputVideoCodec !== 'copy') ? $outputVideoCodec : 'copy (source)';
+            // New combined codec and HW accel string logic
+            $formattedCodecString = 'N/A';
 
-            $hwAccelDisplayForStat = ucfirst($hwAccelMethod ?? 'none'); // Default display
+            if ($outputVideoCodec === 'copy') {
+                $formattedCodecString = 'copy (source)';
+            } elseif ($outputVideoCodec !== 'N/A' && $outputVideoCodec !== null) {
+                $baseCodec = $outputVideoCodec;
+                // Remove _qsv or _vaapi from baseCodec if present, as HW status will be added
+                $baseCodec = str_replace(['_qsv', '_vaapi'], '', $baseCodec);
 
-            // Check if codec name already indicates HW acceleration
-            if (str_contains($codecDisplay, '_qsv') || str_contains($codecDisplay, '_vaapi')) {
-                $normalizedCodecDisplay = strtolower($codecDisplay);
-                $normalizedHwAccelMethod = strtolower($hwAccelMethod ?? 'none');
-
-                if ( (str_contains($normalizedCodecDisplay, 'qsv') && $normalizedHwAccelMethod === 'qsv') ||
-                     (str_contains($normalizedCodecDisplay, 'vaapi') && $normalizedHwAccelMethod === 'vaapi') ) {
-                    $hwAccelDisplayForStat = 'In Codec';
+                $hwStatus = 'HW None';
+                if ($hwAccelMethod === 'qsv') {
+                    $hwStatus = 'HW QSV';
+                } elseif ($hwAccelMethod === 'vaapi') {
+                    $hwStatus = 'HW VAAPI';
                 }
+
+                // If the outputVideoCodec *already* implies a specific hardware (e.g., h264_qsv),
+                // and the hwAccelMethod matches, ensure the status reflects that.
+                if (str_contains($outputVideoCodec, '_qsv') && $hwAccelMethod === 'qsv') {
+                     $baseCodec = str_replace('_qsv', '', $outputVideoCodec);
+                     $hwStatus = 'HW QSV';
+                } elseif (str_contains($outputVideoCodec, '_vaapi') && $hwAccelMethod === 'vaapi') {
+                     $baseCodec = str_replace('_vaapi', '', $outputVideoCodec);
+                     $hwStatus = 'HW VAAPI';
+                }
+                $formattedCodecString = "{$baseCodec} ({$hwStatus})";
             }
+            // If $channel was null previously, this logic path won't be hit.
+            // If $outputVideoCodec determination resulted in 'N/A', $formattedCodecString remains 'N/A'.
 
             $stats[] = [
                 'channelName' => $channel->title_custom ?? $channel->title,
                 'playlistName' => $playlist->name,
                 'activeStreams' => $activeStreamsOnPlaylist,
-                'maxStreams' => $maxStreamsDisplay, // Use the formatted value
-                'codec' => $codecDisplay,
-                'hwAccel' => $hwAccelDisplayForStat, // Use the new conditional value
-                'resolution' => 'N/A', // Still deferred
-                'lastSeen' => $lastSeenDisplay, // Updated
-                'isBadSource' => $isBadSource, // Updated
+                'maxStreams' => $maxStreamsDisplay,
+                'codec' => $formattedCodecString, // Use the new combined string
+                // 'hwAccel' key is now removed
+                'resolution' => 'N/A',
+                'lastSeen' => $lastSeenDisplay,
+                'isBadSource' => $isBadSource,
             ];
         }
         Log::info('Processed statsData: ', $stats);
         return $stats;
     }
-
-    // Add the new logic inside the loop, after $playlist and $channel are confirmed
-    // This is a conceptual placement, the actual diff will integrate it correctly.
-    // For reference, the new logic snippet to be integrated:
-    /*
-            $lastSeenTimestamp = Redis::get("hls:channel_last_seen:{$originalChannelId}");
-            $lastSeenDisplay = $lastSeenTimestamp ? Carbon::createFromTimestamp($lastSeenTimestamp)->diffForHumans() : 'N/A';
-
-            // Ensure $channel and $playlist are not null before using their IDs
-            $isBadSource = false; // Default to false
-            if ($channel && $playlist) {
-                $badSourceCacheKey = "mfp:bad_source:{$channel->id}:{$playlist->id}";
-                $isBadSource = Redis::exists($badSourceCacheKey);
-            } elseif ($channel) {
-                // If playlist is null, we might not be able to determine bad source for that specific playlist context.
-                // However, a channel itself could be globally marked bad, but that's not what mfp:bad_source usually means.
-                // For now, if playlist is missing, we can't check the specific key.
-                Log::warning("StreamingChannelStats: Cannot check bad source status for channel ID {$channel->id} due to missing playlist.");
-            }
-    */
 }
