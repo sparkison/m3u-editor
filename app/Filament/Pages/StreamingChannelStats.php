@@ -48,7 +48,7 @@ class StreamingChannelStats extends Page
 
             // Get last seen for original channel ID
             $lastSeenTimestamp = Redis::get("hls:channel_last_seen:{$originalChannelId}");
-            $lastSeenDisplay = $lastSeenTimestamp ? Carbon::createFromTimestamp($lastSeenTimestamp)->diffForHumans() : 'N/A';
+            $lastSeenDisplay = $lastSeenTimestamp ? Carbon::createFromTimestamp($lastSeenTimestamp)->format('Y-m-d H:i:s') : 'N/A';
 
             $playlist = $channel->playlist;
             $isBadSource = false; // Default
