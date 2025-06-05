@@ -588,7 +588,7 @@ class HlsStreamService
             if ($vaapiEnabled || $isVaapiCodec) {
                 $outputVideoCodec = $isVaapiCodec ? $finalVideoCodec : 'h264_vaapi'; // Default to h264_vaapi if only toggle is on
 
-                $hwaccelInitArgs = "-init_hw_device vaapi=va_device:{$vaapiDevice} -filter_hw_device va_device:{$vaapiDevice} ";
+                $hwaccelInitArgs = "-init_hw_device vaapi=va_device:{$vaapiDevice} -filter_hw_device va_device ";
 
                 // These args are for full hardware acceleration (decode using VA-API)
                 $hwaccelInputArgs = "-hwaccel vaapi -hwaccel_device va_device -hwaccel_output_format vaapi ";
