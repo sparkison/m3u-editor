@@ -73,7 +73,7 @@ class StreamingChannelStats extends Page
             $badSourceCacheKey = "mfp:bad_source:{$channel->id}:{$playlist->id}";
             $isBadSource = Redis::exists($badSourceCacheKey);
 
-            $activeStreamsOnPlaylist = Redis::get("hls:active_streams_count:{$playlist->id}") ?? 0;
+            $activeStreamsOnPlaylist = Redis::get("active_streams:{$playlist->id}") ?? 0;
             $maxStreamsOnPlaylist = $playlist->available_streams ?? 'N/A';
 
             $settings = ProxyService::getStreamSettings();
