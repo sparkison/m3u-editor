@@ -118,28 +118,22 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                     // Increment counter
                     $channelCount++;
 
-                    // Only do this if the URL is not a .ts or .m3u8 file
-                    // as these are not suitable for similarity search
-                    // Consider other formats as VOD and ignore them
-                    $epgChannel = null;
-                    if (Str::endsWith($channel->url, ['ts', 'm3u8', 'rtmp'])) {
-                        // Get the EPG channel
-                        $epgChannel = $epg->channels()
-                            ->where('channel_id', '!=', '')
-                            ->where(function ($sub) use ($channel) {
-                                $search1 = strtolower(trim($channel->stream_id));
-                                $search2 = strtolower(trim($channel->name));
-                                return $sub
-                                    ->whereRaw('LOWER(channel_id) = ?', [$search1])
-                                    ->orWhereRaw('LOWER(channel_id) = ?', [$search2]);
-                            })
-                            ->select('id', 'channel_id')
-                            ->first();
+                    // Get the EPG channel (check for direct match first)
+                    $epgChannel = $epg->channels()
+                        ->where('channel_id', '!=', '')
+                        ->where(function ($sub) use ($channel) {
+                            $search1 = strtolower(trim($channel->stream_id));
+                            $search2 = strtolower(trim($channel->name));
+                            return $sub
+                                ->whereRaw('LOWER(channel_id) = ?', [$search1])
+                                ->orWhereRaw('LOWER(channel_id) = ?', [$search2]);
+                        })
+                        ->select('id', 'channel_id')
+                        ->first();
 
-                        // Of no direct match, attempt a similarity search
-                        if (!$epgChannel) {
-                            $epgChannel = $this->similaritySearch->findMatchingEpgChannel($channel, $epg);
-                        }
+                    // Of no direct match, attempt a similarity search
+                    if (!$epgChannel) {
+                        $epgChannel = $this->similaritySearch->findMatchingEpgChannel($channel, $epg);
                     }
 
                     // If EPG channel found, link it to the Playlist channel
