@@ -136,7 +136,10 @@ class PlaylistGenerateController extends Controller
                     if ($channel->catchup_source) {
                         $extInf .= " catchup-source=\"$channel->catchup_source\"";
                     }
-                    $extInf .= " tvg-chno=\"$channelNo\" tvg-id=\"$tvgId\" timeshift=\"$timeshift\" tvg-name=\"$name\" tvg-logo=\"$icon\" group-title=\"$group\"";
+                    if ($timeshift) {
+                        $extInf .= " timeshift=\"$timeshift\"";
+                    }
+                    $extInf .= " tvg-chno=\"$channelNo\" tvg-id=\"$tvgId\" tvg-name=\"$name\" tvg-logo=\"$icon\" group-title=\"$group\"";
                     echo "$extInf," . $title . "\n";
                     if ($channel->extvlcopt) {
                         foreach ($channel->extvlcopt as $extvlcopt) {
