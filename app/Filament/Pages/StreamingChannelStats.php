@@ -4,7 +4,6 @@ namespace App\Filament\Pages;
 
 use App\Models\Channel;
 use App\Models\Episode;
-use App\Models\Playlist; // Should be present if Playlist model is used
 use App\Services\ProxyService;
 use Filament\Pages\Page;
 use Illuminate\Support\Str;
@@ -16,9 +15,9 @@ class StreamingChannelStats extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-video-camera';
     protected static ?string $navigationLabel = 'Streaming Stats';
-    protected static ?string $title = 'Active Streaming Channel Statistics';
+    protected static ?string $title = 'Active Streaming Statistics';
     protected static ?string $navigationGroup = 'Tools';
-    protected static ?int $navigationSort = 10; // Adjust as needed
+    protected static ?int $navigationSort = 10;
 
     protected static string $view = 'filament.pages.streaming-channel-stats';
 
@@ -27,6 +26,13 @@ class StreamingChannelStats extends Page
     public function mount(): void
     {
         $this->statsData = $this->getStatsData();
+    }
+
+    public function getSubheading(): ?string
+    {
+        return empty($this->statsData)
+            ? 'No active streams or data available currently.'
+            : null;
     }
 
     protected function getStatsData(): array
@@ -78,7 +84,7 @@ class StreamingChannelStats extends Page
                 if ($model && $model->series) {
                     $itemName = $model->series->title . " - S" . $model->season_num . "E" . $model->episode_num . " - " . $model->title;
                 } elseif ($model) {
-                     $itemName = "Ep. " . $model->title;
+                    $itemName = "Ep. " . $model->title;
                 } else {
                     $itemName = "Episode ID: {$actualStreamingModelId} (Not Found)";
                 }
@@ -115,7 +121,7 @@ class StreamingChannelStats extends Page
             // Format Details
             $formatInfo = $streamDetails['format'] ?? [];
             $formatDuration = ($formatInfo['duration'] ?? null) ? gmdate("H:i:s", (int)$formatInfo['duration']) : 'N/A';
-            $formatSize = ($formatInfo['size'] ?? null) ? round($formatInfo['size'] / (1024*1024), 2) . ' MB' : 'N/A';
+            $formatSize = ($formatInfo['size'] ?? null) ? round($formatInfo['size'] / (1024 * 1024), 2) . ' MB' : 'N/A';
             $formatBitRate = ($formatInfo['bit_rate'] ?? null) ? round($formatInfo['bit_rate'] / 1000, 0) . ' kbps' : 'N/A';
             $formatNbStreams = $formatInfo['nb_streams'] ?? 'N/A';
             $formatTags = $formatInfo['tags'] ?? [];
@@ -126,14 +132,26 @@ class StreamingChannelStats extends Page
                     'itemName' => $itemName,
                     'itemType' => ucfirst($modelType),
                     'playlistName' => 'N/A (Model missing)',
-                    'activeStreams' => 'N/A', 'maxStreams' => 'N/A', 'codec' => 'N/A',
+                    'activeStreams' => 'N/A',
+                    'maxStreams' => 'N/A',
+                    'codec' => 'N/A',
                     'resolution' => $resolutionDisplay, // Will be N/A if model not found, but details might have been fetched if ID existed
-                    'video_codec_long_name' => $codecLongName, 'video_color_range' => $colorRange,
-                    'video_color_space' => $colorSpace, 'video_color_transfer' => $colorTransfer, 'video_color_primaries' => $colorPrimaries,
-                    'video_tags' => $videoTags, 'audio_codec_name' => $audioCodec, 'audio_profile' => $audioProfile,
-                    'audio_channels' => $audioChannels, 'audio_channel_layout' => $audioChannelLayout, 'audio_tags' => $audioTags,
-                    'format_duration' => $formatDuration, 'format_size' => $formatSize, 'format_bit_rate' => $formatBitRate,
-                    'format_nb_streams' => $formatNbStreams, 'format_tags' => $formatTags,
+                    'video_codec_long_name' => $codecLongName,
+                    'video_color_range' => $colorRange,
+                    'video_color_space' => $colorSpace,
+                    'video_color_transfer' => $colorTransfer,
+                    'video_color_primaries' => $colorPrimaries,
+                    'video_tags' => $videoTags,
+                    'audio_codec_name' => $audioCodec,
+                    'audio_profile' => $audioProfile,
+                    'audio_channels' => $audioChannels,
+                    'audio_channel_layout' => $audioChannelLayout,
+                    'audio_tags' => $audioTags,
+                    'format_duration' => $formatDuration,
+                    'format_size' => $formatSize,
+                    'format_bit_rate' => $formatBitRate,
+                    'format_nb_streams' => $formatNbStreams,
+                    'format_tags' => $formatTags,
                     'processStartTime' => $processStartTime,
                     'isBadSource' => false,
                     'format' => $format,
@@ -155,7 +173,7 @@ class StreamingChannelStats extends Page
                 $badSourceCacheKey = "mfp:bad_source:{$model->id}:{$playlist->id}";
                 $isBadSource = Redis::exists($badSourceCacheKey);
             } else {
-                 Log::warning("StreamingChannelStats: Playlist not found for {$modelType} ID {$model->id}");
+                Log::warning("StreamingChannelStats: Playlist not found for {$modelType} ID {$model->id}");
             }
 
             $settings = ProxyService::getStreamSettings();
@@ -183,11 +201,11 @@ class StreamingChannelStats extends Page
                 if ($hwAccelMethod === 'qsv') $hwStatus = 'HW QSV';
                 elseif ($hwAccelMethod === 'vaapi') $hwStatus = 'HW VAAPI';
                 if (str_contains($outputVideoCodec, '_qsv') && $hwAccelMethod === 'qsv') {
-                     $baseCodec = str_replace('_qsv', '', $outputVideoCodec);
-                     $hwStatus = 'HW QSV';
+                    $baseCodec = str_replace('_qsv', '', $outputVideoCodec);
+                    $hwStatus = 'HW QSV';
                 } elseif (str_contains($outputVideoCodec, '_vaapi') && $hwAccelMethod === 'vaapi') {
-                     $baseCodec = str_replace('_vaapi', '', $outputVideoCodec);
-                     $hwStatus = 'HW VAAPI';
+                    $baseCodec = str_replace('_vaapi', '', $outputVideoCodec);
+                    $hwStatus = 'HW VAAPI';
                 }
                 $formattedCodecString = "{$baseCodec} ({$hwStatus})";
             }

@@ -1,8 +1,6 @@
 <x-filament-panels::page>
     <div class="space-y-4">
-        @if (empty($statsData))
-            <p class="fi-header-subheading mt-2 max-w-2xl text-lg text-gray-600 dark:text-gray-400">No active streams or data available currently.</p>
-        @else
+        @if (!empty($statsData))
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 @foreach ($statsData as $stat)
                     <x-filament::card class="p-4">
