@@ -135,6 +135,19 @@ class StreamingChannelStats extends Page
             $videoInfo = $streamDetails['video'] ?? [];
             $resolutionDisplay = ($videoInfo['width'] ?? 'N/A') . 'x' . ($videoInfo['height'] ?? 'N/A');
             if ($resolutionDisplay === 'N/AxN/A') $resolutionDisplay = 'N/A';
+
+            $resolution_logo_path = null;
+            if (($videoInfo['width'] ?? 0) === 1280 && ($videoInfo['height'] ?? 0) === 720) {
+                $resolution_logo_path = 'images/sd.svg';
+            } elseif (($videoInfo['width'] ?? 0) === 1920 && ($videoInfo['height'] ?? 0) === 1080) {
+                $resolution_logo_path = 'images/1080.svg';
+            } elseif (
+                (($videoInfo['width'] ?? 0) === 3840 && ($videoInfo['height'] ?? 0) === 2160) ||
+                (($videoInfo['width'] ?? 0) === 4096 && ($videoInfo['height'] ?? 0) === 2160)
+            ) {
+                $resolution_logo_path = 'images/4k.svg';
+            }
+
             $codecLongName = $videoInfo['codec_long_name'] ?? 'N/A';
             $colorRange = $videoInfo['color_range'] ?? 'N/A';
             $colorSpace = $videoInfo['color_space'] ?? 'N/A';
@@ -188,6 +201,7 @@ class StreamingChannelStats extends Page
                     'isBadSource' => false,
                     'format' => $format,
                     'logo' => $itemLogo,
+                    'resolution_logo' => $resolution_logo_path,
                     'client_ip' => $clientIp,
                     'stream_id' => $streamId,
                 ];
@@ -272,6 +286,7 @@ class StreamingChannelStats extends Page
                 'isBadSource' => $isBadSource,
                 'format' => Str::upper($format),
                 'logo' => $itemLogo,
+                'resolution_logo' => $resolution_logo_path,
                 'client_ip' => $clientIp,
                 'stream_id' => $streamId,
             ];

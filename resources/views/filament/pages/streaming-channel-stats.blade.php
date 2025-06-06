@@ -72,6 +72,9 @@
                                     <div>
                                         <span class="text-gray-500 dark:text-gray-400">Resolution:</span>
                                         <span class="ml-1 font-mono">{{ $stat['resolution'] ?? 'N/A' }}</span>
+                                        @if (!empty($stat['resolution_logo']))
+                                            <img src="{{ asset($stat['resolution_logo']) }}" alt="Resolution Logo" style="height: 1em; display: inline-block; margin-left: 5px; vertical-align: middle;">
+                                        @endif
                                     </div>
                                     <div>
                                         <span class="text-gray-500 dark:text-gray-400">Codec:</span>
