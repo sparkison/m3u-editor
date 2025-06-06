@@ -1,15 +1,22 @@
 <x-filament-panels::page>
     <div class="space-y-4">
         @if (empty($statsData))
-            <p>No active streams or data available currently.</p>
+            <p class="fi-header-subheading mt-2 max-w-2xl text-lg text-gray-600 dark:text-gray-400">No active streams or data available currently.</p>
         @else
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 @foreach ($statsData as $stat)
                     <x-filament::card>
+                        <x-filament::avatar
+                            src="{{ $stat['logo'] ?? asset('/placeholder.png') }}"
+                            alt="Stream logo"
+                            :circular="false"
+                            size="w-auto h-8"
+                        />
                         <h3 class="text-lg font-semibold">{{ $stat['itemName'] ?? 'N/A' }} ({{ $stat['itemType'] ?? 'N/A' }})</h3>
                         <p>Playlist: {{ $stat['playlistName'] ?? 'N/A' }}</p>
                         <p>Streams on Playlist: {{ $stat['activeStreams'] ?? 'N/A' }} / {{ $stat['maxStreams'] ?? 'N/A' }}</p>
                         <p>Output Codec: {{ $stat['codec'] ?? 'N/A' }}</p>
+                        <p>Format: {{ $stat['format'] ?? 'N/A' }}</p>
 
                         <h4 class="mt-2 font-semibold text-md">Source Video Details:</h4>
                         <p>Resolution: {{ $stat['resolution'] ?? 'N/A' }}</p>
@@ -56,7 +63,7 @@
                             </p>
                         @endif
 
-                        <p class="mt-2">Uptime: <span class="relative-timestamp" data-timestamp="{{ $stat['processStartTime'] }}">{{ $stat['processStartTime'] ? 'Loading...' : 'N/A' }}</span></p>
+                        <p class="mt-2">Started: <span class="relative-timestamp" data-timestamp="{{ $stat['processStartTime'] }}">{{ $stat['processStartTime'] ? 'Loading...' : 'N/A' }}</span></p>
                         @if ($stat['isBadSource'] ?? false)
                             <p class="text-red-500">Bad Source: Yes</p>
                         @endif

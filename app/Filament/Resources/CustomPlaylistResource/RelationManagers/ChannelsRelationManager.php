@@ -56,7 +56,7 @@ class ChannelsRelationManager extends RelationManager
                 Tables\Columns\ImageColumn::make('logo')
                     ->label('Icon')
                     ->checkFileExistence(false)
-                    ->height(40)
+                    ->height(30)
                     ->width('auto')
                     ->getStateUsing(function ($record) {
                         if ($record->logo_type === ChannelLogoType::Channel) {

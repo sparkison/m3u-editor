@@ -7,6 +7,7 @@ use App\Models\Episode;
 use App\Models\Playlist; // Should be present if Playlist model is used
 use App\Services\ProxyService;
 use Filament\Pages\Page;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
@@ -36,13 +37,13 @@ class StreamingChannelStats extends Page
         $activeChannelIds = Redis::smembers('hls:active_channel_ids');
         Log::info('Active HLS Channel IDs from Redis: ', $activeChannelIds ?: []);
         foreach ($activeChannelIds as $id) {
-            $activeItems[] = ['id' => $id, 'type' => 'channel'];
+            $activeItems[] = ['id' => $id, 'type' => 'channel', 'format' => 'hls'];
         }
 
         $activeEpisodeIds = Redis::smembers('hls:active_episode_ids');
         Log::info('Active HLS Episode IDs from Redis: ', $activeEpisodeIds ?: []);
         foreach ($activeEpisodeIds as $id) {
-            $activeItems[] = ['id' => $id, 'type' => 'episode'];
+            $activeItems[] = ['id' => $id, 'type' => 'episode', 'format' => 'hls'];
         }
 
         if (empty($activeItems)) {
@@ -52,20 +53,28 @@ class StreamingChannelStats extends Page
         foreach ($activeItems as $item) {
             $originalModelId = $item['id'];
             $modelType = $item['type']; // 'channel' or 'episode'
+            $format = $item['format']; // 'hls' or 'mpts'
             $model = null;
             $itemName = 'Unknown Item';
+            $itemLogo = null;
 
             // Resolve actual streaming ID (failover)
-            $actualStreamingModelId = Cache::get("hls:stream_mapping:{$modelType}:{$originalModelId}");
-            if (!$actualStreamingModelId) {
+            if ($format === 'hls') {
+                $actualStreamingModelId = Cache::get("hls:stream_mapping:{$modelType}:{$originalModelId}");
+                if (!$actualStreamingModelId) {
+                    $actualStreamingModelId = $originalModelId;
+                }
+            } else {
                 $actualStreamingModelId = $originalModelId;
             }
 
             if ($modelType === 'channel') {
                 $model = Channel::find($actualStreamingModelId);
                 $itemName = $model ? ($model->title_custom ?? $model->title) : "Channel ID: {$actualStreamingModelId} (Not Found)";
+                $itemLogo = $model ? ($model->logo ?? null) : null;
             } elseif ($modelType === 'episode') {
                 $model = Episode::find($actualStreamingModelId);
+                $itemLogo = $model ? ($model->cover ?? null) : null;
                 if ($model && $model->series) {
                     $itemName = $model->series->title . " - S" . $model->season_num . "E" . $model->episode_num . " - " . $model->title;
                 } elseif ($model) {
@@ -76,11 +85,11 @@ class StreamingChannelStats extends Page
             }
 
             // Fetch process start time
-            $startTimeKey = "hls:streaminfo:starttime:{$modelType}:{$actualStreamingModelId}";
+            $startTimeKey = "{$format}:streaminfo:starttime:{$modelType}:{$actualStreamingModelId}";
             $processStartTime = Redis::get($startTimeKey) ?: null;
 
             // Fetch detailed stream information
-            $detailsCacheKey = "hls:streaminfo:details:{$modelType}:{$actualStreamingModelId}";
+            $detailsCacheKey = "{$format}:streaminfo:details:{$modelType}:{$actualStreamingModelId}";
             $detailsJson = Redis::get($detailsCacheKey);
             $streamDetails = $detailsJson ? json_decode($detailsJson, true) : [];
 
@@ -127,6 +136,8 @@ class StreamingChannelStats extends Page
                     'format_nb_streams' => $formatNbStreams, 'format_tags' => $formatTags,
                     'processStartTime' => $processStartTime,
                     'isBadSource' => false,
+                    'format' => $format,
+                    'logo' => $itemLogo,
                 ];
                 continue;
             }
@@ -207,6 +218,8 @@ class StreamingChannelStats extends Page
                 'format_tags' => $formatTags,
                 'processStartTime' => $processStartTime,
                 'isBadSource' => $isBadSource,
+                'format' => Str::upper($format),
+                'logo' => $itemLogo,
             ];
         }
         Log::info('Processed statsData (including episodes): ', $stats);
