@@ -76,11 +76,11 @@ class StreamingChannelStats extends Page
             }
 
             // Fetch process start time
-            $startTimeKey = "streaminfo:starttime:{$modelType}:{$actualStreamingModelId}";
+            $startTimeKey = "hls:streaminfo:starttime:{$modelType}:{$actualStreamingModelId}";
             $processStartTime = Redis::get($startTimeKey) ?: null;
 
             // Fetch detailed stream information
-            $detailsCacheKey = "streaminfo:details:{$modelType}:{$actualStreamingModelId}";
+            $detailsCacheKey = "hls:streaminfo:details:{$modelType}:{$actualStreamingModelId}";
             $detailsJson = Redis::get($detailsCacheKey);
             $streamDetails = $detailsJson ? json_decode($detailsJson, true) : [];
 

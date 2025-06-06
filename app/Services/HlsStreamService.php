@@ -227,7 +227,7 @@ class HlsStreamService
         Cache::forever($cacheKey, $pid);
 
         // Store the process start time
-        $startTimeCacheKey = "streaminfo:starttime:{$type}:{$model->id}";
+        $startTimeCacheKey = "hls:streaminfo:starttime:{$type}:{$model->id}";
         $currentTime = now()->timestamp;
         Redis::setex($startTimeCacheKey, 604800, $currentTime); // 7 days TTL
         Log::channel('ffmpeg')->info("Stored ffmpeg process start time for {$type} ID {$model->id} at {$currentTime}");
@@ -334,10 +334,10 @@ class HlsStreamService
                 }
 
                 // Remove the old individual resolution cache key as it's now part of the JSON blob
-                Redis::del("streaminfo:resolution:{$modelType}:{$modelId}");
+                Redis::del("hls:streaminfo:resolution:{$modelType}:{$modelId}");
 
                 if (!empty($extractedDetails)) {
-                    $detailsCacheKey = "streaminfo:details:{$modelType}:{$modelId}";
+                    $detailsCacheKey = "hls:streaminfo:details:{$modelType}:{$modelId}";
                     Redis::setex($detailsCacheKey, 86400, json_encode($extractedDetails)); // Cache for 24 hours
                     Log::channel('ffmpeg')->info("[PRE-CHECK] Cached detailed streaminfo for {$modelType} ID {$modelId}.");
                 }
@@ -387,8 +387,8 @@ class HlsStreamService
                 Log::channel('ffmpeg')->warning("Force killed FFmpeg process {$pid} for {$type} {$id}");
             }
             Cache::forget($cacheKey);
-            Redis::del("streaminfo:starttime:{$type}:{$id}");
-            Redis::del("streaminfo:details:{$type}:{$id}");
+            Redis::del("hls:streaminfo:starttime:{$type}:{$id}");
+            Redis::del("hls:streaminfo:details:{$type}:{$id}");
 
             // Cleanup on-disk HLS files
             if ($type === 'episode') {
@@ -437,8 +437,8 @@ class HlsStreamService
 
         // Remove the cached PID
         Cache::forget($cacheKey);
-        Redis::del("streaminfo:starttime:{$type}:{$id}"); // Added
-        Redis::del("streaminfo:details:{$type}:{$id}"); // Also remove details on cleanup
+        Redis::del("hls:streaminfo:starttime:{$type}:{$id}"); // Added
+        Redis::del("hls:streaminfo:details:{$type}:{$id}"); // Also remove details on cleanup
 
         // Remove from active IDs set
         Redis::srem("hls:active_{$type}_ids", $id);
