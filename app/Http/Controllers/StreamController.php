@@ -102,7 +102,7 @@ class StreamController extends Controller
                     streamId: $streamId,
                     contentType: $contentType,
                     userAgent: $playlist->user_agent ?? null,
-                    failoverSupport: $streamCount > 1,
+                    failoverSupport: $format === 'ts', // Only support failover for TS streams
                     playlistId: $playlist->id
                 );
             } catch (SourceNotResponding $e) {
@@ -192,6 +192,7 @@ class StreamController extends Controller
             streamId: $streamId,
             contentType: $contentType,
             userAgent: $playlist->user_agent ?? null,
+            failoverSupport: $format === 'ts', // Only support failover for TS streams
             playlistId: $playlist->id
         );
     }
@@ -351,16 +352,8 @@ class StreamController extends Controller
                 // Start the streaming process!
                 $process = SymfonyProcess::fromShellCommandline($cmd);
                 $process->setTimeout(null);
-                $streamType = $type;
                 try {
-                    $process->run(function ($type, $buffer) use (
-                        $modelId,
-                        $title,
-                        $format,
-                        $streamType,
-                        $playlistId,
-                        $clientKey
-                    ) {
+                    $process->run(function ($type, $buffer) {
                         if (connection_aborted()) {
                             throw new \Exception("Connection aborted by client.");
                         }
@@ -370,37 +363,9 @@ class StreamController extends Controller
                             usleep(10000); // Reduce CPU usage
                         }
                         if ($type === SymfonyProcess::ERR) {
-                            // split out each line
-                            $lines = preg_split('/\r?\n/', trim($buffer));
-                            foreach ($lines as $line) {
-                                if (!empty(trim($line))) {
-                                    // Log the line if it's not empty
-                                    Log::channel('ffmpeg')->error($line);
-                                }
-
-                                // Use below, along with `-progress pipe:2`, to enable stream progress tracking...
-                                /*
-                                    // "progress" lines are always KEY=VALUE
-                                    if (strpos($line, '=') !== false) {
-                                        list($key, $value) = explode('=', $line, 2);
-                                        if (in_array($key, ['bitrate', 'fps', 'out_time_ms'])) {
-                                            // push the metric value onto a Redis list and trim to last 20 points
-                                            $listKey = "mpts:{$streamType}_hist:{$modelId}:{$key}";
-                                            $timeKey = "mpts:{$streamType}_hist:{$modelId}:timestamps";
-
-                                            // push the timestamp into a parallel list (once per loop)
-                                            Redis::rpush($timeKey, now()->format('H:i:s'));
-                                            Redis::ltrim($timeKey, -20, -1);
-
-                                            // push the metric value
-                                            Redis::rpush($listKey, $value);
-                                            Redis::ltrim($listKey, -20, -1);
-                                        }
-                                    } elseif ($line !== '') {
-                                        // anything else is a true ffmpeg log/error
-                                        Log::channel('ffmpeg')->error($line);
-                                    }
-                                */
+                            if (!empty(trim($buffer))) {
+                                // Log the line if it's not empty
+                                Log::channel('ffmpeg')->error($buffer);
                             }
                         }
                     });
