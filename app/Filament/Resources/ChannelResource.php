@@ -421,16 +421,17 @@ class ChannelResource extends Resource
                                     ->options([]) // no options until search
                                     ->searchable()
                                     ->getSearchResultsUsing(function (string $search) use ($existingFailoverIds) {
+                                        $searchLower = strtolower($search);
                                         $channels = Channel::query()
                                             ->withoutEagerLoads()
                                             ->with('playlist')
                                             ->whereNotIn('id', $existingFailoverIds)
-                                            ->where(function ($query) use ($search) {
-                                                $query->where('title', 'like', "%{$search}%")
-                                                    ->orWhere('title_custom', 'like', "%{$search}%")
-                                                    ->orWhere('name', 'like', "%{$search}%")
-                                                    ->orWhere('name_custom', 'like', "%{$search}%")
-                                                    ->orWhere('stream_id', 'like', "%{$search}%");
+                                            ->where(function ($query) use ($searchLower) {
+                                                $query->whereRaw('LOWER(title) LIKE ?', ["%{$searchLower}%"])
+                                                    ->orWhereRaw('LOWER(title_custom) LIKE ?', ["%{$searchLower}%"])
+                                                    ->orWhereRaw('LOWER(name) LIKE ?', ["%{$searchLower}%"])
+                                                    ->orWhereRaw('LOWER(name_custom) LIKE ?', ["%{$searchLower}%"])
+                                                    ->orWhereRaw('LOWER(stream_id) LIKE ?', ["%{$searchLower}%"]);
                                             })
                                             ->limit(50) // Keep a reasonable limit
                                             ->get();
@@ -843,20 +844,21 @@ class ChannelResource extends Resource
                                     }
 
                                     // Always include the selected value if it exists
+                                    $searchLower = strtolower($search);
                                     $channels = Channel::query()
                                         ->withoutEagerLoads()
                                         ->with('playlist')
                                         ->whereNotIn('id', $existingFailoverIds)
-                                        ->where(function ($query) use ($search) {
-                                            $query->where('title', 'like', "%{$search}%")
-                                                ->orWhere('title_custom', 'like', "%{$search}%")
-                                                ->orWhere('name', 'like', "%{$search}%")
-                                                ->orWhere('name_custom', 'like', "%{$search}%")
-                                                ->orWhere('stream_id', 'like', "%{$search}%");
+                                        ->where(function ($query) use ($searchLower) {
+                                            $query->whereRaw('LOWER(title) LIKE ?', ["%{$searchLower}%"])
+                                                ->orWhereRaw('LOWER(title_custom) LIKE ?', ["%{$searchLower}%"])
+                                                ->orWhereRaw('LOWER(name) LIKE ?', ["%{$searchLower}%"])
+                                                ->orWhereRaw('LOWER(name_custom) LIKE ?', ["%{$searchLower}%"])
+                                                ->orWhereRaw('LOWER(stream_id) LIKE ?', ["%{$searchLower}%"]);
                                         })
                                         ->limit(50) // Keep a reasonable limit
                                         ->get();
-
+                                    
                                     // Create options array
                                     $options = [];
                                     foreach ($channels as $channel) {
