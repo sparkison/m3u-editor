@@ -168,7 +168,7 @@ class HlsStreamController extends Controller
                     $activeStreamId = null;
                 }
             } else {
-                Log::channel('ffmpeg')->info("HLS Stream: Found existing stream for $type ID {$model->id} (" . strip_tags($title) . ").");
+                // Log::channel('ffmpeg')->info("HLS Stream: Found existing stream for $type ID {$model->id} (" . strip_tags($title) . ").");
             }
         }
 

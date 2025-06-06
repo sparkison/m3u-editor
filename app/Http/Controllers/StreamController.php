@@ -252,12 +252,14 @@ class StreamController extends Controller
             } else {
                 $ffprobePath = 'ffprobe';
             }
+            $ffprobeTimeout = $settings['ffmpeg_ffprobe_timeout'] ?? 5; // Default timeout for ffprobe
 
-            // Run pre-check with ffprobe
-            $precheckCmd = $ffprobePath . " -v quiet -print_format json -show_streams -select_streams v:0 -user_agent " . $userAgent . " -multiple_requests 1 -reconnect_on_network_error 1 -reconnect_on_http_error 5xx,4xx,509 -reconnect_streamed 1 -reconnect_delay_max 2 -timeout 5000000 " . escapeshellarg($streamUrl);
-            Log::channel('ffmpeg')->info("[PRE-CHECK] Executing ffprobe command for [{$title}]: {$precheckCmd}");
+            // Updated command to include -show_format and remove -select_streams to get all streams for detailed info
+            $precheckCmd = "$ffprobePath -v quiet -print_format json -show_streams -show_format -user_agent " . $userAgent . " " . escapeshellarg($streamUrl);
+
+            Log::channel('ffmpeg')->info("[PRE-CHECK] Executing ffprobe command for [{$title}] with timeout {$ffprobeTimeout}s: {$precheckCmd}");
             $precheckProcess = SymfonyProcess::fromShellCommandline($precheckCmd);
-            $precheckProcess->setTimeout(5); // low timeout for pre-check
+            $precheckProcess->setTimeout($ffprobeTimeout);
             try {
                 $precheckProcess->run();
                 if (!$precheckProcess->isSuccessful()) {
@@ -267,28 +269,82 @@ class StreamController extends Controller
                 Log::channel('ffmpeg')->info("[PRE-CHECK] ffprobe successful for source [{$title}].");
 
                 // Check channel health
-                $ffprobeOutput = $precheckProcess->getOutput();
-                $streamInfo = json_decode($ffprobeOutput, true);
-                if (json_last_error() === JSON_ERROR_NONE && isset($streamInfo['streams'])) {
-                    foreach ($streamInfo['streams'] as $stream) {
-                        if (isset($stream['codec_type']) && $stream['codec_type'] === 'video') {
-                            $codecName = $stream['codec_name'] ?? 'N/A';
-                            $pixFmt = $stream['pix_fmt'] ?? 'N/A';
-                            $width = $stream['width'] ?? 'N/A';
-                            $height = $stream['height'] ?? 'N/A';
-                            $profile = $stream['profile'] ?? 'N/A';
-                            $level = $stream['level'] ?? 'N/A';
-                            Log::channel('ffmpeg')->info("[PRE-CHECK] Source [{$title}] video stream: Codec: {$codecName}, Format: {$pixFmt}, Resolution: {$width}x{$height}, Profile: {$profile}, Level: {$level}");
-                            break;
+                $ffprobeJsonOutput = $precheckProcess->getOutput();
+                $streamInfo = json_decode($ffprobeJsonOutput, true);
+                $extractedDetails = [];
+
+                if (json_last_error() === JSON_ERROR_NONE && !empty($streamInfo)) {
+                    // Format Section
+                    if (isset($streamInfo['format'])) {
+                        $streamFormat = $streamInfo['format'];
+                        $extractedDetails['format'] = [
+                            'duration' => $streamFormat['duration'] ?? null,
+                            'size' => $streamFormat['size'] ?? null,
+                            'bit_rate' => $streamFormat['bit_rate'] ?? null,
+                            'nb_streams' => $streamFormat['nb_streams'] ?? null,
+                            'tags' => $streamFormat['tags'] ?? [],
+                        ];
+                    }
+
+                    $videoStreamFound = false;
+                    $audioStreamFound = false;
+
+                    if (isset($streamInfo['streams']) && is_array($streamInfo['streams'])) {
+                        foreach ($streamInfo['streams'] as $stream) {
+                            if (!$videoStreamFound && isset($stream['codec_type']) && $stream['codec_type'] === 'video') {
+                                $extractedDetails['video'] = [
+                                    'codec_long_name' => $stream['codec_long_name'] ?? null,
+                                    'width' => $stream['width'] ?? null,
+                                    'height' => $stream['height'] ?? null,
+                                    'color_range' => $stream['color_range'] ?? null,
+                                    'color_space' => $stream['color_space'] ?? null,
+                                    'color_transfer' => $stream['color_transfer'] ?? null,
+                                    'color_primaries' => $stream['color_primaries'] ?? null,
+                                    'tags' => $stream['tags'] ?? [],
+                                ];
+                                $logResolution = ($stream['width'] ?? 'N/A') . 'x' . ($stream['height'] ?? 'N/A');
+                                Log::channel('ffmpeg')->info(
+                                    "[PRE-CHECK] Source [{$title}] video stream: " .
+                                        "Codec: " . ($stream['codec_name'] ?? 'N/A') . ", " .
+                                        "Format: " . ($stream['pix_fmt'] ?? 'N/A') . ", " .
+                                        "Resolution: " . $logResolution . ", " .
+                                        "Profile: " . ($stream['profile'] ?? 'N/A') . ", " .
+                                        "Level: " . ($stream['level'] ?? 'N/A')
+                                );
+                                $videoStreamFound = true;
+                            } elseif (!$audioStreamFound && isset($stream['codec_type']) && $stream['codec_type'] === 'audio') {
+                                $extractedDetails['audio'] = [
+                                    'codec_name' => $stream['codec_name'] ?? null,
+                                    'profile' => $stream['profile'] ?? null,
+                                    'channels' => $stream['channels'] ?? null,
+                                    'channel_layout' => $stream['channel_layout'] ?? null,
+                                    'tags' => $stream['tags'] ?? [],
+                                ];
+                                $audioStreamFound = true;
+                            }
+                            if ($videoStreamFound && $audioStreamFound) {
+                                break;
+                            }
                         }
                     }
+                    if (!empty($extractedDetails)) {
+                        $detailsCacheKey = "mpts:streaminfo:details:{$streamId}";
+                        Redis::setex($detailsCacheKey, 86400, json_encode($extractedDetails)); // Cache for 24 hours
+                        Log::channel('ffmpeg')->info("[PRE-CHECK] Cached detailed streaminfo for {$type} ID {$modelId}.");
+                    }
                 } else {
-                    Log::channel('ffmpeg')->warning("[PRE-CHECK] Could not decode ffprobe JSON output or no streams found for [{$title}]. Output: " . $ffprobeOutput);
+                    Log::channel('ffmpeg')->warning("[PRE-CHECK] Could not decode ffprobe JSON output for [{$title}]. Output: " . $ffprobeJsonOutput);
                 }
             } catch (Exception $e) {
                 throw new SourceNotResponding("failed_ffprobe_exception (" . $e->getMessage() . ")");
             }
         }
+
+        // Store the process start time
+        $startTimeCacheKey = "mpts:streaminfo:starttime:{$streamId}";
+        $currentTime = now()->timestamp;
+        Redis::setex($startTimeCacheKey, 604800, $currentTime); // 7 days TTL
+        Log::channel('ffmpeg')->info("Stored ffmpeg process start time for {$type} ID {$modelId} at {$currentTime}");
 
         // Set the content type based on the format
         return new StreamedResponse(function () use (
@@ -304,15 +360,20 @@ class StreamController extends Controller
             $userAgent
         ) {
             // Set unique client key (order is used for stats output)
-            $clientKey = "{$ip}::{$modelId}::{$streamId}::{$type}";
+            // E.g. $clientDetailss = Redis::smembers('mpts:active_ids');
+            //      Loop over the client keys and extract the details:
+            //      `explode('::', $clientDetails)` will return [ip, modelId, type, streamId]
+            $clientDetails = "{$ip}::{$modelId}::{$type}::{$streamId}";
 
             // Make sure PHP doesn't ignore user aborts
             ignore_user_abort(false);
 
             // Register a shutdown function that ALWAYS runs when the script dies
             $self = $this;
-            register_shutdown_function(function () use ($clientKey, $playlistId, $type, $title, $self) {
-                Redis::srem('mpts:active_ids', $clientKey);
+            register_shutdown_function(function () use ($clientDetails, $streamId, $playlistId, $type, $title, $self) {
+                Redis::srem('mpts:active_ids', $clientDetails);
+                Redis::del("mpts:streaminfo:details:{$streamId}");
+                Redis::del("mpts:streaminfo:starttime:{$streamId}");
                 if ($playlistId) {
                     // Decrement the active streams count using the trait
                     $self->decrementActiveStreams($playlistId);
@@ -321,7 +382,7 @@ class StreamController extends Controller
             });
 
             // Add the client key to the active IDs set
-            Redis::sadd('mpts:active_ids', $clientKey);
+            Redis::sadd('mpts:active_ids', $clientDetails);
 
             // Clear any existing output buffers
             // This is important for real-time streaming
@@ -497,6 +558,9 @@ class StreamController extends Controller
             $cmd = escapeshellcmd($ffmpegPath) . ' ';
             $cmd .= $hwaccelInitArgs;
             $cmd .= $hwaccelArgs;
+
+            // Better error handling
+            $cmd .= '-err_detect ignore_err -ignore_unknown ';
 
             // Pre-input HTTP options:
             $cmd .= "-user_agent " . $userAgent . " -referer " . escapeshellarg("MyComputer") . " " .

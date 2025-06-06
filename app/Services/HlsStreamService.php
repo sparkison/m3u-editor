@@ -333,10 +333,6 @@ class HlsStreamService
                         }
                     }
                 }
-
-                // Remove the old individual resolution cache key as it's now part of the JSON blob
-                Redis::del("hls:streaminfo:resolution:{$modelType}:{$modelId}");
-
                 if (!empty($extractedDetails)) {
                     $detailsCacheKey = "hls:streaminfo:details:{$modelType}:{$modelId}";
                     Redis::setex($detailsCacheKey, 86400, json_encode($extractedDetails)); // Cache for 24 hours
