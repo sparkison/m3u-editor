@@ -137,13 +137,13 @@ class StreamingChannelStats extends Page
             if ($resolutionDisplay === 'N/AxN/A') $resolutionDisplay = 'N/A';
 
             $resolution_logo_path = null;
-            if (($videoInfo['width'] ?? 0) === 1280 && ($videoInfo['height'] ?? 0) === 720) {
+            if ((($videoInfo['width'] ?? 0) == 1280 && ($videoInfo['height'] ?? 0) == 720) || (($videoInfo['width'] ?? 0) == 960 && ($videoInfo['height'] ?? 0) == 540)) {
                 $resolution_logo_path = 'images/sd.svg';
-            } elseif (($videoInfo['width'] ?? 0) === 1920 && ($videoInfo['height'] ?? 0) === 1080) {
+            } elseif ((($videoInfo['width'] ?? 0) == 1920 && ($videoInfo['height'] ?? 0) == 1080)) {
                 $resolution_logo_path = 'images/1080.svg';
             } elseif (
-                (($videoInfo['width'] ?? 0) === 3840 && ($videoInfo['height'] ?? 0) === 2160) ||
-                (($videoInfo['width'] ?? 0) === 4096 && ($videoInfo['height'] ?? 0) === 2160)
+                (($videoInfo['width'] ?? 0) == 3840 && ($videoInfo['height'] ?? 0) == 2160) ||
+                (($videoInfo['width'] ?? 0) == 4096 && ($videoInfo['height'] ?? 0) == 2160)
             ) {
                 $resolution_logo_path = 'images/4k.svg';
             }
