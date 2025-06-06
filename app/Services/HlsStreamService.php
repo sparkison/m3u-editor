@@ -450,10 +450,8 @@ class HlsStreamService
             }
         }
 
-        // Remove the active streams count for the playlist using the trait
-        $this->decrementActiveStreams($playlistId);
-
-        // Note: Active streams count decrementing is handled by the trait
+        // Note: Active streams count decrementing is handled elsewhere (e.g., stopStream method)
+        // to avoid double decrementing
         Log::channel('ffmpeg')->info("Cleaned up stream resources for {$type} {$id}");
     }
 
