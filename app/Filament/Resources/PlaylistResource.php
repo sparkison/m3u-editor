@@ -86,7 +86,8 @@ class PlaylistResource extends Resource
 
     public static function setupTable(Table $table, $relationId = null): Table
     {
-        return $table
+        return $table->persistFiltersInSession()
+            ->persistSortInSession()
             ->modifyQueryUsing(function (Builder $query) {
                 $query->withCount('enabled_channels');
             })

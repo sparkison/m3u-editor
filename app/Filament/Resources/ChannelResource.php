@@ -68,6 +68,7 @@ class ChannelResource extends Resource
     {
         //        $livewire = $table->getLivewire();
         return $table->persistFiltersInSession()
+            ->persistSortInSession()
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })

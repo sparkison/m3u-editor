@@ -41,7 +41,8 @@ class ChannelsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         $ownerRecord = $this->ownerRecord;
-        return $table
+        return $table->persistFiltersInSession()
+            ->persistSortInSession()
             ->recordTitleAttribute('title')
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');

@@ -56,6 +56,7 @@ class SeriesResource extends Resource
     public static function table(Table $table): Table
     {
         return $table->persistFiltersInSession()
+            ->persistSortInSession()
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })

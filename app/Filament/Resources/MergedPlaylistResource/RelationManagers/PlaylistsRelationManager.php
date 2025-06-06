@@ -23,7 +23,8 @@ class PlaylistsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return $table->persistFiltersInSession()
+            ->persistSortInSession()
             ->recordTitleAttribute('name')
             ->columns([
                 Tables\Columns\TextColumn::make('name'),
