@@ -197,15 +197,10 @@ class HlsStreamService
         $cacheKey = "hls:pid:{$type}:{$model->id}";
 
         // Register shutdown function to ensure the pipe is drained
-        $self = $this;
         register_shutdown_function(function () use (
             $stderr,
             $process,
-            $logger,
-            $type,
-            $model,
-            $playlistId,
-            $self
+            $logger
         ) {
             while (!feof($stderr)) {
                 $line = fgets($stderr);
@@ -215,9 +210,6 @@ class HlsStreamService
             }
             fclose($stderr);
             proc_close($process);
-
-            // Clean up the stream without decrementing again (to avoid double decrement)
-            $self->cleanupStreamResources($type, $model->id, $playlistId);
         });
 
         // Cache the actual FFmpeg PID
@@ -384,27 +376,27 @@ class HlsStreamService
                 Log::channel('ffmpeg')->warning("Force killed FFmpeg process {$pid} for {$type} {$id}");
             }
             Cache::forget($cacheKey);
-            Redis::del("hls:streaminfo:starttime:{$type}:{$id}");
-            Redis::del("hls:streaminfo:details:{$type}:{$id}");
-
-            // Cleanup on-disk HLS files
-            if ($type === 'episode') {
-                $storageDir = Storage::disk('app')->path("hls/e/{$id}");
-            } else {
-                $storageDir = Storage::disk('app')->path("hls/{$id}");
-            }
-            File::deleteDirectory($storageDir);
-            
-            // Decrement active streams count if we have the model and playlist
-            if ($model && $model->playlist) {
-                $this->decrementActiveStreams($model->playlist->id);
-            }
         } else {
             Log::channel('ffmpeg')->warning("No running FFmpeg process for channel {$id} to stop.");
         }
 
         // Remove from active IDs set
         Redis::srem("hls:active_{$type}_ids", $id);
+        Redis::del("hls:streaminfo:starttime:{$type}:{$id}");
+        Redis::del("hls:streaminfo:details:{$type}:{$id}");
+
+        // Cleanup on-disk HLS files
+        if ($type === 'episode') {
+            $storageDir = Storage::disk('app')->path("hls/e/{$id}");
+        } else {
+            $storageDir = Storage::disk('app')->path("hls/{$id}");
+        }
+        File::deleteDirectory($storageDir);
+
+        // Decrement active streams count if we have the model and playlist
+        if ($model && $model->playlist) {
+            $this->decrementActiveStreams($model->playlist->id);
+        }
 
         // Clean up any stream mappings that point to this stopped stream
         $mappingPattern = "hls:stream_mapping:{$type}:*";
@@ -415,44 +407,9 @@ class HlsStreamService
                 Log::channel('ffmpeg')->info("Cleaned up stream mapping: {$key} -> {$id}");
             }
         }
+        Log::channel('ffmpeg')->info("Cleaned up stream resources for {$type} {$id}");
 
         return $wasRunning;
-    }
-
-    /**
-     * Clean up stream resources without decrementing active streams count.
-     * This is used internally by shutdown functions to avoid double decrementing.
-     *
-     * @param string $type
-     * @param string $id
-     * @param int $playlistId
-     * @return void
-     */
-    private function cleanupStreamResources($type, $id, $playlistId): void
-    {
-        $cacheKey = "hls:pid:{$type}:{$id}";
-
-        // Remove the cached PID
-        Cache::forget($cacheKey);
-        Redis::del("hls:streaminfo:starttime:{$type}:{$id}"); // Added
-        Redis::del("hls:streaminfo:details:{$type}:{$id}"); // Also remove details on cleanup
-
-        // Remove from active IDs set
-        Redis::srem("hls:active_{$type}_ids", $id);
-
-        // Clean up any stream mappings that point to this stopped stream
-        $mappingPattern = "hls:stream_mapping:{$type}:*";
-        $mappingKeys = Redis::keys($mappingPattern);
-        foreach ($mappingKeys as $key) {
-            if (Cache::get($key) == $id) {
-                Cache::forget($key);
-                Log::channel('ffmpeg')->info("Cleaned up stream mapping: {$key} -> {$id}");
-            }
-        }
-
-        // Note: Active streams count decrementing is handled elsewhere (e.g., stopStream method)
-        // to avoid double decrementing
-        Log::channel('ffmpeg')->info("Cleaned up stream resources for {$type} {$id}");
     }
 
     /**
