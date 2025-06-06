@@ -387,8 +387,8 @@ class HlsStreamService
                 Log::channel('ffmpeg')->warning("Force killed FFmpeg process {$pid} for {$type} {$id}");
             }
             Cache::forget($cacheKey);
-            Redis::del("streaminfo:starttime:{$type}:{$id}"); // Added
-            Redis::del("streaminfo:details:{$type}:{$id}"); // Also remove details on stop
+            Redis::del("streaminfo:starttime:{$type}:{$id}");
+            Redis::del("streaminfo:details:{$type}:{$id}");
 
             // Cleanup on-disk HLS files
             if ($type === 'episode') {
