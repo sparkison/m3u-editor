@@ -52,6 +52,23 @@ class StreamingChannelStats extends Page
             $activeItems[] = ['id' => $id, 'type' => 'episode', 'format' => 'hls'];
         }
 
+        // Get MPTS streams
+        $activeMptsIds = Redis::smembers('mpts:active_ids');
+        Log::info('Active MPTS Client Details from Redis: ', $activeMptsIds ?: []);
+        foreach ($activeMptsIds as $clientDetails) {
+            // Format: {ip}::{modelId}::{type}::{streamId}
+            $parts = explode('::', $clientDetails);
+            if (count($parts) === 4) {
+                $activeItems[] = [
+                    'id' => $parts[1], // modelId
+                    'type' => $parts[2], // 'channel' or 'episode'
+                    'format' => 'mpts',
+                    'ip' => $parts[0], // client IP
+                    'streamId' => $parts[3], // unique stream ID
+                ];
+            }
+        }
+
         if (empty($activeItems)) {
             return [];
         }
@@ -63,6 +80,8 @@ class StreamingChannelStats extends Page
             $model = null;
             $itemName = 'Unknown Item';
             $itemLogo = null;
+            $clientIp = $item['ip'] ?? null;
+            $streamId = $item['streamId'] ?? null;
 
             // Resolve actual streaming ID (failover)
             if ($format === 'hls') {
@@ -91,13 +110,26 @@ class StreamingChannelStats extends Page
             }
 
             // Fetch process start time
-            $startTimeKey = "{$format}:streaminfo:starttime:{$modelType}:{$actualStreamingModelId}";
-            $processStartTime = Redis::get($startTimeKey) ?: null;
+            $processStartTime = null;
+            if ($format === 'hls') {
+                $startTimeKey = "{$format}:streaminfo:starttime:{$modelType}:{$actualStreamingModelId}";
+                $processStartTime = Redis::get($startTimeKey) ?: null;
+            } elseif ($format === 'mpts' && $streamId) {
+                $startTimeKey = "mpts:streaminfo:starttime:{$streamId}";
+                $processStartTime = Redis::get($startTimeKey) ?: null;
+            }
 
             // Fetch detailed stream information
-            $detailsCacheKey = "{$format}:streaminfo:details:{$modelType}:{$actualStreamingModelId}";
-            $detailsJson = Redis::get($detailsCacheKey);
-            $streamDetails = $detailsJson ? json_decode($detailsJson, true) : [];
+            $streamDetails = [];
+            if ($format === 'hls') {
+                $detailsCacheKey = "{$format}:streaminfo:details:{$modelType}:{$actualStreamingModelId}";
+                $detailsJson = Redis::get($detailsCacheKey);
+                $streamDetails = $detailsJson ? json_decode($detailsJson, true) : [];
+            } elseif ($format === 'mpts' && $streamId) {
+                $detailsCacheKey = "mpts:streaminfo:details:{$streamId}";
+                $detailsJson = Redis::get($detailsCacheKey);
+                $streamDetails = $detailsJson ? json_decode($detailsJson, true) : [];
+            }
 
             // Video Details
             $videoInfo = $streamDetails['video'] ?? [];
@@ -156,6 +188,8 @@ class StreamingChannelStats extends Page
                     'isBadSource' => false,
                     'format' => $format,
                     'logo' => $itemLogo,
+                    'client_ip' => $clientIp,
+                    'stream_id' => $streamId,
                 ];
                 continue;
             }
@@ -238,9 +272,11 @@ class StreamingChannelStats extends Page
                 'isBadSource' => $isBadSource,
                 'format' => Str::upper($format),
                 'logo' => $itemLogo,
+                'client_ip' => $clientIp,
+                'stream_id' => $streamId,
             ];
         }
-        Log::info('Processed statsData (including episodes): ', $stats);
+        Log::info('Processed statsData (including HLS and MPTS): ', $stats);
         return $stats;
     }
 }

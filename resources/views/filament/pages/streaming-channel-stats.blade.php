@@ -19,6 +19,11 @@
                                 </h3>
                                 <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                                     <span class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">{{ $stat['itemType'] ?? 'N/A' }}</span>
+                                    @if (($stat['format'] ?? '') === 'MPTS')
+                                        <span class="px-2 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded">MPTS</span>
+                                    @elseif (($stat['format'] ?? '') === 'HLS')
+                                        <span class="px-2 py-1 bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 rounded">HLS</span>
+                                    @endif
                                     @if ($stat['isBadSource'] ?? false)
                                         <span class="px-2 py-1 bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 rounded">Bad Source</span>
                                     @endif
@@ -44,6 +49,18 @@
                                 <span class="text-gray-500 dark:text-gray-400">Format:</span>
                                 <div class="font-medium">{{ $stat['format'] ?? 'N/A' }}</div>
                             </div>
+                            @if (!empty($stat['client_ip']))
+                                <div>
+                                    <span class="text-gray-500 dark:text-gray-400">Client IP:</span>
+                                    <div class="font-medium font-mono">{{ $stat['client_ip'] }}</div>
+                                </div>
+                            @endif
+                            @if (!empty($stat['stream_id']))
+                                <div>
+                                    <span class="text-gray-500 dark:text-gray-400">Stream ID:</span>
+                                    <div class="font-medium font-mono text-xs">{{ $stat['stream_id'] }}</div>
+                                </div>
+                            @endif
                         </div>
 
                         <!-- Source Details -->
