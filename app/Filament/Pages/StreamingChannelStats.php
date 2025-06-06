@@ -136,17 +136,20 @@ class StreamingChannelStats extends Page
             $resolutionDisplay = ($videoInfo['width'] ?? 'N/A') . 'x' . ($videoInfo['height'] ?? 'N/A');
             if ($resolutionDisplay === 'N/AxN/A') $resolutionDisplay = 'N/A';
 
-            $resolution_logo_path = null;
-            if ((($videoInfo['width'] ?? 0) == 1280 && ($videoInfo['height'] ?? 0) == 720) || (($videoInfo['width'] ?? 0) == 960 && ($videoInfo['height'] ?? 0) == 540)) {
+            $width = $videoInfo['width'] ?? 0;
+            $height = $videoInfo['height'] ?? 0;
+            $resolution_logo_path = null; // Default to null
+
+            if ($height > 0 && $height < 720) { // Rule: Anything with height less than 720p
                 $resolution_logo_path = 'images/sd.svg';
-            } elseif ((($videoInfo['width'] ?? 0) == 1920 && ($videoInfo['height'] ?? 0) == 1080)) {
+            } elseif ($width == 1280 && $height == 720) { // Specifically 1280x720 (720p)
+                $resolution_logo_path = 'images/sd.svg'; // Continues to use sd.svg as per current assets
+            } elseif ($width == 1920 && $height == 1080) { // 1080p
                 $resolution_logo_path = 'images/1080.svg';
-            } elseif (
-                (($videoInfo['width'] ?? 0) == 3840 && ($videoInfo['height'] ?? 0) == 2160) ||
-                (($videoInfo['width'] ?? 0) == 4096 && ($videoInfo['height'] ?? 0) == 2160)
-            ) {
+            } elseif (($width == 3840 && $height == 2160) || ($width == 4096 && $height == 2160)) { // 4K
                 $resolution_logo_path = 'images/4k.svg';
             }
+            // All other resolutions or unknown dimensions will result in a null path (no logo)
 
             $codecLongName = $videoInfo['codec_long_name'] ?? 'N/A';
             $colorRange = $videoInfo['color_range'] ?? 'N/A';
