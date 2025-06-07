@@ -417,10 +417,17 @@ class ChannelResource extends Resource
                         ->form(function (Collection $records) {
                             $existingFailoverIds = $records->pluck('id')->toArray();
 
+                            $initialMasterOptions = [];
+                            foreach ($records as $record) {
+                                $displayTitle = $record->title_custom ?: $record->title;
+                                $playlistName = $record->playlist->name ?? 'Unknown'; // Assuming 'playlist' relationship is loaded or available
+                                $initialMasterOptions[$record->id] = "**[Selected]** {$displayTitle} [{$playlistName}]";
+                            }
+
                             return [
                                 Forms\Components\Select::make('master_channel_id')
                                     ->label('Master Channel')
-                                    ->options([]) // no options until search
+                                    ->options($initialMasterOptions)
                                     ->searchable()
                                     ->getSearchResultsUsing(function (string $search) use ($existingFailoverIds, $records) {
                                         $preSelectedChannelIds = $records->pluck('id')->toArray();
@@ -445,7 +452,7 @@ class ChannelResource extends Resource
                                             $playlistName = $channel->playlist->name ?? 'Unknown';
                                             $label = "{$displayTitle} [{$playlistName}]";
                                             if (in_array($channel->id, $preSelectedChannelIds)) {
-                                                $label = "**[TABLE PICK]** " . $label;
+                                                $label = "**[Selected]** " . $label;
                                             }
                                             $options[$channel->id] = $label;
                                         }
