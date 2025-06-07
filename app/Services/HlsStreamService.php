@@ -492,9 +492,20 @@ class HlsStreamService
         // Setup the stream URL
         $m3uPlaylist = "{$storageDir}/stream.m3u8";
         $segment = "{$storageDir}/segment_%03d.ts";
-        $segmentBaseUrl = $type === 'channel'
-            ? url("/api/stream/{$id}") . '/'
-            : url("/api/stream/e/{$id}") . '/';
+
+        // Construct segmentBaseUrl based on proxy_url_override
+        $proxyOverrideUrl = config('proxy.url_override');
+        if (!empty($proxyOverrideUrl)) {
+            $parsedUrl = parse_url($proxyOverrideUrl);
+            $scheme = $parsedUrl['scheme'] ?? 'http';
+            $host = $parsedUrl['host'];
+            $port = isset($parsedUrl['port']) ? ':' . $parsedUrl['port'] : '';
+            $base = "{$scheme}://{$host}{$port}";
+            $path = $type === 'channel' ? "/api/stream/{$id}/" : "/api/stream/e/{$id}/";
+            $segmentBaseUrl = $base . $path;
+        } else {
+            $segmentBaseUrl = $type === 'channel' ? url("/api/stream/{$id}") . '/' : url("/api/stream/e/{$id}") . '/';
+        }
 
         // Get ffmpeg path
         $ffmpegPath = config('proxy.ffmpeg_path') ?: $settings['ffmpeg_path'];
