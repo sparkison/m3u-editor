@@ -426,8 +426,8 @@ class ChannelResource extends Resource
                                 Forms\Components\ToggleButtons::make('master_source')
                                     ->label('Choose master from?')
                                     ->options([
-                                        'selected' => 'From selected',
-                                        'searched' => 'Search for channel',
+                                        'selected' => 'Selected Channels',
+                                        'searched' => 'Channel Search',
                                     ])
                                     ->icons([
                                         'selected' => 'heroicon-o-check',
@@ -437,14 +437,14 @@ class ChannelResource extends Resource
                                     ->live()
                                     ->grouped(),
                                 Forms\Components\Select::make('selected_master_id')
-                                    ->label('Select Master Channel')
+                                    ->label('Select master channel')
                                     ->helperText('From the selected channels')
                                     ->options($initialMasterOptions)
                                     ->required()
                                     ->hidden(fn(Get $get) => $get('master_source') !== 'selected')
                                     ->searchable(),
                                 Forms\Components\Select::make('master_channel_id')
-                                    ->label('Search Master Channel')
+                                    ->label('Search for master channel')
                                     ->searchable()
                                     ->required()
                                     ->hidden(fn(Get $get) => $get('master_source') !== 'searched')
@@ -474,7 +474,7 @@ class ChannelResource extends Resource
 
                                         return $options;
                                     })
-                                    ->helperText('Search for another channel to use as the master channel for the selected failovers.')
+                                    ->helperText('To use as the master for the selected channel.')
                                     ->required(),
                             ];
                         })
