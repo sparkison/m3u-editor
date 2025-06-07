@@ -416,19 +416,18 @@ class ChannelResource extends Resource
                         ->label('Add as failover')
                         ->form(function (Collection $records) {
                             $existingFailoverIds = $records->pluck('id')->toArray();
-                            $selectedChannels = $records->map(function ($record) {
-                                return $record->title_custom ?: $record->title;
-                            })->join(', ');
+                            $selectedChannelsList = $records->map(fn ($record) => $record->title_custom ?: $record->title)->join(', ');
 
                             return [
-                                Forms\Components\Placeholder::make('selected_channels_display')
-                                    ->label('Selected Channels')
-                                    ->content(new HtmlString("<strong>{$selectedChannels}</strong>")),
+                                Forms\Components\Placeholder::make('selected_failover_candidates_display')
+                                    ->label('Channels to become failovers:')
+                                    ->content($selectedChannelsList),
                                 Forms\Components\Select::make('master_channel_id')
                                     ->label('Master Channel')
                                     ->options([]) // no options until search
                                     ->searchable()
-                                    ->getSearchResultsUsing(function (string $search) use ($existingFailoverIds) {
+                                    ->getSearchResultsUsing(function (string $search) use ($existingFailoverIds, $records) {
+                                        $preSelectedChannelIds = $records->pluck('id')->toArray();
                                         $searchLower = strtolower($search);
                                         $channels = Channel::query()
                                             ->withoutEagerLoads()
@@ -449,7 +448,11 @@ class ChannelResource extends Resource
                                         foreach ($channels as $channel) {
                                             $displayTitle = $channel->title_custom ?: $channel->title;
                                             $playlistName = $channel->playlist->name ?? 'Unknown';
-                                            $options[$channel->id] = "{$displayTitle} [{$playlistName}]";
+                                            $label = "{$displayTitle} [{$playlistName}]";
+                                            if (in_array($channel->id, $preSelectedChannelIds)) {
+                                                $label = "[SELECTED] " . $label;
+                                            }
+                                            $options[$channel->id] = $label;
                                         }
 
                                         return $options;
