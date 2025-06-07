@@ -172,6 +172,9 @@ php artisan app:update-check
 # Optimize Laravel
 php artisan optimize
 
+# Optimize Filament
+php artisan filament:optimize
+
 # Make sure app is "up"
 php artisan up
 
