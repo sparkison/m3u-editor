@@ -416,25 +416,44 @@ class ChannelResource extends Resource
                         ->label('Add as failover')
                         ->form(function (Collection $records) {
                             $existingFailoverIds = $records->pluck('id')->toArray();
-
                             $initialMasterOptions = [];
                             foreach ($records as $record) {
                                 $displayTitle = $record->title_custom ?: $record->title;
-                                $playlistName = $record->playlist->name ?? 'Unknown'; // Assuming 'playlist' relationship is loaded or available
-                                $initialMasterOptions[$record->id] = "**[Selected]** {$displayTitle} [{$playlistName}]";
+                                $playlistName = $record->playlist->name ?? 'Unknown';
+                                $initialMasterOptions[$record->id] = "{$displayTitle} [{$playlistName}]";
                             }
-
                             return [
-                                Forms\Components\Select::make('master_channel_id')
-                                    ->label('Master Channel')
+                                Forms\Components\ToggleButtons::make('master_source')
+                                    ->label('Choose master from?')
+                                    ->options([
+                                        'selected' => 'From selected',
+                                        'searched' => 'Search for channel',
+                                    ])
+                                    ->icons([
+                                        'selected' => 'heroicon-o-check',
+                                        'searched' => 'heroicon-o-magnifying-glass',
+                                    ])
+                                    ->default('selected')
+                                    ->live()
+                                    ->grouped(),
+                                Forms\Components\Select::make('selected_master_id')
+                                    ->label('Select Master Channel')
+                                    ->helperText('From the selected channels')
                                     ->options($initialMasterOptions)
+                                    ->required()
+                                    ->hidden(fn(Get $get) => $get('master_source') !== 'selected')
+                                    ->searchable(),
+                                Forms\Components\Select::make('master_channel_id')
+                                    ->label('Search Master Channel')
                                     ->searchable()
-                                    ->getSearchResultsUsing(function (string $search) use ($existingFailoverIds, $records) {
-                                        $preSelectedChannelIds = $records->pluck('id')->toArray();
+                                    ->required()
+                                    ->hidden(fn(Get $get) => $get('master_source') !== 'searched')
+                                    ->getSearchResultsUsing(function (string $search) use ($existingFailoverIds) {
                                         $searchLower = strtolower($search);
                                         $channels = Channel::query()
                                             ->withoutEagerLoads()
                                             ->with('playlist')
+                                            ->whereNotIn('id', $existingFailoverIds)
                                             ->where(function ($query) use ($searchLower) {
                                                 $query->whereRaw('LOWER(title) LIKE ?', ["%{$searchLower}%"])
                                                     ->orWhereRaw('LOWER(title_custom) LIKE ?', ["%{$searchLower}%"])
@@ -450,27 +469,27 @@ class ChannelResource extends Resource
                                         foreach ($channels as $channel) {
                                             $displayTitle = $channel->title_custom ?: $channel->title;
                                             $playlistName = $channel->playlist->name ?? 'Unknown';
-                                            $label = "{$displayTitle} [{$playlistName}]";
-                                            if (in_array($channel->id, $preSelectedChannelIds)) {
-                                                $label = "**[Selected]** " . $label;
-                                            }
-                                            $options[$channel->id] = $label;
+                                            $options[$channel->id] = "{$displayTitle} [{$playlistName}]";
                                         }
 
                                         return $options;
                                     })
+                                    ->helperText('Search for another channel to use as the master channel for the selected failovers.')
                                     ->required(),
                             ];
                         })
                         ->action(function (Collection $records, array $data): void {
                             // Filter out the master channel from the records to be added as failovers
-                            $failoverRecords = $records->filter(function ($record) use ($data) {
-                                return $record->id !== $data['master_channel_id'];
+                            $masterRecordId = $data['master_source'] === 'selected'
+                                ? $data['selected_master_id']
+                                : $data['master_channel_id'];
+                            $failoverRecords = $records->filter(function ($record) use ($masterRecordId) {
+                                return (int)$record->id !== (int)$masterRecordId;
                             });
 
                             foreach ($failoverRecords as $record) {
                                 ChannelFailover::updateOrCreate([
-                                    'channel_id' => $data['master_channel_id'],
+                                    'channel_id' => $masterRecordId,
                                     'channel_failover_id' => $record->id,
                                 ]);
                             }
@@ -871,7 +890,7 @@ class ChannelResource extends Resource
                                         })
                                         ->limit(50) // Keep a reasonable limit
                                         ->get();
-                                    
+
                                     // Create options array
                                     $options = [];
                                     foreach ($channels as $channel) {
