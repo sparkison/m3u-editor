@@ -63,31 +63,62 @@
                             @endif
                         </div>
 
+                        @if (($stat['itemType'] ?? null) === 'Channel' && !empty($stat['availableStreamsList']))
+                            <div class="mt-3">
+                                <label for="stream-select-{{ $loop->index }}" class="text-sm font-medium text-gray-700 dark:text-gray-300">Available Streams:</label>
+                                <select name="stream_select_{{ $loop->index }}" id="stream-select-{{ $loop->index }}" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md dark:bg-gray-700 dark:text-white">
+                                    @foreach ($stat['availableStreamsList'] as $stream)
+                                        <option
+                                            value="{{ $stream['id'] }}"
+                                            @if ($stream['id'] == $stat['currentStreamId'])
+                                                selected
+                                                style="font-weight: bold;"
+                                            @endif
+                                        >
+                                            {{ $stream['name'] }} (Playlist: {{ $stream['playlist_name'] ?? 'N/A' }}) {{ $stream['is_primary'] ? '(Primary)' : '' }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @endif
+
                         <!-- Source Details -->
                         <div class="space-y-3">
                             <!-- Video Section -->
                             <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
                                 <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Video Source</h4>
-                                <div class="grid grid-cols-2 gap-2 text-xs">
-                                    <div>
-                                        <span class="text-gray-500 dark:text-gray-400">Resolution:</span>
-                                        <span class="ml-1 font-mono">{{ $stat['resolution'] ?? 'N/A' }}</span>
+                                <div class="flex items-center"> <!-- Flex container for logo and details -->
+                                    @if (!empty($stat['resolution_logo']))
+                                    <div class="mr-3 flex-shrink-0"> <!-- Logo container (left column) -->
+                                        <img src="{{ asset($stat['resolution_logo']) }}" alt="Resolution Logo" style="height: 3em;">
                                     </div>
-                                    <div>
-                                        <span class="text-gray-500 dark:text-gray-400">Codec:</span>
-                                        <span class="ml-1 font-mono">{{ $stat['video_codec_long_name'] ?? 'N/A' }}</span>
+                                    @endif
+
+                                    <div class="flex-grow"> <!-- Details container (right column) -->
+                                        <div class="text-xs">
+                                            <div>
+                                                <span class="text-gray-500 dark:text-gray-400">Resolution:</span>
+                                                <span class="ml-1 font-mono">{{ $stat['resolution'] ?? 'N/A' }}</span>
+                                            </div>
+                                            <div>
+                                                <span class="text-gray-500 dark:text-gray-400">Codec:</span>
+                                                <span class="ml-1 font-mono">{{ $stat['video_codec_long_name'] ?? 'N/A' }}</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
+
+                                {{-- Video tags remain below the flex container --}}
                                 @if (!empty($stat['video_tags']) && is_array($stat['video_tags']))
-                                    <div class="mt-2 flex flex-wrap gap-1">
-                                        @foreach($stat['video_tags'] as $key => $value)
-                                            @if(!(strtoupper((string)$key) === 'VARIANT_BITRATE' && (string)$value === '0'))
-                                                <span class="inline-block px-1.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded text-xs font-mono">
-                                                    {{ strtoupper((string)$key) }}: {{ is_array($value) ? json_encode($value) : $value }}
-                                                </span>
-                                            @endif
-                                        @endforeach
-                                    </div>
+                                <div class="mt-2 flex flex-wrap gap-1">
+                                    @foreach($stat['video_tags'] as $key => $value)
+                                        @if(!(strtoupper((string)$key) === 'VARIANT_BITRATE' && (string)$value === '0'))
+                                            <span class="inline-block px-1.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded text-xs font-mono">
+                                                {{ strtoupper((string)$key) }}: {{ is_array($value) ? json_encode($value) : $value }}
+                                            </span>
+                                        @endif
+                                    @endforeach
+                                </div>
                                 @endif
                             </div>
 

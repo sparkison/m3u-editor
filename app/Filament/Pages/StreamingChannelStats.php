@@ -82,6 +82,8 @@ class StreamingChannelStats extends Page
             $itemLogo = null;
             $clientIp = $item['ip'] ?? null;
             $streamId = $item['streamId'] ?? null;
+            $availableStreamsList = []; // Initialize for all types
+            $currentStreamIdForStat = null; // Initialize
 
             // Resolve actual streaming ID (failover)
             if ($format === 'hls') {
@@ -94,9 +96,31 @@ class StreamingChannelStats extends Page
             }
 
             if ($modelType === 'channel') {
-                $model = Channel::find($actualStreamingModelId);
-                $itemName = $model ? ($model->title_custom ?? $model->title) : "Channel ID: {$actualStreamingModelId} (Not Found)";
-                $itemLogo = $model ? ($model->logo ?? null) : null;
+                $model = Channel::with('failoverChannels.playlist')->find($actualStreamingModelId); // Eager load with playlist for failovers
+                if ($model) {
+                    $itemName = $model->title_custom ?? $model->title;
+                    $itemLogo = $model->logo ?? null;
+                    $currentStreamIdForStat = $actualStreamingModelId; // Set for channel
+
+                    // Populate availableStreamsList
+                    $availableStreamsList[] = [
+                        'id' => $model->id,
+                        'name' => $model->title_custom ?? $model->title,
+                        'is_primary' => true,
+                        'playlist_name' => $model->playlist ? $model->playlist->name : 'N/A',
+                    ];
+                    foreach ($model->failoverChannels as $failoverChannel) {
+                        $availableStreamsList[] = [
+                            'id' => $failoverChannel->id,
+                            'name' => $failoverChannel->title_custom ?? $failoverChannel->title,
+                            'is_primary' => false,
+                            'playlist_name' => $failoverChannel->playlist ? $failoverChannel->playlist->name : 'N/A',
+                        ];
+                    }
+                } else {
+                     $itemName = "Channel ID: {$actualStreamingModelId} (Not Found)";
+                     $itemLogo = null;
+                }
             } elseif ($modelType === 'episode') {
                 $model = Episode::find($actualStreamingModelId);
                 $itemLogo = $model ? ($model->cover ?? null) : null;
@@ -135,6 +159,22 @@ class StreamingChannelStats extends Page
             $videoInfo = $streamDetails['video'] ?? [];
             $resolutionDisplay = ($videoInfo['width'] ?? 'N/A') . 'x' . ($videoInfo['height'] ?? 'N/A');
             if ($resolutionDisplay === 'N/AxN/A') $resolutionDisplay = 'N/A';
+
+            $width = $videoInfo['width'] ?? 0;
+            $height = $videoInfo['height'] ?? 0;
+            $resolution_logo_path = null; // Default to null
+
+            if ($height > 0 && $height < 720) { // Rule: Anything with height less than 720p
+                $resolution_logo_path = 'images/sd.svg';
+            } elseif ($width == 1280 && $height == 720) { // Specifically 1280x720 (720p)
+                $resolution_logo_path = 'images/sd.svg'; // Continues to use sd.svg as per current assets
+            } elseif ($width == 1920 && $height == 1080) { // 1080p
+                $resolution_logo_path = 'images/1080.svg';
+            } elseif (($width == 3840 && $height == 2160) || ($width == 4096 && $height == 2160)) { // 4K
+                $resolution_logo_path = 'images/4k.svg';
+            }
+            // All other resolutions or unknown dimensions will result in a null path (no logo)
+
             $codecLongName = $videoInfo['codec_long_name'] ?? 'N/A';
             $colorRange = $videoInfo['color_range'] ?? 'N/A';
             $colorSpace = $videoInfo['color_space'] ?? 'N/A';
@@ -188,8 +228,11 @@ class StreamingChannelStats extends Page
                     'isBadSource' => false,
                     'format' => $format,
                     'logo' => $itemLogo,
+                    'resolution_logo' => $resolution_logo_path,
                     'client_ip' => $clientIp,
                     'stream_id' => $streamId,
+                    'availableStreamsList' => $availableStreamsList,
+                    'currentStreamId' => $currentStreamIdForStat,
                 ];
                 continue;
             }
@@ -272,8 +315,11 @@ class StreamingChannelStats extends Page
                 'isBadSource' => $isBadSource,
                 'format' => Str::upper($format),
                 'logo' => $itemLogo,
+                'resolution_logo' => $resolution_logo_path,
                 'client_ip' => $clientIp,
                 'stream_id' => $streamId,
+                'availableStreamsList' => $availableStreamsList,
+                'currentStreamId' => $currentStreamIdForStat,
             ];
         }
         Log::info('Processed statsData (including HLS and MPTS): ', $stats);

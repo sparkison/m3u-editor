@@ -17,6 +17,7 @@ use App\Models\Playlist;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
+use Illuminate\Support\HtmlString;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Infolists;
@@ -415,17 +416,25 @@ class ChannelResource extends Resource
                         ->label('Add as failover')
                         ->form(function (Collection $records) {
                             $existingFailoverIds = $records->pluck('id')->toArray();
+
+                            $initialMasterOptions = [];
+                            foreach ($records as $record) {
+                                $displayTitle = $record->title_custom ?: $record->title;
+                                $playlistName = $record->playlist->name ?? 'Unknown'; // Assuming 'playlist' relationship is loaded or available
+                                $initialMasterOptions[$record->id] = "**[Selected]** {$displayTitle} [{$playlistName}]";
+                            }
+
                             return [
                                 Forms\Components\Select::make('master_channel_id')
                                     ->label('Master Channel')
-                                    ->options([]) // no options until search
+                                    ->options($initialMasterOptions)
                                     ->searchable()
-                                    ->getSearchResultsUsing(function (string $search) use ($existingFailoverIds) {
+                                    ->getSearchResultsUsing(function (string $search) use ($existingFailoverIds, $records) {
+                                        $preSelectedChannelIds = $records->pluck('id')->toArray();
                                         $searchLower = strtolower($search);
                                         $channels = Channel::query()
                                             ->withoutEagerLoads()
                                             ->with('playlist')
-                                            ->whereNotIn('id', $existingFailoverIds)
                                             ->where(function ($query) use ($searchLower) {
                                                 $query->whereRaw('LOWER(title) LIKE ?', ["%{$searchLower}%"])
                                                     ->orWhereRaw('LOWER(title_custom) LIKE ?', ["%{$searchLower}%"])
@@ -441,7 +450,11 @@ class ChannelResource extends Resource
                                         foreach ($channels as $channel) {
                                             $displayTitle = $channel->title_custom ?: $channel->title;
                                             $playlistName = $channel->playlist->name ?? 'Unknown';
-                                            $options[$channel->id] = "{$displayTitle} [{$playlistName}]";
+                                            $label = "{$displayTitle} [{$playlistName}]";
+                                            if (in_array($channel->id, $preSelectedChannelIds)) {
+                                                $label = "**[Selected]** " . $label;
+                                            }
+                                            $options[$channel->id] = $label;
                                         }
 
                                         return $options;
