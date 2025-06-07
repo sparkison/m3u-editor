@@ -169,8 +169,14 @@ php artisan app:generate-key
 # Check for updates
 php artisan app:update-check
 
+# Cache icons
+php artisan icons:cache
+
 # Optimize Laravel
 php artisan optimize
+
+# Optimize Filament
+php artisan filament:optimize
 
 # Make sure app is "up"
 php artisan up
