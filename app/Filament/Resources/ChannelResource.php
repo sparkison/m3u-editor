@@ -416,12 +416,8 @@ class ChannelResource extends Resource
                         ->label('Add as failover')
                         ->form(function (Collection $records) {
                             $existingFailoverIds = $records->pluck('id')->toArray();
-                            $selectedChannelsList = $records->map(fn ($record) => $record->title_custom ?: $record->title)->join(', ');
 
                             return [
-                                Forms\Components\Placeholder::make('selected_failover_candidates_display')
-                                    ->label('Channels to become failovers:')
-                                    ->content($selectedChannelsList),
                                 Forms\Components\Select::make('master_channel_id')
                                     ->label('Master Channel')
                                     ->options([]) // no options until search
@@ -432,7 +428,6 @@ class ChannelResource extends Resource
                                         $channels = Channel::query()
                                             ->withoutEagerLoads()
                                             ->with('playlist')
-                                            ->whereNotIn('id', $existingFailoverIds)
                                             ->where(function ($query) use ($searchLower) {
                                                 $query->whereRaw('LOWER(title) LIKE ?', ["%{$searchLower}%"])
                                                     ->orWhereRaw('LOWER(title_custom) LIKE ?', ["%{$searchLower}%"])
@@ -450,7 +445,7 @@ class ChannelResource extends Resource
                                             $playlistName = $channel->playlist->name ?? 'Unknown';
                                             $label = "{$displayTitle} [{$playlistName}]";
                                             if (in_array($channel->id, $preSelectedChannelIds)) {
-                                                $label = "[SELECTED] " . $label;
+                                                $label = "**[TABLE PICK]** " . $label;
                                             }
                                             $options[$channel->id] = $label;
                                         }
