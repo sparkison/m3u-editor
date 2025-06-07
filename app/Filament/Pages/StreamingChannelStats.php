@@ -96,7 +96,7 @@ class StreamingChannelStats extends Page
             }
 
             if ($modelType === 'channel') {
-                $model = Channel::with('failoverChannels')->find($actualStreamingModelId); // Eager load
+                $model = Channel::with('failoverChannels.playlist')->find($actualStreamingModelId); // Eager load with playlist for failovers
                 if ($model) {
                     $itemName = $model->title_custom ?? $model->title;
                     $itemLogo = $model->logo ?? null;
@@ -107,12 +107,14 @@ class StreamingChannelStats extends Page
                         'id' => $model->id,
                         'name' => $model->title_custom ?? $model->title,
                         'is_primary' => true,
+                        'playlist_name' => $model->playlist ? $model->playlist->name : 'N/A',
                     ];
                     foreach ($model->failoverChannels as $failoverChannel) {
                         $availableStreamsList[] = [
                             'id' => $failoverChannel->id,
                             'name' => $failoverChannel->title_custom ?? $failoverChannel->title,
                             'is_primary' => false,
+                            'playlist_name' => $failoverChannel->playlist ? $failoverChannel->playlist->name : 'N/A',
                         ];
                     }
                 } else {

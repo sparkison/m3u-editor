@@ -75,7 +75,7 @@
                                                 style="font-weight: bold;"
                                             @endif
                                         >
-                                            {{ $stream['name'] }} {{ $stream['is_primary'] ? '(Primary)' : '' }}
+                                            {{ $stream['name'] }} (Playlist: {{ $stream['playlist_name'] ?? 'N/A' }}) {{ $stream['is_primary'] ? '(Primary)' : '' }}
                                         </option>
                                     @endforeach
                                 </select>
