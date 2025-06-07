@@ -63,6 +63,25 @@
                             @endif
                         </div>
 
+                        @if (($stat['itemType'] ?? null) === 'Channel' && !empty($stat['availableStreamsList']))
+                            <div class="mt-3">
+                                <label for="stream-select-{{ $loop->index }}" class="text-sm font-medium text-gray-700 dark:text-gray-300">Available Streams:</label>
+                                <select name="stream_select_{{ $loop->index }}" id="stream-select-{{ $loop->index }}" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md dark:bg-gray-700 dark:text-white">
+                                    @foreach ($stat['availableStreamsList'] as $stream)
+                                        <option
+                                            value="{{ $stream['id'] }}"
+                                            @if ($stream['id'] == $stat['currentStreamId'])
+                                                selected
+                                                style="font-weight: bold;"
+                                            @endif
+                                        >
+                                            {{ $stream['name'] }} {{ $stream['is_primary'] ? '(Primary)' : '' }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @endif
+
                         <!-- Source Details -->
                         <div class="space-y-3">
                             <!-- Video Section -->

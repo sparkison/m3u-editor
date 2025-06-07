@@ -82,6 +82,8 @@ class StreamingChannelStats extends Page
             $itemLogo = null;
             $clientIp = $item['ip'] ?? null;
             $streamId = $item['streamId'] ?? null;
+            $availableStreamsList = []; // Initialize for all types
+            $currentStreamIdForStat = null; // Initialize
 
             // Resolve actual streaming ID (failover)
             if ($format === 'hls') {
@@ -94,9 +96,29 @@ class StreamingChannelStats extends Page
             }
 
             if ($modelType === 'channel') {
-                $model = Channel::find($actualStreamingModelId);
-                $itemName = $model ? ($model->title_custom ?? $model->title) : "Channel ID: {$actualStreamingModelId} (Not Found)";
-                $itemLogo = $model ? ($model->logo ?? null) : null;
+                $model = Channel::with('failoverChannels')->find($actualStreamingModelId); // Eager load
+                if ($model) {
+                    $itemName = $model->title_custom ?? $model->title;
+                    $itemLogo = $model->logo ?? null;
+                    $currentStreamIdForStat = $actualStreamingModelId; // Set for channel
+
+                    // Populate availableStreamsList
+                    $availableStreamsList[] = [
+                        'id' => $model->id,
+                        'name' => $model->title_custom ?? $model->title,
+                        'is_primary' => true,
+                    ];
+                    foreach ($model->failoverChannels as $failoverChannel) {
+                        $availableStreamsList[] = [
+                            'id' => $failoverChannel->id,
+                            'name' => $failoverChannel->title_custom ?? $failoverChannel->title,
+                            'is_primary' => false,
+                        ];
+                    }
+                } else {
+                     $itemName = "Channel ID: {$actualStreamingModelId} (Not Found)";
+                     $itemLogo = null;
+                }
             } elseif ($modelType === 'episode') {
                 $model = Episode::find($actualStreamingModelId);
                 $itemLogo = $model ? ($model->cover ?? null) : null;
@@ -207,6 +229,8 @@ class StreamingChannelStats extends Page
                     'resolution_logo' => $resolution_logo_path,
                     'client_ip' => $clientIp,
                     'stream_id' => $streamId,
+                    'availableStreamsList' => $availableStreamsList,
+                    'currentStreamId' => $currentStreamIdForStat,
                 ];
                 continue;
             }
@@ -292,6 +316,8 @@ class StreamingChannelStats extends Page
                 'resolution_logo' => $resolution_logo_path,
                 'client_ip' => $clientIp,
                 'stream_id' => $streamId,
+                'availableStreamsList' => $availableStreamsList,
+                'currentStreamId' => $currentStreamIdForStat,
             ];
         }
         Log::info('Processed statsData (including HLS and MPTS): ', $stats);
