@@ -17,6 +17,7 @@ use App\Models\Playlist;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
+use Illuminate\Support\HtmlString;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Infolists;
@@ -415,7 +416,14 @@ class ChannelResource extends Resource
                         ->label('Add as failover')
                         ->form(function (Collection $records) {
                             $existingFailoverIds = $records->pluck('id')->toArray();
+                            $selectedChannels = $records->map(function ($record) {
+                                return $record->title_custom ?: $record->title;
+                            })->join(', ');
+
                             return [
+                                Forms\Components\Placeholder::make('selected_channels_display')
+                                    ->label('Selected Channels')
+                                    ->content(new HtmlString("<strong>{$selectedChannels}</strong>")),
                                 Forms\Components\Select::make('master_channel_id')
                                     ->label('Master Channel')
                                     ->options([]) // no options until search
