@@ -64,7 +64,7 @@
                         </div>
 
                         @if (($stat['itemType'] ?? null) === 'Channel' && !empty($stat['availableStreamsList']))
-                            <div class="mt-3">
+                            <div class="my-3">
                                 <label for="stream-select-{{ $loop->index }}" class="text-sm font-medium text-gray-700 dark:text-gray-300">Available Streams:</label>
                                 <select name="stream_select_{{ $loop->index }}" id="stream-select-{{ $loop->index }}" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md dark:bg-gray-700 dark:text-white">
                                     @foreach ($stat['availableStreamsList'] as $stream)
@@ -90,7 +90,7 @@
                                 <div class="flex items-center"> <!-- Flex container for logo and details -->
                                     @if (!empty($stat['resolution_logo']))
                                     <div class="mr-3 flex-shrink-0"> <!-- Logo container (left column) -->
-                                        <img src="{{ asset($stat['resolution_logo']) }}" alt="Resolution Logo" style="height: 3em;">
+                                        <img src="{{ asset($stat['resolution_logo']) }}" alt="Resolution Logo" class="h-10 mr-2">
                                     </div>
                                     @endif
 
