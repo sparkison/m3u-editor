@@ -28,6 +28,14 @@ Route::get('/{uuid}/hdhr/lineup_status.json', [\App\Http\Controllers\PlaylistGen
 // Xtream API route
 Route::get('/{uuid}/xtream', [XtreamApiController::class, 'handle'])->name('playlist.xtream.api');
 
+// Xtream API Stream Handling Routes
+Route::get('/live/{username}/{password}/{streamId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleLive'])
+    ->where(['streamId' => '[0-9]+'])
+    ->name('xtream.stream.live');
+Route::get('/series/{username}/{password}/{streamId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleVod'])
+    ->where(['streamId' => '[0-9]+'])
+    ->name('xtream.stream.vod');
+
 // Generate EPG playlist from the playlist configuration
 Route::get('/{uuid}/epg.xml', EpgGenerateController::class)
     ->name('epg.generate');

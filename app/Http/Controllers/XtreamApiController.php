@@ -17,6 +17,54 @@ use Illuminate\Support\Facades\URL;
 
 class XtreamApiController extends Controller
 {
+    /**
+     * @tags Xtream API
+     * @summary Main Xtream API request handler.
+     * @description This endpoint serves as the primary interface for Xtream API interactions.
+     * It requires authentication via username and password query parameters.
+     * The 'action' query parameter dictates the specific operation to perform and the structure of the response.
+     * Common actions include 'panel' (default, retrieves player_api.php equivalent), 'get_live_streams', 'get_vod_streams', and 'get_vod_info'.
+     * The detailed response structure for each action is documented in inline PHPDoc blocks within the method implementation.
+     *
+     * @pathParam uuid string required The UUID of the playlist. Example: "00000000-0000-0000-0000-000000000000"
+     * @queryParam username string required User's Xtream API username. Example: "user123"
+     * @queryParam password string required User's Xtream API password. Example: "password"
+     * @queryParam action string optional Defaults to 'panel'. Determines the API action (e.g., 'panel', 'get_live_streams', 'get_vod_streams', 'get_vod_info'). Example: "get_live_streams"
+     * @queryParam vod_id int optional Required if action is 'get_vod_info'. The ID of the VOD item. Example: 101
+     *
+     * @response 200 scenario="Successful response (structure varies by action)"
+     * Example for 'panel' action:
+     * @responseField user_info object User authentication and subscription details.
+     * @responseField user_info.username string The username.
+     * @responseField user_info.password string The password.
+     * @responseField user_info.message string Optional message from server.
+     * @responseField user_info.auth int Authentication status (1 for success).
+     * @responseField user_info.status string Subscription status (e.g., "Active").
+     * @responseField user_info.exp_date string Subscription expiry timestamp or null.
+     * @responseField user_info.is_trial string "0" or "1".
+     * @responseField user_info.active_cons int Number of active connections.
+     * @responseField user_info.created_at string Account creation timestamp.
+     * @responseField user_info.max_connections string Maximum allowed connections.
+     * @responseField user_info.allowed_output_formats array Allowed output formats (e.g., ["m3u8", "ts"]).
+     * @responseField server_info object Server details and features.
+     * @responseField server_info.url string Server URL.
+     * @responseField server_info.port string Server port.
+     * @responseField server_info.https_port string Server HTTPS port.
+     * @responseField server_info.rtmp_port string Server RTMP port.
+     * @responseField server_info.server_protocol string Server protocol (http/https).
+     * @responseField server_info.timezone string Server timezone.
+     * @responseField server_info.server_software string Name of the server software.
+     * @responseField server_info.timestamp_now string Current server timestamp.
+     * @responseField server_info.time_now string Current server time (YYYY-MM-DD HH:MM:SS).
+     * @responseField available_channels array List of available live channels (only for 'panel' action, see inline docs for 'get_live_streams').
+     * @responseField series array List of available VOD series/movies (only for 'panel' action, see inline docs for 'get_vod_streams').
+     * @responseField categories array List of available categories.
+     *
+     * @response 400 scenario="Bad Request (e.g., missing vod_id for get_vod_info)" {"error": "Missing vod_id parameter"}
+     * @response 401 scenario="Unauthorized - Missing Credentials" {"error": "Unauthorized - Missing credentials"}
+     * @response 401 scenario="Unauthorized - Invalid Credentials" {"error": "Unauthorized"}
+     * @response 404 scenario="Not Found (e.g., playlist or VOD item not found)" {"error": "Playlist not found"}
+     */
     public function handle(Request $request, string $uuid)
     {
         $playlist = null;
@@ -231,7 +279,31 @@ class XtreamApiController extends Controller
                 'series' => $vodSeries, // Populate this
                 'categories' => $responseCategories,
             ]);
-        } else if ($action === 'get_live_streams') {
+        }
+        /**
+         * Action: get_live_streams
+         * Returns a JSON array of live stream objects for the authenticated playlist.
+         * Only enabled channels are included.
+         *
+         * Response Structure:
+         * [
+         *   {
+         *     "num": int, (Sequential number)
+         *     "name": string, (Channel name)
+         *     "stream_type": "live",
+         *     "stream_id": int, (Channel ID)
+         *     "stream_icon": string, (URL to channel icon)
+         *     "epg_channel_id": string, (EPG channel ID)
+         *     "added": string, (Timestamp of when channel was added)
+         *     "category_id": string, (Category ID)
+         *     "tv_archive": int, (0 or 1 if TV archive is enabled)
+         *     "direct_source": string, (Direct stream URL, potentially empty if not applicable)
+         *     "tv_archive_duration": int (Duration of TV archive in hours, e.g., 72)
+         *   },
+         *   ...
+         * ]
+         */
+        else if ($action === 'get_live_streams') {
             $enabledChannels = $playlist->channels ?? new Collection();
             $liveStreams = [];
             foreach ($enabledChannels as $index => $channel) {
@@ -261,12 +333,41 @@ class XtreamApiController extends Controller
                     'added' => (string)$channel->created_at->timestamp,
                     'category_id' => $channelCategoryId, // Ensure this category_id is valid based on your categories logic
                     'tv_archive' => $channel->tv_archive_enabled ?? 0, // Assuming a model attribute or default
-                    'direct_source' => $channel->direct_source_url ?? '', // Assuming a model attribute or default
+                    'direct_source' => url("/live/{$username}/{$password}/{$channel->id}.ts"),
                     'tv_archive_duration' => $channel->tv_archive_duration ?? 0, // Assuming a model attribute or default
                 ];
             }
             return response()->json($liveStreams);
-        } else if ($action === 'get_vod_streams') {
+        }
+        /**
+         * Action: get_vod_streams
+         * Returns a JSON array of VOD (Video on Demand) stream objects, representing series or movies.
+         * Only enabled series/movies are included.
+         *
+         * Response Structure:
+         * [
+         *   {
+         *     "num": int, (Sequential number)
+         *     "name": string, (Series/Movie name)
+         *     "series_id": int, (Series/Movie ID)
+         *     "cover": string, (URL to cover image)
+         *     "plot": string, (Plot summary)
+         *     "cast": string, (Cast members)
+         *     "director": string, (Director name)
+         *     "genre": string, (Genre)
+         *     "releaseDate": string, (Release date, YYYY-MM-DD)
+         *     "last_modified": string, (Timestamp of last modification)
+         *     "rating": string, (Rating, e.g., "8.5")
+         *     "rating_5based": float, (Rating converted to a 5-based scale)
+         *     "backdrop_path": array, (Array of backdrop image URLs, often empty)
+         *     "youtube_trailer": string, (YouTube trailer ID or URL)
+         *     "episode_run_time": string, (Episode run time, e.g., "25")
+         *     "category_id": string (Category ID)
+         *   },
+         *   ...
+         * ]
+         */
+        else if ($action === 'get_vod_streams') {
             $enabledSeriesCollection = $playlist->series ?? new Collection();
             $vodSeries = [];
             $now = Carbon::now(); // Ensure $now is available
@@ -300,7 +401,77 @@ class XtreamApiController extends Controller
                 ];
             }
             return response()->json($vodSeries);
-        } else if ($action === 'get_vod_info') {
+        }
+        /**
+         * Action: get_vod_info
+         * Returns detailed information for a specific VOD item (series or movie), including its episodes if applicable.
+         * Requires 'vod_id' (series_id) as a request parameter.
+         *
+         * Response Structure:
+         * {
+         *   "info": {
+         *     "name": string, (Series/Movie name)
+         *     "cover": string, (URL to cover image)
+         *     "plot": string, (Plot summary)
+         *     "cast": string, (Cast members)
+         *     "director": string, (Director name)
+         *     "genre": string, (Genre)
+         *     "releaseDate": string, (Release date, YYYY-MM-DD)
+         *     "last_modified": string, (Timestamp of last modification)
+         *     "rating": string, (Rating, e.g., "8.5")
+         *     "rating_5based": float, (Rating converted to a 5-based scale)
+         *     "backdrop_path": array, (Array of backdrop image URLs)
+         *     "youtube_trailer": string, (YouTube trailer ID or URL)
+         *     "episode_run_time": string, (Episode run time)
+         *     "category_id": string (Category ID)
+         *   },
+         *   "episodes": {
+         *     "season_number": [  // Key is the season number
+         *       {
+         *         "id": string, (Episode ID)
+         *         "episode_num": int, (Episode number within the season)
+         *         "title": string, (Episode title)
+         *         "container_extension": string, (e.g., "mp4", "mkv")
+         *         "info": {
+         *           "movie_image": string, (URL to episode thumbnail or series cover)
+         *           "plot": string, (Episode plot summary)
+         *           "duration_secs": int, (Duration in seconds)
+         *           "duration": string, (Formatted duration HH:MM:SS)
+         *           "video": array, (Video stream details - often empty)
+         *           "audio": array, (Audio stream details - often empty)
+         *           "bitrate": int, (Episode bitrate)
+         *           "rating": string (Episode rating)
+         *         },
+         *         "added": string, (Timestamp of when episode was added)
+         *         "season": int, (Season number this episode belongs to)
+         *         "stream_id": int, (Episode ID, often same as "id" for Xtream Codes compatibility)
+         *         "direct_source": string (Full URL to stream the episode)
+         *       },
+         *       ... // Other episodes in this season
+         *     ],
+         *     ... // Other seasons
+         *   },
+         *   "movie_data": { // Often duplicates info from "info" and adds some specific fields for player compatibility
+         *     "stream_id": int, (Series/Movie ID)
+         *     "name": string,
+         *     "title": string,
+         *     "year": string, (Release year)
+         *     "episode_run_time": string,
+         *     "plot": string,
+         *     "cast": string,
+         *     "director": string,
+         *     "genre": string,
+         *     "releaseDate": string,
+         *     "last_modified": string,
+         *     "rating": string,
+         *     "rating_5based": float,
+         *     "cover_big": string, (Often same as "info.cover")
+         *     "youtube_trailer": string,
+         *     "backdrop_path": array
+         *   }
+         * }
+         */
+        else if ($action === 'get_vod_info') {
             $vodId = $request->input('vod_id');
             if (!$vodId) {
                 return response()->json(['error' => 'Missing vod_id parameter'], 400);
@@ -342,7 +513,7 @@ class XtreamApiController extends Controller
                         foreach ($season->episodes as $episode) {
                             // Construct stream URL - ensure username/password are available from the main handle method scope
                             $containerExtension = $episode->container_extension ?? 'mp4'; // Default or from model
-                            $streamUrlPath = "/series/{$uuid}/{$username}/{$password}/{$seriesItem->id}-{$episode->id}.{$containerExtension}";
+                            // $streamUrlPath = "/series/{$uuid}/{$username}/{$password}/{$seriesItem->id}-{$episode->id}.{$containerExtension}";
 
                             $seasonEpisodes[] = [
                                 'id' => (string)$episode->id,
@@ -364,7 +535,7 @@ class XtreamApiController extends Controller
                                 // The key for the stream URL is usually the series_id for older API, but episode ID is more specific
                                 // Xtream Codes typically uses the episode ID as the stream ID in this context.
                                 'stream_id' => (int)$episode->id, // Or series_id if that's the convention followed
-                                'direct_source' => url($streamUrlPath) // Generate full URL
+                                'direct_source' => url("/series/{$username}/{$password}/{$episode->id}.{$containerExtension}")
                             ];
                         }
                     }
@@ -378,7 +549,7 @@ class XtreamApiController extends Controller
             // This part might need adjustment based on how single VOD items (non-series) are structured
             if (empty($episodesBySeason) && $seriesItem->is_movie) { // Assuming an is_movie flag or similar logic
                  $containerExtension = $seriesItem->container_extension ?? 'mp4';
-                 $streamUrlPath = "/series/{$uuid}/{$username}/{$password}/{$seriesItem->id}.{$containerExtension}";
+                 // $streamUrlPath = "/series/{$uuid}/{$username}/{$password}/{$seriesItem->id}.{$containerExtension}";
                  $episodesBySeason[1] = [ // Default to season 1 for movies
                     [
                         'id' => (string)$seriesItem->id, // Use series ID as episode ID for movie
@@ -398,7 +569,7 @@ class XtreamApiController extends Controller
                         'added' => (string)($seriesItem->created_at ? $seriesItem->created_at->timestamp : $now->timestamp),
                         'season' => 1,
                         'stream_id' => (int)$seriesItem->id,
-                        'direct_source' => url($streamUrlPath)
+                        'direct_source' => url("/series/{$username}/{$password}/{$seriesItem->id}.{$containerExtension}")
                     ]
                  ];
             }
