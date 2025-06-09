@@ -217,7 +217,7 @@ class ProcessEpgImport implements ShouldQueue
                                                 $elementData['lang'] = trim($innerReader->getAttribute('lang'));
                                             } else {
                                                 // If we already have a display name, add to additional display names
-                                                $additionalDisplayNames[] = trim(strtolower($innerReader->readString()));
+                                                $additionalDisplayNames[] = trim($innerReader->readString());
                                             }
                                             break;
                                         case 'icon':
