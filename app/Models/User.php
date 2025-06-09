@@ -83,4 +83,9 @@ class User extends Authenticatable implements FilamentUser, HasAvatar
     {
         return $this->hasMany(Epg::class);
     }
+
+    public function channels()
+    {
+        return $this->hasMany(Channel::class);
+    }
 }

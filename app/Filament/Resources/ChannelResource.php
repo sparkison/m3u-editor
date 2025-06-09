@@ -26,6 +26,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class ChannelResource extends Resource
@@ -450,7 +451,7 @@ class ChannelResource extends Resource
                                     ->hidden(fn(Get $get) => $get('master_source') !== 'searched')
                                     ->getSearchResultsUsing(function (string $search) use ($existingFailoverIds) {
                                         $searchLower = strtolower($search);
-                                        $channels = Channel::query()
+                                        $channels = Auth::user()->channels()
                                             ->withoutEagerLoads()
                                             ->with('playlist')
                                             ->whereNotIn('id', $existingFailoverIds)
@@ -877,7 +878,7 @@ class ChannelResource extends Resource
 
                                     // Always include the selected value if it exists
                                     $searchLower = strtolower($search);
-                                    $channels = Channel::query()
+                                    $channels = Auth::user()->channels()
                                         ->withoutEagerLoads()
                                         ->with('playlist')
                                         ->whereNotIn('id', $existingFailoverIds)
