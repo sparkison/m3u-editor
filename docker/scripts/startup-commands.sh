@@ -19,6 +19,5 @@ php artisan app:hls-prune
 
 echo "✅ Startup commands completed successfully!"
 
-# Keep the process alive but in a sleeping state
-# This prevents supervisor from restarting it constantly
-sleep infinity
+# Exit normally - supervisor won't restart due to autorestart=false
+exit 0
