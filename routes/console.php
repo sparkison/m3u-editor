@@ -24,4 +24,6 @@ Schedule::command('app:refresh-epg')
 
 // Prune stale processes
 Schedule::command('app:hls-prune')
-    ->everyFifteenSeconds();
+    ->everyFifteenSeconds()
+    ->withoutOverlapping()
+    ->runInBackground();
