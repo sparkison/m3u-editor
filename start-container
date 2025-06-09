@@ -131,6 +131,8 @@ fi
 [ ! -f "${nginx_log_file}" ] && touch "${nginx_log_file}"
 
 # Clear out the log content (could build up over time, clean on container reboot)
+echo "" > "/var/log/cron.out.log"
+echo "" > "/var/log/cron.err.log"
 echo "" > "${queue_log_file}"
 echo "" > "${websockets_log_file}"
 echo "" > "${ffmpeg_log_file}"
