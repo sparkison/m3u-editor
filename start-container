@@ -88,6 +88,7 @@ laravel_log_file="${log_dir}/laravel.log"
 ffmpeg_log_file="${log_dir}/ffmpeg.log"
 nginx_log_file="${log_dir}/nginx.log"
 postgres_log_file="${log_dir}/postgress.log"
+startup_log_file="${log_dir}/startup.log"
 
 # Invalid log files, or files that will be created by the app
 swoole_log_file="${log_dir}/swoole_http.log"
@@ -129,6 +130,7 @@ fi
 [ ! -f "${websockets_log_file}" ] && touch "${websockets_log_file}"
 [ ! -f "${ffmpeg_log_file}" ] && touch "${ffmpeg_log_file}"
 [ ! -f "${nginx_log_file}" ] && touch "${nginx_log_file}"
+[ ! -f "${startup_log_file}" ] && touch "${startup_log_file}"
 
 # Clear out the log content (could build up over time, clean on container reboot)
 echo "" > "/var/log/cron.out.log"
@@ -137,6 +139,7 @@ echo "" > "${queue_log_file}"
 echo "" > "${websockets_log_file}"
 echo "" > "${ffmpeg_log_file}"
 echo "" > "${nginx_log_file}"
+echo "" > "${startup_log_file}"
 
 # Cleanup
 [ -f "${swoole_log_file}" ] && rm -f "${swoole_log_file}"

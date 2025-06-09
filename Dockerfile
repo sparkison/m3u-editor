@@ -93,6 +93,13 @@ RUN touch /var/run/supervisord.pid \
 
 COPY ./docker/8.4/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
+# Create directory structure and copy startup script
+RUN mkdir -p /var/scripts
+COPY ./docker/scripts/startup-commands.sh /var/scripts/startup-commands.sh
+
+# Make startup script executable
+RUN chmod +x /var/scripts/startup-commands.sh
+
 # Install composer
 ENV COMPOSER_ALLOW_SUPERUSER=1
 ENV PATH=$PATH:/root/.composer/vendor/bin
