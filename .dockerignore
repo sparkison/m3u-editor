@@ -1,6 +1,8 @@
 docker-compose.yml
 vendor
 node_modules
+storage/app/private/*
+storage/app/public/*
 storage/framework/cache/*
 storage/framework/sessions/*
 storage/framework/testing/*

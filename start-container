@@ -305,7 +305,7 @@ if [ $# -gt 0 ]; then
     fi
 else
     echo ""
-    echo "🚀 Starting services..."
+    echo "🚀 All systems go!"
     echo ""
     exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
 fi
