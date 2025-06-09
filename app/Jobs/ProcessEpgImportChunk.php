@@ -68,6 +68,7 @@ class ProcessEpgImportChunk implements ShouldQueue
                 'lang',
                 'channel_id',
                 'import_batch_no',
+                'additional_display_names',
             ]);
         }
     }

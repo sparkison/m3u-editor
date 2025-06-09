@@ -170,6 +170,7 @@ class ProcessEpgImport implements ShouldQueue
                     'epg_id' => $epgId,
                     'user_id' => $userId,
                     'import_batch_no' => $batchNo,
+                    'additional_display_names' => null
                 ];
 
                 // Update progress
@@ -201,6 +202,7 @@ class ProcessEpgImport implements ShouldQueue
                             ];
 
                             // Get the node data
+                            $additionalDisplayNames = [];
                             while (@$innerReader->read()) {
                                 if ($innerReader->nodeType == XMLReader::ELEMENT) {
                                     switch ($innerReader->name) {
@@ -213,6 +215,9 @@ class ProcessEpgImport implements ShouldQueue
                                                 $elementData['name'] = Str::limit(trim($innerReader->readString()), 255);
                                                 $elementData['display_name'] = trim($innerReader->readString());
                                                 $elementData['lang'] = trim($innerReader->getAttribute('lang'));
+                                            } else {
+                                                // If we already have a display name, add to additional display names
+                                                $additionalDisplayNames[] = trim(strtolower($innerReader->readString()));
                                             }
                                             break;
                                         case 'icon':
@@ -220,6 +225,9 @@ class ProcessEpgImport implements ShouldQueue
                                             break;
                                     }
                                 }
+                            }
+                            if (count($additionalDisplayNames) > 0) {
+                                $elementData['additional_display_names'] = json_encode($additionalDisplayNames);
                             }
 
                             // Close the inner XMLReader

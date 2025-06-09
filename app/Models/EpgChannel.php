@@ -21,6 +21,7 @@ class EpgChannel extends Model
         'id' => 'integer',
         'epg_id' => 'integer',
         'user_id' => 'integer',
+        'additional_display_names' => 'array',
     ];
 
     protected $with = ['epg'];
