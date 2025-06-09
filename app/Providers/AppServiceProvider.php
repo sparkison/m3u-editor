@@ -255,7 +255,6 @@ class AppServiceProvider extends ServiceProvider
                 }
                 return $channelFailover;
             });
-
         } catch (\Throwable $e) {
             // Log the error
             report($e);
@@ -304,7 +303,8 @@ class AppServiceProvider extends ServiceProvider
                 return Str::startsWith($route->uri, [
                     'playlist/',
                     'epg/',
-                    'user/'
+                    'user/',
+                    'xtream/'
                 ]);
             })
             ->withDocumentTransformers(function (OpenApi $openApi) {

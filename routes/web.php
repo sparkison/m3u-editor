@@ -26,7 +26,7 @@ Route::get('/{uuid}/hdhr/lineup_status.json', [\App\Http\Controllers\PlaylistGen
     ->name('playlist.hdhr.lineup_status');
 
 // Xtream API route
-Route::get('/{uuid}/xtream', [XtreamApiController::class, 'handle'])->name('playlist.xtream.api');
+Route::get('/xtream/{uuid}/api', [XtreamApiController::class, 'handle'])->name('playlist.xtream.api');
 
 // Xtream API Stream Handling Routes
 Route::get('/live/{username}/{password}/{streamId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleLive'])

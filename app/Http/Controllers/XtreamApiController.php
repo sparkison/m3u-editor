@@ -18,9 +18,9 @@ use Illuminate\Support\Facades\URL;
 class XtreamApiController extends Controller
 {
     /**
-     * @tags Xtream API
-     * @summary Main Xtream API request handler.
-     * @description This endpoint serves as the primary interface for Xtream API interactions.
+     * Main Xtream API request handler.
+     * 
+     * This endpoint serves as the primary interface for Xtream API interactions.
      * It requires authentication via username and password query parameters.
      * The 'action' query parameter dictates the specific operation to perform and the structure of the response.
      * Common actions include 'panel' (default, retrieves player_api.php equivalent), 'get_live_streams', 'get_vod_streams', and 'get_vod_info'.
@@ -64,6 +64,8 @@ class XtreamApiController extends Controller
      * @response 401 scenario="Unauthorized - Missing Credentials" {"error": "Unauthorized - Missing credentials"}
      * @response 401 scenario="Unauthorized - Invalid Credentials" {"error": "Unauthorized"}
      * @response 404 scenario="Not Found (e.g., playlist or VOD item not found)" {"error": "Playlist not found"}
+     * 
+     * @unauthenticated
      */
     public function handle(Request $request, string $uuid)
     {
