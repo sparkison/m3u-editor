@@ -6,6 +6,7 @@ use App\Models\Channel;
 use App\Models\Epg;
 use App\Models\EpgChannel;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class SimilaritySearchService
 {
@@ -73,6 +74,9 @@ class SimilaritySearchService
                 $query->whereRaw('LOWER(channel_id) like ?', ["%$normalizedChan%"])
                     ->orWhereRaw('LOWER(name) like ?', ["%$normalizedChan%"])
                     ->orWhereRaw('LOWER(display_name) like ?', ["%$normalizedChan%"]);
+                
+                // Add search for additional_display_names JSONB column
+                $this->addJsonSearchCondition($query, $normalizedChan);
             });
 
         // Setup variables
@@ -208,5 +212,54 @@ class SimilaritySearchService
         if ($magA == 0 || $magB == 0) return 0;
 
         return $dotProduct / (sqrt($magA) * sqrt($magB));
+    }
+
+    /**
+     * Add database-specific search condition for additional_display_names JSONB column.
+     * 
+     * @param \Illuminate\Database\Query\Builder $query
+     * @param string $normalizedChan
+     * 
+     * @return void
+     */
+    private function addJsonSearchCondition($query, string $normalizedChan): void
+    {
+        $driver = DB::connection()->getConfig('driver');
+        
+        switch ($driver) {
+            case 'pgsql':
+                // PostgreSQL: Use jsonb_array_elements_text to search through array elements
+                $query->orWhereRaw(
+                    'EXISTS (SELECT 1 FROM jsonb_array_elements_text(additional_display_names) AS elem WHERE LOWER(elem) LIKE ?)',
+                    ["%$normalizedChan%"]
+                );
+                break;
+                
+            case 'mysql':
+            case 'mariadb':
+                // MySQL/MariaDB: Use JSON_UNQUOTE and JSON_SEARCH for array search
+                $query->orWhereRaw(
+                    'JSON_SEARCH(LOWER(JSON_UNQUOTE(additional_display_names)), "one", ?) IS NOT NULL',
+                    ["%$normalizedChan%"]
+                );
+                break;
+                
+            case 'sqlite':
+                // SQLite: Use json_each to iterate through array elements
+                $query->orWhereRaw(
+                    'EXISTS (SELECT 1 FROM json_each(additional_display_names) WHERE LOWER(json_each.value) LIKE ?)',
+                    ["%$normalizedChan%"]
+                );
+                break;
+                
+            default:
+                // Fallback: Use Laravel's JSON where clause (less efficient but universal)
+                // This converts the array to string and searches within it
+                $query->orWhere(function ($subQuery) use ($normalizedChan) {
+                    $subQuery->whereNotNull('additional_display_names')
+                        ->whereRaw('LOWER(CAST(additional_display_names AS TEXT)) LIKE ?', ["%$normalizedChan%"]);
+                });
+                break;
+        }
     }
 }
