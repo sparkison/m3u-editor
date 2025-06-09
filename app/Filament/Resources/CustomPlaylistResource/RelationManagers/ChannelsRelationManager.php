@@ -41,17 +41,17 @@ class ChannelsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         $ownerRecord = $this->ownerRecord;
-        return $table
-            ->modifyQueryUsing(fn (Builder $query) => $query->withCount('failovers'))
+        return $table->persistFiltersInSession()
             ->persistFiltersInSession()
             ->persistSortInSession()
             ->recordTitleAttribute('title')
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
-            // ->modifyQueryUsing(function (Builder $query) {
-            //     $query->with('tags');
-            // })
+            ->modifyQueryUsing(function (Builder $query) {
+                $query->with('tags')
+                    ->withCount('failovers');
+            })
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
             ->columns([

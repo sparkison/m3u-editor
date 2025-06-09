@@ -7,7 +7,6 @@ use App\Filament\Resources\CustomPlaylistResource\RelationManagers;
 use App\Forms\Components\PlaylistEpgUrl;
 use App\Forms\Components\PlaylistM3uUrl;
 use App\Forms\Components\MediaFlowProxyUrl;
-use App\Models\Channel;
 use App\Models\CustomPlaylist;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -19,7 +18,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use App\Facades\PlaylistUrlFacade;
 use Filament\Forms\FormsComponent;
-use Illuminate\Support\Facades\Auth;
 
 class CustomPlaylistResource extends Resource
 {
