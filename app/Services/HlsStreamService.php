@@ -51,7 +51,7 @@ class HlsStreamService
                     : $stream->title;
                 $existingStreamTitle = strip_tags($existingStreamTitle);
 
-                Log::channel('ffmpeg')->info("HLS Stream: Found existing running stream for $type ID {$stream->id} ({$existingStreamTitle}) - reusing for original request {$model->id} ({$title}).");
+                Log::channel('ffmpeg')->debug("HLS Stream: Found existing running stream for $type ID {$stream->id} ({$existingStreamTitle}) - reusing for original request {$model->id} ({$title}).");
                 return $stream; // Return the already running stream
             }
         }
@@ -77,9 +77,9 @@ class HlsStreamService
             $badSourceCacheKey = ProxyService::BAD_SOURCE_CACHE_PREFIX . $stream->id . ':' . $playlist->id;
             if (Redis::exists($badSourceCacheKey)) {
                 if ($model->id === $stream->id) {
-                    Log::channel('ffmpeg')->info("Skipping source ID {$currentStreamTitle} ({$stream->id}) for as it was recently marked as bad for playlist {$playlist->id}. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
+                    Log::channel('ffmpeg')->debug("Skipping source ID {$currentStreamTitle} ({$stream->id}) for as it was recently marked as bad for playlist {$playlist->id}. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
                 } else {
-                    Log::channel('ffmpeg')->info("Skipping Failover {$type} {$stream->name} for source {$model->title} ({$model->id}) as it (stream ID {$stream->id}) was recently marked as bad for playlist {$playlist->id}. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
+                    Log::channel('ffmpeg')->debug("Skipping Failover {$type} {$stream->name} for source {$model->title} ({$model->id}) as it (stream ID {$stream->id}) was recently marked as bad for playlist {$playlist->id}. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
                 }
                 continue;
             }
@@ -91,7 +91,7 @@ class HlsStreamService
             if ($this->wouldExceedStreamLimit($playlist->id, $playlist->available_streams, $activeStreams)) {
                 // We're over limit, so decrement and skip
                 $this->decrementActiveStreams($playlist->id);
-                Log::channel('ffmpeg')->info("Max streams reached for playlist {$playlist->name} ({$playlist->id}). Skipping channel {$currentStreamTitle}.");
+                Log::channel('ffmpeg')->debug("Max streams reached for playlist {$playlist->name} ({$playlist->id}). Skipping channel {$currentStreamTitle}.");
                 continue;
             }
 
@@ -114,7 +114,7 @@ class HlsStreamService
                     playlistId: $playlist->id,
                     userAgent: $userAgent,
                 );
-                Log::channel('ffmpeg')->info("Successfully started HLS stream for {$type} {$currentStreamTitle} (ID: {$stream->id}) on playlist {$playlist->id}.");
+                Log::channel('ffmpeg')->debug("Successfully started HLS stream for {$type} {$currentStreamTitle} (ID: {$stream->id}) on playlist {$playlist->id}.");
                 return $stream; // Return the successful stream object
 
             } catch (SourceNotResponding $e) {
@@ -222,7 +222,7 @@ class HlsStreamService
         $startTimeCacheKey = "hls:streaminfo:starttime:{$type}:{$model->id}";
         $currentTime = now()->timestamp;
         Redis::setex($startTimeCacheKey, 604800, $currentTime); // 7 days TTL
-        Log::channel('ffmpeg')->info("Stored ffmpeg process start time for {$type} ID {$model->id} at {$currentTime}");
+        Log::channel('ffmpeg')->debug("Stored ffmpeg process start time for {$type} ID {$model->id} at {$currentTime}");
 
         // Record timestamp in Redis (never expires until we prune)
         // This key represents when the startStream method was last invoked for this model,
@@ -232,7 +232,7 @@ class HlsStreamService
         // Add to active IDs set
         Redis::sadd("hls:active_{$type}_ids", $model->id);
 
-        Log::channel('ffmpeg')->info("Streaming {$type} {$title} with command: {$cmd}");
+        Log::channel('ffmpeg')->debug("Streaming {$type} {$title} with command: {$cmd}");
         return $pid;
     }
 
@@ -255,7 +255,7 @@ class HlsStreamService
         // Updated command to include -show_format and remove -select_streams to get all streams for detailed info
         $cmd = "$ffprobePath -v quiet -print_format json -show_streams -show_format -user_agent " . escapeshellarg($userAgent) . " " . escapeshellarg($streamUrl);
 
-        Log::channel('ffmpeg')->info("[PRE-CHECK] Executing ffprobe command for [{$title}] with timeout {$ffprobeTimeout}s: {$cmd}");
+        Log::channel('ffmpeg')->debug("[PRE-CHECK] Executing ffprobe command for [{$title}] with timeout {$ffprobeTimeout}s: {$cmd}");
         $precheckProcess = SymfonyProcess::fromShellCommandline($cmd);
         $precheckProcess->setTimeout($ffprobeTimeout);
         try {
@@ -264,7 +264,7 @@ class HlsStreamService
                 Log::channel('ffmpeg')->error("[PRE-CHECK] ffprobe failed for source [{$title}]. Exit Code: " . $precheckProcess->getExitCode() . ". Error Output: " . $precheckProcess->getErrorOutput());
                 throw new SourceNotResponding("failed_ffprobe (Exit: " . $precheckProcess->getExitCode() . ")");
             }
-            Log::channel('ffmpeg')->info("[PRE-CHECK] ffprobe successful for source [{$title}].");
+            Log::channel('ffmpeg')->debug("[PRE-CHECK] ffprobe successful for source [{$title}].");
 
             // Check channel health
             $ffprobeJsonOutput = $precheckProcess->getOutput();
@@ -301,7 +301,7 @@ class HlsStreamService
                                 'tags' => $stream['tags'] ?? [],
                             ];
                             $logResolution = ($stream['width'] ?? 'N/A') . 'x' . ($stream['height'] ?? 'N/A');
-                            Log::channel('ffmpeg')->info(
+                            Log::channel('ffmpeg')->debug(
                                 "[PRE-CHECK] Source [{$title}] video stream: " .
                                 "Codec: " . ($stream['codec_name'] ?? 'N/A') . ", " .
                                 "Format: " . ($stream['pix_fmt'] ?? 'N/A') . ", " .
@@ -328,7 +328,7 @@ class HlsStreamService
                 if (!empty($extractedDetails)) {
                     $detailsCacheKey = "hls:streaminfo:details:{$modelType}:{$modelId}";
                     Redis::setex($detailsCacheKey, 86400, json_encode($extractedDetails)); // Cache for 24 hours
-                    Log::channel('ffmpeg')->info("[PRE-CHECK] Cached detailed streaminfo for {$modelType} ID {$modelId}.");
+                    Log::channel('ffmpeg')->debug("[PRE-CHECK] Cached detailed streaminfo for {$modelType} ID {$modelId}.");
                 }
             } else {
                 Log::channel('ffmpeg')->warning("[PRE-CHECK] Could not decode ffprobe JSON output for [{$title}]. Output: " . $ffprobeJsonOutput);
@@ -404,10 +404,10 @@ class HlsStreamService
         foreach ($mappingKeys as $key) {
             if (Cache::get($key) == $id) {
                 Cache::forget($key);
-                Log::channel('ffmpeg')->info("Cleaned up stream mapping: {$key} -> {$id}");
+                Log::channel('ffmpeg')->debug("Cleaned up stream mapping: {$key} -> {$id}");
             }
         }
-        Log::channel('ffmpeg')->info("Cleaned up stream resources for {$type} {$id}");
+        Log::channel('ffmpeg')->debug("Cleaned up stream resources for {$type} {$id}");
 
         return $wasRunning;
     }

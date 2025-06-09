@@ -61,9 +61,9 @@ class StreamController extends Controller
             $badSourceCacheKey = ProxyService::BAD_SOURCE_CACHE_PREFIX . $stream->id . ':' . $playlist->id;
             if (Redis::exists($badSourceCacheKey)) {
                 if ($sourceChannel->id === $stream->id) {
-                    Log::channel('ffmpeg')->info("Skipping source ID {$title} ({$sourceChannel->id}) for as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
+                    Log::channel('ffmpeg')->debug("Skipping source ID {$title} ({$sourceChannel->id}) for as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
                 } else {
-                    Log::channel('ffmpeg')->info("Skipping Failover Channel {$stream->name} for source {$title} ({$sourceChannel->id}) as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
+                    Log::channel('ffmpeg')->debug("Skipping Failover Channel {$stream->name} for source {$title} ({$sourceChannel->id}) as it was recently marked as bad. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
                 }
                 continue;
             }
@@ -77,7 +77,7 @@ class StreamController extends Controller
             if ($format !== 'mp4' && $this->wouldExceedStreamLimit($playlist->id, $playlist->available_streams, $activeStreams)) {
                 // We're over limit, so decrement and skip
                 $this->decrementActiveStreams($playlist->id);
-                Log::channel('ffmpeg')->info("Max streams reached for playlist {$playlist->name} ({$playlist->id}). Skipping channel {$title}.");
+                Log::channel('ffmpeg')->debug("Max streams reached for playlist {$playlist->name} ({$playlist->id}). Skipping channel {$title}.");
                 continue;
             }
 
@@ -168,7 +168,7 @@ class StreamController extends Controller
         if ($format !== 'mp4' && $this->wouldExceedStreamLimit($playlist->id, $playlist->available_streams, $activeStreams)) {
             // We're over limit, so decrement and skip
             $this->decrementActiveStreams($playlist->id);
-            Log::channel('ffmpeg')->info("Max streams reached for playlist {$playlist->name} ({$playlist->id}). Aborting episode {$title}.");
+            Log::channel('ffmpeg')->debug("Max streams reached for playlist {$playlist->name} ({$playlist->id}). Aborting episode {$title}.");
             abort(503, 'Max streams reached for this playlist.');
         }
 
@@ -257,7 +257,7 @@ class StreamController extends Controller
             // Updated command to include -show_format and remove -select_streams to get all streams for detailed info
             $precheckCmd = "$ffprobePath -v quiet -print_format json -show_streams -show_format -user_agent " . $userAgent . " " . escapeshellarg($streamUrl);
 
-            Log::channel('ffmpeg')->info("[PRE-CHECK] Executing ffprobe command for [{$title}] with timeout {$ffprobeTimeout}s: {$precheckCmd}");
+            Log::channel('ffmpeg')->debug("[PRE-CHECK] Executing ffprobe command for [{$title}] with timeout {$ffprobeTimeout}s: {$precheckCmd}");
             $precheckProcess = SymfonyProcess::fromShellCommandline($precheckCmd);
             $precheckProcess->setTimeout($ffprobeTimeout);
             try {
@@ -266,7 +266,7 @@ class StreamController extends Controller
                     Log::channel('ffmpeg')->error("[PRE-CHECK] ffprobe failed for source [{$title}]. Exit Code: " . $precheckProcess->getExitCode() . ". Error Output: " . $precheckProcess->getErrorOutput());
                     throw new SourceNotResponding("failed_ffprobe (Exit: " . $precheckProcess->getExitCode() . ")");
                 }
-                Log::channel('ffmpeg')->info("[PRE-CHECK] ffprobe successful for source [{$title}].");
+                Log::channel('ffmpeg')->debug("[PRE-CHECK] ffprobe successful for source [{$title}].");
 
                 // Check channel health
                 $ffprobeJsonOutput = $precheckProcess->getOutput();
@@ -303,7 +303,7 @@ class StreamController extends Controller
                                     'tags' => $stream['tags'] ?? [],
                                 ];
                                 $logResolution = ($stream['width'] ?? 'N/A') . 'x' . ($stream['height'] ?? 'N/A');
-                                Log::channel('ffmpeg')->info(
+                                Log::channel('ffmpeg')->debug(
                                     "[PRE-CHECK] Source [{$title}] video stream: " .
                                         "Codec: " . ($stream['codec_name'] ?? 'N/A') . ", " .
                                         "Format: " . ($stream['pix_fmt'] ?? 'N/A') . ", " .
@@ -330,7 +330,7 @@ class StreamController extends Controller
                     if (!empty($extractedDetails)) {
                         $detailsCacheKey = "mpts:streaminfo:details:{$streamId}";
                         Redis::setex($detailsCacheKey, 86400, json_encode($extractedDetails)); // Cache for 24 hours
-                        Log::channel('ffmpeg')->info("[PRE-CHECK] Cached detailed streaminfo for {$type} ID {$modelId}.");
+                        Log::channel('ffmpeg')->debug("[PRE-CHECK] Cached detailed streaminfo for {$type} ID {$modelId}.");
                     }
                 } else {
                     Log::channel('ffmpeg')->warning("[PRE-CHECK] Could not decode ffprobe JSON output for [{$title}]. Output: " . $ffprobeJsonOutput);
@@ -344,7 +344,7 @@ class StreamController extends Controller
         $startTimeCacheKey = "mpts:streaminfo:starttime:{$streamId}";
         $currentTime = now()->timestamp;
         Redis::setex($startTimeCacheKey, 604800, $currentTime); // 7 days TTL
-        Log::channel('ffmpeg')->info("Stored ffmpeg process start time for {$type} ID {$modelId} at {$currentTime}");
+        Log::channel('ffmpeg')->debug("Stored ffmpeg process start time for {$type} ID {$modelId} at {$currentTime}");
 
         // Set the content type based on the format
         return new StreamedResponse(function () use (
@@ -378,7 +378,7 @@ class StreamController extends Controller
                     // Decrement the active streams count using the trait
                     $self->decrementActiveStreams($playlistId);
                 }
-                Log::channel('ffmpeg')->info("Streaming stopped for {$type} {$title}");
+                Log::channel('ffmpeg')->debug("Streaming stopped for {$type} {$title}");
             });
 
             // Add the client key to the active IDs set
@@ -405,7 +405,7 @@ class StreamController extends Controller
             );
 
             // Log the command for debugging
-            Log::channel('ffmpeg')->info("Streaming {$type} {$title} with command: {$cmd}");
+            Log::channel('ffmpeg')->debug("Streaming {$type} {$title} with command: {$cmd}");
 
             // Continue trying until the client disconnects, or max retries are reached
             $retries = 0;

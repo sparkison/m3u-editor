@@ -41,20 +41,20 @@ class StreamingChannelStats extends Page
         $activeItems = [];
 
         $activeChannelIds = Redis::smembers('hls:active_channel_ids');
-        Log::info('Active HLS Channel IDs from Redis: ', $activeChannelIds ?: []);
+        Log::debug('Active HLS Channel IDs from Redis: ', $activeChannelIds ?: []);
         foreach ($activeChannelIds as $id) {
             $activeItems[] = ['id' => $id, 'type' => 'channel', 'format' => 'hls'];
         }
 
         $activeEpisodeIds = Redis::smembers('hls:active_episode_ids');
-        Log::info('Active HLS Episode IDs from Redis: ', $activeEpisodeIds ?: []);
+        Log::debug('Active HLS Episode IDs from Redis: ', $activeEpisodeIds ?: []);
         foreach ($activeEpisodeIds as $id) {
             $activeItems[] = ['id' => $id, 'type' => 'episode', 'format' => 'hls'];
         }
 
         // Get MPTS streams
         $activeMptsIds = Redis::smembers('mpts:active_ids');
-        Log::info('Active MPTS Client Details from Redis: ', $activeMptsIds ?: []);
+        Log::debug('Active MPTS Client Details from Redis: ', $activeMptsIds ?: []);
         foreach ($activeMptsIds as $clientDetails) {
             // Format: {ip}::{modelId}::{type}::{streamId}
             $parts = explode('::', $clientDetails);
@@ -322,7 +322,7 @@ class StreamingChannelStats extends Page
                 'currentStreamId' => $currentStreamIdForStat,
             ];
         }
-        Log::info('Processed statsData (including HLS and MPTS): ', $stats);
+        Log::debug('Processed statsData (including HLS and MPTS): ', $stats);
         return $stats;
     }
 }

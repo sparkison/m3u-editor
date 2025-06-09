@@ -33,7 +33,7 @@ trait TracksActiveStreams
             $activeStreams = 1;
         }
         
-        Log::channel('ffmpeg')->info("Active streams for playlist {$playlistId}: {$activeStreams} (after increment)");
+        Log::channel('ffmpeg')->debug("Active streams for playlist {$playlistId}: {$activeStreams} (after increment)");
         
         return $activeStreams;
     }
@@ -57,7 +57,7 @@ trait TracksActiveStreams
             $activeStreams = 0;
         }
         
-        Log::channel('ffmpeg')->info("Active streams for playlist {$playlistId}: {$activeStreams} (after decrement)");
+        Log::channel('ffmpeg')->debug("Active streams for playlist {$playlistId}: {$activeStreams} (after decrement)");
         
         return $activeStreams;
     }
@@ -110,7 +110,7 @@ trait TracksActiveStreams
         $activeStreamsKey = "active_streams:{$playlistId}";
         Redis::set($activeStreamsKey, 0);
         
-        Log::channel('ffmpeg')->info("Reset active streams count for playlist {$playlistId} to 0");
+        Log::channel('ffmpeg')->debug("Reset active streams count for playlist {$playlistId} to 0");
     }
     
     /**
@@ -126,7 +126,7 @@ trait TracksActiveStreams
             $this->decrementActiveStreams($playlistId);
             
             if ($logContext) {
-                Log::channel('ffmpeg')->info("Stream cleanup executed for {$logContext}");
+                Log::channel('ffmpeg')->debug("Stream cleanup executed for {$logContext}");
             }
         });
     }
