@@ -25,17 +25,6 @@ Route::get('/{uuid}/hdhr/lineup.json', [\App\Http\Controllers\PlaylistGenerateCo
 Route::get('/{uuid}/hdhr/lineup_status.json', [\App\Http\Controllers\PlaylistGenerateController::class, 'hdhrLineupStatus'])
     ->name('playlist.hdhr.lineup_status');
 
-// Xtream API route
-Route::get('/xtream/{uuid}/api', [XtreamApiController::class, 'handle'])->name('playlist.xtream.api');
-
-// Xtream API Stream Handling Routes
-Route::get('/live/{username}/{password}/{streamId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleLive'])
-    ->where(['streamId' => '[0-9]+'])
-    ->name('xtream.stream.live');
-Route::get('/series/{username}/{password}/{streamId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleVod'])
-    ->where(['streamId' => '[0-9]+'])
-    ->name('xtream.stream.vod');
-
 // Generate EPG playlist from the playlist configuration
 Route::get('/{uuid}/epg.xml', EpgGenerateController::class)
     ->name('epg.generate');
@@ -77,6 +66,19 @@ Route::get('/stream/{encodedId}.{format?}', \App\Http\Controllers\StreamControll
 
 Route::get('/stream/e/{encodedId}.{format?}', [\App\Http\Controllers\StreamController::class, 'episode'])
     ->name('stream.episode');
+
+/*
+ * Xtream API route
+ */
+
+// Xtream API handling route
+Route::get('/xtream/{uuid}/api', [XtreamApiController::class, 'handle'])->name('playlist.xtream.api');
+
+// Xtream API Stream Handling Routes
+Route::get('/live/{username}/{password}/{encodedId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleLive'])
+    ->name('xtream.stream.live');
+Route::get('/series/{username}/{password}/{encodedId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleVod'])
+    ->name('xtream.stream.vod');
 
 
 /*

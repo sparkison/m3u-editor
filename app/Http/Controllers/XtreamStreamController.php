@@ -31,9 +31,9 @@ class XtreamStreamController extends Controller
             $currentPlaylist = null;
 
             // Try to authenticate via PlaylistAuth
-            $playlistViaAuth = (clone $query)->with('playlistAuth') // Eager load to access username/password if needed, though query does it
-                ->whereHas('playlistAuth', function ($q) use ($username, $password) {
-                    $q->where('username', $username)->where('password', $password)->where('is_enabled', true);
+            $playlistViaAuth = (clone $query)->with('playlistAuths')
+                ->whereHas('playlistAuths', function ($q) use ($username, $password) {
+                    $q->where('username', $username)->where('password', $password)->where('enabled', true);
                 })->first();
 
             if ($playlistViaAuth) {
@@ -80,11 +80,13 @@ class XtreamStreamController extends Controller
         } elseif ($streamType === 'vod') {
             $episode = Episode::with('season.series')->find($streamId);
 
-            if (!$episode || !$episode->season || !$episode->season->series) {
+            if (!$episode) {
                 return null; // Episode or its hierarchy not found
             }
-
-            $series = $episode->season->series;
+            $series = $episode->season()?->series ?? null;
+            if (!$series) {
+                return null; // Series not found
+            }
 
             if (!$series->enabled) {
                 return null; // Series is disabled
@@ -110,16 +112,22 @@ class XtreamStreamController extends Controller
      * this endpoint redirects to the actual internal stream URL.
      * The route for this endpoint is typically `/live/{username}/{password}/{streamId}.{format}`.
      *
-     * @pathParam username string required User's Xtream API username. Example: "user123"
-     * @pathParam password string required User's Xtream API password. Example: "password"
-     * @pathParam streamId int required The ID of the live stream (channel ID). Example: 101
-     * @pathParam format string required The requested stream format (e.g., 'ts', 'm3u8'). Example: "ts"
+     * @param \Illuminate\Http\Request $request The HTTP request
+     * @param string $username User's Xtream API username (path parameter)
+     * @param string $password User's Xtream API password (path parameter)
+     * @param int $streamId The ID of the live stream (channel ID) (path parameter)
+     * @param string $format The requested stream format (e.g., 'ts', 'm3u8') (path parameter)
      *
      * @response 302 scenario="Successful redirect to stream URL" description="Redirects to the internal live stream URL."
      * @response 403 scenario="Forbidden/Unauthorized" {"error": "Unauthorized or stream not found"}
      */
     public function handleLive(Request $request, string $username, string $password, int $streamId, string $format)
     {
+        // Find the channel by ID
+        if (strpos($streamId, '==') === false) {
+            $streamId .= '=='; // right pad to ensure proper decoding
+        }
+        $streamId = base64_decode($streamId);
         $channel = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'live');
 
         if ($channel instanceof Channel) {
@@ -143,10 +151,11 @@ class XtreamStreamController extends Controller
      * this endpoint redirects to the actual internal stream URL for the episode.
      * The route for this endpoint is typically `/series/{username}/{password}/{streamId}.{format}`.
      *
-     * @pathParam username string required User's Xtream API username. Example: "user123"
-     * @pathParam password string required User's Xtream API password. Example: "password"
-     * @pathParam streamId int required The ID of the VOD stream (episode ID). Example: 5001
-     * @pathParam format string required The requested stream format (e.g., 'mp4', 'mkv', 'm3u8'). Example: "mp4"
+     * @param \Illuminate\Http\Request $request The HTTP request
+     * @param string $username User's Xtream API username (path parameter)
+     * @param string $password User's Xtream API password (path parameter)
+     * @param int $streamId The ID of the VOD stream (episode ID) (path parameter)
+     * @param string $format The requested stream format (e.g., 'mp4', 'mkv', 'm3u8') (path parameter)
      *
      * @response 302 scenario="Successful redirect to stream URL" description="Redirects to the internal VOD episode stream URL."
      * @response 403 scenario="Forbidden/Unauthorized" {"error": "Unauthorized or stream not found"}
@@ -154,6 +163,11 @@ class XtreamStreamController extends Controller
      */
     public function handleVod(Request $request, string $username, string $password, int $streamId, string $format)
     {
+        // Find the episode by ID
+        if (strpos($streamId, '==') === false) {
+            $streamId .= '=='; // right pad to ensure proper decoding
+        }
+        $streamId = base64_decode($streamId);
         $episode = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'vod');
 
         if ($episode instanceof Episode) {

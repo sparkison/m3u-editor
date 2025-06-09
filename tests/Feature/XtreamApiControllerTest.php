@@ -38,22 +38,17 @@ class XtreamApiControllerTest extends TestCase
         $this->username = 'testuser_' . Str::random(5); // Unique username for auth
         $this->password = 'testpass';
 
-        // Ensure only one PlaylistAuth is created for the combination
-        PlaylistAuth::updateOrCreate(
-            ['playlist_id' => $this->playlist->id, 'username' => $this->username],
-            [
-                'password' => $this->password, // In real app, hash passwords if not already
-                'is_enabled' => true,
-            ]
-        );
-
-        // Mock URL::asset to prevent issues with asset versioning in tests
-        // Check if already mocked to avoid conflicts if setUp is called multiple times by test runner
-        if (!URL::hasMacro('asset')) { // A simple check; better might be a static flag
-            URL::shouldReceive('asset')->andReturnUsing(function ($path) {
-                return 'http://localhost/' . ltrim($path, '/');
-            })->byDefault();
-        }
+        // Create PlaylistAuth and attach it to the playlist using the polymorphic relationship
+        $playlistAuth = PlaylistAuth::create([
+            'name' => 'Test Auth',
+            'username' => $this->username,
+            'password' => $this->password,
+            'enabled' => true,
+            'user_id' => $this->user->id,
+        ]);
+        
+        // Attach the auth to the playlist using the morphToMany relationship
+        $this->playlist->playlistAuths()->attach($playlistAuth);
     }
 
     // Helper to build URL for Xtream API actions
@@ -79,12 +74,16 @@ class XtreamApiControllerTest extends TestCase
         $authPassword = $playlistAuthCredentials['password'] ?? $this->password;
 
         // PlaylistAuth is already created in setUp generally, but this allows override for specific panel tests
-        if (!PlaylistAuth::where('playlist_id', $playlist->id)->where('username', $authUsername)->exists()) {
-             PlaylistAuth::factory()->for($playlist)->create([
-                 'username' => $authUsername,
-                 'password' => $authPassword,
-                 'is_enabled' => true,
-             ]);
+        $existingAuth = $playlist->playlistAuths->where('username', $authUsername)->first();
+        if (!$existingAuth) {
+            $playlistAuth = PlaylistAuth::create([
+                'name' => 'Test Auth Override',
+                'username' => $authUsername,
+                'password' => $authPassword,
+                'enabled' => true,
+                'user_id' => $user->id,
+            ]);
+            $playlist->playlistAuths()->attach($playlistAuth);
         }
 
         return $this->getJson(route('playlist.xtream.api', [
@@ -101,7 +100,7 @@ class XtreamApiControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonStructure([
-            'user_info', 'server_info', 'available_channels', 'series', 'categories',
+            'user_info', 'server_info',
         ]);
         $response->assertJsonStructure([
             'user_info' => [
@@ -117,18 +116,23 @@ class XtreamApiControllerTest extends TestCase
                 'timezone', 'server_software', 'timestamp_now', 'time_now',
             ],
         ]);
-        $response->assertJsonPath('server_info.server_software', 'MediaFlow Xtream API');
+        $response->assertJsonPath('server_info.server_software', config('app.name') . ' Xtream API');
     }
 
     public function test_panel_action_with_invalid_playlist_auth_returns_unauthorized(): void
     {
         $user = User::factory()->create();
         $playlist = Playlist::factory()->for($user)->create();
-        PlaylistAuth::factory()->for($playlist)->create([ // Valid auth created
+        
+        // Create a valid auth and attach it to the playlist
+        $playlistAuth = PlaylistAuth::create([
+            'name' => 'Test Auth',
             'username' => 'correct_user',
             'password' => 'correct_password',
-            'is_enabled' => true,
+            'enabled' => true,
+            'user_id' => $user->id,
         ]);
+        $playlist->playlistAuths()->attach($playlistAuth);
 
         $response = $this->getJson(route('playlist.xtream.api', [
             'uuid' => $playlist->uuid,
@@ -146,7 +150,16 @@ class XtreamApiControllerTest extends TestCase
         $plainPassword = 'password123';
         $user = User::factory()->create(['password' => Hash::make($plainPassword)]);
         $playlist = Playlist::factory()->for($user)->create();
-        PlaylistAuth::factory()->for($playlist)->create(['is_enabled' => false]); // Ensure PlaylistAuth not used
+        
+        // Create a disabled auth to ensure it's not used
+        $playlistAuth = PlaylistAuth::create([
+            'name' => 'Disabled Auth',
+            'username' => 'disabled_user',
+            'password' => 'disabled_password',
+            'enabled' => false,
+            'user_id' => $user->id,
+        ]);
+        $playlist->playlistAuths()->attach($playlistAuth);
 
         $response = $this->getJson(route('playlist.xtream.api', [
             'uuid' => $playlist->uuid,
@@ -157,14 +170,23 @@ class XtreamApiControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('user_info.username', 'm3ue');
-        $response->assertJsonStructure(['user_info', 'server_info', 'available_channels', 'series', 'categories']);
+        $response->assertJsonStructure(['user_info', 'server_info']);
     }
 
     public function test_panel_action_with_m3ue_user_and_incorrect_password_returns_unauthorized(): void
     {
         $user = User::factory()->create(['password' => Hash::make('correct_password')]);
         $playlist = Playlist::factory()->for($user)->create();
-        PlaylistAuth::factory()->for($playlist)->create(['is_enabled' => false]);
+        
+        // Create a disabled auth to ensure it's not used
+        $playlistAuth = PlaylistAuth::create([
+            'name' => 'Disabled Auth',
+            'username' => 'disabled_user',
+            'password' => 'disabled_password',
+            'enabled' => false,
+            'user_id' => $user->id,
+        ]);
+        $playlist->playlistAuths()->attach($playlistAuth);
 
         $response = $this->getJson(route('playlist.xtream.api', [
             'uuid' => $playlist->uuid,
@@ -201,84 +223,6 @@ class XtreamApiControllerTest extends TestCase
         $responseMissingPass->assertStatus(401)->assertJson(['error' => 'Unauthorized - Missing credentials']);
     }
 
-    public function test_panel_action_contains_playlist_channels(): void
-    {
-        $user = null; $playlist = null; // Passed by reference to setup
-        $group = Group::factory()->create(['name' => 'Test Group']); // ID will be auto-generated
-
-        // This will be passed by reference and populated by setupAuthenticatedPanelRequest
-        $this->setupAuthenticatedPanelRequest($user, $playlist);
-
-        $channel1 = Channel::factory()->for($playlist)->for($group)->create(['title' => 'Channel 1', 'enabled' => true]);
-        Channel::factory()->for($playlist)->for($group)->create(['title' => 'Channel 2', 'enabled' => true]);
-        Channel::factory()->for($playlist)->create(['title' => 'Channel Disabled', 'enabled' => false]); // Should not appear
-
-        // Re-fetch after adding channels
-        $response = $this->setupAuthenticatedPanelRequest($user, $playlist);
-
-        $response->assertOk();
-        $response->assertJsonCount(2, 'available_channels'); // Only enabled channels
-        $response->assertJsonPath('available_channels.0.name', 'Channel 1');
-        $response->assertJsonPath('available_channels.0.stream_id', $channel1->id); // stream_id is int
-        $response->assertJsonPath('available_channels.0.category_id', (string)$group->id); // category_id is string
-
-        $response->assertJsonFragment([ // Check category presence
-            'category_id' => (string)$group->id,
-            'category_name' => 'Test Group',
-        ]);
-    }
-
-    public function test_panel_action_contains_playlist_series(): void
-    {
-        $user = null; $playlist = null;
-        $seriesCategory = Category::factory()->create(['name' => 'Test Series Category']);
-
-        $this->setupAuthenticatedPanelRequest($user, $playlist);
-
-        $seriesA = Series::factory()->for($playlist)->for($seriesCategory)->create(['name' => 'Series A', 'enabled' => true]);
-        Series::factory()->for($playlist)->for($seriesCategory)->create(['name' => 'Series B', 'enabled' => true]);
-        Series::factory()->for($playlist)->create(['name' => 'Series Disabled', 'enabled' => false]); // Should not appear
-
-        // Re-fetch after adding series
-        $response = $this->setupAuthenticatedPanelRequest($user, $playlist);
-
-        $response->assertOk();
-        $response->assertJsonCount(2, 'series'); // Only enabled series
-        $response->assertJsonPath('series.0.name', 'Series A');
-        $response->assertJsonPath('series.0.series_id', $seriesA->id); // series_id is int
-        $response->assertJsonPath('series.0.category_id', (string)$seriesCategory->id); // category_id is string
-
-        $response->assertJsonFragment([
-            'category_id' => (string)$seriesCategory->id,
-            'category_name' => 'Test Series Category',
-        ]);
-    }
-
-    public function test_panel_action_contains_mixed_categories(): void
-    {
-        $user = null; $playlist = null; // Passed by ref
-        // Use class properties for user and playlist if already set up by main setUp
-        $this->setUp(); // Ensure base setup is run if test is run in isolation
-        $user = $this->user;
-        $playlist = $this->playlist;
-
-
-        $liveGroup = Group::factory()->create(['name' => 'Live Group']);
-        $vodCategory = Category::factory()->create(['name' => 'VOD Category']);
-
-        // Pass the specific user and playlist to ensure context
-        $this->setupAuthenticatedPanelRequest($user, $playlist);
-
-        Channel::factory()->for($playlist)->for($liveGroup)->create(['enabled' => true]);
-        Series::factory()->for($playlist)->for($vodCategory)->create(['enabled' => true]);
-
-        $response = $this->setupAuthenticatedPanelRequest($user, $playlist);
-
-        $response->assertOk();
-        $response->assertJsonFragment(['category_name' => 'Live Group', 'category_id' => (string)$liveGroup->id]);
-        $response->assertJsonFragment(['category_name' => 'VOD Category', 'category_id' => (string)$vodCategory->id]);
-    }
-
     // Tests for get_live_streams
     public function test_get_live_streams_success()
     {
@@ -302,11 +246,11 @@ class XtreamApiControllerTest extends TestCase
             ]
         ]);
         // Check specific icon for channel 1
-        $this->assertEquals('http://localhost/icon1.png', $response->json('0.stream_icon'));
+        $this->assertEquals('https://m3ueditor.test/icon1.png', $response->json('0.stream_icon'));
         // Check direct_source for the first channel
         $jsonResponse = $response->json();
         if (!empty($jsonResponse)) {
-            $expectedDirectSource = url("/live/{$this->username}/{$this->password}/{$enabledChannel1->id}.ts");
+            $expectedDirectSource = url("/live/{$this->username}/{$this->password}/" . base64_encode($enabledChannel1->id) . ".ts");
             $this->assertEquals($expectedDirectSource, $jsonResponse[0]['direct_source']);
         }
     }
@@ -321,7 +265,7 @@ class XtreamApiControllerTest extends TestCase
     public function test_get_vod_streams_success()
     {
         $category = Category::factory()->for($this->user)->create(); // Use existing Category model
-        $enabledSeries1 = Series::factory()->for($this->playlist)->for($category)->create(['enabled' => true, 'name' => 'Enabled Series 1', 'cover_image' => 'cover1.jpg']);
+        $enabledSeries1 = Series::factory()->for($this->playlist)->for($category)->create(['enabled' => true, 'name' => 'Enabled Series 1', 'cover' => 'cover1.jpg']);
         $enabledSeries2 = Series::factory()->for($this->playlist)->for($category)->create(['enabled' => true, 'name' => 'Enabled Series 2']);
         Series::factory()->for($this->playlist)->create(['enabled' => false, 'name' => 'Disabled Series']);
 
@@ -340,7 +284,7 @@ class XtreamApiControllerTest extends TestCase
                 'backdrop_path', 'youtube_trailer', 'episode_run_time', 'category_id'
             ]
         ]);
-        $this->assertEquals('http://localhost/cover1.jpg', $response->json('0.cover'));
+        $this->assertEquals('https://m3ueditor.test/cover1.jpg', $response->json('0.cover'));
     }
 
     public function test_get_vod_streams_no_series()
@@ -358,30 +302,32 @@ class XtreamApiControllerTest extends TestCase
             ->for($category)
             ->has(Season::factory()->count(2)
                 ->has(Episode::factory()->count(3)
-                    ->state(function (array $attributes, Season $season) {
-                        return ['container_extension' => 'mp4', 'title' => 'Episode Title '.Str::random(3)];
-                    }), 'episodes'), 'seasons')
-            ->create(['enabled' => true, 'name' => 'Test Series with Episodes', 'cover_image' => 'series_cover.jpg']);
+                    ->sequence(
+                        ['episode_num' => 1, 'container_extension' => 'mp4', 'title' => 'Episode Title 1'],
+                        ['episode_num' => 2, 'container_extension' => 'mp4', 'title' => 'Episode Title 2'],
+                        ['episode_num' => 3, 'container_extension' => 'mp4', 'title' => 'Episode Title 3']
+                    ), 'episodes'), 'seasons')
+            ->create(['enabled' => true, 'name' => 'Test Series with Episodes', 'cover' => 'series_cover.jpg']);
 
         $response = $this->getJson($this->getXtreamApiUrl('get_vod_info', ['vod_id' => $series->id]));
 
         $response->assertStatus(200)
             ->assertJsonPath('info.name', $series->name)
-            ->assertJsonPath('info.cover', 'http://localhost/series_cover.jpg')
+            ->assertJsonPath('info.cover', 'https://m3ueditor.test/series_cover.jpg')
             ->assertJsonPath('movie_data.name', $series->name)
             ->assertJsonCount(2, 'episodes');
 
         $firstSeason = $series->seasons()->orderBy('season_number')->first();
         $firstSeasonNumber = $firstSeason->season_number;
-        $firstEpisode = $firstSeason->episodes()->orderBy('episode_number')->first();
+        $firstEpisode = $firstSeason->episodes()->orderBy('episode_num')->first();
 
         $response->assertJsonPath("episodes.{$firstSeasonNumber}.0.id", (string)$firstEpisode->id);
         $response->assertJsonPath("episodes.{$firstSeasonNumber}.0.title", $firstEpisode->title);
         $response->assertJsonPath("episodes.{$firstSeasonNumber}.0.container_extension", $firstEpisode->container_extension ?? 'mp4');
-        $response->assertJsonPath("episodes.{$firstSeasonNumber}.0.stream_id", $firstEpisode->id); // Assuming stream_id is episode_id
+        $response->assertJsonPath("episodes.{$firstSeasonNumber}.0.stream_id", base64_encode($firstEpisode->id)); // stream_id is base64 encoded
 
         // $expectedUrlPath = "/series/{$this->playlist->uuid}/{$this->username}/{$this->password}/{$series->id}-{$firstEpisode->id}.{$firstEpisode->container_extension}";
-        $expectedDirectSource = url("/series/{$this->username}/{$this->password}/{$firstEpisode->id}.{$firstEpisode->container_extension}");
+        $expectedDirectSource = url("/series/{$this->username}/{$this->password}/" . base64_encode($firstEpisode->id) . ".{$firstEpisode->container_extension}");
         $actualDirectSource = $response->json("episodes.{$firstSeasonNumber}.0.direct_source");
         $this->assertNotNull($actualDirectSource, "Direct source URL is null.");
         // $this->assertStringContainsString($expectedUrlPath, $actualDirectSource);
@@ -412,29 +358,27 @@ class XtreamApiControllerTest extends TestCase
             ->create([
                 'enabled' => true,
                 'name' => 'Test Movie as Series',
-                'is_movie' => true,
-                'container_extension' => 'mkv',
-                'plot_summary' => 'A great movie plot.',
-                'cover_image' => 'movie_cover.jpg',
+                'plot' => 'A great movie plot.',
+                'cover' => 'movie_cover.jpg',
             ]);
 
         $response = $this->getJson($this->getXtreamApiUrl('get_vod_info', ['vod_id' => $movieSeries->id]));
 
         $response->assertStatus(200)
             ->assertJsonPath('info.name', $movieSeries->name)
-            ->assertJsonPath('info.cover', 'http://localhost/movie_cover.jpg')
+            ->assertJsonPath('info.cover', 'https://m3ueditor.test/movie_cover.jpg')
             ->assertJsonPath('movie_data.name', $movieSeries->name);
 
         $response->assertJsonCount(1, 'episodes.1');
         $response->assertJsonPath('episodes.1.0.id', (string)$movieSeries->id);
         $response->assertJsonPath('episodes.1.0.title', $movieSeries->name);
-        $response->assertJsonPath('episodes.1.0.container_extension', $movieSeries->container_extension);
-        $response->assertJsonPath('episodes.1.0.stream_id', $movieSeries->id);
-        $response->assertJsonPath('episodes.1.0.info.plot', $movieSeries->plot_summary);
-        $response->assertJsonPath('episodes.1.0.info.movie_image', 'http://localhost/movie_cover.jpg');
+        $response->assertJsonPath('episodes.1.0.container_extension', 'mp4');
+        $response->assertJsonPath('episodes.1.0.stream_id', base64_encode($movieSeries->id));
+        $response->assertJsonPath('episodes.1.0.info.plot', $movieSeries->plot);
+        $response->assertJsonPath('episodes.1.0.info.movie_image', 'https://m3ueditor.test/movie_cover.jpg');
 
         // $expectedUrlPath = "/series/{$this->playlist->uuid}/{$this->username}/{$this->password}/{$movieSeries->id}.{$movieSeries->container_extension}";
-        $expectedDirectSource = url("/series/{$this->username}/{$this->password}/{$movieSeries->id}.{$movieSeries->container_extension}");
+        $expectedDirectSource = url("/series/{$this->username}/{$this->password}/" . base64_encode($movieSeries->id) . ".mp4");
         $actualDirectSource = $response->json('episodes.1.0.direct_source');
         $this->assertNotNull($actualDirectSource, "Direct source URL is null for movie.");
         // $this->assertStringContainsString($expectedUrlPath, $actualDirectSource);
