@@ -41,7 +41,9 @@ class ChannelsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         $ownerRecord = $this->ownerRecord;
-        return $table->persistFiltersInSession()
+        return $table
+            ->modifyQueryUsing(fn (Builder $query) => $query->withCount('failovers'))
+            ->persistFiltersInSession()
             ->persistSortInSession()
             ->recordTitleAttribute('title')
             ->filtersTriggerAction(function ($action) {
@@ -73,6 +75,10 @@ class ChannelsRelationManager extends RelationManager
                     ->sortable()
                     ->tooltip(fn($record) => $record->playlist->auto_sort ? 'Playlist auto-sort enabled; disable to change' : 'Channel sort order')
                     ->disabled(fn($record) => $record->playlist->auto_sort)
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('failovers_count')
+                    ->label('Failovers')
+                    ->sortable()
                     ->toggleable(),
                 Tables\Columns\TextInputColumn::make('stream_id_custom')
                     ->label('ID')
