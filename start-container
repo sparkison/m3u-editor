@@ -307,5 +307,30 @@ else
     echo ""
     echo "🚀 Starting services..."
     echo ""
-    exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
+    
+    # Start supervisord in background to get Redis running
+    /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf &
+    SUPERVISORD_PID=$!
+    
+    # Wait for Services to be ready and run startup tasks
+    timeout=60
+    while [ $timeout -gt 0 ] && ! redis-cli -p $REDIS_SERVER_PORT ping >/dev/null 2>&1; do
+        sleep 1
+        timeout=$((timeout-1))
+    done
+    
+    if [ $timeout -gt 0 ]; then
+        echo "✅ Redis is ready!"
+        php artisan app:flush-ffmpeg-process-cache
+        
+        echo "🧹 Pruning stale HLS processes..."
+        php artisan app:hls-prune
+        
+        echo "✅ Startup completed!"
+    else
+        echo "⚠️ Redis startup timeout - continuing anyway"
+    fi
+    
+    # Wait for supervisord to finish (keep container running)
+    wait $SUPERVISORD_PID
 fi
