@@ -733,6 +733,13 @@ class ChannelResource extends Resource
                         ->placeholder(fn(Get $get) => $get('stream_id'))
                         ->helperText("Leave empty to use playlist default value.")
                         ->rules(['min:1', 'max:255']),
+                    Forms\Components\TextInput::make('station_id')
+                        ->label('Station ID')
+                        ->hint('tvc-guide-stationid')
+                        ->columnSpan(1)
+                        ->helperText("Gracenote station ID")
+                        ->type('number')
+                        ->rules(['numeric', 'min:0']),
                     Forms\Components\TextInput::make('channel')
                         ->label('Channel No.')
                         ->hint('tvg-chno')
@@ -747,7 +754,7 @@ class ChannelResource extends Resource
                         ->label('Group')
                         ->hint('group-title')
                         ->options(fn($record) => Group::where('playlist_id', $record->playlist_id)->get(['name', 'id'])->pluck('name', 'id'))
-                        ->columnSpan(1)
+                        ->columnSpanFull()
                         ->placeholder('Select a group')
                         ->searchable()
                         ->live()
