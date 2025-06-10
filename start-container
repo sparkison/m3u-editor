@@ -191,7 +191,8 @@ echo ""
 
 # Start Redis server
 echo "📡 Starting Redis server..."
-redis-server /etc/redis/redis.conf --daemonize yes
+# Start Redis in background and suppress memory overcommit warning
+redis-server /etc/redis/redis.conf 2>&1 | grep -v "Memory overcommit must be enabled" &
 
 # If postgres is enabled, start it
 if [ "${ENABLE_POSTGRES}" = "true" ]; then
