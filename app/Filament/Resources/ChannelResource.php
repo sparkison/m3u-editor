@@ -826,6 +826,28 @@ class ChannelResource extends Resource
                         ->helperText('Select an associated EPG channel for this channel.')
                         ->relationship('epgChannel', 'name')
                         ->getOptionLabelFromRecordUsing(fn($record) => "$record->name [{$record->epg->name}]")
+                        ->getSearchResultsUsing(function (string $search) {
+                            $searchLower = strtolower($search);
+                            $channels = Auth::user()->epgChannels()
+                                ->withoutEagerLoads()
+                                ->with('epg')
+                                ->where(function ($query) use ($searchLower) {
+                                    $query->whereRaw('LOWER(name) LIKE ?', ["%{$searchLower}%"])
+                                        ->orWhereRaw('LOWER(display_name) LIKE ?', ["%{$searchLower}%"])
+                                        ->orWhereRaw('LOWER(channel_id) LIKE ?', ["%{$searchLower}%"]);
+                                })
+                                ->limit(50) // Keep a reasonable limit
+                                ->get();
+
+                            // Create options array
+                            $options = [];
+                            foreach ($channels as $channel) {
+                                $displayTitle = $channel->name;
+                                $epgName = $channel->epg->name ?? 'Unknown';
+                                $options[$channel->id] = "{$displayTitle} [{$epgName}]";
+                            }
+                            return $options;
+                        })
                         ->searchable()
                         ->columnSpan(1),
                     Forms\Components\Select::make('logo_type')
