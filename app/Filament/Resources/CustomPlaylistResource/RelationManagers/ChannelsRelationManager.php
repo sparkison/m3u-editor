@@ -235,13 +235,7 @@ class ChannelsRelationManager extends RelationManager
             ])
             ->headerActions([
                 Tables\Actions\AttachAction::make()
-                    ->recordSelectSearchColumns([
-                        'title',
-                        'title_custom',
-                        'name',
-                        'name_custom',
-                        'stream_id'
-                    ])->form(fn(Tables\Actions\AttachAction $action): array => [
+                    ->form(fn(Tables\Actions\AttachAction $action): array => [
                         $action
                             ->getRecordSelect()
                             ->getSearchResultsUsing(function (string $search) {
