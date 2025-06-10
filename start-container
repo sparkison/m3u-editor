@@ -318,11 +318,13 @@ else
         sleep 1
         timeout=$((timeout-1))
     done
-    
     if [ $timeout -gt 0 ]; then
+        # Flush FFmpeg process cache
         php artisan app:flush-ffmpeg-process-cache
         php artisan app:hls-prune
-        php artisan horizon:terminate
+
+        # Restart Horizon
+        php artisan horizon:terminate > /dev/null 2>&1
     fi
     
     # Startup completed
