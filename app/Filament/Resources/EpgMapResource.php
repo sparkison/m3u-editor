@@ -159,7 +159,7 @@ class EpgMapResource extends Resource
                         ->inline(true)
                         ->live()
                         ->default(false)
-                        ->helperText('When enabled, channel titles will be cleaned based on regex pattern instead of prefix before matching.'),
+                        ->helperText('When enabled, channel attributes will be cleaned based on regex pattern instead of prefix before matching.'),
                     Forms\Components\TagsInput::make('settings.exclude_prefixes')
                         ->label(fn(Get $get) => !$get('settings.use_regex') ? 'Channel prefixes to remove before matching' : 'Regex patterns to remove before matching')
                         ->helperText('Press [tab] or [return] to add item. Leave empty to disable.')
