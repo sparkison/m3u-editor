@@ -20,7 +20,7 @@ class HlsStreamService
 
     /**
      * Start an HLS stream with failover support for the given channel.
-     * This method also tracks connections, performs pre-checks using ffprobe, and monitors for slow speed.
+     * This method also tracks connections and performs pre-checks using ffprobe.
      *
      * @param string $type
      * @param Channel|Episode $model The Channel model instance
@@ -39,8 +39,16 @@ class HlsStreamService
         $streams = collect([$model]);
 
         // If type is channel, include failover channels
-        if ($type === 'channel' && $model instanceof Channel) {
-            $streams = $streams->concat($model->failoverChannels);
+        if ($model instanceof Channel) {
+            if ($model->is_custom && !($model->url_custom || $model->url)) {
+                // If the custom channel has no URL set, log it and set $streams to the channel failovers only
+                Log::channel('ffmpeg')->debug("HLS Stream: Custom channel {$model->id} ({$title}) has no URL set. Using failover channels only.");
+
+                // Set $streams to only the failover channels if no URL is set
+                $streams = $model->failoverChannels;
+            } else {
+                $streams = $streams->concat($model->failoverChannels);
+            }
         }
 
         // First check if any of the streams (including failovers) are already running
@@ -64,11 +72,10 @@ class HlsStreamService
 
         // Loop over the failover channels and grab the first one that works.
         foreach ($streams as $stream) { // $stream is the current primary or failover channel being attempted
-            // Skip if the model `is_custom` and there's not URL set
-            if ($model->is_custom && (empty($stream->url) || empty($stream->url_custom))) {
-                Log::channel('ffmpeg')->debug("Skipping custom channel {$title} (ID: {$model->id}) as it has no URL set.");
-                continue;
-            }
+            // URL for the current stream being attempted
+            $currentAttemptStreamUrl = $type === 'channel'
+                ? ($stream->url_custom ?? $stream->url) // Use current $stream's URL
+                : $stream->url;
 
             // Get the title for the current stream in the loop
             $currentStreamTitle = $type === 'channel'
@@ -101,18 +108,13 @@ class HlsStreamService
                 continue;
             }
 
-            // URL for the current stream being attempted
-            $currentAttemptStreamUrl = $type === 'channel'
-                ? ($stream->url_custom ?? $stream->url) // Use current $stream's URL
-                : $stream->url;
-
             $userAgent = $playlist->user_agent ?? null;
             try {
                 // Pass the ffprobe timeout to runPreCheck
                 // Pass $type and $stream->id for caching stream info
                 $this->runPreCheck($type, $stream->id, $currentAttemptStreamUrl, $userAgent, $currentStreamTitle, $ffprobeTimeout);
 
-                $this->startStreamWithSpeedCheck(
+                $this->startStreamingProcess(
                     type: $type,
                     model: $stream, // Pass the current $stream object
                     streamUrl: $currentAttemptStreamUrl, // Pass the URL of the current $stream
@@ -147,7 +149,7 @@ class HlsStreamService
     }
 
     /**
-     * Start a stream and monitor for slow speed.
+     * Start a stream process.
      *
      * @param string $type
      * @param Channel|Episode $model
@@ -157,9 +159,9 @@ class HlsStreamService
      * @param string|null $userAgent
      * 
      * @return int The FFmpeg process ID
-     * @throws Exception If the stream fails or speed drops below the threshold
+     * @throws Exception If the stream fails
      */
-    private function startStreamWithSpeedCheck(
+    private function startStreamingProcess(
         string $type,
         Channel|Episode $model,
         string $streamUrl,
