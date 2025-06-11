@@ -42,25 +42,25 @@ class MonitorStreamHealthJob implements ShouldQueue
      * @param int \$currentIndexInSourceIds Index in streamSourceIds that corresponds to activeStreamId
      */
     public function __construct(
-        string \$streamType,
-        int \$activeStreamId,
-        int \$originalModelId,
-        string \$originalModelTitle,
-        int \$playlistIdOfActiveStream,
-        array \$streamSourceIds,
-        int \$currentIndexInSourceIds
+        string $streamType,
+        int $activeStreamId,
+        int $originalModelId,
+        string $originalModelTitle,
+        int $playlistIdOfActiveStream,
+        array $streamSourceIds,
+        int $currentIndexInSourceIds
     ) {
-        \$this->streamType = \$streamType;
-        \$this->activeStreamId = \$activeStreamId;
-        \$this->originalModelId = \$originalModelId;
-        \$this->originalModelTitle = \$originalModelTitle;
-        \$this->playlistIdOfActiveStream = \$playlistIdOfActiveStream;
-        \$this->streamSourceIds = \$streamSourceIds;
-        \$this->currentIndexInSourceIds = \$currentIndexInSourceIds;
+        $this->streamType = $streamType;
+        $this->activeStreamId = $activeStreamId;
+        $this->originalModelId = $originalModelId;
+        $this->originalModelTitle = $originalModelTitle;
+        $this->playlistIdOfActiveStream = $playlistIdOfActiveStream;
+        $this->streamSourceIds = $streamSourceIds;
+        $this->currentIndexInSourceIds = $currentIndexInSourceIds;
 
-        \$this->tries = config('streaming.monitor_job_tries', 3);
-        \$this->backoff = config('streaming.monitor_job_backoff', [60, 120, 300]);
-        \$this->onQueue(config('proxy.queue_priority_hls_monitor', 'default'));
+        $this->tries = config('streaming.monitor_job_tries', 3);
+        $this->backoff = config('streaming.monitor_job_backoff', [60, 120, 300]);
+        $this->onQueue(config('proxy.queue_priority_hls_monitor', 'default'));
     }
 
     /**
