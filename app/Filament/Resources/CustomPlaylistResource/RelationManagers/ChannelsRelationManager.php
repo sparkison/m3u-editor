@@ -76,8 +76,8 @@ class ChannelsRelationManager extends RelationManager
                     ->type('number')
                     ->placeholder('Sort Order')
                     ->sortable()
-                    ->tooltip(fn($record) => $record->playlist->auto_sort ? 'Playlist auto-sort enabled; disable to change' : 'Channel sort order')
-                    ->disabled(fn($record) => $record->playlist->auto_sort)
+                    ->tooltip(fn($record) => $record->playlist?->auto_sort ? 'Playlist auto-sort enabled; disable to change' : 'Channel sort order')
+                    ->disabled(fn($record) => $record->playlist?->auto_sort)
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('failovers_count')
                     ->label('Failovers')
