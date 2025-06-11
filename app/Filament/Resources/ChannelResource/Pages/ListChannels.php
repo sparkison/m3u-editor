@@ -5,6 +5,7 @@ namespace App\Filament\Resources\ChannelResource\Pages;
 use App\Filament\Exports\ChannelExporter;
 use App\Filament\Imports\ChannelImporter;
 use App\Filament\Resources\ChannelResource;
+use App\Filament\Resources\EpgMapResource;
 use App\Models\Channel;
 use App\Models\Epg;
 use App\Models\Playlist;
@@ -65,35 +66,15 @@ class ListChannels extends ListRecords
             Actions\ActionGroup::make([
                 Actions\Action::make('map')
                     ->label('Map EPG to Playlist')
-                    ->form([
-                        Forms\Components\Select::make('epg')
-                            ->required()
-                            ->label('EPG')
-                            ->helperText('Select the EPG you would like to map from.')
-                            ->options(Epg::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                            ->searchable(),
-                        Forms\Components\Select::make('playlist')
-                            ->required()
-                            ->label('Playlist')
-                            ->helperText('Select the playlist you would like to map to.')
-                            ->options(Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                            ->searchable(),
-                        Forms\Components\Toggle::make('overwrite')
-                            ->label('Overwrite')
-                            ->helperText('Overwrite channels with existing mappings?')
-                            ->default(false),
-                        Forms\Components\Toggle::make('recurring')
-                            ->label('Recurring')
-                            ->helperText('Re-run this mapping everytime the EPG is synced?')
-                            ->default(false),
-                    ])
-                    ->action(function (Collection $records, array $data): void {
+                    ->form(EpgMapResource::getForm())
+                    ->action(function (array $data): void {
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new \App\Jobs\MapPlaylistChannelsToEpg(
-                                epg: (int)$data['epg'],
-                                playlist: $data['playlist'],
-                                force: $data['overwrite'],
+                                epg: (int)$data['epg_id'],
+                                playlist: $data['playlist_id'],
+                                force: $data['override'],
                                 recurring: $data['recurring'],
+                                settings: $data['settings'] ?? [],
                             ));
                     })->after(function () {
                         Notification::make()

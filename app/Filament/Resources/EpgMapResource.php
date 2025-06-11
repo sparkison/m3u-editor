@@ -5,9 +5,12 @@ namespace App\Filament\Resources;
 use App\Enums\Status;
 use App\Filament\Resources\EpgMapResource\Pages;
 use App\Filament\Resources\EpgMapResource\RelationManagers;
+use App\Models\Epg;
 use App\Models\EpgMap;
+use App\Models\Playlist;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -34,9 +37,7 @@ class EpgMapResource extends Resource
     public static function form(Form $form): Form
     {
         return $form
-            ->schema([
-                //
-            ]);
+            ->schema(self::getForm(showPlaylist: false, showEpg: false));
     }
 
     public static function table(Table $table): Table
@@ -90,6 +91,9 @@ class EpgMapResource extends Resource
                 Tables\Actions\DeleteAction::make()
                     ->button()
                     ->hiddenLabel(),
+                Tables\Actions\EditAction::make()
+                    ->button()
+                    ->hiddenLabel()
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -111,6 +115,66 @@ class EpgMapResource extends Resource
             'index' => Pages\ListEpgMaps::route('/'),
             // 'create' => Pages\CreateEpgMap::route('/create'),
             // 'edit' => Pages\EditEpgMap::route('/{record}/edit'),
+        ];
+    }
+
+    public static function getForm(
+        $showPlaylist = true,
+        $showEpg = true
+    ): array {
+        return [
+            Forms\Components\Select::make('epg_id')
+                ->required()
+                ->label('EPG')
+                ->helperText('Select the EPG you would like to map from.')
+                ->options(Epg::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                ->hidden(!$showEpg)
+                ->searchable(),
+            Forms\Components\Select::make('playlist_id')
+                ->required()
+                ->label('Playlist')
+                ->helperText('Select the playlist you would like to map to.')
+                ->options(Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                ->hidden(!$showPlaylist)
+                ->searchable(),
+            Forms\Components\Toggle::make('override')
+                ->label('Overwrite')
+                ->disabled((fn($record) => $record && $record->playlist_id === null))
+                ->helperText((fn($record): string => $record && $record->playlist_id === null ? 'Not available for custom channel mappings' : 'Overwrite channels with existing mappings?'))
+                ->hintIcon((fn($record) => $record && $record->playlist_id === null ? 'heroicon-o-lock-closed' : ''))
+                ->default(false),
+            Forms\Components\Toggle::make('recurring')
+                ->label('Recurring')
+                ->disabled((fn($record) => $record && $record->playlist_id === null))
+                ->helperText((fn($record): string => $record && $record->playlist_id === null ? 'Not available for custom channel mappings' : 'Re-run this mapping everytime the EPG is synced?'))
+                ->hintIcon((fn($record) => $record && $record->playlist_id === null ? 'heroicon-o-lock-closed' : ''))
+                ->default(false),
+            Forms\Components\Fieldset::make('Advanced Settings')
+                ->columns(2)
+                ->columnSpanFull()
+                ->schema([
+                    Forms\Components\Toggle::make('settings.use_regex')
+                        ->label('Use regex for filtering')
+                        ->columnSpanFull()
+                        ->inline(true)
+                        ->live()
+                        ->default(false)
+                        ->helperText('When enabled, channel titles will be cleaned based on regex pattern instead of prefix before matching.'),
+                    Forms\Components\TagsInput::make('settings.exclude_prefixes')
+                        ->label(fn(Get $get) => !$get('settings.use_regex') ? 'Channel prefixes to remove before matching' : 'Regex patterns to remove before matching')
+                        ->helperText('Press [tab] or [return] to add item. Leave empty to disable.')
+                        ->columnSpanFull()
+                        ->suggestions([
+                            'US: ',
+                            'UK: ',
+                            'CA: ',
+                            '^(US|UK|CA): ',
+                            '\s*(FHD|HD)\s*',
+                            '\s+(FHD|HD).*$',
+                            '\[.*\]'
+                        ])
+                        ->splitKeys(['Tab', 'Return', ',']),
+                ]),
         ];
     }
 }

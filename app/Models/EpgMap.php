@@ -25,6 +25,7 @@ class EpgMap extends Model
         'epg_id' => 'integer',
         'channel_count' => 'integer',
         'mapped_count' => 'integer',
+        'settings' => 'array',
         'status' => Status::class,
     ];
 

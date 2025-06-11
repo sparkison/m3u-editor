@@ -350,24 +350,14 @@ class ChannelResource extends Resource
                         ->modalSubmitActionLabel('Move now'),
                     Tables\Actions\BulkAction::make('map')
                         ->label('Map EPG to selected')
-                        ->form([
-                            Forms\Components\Select::make('epg')
-                                ->required()
-                                ->label('EPG')
-                                ->helperText('Select the EPG you would like to map from.')
-                                ->options(Epg::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                                ->searchable(),
-                            Forms\Components\Toggle::make('overwrite')
-                                ->label('Overwrite')
-                                ->helperText('Overwrite channels with existing mappings?')
-                                ->default(false),
-                        ])
+                        ->form(EpgMapResource::getForm(showPlaylist: false, showEpg: true))
                         ->action(function (Collection $records, array $data): void {
                             app('Illuminate\Contracts\Bus\Dispatcher')
                                 ->dispatch(new \App\Jobs\MapPlaylistChannelsToEpg(
-                                    epg: (int)$data['epg'],
+                                    epg: (int)$data['epg_id'],
                                     channels: $records->pluck('id')->toArray(),
-                                    force: $data['overwrite'],
+                                    force: $data['override'],
+                                    settings: $data['settings'] ?? [],
                                 ));
                         })->after(function () {
                             Notification::make()
