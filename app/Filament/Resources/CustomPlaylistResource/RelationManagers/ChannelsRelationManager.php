@@ -258,7 +258,7 @@ class ChannelsRelationManager extends RelationManager
                                 $options = [];
                                 foreach ($channels as $channel) {
                                     $displayTitle = $channel->title_custom ?: $channel->title;
-                                    $playlistName = $channel->playlist->name ?? 'Unknown';
+                                    $playlistName = $channel->getEffectivePlaylist()->name ?? 'Unknown';
                                     $options[$channel->id] = "{$displayTitle} [{$playlistName}]";
                                 }
 
@@ -266,7 +266,7 @@ class ChannelsRelationManager extends RelationManager
                             })
                             ->getOptionLabelFromRecordUsing(function ($record) {
                                 $displayTitle = $record->title_custom ?: $record->title;
-                                $playlistName = $record->playlist->name ?? 'Unknown';
+                                $playlistName = $record->getEffectivePlaylist()->name ?? 'Unknown';
                                 $options[$record->id] = "{$displayTitle} [{$playlistName}]";
                                 return "{$displayTitle} [{$playlistName}]";
                             })
@@ -337,7 +337,7 @@ class ChannelsRelationManager extends RelationManager
                             $initialMasterOptions = [];
                             foreach ($records as $record) {
                                 $displayTitle = $record->title_custom ?: $record->title;
-                                $playlistName = $record->playlist->name ?? 'Unknown';
+                                $playlistName = $record->getEffectivePlaylist()->name ?? 'Unknown';
                                 $initialMasterOptions[$record->id] = "{$displayTitle} [{$playlistName}]";
                             }
                             return [
@@ -387,7 +387,7 @@ class ChannelsRelationManager extends RelationManager
                                         $options = [];
                                         foreach ($channels as $channel) {
                                             $displayTitle = $channel->title_custom ?: $channel->title;
-                                            $playlistName = $channel->playlist->name ?? 'Unknown';
+                                            $playlistName = $channel->getEffectivePlaylist()->name ?? 'Unknown';
                                             $options[$channel->id] = "{$displayTitle} [{$playlistName}]";
                                         }
 

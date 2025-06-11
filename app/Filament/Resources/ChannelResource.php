@@ -420,7 +420,7 @@ class ChannelResource extends Resource
                             $initialMasterOptions = [];
                             foreach ($records as $record) {
                                 $displayTitle = $record->title_custom ?: $record->title;
-                                $playlistName = $record->playlist->name ?? 'Unknown';
+                                $playlistName = $record->getEffectivePlaylist()->name ?? 'Unknown';
                                 $initialMasterOptions[$record->id] = "{$displayTitle} [{$playlistName}]";
                             }
                             return [
@@ -470,7 +470,7 @@ class ChannelResource extends Resource
                                         $options = [];
                                         foreach ($channels as $channel) {
                                             $displayTitle = $channel->title_custom ?: $channel->title;
-                                            $playlistName = $channel->playlist->name ?? 'Unknown';
+                                            $playlistName = $channel->getEffectivePlaylist()->name ?? 'Unknown';
                                             $options[$channel->id] = "{$displayTitle} [{$playlistName}]";
                                         }
 
@@ -861,7 +861,7 @@ class ChannelResource extends Resource
                         ->prefixIcon('heroicon-m-globe-alt')
                         ->placeholder(fn($record) => ProxyFacade::getProxyUrlForChannel(
                             $record->id,
-                            $record->playlist->proxy_options['output'] ?? 'ts'
+                            $record->getEffectivePlaylist()->proxy_options['output'] ?? 'ts'
                         ))
                         ->helperText("m3u editor proxy url.")
                         ->disabled()
@@ -871,7 +871,7 @@ class ChannelResource extends Resource
                                 ->action(function ($record, $state) {
                                     $url = ProxyFacade::getProxyUrlForChannel(
                                         $record->id,
-                                        $record->playlist->proxy_options['output'] ?? 'ts'
+                                        $record->getEffectivePlaylist()->proxy_options['output'] ?? 'ts'
                                     );
                                     $title = $record->title_custom ?? $record->title;
                                     Notification::make()
@@ -956,7 +956,7 @@ class ChannelResource extends Resource
 
                                     // Return the single channel as the only results if not searching
                                     $displayTitle = $channel->title_custom ?: $channel->title;
-                                    $playlistName = $channel->playlist->name ?? 'Unknown';
+                                    $playlistName = $channel->getEffectivePlaylist()->name ?? 'Unknown';
                                     return [$channel->id => "{$displayTitle} [{$playlistName}]"];
                                 })
                                 ->searchable()
@@ -993,7 +993,7 @@ class ChannelResource extends Resource
                                     $options = [];
                                     foreach ($channels as $channel) {
                                         $displayTitle = $channel->title_custom ?: $channel->title;
-                                        $playlistName = $channel->playlist->name ?? 'Unknown';
+                                        $playlistName = $channel->getEffectivePlaylist()->name ?? 'Unknown';
                                         $options[$channel->id] = "{$displayTitle} [{$playlistName}]";
                                     }
 

@@ -64,6 +64,12 @@ class HlsStreamService
 
         // Loop over the failover channels and grab the first one that works.
         foreach ($streams as $stream) { // $stream is the current primary or failover channel being attempted
+            // Skip if the model `is_custom` and there's not URL set
+            if ($model->is_custom && (empty($stream->url) || empty($stream->url_custom))) {
+                Log::channel('ffmpeg')->debug("Skipping custom channel {$title} (ID: {$model->id}) as it has no URL set.");
+                continue;
+            }
+
             // Get the title for the current stream in the loop
             $currentStreamTitle = $type === 'channel'
                 ? ($stream->title_custom ?? $stream->title)
@@ -71,7 +77,7 @@ class HlsStreamService
             $currentStreamTitle = strip_tags($currentStreamTitle);
 
             // Check if playlist is specified for the current stream
-            $playlist = $stream->playlist;
+            $playlist = $stream->getEffectivePlaylist();
 
             // Make sure we have a valid source channel (using current stream's ID and its playlist ID)
             $badSourceCacheKey = ProxyService::BAD_SOURCE_CACHE_PREFIX . $stream->id . ':' . $playlist->id;
@@ -251,7 +257,7 @@ class HlsStreamService
     private function runPreCheck(string $modelType, $modelId, $streamUrl, $userAgent, $title, int $ffprobeTimeout)
     {
         $ffprobePath = config('proxy.ffprobe_path', 'ffprobe');
-        
+
         // Updated command to include -show_format and remove -select_streams to get all streams for detailed info
         $cmd = "$ffprobePath -v quiet -print_format json -show_streams -show_format -user_agent " . escapeshellarg($userAgent) . " " . escapeshellarg($streamUrl);
 
@@ -303,11 +309,11 @@ class HlsStreamService
                             $logResolution = ($stream['width'] ?? 'N/A') . 'x' . ($stream['height'] ?? 'N/A');
                             Log::channel('ffmpeg')->debug(
                                 "[PRE-CHECK] Source [{$title}] video stream: " .
-                                "Codec: " . ($stream['codec_name'] ?? 'N/A') . ", " .
-                                "Format: " . ($stream['pix_fmt'] ?? 'N/A') . ", " .
-                                "Resolution: " . $logResolution . ", " .
-                                "Profile: " . ($stream['profile'] ?? 'N/A') . ", " .
-                                "Level: " . ($stream['level'] ?? 'N/A')
+                                    "Codec: " . ($stream['codec_name'] ?? 'N/A') . ", " .
+                                    "Format: " . ($stream['pix_fmt'] ?? 'N/A') . ", " .
+                                    "Resolution: " . $logResolution . ", " .
+                                    "Profile: " . ($stream['profile'] ?? 'N/A') . ", " .
+                                    "Level: " . ($stream['level'] ?? 'N/A')
                             );
                             $videoStreamFound = true;
                         } elseif (!$audioStreamFound && isset($stream['codec_type']) && $stream['codec_type'] === 'audio') {
@@ -350,7 +356,7 @@ class HlsStreamService
         $cacheKey = "hls:pid:{$type}:{$id}";
         $pid = Cache::get($cacheKey);
         $wasRunning = false;
-        
+
         // Get the model to access playlist for stream count decrementing
         $model = null;
         if ($type === 'channel') {
@@ -358,7 +364,7 @@ class HlsStreamService
         } elseif ($type === 'episode') {
             $model = Episode::find($id);
         }
-        
+
         if ($this->isRunning($type, $id)) {
             $wasRunning = true;
 
@@ -394,8 +400,11 @@ class HlsStreamService
         File::deleteDirectory($storageDir);
 
         // Decrement active streams count if we have the model and playlist
-        if ($model && $model->playlist) {
-            $this->decrementActiveStreams($model->playlist->id);
+        if ($model) {
+            $playlist = $model->getEffectivePlaylist();
+            if ($playlist) {
+                $this->decrementActiveStreams($playlist->id);
+            }
         }
 
         // Clean up any stream mappings that point to this stopped stream
@@ -623,7 +632,7 @@ class HlsStreamService
 
             // Input analysis optimization for faster stream start
             $cmd .= '-analyzeduration 1M -probesize 1M -max_delay 500000 -fpsprobesize 0 ';
-            
+
             // Better error handling
             $cmd .= '-err_detect ignore_err -ignore_unknown ';
 

@@ -53,16 +53,7 @@ class Channel extends Model
      */
     public function getEffectivePlaylist()
     {
-        if ($this->is_custom) {
-            // For custom channels, we might want to get settings from the custom playlist
-            // but still maintain the foreign key relationship to the original playlist
-            $customPlaylist = $this->customPlaylists()->first();
-            if ($customPlaylist) {
-                return $customPlaylist;
-            }
-        }
-        
-        return $this->playlist;
+        return $this->playlist ?? $this->customPlaylist;
     }
 
     public function group(): BelongsTo

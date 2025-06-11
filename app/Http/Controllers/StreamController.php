@@ -46,7 +46,6 @@ class StreamController extends Controller
         // Get the failover channels (if any)
         $sourceChannel = $channel;
         $streams = collect([$channel])->concat($channel->failoverChannels);
-        $streamCount = $streams->count();
 
         // Loop over the failover channels and grab the first one that works.
         foreach ($streams as $stream) {
@@ -55,7 +54,7 @@ class StreamController extends Controller
             $title = strip_tags($title);
 
             // Check if playlist is specified
-            $playlist = $stream->playlist;
+            $playlist = $stream->getEffectivePlaylist();
 
             // Make sure we have a valid source channel
             $badSourceCacheKey = ProxyService::BAD_SOURCE_CACHE_PREFIX . $stream->id . ':' . $playlist->id;
@@ -157,7 +156,7 @@ class StreamController extends Controller
         $title = strip_tags($title);
 
         // Check if playlist is specified
-        $playlist = $episode->playlist;
+        $playlist = $episode->getEffectivePlaylist();
 
         // Keep track of the active streams for this playlist using optimistic locking pattern
         $activeStreams = $this->incrementActiveStreams($playlist->id);
