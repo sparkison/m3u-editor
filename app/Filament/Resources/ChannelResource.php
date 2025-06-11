@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Model;
 
 class ChannelResource extends Resource
 {
@@ -744,6 +745,7 @@ class ChannelResource extends Resource
                         ->validationMessages([
                             'required_without' => 'Custom Playlist is required if not using a standard playlist.',
                         ])
+                        ->dehydrated(true)
                         ->rules(['exists:custom_playlists,id'])
                 ])->hiddenOn('edit'),
             Forms\Components\Fieldset::make('General Settings')
@@ -1000,5 +1002,40 @@ class ChannelResource extends Resource
                         ->defaultItems(0)
                 ])
         ];
+    }
+
+    /**
+     * Create a custom channel with the provided data.
+     * 
+     * This method is used to create a channel with custom data, typically for a Custom Playlist.
+     * 
+     * @param array $data The data for the channel.
+     * @param string $model The model class to use for creating the channel.
+     * @return Model The created channel model.
+     * @throws \Illuminate\Validation\ValidationException
+     * @throws \Illuminate\Database\Eloquent\ModelNotFoundException
+     * @throws \Illuminate\Database\QueryException
+     * @throws \Exception
+     */
+    public static function createCustomChannel(array $data, string $model): Model
+    {
+        $data['user_id'] = auth()->id();
+        $data['is_custom'] = true;
+        if (!$data['shift']) {
+            $data['shift'] = 0; // Default shift to 0 if not provided
+        }
+        if (!$data['logo_type']) {
+            $data['logo_type'] = 'channel'; // Default to channel if not provided
+        }
+        $channel = $model::create($data);
+
+        // If the channel is created for a Custom Playlist, we need to associate it with the Custom Playlist
+        if (isset($data['custom_playlist_id']) && $data['custom_playlist_id']) {
+            $channel->customPlaylists()
+                ->syncWithoutDetaching([$data['custom_playlist_id']]);
+
+            $channel->save();
+        }
+        return $channel;
     }
 }
