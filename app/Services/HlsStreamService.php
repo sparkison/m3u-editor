@@ -779,110 +779,87 @@ class HlsStreamService
      * @return \App\Models\Channel|\App\Models\Episode|null The successfully started stream model, or null on failure.
      */
     private function attemptSpecificStreamSource(
-        string \$type,
-        \$specificStreamModel, // Type hint will be Channel|Episode based on Laravel version & setup
-        string \$originalModelTitle,
-        array \$streamSourceIds,
-        int \$newCurrentIndexInSourceIds,
-        int \$originalModelId,
-        int \$playlistIdOfSpecificStream
+        string $type,
+        $specificStreamModel, // Actual type hint in file: \App\Models\Channel|\App\Models\Episode
+        string $originalModelTitle,
+        array $streamSourceIds,
+        int $newCurrentIndexInSourceIds,
+        int $originalModelId,
+        int $playlistIdOfSpecificStream
     ): ?object {
-        \$streamIdToAttempt = \$specificStreamModel->id;
-        // Determine title for logging (ensure model properties like title_custom, title exist)
-        \$currentStreamTitleAttempt = 'Unknown Title';
-        if (\$type === 'channel' && \$specificStreamModel instanceof \App\Models\Channel) {
-            \$currentStreamTitleAttempt = (\$specificStreamModel->title_custom ?? \$specificStreamModel->title);
-        } elseif (\$type === 'episode' && \$specificStreamModel instanceof \App\Models\Episode) {
-            \$currentStreamTitleAttempt = \$specificStreamModel->title;
+        $streamIdToAttempt = $specificStreamModel->id;
+        $currentStreamTitleAttempt = 'Unknown Title';
+        if ($type === 'channel' && $specificStreamModel instanceof \App\Models\Channel) {
+            $currentStreamTitleAttempt = ($specificStreamModel->title_custom ?? $specificStreamModel->title);
+        } elseif ($type === 'episode' && $specificStreamModel instanceof \App\Models\Episode) {
+            $currentStreamTitleAttempt = $specificStreamModel->title;
         }
-        \$currentStreamTitleAttempt = strip_tags(\$currentStreamTitleAttempt);
+        $currentStreamTitleAttempt = strip_tags($currentStreamTitleAttempt);
 
-        Log::channel('ffmpeg')->info(
-            "[SpecificAttempt][OrigReq ID {\$originalModelId}] Attempting to start specific source: {\$type} ID {\$streamIdToAttempt} ('{\$currentStreamTitleAttempt}')."
-        );
+        // Simplified Log message using concatenation
+        Log::channel('ffmpeg')->info("[SpecificAttempt] OrigReq ID " . $originalModelId . " - Attempting: " . $type . " ID " . $streamIdToAttempt . " ('" . $currentStreamTitleAttempt . "').");
 
-        \$playlist = \$specificStreamModel->playlist;
-        if (!\$playlist || \$playlist->id !== \$playlistIdOfSpecificStream) {
-            Log::channel('ffmpeg')->warning("[SpecificAttempt][OrigReq ID {\$originalModelId}] Playlist ID mismatch or not found for {\$type} ID {\$streamIdToAttempt}. Using provided playlist ID {\$playlistIdOfSpecificStream} for operations. Model playlist: " . (\$playlist->id ?? 'N/A'));
-            // If \$playlist is null, we need to ensure available_streams is handled.
-            // For now, we rely on \$playlistIdOfSpecificStream for stream counting.
-            // A proper Playlist model might need to be fetched if more details are needed than just the ID.
+        $playlist = $specificStreamModel->playlist;
+        if (!$playlist || $playlist->id !== $playlistIdOfSpecificStream) {
+            Log::channel('ffmpeg')->warning("[SpecificAttempt] OrigReq ID " . $originalModelId . " - Playlist ID mismatch or not found for " . $type . " ID " . $streamIdToAttempt . ". Using provided playlist ID " . $playlistIdOfSpecificStream . ". Model playlist: " . (isset($playlist->id) ? $playlist->id : 'N/A'));
         }
 
-        \$streamSettings = ProxyService::getStreamSettings();
-        \$ffprobeTimeout = \$streamSettings['ffmpeg_ffprobe_timeout'] ?? 5;
+        $streamSettings = ProxyService::getStreamSettings();
+        $ffprobeTimeout = $streamSettings['ffmpeg_ffprobe_timeout'] ?? 5;
+        $availableStreamsCount = isset($playlist->available_streams) ? $playlist->available_streams : 1; // Safer access
+        $activeStreams = $this->incrementActiveStreams($playlistIdOfSpecificStream);
 
-        // Increment active streams
-        // If \$playlist isn't loaded on \$specificStreamModel, this might be an issue for available_streams.
-        // We must use the passed \$playlistIdOfSpecificStream for stream counting.
-        \$availableStreamsCount = \$playlist->available_streams ?? 1; // Default to 1 if playlist or count not found
-
-        \$activeStreams = \$this->incrementActiveStreams(\$playlistIdOfSpecificStream);
-
-        if (\$this->wouldExceedStreamLimit(\$playlistIdOfSpecificStream, \$availableStreamsCount, \$activeStreams)) {
-            \$this->decrementActiveStreams(\$playlistIdOfSpecificStream);
-            Log::channel('ffmpeg')->warning(
-                "[SpecificAttempt][OrigReq ID {\$originalModelId}] Max streams reached for playlist ID {\$playlistIdOfSpecificStream}. Cannot start {\$type} ID {\$streamIdToAttempt}."
-            );
+        if ($this->wouldExceedStreamLimit($playlistIdOfSpecificStream, $availableStreamsCount, $activeStreams)) {
+            $this->decrementActiveStreams($playlistIdOfSpecificStream);
+            Log::channel('ffmpeg')->warning("[SpecificAttempt] OrigReq ID " . $originalModelId . " - Max streams for playlist ID " . $playlistIdOfSpecificStream . ". Cannot start " . $type . " ID " . $streamIdToAttempt . ".");
             return null;
         }
 
-        // Determine stream URL (ensure model properties like url_custom, url exist)
-        \$streamUrl = '';
-        if (\$type === 'channel' && \$specificStreamModel instanceof \App\Models\Channel) {
-            \$streamUrl = (\$specificStreamModel->url_custom ?? \$specificStreamModel->url);
-        } elseif (\$type === 'episode' && \$specificStreamModel instanceof \App\Models\Episode) {
-            \$streamUrl = \$specificStreamModel->url;
+        $streamUrl = '';
+        if ($type === 'channel' && $specificStreamModel instanceof \App\Models\Channel) {
+            $streamUrl = ($specificStreamModel->url_custom ?? $specificStreamModel->url);
+        } elseif ($type === 'episode' && $specificStreamModel instanceof \App\Models\Episode) {
+            $streamUrl = $specificStreamModel->url;
         }
-
-        \$userAgent = \$playlist->user_agent ?? null; // Use playlist from model if available
+        $userAgent = isset($playlist->user_agent) ? $playlist->user_agent : null; // Safer access
 
         try {
-            \$this->runPreCheck(\$type, \$streamIdToAttempt, \$streamUrl, \$userAgent, \$currentStreamTitleAttempt, \$ffprobeTimeout);
-
-            \$this->startStreamWithSpeedCheck(
-                type: \$type,
-                model: \$specificStreamModel,
-                streamUrl: \$streamUrl,
-                title: \$currentStreamTitleAttempt,
-                playlistId: \$playlistIdOfSpecificStream, // Use the passed ID
-                userAgent: \$userAgent
+            $this->runPreCheck($type, $streamIdToAttempt, $streamUrl, $userAgent, $currentStreamTitleAttempt, $ffprobeTimeout);
+            $this->startStreamWithSpeedCheck(
+                type: $type,
+                model: $specificStreamModel,
+                streamUrl: $streamUrl,
+                title: $currentStreamTitleAttempt,
+                playlistId: $playlistIdOfSpecificStream,
+                userAgent: $userAgent
             );
 
-            Log::channel('ffmpeg')->debug(
-                "[SpecificAttempt][OrigReq ID {\$originalModelId}] Successfully started specific source: {\$type} ID {\$streamIdToAttempt} ('{\$currentStreamTitleAttempt}')."
-            );
+            Log::channel('ffmpeg')->debug("[SpecificAttempt] OrigReq ID " . $originalModelId . " - Successfully started: " . $type . " ID " . $streamIdToAttempt . " ('" . $currentStreamTitleAttempt . "').");
 
-            \$monitoringDisabledCacheKey = "hls:monitoring_disabled:{\$type}:{\$streamIdToAttempt}";
-            Cache::forget(\$monitoringDisabledCacheKey);
+            $monitoringDisabledCacheKey = "hls:monitoring_disabled:{$type}:{$streamIdToAttempt}";
+            Cache::forget($monitoringDisabledCacheKey);
 
             MonitorStreamHealthJob::dispatch(
-                \$type,
-                \$streamIdToAttempt,
-                \$originalModelId,
-                \$originalModelTitle,
-                \$playlistIdOfSpecificStream, // Use the passed ID
-                \$streamSourceIds,
-                \$newCurrentIndexInSourceIds
+                $type,
+                $streamIdToAttempt,
+                $originalModelId,
+                $originalModelTitle,
+                $playlistIdOfSpecificStream,
+                $streamSourceIds,
+                $newCurrentIndexInSourceIds
             )->delay(now()->addSeconds(config('streaming.monitor_job_interval_seconds', 10)));
 
-            Log::channel('ffmpeg')->info(
-                "[SpecificAttempt][OrigReq ID {\$originalModelId}] Dispatched MonitorStreamHealthJob for newly active specific stream {\$type} ID {\$streamIdToAttempt} (Index {\$newCurrentIndexInSourceIds})."
-            );
+            Log::channel('ffmpeg')->info("[SpecificAttempt] OrigReq ID " . $originalModelId . " - Dispatched MonitorStreamHealthJob for " . $type . " ID " . $streamIdToAttempt . " (Index " . $newCurrentIndexInSourceIds . ").");
 
-            return \$specificStreamModel;
+            return $specificStreamModel;
 
-        } catch (SourceNotResponding \$e) {
-            \$this->decrementActiveStreams(\$playlistIdOfSpecificStream);
-            Log::channel('ffmpeg')->error(
-                "[SpecificAttempt][OrigReq ID {\$originalModelId}] Source not responding for specific source {\$type} ID {\$streamIdToAttempt} ('{\$currentStreamTitleAttempt}'): " . \$e->getMessage()
-            );
+        } catch (SourceNotResponding $e) {
+            $this->decrementActiveStreams($playlistIdOfSpecificStream);
+            Log::channel('ffmpeg')->error("[SpecificAttempt] OrigReq ID " . $originalModelId . " - SourceNotResponding for " . $type . " ID " . $streamIdToAttempt . " ('" . $currentStreamTitleAttempt . "'): " . $e->getMessage());
             return null;
-        } catch (Exception \$e) {
-            \$this->decrementActiveStreams(\$playlistIdOfSpecificStream);
-            Log::channel('ffmpeg')->error(
-                "[SpecificAttempt][OrigReq ID {\$originalModelId}] Error streaming specific source {\$type} ID {\$streamIdToAttempt} ('{\$currentStreamTitleAttempt}'): " . \$e->getMessage()
-            );
+        } catch (Exception $e) {
+            $this->decrementActiveStreams($playlistIdOfSpecificStream);
+            Log::channel('ffmpeg')->error("[SpecificAttempt] OrigReq ID " . $originalModelId . " - Exception for " . $type . " ID " . $streamIdToAttempt . " ('" . $currentStreamTitleAttempt . "'): " . $e->getMessage());
             return null;
         }
     }
