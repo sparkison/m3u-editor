@@ -159,17 +159,19 @@ class EpgMapResource extends Resource
                         ->inline(true)
                         ->live()
                         ->default(false)
-                        ->helperText('When enabled, channel titles will be matched based on regex pattern instead of prefix.'),
+                        ->helperText('When enabled, channel titles will be cleaned based on regex pattern instead of prefix before matching.'),
                     Forms\Components\TagsInput::make('settings.exclude_prefixes')
-                        ->label(fn(Get $get) => !$get('settings.use_regex') ? 'Channel prefixes to exclude' : 'Regex patterns to exclude')
+                        ->label(fn(Get $get) => !$get('settings.use_regex') ? 'Channel prefixes to remove before matching' : 'Regex patterns to remove before matching')
                         ->helperText('Press [tab] or [return] to add item. Leave empty to disable.')
                         ->columnSpanFull()
                         ->suggestions([
                             'US: ',
                             'UK: ',
                             'CA: ',
-                            '^(US|UK|CA)',
-                            '(FHD|HD)$'
+                            '^(US|UK|CA): ',
+                            '\s*(FHD|HD)\s*',
+                            '\s+(FHD|HD).*$',
+                            '\[.*\]'
                         ])
                         ->splitKeys(['Tab', 'Return', ',']),
                 ]),

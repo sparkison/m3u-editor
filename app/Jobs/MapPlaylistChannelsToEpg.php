@@ -129,14 +129,6 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                     $name = trim($channel->name);
                     $title = trim($channel->title ?? $channel->title);
 
-                    dump([
-                        'stream_id' => $streamId,
-                        'name' => $name,
-                        'title' => $title,
-                        'patterns' => $patterns,
-                        'useRegex' => $useRegex,
-                    ]);
-
                     // Get cleaned title and stream id
                     if (!empty($patterns)) {
                         foreach ($patterns as $pattern) {
@@ -170,12 +162,6 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                             }
                         }
                     }
-
-                    dump([
-                        'cleaned_stream_id' => $streamId,
-                        'cleaned_name' => $name,
-                        'cleaned_title' => $title,
-                    ]);
 
                     // Get the EPG channel (check for direct match first)
                     $epgChannel = $epg->channels()
