@@ -169,8 +169,7 @@ class EpgMapResource extends Resource
                             'UK: ',
                             'CA: ',
                             '^(US|UK|CA)',
-                            '*HD$',
-                            '\[*\]'
+                            '(FHD|HD)$'
                         ])
                         ->splitKeys(['Tab', 'Return', ',']),
                 ]),
