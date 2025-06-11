@@ -33,156 +33,143 @@ class HlsStreamService
         Channel|Episode $model, // This $model is the *original* requested channel/episode
         string $title           // This $title is the title of the *original* model
     ): ?object {
-        \$streamSettings = ProxyService::getStreamSettings();
-        \$ffprobeTimeout = \$streamSettings['ffmpeg_ffprobe_timeout'] ?? 5;
+        $streamSettings = ProxyService::getStreamSettings();
+        $ffprobeTimeout = $streamSettings['ffmpeg_ffprobe_timeout'] ?? 5;
 
         // --- Compile streamSourceIds ---
-        \$streamSourceIds = [\$model->id];
-        // Assuming $model is loaded with failoverChannels if it's a Channel
-        if (\$type === 'channel' && \$model instanceof \App\Models\Channel && !empty(\$model->failoverChannels) && \$model->failoverChannels->count() > 0) {
-            foreach (\$model->failoverChannels as \$failoverChannel) {
-                \$streamSourceIds[] = \$failoverChannel->id;
+        $streamSourceIds = [$model->id]; // CORRECTED
+        if ($type === 'channel' && $model instanceof Channel && !empty($model->failoverChannels) && $model->failoverChannels->count() > 0) { // CORRECTED: Using 'Channel' directly
+            foreach ($model->failoverChannels as $failoverChannel) {
+                $streamSourceIds[] = $failoverChannel->id;
             }
         }
         // TODO: Add similar logic for Episode failovers if applicable.
 
         // --- Initial check for any already running stream from the list ---
-        // This part can use a simple loop through models if $streams collection was already built
-        // Or, adapt to check isRunning for each ID in $streamSourceIds if efficient.
-        // For simplicity, if any stream in the potential list is already running, return it.
-        // This avoids re-starting and re-dispatching monitors if not needed.
-        // This needs to be done carefully. The original code looped through a $streams collection.
-        // Let's replicate a quick check:
-        \$_tempStreamCollection = collect([\$model]);
-        if (\$type === 'channel' && \$model instanceof \App\Models\Channel && !empty(\$model->failoverChannels)) {
-            \$_tempStreamCollection = \$_tempStreamCollection->concat(\$model->failoverChannels);
+        $_tempStreamCollection = collect([$model]);
+        if ($type === 'channel' && $model instanceof Channel && !empty($model->failoverChannels)) { // CORRECTED
+            $_tempStreamCollection = $_tempStreamCollection->concat($model->failoverChannels);
         }
-        foreach (\$_tempStreamCollection as \$streamToCheckIfExists) {
-            if (\$this->isRunning(\$type, \$streamToCheckIfExists->id)) {
-                \$existingStreamTitle = (\$type === 'channel')
-                    ? (\$streamToCheckIfExists->title_custom ?? \$streamToCheckIfExists->title)
-                    : \$streamToCheckIfExists->title;
-                \$existingStreamTitle = strip_tags(\$existingStreamTitle);
-                Log::channel('ffmpeg')->debug("[HLS Setup][OrigReq ID {\$model->id}] Found existing running stream for {\$type} ID {\$streamToCheckIfExists->id} ('{\$existingStreamTitle}') - reusing.");
-                return \$streamToCheckIfExists; // Return the already running stream
+        foreach ($_tempStreamCollection as $streamToCheckIfExists) {
+            if ($this->isRunning($type, $streamToCheckIfExists->id)) {
+                $existingStreamTitle = ($type === 'channel')
+                    ? ($streamToCheckIfExists->title_custom ?? $streamToCheckIfExists->title)
+                    : $streamToCheckIfExists->title;
+                $existingStreamTitle = strip_tags($existingStreamTitle);
+                Log::channel('ffmpeg')->debug("[HLS Setup][OrigReq ID {$model->id}] Found existing running stream for {$type} ID {$streamToCheckIfExists->id} ('{$existingStreamTitle}') - reusing.");
+                return $streamToCheckIfExists;
             }
         }
 
 
-        Redis::set("hls:{\$type}_last_seen:{\$model->id}", now()->timestamp);
-        Redis::sadd("hls:active_{\$type}_ids", \$model->id); // For the original requested model
+        Redis::set("hls:{$type}_last_seen:{$model->id}", now()->timestamp);
+        Redis::sadd("hls:active_{$type}_ids", $model->id); // For the original requested model
 
-        \$currentSuccessfulStream = null;
-        \$currentIndexInSourceIds = -1;
+        $currentSuccessfulStream = null;
+        $currentIndexInSourceIds = -1;
 
-        foreach (\$streamSourceIds as \$index => \$streamIdToAttempt) {
-            \$streamModelBeingAttempted = null;
-            if (\$type === 'channel') {
-                \$streamModelBeingAttempted = \App\Models\Channel::with('playlist')->find(\$streamIdToAttempt);
-            } elseif (\$type === 'episode') {
-                \$streamModelBeingAttempted = \App\Models\Episode::with('playlist')->find(\$streamIdToAttempt);
-                // Ensure Episode model also has 'playlist' relationship if this path is taken.
+        foreach ($streamSourceIds as $index => $streamIdToAttempt) {
+            $streamModelBeingAttempted = null;
+            if ($type === 'channel') {
+                $streamModelBeingAttempted = Channel::with('playlist')->find($streamIdToAttempt); // CORRECTED (using Channel directly)
+            } elseif ($type === 'episode') {
+                $streamModelBeingAttempted = Episode::with('playlist')->find($streamIdToAttempt); // CORRECTED (using Episode directly)
             }
 
-            if (!\$streamModelBeingAttempted) {
-                Log::channel('ffmpeg')->warning("[HLS Setup][OrigReq ID {\$model->id}] Stream source {\$type} ID {\$streamIdToAttempt} not found in DB. Skipping.");
+            if (!$streamModelBeingAttempted) {
+                Log::channel('ffmpeg')->warning("[HLS Setup][OrigReq ID {$model->id}] Stream source {$type} ID {$streamIdToAttempt} not found in DB. Skipping.");
                 continue;
             }
 
-            \$currentStreamTitleAttempt = 'Unknown Title';
-            if (\$type === 'channel' && \$streamModelBeingAttempted instanceof \App\Models\Channel) {
-                \$currentStreamTitleAttempt = (\$streamModelBeingAttempted->title_custom ?? \$streamModelBeingAttempted->title);
-            } elseif (\$type === 'episode' && \$streamModelBeingAttempted instanceof \App\Models\Episode) {
-                \$currentStreamTitleAttempt = \$streamModelBeingAttempted->title;
+            $currentStreamTitleAttempt = 'Unknown Title';
+            if ($type === 'channel' && $streamModelBeingAttempted instanceof Channel) { // CORRECTED
+                $currentStreamTitleAttempt = ($streamModelBeingAttempted->title_custom ?? $streamModelBeingAttempted->title);
+            } elseif ($type === 'episode' && $streamModelBeingAttempted instanceof Episode) { // CORRECTED
+                $currentStreamTitleAttempt = $streamModelBeingAttempted->title;
             }
-            \$currentStreamTitleAttempt = strip_tags(\$currentStreamTitleAttempt);
+            $currentStreamTitleAttempt = strip_tags($currentStreamTitleAttempt);
 
-            \$playlist = \$streamModelBeingAttempted->playlist;
-            if (!\$playlist) {
-                Log::channel('ffmpeg')->warning("[HLS Setup][OrigReq ID {\$model->id}] Playlist not found for {\$type} ID {\$streamModelBeingAttempted->id} ('{\$currentStreamTitleAttempt}'). Skipping.");
+            $playlist = $streamModelBeingAttempted->playlist;
+            if (!$playlist) {
+                Log::channel('ffmpeg')->warning("[HLS Setup][OrigReq ID {$model->id}] Playlist not found for {$type} ID {$streamModelBeingAttempted->id} ('{$currentStreamTitleAttempt}'). Skipping.");
                 continue;
             }
 
-            \$activeStreams = \$this->incrementActiveStreams(\$playlist->id);
-            if (\$this->wouldExceedStreamLimit(\$playlist->id, \$playlist->available_streams ?? 1, \$activeStreams)) {
-                \$this->decrementActiveStreams(\$playlist->id);
-                Log::channel('ffmpeg')->debug("[HLS Setup][OrigReq ID {\$model->id}] Max streams reached for playlist {\$playlist->name} (ID {\$playlist->id}). Skipping {\$type} '{\$currentStreamTitleAttempt}'.");
+            $activeStreams = $this->incrementActiveStreams($playlist->id);
+            if ($this->wouldExceedStreamLimit($playlist->id, $playlist->available_streams ?? 1, $activeStreams)) {
+                $this->decrementActiveStreams($playlist->id);
+                Log::channel('ffmpeg')->debug("[HLS Setup][OrigReq ID {$model->id}] Max streams reached for playlist {$playlist->name} (ID {$playlist->id}). Skipping {$type} '{$currentStreamTitleAttempt}'.");
                 continue;
             }
 
-            \$streamUrl = '';
-            if (\$type === 'channel' && \$streamModelBeingAttempted instanceof \App\Models\Channel) {
-                \$streamUrl = (\$streamModelBeingAttempted->url_custom ?? \$streamModelBeingAttempted->url);
-            } elseif (\$type === 'episode' && \$streamModelBeingAttempted instanceof \App\Models\Episode) {
-                \$streamUrl = \$streamModelBeingAttempted->url;
+            $streamUrl = '';
+            if ($type === 'channel' && $streamModelBeingAttempted instanceof Channel) { // CORRECTED
+                $streamUrl = ($streamModelBeingAttempted->url_custom ?? $streamModelBeingAttempted->url);
+            } elseif ($type === 'episode' && $streamModelBeingAttempted instanceof Episode) { // CORRECTED
+                $streamUrl = $streamModelBeingAttempted->url;
             }
-            \$userAgent = \$playlist->user_agent ?? null;
+            $userAgent = $playlist->user_agent ?? null;
 
             try {
-                \$this->runPreCheck(\$type, \$streamModelBeingAttempted->id, \$streamUrl, \$userAgent, \$currentStreamTitleAttempt, \$ffprobeTimeout);
-                \$this->startStreamWithSpeedCheck(
-                    type: \$type,
-                    model: \$streamModelBeingAttempted,
-                    streamUrl: \$streamUrl,
-                    title: \$currentStreamTitleAttempt,
-                    playlistId: \$playlist->id,
-                    userAgent: \$userAgent
+                $this->runPreCheck($type, $streamModelBeingAttempted->id, $streamUrl, $userAgent, $currentStreamTitleAttempt, $ffprobeTimeout);
+                $this->startStreamWithSpeedCheck(
+                    type: $type,
+                    model: $streamModelBeingAttempted,
+                    streamUrl: $streamUrl,
+                    title: $currentStreamTitleAttempt,
+                    playlistId: $playlist->id,
+                    userAgent: $userAgent
                 );
 
                 Log::channel('ffmpeg')->debug(
-                    "[HLS Setup][OrigReq ID {\$model->id}] Successfully started HLS stream for {\$type} {\$currentStreamTitleAttempt} (ID: {\$streamModelBeingAttempted->id}) on playlist {\$playlist->id}."
+                    "[HLS Setup][OrigReq ID {$model->id}] Successfully started HLS stream for {$type} {$currentStreamTitleAttempt} (ID: {$streamModelBeingAttempted->id}) on playlist {$playlist->id}."
                 );
 
-                \$currentSuccessfulStream = \$streamModelBeingAttempted;
-                \$currentIndexInSourceIds = \$index;
+                $currentSuccessfulStream = $streamModelBeingAttempted;
+                $currentIndexInSourceIds = $index;
                 break;
 
-            } catch (SourceNotResponding \$e) {
-                \$this->decrementActiveStreams(\$playlist->id);
-                Log::channel('ffmpeg')->error("[HLS Setup][OrigReq ID {\$model->id}] Source not responding for {\$type} '{\$currentStreamTitleAttempt}' (ID {\$streamModelBeingAttempted->id}): " . \$e->getMessage());
-            } catch (Exception \$e) {
-                \$this->decrementActiveStreams(\$playlist->id);
-                Log::channel('ffmpeg')->error("[HLS Setup][OrigReq ID {\$model->id}] Error streaming {\$type} '{\$currentStreamTitleAttempt}' (ID {\$streamModelBeingAttempted->id}): " . \$e->getMessage());
+            } catch (SourceNotResponding $e) {
+                $this->decrementActiveStreams($playlist->id);
+                Log::channel('ffmpeg')->error("[HLS Setup][OrigReq ID {$model->id}] Source not responding for {$type} '{$currentStreamTitleAttempt}' (ID {$streamModelBeingAttempted->id}): " . $e->getMessage());
+            } catch (Exception $e) {
+                $this->decrementActiveStreams($playlist->id);
+                Log::channel('ffmpeg')->error("[HLS Setup][OrigReq ID {$model->id}] Error streaming {$type} '{$currentStreamTitleAttempt}' (ID {$streamModelBeingAttempted->id}): " . $e->getMessage());
             }
         }
 
-        if (\$currentSuccessfulStream) {
-            // Ensure playlist is loaded on currentSuccessfulStream for the dispatch
-            if (!\$currentSuccessfulStream->relationLoaded('playlist') || !\$currentSuccessfulStream->playlist) {
+        if ($currentSuccessfulStream) {
+            if (!$currentSuccessfulStream->relationLoaded('playlist') || !$currentSuccessfulStream->playlist) {
                  // Eager loaded with 'with('playlist')' above, but double check or reload if necessary
-                 // For now, assume it's loaded from the find() call with eager loading.
             }
-            if (!\$currentSuccessfulStream->playlist) {
-                 Log::channel('ffmpeg')->error("[HLS Setup][OrigReq ID {\$model->id}] CRITICAL: Successful stream {\$currentSuccessfulStream->id} has no playlist loaded for job dispatch. Monitor job may fail.");
-                 // Cannot dispatch job without playlist ID. This indicates a data integrity or loading issue.
-                 // Depending on strictness, could return null here or attempt to dispatch without playlist ID if job can handle.
-                 // For now, proceed assuming it should be there. The job requires playlistId.
-                 return \$currentSuccessfulStream; // Return stream but warn about monitor.
+            if (!$currentSuccessfulStream->playlist) {
+                 Log::channel('ffmpeg')->error("[HLS Setup][OrigReq ID {$model->id}] CRITICAL: Successful stream {$currentSuccessfulStream->id} has no playlist loaded for job dispatch. Monitor job may fail.");
+                 return $currentSuccessfulStream;
             }
 
 
-            \$monitoringDisabledCacheKey = "hls:monitoring_disabled:{\$type}:{\$currentSuccessfulStream->id}";
-            Cache::forget(\$monitoringDisabledCacheKey);
+            $monitoringDisabledCacheKey = "hls:monitoring_disabled:{$type}:{$currentSuccessfulStream->id}";
+            Cache::forget($monitoringDisabledCacheKey);
 
             MonitorStreamHealthJob::dispatch(
-                \$type,
-                \$currentSuccessfulStream->id,
-                \$model->id,
-                \$title,
-                \$currentSuccessfulStream->playlist->id,
-                \$streamSourceIds,
-                \$currentIndexInSourceIds
+                $type,
+                $currentSuccessfulStream->id,
+                $model->id,
+                $title,
+                $currentSuccessfulStream->playlist->id,
+                $streamSourceIds,
+                $currentIndexInSourceIds
             )->delay(now()->addSeconds(config('streaming.monitor_job_interval_seconds', 10)));
 
             Log::channel('ffmpeg')->info(
-                "[HLS Setup][OrigReq ID {\$model->id}] Dispatched MonitorStreamHealthJob for active stream {\$type} ID {\$currentSuccessfulStream->id} (Index {\$currentIndexInSourceIds}). Sources: [" . implode(',', \$streamSourceIds) . "]"
+                "[HLS Setup][OrigReq ID {$model->id}] Dispatched MonitorStreamHealthJob for active stream {$type} ID {$currentSuccessfulStream->id} (Index {$currentIndexInSourceIds}). Sources: [" . implode(',', $streamSourceIds) . "]"
             );
 
-            return \$currentSuccessfulStream;
+            return $currentSuccessfulStream;
         }
 
         Log::channel('ffmpeg')->error(
-            "[HLS Setup][OrigReq ID {\$model->id}] No available HLS streams for {\$type} '{\$title}' after trying all sources: [" . implode(', ', \$streamSourceIds) . "]"
+            "[HLS Setup][OrigReq ID {$model->id}] No available HLS streams for {$type} '{$title}' after trying all sources: [" . implode(', ', $streamSourceIds) . "]"
         );
         return null;
     }
