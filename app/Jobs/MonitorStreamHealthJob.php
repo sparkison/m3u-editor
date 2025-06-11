@@ -266,7 +266,6 @@ class MonitorStreamHealthJob implements ShouldQueue
                 $streamModelToAttempt = Channel::with('playlist')->find($streamIdToAttempt);
             } elseif ($this->streamType === 'episode') {
                 $streamModelToAttempt = Episode::with('playlist')->find($streamIdToAttempt);
-                // Ensure Episode model also has 'playlist' relationship defined for with() to work.
             }
 
             if (!$streamModelToAttempt) {
@@ -276,9 +275,8 @@ class MonitorStreamHealthJob implements ShouldQueue
                 continue;
             }
 
-            // Ensure playlist is available for attemptSpecificStreamSource
             if (!$streamModelToAttempt->playlist) {
-                Log::channel('ffmpeg')->warning(
+                 Log::channel('ffmpeg')->warning(
                     "[SeqFail][OrigReq ID {$this->originalModelId}] Source model {$this->streamType} ID {$streamIdToAttempt} has no playlist loaded/defined. Skipping."
                 );
                 continue;

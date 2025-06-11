@@ -778,7 +778,7 @@ class HlsStreamService
      * @param int \$playlistIdOfSpecificStream The playlist ID of the \$specificStreamModel.
      * @return \App\Models\Channel|\App\Models\Episode|null The successfully started stream model, or null on failure.
      */
-    private function attemptSpecificStreamSource(
+    public function attemptSpecificStreamSource(
         string $type,
         $specificStreamModel, // Actual type hint in file: \App\Models\Channel|\App\Models\Episode
         string $originalModelTitle,
