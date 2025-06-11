@@ -712,12 +712,19 @@ class ChannelResource extends Resource
                 ->columnSpan('full'),
             Forms\Components\Fieldset::make('Playlist')
                 ->schema([
+                    Forms\Components\Toggle::make('is_custom')
+                        ->default(true)
+                        ->hidden()
+                        ->columnSpan('full'),
                     Forms\Components\Select::make('playlist_id')
                         ->label('Playlist')
                         ->options(fn() => Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
                         ->searchable()
                         ->reactive()
                         ->requiredWithout('custom_playlist_id')
+                        ->validationMessages([
+                            'required_without' => 'Playlist is required if not using a custom playlist.',
+                        ])
                         ->rules(['exists:playlists,id']),
                     Forms\Components\Select::make('custom_playlist_id')
                         ->label('Custom Playlist')
@@ -725,6 +732,9 @@ class ChannelResource extends Resource
                         ->searchable()
                         ->reactive()
                         ->requiredWithout('playlist_id')
+                        ->validationMessages([
+                            'required_without' => 'Custom Playlist is required if not using a standard playlist.',
+                        ])
                         ->rules(['exists:custom_playlists,id'])
                 ])->hiddenOn('edit'),
             Forms\Components\Fieldset::make('General Settings')
@@ -732,14 +742,18 @@ class ChannelResource extends Resource
                     Forms\Components\TextInput::make('title_custom')
                         ->label('Title')
                         ->placeholder(fn(Get $get) => $get('title'))
-                        ->helperText("Leave empty to use playlist default value.")
+                        ->helperText(fn(Get $get) => $get('is_custom') ? "" : "Leave empty to use playlist default value.")
                         ->columnSpan(1)
+                        ->requiredIf('is_custom', true)
+                        ->validationMessages([
+                            'required_if' => 'The title is required for custom channels.',
+                        ])
                         ->rules(['min:1', 'max:255']),
                     Forms\Components\TextInput::make('name_custom')
                         ->label('Name')
                         ->hint('tvg-name')
                         ->placeholder(fn(Get $get) => $get('name'))
-                        ->helperText("Leave empty to use playlist default value.")
+                        ->helperText(fn(Get $get) => $get('is_custom') ? "" : "Leave empty to use playlist default value.")
                         ->columnSpan(1)
                         ->rules(['min:1', 'max:255']),
                     Forms\Components\TextInput::make('stream_id_custom')
@@ -747,7 +761,7 @@ class ChannelResource extends Resource
                         ->hint('tvg-id')
                         ->columnSpan(1)
                         ->placeholder(fn(Get $get) => $get('stream_id'))
-                        ->helperText("Leave empty to use playlist default value.")
+                        ->helperText(fn(Get $get) => $get('is_custom') ? "" : "Leave empty to use playlist default value.")
                         ->rules(['min:1', 'max:255']),
                     Forms\Components\TextInput::make('station_id')
                         ->label('Station ID')
@@ -788,10 +802,15 @@ class ChannelResource extends Resource
                         ->columnSpan(1)
                         ->prefixIcon('heroicon-m-globe-alt')
                         ->placeholder(fn(Get $get) => $get('url'))
-                        ->helperText("Leave empty to use playlist default value.")
+                        ->helperText(fn(Get $get) => $get('is_custom') ? "" : "Leave empty to use playlist default value.")
+                        ->requiredIf('is_custom', true)
+                        ->validationMessages([
+                            'required_if' => 'The URL is required for custom channels.',
+                        ])
                         ->rules(['min:1'])
                         ->suffixAction(
-                            Forms\Components\Actions\Action::make('copy')
+                            fn(Get $get) => !$get('is_custom') ?
+                                Forms\Components\Actions\Action::make('copy')
                                 ->icon('heroicon-s-eye')
                                 ->action(function (Get $get, $record, $state) {
                                     $url = $state ?? $get('url');
@@ -804,6 +823,7 @@ class ChannelResource extends Resource
                                         ->persistent()
                                         ->send();
                                 })
+                                : null
                         )
                         ->type('url'),
                     Forms\Components\TextInput::make('url_proxy')
@@ -955,7 +975,7 @@ class ChannelResource extends Resource
                         ->addActionLabel('Add failover channel')
                         ->columnSpanFull()
                         ->defaultItems(0)
-                ])->hiddenOn('create')
+                ])
         ];
     }
 }

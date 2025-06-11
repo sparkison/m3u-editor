@@ -38,6 +38,9 @@ class ListChannels extends ListRecords
     {
         return [
             Actions\CreateAction::make()
+                ->label('Create Custom Channel')
+                ->modalHeading('New Custom Channel')
+                ->modalDescription('NOTE: Custom channels need to be associated with a playlist, or custom playlist.')
                 ->using(function (array $data, string $model): Model {
                     $data['user_id'] = auth()->id();
                     $data['is_custom'] = true;
