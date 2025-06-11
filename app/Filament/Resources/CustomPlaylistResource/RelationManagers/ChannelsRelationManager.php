@@ -248,7 +248,8 @@ class ChannelsRelationManager extends RelationManager
                                             ->orWhereRaw('LOWER(title_custom) LIKE ?', ["%{$searchLower}%"])
                                             ->orWhereRaw('LOWER(name) LIKE ?', ["%{$searchLower}%"])
                                             ->orWhereRaw('LOWER(name_custom) LIKE ?', ["%{$searchLower}%"])
-                                            ->orWhereRaw('LOWER(stream_id) LIKE ?', ["%{$searchLower}%"]);
+                                            ->orWhereRaw('LOWER(stream_id) LIKE ?', ["%{$searchLower}%"])
+                                            ->orWhereRaw('LOWER(stream_id_custom) LIKE ?', ["%{$searchLower}%"]);
                                     })
                                     ->limit(50)
                                     ->get();
@@ -376,7 +377,8 @@ class ChannelsRelationManager extends RelationManager
                                                     ->orWhereRaw('LOWER(title_custom) LIKE ?', ["%{$searchLower}%"])
                                                     ->orWhereRaw('LOWER(name) LIKE ?', ["%{$searchLower}%"])
                                                     ->orWhereRaw('LOWER(name_custom) LIKE ?', ["%{$searchLower}%"])
-                                                    ->orWhereRaw('LOWER(stream_id) LIKE ?', ["%{$searchLower}%"]);
+                                                    ->orWhereRaw('LOWER(stream_id) LIKE ?', ["%{$searchLower}%"])
+                                                    ->orWhereRaw('LOWER(stream_id_custom) LIKE ?', ["%{$searchLower}%"]);
                                             })
                                             ->limit(50) // Keep a reasonable limit
                                             ->get();
