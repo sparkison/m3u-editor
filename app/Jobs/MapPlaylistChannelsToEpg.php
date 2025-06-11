@@ -94,7 +94,6 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
         }
 
         $settings = $map->settings ?? [];
-        dump($settings);
         try {
             // Fetch the playlist (if set)
             $channels = [];
