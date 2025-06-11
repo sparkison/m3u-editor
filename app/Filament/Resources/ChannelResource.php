@@ -101,8 +101,8 @@ class ChannelResource extends Resource
                     ->type('number')
                     ->placeholder('Sort Order')
                     ->sortable()
-                    ->tooltip(fn($record) => $record->playlist?->auto_sort ? 'Playlist auto-sort enabled; disable to change' : 'Channel sort order')
-                    ->disabled(fn($record) => $record->playlist?->auto_sort)
+                    ->tooltip(fn($record) => !$record->is_custom && $record->playlist?->auto_sort ? 'Playlist auto-sort enabled; disable to change' : 'Channel sort order')
+                    ->disabled(fn($record) => !$record->is_custom && $record->playlist?->auto_sort)
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('failovers_count')
                     ->label('Failovers')
@@ -269,13 +269,20 @@ class ChannelResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ActionGroup::make([
-                    Tables\Actions\EditAction::make(),
+                    Tables\Actions\EditAction::make('edit_custom')
+                        ->slideOver()
+                        ->form(fn(Tables\Actions\EditAction $action): array => [
+                            Forms\Components\Grid::make()
+                                ->schema(self::getForm(edit: true))
+                                ->columns(2)
+                        ]),
                     Tables\Actions\DeleteAction::make()
                 ])->button()->hiddenLabel()->size('sm')->hidden(fn(Model $record) => !$record->is_custom),
-                Tables\Actions\EditAction::make()
+                Tables\Actions\EditAction::make('edit')
                     ->button()
                     ->hiddenLabel()
                     ->slideOver()
+                    ->disabled(fn(Model $record) => $record->is_custom)
                     ->hidden(fn(Model $record) => $record->is_custom),
                 Tables\Actions\ViewAction::make()
                     ->button()
@@ -701,7 +708,7 @@ class ChannelResource extends Resource
             ]);
     }
 
-    public static function getForm($customPlaylist = null): array
+    public static function getForm($customPlaylist = null, $edit = false): array
     {
         return [
             // Customizable channel fields
@@ -752,14 +759,14 @@ class ChannelResource extends Resource
                         ])
                         ->dehydrated(true)
                         ->rules(['exists:custom_playlists,id'])
-                ])->hiddenOn('edit'),
+                ])->hidden($edit),
             Forms\Components\Fieldset::make('General Settings')
                 ->schema([
                     Forms\Components\TextInput::make('title')
                         ->label('Title')
                         ->columnSpan(1)
                         ->required()
-                        ->hiddenOn('edit')
+                        ->hidden($edit)
                         ->rules(['min:1', 'max:255']),
                     Forms\Components\TextInput::make('title_custom')
                         ->label('Title')
