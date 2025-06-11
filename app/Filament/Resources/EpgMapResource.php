@@ -5,7 +5,9 @@ namespace App\Filament\Resources;
 use App\Enums\Status;
 use App\Filament\Resources\EpgMapResource\Pages;
 use App\Filament\Resources\EpgMapResource\RelationManagers;
+use App\Models\Epg;
 use App\Models\EpgMap;
+use App\Models\Playlist;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -34,9 +36,7 @@ class EpgMapResource extends Resource
     public static function form(Form $form): Form
     {
         return $form
-            ->schema([
-                //
-            ]);
+            ->schema(self::getForm(showPlaylist: false, showEpg: false));
     }
 
     public static function table(Table $table): Table
@@ -90,6 +90,9 @@ class EpgMapResource extends Resource
                 Tables\Actions\DeleteAction::make()
                     ->button()
                     ->hiddenLabel(),
+                Tables\Actions\EditAction::make()
+                    ->button()
+                    ->hiddenLabel()
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -111,6 +114,36 @@ class EpgMapResource extends Resource
             'index' => Pages\ListEpgMaps::route('/'),
             // 'create' => Pages\CreateEpgMap::route('/create'),
             // 'edit' => Pages\EditEpgMap::route('/{record}/edit'),
+        ];
+    }
+
+    public static function getForm(
+        $showPlaylist = true,
+        $showEpg = true
+    ): array {
+        return [
+            Forms\Components\Select::make('epg_id')
+                ->required()
+                ->label('EPG')
+                ->helperText('Select the EPG you would like to map from.')
+                ->options(Epg::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                ->hidden(!$showEpg)
+                ->searchable(),
+            Forms\Components\Select::make('playlist_id')
+                ->required()
+                ->label('Playlist')
+                ->helperText('Select the playlist you would like to map to.')
+                ->options(Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                ->hidden(!$showPlaylist)
+                ->searchable(),
+            Forms\Components\Toggle::make('override')
+                ->label('Overwrite')
+                ->helperText('Overwrite channels with existing mappings?')
+                ->default(false),
+            Forms\Components\Toggle::make('recurring')
+                ->label('Recurring')
+                ->helperText('Re-run this mapping everytime the EPG is synced?')
+                ->default(false),
         ];
     }
 }
