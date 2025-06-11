@@ -387,4 +387,179 @@ class HlsStreamServiceTest extends TestCase
         $serviceSpy->shouldNotHaveReceived('incrementActiveStreams');
     }
 
+
+    /** @test */
+    public function startStream_compiles_sources_and_dispatches_job_on_first_source_success()
+    {
+        $serviceSpy = Mockery::spy(HlsStreamService::class)->makePartial();
+
+        $originalModelPlaylistMock = Mockery::mock(Playlist::class);
+        $originalModelPlaylistMock->id = 1;
+        $originalModelPlaylistMock->available_streams = 2;
+        $originalModelPlaylistMock->user_agent = 'Test UA';
+
+        $originalModelMock = Mockery::mock(Channel::class)->makePartial();
+        $originalModelMock->id = 100;
+        $originalModelMock->failoverChannels = collect([]);
+        $originalModelMock->playlist = $originalModelPlaylistMock;
+        $originalModelMock->shouldReceive('getAttribute')->with('id')->andReturn(100);
+        $originalModelMock->shouldReceive('getAttribute')->with('failoverChannels')->andReturn(collect([]));
+        $originalModelMock->shouldReceive('getAttribute')->with('playlist')->andReturn($originalModelPlaylistMock);
+        $originalModelMock->title_custom = null;
+        $originalModelMock->title = 'Original Channel Title';
+        $originalModelMock->url_custom = null;
+        $originalModelMock->url = 'http://primary.url';
+
+
+        $serviceSpy->shouldReceive('isRunning')->andReturn(false);
+
+        Channel::shouldReceive('with')->with('playlist')->andReturnSelf();
+        Channel::shouldReceive('find')->with(100)->andReturn($originalModelMock);
+
+        $serviceSpy->shouldReceive('incrementActiveStreams')->with(1)->andReturn(1);
+        $serviceSpy->shouldReceive('wouldExceedStreamLimit')->with(1, 2, 1)->andReturn(false);
+        $serviceSpy->shouldReceive('runPreCheck')->andReturnNull();
+        $serviceSpy->shouldReceive('startStreamWithSpeedCheck')->andReturn(54321); // PID
+
+        Cache::shouldReceive('forget')->with("hls:monitoring_disabled:channel:100")->once();
+
+        $type = 'channel';
+        $title = 'Original Channel Title';
+
+        $result = $serviceSpy->startStream($type, $originalModelMock, $title);
+
+        $this->assertSame($originalModelMock, $result);
+
+        $expectedStreamSourceIds = [100];
+        $expectedCurrentIndex = 0;
+
+        Queue::assertPushed(MonitorStreamHealthJob::class, function ($job) use ($type, $originalModelMock, $title, $expectedStreamSourceIds, $expectedCurrentIndex) {
+            return $job->streamType === $type &&
+                   $job->activeStreamId === $originalModelMock->id &&
+                   $job->originalModelId === $originalModelMock->id &&
+                   $job->originalModelTitle === $title &&
+                   $job->playlistIdOfActiveStream === $originalModelMock->playlist->id &&
+                   $job->streamSourceIds === $expectedStreamSourceIds &&
+                   $job->currentIndexInSourceIds === $expectedCurrentIndex;
+        });
+    }
+
+    /** @test */
+    public function startStream_uses_failover_and_dispatches_job_with_correct_index()
+    {
+        $serviceSpy = Mockery::spy(HlsStreamService::class)->makePartial();
+
+        $primaryPlaylistMock = Mockery::mock(Playlist::class); $primaryPlaylistMock->id = 1; $primaryPlaylistMock->available_streams = 1; $primaryPlaylistMock->user_agent = 'UA1';
+        $failoverPlaylistMock = Mockery::mock(Playlist::class); $failoverPlaylistMock->id = 2; $failoverPlaylistMock->available_streams = 1; $failoverPlaylistMock->user_agent = 'UA2';
+
+        $failoverChannelMock = Mockery::mock(Channel::class)->makePartial();
+        $failoverChannelMock->id = 102;
+        $failoverChannelMock->playlist = $failoverPlaylistMock;
+        $failoverChannelMock->title_custom = null; $failoverChannelMock->title = 'Failover Channel'; $failoverChannelMock->url_custom = null; $failoverChannelMock->url = 'http://failover.url';
+
+        $originalModelMock = Mockery::mock(Channel::class)->makePartial();
+        $originalModelMock->id = 100;
+        $originalModelMock->failoverChannels = collect([$failoverChannelMock]);
+        $originalModelMock->playlist = $primaryPlaylistMock;
+        $originalModelMock->shouldReceive('getAttribute')->with('id')->andReturn(100);
+        $originalModelMock->shouldReceive('getAttribute')->with('failoverChannels')->andReturn(collect([$failoverChannelMock]));
+        $originalModelMock->shouldReceive('getAttribute')->with('playlist')->andReturn($primaryPlaylistMock);
+        $originalModelMock->title_custom = null; $originalModelMock->title = 'Primary Channel'; $originalModelMock->url_custom = null; $originalModelMock->url = 'http://primary.url';
+
+        $serviceSpy->shouldReceive('isRunning')->andReturn(false);
+
+        Channel::shouldReceive('with')->with('playlist')->andReturnSelf();
+        Channel::shouldReceive('find')->with(100)->andReturn($originalModelMock);
+        Channel::shouldReceive('find')->with(102)->andReturn($failoverChannelMock);
+
+        $serviceSpy->shouldReceive('incrementActiveStreams')->with(1)->once()->andReturn(1);
+        $serviceSpy->shouldReceive('wouldExceedStreamLimit')->with(1, 1, 1)->once()->andReturn(false);
+        $serviceSpy->shouldReceive('runPreCheck')
+            ->with('channel', 100, 'http://primary.url', 'UA1', 'Primary Channel', Mockery::any())
+            ->once()
+            ->andThrow(new SourceNotResponding('Primary failed precheck'));
+        $serviceSpy->shouldReceive('decrementActiveStreams')->with(1)->once();
+
+        $serviceSpy->shouldReceive('incrementActiveStreams')->with(2)->once()->andReturn(1);
+        $serviceSpy->shouldReceive('wouldExceedStreamLimit')->with(2, 1, 1)->once()->andReturn(false);
+        $serviceSpy->shouldReceive('runPreCheck')
+            ->with('channel', 102, 'http://failover.url', 'UA2', 'Failover Channel', Mockery::any())
+            ->once()
+            ->andReturnNull();
+        $serviceSpy->shouldReceive('startStreamWithSpeedCheck')
+             ->with('channel', $failoverChannelMock, 'http://failover.url', 'Failover Channel', 2, 'UA2')
+            ->once()
+            ->andReturn(54322); // PID
+
+        Cache::shouldReceive('forget')->with("hls:monitoring_disabled:channel:102")->once();
+
+        $type = 'channel'; $title = 'Primary Channel';
+        $result = $serviceSpy->startStream($type, $originalModelMock, $title);
+
+        $this->assertSame($failoverChannelMock, $result);
+        $expectedStreamSourceIds = [100, 102];
+        $expectedCurrentIndex = 1;
+
+        Queue::assertPushed(MonitorStreamHealthJob::class, function ($job) use ($type, $originalModelMock, $title, $failoverChannelMock, $expectedStreamSourceIds, $expectedCurrentIndex) {
+            return $job->streamType === $type &&
+                   $job->activeStreamId === $failoverChannelMock->id &&
+                   $job->originalModelId === $originalModelMock->id &&
+                   $job->originalModelTitle === $title &&
+                   $job->playlistIdOfActiveStream === $failoverChannelMock->playlist->id &&
+                   $job->streamSourceIds === $expectedStreamSourceIds &&
+                   $job->currentIndexInSourceIds === $expectedCurrentIndex;
+        });
+    }
+
+    /** @test */
+    public function startStream_returns_null_if_all_sources_fail()
+    {
+        $serviceSpy = Mockery::spy(HlsStreamService::class)->makePartial();
+        $originalModelMock = $this->mockStreamModel('channel', 100, 1);
+        $originalModelMock->failoverChannels = collect([]);
+        $originalModelMock->shouldReceive('getAttribute')->with('id')->andReturn(100);
+        $originalModelMock->shouldReceive('getAttribute')->with('failoverChannels')->andReturn(collect([]));
+
+        $serviceSpy->shouldReceive('isRunning')->andReturn(false);
+        Channel::shouldReceive('with')->with('playlist')->andReturnSelf();
+        Channel::shouldReceive('find')->with(100)->andReturn($originalModelMock);
+
+        $serviceSpy->shouldReceive('incrementActiveStreams')->andReturn(1);
+        $serviceSpy->shouldReceive('wouldExceedStreamLimit')->andReturn(false);
+        $serviceSpy->shouldReceive('runPreCheck')->andThrow(new SourceNotResponding('Failed'));
+        $serviceSpy->shouldReceive('decrementActiveStreams')->with(1)->once();
+
+        Log::shouldReceive('error')->once()->with(Mockery::on(function($message) {
+            return str_contains($message, 'No available HLS streams for channel');
+        }));
+
+        $result = $serviceSpy->startStream('channel', $originalModelMock, 'Original Title');
+
+        $this->assertNull($result);
+        Queue::assertNotPushed(MonitorStreamHealthJob::class);
+    }
+
+    /** @test */
+    public function startStream_returns_existing_running_stream_and_does_not_dispatch_job()
+    {
+        $serviceSpy = Mockery::spy(HlsStreamService::class)->makePartial();
+        $originalModelMock = $this->mockStreamModel('channel', 100, 1);
+        $originalModelMock->failoverChannels = collect([]);
+        $originalModelMock->shouldReceive('getAttribute')->with('id')->andReturn(100);
+         $originalModelMock->shouldReceive('getAttribute')->with('failoverChannels')->andReturn(collect([]));
+
+
+        $serviceSpy->shouldReceive('isRunning')->with('channel', 100)->andReturn(true);
+
+        Log::shouldReceive('debug')->once()->with(Mockery::on(function($message) {
+            return str_contains($message, 'Found existing running stream');
+        }));
+
+        $result = $serviceSpy->startStream('channel', $originalModelMock, 'Original Title');
+
+        $this->assertSame($originalModelMock, $result);
+        Queue::assertNotPushed(MonitorStreamHealthJob::class);
+        $serviceSpy->shouldNotHaveReceived('incrementActiveStreams');
+    }
+
 }

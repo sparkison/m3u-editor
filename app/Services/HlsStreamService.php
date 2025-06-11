@@ -476,7 +476,7 @@ class HlsStreamService
     /**
      * Return true if $pid is alive and matches an ffmpeg command.
      */
-    protected function isFfmpeg(int $pid): bool
+    public function isFfmpeg(int $pid): bool
     {
         // On Linux systems
         if (PHP_OS_FAMILY === 'Linux' && file_exists("/proc/{$pid}/cmdline")) {
