@@ -268,18 +268,19 @@ class ChannelResource extends Resource
                     }),
             ])
             ->actions([
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\EditAction::make(),
+                    Tables\Actions\DeleteAction::make()
+                ])->button()->hiddenLabel()->size('sm')->hidden(fn(Model $record) => !$record->is_custom),
                 Tables\Actions\EditAction::make()
                     ->button()
                     ->hiddenLabel()
-                    ->slideOver(),
+                    ->slideOver()
+                    ->hidden(fn(Model $record) => $record->is_custom),
                 Tables\Actions\ViewAction::make()
                     ->button()
                     ->hiddenLabel()
                     ->slideOver(),
-                Tables\Actions\DeleteAction::make()
-                    ->button()
-                    ->hiddenLabel()
-                    ->disabled(fn(Model $record) => !$record->is_custom),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
