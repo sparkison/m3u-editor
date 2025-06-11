@@ -726,6 +726,8 @@ class ChannelResource extends Resource
                         ->afterStateUpdated(function (Forms\Set $set, $state) {
                             if ($state) {
                                 $set('custom_playlist_id', null);
+                                $set('group', null);
+                                $set('group_id', null);
                             }
                         })
                         ->requiredWithout('custom_playlist_id')
@@ -741,6 +743,8 @@ class ChannelResource extends Resource
                         ->afterStateUpdated(function (Forms\Set $set, $state) {
                             if ($state) {
                                 $set('playlist_id', null);
+                                $set('group', null);
+                                $set('group_id', null);
                             }
                         })
                         ->requiredWithout('playlist_id')
@@ -794,21 +798,31 @@ class ChannelResource extends Resource
                         ->hint('timeshift')
                         ->columnSpan(1)
                         ->rules(['numeric', 'min:0']),
-                    Forms\Components\Hidden::make('group'),
-                    Forms\Components\Select::make('group_id')
-                        ->label('Group')
-                        ->hint('group-title')
-                        ->options(fn($record) => Group::where('playlist_id', $record->playlist_id)->get(['name', 'id'])->pluck('name', 'id'))
+                    Forms\Components\Grid::make()
                         ->columnSpanFull()
-                        ->placeholder('Select a group')
-                        ->searchable()
-                        ->live()
-                        ->afterStateUpdated(function (Forms\Get $get, Forms\Set $set) {
-                            $group = Group::find($get('group_id'));
-                            $set('group', $group->name ?? null);
-                        })
+                        ->schema([
+                            Forms\Components\Hidden::make('group'),
+                            Forms\Components\Select::make('group_id')
+                                ->label('Group')
+                                ->hint('group-title')
+                                ->options(fn(Get $get) => Group::where('playlist_id', $get('playlist_id'))->get(['name', 'id'])->pluck('name', 'id'))
+                                ->columnSpanFull()
+                                ->placeholder('Select a group')
+                                ->searchable()
+                                ->live()
+                                ->afterStateUpdated(function (Forms\Get $get, Forms\Set $set) {
+                                    $group = Group::find($get('group_id'));
+                                    $set('group', $group->name ?? null);
+                                })
+                                ->rules(['numeric', 'min:0']),
+                        ])->hidden(fn(Get $get) => !$get('playlist_id')),
+                    Forms\Components\TextInput::make('group')
+                        ->columnSpanFull()
+                        ->placeholder('Enter a group title')
+                        ->hint('group-title')
                         ->hiddenOn('create')
-                        ->rules(['numeric', 'min:0']),
+                        ->rules(['min:1', 'max:255'])
+                        ->hidden(fn(Get $get) => !$get('custom_playlist_id')),
                 ]),
             Forms\Components\Fieldset::make('URL Settings')
                 ->schema([
