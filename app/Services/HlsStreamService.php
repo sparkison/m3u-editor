@@ -63,6 +63,7 @@ class HlsStreamService
         Redis::sadd("hls:active_{$type}_ids", $model->id);
 
         // Loop over the failover channels and grab the first one that works.
+        $isSingleStream = ($streams->count() === 1);
         foreach ($streams as $stream) { // $stream is the current primary or failover channel being attempted
             // Get the title for the current stream in the loop
             $currentStreamTitle = $type === 'channel'
@@ -72,17 +73,6 @@ class HlsStreamService
 
             // Check if playlist is specified for the current stream
             $playlist = $stream->playlist;
-
-            // Make sure we have a valid source channel (using current stream's ID and its playlist ID)
-            $badSourceCacheKey = ProxyService::BAD_SOURCE_CACHE_PREFIX . $stream->id . ':' . $playlist->id;
-            if (Redis::exists($badSourceCacheKey)) {
-                if ($model->id === $stream->id) {
-                    Log::channel('ffmpeg')->debug("Skipping source ID {$currentStreamTitle} ({$stream->id}) for as it was recently marked as bad for playlist {$playlist->id}. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
-                } else {
-                    Log::channel('ffmpeg')->debug("Skipping Failover {$type} {$stream->name} for source {$model->title} ({$model->id}) as it (stream ID {$stream->id}) was recently marked as bad for playlist {$playlist->id}. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
-                }
-                continue;
-            }
 
             // Keep track of the active streams for this playlist using optimistic locking pattern
             $activeStreams = $this->incrementActiveStreams($playlist->id);
@@ -121,7 +111,10 @@ class HlsStreamService
                 // Log the error and cache the bad source
                 $this->decrementActiveStreams($playlist->id);
                 Log::channel('ffmpeg')->error("Source not responding for channel {$title}: " . $e->getMessage());
-                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, $e->getMessage());
+                if ($isSingleStream) {
+                    Log::channel('ffmpeg')->error("Single stream {$type} {$title} (ID: {$model->id}) failed, terminating attempt.");
+                    return null;
+                }
 
                 // Try the next failover channel
                 continue;
@@ -129,7 +122,10 @@ class HlsStreamService
                 // Log the error and abort
                 $this->decrementActiveStreams($playlist->id);
                 Log::channel('ffmpeg')->error("Error streaming channel {$title}: " . $e->getMessage());
-                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, $e->getMessage());
+                if ($isSingleStream) {
+                    Log::channel('ffmpeg')->error("Single stream {$type} {$title} (ID: {$model->id}) failed, terminating attempt.");
+                    return null;
+                }
 
                 // Try the next failover channel
                 continue;
