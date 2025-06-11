@@ -16,6 +16,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Database\Eloquent\Model;
 use Filament\Tables\Columns\SpatieTagsColumn;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -234,6 +235,16 @@ class ChannelsRelationManager extends RelationManager
                     }),
             ])
             ->headerActions([
+                Tables\Actions\CreateAction::make()
+                    ->label('Create Custom Channel')
+                    ->form(ChannelResource::getForm(customPlaylist: $ownerRecord))
+                    ->modalHeading('New Custom Channel')
+                    ->modalDescription('NOTE: Custom channels need to be associated with a Playlist or Custom Playlist.')
+                    ->using(fn(array $data, string $model): Model => ChannelResource::createCustomChannel(
+                        data: $data,
+                        model: $model,
+                    ))
+                    ->slideOver(),
                 Tables\Actions\AttachAction::make()
                     ->form(fn(Tables\Actions\AttachAction $action): array => [
                         $action
