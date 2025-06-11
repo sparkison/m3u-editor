@@ -276,6 +276,10 @@ class ChannelResource extends Resource
                     ->button()
                     ->hiddenLabel()
                     ->slideOver(),
+                Tables\Actions\DeleteAction::make()
+                    ->button()
+                    ->hiddenLabel()
+                    ->disabled(fn(Model $record) => !$record->is_custom),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

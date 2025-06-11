@@ -303,6 +303,9 @@ class ChannelsRelationManager extends RelationManager
                     Tables\Actions\ViewAction::make()
                         ->slideOver(),
                     Tables\Actions\DetachAction::make()
+                        ->color('warning'),
+                    Tables\Actions\DeleteAction::make()
+                        ->disabled(fn(Model $record) => ! $record->is_custom)
                 ])->button()->hiddenLabel()->size('sm'),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
