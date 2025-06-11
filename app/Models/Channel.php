@@ -33,6 +33,7 @@ class Channel extends Model
         'group_id' => 'integer',
         'extvlcopt' => 'array',
         'kodidrop' => 'array',
+        'is_custom' => 'boolean',
         'logo_type' => ChannelLogoType::class,
     ];
 
@@ -46,6 +47,24 @@ class Channel extends Model
         return $this->belongsTo(Playlist::class);
     }
 
+    /**
+     * Get the effective playlist (either the main playlist or custom playlist)
+     * This method returns the playlist that should be used for configuration
+     */
+    public function getEffectivePlaylist()
+    {
+        if ($this->is_custom) {
+            // For custom channels, we might want to get settings from the custom playlist
+            // but still maintain the foreign key relationship to the original playlist
+            $customPlaylist = $this->customPlaylists()->first();
+            if ($customPlaylist) {
+                return $customPlaylist;
+            }
+        }
+        
+        return $this->playlist;
+    }
+
     public function group(): BelongsTo
     {
         return $this->belongsTo(Group::class);
@@ -55,6 +74,11 @@ class Channel extends Model
     {
         return $this->belongsTo(EpgChannel::class)
             ->withoutEagerLoads();
+    }
+
+    public function customPlaylist(): BelongsTo
+    {
+        return $this->belongsTo(CustomPlaylist::class);
     }
 
     public function customPlaylists(): BelongsToMany
@@ -86,9 +110,10 @@ class Channel extends Model
      */
     public function getProxyUrlAttribute(): string
     {
+        $effectivePlaylist = $this->getEffectivePlaylist();
         return ProxyFacade::getProxyUrlForChannel(
             $this->id,
-            $this->playlist->proxy_options['output'] ?? 'ts'
+            $effectivePlaylist->proxy_options['output'] ?? 'ts'
         );
     }
 

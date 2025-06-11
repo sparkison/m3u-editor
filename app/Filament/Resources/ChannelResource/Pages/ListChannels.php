@@ -16,6 +16,7 @@ use Filament\Resources\Components\Tab;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Hydrat\TableLayoutToggle\Concerns\HasToggleableTable;
 use Illuminate\Support\Str;
 
@@ -36,7 +37,28 @@ class ListChannels extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            // Actions\CreateAction::make(),
+            Actions\CreateAction::make()
+                ->using(function (array $data, string $model): Model {
+                    $data['user_id'] = auth()->id();
+                    $data['is_custom'] = true;
+                    if (!$data['shift']) {
+                        $data['shift'] = 0; // Default shift to 0 if not provided
+                    }
+                    if (!$data['logo_type']) {
+                        $data['logo_type'] = 'channel'; // Default to channel if not provided
+                    }
+                    $channel = $model::create($data);
+
+                    // If the channel is created for a Custom Playlist, we need to associate it with the Custom Playlist
+                    if (isset($data['custom_playlist_id']) && $data['custom_playlist_id']) {
+                        $channel->customPlaylists()
+                            ->syncWithoutDetaching([$data['custom_playlist_id']]);
+
+                        $channel->save();
+                    }
+                    return $channel;
+                })
+                ->slideOver(),
             Actions\ActionGroup::make([
                 Actions\Action::make('map')
                     ->label('Map EPG to Playlist')

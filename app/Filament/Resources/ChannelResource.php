@@ -709,8 +709,24 @@ class ChannelResource extends Resource
         return [
             // Customizable channel fields
             Forms\Components\Toggle::make('enabled')
-                ->columnSpan('full')
-                ->helperText('Toggle channel status'),
+                ->columnSpan('full'),
+            Forms\Components\Fieldset::make('Playlist')
+                ->schema([
+                    Forms\Components\Select::make('playlist_id')
+                        ->label('Playlist')
+                        ->options(fn() => Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                        ->searchable()
+                        ->reactive()
+                        ->requiredWithout('custom_playlist_id')
+                        ->rules(['exists:playlists,id']),
+                    Forms\Components\Select::make('custom_playlist_id')
+                        ->label('Custom Playlist')
+                        ->options(fn() => CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                        ->searchable()
+                        ->reactive()
+                        ->requiredWithout('playlist_id')
+                        ->rules(['exists:custom_playlists,id'])
+                ])->hiddenOn('edit'),
             Forms\Components\Fieldset::make('General Settings')
                 ->schema([
                     Forms\Components\TextInput::make('title_custom')
@@ -762,6 +778,7 @@ class ChannelResource extends Resource
                             $group = Group::find($get('group_id'));
                             $set('group', $group->name ?? null);
                         })
+                        ->hiddenOn('create')
                         ->rules(['numeric', 'min:0']),
                 ]),
             Forms\Components\Fieldset::make('URL Settings')
@@ -818,7 +835,8 @@ class ChannelResource extends Resource
                                 })
                         )
                         ->dehydrated(false) // don't save the value in the database
-                        ->type('url'),
+                        ->type('url')
+                        ->hiddenOn('create'),
                     Forms\Components\TextInput::make('logo')
                         ->label('Icon')
                         ->hint('tvg-logo')
@@ -937,7 +955,7 @@ class ChannelResource extends Resource
                         ->addActionLabel('Add failover channel')
                         ->columnSpanFull()
                         ->defaultItems(0)
-                ])
+                ])->hiddenOn('create')
         ];
     }
 }
