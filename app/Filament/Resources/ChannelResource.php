@@ -84,7 +84,7 @@ class ChannelResource extends Resource
             ->defaultPaginationPageOption(25)
             ->columns([
                 Tables\Columns\ImageColumn::make('logo')
-                    ->label('Icon')
+                    ->label('Logo')
                     ->checkFileExistence(false)
                     ->height(30)
                     ->width('auto')
@@ -150,6 +150,7 @@ class ChannelResource extends Resource
                     ->searchable()
                     ->toggleable(),
                 Tables\Columns\TextInputColumn::make('shift')
+                    ->label('Time Shift')
                     ->rules(['numeric', 'min:0'])
                     ->type('number')
                     ->placeholder('Time Shift')
@@ -804,6 +805,10 @@ class ChannelResource extends Resource
                     Forms\Components\TextInput::make('station_id')
                         ->label('Station ID')
                         ->hint('tvc-guide-stationid')
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'Gracenote station ID is a unique identifier for a TV channel in the Gracenote database. It is used to associate the channel with its metadata, such as program listings and other information.'
+                        )
                         ->columnSpan(1)
                         ->helperText("Gracenote station ID")
                         ->type('number')
@@ -814,7 +819,12 @@ class ChannelResource extends Resource
                         ->columnSpan(1)
                         ->rules(['numeric', 'min:0']),
                     Forms\Components\TextInput::make('shift')
+                        ->label("Time Shift")
                         ->hint('timeshift')
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'Time-shift is features that enable you to access content that has already been broadcasted or is currently being broadcasted, but at a different time than the original schedule. Time-shift allows you to pause, rewind, or fast-forward live TV, giving you more control over your viewing experience. Your provider must support this feature for it to work.'
+                        )
                         ->placeholder(0)
                         ->columnSpan(1)
                         ->rules(['numeric', 'min:0']),
@@ -846,68 +856,57 @@ class ChannelResource extends Resource
                 ]),
             Forms\Components\Fieldset::make('URL Settings')
                 ->schema([
-                    Forms\Components\TextInput::make('url_custom')
-                        ->label('URL')
+                    Forms\Components\TextInput::make('url')
+                        ->label('Provider URL')
                         ->columnSpan(1)
                         ->prefixIcon('heroicon-m-globe-alt')
-                        ->placeholder(fn(Get $get) => $get('url'))
-                        ->helperText(fn(Get $get) => $get('is_custom') ? "" : "Leave empty to use default value.")
-                        // ->requiredIf('is_custom', true)
-                        // ->validationMessages([
-                        //     'required_if' => 'The URL is required for custom channels.',
-                        // ])
-                        ->rules(['min:1'])
-                        ->suffixAction(
-                            fn(Get $get) => !$get('is_custom') ?
-                                Forms\Components\Actions\Action::make('copy')
-                                ->icon('heroicon-s-eye')
-                                ->action(function (Get $get, $record, $state) {
-                                    $url = $state ?? $get('url');
-                                    $title = $record->title_custom ?? $record->title;
-                                    Notification::make()
-                                        ->icon('heroicon-s-eye')
-                                        ->title("$title - URL")
-                                        ->success()
-                                        ->body($url)
-                                        ->persistent()
-                                        ->send();
-                                })
-                                : null
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'The original URL from the playlist provider. This is read-only and cannot be modified. This URL is automatically updated on Playlist sync.'
                         )
+                        ->formatStateUsing(fn($record) => $record?->url)
+                        ->disabled() // make it read-only but copyable
+                        ->dehydrated(false) // don't save the value in the database
+                        ->type('url'),
+                    Forms\Components\TextInput::make('url_custom')
+                        ->label('URL Override')
+                        ->columnSpan(1)
+                        ->prefixIcon('heroicon-m-globe-alt')
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'Override the provider URL with your own custom URL. This URL will be used instead of the provider URL.'
+                        )
+                        ->helperText("Leave empty to use provider URL.")
+                        ->rules(['min:1'])
                         ->type('url'),
                     Forms\Components\TextInput::make('url_proxy')
                         ->label('Proxy URL')
                         ->columnSpan(1)
                         ->prefixIcon('heroicon-m-globe-alt')
-                        ->placeholder(fn($record) => ProxyFacade::getProxyUrlForChannel(
-                            $record->id,
-                            $record->getEffectivePlaylist()->proxy_options['output'] ?? 'ts'
-                        ))
-                        ->helperText("m3u editor proxy url.")
-                        ->disabled()
-                        ->suffixAction(
-                            Forms\Components\Actions\Action::make('copy')
-                                ->icon('heroicon-s-eye')
-                                ->action(function ($record, $state) {
-                                    $url = ProxyFacade::getProxyUrlForChannel(
-                                        $record->id,
-                                        $record->getEffectivePlaylist()->proxy_options['output'] ?? 'ts'
-                                    );
-                                    $title = $record->title_custom ?? $record->title;
-                                    Notification::make()
-                                        ->icon('heroicon-s-eye')
-                                        ->title("$title - Proxy URL")
-                                        ->success()
-                                        ->body($url)
-                                        ->persistent()
-                                        ->send();
-                                })
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'Use m3u editor proxy to access this channel. Format is defined in playlist proxy options.'
                         )
+                        ->formatStateUsing(function ($record) {
+                            if (!$record || !$record->id) {
+                                return null;
+                            }
+                            try {
+                                return ProxyFacade::getProxyUrlForChannel(
+                                    $record->id,
+                                    $record->playlist->proxy_options['output'] ?? 'ts'
+                                );
+                            } catch (\Exception $e) {
+                                return null;
+                            }
+                        })
+                        ->helperText("m3u editor proxy url.")
+                        ->disabled() // make it read-only but copyable
                         ->dehydrated(false) // don't save the value in the database
                         ->type('url')
                         ->hiddenOn('create'),
                     Forms\Components\TextInput::make('logo')
-                        ->label('Icon')
+                        ->label('Logo')
                         ->hint('tvg-logo')
                         ->columnSpan(1)
                         ->prefixIcon('heroicon-m-globe-alt')
@@ -955,10 +954,14 @@ class ChannelResource extends Resource
                     Forms\Components\TextInput::make('tvg_shift')
                         ->label('EPG Shift')
                         ->hint('tvg-shift')
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'The "tvg-shift" attribute is used in your generated M3U playlist to shift the EPG (Electronic Program Guide) time for specific channels by a certain number of hours. This allows for adjusting the EPG data for individual channels rather than applying a global shift.'
+                        )
                         ->columnSpan(1)
                         ->rules(['numeric'])
                         ->placeholder('0')
-                        ->helperText('Indicates the shift of the program schedule, use the values -1,-1.5,0,1.5,2,.. and so on.')
+                        ->helperText('Indicates the shift of the program schedule, use the values -1,-1.5,0,1.5,1,.. and so on.')
                         ->rules(['nullable', 'numeric', 'min:0']),
                 ]),
             Forms\Components\Fieldset::make('Failover Channels')
