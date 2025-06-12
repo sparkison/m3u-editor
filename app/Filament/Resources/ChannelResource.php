@@ -857,16 +857,16 @@ class ChannelResource extends Resource
             Forms\Components\Fieldset::make('URL Settings')
                 ->schema([
                     Forms\Components\TextInput::make('url')
-                        ->label('Provider URL')
+                        ->label(fn(Get $get) => $get('is_custom') ? 'URL' : 'Provider URL')
                         ->columnSpan(1)
                         ->prefixIcon('heroicon-m-globe-alt')
                         ->hintIcon(
-                            'heroicon-m-question-mark-circle',
-                            tooltip: 'The original URL from the playlist provider. This is read-only and cannot be modified. This URL is automatically updated on Playlist sync.'
+                            icon: fn(Get $get) => $get('is_custom') ? null : 'heroicon-m-question-mark-circle',
+                            tooltip: fn(Get $get) => $get('is_custom') ? null : 'The original URL from the playlist provider. This is read-only and cannot be modified. This URL is automatically updated on Playlist sync.'
                         )
                         ->formatStateUsing(fn($record) => $record?->url)
-                        ->disabled() // make it read-only but copyable
-                        ->dehydrated(false) // don't save the value in the database
+                        ->disabled(fn(Get $get) => !$get('is_custom')) // make it read-only but copyable for non-custom channels
+                        ->dehydrated(fn(Get $get) => $get('is_custom')) // don't save the value in the database for custom channels
                         ->type('url'),
                     Forms\Components\TextInput::make('url_custom')
                         ->label('URL Override')
@@ -878,7 +878,8 @@ class ChannelResource extends Resource
                         )
                         ->helperText("Leave empty to use provider URL.")
                         ->rules(['min:1'])
-                        ->type('url'),
+                        ->type('url')
+                        ->hidden(fn(Get $get) => $get('is_custom')),
                     Forms\Components\TextInput::make('url_proxy')
                         ->label('Proxy URL')
                         ->columnSpan(1)
