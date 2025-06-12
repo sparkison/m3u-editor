@@ -287,9 +287,14 @@ class ChannelResource extends Resource
                     Tables\Actions\DeleteAction::make()
                 ])->button()->hiddenLabel()->size('sm')->hidden(fn(Model $record) => !$record->is_custom),
                 Tables\Actions\EditAction::make('edit')
+                    ->slideOver()
+                    ->form(fn(Tables\Actions\EditAction $action): array => [
+                        Forms\Components\Grid::make()
+                            ->schema(self::getForm(edit: true))
+                            ->columns(2)
+                    ])
                     ->button()
                     ->hiddenLabel()
-                    ->slideOver()
                     ->disabled(fn(Model $record) => $record->is_custom)
                     ->hidden(fn(Model $record) => $record->is_custom),
                 Tables\Actions\ViewAction::make()
