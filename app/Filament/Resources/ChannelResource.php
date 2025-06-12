@@ -184,8 +184,7 @@ class ChannelResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextInputColumn::make('tvg_shift')
                     ->label('EPG Shift')
-                    ->rules(['numeric', 'integer'])
-                    ->type('number')
+                    ->rules(['numeric'])
                     ->placeholder('EPG Shift')
                     ->tooltip('EPG Shift')
                     ->toggleable()
@@ -956,8 +955,7 @@ class ChannelResource extends Resource
                         ->label('EPG Shift')
                         ->hint('tvg-shift')
                         ->columnSpan(1)
-                        ->rules(['numeric', 'integer'])
-                        ->type('number')
+                        ->rules(['numeric'])
                         ->placeholder('0')
                         ->helperText('Indicates the shift of the program schedule, use the values -1,-2,0,1,2,.. and so on.')
                         ->rules(['nullable', 'numeric', 'min:0']),
