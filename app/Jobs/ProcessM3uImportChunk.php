@@ -91,6 +91,7 @@ class ProcessM3uImportChunk implements ShouldQueue
                 'kodidrop',
                 'catchup',
                 'catchup_source',
+                'tvg_shift', // new field for TVG shift
             ]);
         }
     }

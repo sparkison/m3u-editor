@@ -284,7 +284,8 @@ class ProcessM3uImport implements ShouldQueue
                 'enabled' => $playlist->enable_channels,
                 'catchup' => null,
                 'catchup_source' => null,
-                'shift' => 0
+                'shift' => 0,
+                'tvg_shift' => null
             ];
 
             // Update progress
@@ -496,7 +497,8 @@ class ProcessM3uImport implements ShouldQueue
                     'kodidrop' => null,
                     'catchup' => null,
                     'catchup_source' => null,
-                    'shift' => 0
+                    'shift' => 0,
+                    'tvg_shift' => null
                 ];
                 if ($autoSort) {
                     $channelFields['sort'] = 0;
@@ -527,6 +529,7 @@ class ProcessM3uImport implements ShouldQueue
                         'shift' => 'timeshift', // timeshift in hours, falls back to 'tvg-shift' if not set
                         'catchup' => 'catchup',
                         'catchup_source' => 'catchup-source',
+                        'tvg_shift' => 'tvg-shift', // used for EPG shift in hrs (can be negative)
                     ];
 
                     // Parse the M3U file

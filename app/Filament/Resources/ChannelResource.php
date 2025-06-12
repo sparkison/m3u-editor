@@ -152,8 +152,8 @@ class ChannelResource extends Resource
                 Tables\Columns\TextInputColumn::make('shift')
                     ->rules(['numeric', 'min:0'])
                     ->type('number')
-                    ->placeholder('Shift')
-                    ->tooltip('Shift')
+                    ->placeholder('Time Shift')
+                    ->tooltip('Time Shift')
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('group')
@@ -181,6 +181,14 @@ class ChannelResource extends Resource
                     ->toggleable()
                     ->searchable()
                     ->limit(40)
+                    ->sortable(),
+                Tables\Columns\TextInputColumn::make('tvg_shift')
+                    ->label('EPG Shift')
+                    ->rules(['numeric', 'integer'])
+                    ->type('number')
+                    ->placeholder('EPG Shift')
+                    ->tooltip('EPG Shift')
+                    ->toggleable()
                     ->sortable(),
                 Tables\Columns\SelectColumn::make('logo_type')
                     ->label('Preferred Icon')
@@ -939,6 +947,15 @@ class ChannelResource extends Resource
                             'epg' => 'EPG',
                         ])
                         ->columnSpan(1),
+                    Forms\Components\TextInput::make('tvg_shift')
+                        ->label('EPG Shift')
+                        ->hint('tvg-shift')
+                        ->columnSpan(1)
+                        ->rules(['numeric', 'integer'])
+                        ->type('number')
+                        ->placeholder('0')
+                        ->helperText('Indicates the shift of the program schedule, use the values -1,-2,0,1,2,.. and so on.')
+                        ->rules(['nullable', 'numeric', 'min:0']),
                 ]),
             Forms\Components\Fieldset::make('Failover Channels')
                 ->schema([
