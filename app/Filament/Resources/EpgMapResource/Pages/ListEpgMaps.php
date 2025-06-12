@@ -16,7 +16,7 @@ class ListEpgMaps extends ListRecords
 {
     protected static string $resource = EpgMapResource::class;
 
-    protected ?string $subheading = 'View the EPG channel mapping jobs and progress here. Head to channels to create a new mapping.';
+    protected ?string $subheading = 'View the EPG channel mapping jobs and progress here.';
 
     protected function getHeaderActions(): array
     {

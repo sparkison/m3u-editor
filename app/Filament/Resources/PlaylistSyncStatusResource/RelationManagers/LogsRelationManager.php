@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PlaylistSyncStatusResource\RelationManagers;
 
 use App\Models\PlaylistSyncStatusLog;
+use App\Tables\Columns\SyncStats;
 use Filament\Forms;
 use Filament\Resources\Components\Tab;
 use Filament\Forms\Form;
@@ -33,31 +34,42 @@ class LogsRelationManager extends RelationManager
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
             ->columns([
-                Tables\Columns\TextColumn::make('name')
-                    ->label('Item Name')
-                    ->sortable()
-                    ->searchable()
-                    ->toggleable(),
-                Tables\Columns\TextColumn::make('type')
-                    ->badge()
-                    ->colors([
-                        'primary',
-                        'primary' => 'channel',
-                        'gray' => 'group',
-                    ])
-                    ->sortable()
-                    ->searchable()
-                    ->toggleable(),
-                Tables\Columns\TextColumn::make('status')
-                    ->badge()
-                    ->colors([
-                        'primary',
-                        'success' => 'added',
-                        'danger' => 'removed',
-                    ])
-                    ->sortable()
-                    ->searchable()
-                    ->toggleable(),
+                Tables\Columns\Layout\Split::make([
+                    Tables\Columns\TextColumn::make('name')
+                        ->label('Item Name')
+                        ->sortable()
+                        ->searchable()
+                        ->toggleable(),
+                    Tables\Columns\Layout\Split::make([
+                        Tables\Columns\TextColumn::make('type')
+                            ->badge()
+                            ->colors([
+                                'primary',
+                                'primary' => 'channel',
+                                'gray' => 'group',
+                            ])
+                            ->sortable()
+                            ->searchable()
+                            ->toggleable(),
+                        Tables\Columns\TextColumn::make('status')
+                            ->badge()
+                            ->colors([
+                                'primary',
+                                'success' => 'added',
+                                'danger' => 'removed',
+                            ])
+                            ->sortable()
+                            ->searchable()
+                            ->toggleable()
+                    ])->grow(false)
+                ])->from('md'),
+                Tables\Columns\Layout\Panel::make([
+                    Tables\Columns\Layout\Stack::make([
+                        SyncStats::make('meta')
+                            ->label('Item Details')
+                            ->searchable()
+                    ]),
+                ])->collapsible()
             ])
             ->filters([
                 // Tables\Filters\Filter::make('added')
