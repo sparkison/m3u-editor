@@ -79,6 +79,7 @@ class PlaylistGenerateController extends Controller
                     $epgData = $channel->epgChannel ?? null;
                     $channelNo = $channel->channel;
                     $timeshift = $channel->shift ?? 0;
+                    $epgShift = $channel->tvg_shift ?? 0;
                     $group = $channel->group ?? '';
                     if (!$channelNo && $playlist->auto_channel_increment) {
                         $channelNo = ++$channelNumber;
@@ -138,6 +139,9 @@ class PlaylistGenerateController extends Controller
                     }
                     if ($timeshift) {
                         $extInf .= " timeshift=\"$timeshift\"";
+                    }
+                    if ($epgShift) {
+                        $extInf .= " tvg-shift=\"$epgShift\"";
                     }
                     $extInf .= " tvg-chno=\"$channelNo\" tvg-id=\"$tvgId\" tvg-name=\"$name\" tvg-logo=\"$icon\" group-title=\"$group\"";
                     echo "$extInf," . $title . "\n";
