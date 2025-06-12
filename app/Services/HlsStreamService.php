@@ -187,7 +187,7 @@ class HlsStreamService
      * @return int The FFmpeg process ID
      * @throws Exception If the stream fails or speed drops below the threshold
      */
-    private function startStreamWithSpeedCheck(
+    protected function startStreamWithSpeedCheck(
         string $type,
         Channel|Episode $model,
         string $streamUrl,
@@ -282,7 +282,7 @@ class HlsStreamService
      * 
      * @throws Exception If the pre-check fails
      */
-    private function runPreCheck(string $modelType, $modelId, $streamUrl, $userAgent, $title, int $ffprobeTimeout)
+    protected function runPreCheck(string $modelType, $modelId, $streamUrl, $userAgent, $title, int $ffprobeTimeout)
     {
         $ffprobePath = config('proxy.ffprobe_path', 'ffprobe');
         

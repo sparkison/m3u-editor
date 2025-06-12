@@ -48,6 +48,8 @@ class MonitorStreamHealthJobTest extends TestCase
         Storage::fake('app');
         Queue::fake();
 
+        Config::set('logging.default', 'null');
+
         // Use partialMock to allow some Facade methods to pass through if not explicitly mocked
         Cache::partialMock();
         Redis::partialMock();
@@ -112,9 +114,9 @@ class MonitorStreamHealthJobTest extends TestCase
 
         $this->hlsStreamServiceMock->shouldReceive('stopStream')->once()->with('channel', 101);
 
-        $playlistMock2 = Mockery::mock(Playlist::class);
+        $playlistMock2 = Mockery::mock(Playlist::class)->makePartial();
         $playlistMock2->id = 2;
-        $channelMock102 = Mockery::mock(Channel::class);
+        $channelMock102 = Mockery::mock(Channel::class)->makePartial();
         $channelMock102->id = 102;
         $channelMock102->playlist = $playlistMock2;
 
@@ -150,9 +152,9 @@ class MonitorStreamHealthJobTest extends TestCase
 
         $this->hlsStreamServiceMock->shouldReceive('stopStream')->once()->with('channel', 101);
 
-        $playlistMock2 = Mockery::mock(Playlist::class);
+        $playlistMock2 = Mockery::mock(Playlist::class)->makePartial();
         $playlistMock2->id = 2;
-        $channelMock102 = Mockery::mock(Channel::class);
+        $channelMock102 = Mockery::mock(Channel::class)->makePartial();
         $channelMock102->id = 102;
         $channelMock102->playlist = $playlistMock2;
 
@@ -185,9 +187,9 @@ class MonitorStreamHealthJobTest extends TestCase
         $this->hlsStreamServiceMock->shouldReceive('stopStream')->once()->with('channel', 101);
 
         // Mock subsequent failover attempts to fail quickly
-        $playlistMock2 = Mockery::mock(Playlist::class);
+        $playlistMock2 = Mockery::mock(Playlist::class)->makePartial();
         $playlistMock2->id = 2;
-        $channelMock102 = Mockery::mock(Channel::class);
+        $channelMock102 = Mockery::mock(Channel::class)->makePartial();
         $channelMock102->id = 102;
         $channelMock102->playlist = $playlistMock2;
 
@@ -261,9 +263,9 @@ class MonitorStreamHealthJobTest extends TestCase
         }));
 
         $this->hlsStreamServiceMock->shouldReceive('stopStream')->once()->with('channel', 101);
-        $playlistMock2 = Mockery::mock(Playlist::class);
+        $playlistMock2 = Mockery::mock(Playlist::class)->makePartial();
         $playlistMock2->id = 2;
-        $channelMock102 = Mockery::mock(Channel::class);
+        $channelMock102 = Mockery::mock(Channel::class)->makePartial();
         $channelMock102->id = 102;
         $channelMock102->playlist = $playlistMock2;
         Channel::shouldReceive('with')->with('playlist')->zeroOrMoreTimes()->andReturnSelf();
@@ -318,9 +320,9 @@ class MonitorStreamHealthJobTest extends TestCase
         }));
 
         $this->hlsStreamServiceMock->shouldReceive('stopStream')->once()->with('channel', 101);
-        $playlistMock2 = Mockery::mock(Playlist::class);
+        $playlistMock2 = Mockery::mock(Playlist::class)->makePartial();
         $playlistMock2->id = 2;
-        $channelMock102 = Mockery::mock(Channel::class);
+        $channelMock102 = Mockery::mock(Channel::class)->makePartial();
         $channelMock102->id = 102;
         $channelMock102->playlist = $playlistMock2;
         Channel::shouldReceive('with')->with('playlist')->zeroOrMoreTimes()->andReturnSelf();
@@ -346,9 +348,9 @@ class MonitorStreamHealthJobTest extends TestCase
         $this->hlsStreamServiceMock->shouldReceive('stopStream')->once()->with('channel', 101);
 
         // Next source to try is 102 (index 1)
-        $playlistMock2 = Mockery::mock(Playlist::class);
+        $playlistMock2 = Mockery::mock(Playlist::class)->makePartial();
         $playlistMock2->id = 2;
-        $channelMock102 = Mockery::mock(Channel::class);
+        $channelMock102 = Mockery::mock(Channel::class)->makePartial();
         $channelMock102->id = 102;
         $channelMock102->playlist = $playlistMock2;
 
@@ -377,15 +379,15 @@ class MonitorStreamHealthJobTest extends TestCase
 
         $this->hlsStreamServiceMock->shouldReceive('stopStream')->once()->with('channel', 101);
 
-        $playlistMock2 = Mockery::mock(Playlist::class);
+        $playlistMock2 = Mockery::mock(Playlist::class)->makePartial();
         $playlistMock2->id = 2;
-        $channelMock102 = Mockery::mock(Channel::class);
+        $channelMock102 = Mockery::mock(Channel::class)->makePartial();
         $channelMock102->id = 102;
         $channelMock102->playlist = $playlistMock2;
 
-        $playlistMock3 = Mockery::mock(Playlist::class);
+        $playlistMock3 = Mockery::mock(Playlist::class)->makePartial();
         $playlistMock3->id = 3;
-        $channelMock103 = Mockery::mock(Channel::class);
+        $channelMock103 = Mockery::mock(Channel::class)->makePartial();
         $channelMock103->id = 103;
         $channelMock103->playlist = $playlistMock3;
 
@@ -421,15 +423,15 @@ class MonitorStreamHealthJobTest extends TestCase
 
         $this->hlsStreamServiceMock->shouldReceive('stopStream')->once()->with('channel', 101);
 
-        $playlistMock2 = Mockery::mock(Playlist::class);
+        $playlistMock2 = Mockery::mock(Playlist::class)->makePartial();
         $playlistMock2->id = 2;
-        $channelMock102 = Mockery::mock(Channel::class);
+        $channelMock102 = Mockery::mock(Channel::class)->makePartial();
         $channelMock102->id = 102;
         $channelMock102->playlist = $playlistMock2;
 
-        $playlistMock3 = Mockery::mock(Playlist::class);
+        $playlistMock3 = Mockery::mock(Playlist::class)->makePartial();
         $playlistMock3->id = 3;
-        $channelMock103 = Mockery::mock(Channel::class);
+        $channelMock103 = Mockery::mock(Channel::class)->makePartial();
         $channelMock103->id = 103;
         $channelMock103->playlist = $playlistMock3;
 
