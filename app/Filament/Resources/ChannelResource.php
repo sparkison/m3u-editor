@@ -815,6 +815,7 @@ class ChannelResource extends Resource
                         ->rules(['numeric', 'min:0']),
                     Forms\Components\TextInput::make('shift')
                         ->hint('timeshift')
+                        ->placeholder(0)
                         ->columnSpan(1)
                         ->rules(['numeric', 'min:0']),
                     Forms\Components\Grid::make()
@@ -957,7 +958,7 @@ class ChannelResource extends Resource
                         ->columnSpan(1)
                         ->rules(['numeric'])
                         ->placeholder('0')
-                        ->helperText('Indicates the shift of the program schedule, use the values -1,-2,0,1,2,.. and so on.')
+                        ->helperText('Indicates the shift of the program schedule, use the values -1,-1.5,0,1.5,2,.. and so on.')
                         ->rules(['nullable', 'numeric', 'min:0']),
                 ]),
             Forms\Components\Fieldset::make('Failover Channels')
