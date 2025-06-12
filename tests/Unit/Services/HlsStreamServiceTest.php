@@ -28,6 +28,8 @@ class HlsStreamServiceTest extends TestCase
     // use RefreshDatabase;
 
     protected $proxyServiceMock;
+    protected $loggerMock; // This will be the Psr\Log\LoggerInterface mock
+    protected $logManagerMock; // This will be the Illuminate\Log\LogManager mock
     // HlsStreamService instance will be created directly, but methods might be mocked if testing other methods.
     // For testing a specific method like attemptSpecificStreamSource, we might spy on the service or use a real instance
     // and mock its internal calls like runPreCheck, startStreamWithSpeedCheck.
@@ -54,11 +56,34 @@ class HlsStreamServiceTest extends TestCase
         Queue::fake();
         Storage::fake('app'); // For HLS file operations, if any are directly in methods being tested
 
-        Config::set('logging.default', 'null');
+        // Config::set('logging.default', 'null'); // Removed
+
+        // This is the actual PSR logger mock where expectations will be set
+        $this->loggerMock = Mockery::mock(\Psr\Log\LoggerInterface::class);
+        $this->loggerMock->shouldReceive('info')->zeroOrMoreTimes()->withAnyArgs()->andReturnNull();
+        $this->loggerMock->shouldReceive('warning')->zeroOrMoreTimes()->withAnyArgs()->andReturnNull();
+        $this->loggerMock->shouldReceive('error')->zeroOrMoreTimes()->withAnyArgs()->andReturnNull();
+        $this->loggerMock->shouldReceive('debug')->zeroOrMoreTimes()->withAnyArgs()->andReturnNull();
+        $this->loggerMock->shouldReceive('log')->zeroOrMoreTimes()->withAnyArgs()->andReturnNull();
+
+        // This is the LogManager mock that Log::swap() will use.
+        $this->logManagerMock = Mockery::mock(\Illuminate\Log\LogManager::class)->makePartial();
+        $this->logManagerMock->shouldReceive('channel')->zeroOrMoreTimes()->withAnyArgs()->andReturn($this->loggerMock);
+        // $this->logManagerMock->shouldReceive('driver')->zeroOrMoreTimes()->withAnyArgs()->andReturn($this->loggerMock); // Removed
+        // Forward direct calls like Log::info() to the $loggerMock too
+        $this->logManagerMock->shouldReceive('info')->zeroOrMoreTimes()->withAnyArgs()->andReturnUsing([$this->loggerMock, 'info']);
+        $this->logManagerMock->shouldReceive('warning')->zeroOrMoreTimes()->withAnyArgs()->andReturnUsing([$this->loggerMock, 'warning']);
+        $this->logManagerMock->shouldReceive('error')->zeroOrMoreTimes()->withAnyArgs()->andReturnUsing([$this->loggerMock, 'error']);
+        $this->logManagerMock->shouldReceive('debug')->zeroOrMoreTimes()->withAnyArgs()->andReturnUsing([$this->loggerMock, 'debug']);
+
+        Log::swap($this->logManagerMock);
+
+        Config::set('database.default', 'sqlite');
+        Config::set('database.connections.sqlite.database', ':memory:');
 
         Cache::partialMock();
         Redis::partialMock();
-        Log::partialMock();
+        // Log::partialMock(); // Removed
         File::partialMock(); // If HlsStreamService uses File facade directly
 
         // Mock the TracksActiveStreams trait methods if they are called and need specific behavior
@@ -148,7 +173,7 @@ class HlsStreamServiceTest extends TestCase
         $serviceSpy->shouldReceive('wouldExceedStreamLimit')->with($playlistId, 1, 2)->andReturn(true); // Limit is 1, active is 2
         $serviceSpy->shouldReceive('decrementActiveStreams')->with($playlistId)->once();
 
-        Log::shouldReceive('warning')->once()->with(Mockery::on(function($message) {
+        $this->loggerMock->shouldReceive('warning')->once()->with(Mockery::on(function($message) {
             return str_contains($message, 'Max streams reached for playlist ID 5');
         }));
 
@@ -172,7 +197,7 @@ class HlsStreamServiceTest extends TestCase
         $serviceSpy->shouldReceive('runPreCheck')->andThrow(new SourceNotResponding('FFprobe failed'));
         $serviceSpy->shouldReceive('decrementActiveStreams')->with($playlistId)->once();
 
-        Log::shouldReceive('error')->once()->with(Mockery::on(function($message) {
+        $this->loggerMock->shouldReceive('error')->once()->with(Mockery::on(function($message) {
             return str_contains($message, 'Source not responding for specific source');
         }));
 
@@ -196,7 +221,7 @@ class HlsStreamServiceTest extends TestCase
         $serviceSpy->shouldReceive('startStreamWithSpeedCheck')->andThrow(new \Exception('FFmpeg process error'));
         $serviceSpy->shouldReceive('decrementActiveStreams')->with($playlistId)->once();
 
-        Log::shouldReceive('error')->once()->with(Mockery::on(function($message) {
+        $this->loggerMock->shouldReceive('error')->once()->with(Mockery::on(function($message) {
             return str_contains($message, 'Error streaming specific source');
         }));
 
@@ -349,7 +374,7 @@ class HlsStreamServiceTest extends TestCase
         $serviceSpy->shouldReceive('runPreCheck')->andThrow(new SourceNotResponding('Failed'));
         $serviceSpy->shouldReceive('decrementActiveStreams')->with(1)->once();
 
-        Log::shouldReceive('error')->once()->with(Mockery::on(function($message) {
+        $this->loggerMock->shouldReceive('error')->once()->with(Mockery::on(function($message) {
             return str_contains($message, 'No available HLS streams for channel');
         }));
 
@@ -371,7 +396,7 @@ class HlsStreamServiceTest extends TestCase
 
         $serviceSpy->shouldReceive('isRunning')->with('channel', 100)->andReturn(true);
 
-        Log::shouldReceive('debug')->once()->with(Mockery::on(function($message) {
+        $this->loggerMock->shouldReceive('debug')->once()->with(Mockery::on(function($message) {
             return str_contains($message, 'Found existing running stream');
         }));
 

@@ -25,6 +25,8 @@ class MonitorStreamHealthJobTest extends TestCase
     // use RefreshDatabase;
 
     protected $hlsStreamServiceMock;
+    protected $loggerMock; // This will be the Psr\Log\LoggerInterface mock
+    protected $logManagerMock; // This will be the Illuminate\Log\LogManager mock
 
     protected function setUp(): void
     {
@@ -48,12 +50,35 @@ class MonitorStreamHealthJobTest extends TestCase
         Storage::fake('app');
         Queue::fake();
 
-        Config::set('logging.default', 'null');
+        // Config::set('logging.default', 'null'); // Removed
+
+        // This is the actual PSR logger mock where expectations will be set
+        $this->loggerMock = Mockery::mock(\Psr\Log\LoggerInterface::class);
+        $this->loggerMock->shouldReceive('info')->zeroOrMoreTimes()->withAnyArgs()->andReturnNull();
+        $this->loggerMock->shouldReceive('warning')->zeroOrMoreTimes()->withAnyArgs()->andReturnNull();
+        $this->loggerMock->shouldReceive('error')->zeroOrMoreTimes()->withAnyArgs()->andReturnNull();
+        $this->loggerMock->shouldReceive('debug')->zeroOrMoreTimes()->withAnyArgs()->andReturnNull();
+        $this->loggerMock->shouldReceive('log')->zeroOrMoreTimes()->withAnyArgs()->andReturnNull();
+
+        // This is the LogManager mock that Log::swap() will use.
+        $this->logManagerMock = Mockery::mock(\Illuminate\Log\LogManager::class)->makePartial();
+        $this->logManagerMock->shouldReceive('channel')->zeroOrMoreTimes()->withAnyArgs()->andReturn($this->loggerMock);
+        // $this->logManagerMock->shouldReceive('driver')->zeroOrMoreTimes()->withAnyArgs()->andReturn($this->loggerMock); // Removed
+        // Forward direct calls like Log::info() to the $loggerMock too
+        $this->logManagerMock->shouldReceive('info')->zeroOrMoreTimes()->withAnyArgs()->andReturnUsing([$this->loggerMock, 'info']);
+        $this->logManagerMock->shouldReceive('warning')->zeroOrMoreTimes()->withAnyArgs()->andReturnUsing([$this->loggerMock, 'warning']);
+        $this->logManagerMock->shouldReceive('error')->zeroOrMoreTimes()->withAnyArgs()->andReturnUsing([$this->loggerMock, 'error']);
+        $this->logManagerMock->shouldReceive('debug')->zeroOrMoreTimes()->withAnyArgs()->andReturnUsing([$this->loggerMock, 'debug']);
+
+        Log::swap($this->logManagerMock);
+
+        Config::set('database.default', 'sqlite');
+        Config::set('database.connections.sqlite.database', ':memory:');
 
         // Use partialMock to allow some Facade methods to pass through if not explicitly mocked
         Cache::partialMock();
         Redis::partialMock();
-        Log::partialMock();
+        // Log::partialMock(); // Removed
         File::partialMock(); // For File::exists, File::glob, File::lastModified used in the Job
     }
 
@@ -92,7 +117,7 @@ class MonitorStreamHealthJobTest extends TestCase
     #[Test]
     public function handle_terminates_if_monitoring_disabled_flag_is_set()
     {
-        Log::shouldReceive('info')->once()->with(Mockery::on(function($message) {
+        $this->loggerMock->shouldReceive('info')->once()->with(Mockery::on(function($message) {
             return str_contains($message, 'Monitoring disabled. Job terminating.');
         }));
         Cache::shouldReceive('get')->with("hls:monitoring_disabled:channel:101")->andReturn(true);
@@ -108,7 +133,7 @@ class MonitorStreamHealthJobTest extends TestCase
     {
         Cache::shouldReceive('get')->with("hls:monitoring_disabled:channel:101")->andReturn(false);
         Cache::shouldReceive('get')->with("hls:pid:channel:101")->andReturn(null);
-        Log::shouldReceive('warning')->once()->with(Mockery::on(function($message) {
+        $this->loggerMock->shouldReceive('warning')->once()->with(Mockery::on(function($message) {
             return str_contains($message, 'PID not found in cache');
         }));
 
@@ -130,7 +155,7 @@ class MonitorStreamHealthJobTest extends TestCase
                    'Test Channel Original', [101, 102, 103], 1, 100, 2)
             ->andReturn(null);
 
-        Log::shouldReceive('warning')->once()->with(Mockery::on(function($message) {
+        $this->loggerMock->shouldReceive('warning')->once()->with(Mockery::on(function($message) {
             return str_contains($message, 'Source model channel ID 103 not found. Skipping.');
         }));
 
@@ -145,7 +170,7 @@ class MonitorStreamHealthJobTest extends TestCase
     {
         Cache::shouldReceive('get')->with("hls:monitoring_disabled:channel:101")->andReturn(false);
         Cache::shouldReceive('get')->with("hls:pid:channel:101")->andReturn(12345);
-        Log::shouldReceive('warning')->once()->with(Mockery::on(function($message) {
+        $this->loggerMock->shouldReceive('warning')->once()->with(Mockery::on(function($message) {
             return str_contains($message, 'PID 12345 is not running');
         }));
         // Note: Direct test of posix_kill is hard. This test assumes the condition is met internally.
@@ -180,7 +205,7 @@ class MonitorStreamHealthJobTest extends TestCase
         // This test assumes function_exists('posix_kill') is true and posix_kill(12345, 0) is true.
         // We then mock isFfmpeg to return false.
         $this->hlsStreamServiceMock->shouldReceive('isFfmpeg')->with(12345)->andReturn(false);
-        Log::shouldReceive('warning')->once()->with(Mockery::on(function($message) {
+        $this->loggerMock->shouldReceive('warning')->once()->with(Mockery::on(function($message) {
             return str_contains($message, 'PID 12345 is running but is not an FFmpeg process.');
         }));
 
@@ -219,10 +244,10 @@ class MonitorStreamHealthJobTest extends TestCase
         File::shouldReceive('lastModified')->with('segment2.ts')->andReturn(time() - 2);
         File::shouldReceive('lastModified')->with('segment3.ts')->andReturn(time() - 0); // Most recent
 
-        Log::shouldReceive('info')->once()->with(Mockery::on(function($message) {
+        $this->loggerMock->shouldReceive('info')->once()->with(Mockery::on(function($message) {
             return str_contains($message, 'Stream is healthy.');
         }));
-        Log::shouldReceive('debug')->once()->with(Mockery::on(function($message) {
+        $this->loggerMock->shouldReceive('debug')->once()->with(Mockery::on(function($message) {
             return str_contains($message, 'Re-dispatching self');
         }));
 
@@ -258,7 +283,7 @@ class MonitorStreamHealthJobTest extends TestCase
 
         Redis::shouldReceive('get')->with("hls:streaminfo:starttime:channel:101")->andReturn(time() - 50); // Started 50s ago, grace is 20s
 
-        Log::shouldReceive('warning')->once()->with(Mockery::on(function($message) {
+        $this->loggerMock->shouldReceive('warning')->once()->with(Mockery::on(function($message) {
             return str_contains($message, 'No .ts segments found') && str_contains($message, 'after grace period');
         }));
 
@@ -291,7 +316,7 @@ class MonitorStreamHealthJobTest extends TestCase
 
         Redis::shouldReceive('get')->with("hls:streaminfo:starttime:channel:101")->andReturn(time() - 5); // Started 5s ago, grace is 20s
 
-        Log::shouldReceive('debug')->once()->with(Mockery::on(function($message) {
+        $this->loggerMock->shouldReceive('debug')->once()->with(Mockery::on(function($message) {
             return str_contains($message, 'No .ts segments yet') && str_contains($message, 'within grace period');
         }));
 
@@ -315,7 +340,7 @@ class MonitorStreamHealthJobTest extends TestCase
         File::shouldReceive('glob')->with($hlsDirectoryPath . '/*.ts')->andReturn(['segment.ts']);
         File::shouldReceive('lastModified')->with('segment.ts')->andReturn(time() - 50); // 50s old, threshold is 12s
 
-        Log::shouldReceive('warning')->once()->with(Mockery::on(function($message) {
+        $this->loggerMock->shouldReceive('warning')->once()->with(Mockery::on(function($message) {
             return str_contains($message, 'Latest segment') && str_contains($message, 'is too old');
         }));
 
@@ -362,7 +387,7 @@ class MonitorStreamHealthJobTest extends TestCase
             ->with('channel', $channelMock102, 'Test Channel Original', [101, 102, 103], 1, 100, 2)
             ->andReturn($channelMock102);
 
-        Log::shouldReceive('info')->once()->with(Mockery::on(function($message) {
+        $this->loggerMock->shouldReceive('info')->once()->with(Mockery::on(function($message) {
             return str_contains($message, 'Successfully failed over to new stream: channel ID 102');
         }));
 
@@ -399,7 +424,7 @@ class MonitorStreamHealthJobTest extends TestCase
             ->once()
             ->with('channel', $channelMock102, 'Test Channel Original', [101, 102, 103], 1, 100, 2)
             ->andReturn(null);
-        Log::shouldReceive('warning')->once()->with(Mockery::on(function($message) {
+        $this->loggerMock->shouldReceive('warning')->once()->with(Mockery::on(function($message) {
             return str_contains($message, 'Attempt to start source channel ID 102 failed.');
         }));
 
@@ -407,7 +432,7 @@ class MonitorStreamHealthJobTest extends TestCase
             ->once()
             ->with('channel', $channelMock103, 'Test Channel Original', [101, 102, 103], 2, 100, 3)
             ->andReturn($channelMock103);
-        Log::shouldReceive('info')->once()->with(Mockery::on(function($message) {
+        $this->loggerMock->shouldReceive('info')->once()->with(Mockery::on(function($message) {
             return str_contains($message, 'Successfully failed over to new stream: channel ID 103');
         }));
 
@@ -443,7 +468,7 @@ class MonitorStreamHealthJobTest extends TestCase
             ->once()
             ->with('channel', $channelMock102, 'Test Channel Original', [101, 102, 103], 1, 100, 2)
             ->andReturn(null);
-        Log::shouldReceive('warning')->once()->with(Mockery::on(function($message) {
+        $this->loggerMock->shouldReceive('warning')->once()->with(Mockery::on(function($message) {
             return str_contains($message, 'Attempt to start source channel ID 102 failed.');
         }));
 
@@ -451,11 +476,11 @@ class MonitorStreamHealthJobTest extends TestCase
             ->once()
             ->with('channel', $channelMock103, 'Test Channel Original', [101, 102, 103], 2, 100, 3)
             ->andReturn(null);
-        Log::shouldReceive('warning')->once()->with(Mockery::on(function($message) {
+        $this->loggerMock->shouldReceive('warning')->once()->with(Mockery::on(function($message) {
             return str_contains($message, 'Attempt to start source channel ID 103 failed.');
         }));
 
-        Log::shouldReceive('error')->once()->with(Mockery::on(function($message) {
+        $this->loggerMock->shouldReceive('error')->once()->with(Mockery::on(function($message) {
             return str_contains($message, 'All available sources in the sequence have been attempted and failed');
         }));
 
@@ -482,7 +507,7 @@ class MonitorStreamHealthJobTest extends TestCase
 
         $this->hlsStreamServiceMock->shouldNotReceive('attemptSpecificStreamSource');
 
-        Log::shouldReceive('error')->once()->with(Mockery::on(function($message) {
+        $this->loggerMock->shouldReceive('error')->once()->with(Mockery::on(function($message) {
             return str_contains($message, 'All available sources in the sequence have been attempted and failed');
         }));
 
