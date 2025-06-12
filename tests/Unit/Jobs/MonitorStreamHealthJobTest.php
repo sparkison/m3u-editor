@@ -39,18 +39,11 @@ class MonitorStreamHealthJobTest extends TestCase
         Config::set('proxy.queue_priority_hls_monitor', 'test_monitor_queue');
 
         // Mock static call to ProxyService::getStreamSettings
-        // Ensure this mocking strategy is robust. Using 'overload' if ProxyService is a concrete class.
-        if (!Mockery::getContainer() || !Mockery::getContainer()->hasDefinition(ProxyService::class)) {
-             Mockery::mock('overload:' . ProxyService::class)
-                ->shouldReceive('getStreamSettings')
-                ->zeroOrMoreTimes()
-                ->andReturn(['ffmpeg_hls_time' => 4]);
-        } else {
-            // If already mocked (e.g. by a base test class or another test's setup), re-apply or add expectations
-            ProxyService::shouldReceive('getStreamSettings')
-                ->zeroOrMoreTimes()
-                ->andReturn(['ffmpeg_hls_time' => 4]);
-        }
+        // Ensure App\Services\ProxyService is imported via 'use App\Services\ProxyService;'
+        Mockery::mock('overload:'.ProxyService::class)
+            ->shouldReceive('getStreamSettings')
+            ->zeroOrMoreTimes()
+            ->andReturn(['ffmpeg_hls_time' => 4, 'ffmpeg_ffprobe_timeout' => 5]); // Added ffprobe_timeout
 
         Storage::fake('app');
         Queue::fake();

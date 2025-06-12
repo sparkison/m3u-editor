@@ -41,24 +41,15 @@ class HlsStreamServiceTest extends TestCase
         Config::set('streaming.monitor_job_interval_seconds', 10);
 
         // Mock ProxyService::getStreamSettings() as it's used by HlsStreamService
-        // Overload the class if getStreamSettings is a public static method.
-        if (!Mockery::getContainer() || !Mockery::getContainer()->hasDefinition(ProxyService::class)) {
-            Mockery::mock('overload:' . ProxyService::class)
-                ->shouldReceive('getStreamSettings')
-                ->zeroOrMoreTimes()
-                ->andReturn([ // Provide default settings needed
-                    'ffmpeg_ffprobe_timeout' => 5,
-                    'ffmpeg_hls_time' => 4,
-                    // Add other settings HlsStreamService::buildCmd might need if testing that too
-                ]);
-        } else {
-            ProxyService::shouldReceive('getStreamSettings')
-                ->zeroOrMoreTimes()
-                ->andReturn([
-                    'ffmpeg_ffprobe_timeout' => 5,
-                    'ffmpeg_hls_time' => 4,
-                ]);
-        }
+        // Ensure App\Services\ProxyService is imported via 'use App\Services\ProxyService;'
+        Mockery::mock('overload:'.ProxyService::class)
+            ->shouldReceive('getStreamSettings')
+            ->zeroOrMoreTimes()
+            ->andReturn([
+                'ffmpeg_ffprobe_timeout' => 5,
+                'ffmpeg_hls_time' => 4
+                // Add other settings HlsStreamService::buildCmd might need, if necessary for these unit tests
+            ]);
 
         Queue::fake();
         Storage::fake('app'); // For HLS file operations, if any are directly in methods being tested
