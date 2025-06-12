@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Storage;
 use Mockery;
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test; // Added import for Test attribute
 // use Illuminate\Foundation\Testing\RefreshDatabase;
 use Symfony\Component\Process\Process as SymfonyProcess;
 
@@ -106,7 +107,7 @@ class HlsStreamServiceTest extends TestCase
     // Test methods for attemptSpecificStreamSource will be added here.
     // Test methods for startStream (job dispatch part) will be added here.
 
-    /** @test */
+    #[Test]
     public function attemptSpecificStreamSource_starts_stream_and_dispatches_job_on_success()
     {
         $serviceSpy = Mockery::spy(HlsStreamService::class)->makePartial();
@@ -142,7 +143,7 @@ class HlsStreamServiceTest extends TestCase
         });
     }
 
-    /** @test */
+    #[Test]
     public function attemptSpecificStreamSource_returns_null_if_stream_limit_reached()
     {
         $serviceSpy = Mockery::spy(HlsStreamService::class)->makePartial();
@@ -165,7 +166,7 @@ class HlsStreamServiceTest extends TestCase
         Queue::assertNotPushed(MonitorStreamHealthJob::class);
     }
 
-    /** @test */
+    #[Test]
     public function attemptSpecificStreamSource_returns_null_on_SourceNotResponding_exception()
     {
         $serviceSpy = Mockery::spy(HlsStreamService::class)->makePartial();
@@ -188,7 +189,7 @@ class HlsStreamServiceTest extends TestCase
         Queue::assertNotPushed(MonitorStreamHealthJob::class);
     }
 
-    /** @test */
+    #[Test]
     public function attemptSpecificStreamSource_returns_null_on_general_exception_during_start()
     {
         $serviceSpy = Mockery::spy(HlsStreamService::class)->makePartial();
@@ -213,7 +214,7 @@ class HlsStreamServiceTest extends TestCase
     }
 
 
-    /** @test */
+    #[Test]
     public function startStream_compiles_sources_and_dispatches_job_on_first_source_success()
     {
         $serviceSpy = Mockery::spy(HlsStreamService::class)->makePartial();
@@ -269,7 +270,7 @@ class HlsStreamServiceTest extends TestCase
         });
     }
 
-    /** @test */
+    #[Test]
     public function startStream_uses_failover_and_dispatches_job_with_correct_index()
     {
         $serviceSpy = Mockery::spy(HlsStreamService::class)->makePartial();
@@ -336,7 +337,7 @@ class HlsStreamServiceTest extends TestCase
         });
     }
 
-    /** @test */
+    #[Test]
     public function startStream_returns_null_if_all_sources_fail()
     {
         $serviceSpy = Mockery::spy(HlsStreamService::class)->makePartial();
@@ -364,7 +365,7 @@ class HlsStreamServiceTest extends TestCase
         Queue::assertNotPushed(MonitorStreamHealthJob::class);
     }
 
-    /** @test */
+    #[Test]
     public function startStream_returns_existing_running_stream_and_does_not_dispatch_job()
     {
         $serviceSpy = Mockery::spy(HlsStreamService::class)->makePartial();
@@ -388,7 +389,7 @@ class HlsStreamServiceTest extends TestCase
     }
 
 
-    /** @test */
+    #[Test]
     public function startStream_compiles_sources_and_dispatches_job_on_first_source_success()
     {
         $serviceSpy = Mockery::spy(HlsStreamService::class)->makePartial();
@@ -444,7 +445,7 @@ class HlsStreamServiceTest extends TestCase
         });
     }
 
-    /** @test */
+    #[Test]
     public function startStream_uses_failover_and_dispatches_job_with_correct_index()
     {
         $serviceSpy = Mockery::spy(HlsStreamService::class)->makePartial();
@@ -511,7 +512,7 @@ class HlsStreamServiceTest extends TestCase
         });
     }
 
-    /** @test */
+    #[Test]
     public function startStream_returns_null_if_all_sources_fail()
     {
         $serviceSpy = Mockery::spy(HlsStreamService::class)->makePartial();
@@ -539,7 +540,7 @@ class HlsStreamServiceTest extends TestCase
         Queue::assertNotPushed(MonitorStreamHealthJob::class);
     }
 
-    /** @test */
+    #[Test]
     public function startStream_returns_existing_running_stream_and_does_not_dispatch_job()
     {
         $serviceSpy = Mockery::spy(HlsStreamService::class)->makePartial();
@@ -563,3 +564,5 @@ class HlsStreamServiceTest extends TestCase
     }
 
 }
+
+[end of tests/Unit/Services/HlsStreamServiceTest.php]

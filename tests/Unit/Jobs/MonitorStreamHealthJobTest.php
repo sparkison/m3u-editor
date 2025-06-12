@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Storage;
 use Mockery;
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 // use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class MonitorStreamHealthJobTest extends TestCase
@@ -93,7 +94,7 @@ class MonitorStreamHealthJobTest extends TestCase
 
     // Test methods will be added in subsequent steps.
 
-    /** @test */
+    #[Test]
     public function handle_terminates_if_monitoring_disabled_flag_is_set()
     {
         Log::shouldReceive('info')->once()->with(Mockery::on(function($message) {
@@ -107,7 +108,7 @@ class MonitorStreamHealthJobTest extends TestCase
         Queue::assertNotPushed(MonitorStreamHealthJob::class);
     }
 
-    /** @test */
+    #[Test]
     public function handle_pid_not_in_cache_triggers_sequence_failure()
     {
         Cache::shouldReceive('get')->with("hls:monitoring_disabled:channel:101")->andReturn(false);
@@ -144,7 +145,7 @@ class MonitorStreamHealthJobTest extends TestCase
         Queue::assertNotPushed(MonitorStreamHealthJob::class);
     }
 
-    /** @test */
+    #[Test]
     public function handle_pid_not_running_path_triggers_sequence_failure()
     {
         Cache::shouldReceive('get')->with("hls:monitoring_disabled:channel:101")->andReturn(false);
@@ -176,7 +177,7 @@ class MonitorStreamHealthJobTest extends TestCase
 
     // [TODO: Implement further tests as per the testing plan]
 
-    /** @test */
+    #[Test]
     public function handle_pid_not_ffmpeg_triggers_sequence_failure()
     {
         Cache::shouldReceive('get')->with("hls:monitoring_disabled:channel:101")->andReturn(false);
@@ -209,7 +210,7 @@ class MonitorStreamHealthJobTest extends TestCase
         Queue::assertNotPushed(MonitorStreamHealthJob::class);
     }
 
-    /** @test */
+    #[Test]
     public function handle_segments_current_is_healthy_and_redispatches()
     {
         Cache::shouldReceive('get')->with("hls:monitoring_disabled:channel:101")->andReturn(false);
@@ -249,7 +250,7 @@ class MonitorStreamHealthJobTest extends TestCase
         });
     }
 
-    /** @test */
+    #[Test]
     public function handle_no_segments_after_grace_period_triggers_sequence_failure()
     {
         Cache::shouldReceive('get')->with("hls:monitoring_disabled:channel:101")->andReturn(false);
@@ -282,7 +283,7 @@ class MonitorStreamHealthJobTest extends TestCase
         Queue::assertNotPushed(MonitorStreamHealthJob::class);
     }
 
-    /** @test */
+    #[Test]
     public function handle_no_segments_within_grace_period_is_healthy_and_redispatches()
     {
         Cache::shouldReceive('get')->with("hls:monitoring_disabled:channel:101")->andReturn(false);
@@ -307,7 +308,7 @@ class MonitorStreamHealthJobTest extends TestCase
         });
     }
 
-    /** @test */
+    #[Test]
     public function handle_stale_segments_triggers_sequence_failure()
     {
         Cache::shouldReceive('get')->with("hls:monitoring_disabled:channel:101")->andReturn(false);
@@ -341,7 +342,7 @@ class MonitorStreamHealthJobTest extends TestCase
 
     // [TODO: Implement further tests as per the testing plan]
 
-    /** @test */
+    #[Test]
     public function handleStreamSequenceFailure_successfully_fails_over_to_next_source()
     {
         // This test focuses on the handleStreamSequenceFailure method's logic
@@ -375,7 +376,7 @@ class MonitorStreamHealthJobTest extends TestCase
 
     }
 
-    /** @test */
+    #[Test]
     public function handleStreamSequenceFailure_tries_next_source_if_first_failover_attempt_fails()
     {
         Cache::shouldReceive('get')->with("hls:monitoring_disabled:channel:101")->andReturn(false);
@@ -419,7 +420,7 @@ class MonitorStreamHealthJobTest extends TestCase
         $job->handle($this->hlsStreamServiceMock);
     }
 
-    /** @test */
+    #[Test]
     public function handleStreamSequenceFailure_terminates_if_all_remaining_sources_fail()
     {
         Cache::shouldReceive('get')->with("hls:monitoring_disabled:channel:101")->andReturn(false);
@@ -468,7 +469,7 @@ class MonitorStreamHealthJobTest extends TestCase
         Queue::assertNotPushed(MonitorStreamHealthJob::class);
     }
 
-    /** @test */
+    #[Test]
     public function handleStreamSequenceFailure_when_last_stream_in_sequence_fails()
     {
         $jobParams = [
@@ -490,6 +491,7 @@ class MonitorStreamHealthJobTest extends TestCase
             return str_contains($message, 'All available sources in the sequence have been attempted and failed');
         }));
 
+        $job = $this->createJobInstance($jobParams); // Re-instantiate job with specific params for this test case.
         $job->handle($this->hlsStreamServiceMock);
         Queue::assertNotPushed(MonitorStreamHealthJob::class);
     }
