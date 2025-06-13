@@ -103,18 +103,20 @@ class StreamingChannelStats extends Page
                     $currentStreamIdForStat = $actualStreamingModelId; // Set for channel
 
                     // Populate availableStreamsList
+                    $modelPlaylist = $model->getEffectivePlaylist();
                     $availableStreamsList[] = [
                         'id' => $model->id,
                         'name' => $model->title_custom ?? $model->title,
                         'is_primary' => true,
-                        'playlist_name' => $model->playlist ? $model->playlist->name : 'N/A',
+                        'playlist_name' => $modelPlaylist ? $modelPlaylist->name : 'N/A',
                     ];
                     foreach ($model->failoverChannels as $failoverChannel) {
+                        $failoverPlaylist = $failoverChannel->getEffectivePlaylist();
                         $availableStreamsList[] = [
                             'id' => $failoverChannel->id,
                             'name' => $failoverChannel->title_custom ?? $failoverChannel->title,
                             'is_primary' => false,
-                            'playlist_name' => $failoverChannel->playlist ? $failoverChannel->playlist->name : 'N/A',
+                            'playlist_name' => $failoverPlaylist ? $failoverPlaylist->name : 'N/A',
                         ];
                     }
                 } else {
@@ -237,7 +239,7 @@ class StreamingChannelStats extends Page
                 continue;
             }
 
-            $playlist = $model->playlist;
+            $playlist = $model->getEffectivePlaylist();
             $activeStreamsOnPlaylist = 'N/A';
             $maxStreamsDisplay = 'N/A';
             $isBadSource = false;

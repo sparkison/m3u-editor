@@ -17,6 +17,7 @@ use Filament\Resources\Components\Tab;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Hydrat\TableLayoutToggle\Concerns\HasToggleableTable;
 use Illuminate\Support\Str;
 
@@ -37,7 +38,15 @@ class ListChannels extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            // Actions\CreateAction::make(),
+            Actions\CreateAction::make()
+                ->label('Create Custom Channel')
+                ->modalHeading('New Custom Channel')
+                ->modalDescription('NOTE: Custom channels need to be associated with a Playlist or Custom Playlist.')
+                ->using(fn (array $data, string $model): Model => ChannelResource::createCustomChannel(
+                    data: $data,
+                    model: $model,
+                ))
+                ->slideOver(),
             Actions\ActionGroup::make([
                 Actions\Action::make('map')
                     ->label('Map EPG to Playlist')
@@ -231,21 +240,29 @@ class ListChannels extends ListRecords
             ->when($relationId, function ($query, $relationId) {
                 return $query->where('group_id', $relationId);
             })->count();
+        $customCount = Channel::query()->where('is_custom', true)
+            ->when($relationId, function ($query, $relationId) {
+                return $query->where('group_id', $relationId);
+            })->count();
 
         // Return tabs
         return [
             'all' => Tab::make('All Channels')
                 ->badge($totalCount),
-            'enabled' => Tab::make('Enabled Channels')
+            'enabled' => Tab::make('Enabled')
                 // ->icon('heroicon-m-check')
                 ->badgeColor('success')
                 ->modifyQueryUsing(fn($query) => $query->where('enabled', true))
                 ->badge($enabledCount),
-            'disabled' => Tab::make('Disabled Channels')
+            'disabled' => Tab::make('Disabled')
                 // ->icon('heroicon-m-x-mark')
                 ->badgeColor('danger')
                 ->modifyQueryUsing(fn($query) => $query->where('enabled', false))
                 ->badge($disabledCount),
+            'custom' => Tab::make('Custom')
+                // ->icon('heroicon-m-x-mark')
+                ->modifyQueryUsing(fn($query) => $query->where('is_custom', true))
+                ->badge($customCount),
         ];
     }
 

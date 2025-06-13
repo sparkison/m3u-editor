@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Spatie\Tags\HasTags;
 
@@ -42,6 +43,11 @@ class CustomPlaylist extends Model
         return $this->belongsToMany(Channel::class, 'channel_custom_playlist');
     }
 
+    public function customChannels(): HasMany
+    {
+        return $this->hasMany(Channel::class);
+    }
+
     public function enabled_channels(): BelongsToMany
     {
         return $this->channels()->where('enabled', true);
@@ -67,5 +73,10 @@ class CustomPlaylist extends Model
     public function postProcesses(): MorphToMany
     {
         return $this->morphToMany(PostProcess::class, 'processable');
+    }
+
+    public function getAutoSortAttribute(): bool
+    {
+        return true;
     }
 }

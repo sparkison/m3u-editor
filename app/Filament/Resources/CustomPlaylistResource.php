@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use App\Facades\PlaylistUrlFacade;
 use Filament\Forms\FormsComponent;
+use Illuminate\Support\Facades\Redis;
 
 class CustomPlaylistResource extends Resource
 {
@@ -65,6 +66,13 @@ class CustomPlaylistResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('available_streams')
+                    ->label('Streams')
+                    ->toggleable()
+                    ->formatStateUsing(fn(int $state): string => $state === 0 ? '∞' : (string)$state)
+                    ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
+                    ->description(fn(CustomPlaylist $record): string => "Active: " . (int) Redis::get("active_streams:{$record->id}") ?? 0)
                     ->sortable(),
                 Tables\Columns\TextColumn::make('channels_count')
                     ->label('Channels')
@@ -266,6 +274,16 @@ class CustomPlaylistResource extends Resource
                         ->inline(false)
                         ->default(false)
                         ->helperText('When enabled, channel urls will be proxied through m3u editor and streamed via ffmpeg (m3u editor will act as your client, playing the channels directly and sending the content to your client).'),
+                    Forms\Components\TextInput::make('available_streams')
+                        ->label('Available Streams')
+                        ->hint('Set to 0 for unlimited streams.')
+                        ->helperText('Number of streams available for this playlist (only applies to custom channels assigned to this Custom Playlist).')
+                        ->columnSpan(1)
+                        ->rules(['min:1'])
+                        ->type('number')
+                        ->default(0) // Default to 0 streams (for unlimted)
+                        ->required()
+                        ->hidden(fn(Get $get): bool => !$get('enable_proxy')),
                     Forms\Components\TextInput::make('streams')
                         ->label('HDHR Streams')
                         ->helperText('Number of streams available for HDHR service (if using).')
@@ -278,7 +296,7 @@ class CustomPlaylistResource extends Resource
                     Forms\Components\Select::make('proxy_options.output')
                         ->label('Proxy Output Format')
                         ->required()
-                        ->columnSpan(1)
+                        ->columnSpanFull()
                         ->options([
                             'ts' => 'MPEG-TS (.ts)',
                             'hls' => 'HLS (.m3u8)',

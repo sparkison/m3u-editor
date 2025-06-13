@@ -163,6 +163,13 @@ class AppServiceProvider extends ServiceProvider
                 if ($playlist->isDirty('short_urls_enabled')) {
                     $playlist->generateShortUrl();
                 }
+                if ($playlist->isDirty('uuid')) {
+                    // If changing the UUID, remove the old short URLs and generate new ones
+                    if ($playlist->short_urls_enabled) {
+                        $playlist->removeShortUrls();
+                        $playlist->generateShortUrl();
+                    }
+                }
                 return $playlist;
             });
             Playlist::deleting(function (Playlist $playlist) {
