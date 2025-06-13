@@ -8,6 +8,7 @@ use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 
 class ChannelFindAndReplaceReset implements ShouldQueue
 {
@@ -34,19 +35,51 @@ class ChannelFindAndReplaceReset implements ShouldQueue
         // Clock the time
         $start = now();
 
-        // Get the channels
-        if (!$this->channels) {
-            $channels = Channel::query()
-                ->when(!$this->all_playlists && $this->playlist_id, fn($query) => $query->where('playlist_id', $this->playlist_id))
-                ->cursor(); // Use cursor for memory efficiency when processing large datasets
-        } else {
-            $channels = $this->channels; // Use the provided collection of channels
-        }
+        $customColumn = $this->column . '_custom';
+        $totalUpdated = 0;
 
-        // Loop over the channels and perform the find and replace operation
-        foreach ($channels as $channel) {
-            $channel->{$this->column . '_custom'} = null; // Reset the custom column to null
-            $channel->save(); // Save the changes to the database
+        // Process channels in chunks for better performance
+        if (!$this->channels) {
+            // Use chunking to process large datasets efficiently
+            Channel::query()
+                ->when(!$this->all_playlists && $this->playlist_id, fn($query) => $query->where('playlist_id', $this->playlist_id))
+                ->whereNotNull($customColumn) // Only get channels that have custom values to reset
+                ->chunkById(1000, function ($channels) use ($customColumn, &$totalUpdated) {
+                    // Get IDs of channels to update
+                    $channelIds = $channels->pluck('id')->toArray();
+                    
+                    if (count($channelIds) > 0) {
+                        // Batch update all channels in this chunk
+                        $updated = DB::table('channels')
+                            ->whereIn('id', $channelIds)
+                            ->update([
+                                $customColumn => null,
+                                'updated_at' => now()
+                            ]);
+                        
+                        $totalUpdated += $updated;
+                    }
+                });
+        } else {
+            // Process the provided collection in chunks
+            $this->channels
+                ->filter(fn($channel) => $channel->{$customColumn} !== null) // Only channels with custom values
+                ->chunk(1000)
+                ->each(function ($chunk) use ($customColumn, &$totalUpdated) {
+                    $channelIds = $chunk->pluck('id')->toArray();
+                    
+                    if (count($channelIds) > 0) {
+                        // Batch update all channels in this chunk
+                        $updated = DB::table('channels')
+                            ->whereIn('id', $channelIds)
+                            ->update([
+                                $customColumn => null,
+                                'updated_at' => now()
+                            ]);
+                        
+                        $totalUpdated += $updated;
+                    }
+                });
         }
 
         // Notify the user we're done!
@@ -57,12 +90,12 @@ class ChannelFindAndReplaceReset implements ShouldQueue
         Notification::make()
             ->success()
             ->title('Find & Replace reset')
-            ->body("Channel find & replace reset has completed successfully.")
+            ->body("Channel find & replace reset has completed successfully. {$totalUpdated} channels updated.")
             ->broadcast($user);
         Notification::make()
             ->success()
             ->title('Find & Replace reset completed')
-            ->body("Channel find & replace reset has completed successfully. Reset completed in {$completedInRounded} seconds")
+            ->body("Channel find & replace reset has completed successfully. {$totalUpdated} channels updated in {$completedInRounded} seconds")
             ->sendToDatabase($user);
     }
 }
