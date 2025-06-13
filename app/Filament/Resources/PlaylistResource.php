@@ -457,21 +457,39 @@ class PlaylistResource extends Resource
     {
         // Define the form fields for each section
         $nameFields = [
-            Forms\Components\TextInput::make('uuid')
-                ->label('Unique identifier')
-                ->helperText('Be careful as this will change your URLs for the Playlist, its EPG, and HDHR. Must be unique and between 3 and 36 characters.')
-                ->rules(function ($record) {
-                    return [
-                        'required',
-                        'min:3',
-                        'max:36',
-                        \Illuminate\Validation\Rule::unique('playlists', 'uuid')->ignore($record?->id),
-                    ];
-                })
-                ->required(),
             Forms\Components\TextInput::make('name')
                 ->helperText('Enter the name of the playlist. Internal use only.')
                 ->required(),
+            Forms\Components\Grid::make()
+                ->columnSpanFull()
+                ->columns(3)
+                ->schema([
+                    Forms\Components\Toggle::make('edit_uuid')
+                        ->label('Change Unique Identifier')
+                        ->columnSpan(1)
+                        ->inline(false)
+                        ->live()
+                        ->dehydrated(false)
+                        ->default(false),
+                    Forms\Components\TextInput::make('uuid')
+                        ->label('Unique Identifier')
+                        ->columnSpan(2)
+                        ->rules(function ($record) {
+                            return [
+                                'required',
+                                'min:3',
+                                'max:36',
+                                \Illuminate\Validation\Rule::unique('playlists', 'uuid')->ignore($record?->id),
+                            ];
+                        })
+                        ->helperText('Value must be between 3 and 36 characters.')
+                        ->hintIcon(
+                            'heroicon-m-exclamation-triangle',
+                            tooltip: 'Be careful changing this value as this will change the URLs for the Playlist, its EPG, and HDHR.'
+                        )
+                        ->hidden(fn($get): bool => !$get('edit_uuid'))
+                        ->required(),
+                ])->hiddenOn('create'),
         ];
 
         // See if MediaFlow Proxy is set up
