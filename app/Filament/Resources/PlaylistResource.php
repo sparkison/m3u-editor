@@ -457,6 +457,18 @@ class PlaylistResource extends Resource
     {
         // Define the form fields for each section
         $nameFields = [
+            Forms\Components\TextInput::make('uuid')
+                ->label('Unique identifier')
+                ->helperText('Be careful as this will change your URLs for the Playlist, its EPG, and HDHR. Must be unique and between 3 and 36 characters.')
+                ->rules(function ($record) {
+                    return [
+                        'required',
+                        'min:3',
+                        'max:36',
+                        \Illuminate\Validation\Rule::unique('playlists', 'uuid')->ignore($record?->id),
+                    ];
+                })
+                ->required(),
             Forms\Components\TextInput::make('name')
                 ->helperText('Enter the name of the playlist. Internal use only.')
                 ->required(),
