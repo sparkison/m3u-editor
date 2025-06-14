@@ -53,6 +53,17 @@ class HlsStreamController extends Controller
      */
     public function serveChannelPlaylist(Request $request, $encodedId)
     {
+        // If timeshift, push timeshift request to the StreamController
+        if ($request->filled('utc')) {
+            return redirect()->action(
+                StreamController::class,
+                [
+                    'encodedId' => $encodedId,
+                    'format'    => 'ts',
+                ]
+            )->setStatusCode(307);
+        }
+
         // Find the channel by ID
         if (strpos($encodedId, '==') === false) {
             $encodedId .= '=='; // right pad to ensure proper decoding

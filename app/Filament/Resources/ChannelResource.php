@@ -706,6 +706,11 @@ class ChannelResource extends Resource
                             ->label('Channel'),
                         Infolists\Components\TextEntry::make('group')
                             ->label('Group'),
+                        Infolists\Components\IconEntry::make('catchup')
+                            ->label('Catchup')
+                            ->boolean()
+                            ->trueColor('success')
+                            ->falseColor('danger'),
                     ]),
                 Infolists\Components\Section::make('Stream Info')
                     ->description('Click to load stream info')
