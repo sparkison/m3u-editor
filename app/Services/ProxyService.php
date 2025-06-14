@@ -114,6 +114,18 @@ class ProxyService
         ];
 
         try {
+            // Fetch all custom command templates
+            $customCommandTemplates = $userPreferences->ffmpeg_custom_command_templates ?? [];
+            $activeCustomTemplateString = null;
+            if (is_array($customCommandTemplates)) {
+                foreach ($customCommandTemplates as $template) {
+                    if (isset($template['is_enabled']) && $template['is_enabled'] === true && isset($template['template'])) {
+                        $activeCustomTemplateString = $template['template'];
+                        break; // Found the active template
+                    }
+                }
+            }
+
             $settings = [
                 // General settings
                 'ffmpeg_debug' => $userPreferences->ffmpeg_debug ?? $settings['ffmpeg_debug'],
@@ -128,7 +140,8 @@ class ProxyService
 
                 // HW acceleration settings
                 'hardware_acceleration_method' => $userPreferences->hardware_acceleration_method ?? $settings['hardware_acceleration_method'],
-                'ffmpeg_custom_command_template' => $userPreferences->ffmpeg_custom_command_template ?? $settings['ffmpeg_custom_command_template'],
+                // Assign the determined active custom template string here
+                'ffmpeg_custom_command_template' => $activeCustomTemplateString,
 
                 // Add VA-API settings
                 'ffmpeg_vaapi_device' => $userPreferences->ffmpeg_vaapi_device ?? $settings['ffmpeg_vaapi_device'],

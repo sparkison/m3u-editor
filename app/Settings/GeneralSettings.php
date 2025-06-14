@@ -32,7 +32,7 @@ class GeneralSettings extends Settings
 
     // VAAPI and QSV settings
     public ?string $hardware_acceleration_method = 'none';
-    public ?string $ffmpeg_custom_command_template = null;
+    public array $ffmpeg_custom_command_templates = [];
     public ?string $ffmpeg_vaapi_device = null;
     public ?string $ffmpeg_vaapi_video_filter = null;
     public ?string $ffmpeg_qsv_device = null;

@@ -216,13 +216,48 @@ class Preferences extends SettingsPage
                                         $this->makeCodecSelect('audio', 'ffmpeg_codec_audio', $form),
                                         $this->makeCodecSelect('subtitle', 'ffmpeg_codec_subtitles', $form),
 
-                                        Forms\Components\Textarea::make('ffmpeg_custom_command_template')
-                                            ->label('Custom FFmpeg Command Template')
+                                        Forms\Components\Repeater::make('ffmpeg_custom_command_templates')
+                                            ->label('Custom FFmpeg Command Templates')
                                             ->columnSpanFull()
-                                            ->nullable()
-                                            ->placeholder('e.g., {FFMPEG_PATH} -hwaccel vaapi -hwaccel_device /dev/dri/renderD128 -i {INPUT_URL} -vf "scale_vaapi=format=nv12" {OUTPUT_OPTIONS}')
-                                            ->rows(5)
-                                            ->helperText('Define a full FFmpeg command template. Use placeholders like {FFMPEG_PATH}, {INPUT_URL}, {OUTPUT_OPTIONS}, {USER_AGENT}, {REFERER}, {HWACCEL_INIT_ARGS}, {HWACCEL_ARGS}, {VIDEO_FILTER_ARGS}, {AUDIO_CODEC_ARGS}, {VIDEO_CODEC_ARGS}, {SUBTITLE_CODEC_ARGS}. If this field is filled, it will override most other FFmpeg settings. Leave empty to use the application-generated command. Use with caution: an improperly configured custom command can expose security vulnerabilities or cause instability.'),
+                                            ->collapsible()
+                                            ->cloneable()
+                                            ->schema([
+                                                Forms\Components\TextInput::make('name')
+                                                    ->label('Template Name')
+                                                    ->required()
+                                                    ->columnSpanFull(),
+                                                Forms\Components\Textarea::make('template')
+                                                    ->label('FFmpeg Command Template')
+                                                    ->required()
+                                                    ->rows(3)
+                                                    ->columnSpanFull()
+                                                    ->placeholder('e.g., {FFMPEG_PATH} -i {INPUT_URL} ... {OUTPUT_OPTIONS}')
+                                                    ->helperText('Use placeholders like {FFMPEG_PATH}, {INPUT_URL}, {OUTPUT_OPTIONS}, {USER_AGENT}, {REFERER}, {HWACCEL_INIT_ARGS}, {HWACCEL_ARGS}, {VIDEO_FILTER_ARGS}, {AUDIO_CODEC_ARGS}, {VIDEO_CODEC_ARGS}, {SUBTITLE_CODEC_ARGS}.'),
+                                                Forms\Components\Toggle::make('is_enabled')
+                                                    ->label('Enable this template')
+                                                    ->live() // Make it reactive
+                                                    ->afterStateUpdated(function (Get $get, Set $set, $state, Forms\Components\Component $component) {
+                                                        if ($state === true) {
+                                                            $repeaterPath = $component->getContainer()->getStatePath();
+                                                            $templates = $get($repeaterPath);
+
+                                                            if (is_array($templates)) {
+                                                                $currentItemPath = $component->getStatePath();
+
+                                                                foreach ($templates as $key => $templateData) {
+                                                                    $pathForOtherToggle = "{$repeaterPath}.{$key}.is_enabled";
+                                                                    if ($pathForOtherToggle !== $currentItemPath) {
+                                                                        if ($get($pathForOtherToggle) === true) {
+                                                                           $set($pathForOtherToggle, false);
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    })
+                                                    ->helperText('Only one template can be active. Enabling this will disable any other active template.'),
+                                            ])
+                                            ->default([]),
                                     ])->columns(3),
 
 
@@ -449,7 +484,7 @@ class Preferences extends SettingsPage
             'ffmpeg_qsv_video_filter',
             'ffmpeg_qsv_encoder_options',
             'ffmpeg_qsv_additional_args',
-            'ffmpeg_custom_command_template',
+            // 'ffmpeg_custom_command_template', // REMOVED
             // mediaflow fields were removed, but if others exist that are text & nullable, add here
             // 'mediaflow_proxy_url', 'mediaflow_proxy_port', 'mediaflow_proxy_password',
             // 'mediaflow_proxy_user_agent', 
