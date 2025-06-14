@@ -436,47 +436,38 @@ class Preferences extends SettingsPage
      */
 protected function mutateFormDataBeforeSave(array $submittedFormData): array
 {
-    $settingsClass = static::getSettings(); // Or static::$settings
-    $loadedSettingsInstance = app($settingsClass);
+    // Load all current settings for the group.
+    // $this->getSettings() returns the hydrated settings object.
+    $allSettingsData = $this->getSettings()->toArray();
 
-    // Start with all currently persisted or default values from the settings class.
-    $finalData = $loadedSettingsInstance->toArray();
+    // Merge the submitted form data (from current tab/form) into the full settings data.
+    // This ensures that changes from the current form are applied, while settings
+    // not present in the current form (e.g., from other tabs) are preserved.
+    $finalDataToSave = array_merge($allSettingsData, $submittedFormData);
 
-    // Get all public properties of the settings class to validate keys from submittedFormData.
-    $reflectionClass = new \ReflectionClass($settingsClass);
-    $publicProperties = [];
-    foreach ($reflectionClass->getProperties(\ReflectionProperty::IS_PUBLIC) as $property) {
-        $publicProperties[$property->getName()] = true;
-    }
-
-    // Override $finalData with submitted data for fields that were part of the form
-    // AND are actual public properties of the settings class.
-    foreach ($submittedFormData as $key => $value) {
-        if (isset($publicProperties[$key])) {
-            $finalData[$key] = $value;
-        }
-    }
-
-    // Specifically ensure 'ffmpeg_custom_command_templates' is an array.
-    $finalData['ffmpeg_custom_command_templates'] = $finalData['ffmpeg_custom_command_templates'] ?? [];
-    if (!is_array($finalData['ffmpeg_custom_command_templates'])) {
-        $finalData['ffmpeg_custom_command_templates'] = [];
+    // Ensure 'ffmpeg_custom_command_templates' is an array.
+    // It takes the value from $submittedFormData if present, otherwise from $allSettingsData,
+    // then ensures it's an array.
+    $finalDataToSave['ffmpeg_custom_command_templates'] = $finalDataToSave['ffmpeg_custom_command_templates'] ?? [];
+    if (!is_array($finalDataToSave['ffmpeg_custom_command_templates'])) {
+        $finalDataToSave['ffmpeg_custom_command_templates'] = [];
     }
 
     // Nullify QSV fields if QSV is not the selected hardware acceleration method.
-    if (isset($finalData['hardware_acceleration_method']) && $finalData['hardware_acceleration_method'] !== 'qsv') {
-        $finalData['ffmpeg_qsv_device'] = null;
-        $finalData['ffmpeg_qsv_video_filter'] = null;
-        $finalData['ffmpeg_qsv_encoder_options'] = null;
-        $finalData['ffmpeg_qsv_additional_args'] = null;
+    if (isset($finalDataToSave['hardware_acceleration_method']) && $finalDataToSave['hardware_acceleration_method'] !== 'qsv') {
+        $finalDataToSave['ffmpeg_qsv_device'] = null;
+        $finalDataToSave['ffmpeg_qsv_video_filter'] = null;
+        $finalDataToSave['ffmpeg_qsv_encoder_options'] = null;
+        $finalDataToSave['ffmpeg_qsv_additional_args'] = null;
     }
 
     // Nullify VAAPI fields if VA-API is not the selected method.
-    if (isset($finalData['hardware_acceleration_method']) && $finalData['hardware_acceleration_method'] !== 'vaapi') {
-        $finalData['ffmpeg_vaapi_device'] = null;
-        $finalData['ffmpeg_vaapi_video_filter'] = null;
+    if (isset($finalDataToSave['hardware_acceleration_method']) && $finalDataToSave['hardware_acceleration_method'] !== 'vaapi') {
+        $finalDataToSave['ffmpeg_vaapi_device'] = null;
+        $finalDataToSave['ffmpeg_vaapi_video_filter'] = null;
     }
 
+    // Define the list of fields that should be null if they are empty strings.
     $nullableTextfields = [
         'ffmpeg_codec_video',
         'ffmpeg_codec_audio',
@@ -493,14 +484,16 @@ protected function mutateFormDataBeforeSave(array $submittedFormData): array
         'mediaflow_proxy_password',
         'mediaflow_proxy_user_agent',
     ];
-    $nullableTextfields = array_unique($nullableTextfields);
+    // Using array_unique is a good practice if the list could have duplicates, though not strictly necessary here.
+    // $nullableTextfields = array_unique($nullableTextfields);
 
     foreach ($nullableTextfields as $field) {
-        if (array_key_exists($field, $finalData) && $finalData[$field] === '') {
-            $finalData[$field] = null;
+        // Ensure the key exists in $finalDataToSave before checking if it's an empty string.
+        if (array_key_exists($field, $finalDataToSave) && $finalDataToSave[$field] === '') {
+            $finalDataToSave[$field] = null;
         }
     }
 
-    return $finalData;
+    return $finalDataToSave;
 }
 }
