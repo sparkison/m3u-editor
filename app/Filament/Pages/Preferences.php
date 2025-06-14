@@ -434,87 +434,73 @@ class Preferences extends SettingsPage
      * @param array $submittedFormData The data submitted from the form.
      * @return array The final settings data to be saved.
      */
-    protected function mutateFormDataBeforeSave(array $submittedFormData): array
-    {
-        $settingsClass = static::getSettings(); // Or static::$settings
-        $loadedSettings = app($settingsClass); // Instance of GeneralSettings with current values
+protected function mutateFormDataBeforeSave(array $submittedFormData): array
+{
+    $settingsClass = static::getSettings(); // Or static::$settings
+    $loadedSettingsInstance = app($settingsClass);
 
-        // Start with all existing settings properties and their current values.
-        $finalData = $loadedSettings->toArray();
+    // Start with all currently persisted or default values from the settings class.
+    $finalData = $loadedSettingsInstance->toArray();
 
-        // Update with submitted data for fields that were part of the form
-        // AND are actual public properties of the settings class.
-        // This loop ensures we only consider keys that are valid settings properties.
-        $reflectionClass = new \ReflectionClass($settingsClass);
-        $publicProperties = [];
-        foreach ($reflectionClass->getProperties(\ReflectionProperty::IS_PUBLIC) as $property) {
-            $publicProperties[$property->getName()] = true;
-        }
-
-        foreach ($submittedFormData as $key => $value) {
-            if (isset($publicProperties[$key])) { // Check if submitted key is a defined public property
-                $finalData[$key] = $value;
-            }
-        }
-
-        // Ensure 'ffmpeg_custom_command_templates' is correctly an array.
-        // It might have been set from $submittedFormData in the loop above if the repeater sent data.
-        // If the repeater sent null, or didn't send the key, this ensures it's an empty array.
-        // This also handles if $finalData still has an older non-array value for some reason.
-        $finalData['ffmpeg_custom_command_templates'] = $finalData['ffmpeg_custom_command_templates'] ?? [];
-        if (!is_array($finalData['ffmpeg_custom_command_templates'])) {
-            $finalData['ffmpeg_custom_command_templates'] = [];
-        }
-
-        // Nullify QSV fields if QSV is not the selected hardware acceleration method.
-        // Use $finalData for checking 'hardware_acceleration_method' as it's now the complete picture.
-        if (isset($finalData['hardware_acceleration_method']) && $finalData['hardware_acceleration_method'] !== 'qsv') {
-            $finalData['ffmpeg_qsv_device'] = null;
-            $finalData['ffmpeg_qsv_video_filter'] = null;
-            $finalData['ffmpeg_qsv_encoder_options'] = null;
-            $finalData['ffmpeg_qsv_additional_args'] = null; // Ensure this is included
-        }
-
-        // Nullify VAAPI fields if VA-API is not the selected method.
-        if (isset($finalData['hardware_acceleration_method']) && $finalData['hardware_acceleration_method'] !== 'vaapi') {
-            $finalData['ffmpeg_vaapi_device'] = null;
-            $finalData['ffmpeg_vaapi_video_filter'] = null;
-        }
-
-        // Convert empty strings from text inputs to null for nullable fields.
-        // This should run after ensuring all keys are present and conditional nulling is done.
-        $nullableTextfields = [
-            'ffmpeg_codec_video',
-            'ffmpeg_codec_audio',
-            'ffmpeg_codec_subtitles',
-            'ffmpeg_vaapi_device',
-            'ffmpeg_vaapi_video_filter',
-            'ffmpeg_qsv_device',
-            'ffmpeg_qsv_video_filter',
-            'ffmpeg_qsv_encoder_options',
-            'ffmpeg_qsv_additional_args',
-            // 'ffmpeg_custom_command_template', // REMOVED
-            // mediaflow fields were removed, but if others exist that are text & nullable, add here
-            // 'mediaflow_proxy_url', 'mediaflow_proxy_port', 'mediaflow_proxy_password',
-            // 'mediaflow_proxy_user_agent', 
-            'ffmpeg_path'
-        ];
-
-        foreach ($nullableTextfields as $field) {
-            // Ensure the field exists in finalData before checking if it's an empty string.
-            // This is important because some fields (like QSV/VAAPI ones) might already be null.
-            if (array_key_exists($field, $finalData) && $finalData[$field] === '') {
-                $finalData[$field] = null;
-            }
-        }
-
-        // Ensure 'hardware_acceleration_method' itself has a default if it was somehow missing
-        // from both loaded settings and submitted form data (highly unlikely for a form field).
-        // The initial $finalData = $loadedSettings->toArray() should cover this.
-        // If $loadedSettings didn't have it (e.g. fresh install, no defaults run), 
-        // it might still be an issue for Spatie settings if it's not nullable and has no default in the class.
-        // However, 'hardware_acceleration_method' has a default in GeneralSettings.php.
-
-        return $finalData;
+    // Get all public properties of the settings class to validate keys from submittedFormData.
+    $reflectionClass = new \ReflectionClass($settingsClass);
+    $publicProperties = [];
+    foreach ($reflectionClass->getProperties(\ReflectionProperty::IS_PUBLIC) as $property) {
+        $publicProperties[$property->getName()] = true;
     }
+
+    // Override $finalData with submitted data for fields that were part of the form
+    // AND are actual public properties of the settings class.
+    foreach ($submittedFormData as $key => $value) {
+        if (isset($publicProperties[$key])) {
+            $finalData[$key] = $value;
+        }
+    }
+
+    // Specifically ensure 'ffmpeg_custom_command_templates' is an array.
+    $finalData['ffmpeg_custom_command_templates'] = $finalData['ffmpeg_custom_command_templates'] ?? [];
+    if (!is_array($finalData['ffmpeg_custom_command_templates'])) {
+        $finalData['ffmpeg_custom_command_templates'] = [];
+    }
+
+    // Nullify QSV fields if QSV is not the selected hardware acceleration method.
+    if (isset($finalData['hardware_acceleration_method']) && $finalData['hardware_acceleration_method'] !== 'qsv') {
+        $finalData['ffmpeg_qsv_device'] = null;
+        $finalData['ffmpeg_qsv_video_filter'] = null;
+        $finalData['ffmpeg_qsv_encoder_options'] = null;
+        $finalData['ffmpeg_qsv_additional_args'] = null;
+    }
+
+    // Nullify VAAPI fields if VA-API is not the selected method.
+    if (isset($finalData['hardware_acceleration_method']) && $finalData['hardware_acceleration_method'] !== 'vaapi') {
+        $finalData['ffmpeg_vaapi_device'] = null;
+        $finalData['ffmpeg_vaapi_video_filter'] = null;
+    }
+
+    $nullableTextfields = [
+        'ffmpeg_codec_video',
+        'ffmpeg_codec_audio',
+        'ffmpeg_codec_subtitles',
+        'ffmpeg_vaapi_device',
+        'ffmpeg_vaapi_video_filter',
+        'ffmpeg_qsv_device',
+        'ffmpeg_qsv_video_filter',
+        'ffmpeg_qsv_encoder_options',
+        'ffmpeg_qsv_additional_args',
+        'ffmpeg_path',
+        'mediaflow_proxy_url',
+        'mediaflow_proxy_port',
+        'mediaflow_proxy_password',
+        'mediaflow_proxy_user_agent',
+    ];
+    $nullableTextfields = array_unique($nullableTextfields);
+
+    foreach ($nullableTextfields as $field) {
+        if (array_key_exists($field, $finalData) && $finalData[$field] === '') {
+            $finalData[$field] = null;
+        }
+    }
+
+    return $finalData;
+}
 }
