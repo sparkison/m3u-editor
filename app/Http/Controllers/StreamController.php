@@ -47,6 +47,26 @@ class StreamController extends Controller
         $sourceChannel = $channel;
         $streams = collect([$channel])->concat($channel->failoverChannels);
 
+        /* ── Timeshift parameters, if the request asked for them ───────────── */
+        $utcPresent = $request->filled('utc');
+        if ($utcPresent) {
+            $utc    = (int) $request->query('utc');              // programme start
+            $lutc   = (int) ($request->query('lutc') ?? time()); // “live” (default = now)
+            $offset = max(1, intdiv($lutc - $utc, 60));          // minutes to rewind
+            $stamp  = gmdate('Y-m-d:H-i', $utc);                 // e.g. 2025-06-13:20-00
+
+            // “…://host/live/u/p/<tail>”  →  “…://host/timeshift/u/p/<offset>/<stamp>/<tail>”
+            $rewrite = static function (string $url) use ($offset, $stamp): string {
+                return preg_replace(
+                    '~^(https?://[^/]+)/live/([^/]+)/([^/]+)/(.*)$~',
+                    '$1/timeshift/$2/$3/' . $offset . '/' . $stamp . '/$4',
+                    $url
+                );
+            };
+        }
+        /* ─────────────────────────────────────────────────────────────────── */
+
+
         // Loop over the failover channels and grab the first one that works.
         foreach ($streams as $stream) {
             // Get the title for the channel
@@ -55,6 +75,9 @@ class StreamController extends Controller
 
             // Setup streams array
             $streamUrl = $stream->url_custom ?? $stream->url;
+            if ($utcPresent && $format === 'ts') {       // only live-TS needs shift
+                $streamUrl = $rewrite($streamUrl);
+            }
             if ($stream->is_custom && !$streamUrl) {
                 Log::channel('ffmpeg')->debug("Custom channel {$stream->id} ({$title}) has no URL set. Using failover channels only.");
                 continue; // Skip if no URL is set
