@@ -18,7 +18,12 @@ return [
      * How frequently the MonitorStreamHealthJob should run for each active stream
      * to perform health checks.
      */
-    'monitor_job_interval_seconds' => env('MONITOR_JOB_INTERVAL_SECONDS', 10),
+    // 'monitor_job_interval_seconds' => env('MONITOR_JOB_INTERVAL_SECONDS', 10),
+    // Note: The stream monitoring interval is now dynamically calculated within
+    // App\Jobs\MonitorStreamHealthJob.php. It typically defaults to
+    // max(3, floor(ffmpeg_hls_time / 2)), where ffmpeg_hls_time is sourced
+    // from the General Settings (ProxyService::getStreamSettings()).
+    // This 'monitor_job_interval_seconds' config value is no longer the direct source for the delay.
 
     /**
      * HLS Segment Age Multiplier
@@ -38,6 +43,14 @@ return [
      * some time to initialize and produce the first few segments.
      */
     'hls_segment_grace_period_seconds' => env('HLS_SEGMENT_GRACE_PERIOD_SECONDS', 20),
+
+    /**
+     * Minimum Monitor Job Interval (Seconds)
+     *
+     * The absolute minimum interval (in seconds) for the MonitorStreamHealthJob.
+     * The dynamic calculation (half of ffmpeg_hls_time) will not go below this value.
+     */
+    'min_monitor_job_interval_seconds' => env('MIN_MONITOR_JOB_INTERVAL_SECONDS', 3),
 
     /**
      * Monitor Job Retries

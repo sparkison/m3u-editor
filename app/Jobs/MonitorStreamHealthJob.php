@@ -214,9 +214,12 @@ class MonitorStreamHealthJob implements ShouldQueue
             return;
         }
 
-        $delaySeconds = config('streaming.monitor_job_interval_seconds', 10);
+        $streamSettings = ProxyService::getStreamSettings();
+        $ffmpeg_hls_time = $streamSettings['ffmpeg_hls_time'] ?? 4;
+        $delaySeconds = max(config('streaming.min_monitor_job_interval_seconds', 3), floor($ffmpeg_hls_time / 2));
+
         Log::channel('ffmpeg')->debug(
-            "[Monitor][{$this->streamType} ID {$this->activeStreamId}, OrigReq ID {$this->originalModelId}] Re-dispatching self with a {$delaySeconds}s delay."
+            "[Monitor][{$this->streamType} ID {$this->activeStreamId}, OrigReq ID {$this->originalModelId}] Re-dispatching self with a {$delaySeconds}s delay (derived from ffmpeg_hls_time: {$ffmpeg_hls_time})."
         );
 
         self::dispatch(
