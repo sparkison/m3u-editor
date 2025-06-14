@@ -457,6 +457,15 @@ class Preferences extends SettingsPage
             }
         }
 
+        // Ensure 'ffmpeg_custom_command_templates' is correctly an array.
+        // It might have been set from $submittedFormData in the loop above if the repeater sent data.
+        // If the repeater sent null, or didn't send the key, this ensures it's an empty array.
+        // This also handles if $finalData still has an older non-array value for some reason.
+        $finalData['ffmpeg_custom_command_templates'] = $finalData['ffmpeg_custom_command_templates'] ?? [];
+        if (!is_array($finalData['ffmpeg_custom_command_templates'])) {
+            $finalData['ffmpeg_custom_command_templates'] = [];
+        }
+
         // Nullify QSV fields if QSV is not the selected hardware acceleration method.
         // Use $finalData for checking 'hardware_acceleration_method' as it's now the complete picture.
         if (isset($finalData['hardware_acceleration_method']) && $finalData['hardware_acceleration_method'] !== 'qsv') {
