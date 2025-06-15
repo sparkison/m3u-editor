@@ -515,6 +515,10 @@ protected function mutateFormDataBeforeSave(array $submittedFormData): array
         }
     }
 
+    if (!isset($finalDataToSave['ffmpeg_custom_command_templates']) || !is_array($finalDataToSave['ffmpeg_custom_command_templates'])) {
+        $finalDataToSave['ffmpeg_custom_command_templates'] = [];
+    }
+
     return $finalDataToSave;
 }
 }
