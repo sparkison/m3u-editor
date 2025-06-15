@@ -511,20 +511,6 @@ protected function mutateFormDataBeforeSave(array $data): array
         }
     }
 
-    if (!array_key_exists('ffmpeg_custom_command_templates', $data)) {
-        error_log('Critical: ffmpeg_custom_command_templates was missing before final return in mutateFormDataBeforeSave. Setting to []. Path: app/Filament/Pages/Preferences.php');
-        $data['ffmpeg_custom_command_templates'] = [];
-    } elseif (!is_array($data['ffmpeg_custom_command_templates'])) {
-        if ($data['ffmpeg_custom_command_templates'] !== null) {
-            error_log('Critical: ffmpeg_custom_command_templates was not an array (and not null) before final return in mutateFormDataBeforeSave. Forcing to []. Value: ' . print_r($data['ffmpeg_custom_command_templates'], true) . ' Path: app/Filament/Pages/Preferences.php');
-        } else {
-            // This is a more common case if an empty repeater submits null
-            error_log('Info: ffmpeg_custom_command_templates was null before final return in mutateFormDataBeforeSave. Setting to []. Path: app/Filament/Pages/Preferences.php');
-        }
-        $data['ffmpeg_custom_command_templates'] = [];
-    }
-    // If $data['ffmpeg_custom_command_templates'] exists and is an array, it's left as is.
-
     return $data;
 }
 }
