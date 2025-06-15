@@ -438,7 +438,24 @@ protected function mutateFormDataBeforeSave(array $submittedFormData): array
 {
     // Load all current settings for the group.
     // $this->getSettings() returns the hydrated settings object.
-    $allSettingsData = $this->getSettings()->toArray();
+    $settingsInstance = $this->getSettings();
+    if ($settingsInstance instanceof \App\Settings\GeneralSettings) {
+        $allSettingsData = $settingsInstance->toArray();
+    } elseif (is_string($settingsInstance)) {
+        $decodedSettings = json_decode($settingsInstance, true);
+        if (is_array($decodedSettings)) {
+            $allSettingsData = $decodedSettings;
+        } else {
+            // Log an error or warning here if possible and desired
+            // For now, defaulting to an empty array to prevent fatal error
+            error_log('Warning: GeneralSettings loaded as a string and could not be decoded into an array. Path: app/Filament/Pages/Preferences.php');
+            $allSettingsData = [];
+        }
+    } else {
+        // Log an error or warning here if possible and desired
+        error_log('Warning: GeneralSettings did not load as an object or string. Path: app/Filament/Pages/Preferences.php');
+        $allSettingsData = [];
+    }
 
     // Merge the submitted form data (from current tab/form) into the full settings data.
     // This ensures that changes from the current form are applied, while settings
