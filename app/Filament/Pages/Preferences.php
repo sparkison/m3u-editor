@@ -431,61 +431,60 @@ class Preferences extends SettingsPage
      * selected hardware acceleration method, and converts empty strings to null
      * for specific nullable text fields.
      *
-     * @param array $submittedFormData The data submitted from the form.
+     * @param array $data The data submitted from the form.
      * @return array The final settings data to be saved.
      */
-protected function mutateFormDataBeforeSave(array $submittedFormData): array
+protected function mutateFormDataBeforeSave(array $data): array
 {
-    // Get the raw settings instance
     $settingsInstance = $this->getSettings();
-    $loadedSettingsData = []; // Initialize as empty array
+    $currentSettingsValues = [];
 
     if ($settingsInstance instanceof \App\Settings\GeneralSettings) {
-        $loadedSettingsData = $settingsInstance->toArray();
+        $currentSettingsValues = $settingsInstance->toArray();
     } elseif (is_string($settingsInstance)) {
-        $decodedSettings = json_decode($settingsInstance, true);
-        if (is_array($decodedSettings)) {
-            $loadedSettingsData = $decodedSettings;
+        // Attempt to decode if it's a string (possibly corrupted JSON)
+        $decoded = json_decode($settingsInstance, true);
+        if (is_array($decoded)) {
+            // Use decoded if successful, but still merge with defaults to be safe
+            $currentSettingsValues = array_merge((new \App\Settings\GeneralSettings())->toArray(), $decoded);
+            error_log('Warning: GeneralSettings loaded as a string (potentially corrupted JSON) and was decoded. Path: app/Filament/Pages/Preferences.php');
         } else {
-            error_log('Warning: GeneralSettings loaded as a string and could not be JSON decoded into an array. Path: app/Filament/Pages/Preferences.php');
-            // $loadedSettingsData remains []
+            // Fallback to complete defaults if string wasn't valid JSON
+            $currentSettingsValues = (new \App\Settings\GeneralSettings())->toArray();
+            error_log('Error: GeneralSettings loaded as a string that could not be JSON decoded. Falling back to defaults. Path: app/Filament/Pages/Preferences.php');
         }
     } else {
-        error_log('Warning: GeneralSettings did not load as an object or decodable string. Path: app/Filament/Pages/Preferences.php');
-        // $loadedSettingsData remains []
+        // Fallback to complete defaults if not an object or string
+        $currentSettingsValues = (new \App\Settings\GeneralSettings())->toArray();
+        error_log('Error: GeneralSettings did not load as an object or string. Falling back to defaults. Path: app/Filament/Pages/Preferences.php');
     }
 
-    // Create a complete default settings array
-    $defaultSettingsData = (new \App\Settings\GeneralSettings())->toArray();
+    // Augment incoming $data with any keys from current/default settings that are not already present.
+    // This ensures settings from other tabs/unsubmitted fields are included.
+    foreach ($currentSettingsValues as $key => $value) {
+        if (!array_key_exists($key, $data)) {
+            $data[$key] = $value;
+        }
+    }
 
-    // Merge defaults with loaded data to ensure all keys are present
-    // $loadedSettingsData takes precedence for keys it has.
-    $currentSettingsData = array_merge($defaultSettingsData, $loadedSettingsData);
-
-    // Merge the submitted form data (from current tab/form) into the full settings data.
-    // Submitted form data takes precedence over $currentSettingsData.
-    $finalDataToSave = array_merge($currentSettingsData, $submittedFormData);
-
-    // Ensure 'ffmpeg_custom_command_templates' is an array.
-    // It takes the value from $submittedFormData if present, otherwise from $allSettingsData,
-    // then ensures it's an array.
-    $finalDataToSave['ffmpeg_custom_command_templates'] = $finalDataToSave['ffmpeg_custom_command_templates'] ?? [];
-    if (!is_array($finalDataToSave['ffmpeg_custom_command_templates'])) {
-        $finalDataToSave['ffmpeg_custom_command_templates'] = [];
+    // Specifically ensure 'ffmpeg_custom_command_templates' is an array.
+    // This handles cases where an empty Repeater might submit null.
+    if (!isset($data['ffmpeg_custom_command_templates']) || !is_array($data['ffmpeg_custom_command_templates'])) {
+        $data['ffmpeg_custom_command_templates'] = [];
     }
 
     // Nullify QSV fields if QSV is not the selected hardware acceleration method.
-    if (isset($finalDataToSave['hardware_acceleration_method']) && $finalDataToSave['hardware_acceleration_method'] !== 'qsv') {
-        $finalDataToSave['ffmpeg_qsv_device'] = null;
-        $finalDataToSave['ffmpeg_qsv_video_filter'] = null;
-        $finalDataToSave['ffmpeg_qsv_encoder_options'] = null;
-        $finalDataToSave['ffmpeg_qsv_additional_args'] = null;
+    if (isset($data['hardware_acceleration_method']) && $data['hardware_acceleration_method'] !== 'qsv') {
+        $data['ffmpeg_qsv_device'] = null;
+        $data['ffmpeg_qsv_video_filter'] = null;
+        $data['ffmpeg_qsv_encoder_options'] = null;
+        $data['ffmpeg_qsv_additional_args'] = null;
     }
 
     // Nullify VAAPI fields if VA-API is not the selected method.
-    if (isset($finalDataToSave['hardware_acceleration_method']) && $finalDataToSave['hardware_acceleration_method'] !== 'vaapi') {
-        $finalDataToSave['ffmpeg_vaapi_device'] = null;
-        $finalDataToSave['ffmpeg_vaapi_video_filter'] = null;
+    if (isset($data['hardware_acceleration_method']) && $data['hardware_acceleration_method'] !== 'vaapi') {
+        $data['ffmpeg_vaapi_device'] = null;
+        $data['ffmpeg_vaapi_video_filter'] = null;
     }
 
     // Define the list of fields that should be null if they are empty strings.
@@ -505,20 +504,13 @@ protected function mutateFormDataBeforeSave(array $submittedFormData): array
         'mediaflow_proxy_password',
         'mediaflow_proxy_user_agent',
     ];
-    // Using array_unique is a good practice if the list could have duplicates, though not strictly necessary here.
-    // $nullableTextfields = array_unique($nullableTextfields);
 
     foreach ($nullableTextfields as $field) {
-        // Ensure the key exists in $finalDataToSave before checking if it's an empty string.
-        if (array_key_exists($field, $finalDataToSave) && $finalDataToSave[$field] === '') {
-            $finalDataToSave[$field] = null;
+        if (array_key_exists($field, $data) && $data[$field] === '') {
+            $data[$field] = null;
         }
     }
 
-    if (!isset($finalDataToSave['ffmpeg_custom_command_templates']) || !is_array($finalDataToSave['ffmpeg_custom_command_templates'])) {
-        $finalDataToSave['ffmpeg_custom_command_templates'] = [];
-    }
-
-    return $finalDataToSave;
+    return $data;
 }
 }
