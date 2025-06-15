@@ -436,31 +436,35 @@ class Preferences extends SettingsPage
      */
 protected function mutateFormDataBeforeSave(array $submittedFormData): array
 {
-    // Load all current settings for the group.
-    // $this->getSettings() returns the hydrated settings object.
+    // Get the raw settings instance
     $settingsInstance = $this->getSettings();
+    $loadedSettingsData = []; // Initialize as empty array
+
     if ($settingsInstance instanceof \App\Settings\GeneralSettings) {
-        $allSettingsData = $settingsInstance->toArray();
+        $loadedSettingsData = $settingsInstance->toArray();
     } elseif (is_string($settingsInstance)) {
         $decodedSettings = json_decode($settingsInstance, true);
         if (is_array($decodedSettings)) {
-            $allSettingsData = $decodedSettings;
+            $loadedSettingsData = $decodedSettings;
         } else {
-            // Log an error or warning here if possible and desired
-            // For now, defaulting to an empty array to prevent fatal error
-            error_log('Warning: GeneralSettings loaded as a string and could not be decoded into an array. Path: app/Filament/Pages/Preferences.php');
-            $allSettingsData = [];
+            error_log('Warning: GeneralSettings loaded as a string and could not be JSON decoded into an array. Path: app/Filament/Pages/Preferences.php');
+            // $loadedSettingsData remains []
         }
     } else {
-        // Log an error or warning here if possible and desired
-        error_log('Warning: GeneralSettings did not load as an object or string. Path: app/Filament/Pages/Preferences.php');
-        $allSettingsData = [];
+        error_log('Warning: GeneralSettings did not load as an object or decodable string. Path: app/Filament/Pages/Preferences.php');
+        // $loadedSettingsData remains []
     }
 
+    // Create a complete default settings array
+    $defaultSettingsData = (new \App\Settings\GeneralSettings())->toArray();
+
+    // Merge defaults with loaded data to ensure all keys are present
+    // $loadedSettingsData takes precedence for keys it has.
+    $currentSettingsData = array_merge($defaultSettingsData, $loadedSettingsData);
+
     // Merge the submitted form data (from current tab/form) into the full settings data.
-    // This ensures that changes from the current form are applied, while settings
-    // not present in the current form (e.g., from other tabs) are preserved.
-    $finalDataToSave = array_merge($allSettingsData, $submittedFormData);
+    // Submitted form data takes precedence over $currentSettingsData.
+    $finalDataToSave = array_merge($currentSettingsData, $submittedFormData);
 
     // Ensure 'ffmpeg_custom_command_templates' is an array.
     // It takes the value from $submittedFormData if present, otherwise from $allSettingsData,
