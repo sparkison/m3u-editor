@@ -960,9 +960,9 @@ class ChannelResource extends Resource
                             tooltip: 'The "tvg-shift" attribute is used in your generated M3U playlist to shift the EPG (Electronic Program Guide) time for specific channels by a certain number of hours. This allows for adjusting the EPG data for individual channels rather than applying a global shift.'
                         )
                         ->columnSpan(1)
-                        ->rules(['numeric'])
+                        ->rules(['numeric', 'integer'])
                         ->placeholder('0')
-                        ->helperText('Indicates the shift of the program schedule, use the values -1,-1.5,0,1.5,1,.. and so on.')
+                        ->helperText('Indicates the shift of the program schedule, use the values -2,-1,0,1,2,.. and so on.')
                         ->rules(['nullable', 'numeric', 'min:0']),
                 ]),
             Forms\Components\Fieldset::make('Failover Channels')
