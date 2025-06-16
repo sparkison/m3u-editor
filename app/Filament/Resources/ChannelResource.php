@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Model;
 
 class ChannelResource extends Resource
 {
@@ -83,7 +84,7 @@ class ChannelResource extends Resource
             ->defaultPaginationPageOption(25)
             ->columns([
                 Tables\Columns\ImageColumn::make('logo')
-                    ->label('Icon')
+                    ->label('Logo')
                     ->checkFileExistence(false)
                     ->height(30)
                     ->width('auto')
@@ -100,8 +101,8 @@ class ChannelResource extends Resource
                     ->type('number')
                     ->placeholder('Sort Order')
                     ->sortable()
-                    ->tooltip(fn($record) => $record->playlist->auto_sort ? 'Playlist auto-sort enabled; disable to change' : 'Channel sort order')
-                    ->disabled(fn($record) => $record->playlist->auto_sort)
+                    ->tooltip(fn($record) => !$record->is_custom && $record->playlist?->auto_sort ? 'Playlist auto-sort enabled; disable to change' : 'Channel sort order')
+                    ->disabled(fn($record) => !$record->is_custom && $record->playlist?->auto_sort)
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('failovers_count')
                     ->label('Failovers')
@@ -149,10 +150,11 @@ class ChannelResource extends Resource
                     ->searchable()
                     ->toggleable(),
                 Tables\Columns\TextInputColumn::make('shift')
+                    ->label('Time Shift')
                     ->rules(['numeric', 'min:0'])
                     ->type('number')
-                    ->placeholder('Shift')
-                    ->tooltip('Shift')
+                    ->placeholder('Time Shift')
+                    ->tooltip('Time Shift')
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('group')
@@ -180,6 +182,13 @@ class ChannelResource extends Resource
                     ->toggleable()
                     ->searchable()
                     ->limit(40)
+                    ->sortable(),
+                Tables\Columns\TextInputColumn::make('tvg_shift')
+                    ->label('EPG Shift')
+                    ->rules(['numeric'])
+                    ->placeholder('EPG Shift')
+                    ->tooltip('EPG Shift')
+                    ->toggleable()
                     ->sortable(),
                 Tables\Columns\SelectColumn::make('logo_type')
                     ->label('Preferred Icon')
@@ -267,10 +276,27 @@ class ChannelResource extends Resource
                     }),
             ])
             ->actions([
-                Tables\Actions\EditAction::make()
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\EditAction::make('edit_custom')
+                        ->slideOver()
+                        ->form(fn(Tables\Actions\EditAction $action): array => [
+                            Forms\Components\Grid::make()
+                                ->schema(self::getForm(edit: true))
+                                ->columns(2)
+                        ]),
+                    Tables\Actions\DeleteAction::make()
+                ])->button()->hiddenLabel()->size('sm')->hidden(fn(Model $record) => !$record->is_custom),
+                Tables\Actions\EditAction::make('edit')
+                    ->slideOver()
+                    ->form(fn(Tables\Actions\EditAction $action): array => [
+                        Forms\Components\Grid::make()
+                            ->schema(self::getForm(edit: true))
+                            ->columns(2)
+                    ])
                     ->button()
                     ->hiddenLabel()
-                    ->slideOver(),
+                    ->disabled(fn(Model $record) => $record->is_custom)
+                    ->hidden(fn(Model $record) => $record->is_custom),
                 Tables\Actions\ViewAction::make()
                     ->button()
                     ->hiddenLabel()
@@ -350,24 +376,14 @@ class ChannelResource extends Resource
                         ->modalSubmitActionLabel('Move now'),
                     Tables\Actions\BulkAction::make('map')
                         ->label('Map EPG to selected')
-                        ->form([
-                            Forms\Components\Select::make('epg')
-                                ->required()
-                                ->label('EPG')
-                                ->helperText('Select the EPG you would like to map from.')
-                                ->options(Epg::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                                ->searchable(),
-                            Forms\Components\Toggle::make('overwrite')
-                                ->label('Overwrite')
-                                ->helperText('Overwrite channels with existing mappings?')
-                                ->default(false),
-                        ])
+                        ->form(EpgMapResource::getForm(showPlaylist: false, showEpg: true))
                         ->action(function (Collection $records, array $data): void {
                             app('Illuminate\Contracts\Bus\Dispatcher')
                                 ->dispatch(new \App\Jobs\MapPlaylistChannelsToEpg(
-                                    epg: (int)$data['epg'],
+                                    epg: (int)$data['epg_id'],
                                     channels: $records->pluck('id')->toArray(),
-                                    force: $data['overwrite'],
+                                    force: $data['override'],
+                                    settings: $data['settings'] ?? [],
                                 ));
                         })->after(function () {
                             Notification::make()
@@ -420,7 +436,7 @@ class ChannelResource extends Resource
                             $initialMasterOptions = [];
                             foreach ($records as $record) {
                                 $displayTitle = $record->title_custom ?: $record->title;
-                                $playlistName = $record->playlist->name ?? 'Unknown';
+                                $playlistName = $record->getEffectivePlaylist()->name ?? 'Unknown';
                                 $initialMasterOptions[$record->id] = "{$displayTitle} [{$playlistName}]";
                             }
                             return [
@@ -460,7 +476,8 @@ class ChannelResource extends Resource
                                                     ->orWhereRaw('LOWER(title_custom) LIKE ?', ["%{$searchLower}%"])
                                                     ->orWhereRaw('LOWER(name) LIKE ?', ["%{$searchLower}%"])
                                                     ->orWhereRaw('LOWER(name_custom) LIKE ?', ["%{$searchLower}%"])
-                                                    ->orWhereRaw('LOWER(stream_id) LIKE ?', ["%{$searchLower}%"]);
+                                                    ->orWhereRaw('LOWER(stream_id) LIKE ?', ["%{$searchLower}%"])
+                                                    ->orWhereRaw('LOWER(stream_id_custom) LIKE ?', ["%{$searchLower}%"]);
                                             })
                                             ->limit(50) // Keep a reasonable limit
                                             ->get();
@@ -469,7 +486,7 @@ class ChannelResource extends Resource
                                         $options = [];
                                         foreach ($channels as $channel) {
                                             $displayTitle = $channel->title_custom ?: $channel->title;
-                                            $playlistName = $channel->playlist->name ?? 'Unknown';
+                                            $playlistName = $channel->getEffectivePlaylist()->name ?? 'Unknown';
                                             $options[$channel->id] = "{$displayTitle} [{$playlistName}]";
                                         }
 
@@ -704,26 +721,78 @@ class ChannelResource extends Resource
             ]);
     }
 
-    public static function getForm(): array
+    public static function getForm($customPlaylist = null, $edit = false): array
     {
         return [
             // Customizable channel fields
             Forms\Components\Toggle::make('enabled')
-                ->columnSpan('full')
-                ->helperText('Toggle channel status'),
+                ->default(true)
+                ->columnSpan('full'),
+            Forms\Components\Fieldset::make('Playlist Type (choose one)')
+                ->schema([
+                    Forms\Components\Toggle::make('is_custom')
+                        ->default(true)
+                        ->hidden()
+                        ->columnSpan('full'),
+                    Forms\Components\Select::make('playlist_id')
+                        ->label('Playlist')
+                        ->options(fn() => Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                        ->searchable()
+                        ->live()
+                        ->afterStateUpdated(function (Forms\Set $set, $state) {
+                            if ($state) {
+                                $set('custom_playlist_id', null);
+                                $set('group', null);
+                                $set('group_id', null);
+                            }
+                        })
+                        ->requiredWithout('custom_playlist_id')
+                        ->hidden($customPlaylist !== null)
+                        ->validationMessages([
+                            'required_without' => 'Playlist is required if not using a custom playlist.',
+                        ])
+                        ->rules(['exists:playlists,id']),
+                    Forms\Components\Select::make('custom_playlist_id')
+                        ->label('Custom Playlist')
+                        ->options(fn() => CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                        ->searchable()
+                        ->disabled($customPlaylist !== null)
+                        ->default($customPlaylist ? $customPlaylist->id : null)
+                        ->live()
+                        ->afterStateUpdated(function (Forms\Set $set, $state) {
+                            if ($state) {
+                                $set('playlist_id', null);
+                                $set('group', null);
+                                $set('group_id', null);
+                            }
+                        })
+                        ->requiredWithout('playlist_id')
+                        ->validationMessages([
+                            'required_without' => 'Custom Playlist is required if not using a standard playlist.',
+                        ])
+                        ->dehydrated(true)
+                        ->rules(['exists:custom_playlists,id'])
+                ])->hidden($edit),
             Forms\Components\Fieldset::make('General Settings')
                 ->schema([
+                    Forms\Components\TextInput::make('title')
+                        ->label('Title')
+                        ->columnSpan(1)
+                        ->required()
+                        ->hidden($edit)
+                        ->rules(['min:1', 'max:255']),
                     Forms\Components\TextInput::make('title_custom')
                         ->label('Title')
                         ->placeholder(fn(Get $get) => $get('title'))
-                        ->helperText("Leave empty to use playlist default value.")
+                        ->helperText("Leave empty to use default value.")
                         ->columnSpan(1)
-                        ->rules(['min:1', 'max:255']),
+                        ->rules(['min:1', 'max:255'])
+                        ->hiddenOn('create'),
                     Forms\Components\TextInput::make('name_custom')
                         ->label('Name')
                         ->hint('tvg-name')
                         ->placeholder(fn(Get $get) => $get('name'))
-                        ->helperText("Leave empty to use playlist default value.")
+                        ->helperText(fn(Get $get) => $get('is_custom') ? "" : "Leave empty to use default value.")
                         ->columnSpan(1)
                         ->rules(['min:1', 'max:255']),
                     Forms\Components\TextInput::make('stream_id_custom')
@@ -731,89 +800,114 @@ class ChannelResource extends Resource
                         ->hint('tvg-id')
                         ->columnSpan(1)
                         ->placeholder(fn(Get $get) => $get('stream_id'))
-                        ->helperText("Leave empty to use playlist default value.")
+                        ->helperText(fn(Get $get) => $get('is_custom') ? "" : "Leave empty to use default value.")
                         ->rules(['min:1', 'max:255']),
+                    Forms\Components\TextInput::make('station_id')
+                        ->label('Station ID')
+                        ->hint('tvc-guide-stationid')
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'Gracenote station ID is a unique identifier for a TV channel in the Gracenote database. It is used to associate the channel with its metadata, such as program listings and other information.'
+                        )
+                        ->columnSpan(1)
+                        ->helperText("Gracenote station ID")
+                        ->type('number')
+                        ->rules(['numeric', 'min:0']),
                     Forms\Components\TextInput::make('channel')
                         ->label('Channel No.')
                         ->hint('tvg-chno')
                         ->columnSpan(1)
                         ->rules(['numeric', 'min:0']),
                     Forms\Components\TextInput::make('shift')
+                        ->label("Time Shift")
                         ->hint('timeshift')
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'Time-shift is features that enable you to access content that has already been broadcast or is currently being broadcast, but at a different time than the original schedule. Time-shift allows you to pause, rewind, or fast-forward live TV, giving you more control over your viewing experience. Your provider must support this feature for it to work.'
+                        )
+                        ->placeholder(0)
                         ->columnSpan(1)
                         ->rules(['numeric', 'min:0']),
-                    Forms\Components\Hidden::make('group'),
-                    Forms\Components\Select::make('group_id')
-                        ->label('Group')
+                    Forms\Components\Grid::make()
+                        ->columnSpanFull()
+                        ->schema([
+                            Forms\Components\Hidden::make('group'),
+                            Forms\Components\Select::make('group_id')
+                                ->label('Group')
+                                ->hint('group-title')
+                                ->options(fn(Get $get) => Group::where('playlist_id', $get('playlist_id'))->get(['name', 'id'])->pluck('name', 'id'))
+                                ->columnSpanFull()
+                                ->placeholder('Select a group')
+                                ->searchable()
+                                ->live()
+                                ->afterStateUpdated(function (Forms\Get $get, Forms\Set $set) {
+                                    $group = Group::find($get('group_id'));
+                                    $set('group', $group->name ?? null);
+                                })
+                                ->rules(['numeric', 'min:0']),
+                        ])->hidden(fn(Get $get) => !$get('playlist_id')),
+                    Forms\Components\TextInput::make('group')
+                        ->columnSpanFull()
+                        ->placeholder('Enter a group title')
                         ->hint('group-title')
-                        ->options(fn($record) => Group::where('playlist_id', $record->playlist_id)->get(['name', 'id'])->pluck('name', 'id'))
-                        ->columnSpan(1)
-                        ->placeholder('Select a group')
-                        ->searchable()
-                        ->live()
-                        ->afterStateUpdated(function (Forms\Get $get, Forms\Set $set) {
-                            $group = Group::find($get('group_id'));
-                            $set('group', $group->name ?? null);
-                        })
-                        ->rules(['numeric', 'min:0']),
+                        ->hiddenOn('create')
+                        ->rules(['min:1', 'max:255'])
+                        ->hidden(fn(Get $get) => !$get('custom_playlist_id')),
                 ]),
             Forms\Components\Fieldset::make('URL Settings')
                 ->schema([
-                    Forms\Components\TextInput::make('url_custom')
-                        ->label('URL')
+                    Forms\Components\TextInput::make('url')
+                        ->label(fn(Get $get) => $get('is_custom') ? 'URL' : 'Provider URL')
                         ->columnSpan(1)
                         ->prefixIcon('heroicon-m-globe-alt')
-                        ->placeholder(fn(Get $get) => $get('url'))
-                        ->helperText("Leave empty to use playlist default value.")
-                        ->rules(['min:1'])
-                        ->suffixAction(
-                            Forms\Components\Actions\Action::make('copy')
-                                ->icon('heroicon-s-eye')
-                                ->action(function (Get $get, $record, $state) {
-                                    $url = $state ?? $get('url');
-                                    $title = $record->title_custom ?? $record->title;
-                                    Notification::make()
-                                        ->icon('heroicon-s-eye')
-                                        ->title("$title - URL")
-                                        ->success()
-                                        ->body($url)
-                                        ->persistent()
-                                        ->send();
-                                })
+                        ->hintIcon(
+                            icon: fn(Get $get) => $get('is_custom') ? null : 'heroicon-m-question-mark-circle',
+                            tooltip: fn(Get $get) => $get('is_custom') ? null : 'The original URL from the playlist provider. This is read-only and cannot be modified. This URL is automatically updated on Playlist sync.'
                         )
+                        ->formatStateUsing(fn($record) => $record?->url)
+                        ->disabled(fn(Get $get) => !$get('is_custom')) // make it read-only but copyable for non-custom channels
+                        ->dehydrated(fn(Get $get) => $get('is_custom')) // don't save the value in the database for custom channels
                         ->type('url'),
+                    Forms\Components\TextInput::make('url_custom')
+                        ->label('URL Override')
+                        ->columnSpan(1)
+                        ->prefixIcon('heroicon-m-globe-alt')
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'Override the provider URL with your own custom URL. This URL will be used instead of the provider URL.'
+                        )
+                        ->helperText("Leave empty to use provider URL.")
+                        ->rules(['min:1'])
+                        ->type('url')
+                        ->hidden(fn(Get $get) => $get('is_custom')),
                     Forms\Components\TextInput::make('url_proxy')
                         ->label('Proxy URL')
                         ->columnSpan(1)
                         ->prefixIcon('heroicon-m-globe-alt')
-                        ->placeholder(fn($record) => ProxyFacade::getProxyUrlForChannel(
-                            $record->id,
-                            $record->playlist->proxy_options['output'] ?? 'ts'
-                        ))
-                        ->helperText("m3u editor proxy url.")
-                        ->disabled()
-                        ->suffixAction(
-                            Forms\Components\Actions\Action::make('copy')
-                                ->icon('heroicon-s-eye')
-                                ->action(function ($record, $state) {
-                                    $url = ProxyFacade::getProxyUrlForChannel(
-                                        $record->id,
-                                        $record->playlist->proxy_options['output'] ?? 'ts'
-                                    );
-                                    $title = $record->title_custom ?? $record->title;
-                                    Notification::make()
-                                        ->icon('heroicon-s-eye')
-                                        ->title("$title - Proxy URL")
-                                        ->success()
-                                        ->body($url)
-                                        ->persistent()
-                                        ->send();
-                                })
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'Use m3u editor proxy to access this channel. Format is defined in playlist proxy options.'
                         )
+                        ->formatStateUsing(function ($record) {
+                            if (!$record || !$record->id) {
+                                return null;
+                            }
+                            try {
+                                return ProxyFacade::getProxyUrlForChannel(
+                                    $record->id,
+                                    $record->playlist->proxy_options['output'] ?? 'ts'
+                                );
+                            } catch (\Exception $e) {
+                                return null;
+                            }
+                        })
+                        ->helperText("m3u editor proxy url.")
+                        ->disabled() // make it read-only but copyable
                         ->dehydrated(false) // don't save the value in the database
-                        ->type('url'),
+                        ->type('url')
+                        ->hiddenOn('create'),
                     Forms\Components\TextInput::make('logo')
-                        ->label('Icon')
+                        ->label('Logo')
                         ->hint('tvg-logo')
                         ->columnSpan(1)
                         ->prefixIcon('heroicon-m-globe-alt')
@@ -858,6 +952,18 @@ class ChannelResource extends Resource
                             'epg' => 'EPG',
                         ])
                         ->columnSpan(1),
+                    Forms\Components\TextInput::make('tvg_shift')
+                        ->label('EPG Shift')
+                        ->hint('tvg-shift')
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'The "tvg-shift" attribute is used in your generated M3U playlist to shift the EPG (Electronic Program Guide) time for specific channels by a certain number of hours. This allows for adjusting the EPG data for individual channels rather than applying a global shift.'
+                        )
+                        ->columnSpan(1)
+                        ->rules(['numeric'])
+                        ->placeholder('0')
+                        ->helperText('Indicates the shift of the program schedule, use the values -1,-1.5,0,1.5,1,.. and so on.')
+                        ->rules(['nullable', 'numeric', 'min:0']),
                 ]),
             Forms\Components\Fieldset::make('Failover Channels')
                 ->schema([
@@ -882,7 +988,7 @@ class ChannelResource extends Resource
 
                                     // Return the single channel as the only results if not searching
                                     $displayTitle = $channel->title_custom ?: $channel->title;
-                                    $playlistName = $channel->playlist->name ?? 'Unknown';
+                                    $playlistName = $channel->getEffectivePlaylist()->name ?? 'Unknown';
                                     return [$channel->id => "{$displayTitle} [{$playlistName}]"];
                                 })
                                 ->searchable()
@@ -909,7 +1015,8 @@ class ChannelResource extends Resource
                                                 ->orWhereRaw('LOWER(title_custom) LIKE ?', ["%{$searchLower}%"])
                                                 ->orWhereRaw('LOWER(name) LIKE ?', ["%{$searchLower}%"])
                                                 ->orWhereRaw('LOWER(name_custom) LIKE ?', ["%{$searchLower}%"])
-                                                ->orWhereRaw('LOWER(stream_id) LIKE ?', ["%{$searchLower}%"]);
+                                                ->orWhereRaw('LOWER(stream_id) LIKE ?', ["%{$searchLower}%"])
+                                                ->orWhereRaw('LOWER(stream_id_custom) LIKE ?', ["%{$searchLower}%"]);
                                         })
                                         ->limit(50) // Keep a reasonable limit
                                         ->get();
@@ -918,7 +1025,7 @@ class ChannelResource extends Resource
                                     $options = [];
                                     foreach ($channels as $channel) {
                                         $displayTitle = $channel->title_custom ?: $channel->title;
-                                        $playlistName = $channel->playlist->name ?? 'Unknown';
+                                        $playlistName = $channel->getEffectivePlaylist()->name ?? 'Unknown';
                                         $options[$channel->id] = "{$displayTitle} [{$playlistName}]";
                                     }
 
@@ -932,5 +1039,40 @@ class ChannelResource extends Resource
                         ->defaultItems(0)
                 ])
         ];
+    }
+
+    /**
+     * Create a custom channel with the provided data.
+     * 
+     * This method is used to create a channel with custom data, typically for a Custom Playlist.
+     * 
+     * @param array $data The data for the channel.
+     * @param string $model The model class to use for creating the channel.
+     * @return Model The created channel model.
+     * @throws \Illuminate\Validation\ValidationException
+     * @throws \Illuminate\Database\Eloquent\ModelNotFoundException
+     * @throws \Illuminate\Database\QueryException
+     * @throws \Exception
+     */
+    public static function createCustomChannel(array $data, string $model): Model
+    {
+        $data['user_id'] = auth()->id();
+        $data['is_custom'] = true;
+        if (!$data['shift']) {
+            $data['shift'] = 0; // Default shift to 0 if not provided
+        }
+        if (!$data['logo_type']) {
+            $data['logo_type'] = 'channel'; // Default to channel if not provided
+        }
+        $channel = $model::create($data);
+
+        // If the channel is created for a Custom Playlist, we need to associate it with the Custom Playlist
+        if (isset($data['custom_playlist_id']) && $data['custom_playlist_id']) {
+            $channel->customPlaylists()
+                ->syncWithoutDetaching([$data['custom_playlist_id']]);
+
+            $channel->save();
+        }
+        return $channel;
     }
 }

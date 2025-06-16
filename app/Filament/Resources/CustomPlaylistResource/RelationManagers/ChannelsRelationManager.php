@@ -16,6 +16,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Database\Eloquent\Model;
 use Filament\Tables\Columns\SpatieTagsColumn;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -76,8 +77,8 @@ class ChannelsRelationManager extends RelationManager
                     ->type('number')
                     ->placeholder('Sort Order')
                     ->sortable()
-                    ->tooltip(fn($record) => $record->playlist->auto_sort ? 'Playlist auto-sort enabled; disable to change' : 'Channel sort order')
-                    ->disabled(fn($record) => $record->playlist->auto_sort)
+                    ->tooltip(fn($record) => !$record->is_custom && $record->playlist?->auto_sort ? 'Playlist auto-sort enabled; disable to change' : 'Channel sort order')
+                    ->disabled(fn($record) => !$record->is_custom && $record->playlist?->auto_sort)
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('failovers_count')
                     ->label('Failovers')
@@ -234,14 +235,18 @@ class ChannelsRelationManager extends RelationManager
                     }),
             ])
             ->headerActions([
+                Tables\Actions\CreateAction::make()
+                    ->label('Create Custom Channel')
+                    ->form(ChannelResource::getForm(customPlaylist: $ownerRecord))
+                    ->modalHeading('New Custom Channel')
+                    ->modalDescription('NOTE: Custom channels need to be associated with a Playlist or Custom Playlist.')
+                    ->using(fn(array $data, string $model): Model => ChannelResource::createCustomChannel(
+                        data: $data,
+                        model: $model,
+                    ))
+                    ->slideOver(),
                 Tables\Actions\AttachAction::make()
-                    ->recordSelectSearchColumns([
-                        'title',
-                        'title_custom',
-                        'name',
-                        'name_custom',
-                        'stream_id'
-                    ])->form(fn(Tables\Actions\AttachAction $action): array => [
+                    ->form(fn(Tables\Actions\AttachAction $action): array => [
                         $action
                             ->getRecordSelect()
                             ->getSearchResultsUsing(function (string $search) {
@@ -254,7 +259,8 @@ class ChannelsRelationManager extends RelationManager
                                             ->orWhereRaw('LOWER(title_custom) LIKE ?', ["%{$searchLower}%"])
                                             ->orWhereRaw('LOWER(name) LIKE ?', ["%{$searchLower}%"])
                                             ->orWhereRaw('LOWER(name_custom) LIKE ?', ["%{$searchLower}%"])
-                                            ->orWhereRaw('LOWER(stream_id) LIKE ?', ["%{$searchLower}%"]);
+                                            ->orWhereRaw('LOWER(stream_id) LIKE ?', ["%{$searchLower}%"])
+                                            ->orWhereRaw('LOWER(stream_id_custom) LIKE ?', ["%{$searchLower}%"]);
                                     })
                                     ->limit(50)
                                     ->get();
@@ -263,7 +269,7 @@ class ChannelsRelationManager extends RelationManager
                                 $options = [];
                                 foreach ($channels as $channel) {
                                     $displayTitle = $channel->title_custom ?: $channel->title;
-                                    $playlistName = $channel->playlist->name ?? 'Unknown';
+                                    $playlistName = $channel->getEffectivePlaylist()->name ?? 'Unknown';
                                     $options[$channel->id] = "{$displayTitle} [{$playlistName}]";
                                 }
 
@@ -271,7 +277,7 @@ class ChannelsRelationManager extends RelationManager
                             })
                             ->getOptionLabelFromRecordUsing(function ($record) {
                                 $displayTitle = $record->title_custom ?: $record->title;
-                                $playlistName = $record->playlist->name ?? 'Unknown';
+                                $playlistName = $record->getEffectivePlaylist()->name ?? 'Unknown';
                                 $options[$record->id] = "{$displayTitle} [{$playlistName}]";
                                 return "{$displayTitle} [{$playlistName}]";
                             })
@@ -291,12 +297,16 @@ class ChannelsRelationManager extends RelationManager
                         ->slideOver()
                         ->form(fn(Tables\Actions\EditAction $action): array => [
                             Forms\Components\Grid::make()
-                                ->schema(ChannelResource::getForm())
+                                ->schema(ChannelResource::getForm(edit: true))
                                 ->columns(2)
                         ]),
                     Tables\Actions\ViewAction::make()
                         ->slideOver(),
                     Tables\Actions\DetachAction::make()
+                        ->color('warning'),
+                    Tables\Actions\DeleteAction::make()
+                        ->hidden(fn(Model $record) => !$record->is_custom)
+                        ->disabled(fn(Model $record) => !$record->is_custom)
                 ])->button()->hiddenLabel()->size('sm'),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
@@ -342,7 +352,7 @@ class ChannelsRelationManager extends RelationManager
                             $initialMasterOptions = [];
                             foreach ($records as $record) {
                                 $displayTitle = $record->title_custom ?: $record->title;
-                                $playlistName = $record->playlist->name ?? 'Unknown';
+                                $playlistName = $record->getEffectivePlaylist()->name ?? 'Unknown';
                                 $initialMasterOptions[$record->id] = "{$displayTitle} [{$playlistName}]";
                             }
                             return [
@@ -382,7 +392,8 @@ class ChannelsRelationManager extends RelationManager
                                                     ->orWhereRaw('LOWER(title_custom) LIKE ?', ["%{$searchLower}%"])
                                                     ->orWhereRaw('LOWER(name) LIKE ?', ["%{$searchLower}%"])
                                                     ->orWhereRaw('LOWER(name_custom) LIKE ?', ["%{$searchLower}%"])
-                                                    ->orWhereRaw('LOWER(stream_id) LIKE ?', ["%{$searchLower}%"]);
+                                                    ->orWhereRaw('LOWER(stream_id) LIKE ?', ["%{$searchLower}%"])
+                                                    ->orWhereRaw('LOWER(stream_id_custom) LIKE ?', ["%{$searchLower}%"]);
                                             })
                                             ->limit(50) // Keep a reasonable limit
                                             ->get();
@@ -391,7 +402,7 @@ class ChannelsRelationManager extends RelationManager
                                         $options = [];
                                         foreach ($channels as $channel) {
                                             $displayTitle = $channel->title_custom ?: $channel->title;
-                                            $playlistName = $channel->playlist->name ?? 'Unknown';
+                                            $playlistName = $channel->getEffectivePlaylist()->name ?? 'Unknown';
                                             $options[$channel->id] = "{$displayTitle} [{$playlistName}]";
                                         }
 

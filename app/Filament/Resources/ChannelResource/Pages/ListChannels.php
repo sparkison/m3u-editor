@@ -5,6 +5,7 @@ namespace App\Filament\Resources\ChannelResource\Pages;
 use App\Filament\Exports\ChannelExporter;
 use App\Filament\Imports\ChannelImporter;
 use App\Filament\Resources\ChannelResource;
+use App\Filament\Resources\EpgMapResource;
 use App\Models\Channel;
 use App\Models\Epg;
 use App\Models\Playlist;
@@ -16,6 +17,7 @@ use Filament\Resources\Components\Tab;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Hydrat\TableLayoutToggle\Concerns\HasToggleableTable;
 use Illuminate\Support\Str;
 
@@ -36,39 +38,27 @@ class ListChannels extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            // Actions\CreateAction::make(),
+            Actions\CreateAction::make()
+                ->label('Create Custom Channel')
+                ->modalHeading('New Custom Channel')
+                ->modalDescription('NOTE: Custom channels need to be associated with a Playlist or Custom Playlist.')
+                ->using(fn (array $data, string $model): Model => ChannelResource::createCustomChannel(
+                    data: $data,
+                    model: $model,
+                ))
+                ->slideOver(),
             Actions\ActionGroup::make([
                 Actions\Action::make('map')
                     ->label('Map EPG to Playlist')
-                    ->form([
-                        Forms\Components\Select::make('epg')
-                            ->required()
-                            ->label('EPG')
-                            ->helperText('Select the EPG you would like to map from.')
-                            ->options(Epg::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                            ->searchable(),
-                        Forms\Components\Select::make('playlist')
-                            ->required()
-                            ->label('Playlist')
-                            ->helperText('Select the playlist you would like to map to.')
-                            ->options(Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                            ->searchable(),
-                        Forms\Components\Toggle::make('overwrite')
-                            ->label('Overwrite')
-                            ->helperText('Overwrite channels with existing mappings?')
-                            ->default(false),
-                        Forms\Components\Toggle::make('recurring')
-                            ->label('Recurring')
-                            ->helperText('Re-run this mapping everytime the EPG is synced?')
-                            ->default(false),
-                    ])
-                    ->action(function (Collection $records, array $data): void {
+                    ->form(EpgMapResource::getForm())
+                    ->action(function (array $data): void {
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new \App\Jobs\MapPlaylistChannelsToEpg(
-                                epg: (int)$data['epg'],
-                                playlist: $data['playlist'],
-                                force: $data['overwrite'],
+                                epg: (int)$data['epg_id'],
+                                playlist: $data['playlist_id'],
+                                force: $data['override'],
                                 recurring: $data['recurring'],
+                                settings: $data['settings'] ?? [],
                             ));
                     })->after(function () {
                         Notification::make()
@@ -250,21 +240,29 @@ class ListChannels extends ListRecords
             ->when($relationId, function ($query, $relationId) {
                 return $query->where('group_id', $relationId);
             })->count();
+        $customCount = Channel::query()->where('is_custom', true)
+            ->when($relationId, function ($query, $relationId) {
+                return $query->where('group_id', $relationId);
+            })->count();
 
         // Return tabs
         return [
             'all' => Tab::make('All Channels')
                 ->badge($totalCount),
-            'enabled' => Tab::make('Enabled Channels')
+            'enabled' => Tab::make('Enabled')
                 // ->icon('heroicon-m-check')
                 ->badgeColor('success')
                 ->modifyQueryUsing(fn($query) => $query->where('enabled', true))
                 ->badge($enabledCount),
-            'disabled' => Tab::make('Disabled Channels')
+            'disabled' => Tab::make('Disabled')
                 // ->icon('heroicon-m-x-mark')
                 ->badgeColor('danger')
                 ->modifyQueryUsing(fn($query) => $query->where('enabled', false))
                 ->badge($disabledCount),
+            'custom' => Tab::make('Custom')
+                // ->icon('heroicon-m-x-mark')
+                ->modifyQueryUsing(fn($query) => $query->where('is_custom', true))
+                ->badge($customCount),
         ];
     }
 

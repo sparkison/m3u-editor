@@ -46,7 +46,6 @@ class StreamController extends Controller
         // Get the failover channels (if any)
         $sourceChannel = $channel;
         $streams = collect([$channel])->concat($channel->failoverChannels);
-        $streamCount = $streams->count();
 
         // Loop over the failover channels and grab the first one that works.
         foreach ($streams as $stream) {
@@ -54,8 +53,15 @@ class StreamController extends Controller
             $title = $stream->title_custom ?? $stream->title;
             $title = strip_tags($title);
 
+            // Setup streams array
+            $streamUrl = $stream->url_custom ?? $stream->url;
+            if ($stream->is_custom && !$streamUrl) {
+                Log::channel('ffmpeg')->debug("Custom channel {$stream->id} ({$title}) has no URL set. Using failover channels only.");
+                continue; // Skip if no URL is set
+            }
+
             // Check if playlist is specified
-            $playlist = $stream->playlist;
+            $playlist = $stream->getEffectivePlaylist();
 
             // Make sure we have a valid source channel
             $badSourceCacheKey = ProxyService::BAD_SOURCE_CACHE_PREFIX . $stream->id . ':' . $playlist->id;
@@ -80,9 +86,6 @@ class StreamController extends Controller
                 Log::channel('ffmpeg')->debug("Max streams reached for playlist {$playlist->name} ({$playlist->id}). Skipping channel {$title}.");
                 continue;
             }
-
-            // Setup streams array
-            $streamUrl = $stream->url_custom ?? $stream->url;
 
             // Determine the output format
             $ip = $request->ip();
@@ -157,7 +160,7 @@ class StreamController extends Controller
         $title = strip_tags($title);
 
         // Check if playlist is specified
-        $playlist = $episode->playlist;
+        $playlist = $episode->getEffectivePlaylist();
 
         // Keep track of the active streams for this playlist using optimistic locking pattern
         $activeStreams = $this->incrementActiveStreams($playlist->id);

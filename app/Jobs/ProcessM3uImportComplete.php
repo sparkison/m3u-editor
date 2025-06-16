@@ -92,6 +92,7 @@ class ProcessM3uImportComplete implements ShouldQueue
         // Get the removed channels
         $removedChannels = Channel::where([
             ['playlist_id', $playlist->id],
+            ['is_custom', false],
             ['import_batch_no', '!=', $this->batchNo],
         ]);
 

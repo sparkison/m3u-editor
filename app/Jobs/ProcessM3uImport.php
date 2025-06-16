@@ -284,7 +284,9 @@ class ProcessM3uImport implements ShouldQueue
                 'enabled' => $playlist->enable_channels,
                 'catchup' => null,
                 'catchup_source' => null,
-                'shift' => 0
+                'shift' => 0,
+                'tvg_shift' => null,
+                'is_vod' => false, // default false
             ];
 
             // Update progress
@@ -339,7 +341,8 @@ class ProcessM3uImport implements ShouldQueue
                             'stream_id' => $item['epg_channel_id'] ?? $item['stream_id'], // prefer EPG id for mapping, if set
                             'channel' => $item['num'] ?? null,
                             'catchup' => $item['tv_archive'] ?? null,
-                            'shift' => $item['tv_archive_duration'] ?? 0
+                            'shift' => $item['tv_archive_duration'] ?? 0,
+                            // 'tvg_shift' => $item['tvg_shift'] ?? null, // @TODO: check if this is on Xtream API, not seeing it as a deffinition in the API docs
                         ];
                         if ($autoSort) {
                             $channel['sort'] = $channelNo;
@@ -372,6 +375,7 @@ class ProcessM3uImport implements ShouldQueue
                             'group_internal' => $category['category_name'] ?? '',
                             'stream_id' => $item['stream_id'],
                             'channel' => $item['num'] ?? null,
+                            'is_vod' => true, // mark as VOD
                         ];
                         if ($autoSort) {
                             $channel['sort'] = $channelNo;
@@ -496,7 +500,8 @@ class ProcessM3uImport implements ShouldQueue
                     'kodidrop' => null,
                     'catchup' => null,
                     'catchup_source' => null,
-                    'shift' => 0
+                    'shift' => 0,
+                    'tvg_shift' => null
                 ];
                 if ($autoSort) {
                     $channelFields['sort'] = 0;
@@ -527,6 +532,7 @@ class ProcessM3uImport implements ShouldQueue
                         'shift' => 'timeshift', // timeshift in hours, falls back to 'tvg-shift' if not set
                         'catchup' => 'catchup',
                         'catchup_source' => 'catchup-source',
+                        'tvg_shift' => 'tvg-shift', // used for EPG shift in hrs (can be negative)
                     ];
 
                     // Parse the M3U file
