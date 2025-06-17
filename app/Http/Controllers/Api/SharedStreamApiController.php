@@ -210,4 +210,203 @@ class SharedStreamApiController extends Controller
         
         return $bytes;
     }
+
+    /**
+     * Get dashboard analytics data
+     */
+    public function getDashboardData(): JsonResponse
+    {
+        try {
+            $stats = $this->monitorService->getStreamingStats();
+            $systemStats = $this->monitorService->getSystemStats();
+            
+            // Get recent performance metrics
+            $recentMetrics = \App\Models\SharedStreamStat::selectRaw('
+                    AVG(client_count) as avg_clients,
+                    AVG(bandwidth_kbps) as avg_bandwidth,
+                    MAX(client_count) as peak_clients,
+                    MAX(bandwidth_kbps) as peak_bandwidth
+                ')
+                ->where('recorded_at', '>=', now()->subHour())
+                ->first();
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'streaming_stats' => $stats,
+                    'system_stats' => $systemStats,
+                    'recent_metrics' => $recentMetrics,
+                    'alerts' => $this->getSystemAlerts(),
+                ],
+                'timestamp' => now()->toISOString()
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get real-time streaming metrics
+     */
+    public function getRealTimeMetrics(): JsonResponse
+    {
+        try {
+            $activeStreams = \App\Models\SharedStream::active()->count();
+            $totalClients = \App\Models\SharedStream::active()->sum('client_count');
+            $totalBandwidth = \App\Models\SharedStream::active()->sum('bandwidth_kbps');
+            
+            // Get recent connections (last 5 minutes)
+            $recentConnections = \App\Models\SharedStreamClient::where('connected_at', '>=', now()->subMinutes(5))
+                ->count();
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'active_streams' => $activeStreams,
+                    'total_clients' => $totalClients,
+                    'total_bandwidth_kbps' => $totalBandwidth,
+                    'recent_connections' => $recentConnections,
+                    'bandwidth_formatted' => $totalBandwidth > 1000 ? 
+                        round($totalBandwidth / 1000, 1) . ' Mbps' : 
+                        $totalBandwidth . ' kbps',
+                ],
+                'timestamp' => now()->toISOString()
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get streaming alerts
+     */
+    public function getAlerts(): JsonResponse
+    {
+        try {
+            $alerts = $this->getSystemAlerts();
+            
+            return response()->json([
+                'success' => true,
+                'data' => $alerts,
+                'count' => count($alerts),
+                'timestamp' => now()->toISOString()
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get performance history
+     */
+    public function getPerformanceHistory(Request $request): JsonResponse
+    {
+        $request->validate([
+            'period' => 'sometimes|in:1h,6h,24h,7d',
+            'metric' => 'sometimes|in:clients,bandwidth,streams'
+        ]);
+
+        try {
+            $period = $request->input('period', '24h');
+            $metric = $request->input('metric', 'clients');
+            
+            $startTime = match($period) {
+                '1h' => now()->subHour(),
+                '6h' => now()->subHours(6),
+                '24h' => now()->subDay(),
+                '7d' => now()->subDays(7),
+                default => now()->subDay(),
+            };
+
+            $groupBy = match($period) {
+                '1h', '6h' => 'EXTRACT(MINUTE FROM recorded_at)',
+                '24h' => 'EXTRACT(HOUR FROM recorded_at)',
+                '7d' => 'DATE(recorded_at)',
+                default => 'EXTRACT(HOUR FROM recorded_at)',
+            };
+
+            $stats = \App\Models\SharedStreamStat::selectRaw("
+                    {$groupBy} as period,
+                    AVG(client_count) as avg_clients,
+                    AVG(bandwidth_kbps) as avg_bandwidth,
+                    COUNT(DISTINCT stream_id) as stream_count
+                ")
+                ->where('recorded_at', '>=', $startTime)
+                ->groupBy('period')
+                ->orderBy('period')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $stats,
+                'period' => $period,
+                'metric' => $metric,
+                'timestamp' => now()->toISOString()
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get system alerts
+     */
+    private function getSystemAlerts(): array
+    {
+        $alerts = [];
+        
+        // Check for unhealthy streams
+        $unhealthyStreams = \App\Models\SharedStream::where('health_status', '!=', 'healthy')
+                                                  ->where('status', 'active')
+                                                  ->count();
+        
+        if ($unhealthyStreams > 0) {
+            $alerts[] = [
+                'type' => 'warning',
+                'title' => 'Unhealthy Streams',
+                'message' => "{$unhealthyStreams} streams need attention",
+                'severity' => 'medium',
+                'timestamp' => now()->toISOString(),
+            ];
+        }
+
+        // Check Redis connectivity
+        if (!$this->checkRedisConnection()) {
+            $alerts[] = [
+                'type' => 'error',
+                'title' => 'Redis Connection Lost',
+                'message' => 'Stream coordination may be affected',
+                'severity' => 'high',
+                'timestamp' => now()->toISOString(),
+            ];
+        }
+
+        // Check for high bandwidth usage
+        $totalBandwidth = \App\Models\SharedStream::active()->sum('bandwidth_kbps');
+        $threshold = config('proxy.shared_streaming.monitoring.bandwidth_threshold', 50000);
+        
+        if ($totalBandwidth > $threshold) {
+            $alerts[] = [
+                'type' => 'warning',
+                'title' => 'High Bandwidth Usage',
+                'message' => 'Total bandwidth exceeds threshold',
+                'severity' => 'medium',
+                'timestamp' => now()->toISOString(),
+            ];
+        }
+
+        return $alerts;
+    }
 }

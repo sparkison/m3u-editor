@@ -98,6 +98,16 @@ class AdminPanelProvider extends PanelProvider
                 // DonateCrypto::class,
                 StatsOverview::class,
                 \App\Filament\Widgets\SharedStreamStatsWidget::class,
+                \App\Filament\Widgets\SystemHealthWidget::class,
+                \App\Filament\Widgets\StreamingAlertsWidget::class,
+                \App\Filament\Widgets\QuickActionsWidget::class,
+                \App\Filament\Widgets\SharedStreamPerformanceChart::class,
+                \App\Filament\Widgets\StreamDistributionChart::class,
+                \App\Filament\Widgets\BandwidthUsageChart::class,
+                \App\Filament\Widgets\SystemResourcesChart::class,
+                \App\Filament\Widgets\TopStreamsTable::class,
+                \App\Filament\Widgets\RecentStreamActivity::class,
+                \App\Filament\Widgets\LiveConnectionMonitor::class,
             ])
             ->plugins([
                 FilamentSpatieLaravelBackupPlugin::make()
