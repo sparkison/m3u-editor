@@ -97,6 +97,7 @@ class AdminPanelProvider extends PanelProvider
                 KoFiWidget::class,
                 // DonateCrypto::class,
                 StatsOverview::class,
+                \App\Filament\Widgets\SharedStreamStatsWidget::class,
             ])
             ->plugins([
                 FilamentSpatieLaravelBackupPlugin::make()

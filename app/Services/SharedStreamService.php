@@ -77,7 +77,7 @@ class SharedStreamService
     /**
      * Create a new shared stream
      */
-    private function createSharedStream(
+    public function createSharedStream(
         string $streamKey,
         string $type,
         int $modelId,
