@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Channel;
 use App\Models\Episode;
 use App\Models\SharedStream;
+use App\Models\SharedStreamClient;
 use App\Traits\TracksActiveStreams;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -357,6 +358,15 @@ class SharedStreamService
         $clientKey = self::CLIENT_PREFIX . $streamKey;
         Redis::hdel($clientKey, $clientId);
         
+        // Also remove database record
+        try {
+            SharedStreamClient::where('stream_id', $streamKey)
+                             ->where('client_id', $clientId)
+                             ->delete();
+        } catch (\Exception $e) {
+            Log::error("Failed to delete SharedStreamClient record: " . $e->getMessage());
+        }
+        
         $clientCount = $this->decrementClientCount($streamKey);
         
         Log::channel('ffmpeg')->debug("Removed client {$clientId} from stream {$streamKey}. Remaining clients: {$clientCount}");
@@ -474,6 +484,25 @@ class SharedStreamService
         ];
         Redis::hset($clientKey, $clientId, json_encode($clientData));
         Redis::expire($clientKey, 3600);
+        
+        // Also create database record for dashboard tracking
+        try {
+            SharedStreamClient::firstOrCreate(
+                [
+                    'stream_id' => $streamKey,
+                    'client_id' => $clientId
+                ],
+                [
+                    'ip_address' => $options['ip'] ?? 'unknown',
+                    'user_agent' => $options['user_agent'] ?? null,
+                    'connected_at' => now(),
+                    'last_activity_at' => now(),
+                    'status' => 'connected'
+                ]
+            );
+        } catch (\Exception $e) {
+            Log::error("Failed to create SharedStreamClient record: " . $e->getMessage());
+        }
     }
 
     private function isClientRegistered(string $streamKey, string $clientId): bool
@@ -489,6 +518,15 @@ class SharedStreamService
             $clientData = json_decode(Redis::hget($clientKey, $clientId), true);
             $clientData['last_activity'] = now()->timestamp;
             Redis::hset($clientKey, $clientId, json_encode($clientData));
+            
+            // Also update database record
+            try {
+                SharedStreamClient::where('stream_id', $streamKey)
+                                 ->where('client_id', $clientId)
+                                 ->update(['last_activity_at' => now()]);
+            } catch (\Exception $e) {
+                Log::error("Failed to update SharedStreamClient activity: " . $e->getMessage());
+            }
         }
     }
 
@@ -609,24 +647,57 @@ class SharedStreamService
         $cleanedCount = 0;
         
         try {
-            $streamKeys = Redis::keys('stream:*');
+            // Check both stream patterns
+            $patterns = ['stream:*', '*shared_stream:*', '*stream_clients:*', '*active_streams:*'];
             
-            foreach ($streamKeys as $key) {
-                if (strpos($key, ':clients') !== false || 
-                    strpos($key, ':buffer') !== false || 
-                    strpos($key, ':stats') !== false) {
-                    continue; // Skip sub-keys, they'll be handled with main stream
-                }
+            foreach ($patterns as $pattern) {
+                $keys = Redis::keys($pattern);
                 
-                $streamInfo = Redis::hGetAll($key);
-                
-                // Check if process is still running
-                if (isset($streamInfo['pid']) && $streamInfo['pid']) {
-                    if (!$this->isProcessRunning((int)$streamInfo['pid'])) {
-                        $streamKey = str_replace('stream:', '', $key);
-                        $this->cleanupStream($streamKey, true);
-                        $cleanedCount++;
-                        Log::channel('ffmpeg')->debug("Cleaned up orphaned stream key: {$streamKey}");
+                foreach ($keys as $key) {
+                    // Skip sub-keys for stream pattern
+                    if (strpos($pattern, 'stream:') === 0) {
+                        if (strpos($key, ':clients') !== false || 
+                            strpos($key, ':buffer') !== false || 
+                            strpos($key, ':stats') !== false) {
+                            continue; // Skip sub-keys, they'll be handled with main stream
+                        }
+                        
+                        $streamInfo = Redis::hGetAll($key);
+                        
+                        // Check if key is empty or process is not running
+                        if (empty($streamInfo)) {
+                            Redis::del($key);
+                            $cleanedCount++;
+                            Log::channel('ffmpeg')->debug("Cleaned up empty Redis key: {$key}");
+                        } elseif (isset($streamInfo['pid']) && $streamInfo['pid']) {
+                            if (!$this->isProcessRunning((int)$streamInfo['pid'])) {
+                                $streamKey = str_replace('stream:', '', $key);
+                                $this->cleanupStream($streamKey, true);
+                                $cleanedCount++;
+                                Log::channel('ffmpeg')->debug("Cleaned up orphaned stream key: {$streamKey}");
+                            }
+                        }
+                    } else {
+                        // For other patterns, check if the key has empty data
+                        $keyType = Redis::type($key);
+                        $isEmpty = false;
+                        
+                        if ($keyType === 'string') {
+                            $data = Redis::get($key);
+                            $isEmpty = empty($data) || empty(trim($data));
+                        } elseif ($keyType === 'hash') {
+                            $data = Redis::hGetAll($key);
+                            $isEmpty = empty($data);
+                        } elseif ($keyType === 'set') {
+                            $data = Redis::sMembers($key);
+                            $isEmpty = empty($data);
+                        }
+                        
+                        if ($isEmpty) {
+                            Redis::del($key);
+                            $cleanedCount++;
+                            Log::channel('ffmpeg')->debug("Cleaned up empty Redis key: {$key}");
+                        }
                     }
                 }
             }
@@ -1095,20 +1166,23 @@ class SharedStreamService
     public function getClientCount(string $streamKey): int
     {
         try {
+            // Get count from Redis
             $clientKey = self::CLIENT_PREFIX . $streamKey;
-            $clients = Redis::smembers($clientKey);
+            $redisClients = Redis::hgetall($clientKey);
             
-            // Clean up expired clients
-            $activeClients = [];
-            foreach ($clients as $clientId) {
-                if ($this->isClientActive($clientId)) {
-                    $activeClients[] = $clientId;
-                } else {
-                    Redis::srem($clientKey, $clientId);
-                }
-            }
+            // Also get count from database for accuracy
+            $dbClientCount = SharedStreamClient::where('stream_id', $streamKey)
+                                              ->where('status', 'connected')
+                                              ->where('last_activity_at', '>=', now()->subMinutes(2))
+                                              ->count();
             
-            return count($activeClients);
+            // Use the higher count (Redis might have stale data)
+            $redisCount = count($redisClients);
+            $finalCount = max($redisCount, $dbClientCount);
+            
+            Log::channel('ffmpeg')->debug("Client count for stream {$streamKey}: Redis={$redisCount}, DB={$dbClientCount}, Final={$finalCount}");
+            
+            return $finalCount;
             
         } catch (\Exception $e) {
             Log::error("Failed to get client count for stream {$streamKey}: " . $e->getMessage());

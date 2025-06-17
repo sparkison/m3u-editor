@@ -44,3 +44,12 @@ Schedule::job(new \App\Jobs\BufferManagement())
     ->everyFiveMinutes()
     ->withoutOverlapping()
     ->name('shared-stream-buffer-management');
+
+// Shared stream maintenance
+Schedule::command('app:shared-streams cleanup')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();
+
+Schedule::command('app:shared-streams sync')
+    ->everyTenMinutes()
+    ->withoutOverlapping();

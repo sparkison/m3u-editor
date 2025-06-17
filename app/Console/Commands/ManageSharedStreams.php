@@ -10,8 +10,20 @@ use Illuminate\Support\Facades\Redis;
 class ManageSharedStreams extends Command
 {
     /**
-     * The name and signature of the console command.
-     */
+     * The name and signature of the console         foreach ($streams as $streamKey => $streamData) {
+            $health = $this->monitorService->checkStreamHealth($streamKey);
+            $status = ($health['healthy'] ?? false) ? '<info>✓ Healthy</info>' : '<error>✗ Unhealthy</error>';
+            $reason = $health['reason'] ?? '';
+            
+            $streamInfo = $streamData['stream_info'];
+            $title = substr($streamInfo['title'] ?? 'Unknown', 0, 30);
+            
+            $this->line("{$title}: {$status}" . ($reason ? " ({$reason})" : ""));
+            
+            if (!($health['healthy'] ?? false)) {
+                $unhealthyCount++;
+            }
+        }*/
     protected $signature = 'app:shared-streams {action} {--stream-key=} {--force}';
 
     /**

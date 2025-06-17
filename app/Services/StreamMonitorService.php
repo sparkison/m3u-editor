@@ -623,10 +623,44 @@ class StreamMonitorService
                 }
             }
             
+            // Add healthy boolean for backward compatibility
+            $health['healthy'] = $health['status'] === 'healthy';
+            
+            // Determine if this is a critical failure worthy of automatic restart
+            $health['critical'] = false;
+            if (!$health['healthy']) {
+                // Critical failures: process died and has been inactive for more than 5 minutes
+                $inactiveTime = time() - $health['last_activity'];
+                $health['critical'] = !$health['process_running'] && $inactiveTime > 300;
+            }
+            
+            // Add reason for unhealthy streams
+            if (!$health['healthy']) {
+                $reasons = [];
+                if (!$health['process_running']) {
+                    $reasons[] = 'process not running';
+                }
+                if ((time() - $health['last_activity']) >= config('proxy.shared_streaming.monitoring.stream_timeout', 300)) {
+                    $reasons[] = 'inactive';
+                }
+                if ($health['buffer_health'] === 'missing') {
+                    $reasons[] = 'buffer missing';
+                } else if ($health['buffer_health'] === 'empty') {
+                    $reasons[] = 'buffer empty';
+                }
+                $health['reason'] = implode(', ', $reasons);
+            }
+            
             return $health;
         } catch (\Exception $e) {
             Log::error("Failed to check stream health: " . $e->getMessage());
-            return ['status' => 'error', 'error' => $e->getMessage()];
+            return [
+                'status' => 'error', 
+                'healthy' => false,
+                'critical' => false,
+                'error' => $e->getMessage(),
+                'reason' => 'health check failed'
+            ];
         }
     }
 
