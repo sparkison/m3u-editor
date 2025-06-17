@@ -57,7 +57,7 @@ class SharedStreamService
 
         if (!$streamInfo || !$this->isStreamActive($streamKey)) {
             // Create new shared stream
-            $streamInfo = $this->createSharedStream(
+            $streamInfo = $this->createSharedStreamInternal(
                 $streamKey,
                 $type,
                 $modelId,
