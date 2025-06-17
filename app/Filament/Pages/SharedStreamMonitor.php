@@ -146,8 +146,9 @@ class SharedStreamMonitor extends Page
 
     protected function getActiveStreams(): array
     {
+        // Get streams from database instead of just Redis
         $streams = SharedStream::with(['clients', 'stats'])
-                              ->where('status', '!=', 'stopped')
+                              ->whereIn('status', ['starting', 'active'])
                               ->orderBy('started_at', 'desc')
                               ->get();
 

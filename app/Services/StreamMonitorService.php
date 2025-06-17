@@ -36,12 +36,23 @@ class StreamMonitorService
      */
     private function getSharedStreamStats(): array
     {
-        $keys = Redis::keys('shared_stream:*');
+        // Try both patterns - with and without database prefix
+        $pattern1 = 'shared_stream:*';
+        $pattern2 = '*shared_stream:*';
+        
+        $keys1 = Redis::keys($pattern1);
+        $keys2 = Redis::keys($pattern2);
+        $keys = array_merge($keys1, $keys2);
+        
         $streams = [];
         $totalClients = 0;
 
         foreach ($keys as $key) {
-            $streamKey = str_replace('shared_stream:', '', $key);
+            // Extract stream key from Redis key (handle prefixed keys)
+            $streamKey = str_replace([
+                config('database.redis.options.prefix', ''),
+                'shared_stream:'
+            ], '', $key);
             $streamData = json_decode(Redis::get($key), true);
             
             if ($streamData) {

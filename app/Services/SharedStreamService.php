@@ -1153,7 +1153,8 @@ class SharedStreamService
                     
                     $streamInfo = $this->getStreamInfo($streamKey);
                     
-                    if ($streamInfo) {
+                    // Only include streams with valid data
+                    if ($streamInfo && !empty($streamInfo) && isset($streamInfo['status'])) {
                         $streamInfo['stream_key'] = $streamKey;
                         $streamInfo['client_count'] = $this->getClientCount($streamKey);
                         $streamInfo['uptime'] = time() - ($streamInfo['created_at'] ?? time());
@@ -1390,6 +1391,99 @@ class SharedStreamService
             Log::error("Failed to get stream stats for {$streamKey}: " . $e->getMessage());
             return null;
         }
+    }
+
+    /**
+     * Synchronize database and Redis state for shared streams
+     * This ensures consistency between what's stored in the database and Redis
+     */
+    public function synchronizeState(): array
+    {
+        $stats = [
+            'db_updated' => 0,
+            'redis_cleaned' => 0,
+            'inconsistencies_fixed' => 0
+        ];
+        
+        try {
+            // Get all Redis keys for shared streams (handle prefixed keys)
+            $pattern1 = self::CACHE_PREFIX . '*';
+            $pattern2 = '*' . self::CACHE_PREFIX . '*';
+            
+            $keys1 = Redis::keys($pattern1);
+            $keys2 = Redis::keys($pattern2);
+            $redisKeys = array_merge($keys1, $keys2);
+            
+            $activeRedisStreams = [];
+            
+            // Check Redis streams and their validity
+            foreach ($redisKeys as $key) {
+                $streamKey = str_replace([
+                    config('database.redis.options.prefix', ''),
+                    self::CACHE_PREFIX
+                ], '', $key);
+                
+                $streamInfo = $this->getStreamInfo($streamKey);
+                if ($streamInfo) {
+                    $activeRedisStreams[] = $streamKey;
+                    
+                    // Check if stream process is actually running
+                    $isProcessRunning = false;
+                    if (isset($streamInfo['pid']) && $streamInfo['pid']) {
+                        $isProcessRunning = $this->isProcessRunning((int)$streamInfo['pid']);
+                    }
+                    
+                    // Update database status based on Redis state
+                    $dbStream = SharedStream::where('stream_id', $streamKey)->first();
+                    if ($dbStream) {
+                        $newStatus = $isProcessRunning ? 'active' : 'stopped';
+                        if ($dbStream->status !== $newStatus) {
+                            $dbStream->update([
+                                'status' => $newStatus,
+                                'stopped_at' => $newStatus === 'stopped' ? now() : null
+                            ]);
+                            $stats['db_updated']++;
+                        }
+                    }
+                }
+            }
+            
+            // Clean up database records that don't have corresponding Redis entries
+            $dbStreams = SharedStream::whereIn('status', ['starting', 'active'])->get();
+            foreach ($dbStreams as $dbStream) {
+                if (!in_array($dbStream->stream_id, $activeRedisStreams)) {
+                    // No Redis entry - mark as stopped
+                    $dbStream->update([
+                        'status' => 'stopped', 
+                        'stopped_at' => now()
+                    ]);
+                    $stats['inconsistencies_fixed']++;
+                }
+            }
+            
+            // Clean up Redis entries for stopped processes
+            foreach ($redisKeys as $key) {
+                $streamKey = str_replace([
+                    config('database.redis.options.prefix', ''),
+                    self::CACHE_PREFIX
+                ], '', $key);
+                
+                $streamInfo = $this->getStreamInfo($streamKey);
+                if ($streamInfo && isset($streamInfo['pid'])) {
+                    if (!$this->isProcessRunning((int)$streamInfo['pid'])) {
+                        $this->cleanupStream($streamKey, true);
+                        $stats['redis_cleaned']++;
+                    }
+                }
+            }
+            
+            Log::channel('ffmpeg')->info("SharedStreamService: State synchronization completed", $stats);
+            
+        } catch (\Exception $e) {
+            Log::error("Failed to synchronize shared stream state: " . $e->getMessage());
+        }
+        
+        return $stats;
     }
 
 }

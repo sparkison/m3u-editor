@@ -17,7 +17,7 @@ class ManageSharedStreams extends Command
     /**
      * The console command description.
      */
-    protected $description = 'Manage shared streams (list, stop, restart, cleanup)';
+    protected $description = 'Manage shared streams (list, stop, restart, cleanup, sync)';
 
     private SharedStreamService $sharedStreamService;
     private StreamMonitorService $monitorService;
@@ -64,6 +64,9 @@ class ManageSharedStreams extends Command
             case 'cleanup':
                 return $this->cleanupStreams($force);
             
+            case 'sync':
+                return $this->synchronizeState();
+            
             case 'stats':
                 return $this->showStats();
             
@@ -72,7 +75,7 @@ class ManageSharedStreams extends Command
             
             default:
                 $this->error("Unknown action: {$action}");
-                $this->line('Available actions: list, stop, stop-all, restart, cleanup, stats, health');
+                $this->line('Available actions: list, stop, stop-all, restart, cleanup, sync, stats, health');
                 return 1;
         }
     }
@@ -303,6 +306,25 @@ class ManageSharedStreams extends Command
         }
         
         return $unhealthyCount > 0 ? 1 : 0;
+    }
+
+    private function synchronizeState(): int
+    {
+        $this->info('Synchronizing shared stream state between database and Redis...');
+        
+        try {
+            $stats = $this->sharedStreamService->synchronizeState();
+            
+            $this->info('Synchronization completed:');
+            $this->line("- Database records updated: {$stats['db_updated']}");
+            $this->line("- Redis entries cleaned: {$stats['redis_cleaned']}");
+            $this->line("- Inconsistencies fixed: {$stats['inconsistencies_fixed']}");
+            
+            return 0;
+        } catch (\Exception $e) {
+            $this->error("Synchronization failed: " . $e->getMessage());
+            return 1;
+        }
     }
 
     private function formatUptime(int $seconds): string
