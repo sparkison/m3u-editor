@@ -3,7 +3,10 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "mediaflow-dev": "node resources/js/mediaflow-server.js",
+        "mediaflow-start": "NODE_ENV=production node resources/js/mediaflow-server.js",
+        "dev-all": "concurrently \"npm run dev\" \"npm run mediaflow-dev\""
     },
     "devDependencies": {
         "@tailwindcss/forms": "^0.5.10",
@@ -22,6 +25,9 @@
         "vite": ">=6.1.6"
     },
     "dependencies": {
-        "easyqrcodejs": "^4.6.2"
+        "cors": "^2.8.5",
+        "easyqrcodejs": "^4.6.2",
+        "express": "^4.18.2",
+        "ws": "^8.14.2"
     }
 }

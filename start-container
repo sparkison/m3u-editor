@@ -65,10 +65,11 @@ fi
 if [ -f /etc/nginx/conf.d/laravel.tmpl ]; then
     # If app url contains https, don't show port
     if [[ "$APP_URL" == *"https"* ]]; then
-        echo "⚡️ Starting app at: $APP_URL"
+        export LARAVEL_URL="$APP_URL"
     else
-        echo "⚡️ Starting app at: $APP_URL:$APP_PORT"
+        export LARAVEL_URL="$APP_URL:$APP_PORT"
     fi
+    echo "⚡️ Starting app at: $LARAVEL_URL"
     envsubst '${APP_PORT} ${APP_URL} ${FPMPORT}' < /etc/nginx/conf.d/laravel.tmpl > /etc/nginx/conf.d/laravel.conf
 fi
 

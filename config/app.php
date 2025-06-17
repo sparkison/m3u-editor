@@ -13,6 +13,30 @@ return [
     |
     */
 
+    'name' => env('APP_NAME', 'Laravel'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | MediaFlow Microservice URL
+    |--------------------------------------------------------------------------
+    |
+    | URL for the MediaFlow microservice for advanced streaming features.
+    |
+    */
+
+    'mediaflow_microservice_url' => env('MEDIAFLOW_MICROSERVICE_URL', 'http://localhost:3001'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Application Name
+    |--------------------------------------------------------------------------
+    |
+    | This value is the name of your application, which will be used when the
+    | framework needs to place the application's name in a notification or
+    | other UI elements where an application name needs to be displayed.
+    |
+    */
+
     'name' => env('APP_NAME', 'm3u editor'),
 
     /*
