@@ -313,7 +313,8 @@ class StreamMonitorService
     private function getFFmpegProcessCount(): int
     {
         try {
-            $output = shell_exec('pgrep -c ffmpeg 2>/dev/null || echo 0');
+            // Use cross-platform approach that works on both Linux and macOS
+            $output = shell_exec('ps aux | grep -E "(ffmpeg|jellyfin-ffmpeg)" | grep -v grep | wc -l 2>/dev/null || echo 0');
             return (int) trim($output);
         } catch (\Exception $e) {
             return 0;
