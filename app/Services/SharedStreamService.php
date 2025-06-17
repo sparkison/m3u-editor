@@ -273,6 +273,9 @@ class SharedStreamService
      */
     private function setupErrorLogging(string $streamKey, $stderr, $process): void
     {
+        // Start background monitoring of the process
+        $this->monitorProcessHealth($streamKey, $stderr, $process);
+        
         // Register shutdown function to handle stderr and process cleanup
         register_shutdown_function(function () use ($streamKey, $stderr, $process) {
             $logger = Log::channel('ffmpeg');
@@ -295,6 +298,67 @@ class SharedStreamService
             // Mark stream as stopped if process ended
             $this->cleanupStream($streamKey, true);
         });
+    }
+
+    /**
+     * Monitor process health and detect failures early
+     */
+    private function monitorProcessHealth(string $streamKey, $stderr, $process): void
+    {
+        // Schedule a delayed check to validate the process is still running
+        dispatch(function () use ($streamKey, $stderr, $process) {
+            sleep(2); // Give FFmpeg a moment to initialize
+            
+            $status = proc_get_status($process);
+            $isRunning = $status['running'];
+            
+            if (!$isRunning) {
+                Log::channel('ffmpeg')->warning("Stream {$streamKey}: FFmpeg process failed during startup");
+                
+                // Read any error output
+                $errorOutput = '';
+                while (!feof($stderr)) {
+                    $line = fgets($stderr);
+                    if ($line !== false && !empty(trim($line))) {
+                        $errorOutput .= trim($line) . "\n";
+                    }
+                }
+                
+                if (!empty($errorOutput)) {
+                    Log::channel('ffmpeg')->error("Stream {$streamKey} startup errors: " . $errorOutput);
+                }
+                
+                // Mark stream as failed
+                $this->markStreamAsFailed($streamKey, 'FFmpeg process failed during startup');
+            } else {
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: FFmpeg process health check passed");
+            }
+        })->delay(now()->addSeconds(2));
+    }
+
+    /**
+     * Mark a stream as failed and clean up
+     */
+    private function markStreamAsFailed(string $streamKey, string $reason): void
+    {
+        // Update stream status
+        $streamInfo = $this->getStreamInfo($streamKey);
+        if ($streamInfo) {
+            $streamInfo['status'] = 'failed';
+            $streamInfo['error'] = $reason;
+            $this->setStreamInfo($streamKey, $streamInfo);
+        }
+        
+        // Update database status
+        SharedStream::where('stream_id', $streamKey)->update([
+            'status' => 'failed',
+            'error_message' => $reason
+        ]);
+        
+        // Clean up resources
+        $this->cleanupStream($streamKey, true);
+        
+        Log::channel('ffmpeg')->error("Stream {$streamKey} marked as failed: {$reason}");
     }
 
     /**
