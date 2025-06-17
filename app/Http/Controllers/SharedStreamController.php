@@ -349,8 +349,8 @@ class SharedStreamController extends Controller
                 'message' => 'Test stream started successfully',
                 'stream_key' => $streamInfo['stream_key'],
                 'stream_url' => $format === 'hls' 
-                    ? route('shared.stream.hls.test', ['streamKey' => $streamInfo['stream_key']])
-                    : route('shared.stream.direct.test', ['streamKey' => $streamInfo['stream_key']])
+                    ? route('shared.stream.hls', ['streamKey' => $streamInfo['stream_key']])
+                    : route('shared.stream.direct', ['streamKey' => $streamInfo['stream_key']])
             ]);
 
         } catch (\Exception $e) {
