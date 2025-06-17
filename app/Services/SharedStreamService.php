@@ -139,10 +139,34 @@ class SharedStreamService
         $streamUrl = $streamInfo['stream_url'];
         $title = $streamInfo['title'];
 
-        if ($format === 'hls') {
-            $this->startHLSStream($streamKey, $streamInfo);
-        } else {
-            $this->startDirectStream($streamKey, $streamInfo);
+        try {
+            if ($format === 'hls') {
+                $this->startHLSStream($streamKey, $streamInfo);
+            } else {
+                $this->startDirectStream($streamKey, $streamInfo);
+            }
+            
+            // Update stream status to active
+            $streamInfo['status'] = 'active';
+            $this->setStreamInfo($streamKey, $streamInfo);
+            
+            // Update database status
+            SharedStream::where('stream_id', $streamKey)->update([
+                'status' => 'active',
+                'process_id' => $this->getProcessPid($streamKey)
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Failed to start streaming process for {$streamKey}: " . $e->getMessage());
+            
+            // Update stream status to error
+            $streamInfo['status'] = 'error';
+            $this->setStreamInfo($streamKey, $streamInfo);
+            
+            // Update database status
+            SharedStream::where('stream_id', $streamKey)->update(['status' => 'error']);
+            
+            throw $e;
         }
     }
 
@@ -161,22 +185,46 @@ class SharedStreamService
         // Build FFmpeg command for HLS output
         $cmd = $this->buildHLSCommand($ffmpegPath, $streamInfo, $storageDir, $userAgent);
 
-        // Start the process
-        $process = SymfonyProcess::fromShellCommandline($cmd);
-        $process->setTimeout(null);
-        $process->start();
+        // Use proc_open approach like HlsStreamService for consistency
+        $descriptors = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        
+        $pipes = [];
+        $absoluteStorageDir = Storage::path($storageDir);
+        $process = proc_open($cmd, $descriptors, $pipes, $absoluteStorageDir);
 
-        // Store process PID
-        $this->setStreamProcess($streamKey, $process->getPid());
+        if (!is_resource($process)) {
+            throw new \Exception("Failed to launch FFmpeg for HLS stream {$streamKey}");
+        }
 
-        // Monitor the stream in the background
-        $this->monitorHLSStream($streamKey, $process, $storageDir);
+        // Close stdin and stdout (we don't need them for HLS)
+        fclose($pipes[0]);
+        fclose($pipes[1]);
 
-        Log::channel('ffmpeg')->debug("Started HLS stream {$streamKey} with PID {$process->getPid()}");
+        // Make stderr non-blocking for error logging
+        stream_set_blocking($pipes[2], false);
+
+        // Get the PID and store it
+        $status = proc_get_status($process);
+        $pid = $status['pid'];
+        $this->setStreamProcess($streamKey, $pid);
+
+        // Store process info in stream data
+        $streamInfo['pid'] = $pid;
+        $this->setStreamInfo($streamKey, $streamInfo);
+
+        // Set up error logging from stderr
+        $this->setupErrorLogging($streamKey, $pipes[2], $process);
+
+        Log::channel('ffmpeg')->info("Started HLS shared stream {$streamKey} with PID {$pid}");
+        Log::channel('ffmpeg')->debug("HLS Command: {$cmd}");
     }
 
     /**
-     * Start direct streaming with buffering
+     * Start direct streaming with buffering (similar to MPTS)
      */
     private function startDirectStream(string $streamKey, array $streamInfo): void
     {
@@ -187,61 +235,107 @@ class SharedStreamService
         // Build FFmpeg command for direct output
         $cmd = $this->buildDirectCommand($ffmpegPath, $streamInfo, $userAgent);
 
-        // Start the process with buffering
+        // Use proc_open for direct streaming
         $descriptors = [
             0 => ['pipe', 'r'],
             1 => ['pipe', 'w'],
             2 => ['pipe', 'w'],
         ];
 
+        $pipes = [];
         $process = proc_open($cmd, $descriptors, $pipes);
+        
         if (!is_resource($process)) {
-            throw new \Exception("Failed to start stream process for {$streamKey}");
+            throw new \Exception("Failed to start direct stream process for {$streamKey}");
         }
 
-        // Close stdin
+        // Close stdin (we don't write to FFmpeg)
         fclose($pipes[0]);
 
-        // Store process info
+        // Get the PID and store it
         $status = proc_get_status($process);
-        $this->setStreamProcess($streamKey, $status['pid']);
+        $pid = $status['pid'];
+        $this->setStreamProcess($streamKey, $pid);
 
-        // Start buffer management
-        $this->manageDirectStreamBuffer($streamKey, $pipes[1], $pipes[2]);
+        // Store process info in stream data
+        $streamInfo['pid'] = $pid;
+        $this->setStreamInfo($streamKey, $streamInfo);
 
-        Log::channel('ffmpeg')->debug("Started direct stream {$streamKey} with PID {$status['pid']}");
+        // Start buffer management for direct streaming
+        $this->manageDirectStreamBuffer($streamKey, $pipes[1], $pipes[2], $process);
+
+        Log::channel('ffmpeg')->info("Started direct shared stream {$streamKey} with PID {$pid}");
+        Log::channel('ffmpeg')->debug("Direct Command: {$cmd}");
+    }
+
+    /**
+     * Setup error logging for FFmpeg stderr
+     */
+    private function setupErrorLogging(string $streamKey, $stderr, $process): void
+    {
+        // Register shutdown function to handle stderr and process cleanup
+        register_shutdown_function(function () use ($streamKey, $stderr, $process) {
+            $logger = Log::channel('ffmpeg');
+            
+            // Drain stderr
+            while (!feof($stderr)) {
+                $line = fgets($stderr);
+                if ($line !== false && !empty(trim($line))) {
+                    $logger->error("Stream {$streamKey}: " . trim($line));
+                }
+            }
+            
+            fclose($stderr);
+            
+            // Clean up process
+            if (is_resource($process)) {
+                proc_close($process);
+            }
+            
+            // Mark stream as stopped if process ended
+            $this->cleanupStream($streamKey, true);
+        });
+    }
+
+    /**
+     * Get process PID for a stream
+     */
+    private function getProcessPid(string $streamKey): ?int
+    {
+        $pidKey = "stream_pid:{$streamKey}";
+        return Redis::get($pidKey);
     }
 
     /**
      * Manage buffering for direct streams (similar to xTeVe)
      */
-    private function manageDirectStreamBuffer(string $streamKey, $stdout, $stderr): void
+    private function manageDirectStreamBuffer(string $streamKey, $stdout, $stderr, $process): void
     {
         // Make streams non-blocking
         stream_set_blocking($stdout, false);
         stream_set_blocking($stderr, false);
 
         // Start buffer management in a separate process/thread
-        $this->forkBufferManager($streamKey, $stdout, $stderr);
+        $this->forkBufferManager($streamKey, $stdout, $stderr, $process);
     }
 
     /**
      * Fork buffer manager process (simplified implementation)
      */
-    private function forkBufferManager(string $streamKey, $stdout, $stderr): void
+    private function forkBufferManager(string $streamKey, $stdout, $stderr, $process): void
     {
         // In a production environment, you'd want to use a proper job queue
         // For now, we'll use a simple background process approach
         
-        register_shutdown_function(function () use ($streamKey, $stdout, $stderr) {
-            $this->runBufferManager($streamKey, $stdout, $stderr);
+        register_shutdown_function(function () use ($streamKey, $stdout, $stderr, $process) {
+            $this->runBufferManager($streamKey, $stdout, $stderr, $process);
         });
     }
 
     /**
      * Run the buffer manager (reads from FFmpeg, stores in Redis for sharing)
      */
-    private function runBufferManager(string $streamKey, $stdout, $stderr): void
+    private function runBufferManager(string $streamKey, $stdout, $stderr, $process): void
     {
         $bufferKey = self::BUFFER_PREFIX . $streamKey;
         $segmentNumber = 0;
@@ -277,7 +371,13 @@ class SharedStreamService
         // Cleanup
         fclose($stdout);
         fclose($stderr);
-        $this->cleanupStream($streamKey);
+        
+        // Clean up process
+        if (is_resource($process)) {
+            proc_close($process);
+        }
+        
+        $this->cleanupStream($streamKey, true);
     }
 
     /**
