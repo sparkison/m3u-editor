@@ -115,26 +115,31 @@ class ManageSharedStreams extends Command
 
     private function stopStream(string $streamKey, bool $force): int
     {
-        $stats = $this->sharedStreamService->getStreamStats($streamKey);
-        if (!$stats) {
+        $streams = $this->sharedStreamService->getAllActiveStreams();
+        if (!isset($streams[$streamKey])) {
             $this->error("Stream not found: {$streamKey}");
             return 1;
         }
 
-        if (!$force && $stats['client_count'] > 0) {
-            $this->error("Stream has {$stats['client_count']} connected clients. Use --force to stop anyway.");
+        $streamData = $streams[$streamKey];
+        $clientCount = $streamData['client_count'] ?? 0;
+
+        if (!$force && $clientCount > 0) {
+            $this->error("Stream has {$clientCount} connected clients. Use --force to stop anyway.");
             return 1;
         }
 
         $this->info("Stopping stream: {$streamKey}");
         
-        // Remove all clients to trigger cleanup
-        foreach ($stats['clients'] as $client) {
-            $this->sharedStreamService->removeClient($streamKey, $client['id']);
+        // Stop the stream
+        $success = $this->sharedStreamService->stopStream($streamKey);
+        if ($success) {
+            $this->info("Stream stopped successfully.");
+            return 0;
+        } else {
+            $this->error("Failed to stop stream.");
+            return 1;
         }
-
-        $this->info("Stream stopped successfully.");
-        return 0;
     }
 
     private function stopAllStreams(bool $force): int
@@ -154,11 +159,8 @@ class ManageSharedStreams extends Command
         $stopped = 0;
         foreach ($streams as $streamKey => $streamData) {
             try {
-                $stats = $this->sharedStreamService->getStreamStats($streamKey);
-                if ($stats) {
-                    foreach ($stats['clients'] as $client) {
-                        $this->sharedStreamService->removeClient($streamKey, $client['id']);
-                    }
+                $success = $this->sharedStreamService->stopStream($streamKey);
+                if ($success) {
                     $stopped++;
                 }
             } catch (\Exception $e) {
@@ -172,8 +174,8 @@ class ManageSharedStreams extends Command
 
     private function restartStream(string $streamKey): int
     {
-        $stats = $this->sharedStreamService->getStreamStats($streamKey);
-        if (!$stats) {
+        $streams = $this->sharedStreamService->getAllActiveStreams();
+        if (!isset($streams[$streamKey])) {
             $this->error("Stream not found: {$streamKey}");
             return 1;
         }
@@ -261,9 +263,11 @@ class ManageSharedStreams extends Command
         
         $this->line("System Stats:");
         $this->line("- CPU Usage: " . round($systemStats['cpu_usage'] ?? 0, 1) . "%");
-        $this->line("- Memory Usage: " . round($systemStats['memory_usage'] ?? 0, 1) . "%");
-        $this->line("- Load Average: " . ($systemStats['load_average'] ?? 'N/A'));
-        $this->line("- Active FFmpeg Processes: " . ($systemStats['ffmpeg_processes'] ?? 0));
+        $this->line("- Memory Usage: " . round($systemStats['memory_usage']['percentage'] ?? 0, 1) . "%");
+        $this->line("- Disk Usage: " . round($systemStats['disk_space']['percentage'] ?? 0, 1) . "%");
+        $this->line("- Load Average: " . ($systemStats['load_average']['1min'] ?? 'N/A'));
+        $this->line("- Active FFmpeg Processes: " . ($systemStats['processes']['ffmpeg_processes'] ?? 0));
+        $this->line("- Redis Connected: " . ($systemStats['redis_connected'] ? 'Yes' : 'No'));
         
         return 0;
     }
