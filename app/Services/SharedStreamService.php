@@ -1312,4 +1312,49 @@ class SharedStreamService
         }
     }
 
+    /**
+     * Get statistics for a specific stream
+     */
+    public function getStreamStats(string $streamKey): ?array
+    {
+        try {
+            $streamInfo = $this->getStreamInfo($streamKey);
+            if (!$streamInfo) {
+                return null;
+            }
+
+            // Get client information
+            $clients = [];
+            $clientData = Redis::hGetAll("stream:{$streamKey}:clients");
+            
+            foreach ($clientData as $clientId => $clientInfo) {
+                $info = json_decode($clientInfo, true);
+                if ($info) {
+                    $clients[] = [
+                        'id' => $clientId,
+                        'connected_at' => $info['connected_at'] ?? null,
+                        'last_activity' => $info['last_activity'] ?? null,
+                        'user_agent' => $info['user_agent'] ?? null,
+                        'ip_address' => $info['ip_address'] ?? null
+                    ];
+                }
+            }
+
+            return [
+                'stream_key' => $streamKey,
+                'status' => $streamInfo['status'] ?? 'unknown',
+                'client_count' => count($clients),
+                'clients' => $clients,
+                'created_at' => $streamInfo['created_at'] ?? null,
+                'last_activity' => $streamInfo['last_activity'] ?? null,
+                'stream_url' => $streamInfo['stream_url'] ?? null,
+                'format' => $streamInfo['format'] ?? null,
+                'title' => $streamInfo['title'] ?? null
+            ];
+        } catch (\Exception $e) {
+            Log::error("Failed to get stream stats for {$streamKey}: " . $e->getMessage());
+            return null;
+        }
+    }
+
 }
