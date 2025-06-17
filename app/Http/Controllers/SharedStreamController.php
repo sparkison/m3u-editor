@@ -268,7 +268,7 @@ class SharedStreamController extends Controller
     /**
      * Get stream statistics (similar to xTeVe's web interface)
      */
-    public function getStreamStats(Request $request): Response
+    public function getStreamStats(Request $request): \Illuminate\Http\JsonResponse
     {
         $streams = $this->sharedStreamService->getAllActiveStreams();
         
@@ -298,7 +298,7 @@ class SharedStreamController extends Controller
     /**
      * Stop a specific shared stream (admin function)
      */
-    public function stopStream(Request $request, string $streamKey): Response
+    public function stopStream(Request $request, string $streamKey): \Illuminate\Http\JsonResponse
     {
         $stats = $this->sharedStreamService->getStreamStats($streamKey);
         if (!$stats) {
