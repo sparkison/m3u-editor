@@ -26,10 +26,11 @@ class RecentStreamActivity extends TableWidget
                     ->limit(15)
             )
             ->columns([
-                Tables\Columns\TextColumn::make('stream.title')
+                Tables\Columns\TextColumn::make('stream.stream_id')
                     ->label('Stream')
-                    ->limit(25)
-                    ->tooltip(fn ($record) => $record->stream?->title ?? 'N/A')
+                    ->limit(12)
+                    ->formatStateUsing(fn ($state) => 'Stream ' . substr($state ?? '', -8))
+                    ->tooltip(fn ($record) => $record->stream?->stream_id ?? 'N/A')
                     ->default('N/A'),
 
                 Tables\Columns\TextColumn::make('client_id')
@@ -47,7 +48,7 @@ class RecentStreamActivity extends TableWidget
                     ->since()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('last_activity')
+                Tables\Columns\TextColumn::make('last_activity_at')
                     ->label('Last Activity')
                     ->since()
                     ->sortable(),
@@ -79,7 +80,7 @@ class RecentStreamActivity extends TableWidget
                             return 'N/A';
                         }
                         
-                        $seconds = $record->connected_at->diffInSeconds($record->last_activity ?? now());
+                        $seconds = $record->connected_at->diffInSeconds($record->last_activity_at ?? now());
                         return $this->formatDuration($seconds);
                     }),
             ])

@@ -36,11 +36,12 @@ class TopStreamsTable extends TableWidget
                     ->limit(12)
                     ->tooltip(fn ($record) => $record->stream_id),
 
-                Tables\Columns\TextColumn::make('title')
-                    ->label('Title')
+                Tables\Columns\TextColumn::make('source_url')
+                    ->label('Source')
                     ->searchable()
-                    ->limit(30)
-                    ->tooltip(fn ($record) => $record->title),
+                    ->limit(40)
+                    ->formatStateUsing(fn ($state) => parse_url($state, PHP_URL_HOST) ?: 'Unknown')
+                    ->tooltip(fn ($record) => $record->source_url),
 
                 Tables\Columns\BadgeColumn::make('format')
                     ->label('Format')

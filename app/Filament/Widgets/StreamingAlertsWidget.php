@@ -169,22 +169,10 @@ class StreamingAlertsWidget extends Widget
     {
         $issues = [];
         
-        // Streams with frequent restarts
-        $problematicStreams = SharedStream::where('restart_count', '>', 3)
-                                        ->where('started_at', '>', now()->subHour())
-                                        ->get();
+        // Note: Removed restart_count check as this column doesn't exist in shared_streams table
+        // Could be implemented later with a proper restart tracking mechanism
         
-        foreach ($problematicStreams as $stream) {
-            $issues[] = [
-                'stream_id' => $stream->stream_id,
-                'title' => $stream->title ?: 'Unknown Stream',
-                'issue' => 'Frequent restarts',
-                'details' => "Restarted {$stream->restart_count} times in the last hour",
-                'severity' => 'high',
-            ];
-        }
-
-        // Streams with zero bandwidth
+        // Streams with zero bandwidth but have clients
         $stalledStreams = SharedStream::active()
                                     ->where('client_count', '>', 0)
                                     ->where('bandwidth_kbps', 0)
@@ -193,9 +181,25 @@ class StreamingAlertsWidget extends Widget
         foreach ($stalledStreams as $stream) {
             $issues[] = [
                 'stream_id' => $stream->stream_id,
-                'title' => $stream->title ?: 'Unknown Stream',
+                'title' => 'Stream ' . substr($stream->stream_id, -8), // Use last 8 chars of stream_id as title
                 'issue' => 'No data flow',
                 'details' => "Stream has clients but no bandwidth usage",
+                'severity' => 'medium',
+            ];
+        }
+
+        // Streams with unhealthy status
+        $unhealthyStreams = SharedStream::active()
+                                      ->where('health_status', '!=', 'healthy')
+                                      ->where('health_status', '!=', 'unknown')
+                                      ->get();
+        
+        foreach ($unhealthyStreams as $stream) {
+            $issues[] = [
+                'stream_id' => $stream->stream_id,
+                'title' => 'Stream ' . substr($stream->stream_id, -8),
+                'issue' => 'Unhealthy status',
+                'details' => "Stream health status: {$stream->health_status}",
                 'severity' => 'medium',
             ];
         }

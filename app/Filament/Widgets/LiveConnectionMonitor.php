@@ -35,7 +35,7 @@ class LiveConnectionMonitor extends Widget
                 return [
                     'id' => $client->client_id,
                     'ip' => $client->ip_address,
-                    'stream_title' => $client->stream?->title ?? 'Unknown Stream',
+                    'stream_title' => 'Stream ' . substr($client->stream?->stream_id ?? '', -8),
                     'stream_id' => substr($client->stream?->stream_id ?? '', -8),
                     'connected_at' => $client->connected_at,
                     'duration' => $client->connected_at->diffInSeconds(now()),
