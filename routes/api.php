@@ -26,3 +26,22 @@ Route::group(['prefix' => 'stream'], function () {
         ->where('segment', 'segment_[0-9]{3}\.ts')
         ->name('stream.hls.segment');
 });
+
+// Shared streaming API routes (xTeVe-like proxy functionality)
+Route::group(['prefix' => 'shared'], function () {
+    // HLS segments for shared streams
+    Route::get('hls/{encodedId}/{segment}', [\App\Http\Controllers\SharedStreamController::class, 'serveHLSSegment'])
+        ->where('segment', '.*\.ts')
+        ->name('shared.stream.hls.segment');
+    
+    // Stream statistics and management
+    Route::get('stats', [\App\Http\Controllers\SharedStreamController::class, 'getStreamStats'])
+        ->name('shared.stream.stats');
+    
+    Route::delete('stream/{streamKey}', [\App\Http\Controllers\SharedStreamController::class, 'stopStream'])
+        ->name('shared.stream.stop');
+    
+    // Test streaming
+    Route::post('test', [\App\Http\Controllers\SharedStreamController::class, 'testStream'])
+        ->name('shared.stream.test');
+});

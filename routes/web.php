@@ -66,6 +66,13 @@ Route::get('/stream/{encodedId}.{format?}', \App\Http\Controllers\StreamControll
 Route::get('/stream/e/{encodedId}.{format?}', [\App\Http\Controllers\StreamController::class, 'episode'])
     ->name('stream.episode');
 
+// Shared streaming routes (xTeVe-like proxy functionality)
+Route::get('/shared/stream/{encodedId}.{format?}', [\App\Http\Controllers\SharedStreamController::class, 'streamChannel'])
+    ->name('shared.stream.channel');
+
+Route::get('/shared/stream/e/{encodedId}.{format?}', [\App\Http\Controllers\SharedStreamController::class, 'streamEpisode'])
+    ->name('shared.stream.episode');
+
 
 /*
  * API routes
