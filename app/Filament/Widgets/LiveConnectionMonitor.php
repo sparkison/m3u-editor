@@ -54,8 +54,8 @@ class LiveConnectionMonitor extends Widget
             'last_minute' => SharedStreamClient::where('connected_at', '>=', $now->copy()->subMinute())->count(),
             'last_5_minutes' => SharedStreamClient::where('connected_at', '>=', $now->copy()->subMinutes(5))->count(),
             'last_hour' => SharedStreamClient::where('connected_at', '>=', $now->copy()->subHour())->count(),
-            'active_now' => SharedStreamClient::whereNull('disconnected_at')
-                ->orWhere('last_activity', '>=', $now->copy()->subMinutes(2))
+            'active_now' => SharedStreamClient::where('status', 'connected')
+                ->where('last_activity_at', '>=', $now->copy()->subMinutes(2))
                 ->count(),
         ];
     }
