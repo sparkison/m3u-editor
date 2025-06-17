@@ -1132,18 +1132,40 @@ class SharedStreamService
     public function getAllActiveStreams(): array
     {
         try {
-            $pattern = self::CACHE_PREFIX . '*';
-            $keys = Redis::keys($pattern);
+            // Try both patterns - with and without database prefix
+            $pattern1 = self::CACHE_PREFIX . '*';
+            $pattern2 = '*' . self::CACHE_PREFIX . '*';
+            
+            $keys1 = Redis::keys($pattern1);
+            $keys2 = Redis::keys($pattern2);
+            $keys = array_merge($keys1, $keys2);
+            
             $streams = [];
             
             foreach ($keys as $key) {
-                $streamKey = str_replace(self::CACHE_PREFIX, '', $key);
-                $streamInfo = $this->getStreamInfo($streamKey);
-                
-                if ($streamInfo) {
-                    $streamInfo['stream_key'] = $streamKey;
-                    $streamInfo['clients'] = $this->getClientCount($streamKey);
-                    $streams[] = $streamInfo;
+                // Handle both prefixed and non-prefixed keys
+                if (strpos($key, self::CACHE_PREFIX) !== false) {
+                    // Extract stream key from the Redis key
+                    $streamKey = str_replace([
+                        config('database.redis.options.prefix', ''),
+                        self::CACHE_PREFIX
+                    ], '', $key);
+                    
+                    $streamInfo = $this->getStreamInfo($streamKey);
+                    
+                    if ($streamInfo) {
+                        $streamInfo['stream_key'] = $streamKey;
+                        $streamInfo['client_count'] = $this->getClientCount($streamKey);
+                        $streamInfo['uptime'] = time() - ($streamInfo['created_at'] ?? time());
+                        $streamInfo['last_activity'] = $streamInfo['last_activity'] ?? time();
+                        
+                        $streams[$streamKey] = [
+                            'stream_info' => $streamInfo,
+                            'client_count' => $streamInfo['client_count'],
+                            'uptime' => $streamInfo['uptime'],
+                            'last_activity' => $streamInfo['last_activity']
+                        ];
+                    }
                 }
             }
             
