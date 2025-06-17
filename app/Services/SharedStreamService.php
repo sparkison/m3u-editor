@@ -66,12 +66,17 @@ class SharedStreamService
                 $format,
                 $options
             );
+            $isNewStream = true;
         } else {
             // Join existing stream
             Log::channel('ffmpeg')->debug("Client {$clientId} joining existing shared stream {$streamKey}");
             $this->incrementClientCount($streamKey);
+            $isNewStream = false;
         }
 
+        // Add metadata about whether this was a new stream
+        $streamInfo['is_new_stream'] = $isNewStream;
+        
         return $streamInfo;
     }
 
@@ -356,8 +361,16 @@ class SharedStreamService
         
         Log::channel('ffmpeg')->debug("Removed client {$clientId} from stream {$streamKey}. Remaining clients: {$clientCount}");
 
-        // If no clients left, cleanup stream
+        // If no clients left, cleanup stream and decrement playlist count
         if ($clientCount <= 0) {
+            // Get stream info to find playlist ID
+            $streamInfo = $this->getStreamInfo($streamKey);
+            if ($streamInfo && isset($streamInfo['options']['playlist_id'])) {
+                $playlistId = $streamInfo['options']['playlist_id'];
+                $this->decrementActiveStreams($playlistId);
+                Log::channel('ffmpeg')->debug("Decremented active streams for playlist {$playlistId}");
+            }
+            
             $this->cleanupStream($streamKey);
         }
     }

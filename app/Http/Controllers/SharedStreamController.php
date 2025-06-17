@@ -100,13 +100,6 @@ class SharedStreamController extends Controller
         // Get playlist for stream limits
         $playlist = $model->getEffectivePlaylist();
         
-        // Check stream limits
-        $activeStreams = $this->incrementActiveStreams($playlist->id);
-        if ($this->wouldExceedStreamLimit($playlist->id, $playlist->available_streams, $activeStreams)) {
-            $this->decrementActiveStreams($playlist->id);
-            abort(503, 'Maximum concurrent streams reached for this playlist.');
-        }
-
         $clientId = $this->generateClientId($request);
         $userAgent = $playlist->user_agent ?? 'VLC/3.0.21';
 
@@ -126,6 +119,18 @@ class SharedStreamController extends Controller
                 ]
             );
 
+            // Only check and increment stream limits for NEW streams
+            if ($streamInfo['is_new_stream'] ?? false) {
+                // Check stream limits
+                $activeStreams = $this->incrementActiveStreams($playlist->id);
+                if ($this->wouldExceedStreamLimit($playlist->id, $playlist->available_streams, $activeStreams)) {
+                    $this->decrementActiveStreams($playlist->id);
+                    // Clean up the just-created stream
+                    $this->sharedStreamService->removeClient($streamInfo['stream_key'], $clientId);
+                    abort(503, 'Maximum concurrent streams reached for this playlist.');
+                }
+            }
+
             Log::channel('ffmpeg')->info("Client {$clientId} connected to shared stream for {$type} {$title} ({$format})");
 
             // Return appropriate response based on format
@@ -136,7 +141,10 @@ class SharedStreamController extends Controller
             }
 
         } catch (\Exception $e) {
-            $this->decrementActiveStreams($playlist->id);
+            // Only decrement if we incremented (for new streams)
+            if (isset($streamInfo) && ($streamInfo['is_new_stream'] ?? false)) {
+                $this->decrementActiveStreams($playlist->id);
+            }
             Log::channel('ffmpeg')->error("Error starting shared stream for {$type} {$title}: " . $e->getMessage());
             abort(500, 'Failed to start stream: ' . $e->getMessage());
         }
