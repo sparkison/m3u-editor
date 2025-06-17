@@ -577,9 +577,9 @@ class SharedStreamService
     /**
      * Clean up orphaned Redis keys
      */
-    public function cleanupOrphanedKeys(): array
+    public function cleanupOrphanedKeys(): int
     {
-        $cleaned = [];
+        $cleanedCount = 0;
         
         try {
             $streamKeys = Redis::keys('stream:*');
@@ -598,7 +598,8 @@ class SharedStreamService
                     if (!$this->isProcessRunning((int)$streamInfo['pid'])) {
                         $streamKey = str_replace('stream:', '', $key);
                         $this->cleanupStream($streamKey, true);
-                        $cleaned[] = $streamKey;
+                        $cleanedCount++;
+                        Log::channel('ffmpeg')->debug("Cleaned up orphaned stream key: {$streamKey}");
                     }
                 }
             }
@@ -607,7 +608,7 @@ class SharedStreamService
             Log::error("Failed to cleanup orphaned keys: " . $e->getMessage());
         }
         
-        return $cleaned;
+        return $cleanedCount;
     }
 
     /**
