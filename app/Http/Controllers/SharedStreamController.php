@@ -318,7 +318,7 @@ class SharedStreamController extends Controller
     /**
      * Test streaming with the provided URL
      */
-    public function testStream(Request $request): Response
+    public function testStream(Request $request): \Illuminate\Http\JsonResponse
     {
         $request->validate([
             'url' => 'required|url',
