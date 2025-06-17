@@ -367,4 +367,56 @@ class SharedStreamController extends Controller
     {
         return md5($request->ip() . $request->userAgent() . microtime(true));
     }
+
+    /**
+     * Serve shared stream directly (for testing)
+     */
+    public function serveSharedStream(Request $request, string $streamKey)
+    {
+        $clientId = $this->generateClientId($request);
+        
+        try {
+            $data = $this->sharedStreamService->getStreamData($streamKey, $clientId);
+            
+            if (!$data) {
+                abort(404, 'Stream not found or no data available');
+            }
+            
+            return response($data, 200, [
+                'Content-Type' => 'video/MP2T',
+                'Cache-Control' => 'no-cache, no-store, must-revalidate',
+                'Connection' => 'keep-alive'
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error serving shared stream {$streamKey}: " . $e->getMessage());
+            abort(500, 'Stream error');
+        }
+    }
+
+    /**
+     * Serve HLS playlist for shared stream (for testing)
+     */
+    public function serveHLS(Request $request, string $streamKey)
+    {
+        $clientId = $this->generateClientId($request);
+        
+        try {
+            $playlist = $this->sharedStreamService->getHLSPlaylist($streamKey, $clientId);
+            
+            if (!$playlist) {
+                abort(404, 'Stream not found or playlist not ready');
+            }
+            
+            return response($playlist, 200, [
+                'Content-Type' => 'application/vnd.apple.mpegurl',
+                'Cache-Control' => 'no-cache, no-store, must-revalidate',
+                'Connection' => 'keep-alive'
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error serving HLS playlist for {$streamKey}: " . $e->getMessage());
+            abort(500, 'Stream error');
+        }
+    }
 }

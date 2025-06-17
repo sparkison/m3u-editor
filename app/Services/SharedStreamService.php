@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Channel;
 use App\Models\Episode;
+use App\Models\SharedStream;
 use App\Traits\TracksActiveStreams;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -75,9 +76,9 @@ class SharedStreamService
     }
 
     /**
-     * Create a new shared stream
+     * Create a new shared stream (internal method)
      */
-    public function createSharedStream(
+    public function createSharedStreamInternal(
         string $streamKey,
         string $type,
         int $modelId,
@@ -100,8 +101,20 @@ class SharedStreamService
             'options' => $options
         ];
 
-        // Store stream info
+        // Store stream info in Redis
         $this->setStreamInfo($streamKey, $streamInfo);
+
+        // Also create database record for persistent tracking
+        SharedStream::firstOrCreate(
+            ['stream_id' => $streamKey],
+            [
+                'source_url' => $streamUrl,
+                'format' => $format,
+                'status' => 'starting',
+                'stream_info' => json_encode($streamInfo),
+                'started_at' => now()
+            ]
+        );
 
         // Start the streaming process
         $this->startStreamingProcess($streamKey, $streamInfo);
@@ -1040,6 +1053,201 @@ class SharedStreamService
         } catch (\Exception $e) {
             Log::error("Failed to start shared stream: " . $e->getMessage());
             return null;
+        }
+    }
+
+    /**
+     * Get the number of clients connected to a stream
+     * 
+     * @param string $streamKey
+     * @return int Number of clients
+     */
+    public function getClientCount(string $streamKey): int
+    {
+        try {
+            $clientKey = self::CLIENT_PREFIX . $streamKey;
+            $clients = Redis::smembers($clientKey);
+            
+            // Clean up expired clients
+            $activeClients = [];
+            foreach ($clients as $clientId) {
+                if ($this->isClientActive($clientId)) {
+                    $activeClients[] = $clientId;
+                } else {
+                    Redis::srem($clientKey, $clientId);
+                }
+            }
+            
+            return count($activeClients);
+            
+        } catch (\Exception $e) {
+            Log::error("Failed to get client count for stream {$streamKey}: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Check if a client is still active
+     * 
+     * @param string $clientId
+     * @return bool
+     */
+    private function isClientActive(string $clientId): bool
+    {
+        try {
+            $lastSeen = Redis::get("client_last_seen:{$clientId}");
+            if (!$lastSeen) {
+                return false;
+            }
+            
+            $timeout = config('proxy.shared_streaming.monitoring.client_timeout', 30);
+            return (time() - $lastSeen) < $timeout;
+            
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Get all active streams from Redis cache
+     * 
+     * @return array Array of stream information
+     */
+    public function getAllActiveStreams(): array
+    {
+        try {
+            $pattern = self::CACHE_PREFIX . '*';
+            $keys = Redis::keys($pattern);
+            $streams = [];
+            
+            foreach ($keys as $key) {
+                $streamKey = str_replace(self::CACHE_PREFIX, '', $key);
+                $streamInfo = $this->getStreamInfo($streamKey);
+                
+                if ($streamInfo) {
+                    $streamInfo['stream_key'] = $streamKey;
+                    $streamInfo['clients'] = $this->getClientCount($streamKey);
+                    $streams[] = $streamInfo;
+                }
+            }
+            
+            return $streams;
+            
+        } catch (\Exception $e) {
+            Log::error("Failed to get all active streams: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Create a shared stream (simplified interface for testing)
+     * 
+     * @param string $sourceUrl
+     * @param string $format
+     * @return string Stream ID
+     */
+    public function createSharedStream(string $sourceUrl, string $format): string
+    {
+        $streamKey = $this->getStreamKey('test', 0, $sourceUrl);
+        
+        $streamInfo = $this->createSharedStreamInternal(
+            $streamKey,
+            'test',
+            0,
+            $sourceUrl,
+            'Test Stream',
+            $format,
+            []
+        );
+        
+        return $streamInfo['stream_key'];
+    }
+
+    /**
+     * Join a stream (create if not exists)
+     * 
+     * @param string $sourceUrl
+     * @param string $format
+     * @param string $ipAddress
+     * @return array
+     */
+    public function joinStream(string $sourceUrl, string $format, string $ipAddress): array
+    {
+        $streamKey = $this->getStreamKey('test', 0, $sourceUrl);
+        
+        // Check both Redis and database for existing stream
+        $existingStream = $this->getStreamInfo($streamKey);
+        $dbStream = SharedStream::where('stream_id', $streamKey)->first();
+        
+        // Accept streams that are 'starting' or 'active' as joinable
+        $isExistingJoinable = ($existingStream && in_array($existingStream['status'], ['starting', 'active'])) || 
+                              ($dbStream && in_array($dbStream->status, ['starting', 'active']));
+        
+        if ($isExistingJoinable) {
+            // Join existing stream
+            return [
+                'stream_id' => $streamKey,
+                'joined_existing' => true
+            ];
+        } else {
+            // Create new stream
+            $streamId = $this->createSharedStream($sourceUrl, $format);
+            return [
+                'stream_id' => $streamId,
+                'joined_existing' => false
+            ];
+        }
+    }
+
+    /**
+     * Stop a stream
+     * 
+     * @param string $streamId
+     * @return bool
+     */
+    public function stopStream(string $streamId): bool
+    {
+        try {
+            $streamInfo = $this->getStreamInfo($streamId);
+            if (!$streamInfo) {
+                return false;
+            }
+            
+            // Update status to stopped in Redis
+            $streamInfo['status'] = 'stopped';
+            $streamInfo['stopped_at'] = time();
+            $this->setStreamInfo($streamId, $streamInfo);
+            
+            // Update status in database
+            SharedStream::where('stream_id', $streamId)->update([
+                'status' => 'stopped',
+                'stopped_at' => now()
+            ]);
+            
+            // Clean up the stream
+            $this->cleanupStream($streamId);
+            
+            return true;
+            
+        } catch (\Exception $e) {
+            Log::error("Failed to stop stream {$streamId}: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get stream URL for accessing the stream
+     * 
+     * @param string $streamId
+     * @param string $format
+     * @return string
+     */
+    public function getStreamUrl(string $streamId, string $format): string
+    {
+        if ($format === 'hls') {
+            return route('shared.stream.hls', ['streamKey' => $streamId]);
+        } else {
+            return route('shared.stream.direct', ['streamKey' => $streamId]);
         }
     }
 

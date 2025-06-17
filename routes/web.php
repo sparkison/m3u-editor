@@ -73,6 +73,13 @@ Route::get('/shared/stream/{encodedId}.{format?}', [\App\Http\Controllers\Shared
 Route::get('/shared/stream/e/{encodedId}.{format?}', [\App\Http\Controllers\SharedStreamController::class, 'streamEpisode'])
     ->name('shared.stream.episode');
 
+// Additional shared stream routes
+Route::get('/shared/stream/{streamKey}', [\App\Http\Controllers\SharedStreamController::class, 'serveSharedStream'])
+    ->name('shared.stream.direct');
+
+Route::get('/shared/stream/{streamKey}/hls', [\App\Http\Controllers\SharedStreamController::class, 'serveHLS'])
+    ->name('shared.stream.hls');
+
 
 /*
  * API routes
