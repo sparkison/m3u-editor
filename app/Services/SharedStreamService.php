@@ -613,15 +613,15 @@ class SharedStreamService
     /**
      * Clean up temporary files
      */
-    public function cleanupTempFiles(int $olderThanSeconds = 3600): array
+    public function cleanupTempFiles(int $olderThanSeconds = 3600): int
     {
-        $cleaned = [];
+        $bytesFreed = 0;
         
         try {
             $tempDir = storage_path('app/temp');
             
             if (!is_dir($tempDir)) {
-                return $cleaned;
+                return $bytesFreed;
             }
             
             $cutoffTime = time() - $olderThanSeconds;
@@ -629,8 +629,10 @@ class SharedStreamService
             
             foreach ($files as $file) {
                 if (is_file($file) && filemtime($file) < $cutoffTime) {
+                    $fileSize = filesize($file);
                     if (unlink($file)) {
-                        $cleaned[] = basename($file);
+                        $bytesFreed += $fileSize;
+                        Log::channel('ffmpeg')->debug("Cleaned up temp file: " . basename($file) . " (" . $fileSize . " bytes)");
                     }
                 }
             }
@@ -639,7 +641,7 @@ class SharedStreamService
             Log::error("Failed to cleanup temp files: " . $e->getMessage());
         }
         
-        return $cleaned;
+        return $bytesFreed;
     }
 
     /**
