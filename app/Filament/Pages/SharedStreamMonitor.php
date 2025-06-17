@@ -75,7 +75,6 @@ class SharedStreamMonitor extends Page
                 ->label('Settings')
                 ->icon('heroicon-o-cog-6-tooth')
                 ->size(ActionSize::Small)
-                ->modalContent(view('filament.pages.shared-stream-settings'))
                 ->modalSubmitActionLabel('Save Settings')
                 ->form($this->getSettingsForm())
                 ->action('saveSettings'),
