@@ -306,6 +306,19 @@ class SharedStreamService
         return Redis::get($pidKey);
     }
 
+        // Close stdin
+        fclose($pipes[0]);
+
+        // Store process info
+        $status = proc_get_status($process);
+        $this->setStreamProcess($streamKey, $status['pid']);
+
+        // Start buffer management
+        $this->manageDirectStreamBuffer($streamKey, $pipes[1], $pipes[2]);
+
+        Log::channel('ffmpeg')->debug("Started direct stream {$streamKey} with PID {$status['pid']}");
+    }
+
     /**
      * Manage buffering for direct streams (similar to xTeVe)
      */
