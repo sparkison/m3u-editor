@@ -306,34 +306,65 @@ class SharedStreamService
     private function monitorProcessHealth(string $streamKey, $stderr, $process): void
     {
         // Schedule a delayed check to validate the process is still running
-        dispatch(function () use ($streamKey, $stderr, $process) {
-            sleep(2); // Give FFmpeg a moment to initialize
+        // Using a simple approach without jobs for immediate processing
+        $this->scheduleHealthCheck($streamKey, $stderr, $process);
+    }
+
+    /**
+     * Schedule a health check for the process
+     */
+    private function scheduleHealthCheck(string $streamKey, $stderr, $process): void
+    {
+        // Use a simple background process approach
+        if (function_exists('pcntl_fork')) {
+            $pid = pcntl_fork();
+            if ($pid == 0) {
+                // Child process
+                sleep(2); // Give FFmpeg a moment to initialize
+                $this->performHealthCheck($streamKey, $stderr, $process);
+                exit(0);
+            }
+        } else {
+            // Fallback: perform immediate check after a delay
+            // This is not ideal but works for development
+            register_shutdown_function(function () use ($streamKey, $stderr, $process) {
+                sleep(1);
+                $this->performHealthCheck($streamKey, $stderr, $process);
+            });
+        }
+    }
+
+    /**
+     * Perform the actual health check
+     */
+    private function performHealthCheck(string $streamKey, $stderr, $process): void
+    {
+        $status = proc_get_status($process);
+        $isRunning = $status['running'];
+        
+        if (!$isRunning) {
+            Log::channel('ffmpeg')->warning("Stream {$streamKey}: FFmpeg process failed during startup");
             
-            $status = proc_get_status($process);
-            $isRunning = $status['running'];
-            
-            if (!$isRunning) {
-                Log::channel('ffmpeg')->warning("Stream {$streamKey}: FFmpeg process failed during startup");
-                
-                // Read any error output
-                $errorOutput = '';
+            // Read any error output
+            $errorOutput = '';
+            if (is_resource($stderr)) {
                 while (!feof($stderr)) {
                     $line = fgets($stderr);
                     if ($line !== false && !empty(trim($line))) {
                         $errorOutput .= trim($line) . "\n";
                     }
                 }
-                
-                if (!empty($errorOutput)) {
-                    Log::channel('ffmpeg')->error("Stream {$streamKey} startup errors: " . $errorOutput);
-                }
-                
-                // Mark stream as failed
-                $this->markStreamAsFailed($streamKey, 'FFmpeg process failed during startup');
-            } else {
-                Log::channel('ffmpeg')->debug("Stream {$streamKey}: FFmpeg process health check passed");
             }
-        })->delay(now()->addSeconds(2));
+            
+            if (!empty($errorOutput)) {
+                Log::channel('ffmpeg')->error("Stream {$streamKey} startup errors: " . $errorOutput);
+            }
+            
+            // Mark stream as failed
+            $this->markStreamAsFailed($streamKey, 'FFmpeg process failed during startup');
+        } else {
+            Log::channel('ffmpeg')->debug("Stream {$streamKey}: FFmpeg process health check passed");
+        }
     }
 
     /**

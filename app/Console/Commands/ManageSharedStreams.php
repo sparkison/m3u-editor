@@ -220,6 +220,7 @@ class ManageSharedStreams extends Command
             $activeStreams = $this->sharedStreamService->getAllActiveStreams();
             $cleanedUp = 0;
             
+            // First, check Redis streams
             foreach ($activeStreams as $streamKey => $streamData) {
                 $clientCount = $streamData['client_count'];
                 $lastActivity = $streamData['last_activity'] ?? time();
@@ -233,6 +234,35 @@ class ManageSharedStreams extends Command
                     if ($success) {
                         $cleanedUp++;
                     }
+                }
+            }
+            
+            // Second, check database streams for phantom processes
+            $this->line("Checking database streams for phantom processes...");
+            $dbStreams = \App\Models\SharedStream::whereIn('status', ['starting', 'active'])->get();
+            
+            foreach ($dbStreams as $stream) {
+                $pid = $stream->process_id;
+                $isProcessRunning = false;
+                
+                if ($pid) {
+                    // Check if the process is actually running
+                    $isProcessRunning = $this->isProcessRunning($pid);
+                }
+                
+                if (!$isProcessRunning) {
+                    $this->line("Found phantom stream: {$stream->stream_id} (PID: " . ($pid ?: 'none') . ")");
+                    
+                    // Update database status
+                    $stream->update([
+                        'status' => 'failed',
+                        'error_message' => 'Process not running (phantom stream)',
+                        'stopped_at' => now()
+                    ]);
+                    
+                    // Clean up Redis data
+                    $this->sharedStreamService->cleanupStream($stream->stream_id, true);
+                    $cleanedUp++;
                 }
             }
 
@@ -250,6 +280,20 @@ class ManageSharedStreams extends Command
             $this->error("Cleanup failed: " . $e->getMessage());
             return 1;
         }
+    }
+    
+    /**
+     * Check if a process is running
+     */
+    private function isProcessRunning(int $pid): bool
+    {
+        if (!$pid) {
+            return false;
+        }
+        
+        // Use ps command to check if process exists
+        $result = shell_exec("ps -p {$pid} > /dev/null 2>&1; echo $?");
+        return trim($result) === '0';
     }
 
     private function showStats(): int

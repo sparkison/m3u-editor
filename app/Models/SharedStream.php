@@ -23,6 +23,7 @@ class SharedStream extends Model
         'source_url',
         'format',
         'status',
+        'error_message',
         'process_id',
         'buffer_path',
         'buffer_size',
