@@ -762,7 +762,8 @@ class SharedStreamService
     public function cleanupStream(string $streamKey, bool $force = false): bool
     {
         try {
-            $streamInfo = Redis::hGetAll("stream:$streamKey");
+            // Get stream info using the proper method
+            $streamInfo = $this->getStreamInfo($streamKey);
             
             if (empty($streamInfo) && !$force) {
                 return true; // Already cleaned up
@@ -773,7 +774,13 @@ class SharedStreamService
                 $this->stopStreamProcess((int)$streamInfo['pid']);
             }
 
-            // Clean up Redis keys
+            // Clean up Redis keys with proper prefixes
+            Redis::del(self::CACHE_PREFIX . $streamKey);
+            Redis::del(self::CLIENT_PREFIX . $streamKey);
+            Redis::del(self::BUFFER_PREFIX . $streamKey);
+            Redis::del("stream_pid:{$streamKey}");
+            
+            // Also clean up old format keys for compatibility
             Redis::del("stream:$streamKey");
             Redis::del("stream:$streamKey:clients");
             Redis::del("stream:$streamKey:buffer");
@@ -1547,7 +1554,7 @@ class SharedStreamService
             ]);
             
             // Clean up the stream
-            $this->cleanupStream($streamId);
+            $this->cleanupStream($streamId, true);
             
             return true;
             
