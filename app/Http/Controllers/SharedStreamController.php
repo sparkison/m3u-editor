@@ -204,7 +204,7 @@ class SharedStreamController extends Controller
             });            // Wait for stream to become active before starting streaming loop
             while (!connection_aborted() && (time() - $startTime) < $maxWaitTime) {
                 $stats = $this->sharedStreamService->getStreamStats($streamKey);
-                if ($stats && $stats['status'] === 'active') {
+                if ($stats && in_array($stats['status'], ['active', 'starting'])) {
                     $streamStarted = true;
                     break;
                 }
@@ -219,7 +219,7 @@ class SharedStreamController extends Controller
             }
             
             if (!$streamStarted) {
-                Log::channel('ffmpeg')->warning("Stream {$streamKey} did not become active within {$maxWaitTime}s for client {$clientId}");
+                Log::channel('ffmpeg')->warning("Stream {$streamKey} did not become active/starting within {$maxWaitTime}s for client {$clientId}");
                 echo "HTTP/1.1 503 Service Unavailable\r\n\r\nStream startup timeout";
                 return;
             }

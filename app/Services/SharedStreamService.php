@@ -459,6 +459,7 @@ class SharedStreamService
 
     /**
      * Start continuous buffering process (simplified)
+     * Using direct process management instead of jobs to avoid pipe serialization issues
      */
     private function startContinuousBuffering(string $streamKey, $stdout, $stderr, $process): void
     {
@@ -467,11 +468,27 @@ class SharedStreamService
         stream_set_blocking($stderr, false);
         
         // Start immediate buffering to prevent FFmpeg from hanging
-        $this->startImmediateBuffering($streamKey, $stdout, $stderr, $process);
+        $this->startInitialBuffering($streamKey, $stdout, $stderr, $process);
         
-        // Use background process to continue buffering (since we can't serialize file handles for jobs)
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Using background buffer management");
-        $this->runBufferManagerBackground($streamKey, $stdout, $stderr, $process);
+        // Use simple background approach - no jobs to avoid serialization issues
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Starting direct buffer management");
+        
+        // Use a simple forking approach if available, otherwise run inline
+        if (function_exists('pcntl_fork')) {
+            $pid = pcntl_fork();
+            if ($pid == 0) {
+                // Child process - run buffer manager
+                $this->runBufferManager($streamKey, $stdout, $stderr, $process);
+                exit(0);
+            } elseif ($pid > 0) {
+                // Parent process - continue
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffer manager forked to PID {$pid}");
+                return;
+            }
+        }
+        
+        // Fallback - run buffer manager directly (may block but prevents pipe issues)
+        $this->runBufferManager($streamKey, $stdout, $stderr, $process);
     }
 
 
@@ -675,22 +692,23 @@ class SharedStreamService
                 Log::channel('ffmpeg')->info("Stream {$streamKey}: Status updated to 'active' - stream is ready for clients");
             }
         } else {
-            Log::channel('ffmpeg')->warning("Stream {$streamKey}: No data received after {$maxWait}s, FFmpeg may have failed to start");
+            // Even if no initial buffering succeeded, mark stream as starting so clients can attempt to connect
+            // This handles cases where FFmpeg takes time to start producing data
+            Log::channel('ffmpeg')->warning("Stream {$streamKey}: No initial data received after {$maxWait}s, marking as starting for client attempts");
             
-            // Mark stream as failed since no data was received
             $streamInfo = $this->getStreamInfo($streamKey);
             if ($streamInfo) {
-                $streamInfo['status'] = 'error';
-                $streamInfo['error_message'] = 'No data received from FFmpeg within timeout period';
+                $streamInfo['status'] = 'starting'; // Changed from 'error' to 'starting'
+                $streamInfo['warning_message'] = 'No initial data received, stream may take time to start';
                 $this->setStreamInfo($streamKey, $streamInfo);
                 
-                // Also update database status
+                // Update database status to starting instead of error
                 SharedStream::where('stream_id', $streamKey)->update([
-                    'status' => 'error',
-                    'error_message' => 'No data received from FFmpeg within timeout period'
+                    'status' => 'starting',
+                    'error_message' => null
                 ]);
                 
-                Log::channel('ffmpeg')->error("Stream {$streamKey}: Status updated to 'error' - no data received within {$maxWait}s");
+                Log::channel('ffmpeg')->info("Stream {$streamKey}: Status updated to 'starting' - allowing client attempts despite no initial data");
             }
         }
     }
@@ -991,7 +1009,7 @@ class SharedStreamService
         $cmd .= '-analyzeduration 100000 -probesize 100000 -max_delay 0 '; // Reduced analysis time
         
         // Real-time buffering control optimized for streaming
-        $cmd .= '-flush_packets 1 -max_interleave_delta 0 -muxdelay 0 ';
+        $cmd .= '-flush_packets 1 -max_interleave_delta 0 ';
         
         // Connection resilience and error handling
         $cmd .= '-err_detect ignore_err -ignore_unknown ';
@@ -1149,7 +1167,8 @@ class SharedStreamService
             }
             
             $decoded = json_decode($data, true);
-            return $decoded && !empty($decoded) ? $decoded : null;
+            // Ensure we only return arrays or null, not other JSON types like integers
+            return (is_array($decoded) && !empty($decoded)) ? $decoded : null;
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Error getting stream info for {$streamKey}: " . $e->getMessage());
             return null;
