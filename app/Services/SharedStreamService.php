@@ -1789,4 +1789,88 @@ class SharedStreamService
         }
     }
 
+    /**
+     * Update stream activity timestamp
+     */
+    private function updateStreamActivity(string $streamKey): void
+    {
+        $streamInfo = $this->getStreamInfo($streamKey);
+        if ($streamInfo) {
+            $streamInfo['last_activity'] = time();
+            $this->setStreamInfo($streamKey, $streamInfo);
+        }
+    }
+
+    /**
+     * Get stream storage directory
+     */
+    private function getStreamStorageDir(string $streamKey): string
+    {
+        return 'shared_streams/' . md5($streamKey);
+    }
+
+    /**
+     * Set stream process PID
+     */
+    private function setStreamProcess(string $streamKey, int $pid): void
+    {
+        $pidKey = "stream_pid:{$streamKey}";
+        $this->redis()->setex($pidKey, self::SEGMENT_EXPIRY, $pid);
+    }
+
+    /**
+     * Clean up stream resources
+     */
+    private function cleanupStream(string $streamKey, bool $removeData = false): void
+    {
+        try {
+            if ($removeData) {
+                // Remove stream info from Redis
+                $this->redis()->del($streamKey);
+                
+                // Remove buffer data
+                $bufferKey = self::BUFFER_PREFIX . $streamKey;
+                $segmentNumbers = $this->redis()->lrange("{$bufferKey}:segments", 0, -1);
+                foreach ($segmentNumbers as $segmentNumber) {
+                    $this->redis()->del("{$bufferKey}:segment_{$segmentNumber}");
+                }
+                $this->redis()->del("{$bufferKey}:segments");
+                
+                // Remove client keys
+                $clientKeys = $this->redis()->keys(self::CLIENT_PREFIX . $streamKey . ':*');
+                foreach ($clientKeys as $clientKey) {
+                    $this->redis()->del($clientKey);
+                }
+                
+                // Remove process PID
+                $this->redis()->del("stream_pid:{$streamKey}");
+            }
+            
+            // Update database status
+            SharedStream::where('stream_id', $streamKey)->update(['status' => 'stopped']);
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error cleaning up stream {$streamKey}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Check if a process is running by PID
+     */
+    private function isProcessRunning(int $pid): bool
+    {
+        try {
+            if (function_exists('posix_kill')) {
+                return posix_kill($pid, 0);
+            }
+            
+            // Fallback for systems without posix functions
+            $result = shell_exec("ps -p $pid");
+            return !empty($result) && strpos($result, (string)$pid) !== false;
+            
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
 }
