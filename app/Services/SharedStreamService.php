@@ -61,11 +61,8 @@ class SharedStreamService
         $streamKey = $this->getStreamKey($type, $modelId, $streamUrl);
         $streamInfo = $this->getStreamInfo($streamKey);
 
-        // Register this client for the stream
-        $this->registerClient($streamKey, $clientId, $options);
-
         if (!$streamInfo || !$this->isStreamActive($streamKey)) {
-            // Create new shared stream
+            // Create new shared stream first
             $streamInfo = $this->createSharedStreamInternal(
                 $streamKey,
                 $type,
@@ -82,6 +79,9 @@ class SharedStreamService
             $this->incrementClientCount($streamKey);
             $isNewStream = false;
         }
+
+        // Register this client for the stream AFTER ensuring the stream exists
+        $this->registerClient($streamKey, $clientId, $options);
 
         // Add metadata about whether this was a new stream
         $streamInfo['is_new_stream'] = $isNewStream;
