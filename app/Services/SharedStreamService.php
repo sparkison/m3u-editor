@@ -122,8 +122,16 @@ class SharedStreamService
             ]
         );
 
-        // Start the streaming process
-        $this->startStreamingProcess($streamKey, $streamInfo);
+        // Start the streaming process in background (non-blocking)
+        try {
+            // Dispatch the stream startup as a background job to prevent HTTP timeout
+            \App\Jobs\StreamStarter::dispatch($streamKey, $streamInfo);
+            Log::channel('ffmpeg')->debug("Dispatched stream starter job for {$streamKey}");
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->warning("Failed to dispatch stream starter job for {$streamKey}, starting inline: " . $e->getMessage());
+            // Fallback to inline startup (with timeout risk)
+            $this->startStreamingProcess($streamKey, $streamInfo);
+        }
 
         Log::channel('ffmpeg')->debug("Created new shared stream {$streamKey} for {$type} {$title}");
 
@@ -165,6 +173,54 @@ class SharedStreamService
             
             // Update database status
             SharedStream::where('stream_id', $streamKey)->update(['status' => 'error']);
+            
+            throw $e;
+        }
+    }
+
+    /**
+     * Start the actual streaming process (FFmpeg) - Async version for background jobs
+     */
+    public function startStreamingProcessAsync(string $streamKey, array $streamInfo): void
+    {
+        $format = $streamInfo['format'];
+        $streamUrl = $streamInfo['stream_url'];
+        $title = $streamInfo['title'];
+
+        try {
+            Log::channel('ffmpeg')->info("Starting async streaming process for {$streamKey} ({$title})");
+            
+            if ($format === 'hls') {
+                $this->startHLSStream($streamKey, $streamInfo);
+            } else {
+                $this->startDirectStream($streamKey, $streamInfo);
+            }
+            
+            // Update stream status to active
+            $streamInfo['status'] = 'active';
+            $this->setStreamInfo($streamKey, $streamInfo);
+            
+            // Update database status
+            SharedStream::where('stream_id', $streamKey)->update([
+                'status' => 'active',
+                'process_id' => $this->getProcessPid($streamKey)
+            ]);
+            
+            Log::channel('ffmpeg')->info("Successfully started async streaming process for {$streamKey}");
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Failed to start async streaming process for {$streamKey}: " . $e->getMessage());
+            
+            // Update stream status to error
+            $streamInfo['status'] = 'error';
+            $streamInfo['error_message'] = $e->getMessage();
+            $this->setStreamInfo($streamKey, $streamInfo);
+            
+            // Update database status
+            SharedStream::where('stream_id', $streamKey)->update([
+                'status' => 'error',
+                'error_message' => $e->getMessage()
+            ]);
             
             throw $e;
         }
@@ -839,7 +895,7 @@ class SharedStreamService
         return $decoded && !empty($decoded) ? $decoded : null;
     }
 
-    private function setStreamInfo(string $streamKey, array $streamInfo): void
+    public function setStreamInfo(string $streamKey, array $streamInfo): void
     {
         Redis::setex(self::CACHE_PREFIX . $streamKey, 3600, json_encode($streamInfo));
     }

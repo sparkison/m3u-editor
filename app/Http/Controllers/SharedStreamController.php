@@ -188,13 +188,40 @@ class SharedStreamController extends Controller
             ignore_user_abort(false);
             
             $lastSegment = 0;
-            $buffer = '';
+            $startTime = time();
+            $maxWaitTime = 30; // Wait up to 30 seconds for stream to become active
+            $streamStarted = false;
             
             // Register shutdown function to cleanup client
             register_shutdown_function(function () use ($streamKey, $clientId) {
                 $this->sharedStreamService->removeClient($streamKey, $clientId);
             });
 
+            // Wait for stream to become active before starting streaming loop
+            while (!connection_aborted() && (time() - $startTime) < $maxWaitTime) {
+                $stats = $this->sharedStreamService->getStreamStats($streamKey);
+                if ($stats && $stats['status'] === 'active') {
+                    $streamStarted = true;
+                    Log::channel('ffmpeg')->debug("Stream {$streamKey} is active, starting data flow for client {$clientId}");
+                    break;
+                }
+                
+                if ($stats && $stats['status'] === 'error') {
+                    Log::channel('ffmpeg')->error("Stream {$streamKey} failed to start for client {$clientId}");
+                    echo "HTTP/1.1 503 Service Unavailable\r\n\r\nStream failed to start";
+                    return;
+                }
+                
+                usleep(500000); // 500ms wait between checks
+            }
+            
+            if (!$streamStarted) {
+                Log::channel('ffmpeg')->warning("Stream {$streamKey} did not become active within {$maxWaitTime}s for client {$clientId}");
+                echo "HTTP/1.1 503 Service Unavailable\r\n\r\nStream startup timeout";
+                return;
+            }
+
+            // Now start streaming data
             while (!connection_aborted()) {
                 // Get stream data from shared buffer
                 $data = $this->sharedStreamService->getStreamData($streamKey, $clientId, $lastSegment);
@@ -208,11 +235,13 @@ class SharedStreamController extends Controller
                     usleep(100000); // 100ms
                 }
 
-                // Check if stream is still active
-                $stats = $this->sharedStreamService->getStreamStats($streamKey);
-                if (!$stats) {
-                    Log::channel('ffmpeg')->debug("Stream {$streamKey} no longer active, disconnecting client {$clientId}");
-                    break;
+                // Check if stream is still active (less frequently to reduce overhead)
+                if ($lastSegment % 10 === 0) {
+                    $stats = $this->sharedStreamService->getStreamStats($streamKey);
+                    if (!$stats) {
+                        Log::channel('ffmpeg')->debug("Stream {$streamKey} no longer active, disconnecting client {$clientId}");
+                        break;
+                    }
                 }
             }
 
