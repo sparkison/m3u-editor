@@ -227,13 +227,14 @@ class SharedStreamController extends Controller
                 return;
             }
 
-            // Pre-buffer significant data for VLC before starting the stream
-            Log::channel('ffmpeg')->debug("Pre-buffering data for VLC compatibility for client {$clientId}");
+            // Aggressive pre-buffering for VLC compatibility
+            Log::channel('ffmpeg')->debug("Starting aggressive pre-buffering for VLC client {$clientId}");
             $preBufferData = '';
             $preBufferAttempts = 0;
-            $maxPreBufferAttempts = 20; // 4 seconds max
+            $maxPreBufferAttempts = 30; // 6 seconds max
+            $targetPreBufferSize = 2 * 1024 * 1024; // 2MB for VLC startup
             
-            while ($preBufferAttempts < $maxPreBufferAttempts && strlen($preBufferData) < 1048576) { // 1MB pre-buffer
+            while ($preBufferAttempts < $maxPreBufferAttempts && strlen($preBufferData) < $targetPreBufferSize) {
                 $data = $this->sharedStreamService->getNextStreamSegments($streamKey, $clientId, $lastSegment);
                 if ($data) {
                     $preBufferData .= $data;
@@ -244,7 +245,7 @@ class SharedStreamController extends Controller
                 $preBufferAttempts++;
             }
             
-            // Send the pre-buffered data immediately for faster VLC startup
+            // Send the pre-buffered data as a large chunk for faster VLC startup
             if (!empty($preBufferData)) {
                 echo $preBufferData;
                 if (ob_get_level()) {
@@ -254,9 +255,12 @@ class SharedStreamController extends Controller
                 Log::channel('ffmpeg')->info("Sent " . strlen($preBufferData) . " bytes pre-buffer to VLC client {$clientId}");
             }
 
-            // Now start streaming data with improved delivery for VLC
+            // Now stream with optimized timing for responsive playback
+            $consecutiveEmptyReads = 0;
+            $maxEmptyReads = 100; // Allow more empty reads before backing off
+            
             while (!connection_aborted()) {
-                // Get next segments from shared buffer using improved method
+                // Get next segments with batching for efficiency
                 $data = $this->sharedStreamService->getNextStreamSegments($streamKey, $clientId, $lastSegment);
                 
                 if ($data) {
@@ -268,18 +272,30 @@ class SharedStreamController extends Controller
                     }
                     flush();
                     
-                    // Update segment counter for progress tracking
-                    $lastSegment++;
+                    $consecutiveEmptyReads = 0; // Reset counter
                     
-                    // Minimal delay when actively streaming data for responsive playback
-                    usleep(2000); // 2ms for very responsive streaming
+                    // Minimal delay when actively streaming data (more responsive)
+                    usleep(5000); // 5ms for very responsive streaming
                 } else {
-                    // No new data, wait briefly but not too long to avoid VLC timeout
-                    usleep(10000); // 10ms when waiting for data
+                    $consecutiveEmptyReads++;
+                    
+                    // Adaptive sleep timing based on data availability
+                    if ($consecutiveEmptyReads < 20) {
+                        usleep(10000); // 10ms for first 20 empty reads (200ms total)
+                    } elseif ($consecutiveEmptyReads < 50) {
+                        usleep(25000); // 25ms for next 30 empty reads (750ms more)
+                    } else {
+                        usleep(50000); // 50ms for subsequent reads (backing off)
+                    }
+                    
+                    // Reset after too many consecutive empty reads to stay responsive
+                    if ($consecutiveEmptyReads > $maxEmptyReads) {
+                        $consecutiveEmptyReads = 50; // Keep at moderate back-off level
+                    }
                 }
 
                 // Check if stream is still active (less frequently to reduce overhead)
-                if ($lastSegment % 50 === 0) { // Check every 50 segments
+                if ($lastSegment % 200 === 0) { // Check every 200 segments instead of 50
                     $stats = $this->sharedStreamService->getStreamStats($streamKey);
                     if (!$stats) {
                         Log::channel('ffmpeg')->debug("Stream {$streamKey} no longer active, disconnecting client {$clientId}");

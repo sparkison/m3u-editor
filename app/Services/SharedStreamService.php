@@ -1004,7 +1004,7 @@ class SharedStreamService
     /**
      * Get next stream segments for client streaming
      * This method is called by SharedStreamController to stream data to clients
-     * Optimized for VLC playback performance
+     * Optimized for VLC playback performance with reduced Redis overhead
      */
     public function getNextStreamSegments(string $streamKey, string $clientId, int &$lastSegment): ?string
     {
@@ -1017,18 +1017,52 @@ class SharedStreamService
         try {
             $redis = $this->redis();
             $bufferKey = self::BUFFER_PREFIX . $streamKey;
-            $segments = $redis->lrange("{$bufferKey}:segments", 0, -1);
+            
+            // Use pipeline for better Redis performance
+            $pipeline = $redis->pipeline();
+            $pipeline->lrange("{$bufferKey}:segments", 0, -1);
+            
+            // Get segments that are newer than lastSegment, limiting to next 20 for efficiency
+            $segments = $pipeline->execute()[0];
+            
+            if (empty($segments)) {
+                return null;
+            }
             
             // Get segments that are newer than lastSegment
             $data = '';
             $segmentsRead = 0;
             $totalBytes = 0;
-            $maxBytesPerCall = 2 * 1024 * 1024; // 2MB max per call for VLC compatibility
+            $maxBytesPerCall = 3 * 1024 * 1024; // 3MB max per call for better VLC performance
+            $segmentKeys = [];
             
+            // First, collect all relevant segment keys
             foreach ($segments as $segmentNum) {
                 if ($segmentNum > $lastSegment) {
-                    $segmentKey = "{$bufferKey}:segment_{$segmentNum}";
-                    $segmentData = $redis->get($segmentKey);
+                    $segmentKeys[] = "{$bufferKey}:segment_{$segmentNum}";
+                    if (count($segmentKeys) >= 15) { // Limit to max 15 segments per call
+                        break;
+                    }
+                }
+            }
+            
+            if (empty($segmentKeys)) {
+                return null;
+            }
+            
+            // Batch get all segment data with pipeline for efficiency
+            $pipeline = $redis->pipeline();
+            foreach ($segmentKeys as $segmentKey) {
+                $pipeline->get($segmentKey);
+            }
+            $segmentDataArray = $pipeline->execute();
+            
+            // Process segments and assemble data
+            $segmentIndex = 0;
+            foreach ($segments as $segmentNum) {
+                if ($segmentNum > $lastSegment && $segmentIndex < count($segmentDataArray)) {
+                    $segmentData = $segmentDataArray[$segmentIndex];
+                    $segmentIndex++;
                     
                     if ($segmentData) {
                         // Check if adding this segment would exceed our size limit
@@ -1041,21 +1075,21 @@ class SharedStreamService
                         $segmentsRead++;
                         $totalBytes += strlen($segmentData);
                         
-                        // For VLC, prefer fewer but larger chunks - limit segments but allow bigger total size
-                        if ($segmentsRead >= 3 && $totalBytes >= 500000) { // At least 500KB
+                        // For VLC, prefer larger chunks but don't wait too long for multiple segments
+                        if ($segmentsRead >= 5 && $totalBytes >= 800000) { // At least 800KB with 5 segments
                             break;
                         }
                         
                         // Safety limit for very large segments
-                        if ($segmentsRead >= 10) {
+                        if ($segmentsRead >= 15) {
                             break;
                         }
                     }
                 }
             }
 
-            // Log segment delivery for debugging VLC issues
-            if ($segmentsRead > 0) {
+            // Only log every 50th delivery to reduce log spam
+            if ($segmentsRead > 0 && ($lastSegment % 50 === 0 || $segmentsRead >= 5)) {
                 Log::channel('ffmpeg')->debug("Stream {$streamKey}: Delivered {$segmentsRead} segments ({$totalBytes} bytes) to client {$clientId}");
             }
 
