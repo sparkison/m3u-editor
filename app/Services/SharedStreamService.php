@@ -1715,4 +1715,78 @@ class SharedStreamService
         }
     }
 
+    /**
+     * Get next stream segments for a client
+     */
+    public function getNextStreamSegments(string $streamKey, string $clientId, int &$lastSegment): ?string
+    {
+        $bufferKey = self::BUFFER_PREFIX . $streamKey;
+        $segmentNumbers = $this->redis()->lrange("{$bufferKey}:segments", 0, -1);
+        
+        if (empty($segmentNumbers)) {
+            return null;
+        }
+        
+        $data = '';
+        foreach ($segmentNumbers as $segmentNumber) {
+            if ($segmentNumber > $lastSegment) {
+                $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                $segmentData = $this->redis()->get($segmentKey);
+                if ($segmentData) {
+                    $data .= $segmentData;
+                    $lastSegment = $segmentNumber;
+                }
+            }
+        }
+        
+        return !empty($data) ? $data : null;
+    }
+
+    /**
+     * Synchronize stream state between Redis and database
+     * Called by ManageSharedStreams command
+     */
+    public function synchronizeState(): void
+    {
+        try {
+            $redis = $this->redis();
+            
+            // Get all active stream keys from Redis
+            $streamKeys = $redis->keys(self::STREAM_PREFIX . '*');
+            
+            foreach ($streamKeys as $fullKey) {
+                $streamKey = str_replace(self::STREAM_PREFIX, '', $fullKey);
+                $streamInfo = $this->getStreamInfo($streamKey);
+                
+                if ($streamInfo) {
+                    // Check if process is still running
+                    $pid = $streamInfo['pid'] ?? null;
+                    $isRunning = false;
+                    
+                    if ($pid) {
+                        $isRunning = $this->isProcessRunning($pid);
+                    }
+                    
+                    // Update database status based on actual process state
+                    $status = $isRunning ? 'active' : 'stopped';
+                    
+                    SharedStream::where('stream_id', $streamKey)->update([
+                        'status' => $status,
+                        'last_activity' => now()
+                    ]);
+                    
+                    // Clean up if process is dead
+                    if (!$isRunning) {
+                        $this->cleanupStream($streamKey, true);
+                    }
+                }
+            }
+            
+            Log::channel('ffmpeg')->debug("Synchronized " . count($streamKeys) . " stream states");
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error synchronizing stream states: " . $e->getMessage());
+        }
+    }
+
 }
