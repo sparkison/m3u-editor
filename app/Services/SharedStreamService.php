@@ -154,13 +154,9 @@ class SharedStreamService
                 $this->startDirectStream($streamKey, $streamInfo);
             }
             
-            // Update stream status to active
-            $streamInfo['status'] = 'active';
-            $this->setStreamInfo($streamKey, $streamInfo);
-            
-            // Update database status
+            // Don't set status to 'active' here - let startInitialBuffering do it when data is actually received
+            // Just update the process ID in the database
             SharedStream::where('stream_id', $streamKey)->update([
-                'status' => 'active',
                 'process_id' => $this->getProcessPid($streamKey)
             ]);
             
@@ -196,17 +192,13 @@ class SharedStreamService
                 $this->startDirectStream($streamKey, $streamInfo);
             }
             
-            // Update stream status to active
-            $streamInfo['status'] = 'active';
-            $this->setStreamInfo($streamKey, $streamInfo);
-            
-            // Update database status
+            // Don't set status to 'active' here - let startInitialBuffering do it when data is actually received
+            // Just update the process ID in the database
             SharedStream::where('stream_id', $streamKey)->update([
-                'status' => 'active',
                 'process_id' => $this->getProcessPid($streamKey)
             ]);
             
-            Log::channel('ffmpeg')->info("Successfully started async streaming process for {$streamKey}");
+            Log::channel('ffmpeg')->info("Successfully started async streaming process for {$streamKey} - waiting for data");
             
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Failed to start async streaming process for {$streamKey}: " . $e->getMessage());
@@ -656,6 +648,13 @@ class SharedStreamService
                 $streamInfo['status'] = 'active';
                 $streamInfo['first_data_at'] = time();
                 $this->setStreamInfo($streamKey, $streamInfo);
+                
+                // Also update database status
+                SharedStream::where('stream_id', $streamKey)->update([
+                    'status' => 'active'
+                ]);
+                
+                Log::channel('ffmpeg')->info("Stream {$streamKey}: Status updated to 'active' - stream is ready for clients");
             }
         } else {
             Log::channel('ffmpeg')->warning("Stream {$streamKey}: No data received after {$maxWait}s, FFmpeg may have failed to start");
