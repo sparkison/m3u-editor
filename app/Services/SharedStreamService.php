@@ -583,58 +583,72 @@ class SharedStreamService
     {
         $bufferKey = self::BUFFER_PREFIX . $streamKey;
         $segmentNumber = 0;
-        $bufferSize = 1316 * 1000; // ~1.3MB chunks for better VLC compatibility
+        $targetSegmentSize = 1316 * 1000; // ~1.3MB target for better VLC compatibility
+        $readChunkSize = 8192; // PHP non-blocking read limit
         $maxWait = 15; // Wait up to 15 seconds for data
         $waitTime = 0;
 
         Log::channel('ffmpeg')->debug("Stream {$streamKey}: Starting initial buffering (waiting for FFmpeg data)");
 
-        // Wait for FFmpeg to start producing data
+        // Wait for FFmpeg to start producing data and build initial buffer
+        $accumulatedData = '';
+        $accumulatedSize = 0;
+        $hasFirstData = false;
+
         while ($waitTime < $maxWait) {
-            // Try to read data (non-blocking)
-            $data = fread($stdout, $bufferSize);
-            if ($data !== false && strlen($data) > 0) {
-                $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+            // Try to read data in small chunks (non-blocking)
+            $chunk = fread($stdout, $readChunkSize);
+            if ($chunk !== false && strlen($chunk) > 0) {
+                if (!$hasFirstData) {
+                    Log::channel('ffmpeg')->info("Stream {$streamKey}: First data received! Starting initial buffer accumulation");
+                    $hasFirstData = true;
+                }
                 
-                // Store segment in Redis with expiry
-                $this->redis()->setex($segmentKey, self::SEGMENT_EXPIRY, $data);
-                
-                // Update stream segment list
-                $this->redis()->lpush("{$bufferKey}:segments", $segmentNumber);
-                $this->redis()->ltrim("{$bufferKey}:segments", 0, 50);
-                
-                $segmentNumber++;
+                $accumulatedData .= $chunk;
+                $accumulatedSize += strlen($chunk);
                 $this->updateStreamActivity($streamKey);
                 
-                Log::channel('ffmpeg')->info("Stream {$streamKey}: First data received! Segment {$segmentNumber} buffered (" . strlen($data) . " bytes)");
-                
-                // Build up a more substantial initial buffer for VLC
-                for ($i = 1; $i < 5; $i++) {
-                    $moreData = fread($stdout, $bufferSize);
-                    if ($moreData !== false && strlen($moreData) > 0) {
-                        $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                        $this->redis()->setex($segmentKey, self::SEGMENT_EXPIRY, $moreData);
-                        $this->redis()->lpush("{$bufferKey}:segments", $segmentNumber);
-                        $this->redis()->ltrim("{$bufferKey}:segments", 0, 50);
-                        $segmentNumber++;
-                        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Initial buffer segment {$segmentNumber} buffered (" . strlen($moreData) . " bytes)");
-                    } else {
-                        // No more data available immediately, but we have some data
+                // Check if we have enough for a complete segment
+                if ($accumulatedSize >= $targetSegmentSize || $accumulatedSize >= 188000) {
+                    // Store accumulated data as a segment
+                    $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                    $this->redis()->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
+                    $this->redis()->lpush("{$bufferKey}:segments", $segmentNumber);
+                    $this->redis()->ltrim("{$bufferKey}:segments", 0, 50);
+                    
+                    Log::channel('ffmpeg')->debug("Stream {$streamKey}: Initial buffer segment {$segmentNumber} buffered (" . $accumulatedSize . " bytes from " . ceil($accumulatedSize / $readChunkSize) . " chunks)");
+                    
+                    $segmentNumber++;
+                    $accumulatedData = '';
+                    $accumulatedSize = 0;
+                    
+                    // Build up 3-5 initial segments for better VLC startup
+                    if ($segmentNumber >= 3) {
                         break;
                     }
                 }
-                break;
+            } else {
+                // No immediate data available, check for errors and wait
+                $error = fread($stderr, 1024);
+                if ($error !== false && strlen($error) > 0) {
+                    Log::channel('ffmpeg')->error("Stream {$streamKey} FFmpeg error during initial buffering: {$error}");
+                }
+                
+                usleep(200000); // 200ms wait between attempts
+                $waitTime += 0.2;
             }
-
-            // Check for errors
-            $error = fread($stderr, 1024);
-            if ($error !== false && strlen($error) > 0) {
-                Log::channel('ffmpeg')->error("Stream {$streamKey} FFmpeg error during initial buffering: {$error}");
-            }
-
-            // Wait a bit and try again
-            usleep(200000); // 200ms (reduced for faster startup)
-            $waitTime += 0.2;
+        }
+        
+        
+        // Flush any remaining data from initial buffering
+        if ($accumulatedSize > 0) {
+            $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+            $this->redis()->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
+            $this->redis()->lpush("{$bufferKey}:segments", $segmentNumber);
+            $this->redis()->ltrim("{$bufferKey}:segments", 0, 50);
+            
+            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Final initial buffer segment {$segmentNumber} buffered (" . $accumulatedSize . " bytes)");
+            $segmentNumber++;
         }
         
         if ($segmentNumber > 0) {
@@ -683,44 +697,67 @@ class SharedStreamService
     {
         $bufferKey = self::BUFFER_PREFIX . $streamKey;
         $segmentNumber = 0;
-        $bufferSize = 1316 * 1000; // ~1.3MB chunks for better VLC compatibility (7 x 188KB)
+        $targetSegmentSize = 1316 * 1000; // ~1.3MB target for better VLC compatibility (7 x 188KB)
+        $readChunkSize = 8192; // PHP non-blocking read limit
         $lastActivity = time();
         $maxInactiveTime = 60; // 60 seconds of no data before giving up
 
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffer manager starting continuous read loop with {$bufferSize} byte chunks");
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffer manager starting continuous read loop with {$targetSegmentSize} byte target segments");
 
         try {
+            $accumulatedData = '';
+            $accumulatedSize = 0;
+            $lastFlushTime = time();
+            $maxAccumulationTime = 2; // Max 2 seconds before force-flushing data
+
             while (!feof($stdout) && $this->isStreamActive($streamKey)) {
                 $hasData = false;
 
-                // Read larger chunks to improve VLC playback quality
-                $data = fread($stdout, $bufferSize);
-                if ($data !== false && strlen($data) > 0) {
-                    // Accept any data size to avoid losing packets, but log small segments
-                    $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                    
-                    // Store segment in Redis with expiry
-                    $this->redis()->setex($segmentKey, self::SEGMENT_EXPIRY, $data);
-                    
-                    // Update stream segment list
-                    $this->redis()->lpush("{$bufferKey}:segments", $segmentNumber);
-                    $this->redis()->ltrim("{$bufferKey}:segments", 0, 50); // Keep more segments for better buffering
-                    
-                    $segmentNumber++;
+                // Read in small chunks due to non-blocking stream limitations
+                $chunk = fread($stdout, $readChunkSize);
+                if ($chunk !== false && strlen($chunk) > 0) {
+                    $accumulatedData .= $chunk;
+                    $accumulatedSize += strlen($chunk);
                     $hasData = true;
                     $lastActivity = time();
                     
-                    // Update stream activity
-                    $this->updateStreamActivity($streamKey);
+                    // Check if we have enough data for a complete segment
+                    $shouldFlush = false;
                     
-                    // Log progress for performance monitoring
-                    if ($segmentNumber <= 10 || $segmentNumber % 100 === 0) {
-                        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffered segment {$segmentNumber} (" . strlen($data) . " bytes)");
+                    // Flush if we've reached target size
+                    if ($accumulatedSize >= $targetSegmentSize) {
+                        $shouldFlush = true;
+                    }
+                    // Flush if we've been accumulating for too long (prevents delays)
+                    elseif (time() - $lastFlushTime >= $maxAccumulationTime) {
+                        $shouldFlush = true;
+                    }
+                    // Flush if we have a reasonable amount and no more data is immediately available
+                    elseif ($accumulatedSize >= 188000 && strlen(fread($stdout, 1)) === 0) { // ~188KB minimum
+                        $shouldFlush = true;
                     }
                     
-                    // Warn about small segments that might cause VLC issues
-                    if (strlen($data) < 50000) { // Less than 50KB
-                        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Small segment {$segmentNumber} (" . strlen($data) . " bytes) - may cause playback issues");
+                    if ($shouldFlush && $accumulatedSize > 0) {
+                        // Store accumulated data as a segment
+                        $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                        $this->redis()->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
+                        
+                        // Update stream segment list
+                        $this->redis()->lpush("{$bufferKey}:segments", $segmentNumber);
+                        $this->redis()->ltrim("{$bufferKey}:segments", 0, 50);
+                        
+                        // Update stream activity
+                        $this->updateStreamActivity($streamKey);
+                        
+                        // Log progress for performance monitoring
+                        if ($segmentNumber <= 10 || $segmentNumber % 100 === 0) {
+                            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffered segment {$segmentNumber} (" . $accumulatedSize . " bytes from " . ceil($accumulatedSize / $readChunkSize) . " chunks)");
+                        }
+                        
+                        $segmentNumber++;
+                        $accumulatedData = '';
+                        $accumulatedSize = 0;
+                        $lastFlushTime = time();
                     }
                 }
 
@@ -733,6 +770,15 @@ class SharedStreamService
                 // Check if process is still running
                 $status = proc_get_status($process);
                 if (!$status['running']) {
+                    // Flush any remaining accumulated data before ending
+                    if ($accumulatedSize > 0) {
+                        $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                        $this->redis()->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
+                        $this->redis()->lpush("{$bufferKey}:segments", $segmentNumber);
+                        $this->redis()->ltrim("{$bufferKey}:segments", 0, 50);
+                        $segmentNumber++;
+                        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Flushed final segment {$segmentNumber} (" . $accumulatedSize . " bytes)");
+                    }
                     Log::channel('ffmpeg')->warning("Stream {$streamKey}: FFmpeg process terminated (exit code: {$status['exitcode']})");
                     break;
                 }
@@ -740,6 +786,15 @@ class SharedStreamService
                 // Optimized sleep timing for better responsiveness
                 if (!$hasData) {
                     if (time() - $lastActivity > $maxInactiveTime) {
+                        // Flush any remaining data before ending
+                        if ($accumulatedSize > 0) {
+                            $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                            $this->redis()->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
+                            $this->redis()->lpush("{$bufferKey}:segments", $segmentNumber);
+                            $this->redis()->ltrim("{$bufferKey}:segments", 0, 50);
+                            $segmentNumber++;
+                            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Flushed timeout segment {$segmentNumber} (" . $accumulatedSize . " bytes)");
+                        }
                         Log::channel('ffmpeg')->warning("Stream {$streamKey}: No data for {$maxInactiveTime}s, ending buffer manager");
                         break;
                     }
