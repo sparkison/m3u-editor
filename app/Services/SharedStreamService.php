@@ -466,19 +466,128 @@ class SharedStreamService
         stream_set_blocking($stdout, false);
         stream_set_blocking($stderr, false);
 
-        // Do initial buffering to ensure the stream starts properly
-        $this->startInitialBuffering($streamKey, $stdout, $stderr, $process);
+        // Start immediate buffer management
+        $this->runBufferManager($streamKey, $stdout, $stderr, $process);
+    }
 
-        // Start the continuous buffer manager using a background job
-        // This ensures continuous reading from FFmpeg to prevent pipe blocking
-        try {
-            \App\Jobs\StreamBufferManager::dispatch($streamKey, $stdout, $stderr, $process);
-            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Dispatched continuous buffer manager job");
-        } catch (\Exception $e) {
-            // Fallback to immediate continuous buffering if job dispatch fails
-            Log::channel('ffmpeg')->warning("Stream {$streamKey}: Failed to dispatch buffer manager job, using fallback: " . $e->getMessage());
-            $this->runContinuousBufferFallback($streamKey, $stdout, $stderr, $process);
+    /**
+     * Setup pipe drain to continuously read FFmpeg output
+     */
+    private function setupPipeDrain(string $streamKey, $stdout, $stderr, $process): void
+    {
+        // Create a named pipe or file to redirect FFmpeg output
+        $pipeDir = storage_path("app/stream_pipes");
+        if (!is_dir($pipeDir)) {
+            mkdir($pipeDir, 0755, true);
         }
+        
+        $pipeFile = "{$pipeDir}/{$streamKey}.ts";
+        
+        // Start a background process to continuously drain the pipe
+        $drainScript = $this->createPipeDrainScript($streamKey, $pipeFile);
+        
+        // Execute the drain script in background
+        $command = "nohup php " . escapeshellarg($drainScript) . " > /dev/null 2>&1 &";
+        exec($command);
+        
+        // Set up a shutdown function to ensure proper resource cleanup
+        register_shutdown_function(function () use ($streamKey, $stdout, $stderr, $process, $pipeFile, $drainScript) {
+            // Quick read to drain any remaining data
+            $maxReads = 5;
+            while ($maxReads-- > 0 && !feof($stdout)) {
+                $data = fread($stdout, 188000);
+                if ($data === false || strlen($data) === 0) {
+                    break;
+                }
+                // Write to pipe file for background script to pick up
+                file_put_contents($pipeFile, $data, FILE_APPEND | LOCK_EX);
+            }
+            
+            // Clean up resources
+            if (is_resource($stdout)) fclose($stdout);
+            if (is_resource($stderr)) fclose($stderr);
+            if (is_resource($process)) proc_close($process);
+            
+            // Schedule cleanup of temporary files
+            $this->scheduleCleanup($pipeFile, $drainScript);
+        });
+    }
+
+    /**
+     * Create a simple pipe drain script
+     */
+    private function createPipeDrainScript(string $streamKey, string $pipeFile): string
+    {
+        $scriptPath = storage_path("app/stream_pipes/drain_{$streamKey}.php");
+        
+        $script = <<<'PHP'
+<?php
+// Pipe drain script for stream: {STREAM_KEY}
+
+require_once __DIR__ . '/../../vendor/autoload.php';
+use Illuminate\Support\Facades\Redis;
+
+$streamKey = '{STREAM_KEY}';
+$pipeFile = '{PIPE_FILE}';
+$bufferKey = 'stream_buffer:' . $streamKey;
+$segmentNumber = 0;
+$lastActivity = time();
+$maxInactiveTime = 300; // 5 minutes
+
+while (time() - $lastActivity < $maxInactiveTime) {
+    if (file_exists($pipeFile)) {
+        $data = file_get_contents($pipeFile);
+        if ($data !== false && strlen($data) > 0) {
+            // Clear the file after reading
+            file_put_contents($pipeFile, '');
+            
+            // Store in Redis as segments
+            $chunks = str_split($data, 188000); // ~188KB chunks
+            foreach ($chunks as $chunk) {
+                if (strlen($chunk) > 0) {
+                    $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                    Redis::setex($segmentKey, 300, $chunk);
+                    Redis::lpush("{$bufferKey}:segments", $segmentNumber);
+                    Redis::ltrim("{$bufferKey}:segments", 0, 30);
+                    $segmentNumber++;
+                }
+            }
+            $lastActivity = time();
+        }
+    }
+    usleep(100000); // 100ms
+}
+
+// Cleanup
+if (file_exists($pipeFile)) {
+    unlink($pipeFile);
+}
+unlink(__FILE__);
+PHP;
+
+        $script = str_replace(['{STREAM_KEY}', '{PIPE_FILE}'], [$streamKey, $pipeFile], $script);
+        file_put_contents($scriptPath, $script);
+        chmod($scriptPath, 0755);
+        
+        return $scriptPath;
+    }
+
+    /**
+     * Schedule cleanup of temporary files
+     */
+    private function scheduleCleanup(string $pipeFile, string $scriptFile): void
+    {
+        // Schedule cleanup after a delay
+        $cleanupScript = storage_path("app/stream_pipes/cleanup_" . uniqid() . ".php");
+        $cleanup = <<<PHP
+<?php
+sleep(10); // Wait 10 seconds
+if (file_exists('$pipeFile')) unlink('$pipeFile');
+if (file_exists('$scriptFile')) unlink('$scriptFile');
+unlink(__FILE__);
+PHP;
+        file_put_contents($cleanupScript, $cleanup);
+        exec("nohup php " . escapeshellarg($cleanupScript) . " > /dev/null 2>&1 &");
     }
 
     /**
