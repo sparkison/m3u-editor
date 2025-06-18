@@ -684,28 +684,31 @@ class SharedStreamService
             while (!feof($stdout) && $this->isStreamActive($streamKey)) {
                 $hasData = false;
 
-                // Read data from FFmpeg stdout
+                // Read data from FFmpeg stdout with improved buffering
                 $data = fread($stdout, $bufferSize);
                 if ($data !== false && strlen($data) > 0) {
-                    $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                    
-                    // Store segment in Redis with expiry
-                    Redis::setex($segmentKey, self::SEGMENT_EXPIRY, $data);
-                    
-                    // Update stream segment list
-                    Redis::lpush("{$bufferKey}:segments", $segmentNumber);
-                    Redis::ltrim("{$bufferKey}:segments", 0, 30); // Keep last 30 segments
-                    
-                    $segmentNumber++;
-                    $hasData = true;
-                    $lastActivity = time();
-                    
-                    // Update stream activity
-                    $this->updateStreamActivity($streamKey);
-                    
-                    // Log progress occasionally
-                    if ($segmentNumber <= 10 || $segmentNumber % 100 === 0) {
-                        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffered segment {$segmentNumber} (" . strlen($data) . " bytes)");
+                    // Only store segments that have substantial data to prevent tiny segments
+                    if (strlen($data) >= 1024) { // At least 1KB to avoid tiny segments
+                        $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                        
+                        // Store segment in Redis with expiry
+                        Redis::setex($segmentKey, self::SEGMENT_EXPIRY, $data);
+                        
+                        // Update stream segment list
+                        Redis::lpush("{$bufferKey}:segments", $segmentNumber);
+                        Redis::ltrim("{$bufferKey}:segments", 0, 30); // Keep last 30 segments
+                        
+                        $segmentNumber++;
+                        $hasData = true;
+                        $lastActivity = time();
+                        
+                        // Update stream activity
+                        $this->updateStreamActivity($streamKey);
+                        
+                        // Log progress for performance monitoring
+                        if ($segmentNumber <= 10 || $segmentNumber % 50 === 0) {
+                            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffered segment {$segmentNumber} (" . strlen($data) . " bytes)");
+                        }
                     }
                 }
 
@@ -722,15 +725,15 @@ class SharedStreamService
                     break;
                 }
 
-                // If no data for a while, check if we should continue
+                // Adaptive sleep based on data availability
                 if (!$hasData) {
                     if (time() - $lastActivity > $maxInactiveTime) {
                         Log::channel('ffmpeg')->warning("Stream {$streamKey}: No data for {$maxInactiveTime}s, ending buffer manager");
                         break;
                     }
-                    usleep(100000); // 100ms sleep when no data
+                    usleep(50000); // 50ms sleep when no data (reduced from 100ms)
                 } else {
-                    usleep(10000); // 10ms sleep when actively buffering
+                    usleep(5000); // 5ms sleep when actively buffering (reduced from 10ms)
                 }
             }
         } catch (\Exception $e) {
@@ -887,9 +890,26 @@ class SharedStreamService
 
         $cmd = escapeshellcmd($ffmpegPath) . ' ';
         $cmd .= '-hide_banner -loglevel error ';
+        
+        // Optimizations for streaming performance and low latency
+        $cmd .= '-fflags nobuffer+igndts -flags low_delay ';
+        $cmd .= '-avoid_negative_ts disabled -fpsprobesize 0 ';
+        $cmd .= '-analyzeduration 1M -probesize 1M -max_delay 500000 ';
+        
+        // Connection resilience and error handling
+        $cmd .= '-err_detect ignore_err -ignore_unknown ';
+        $cmd .= '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 ';
+        $cmd .= '-multiple_requests 1 -reconnect_on_network_error 1 ';
+        $cmd .= '-reconnect_on_http_error 5xx,4xx ';
+        
+        // User agent and input
         $cmd .= '-user_agent ' . escapeshellarg($userAgent) . ' ';
+        $cmd .= '-referer ' . escapeshellarg("MyComputer") . ' ';
         $cmd .= '-i ' . escapeshellarg($streamUrl) . ' ';
-        $cmd .= '-c:v copy -c:a copy -f mpegts pipe:1';
+        
+        // Output optimization for streaming
+        $cmd .= '-c:v copy -c:a copy -avoid_negative_ts make_zero ';
+        $cmd .= '-f mpegts -mpegts_copyts 1 -async 1 pipe:1';
 
         return $cmd;
     }

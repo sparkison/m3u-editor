@@ -221,22 +221,24 @@ class SharedStreamController extends Controller
                 return;
             }
 
-            // Now start streaming data
+            // Now start streaming data with improved delivery
             while (!connection_aborted()) {
-                // Get stream data from shared buffer
-                $data = $this->sharedStreamService->getStreamData($streamKey, $clientId, $lastSegment);
+                // Get next segments from shared buffer using improved method
+                $data = $this->sharedStreamService->getNextStreamSegments($streamKey, $clientId, $lastSegment);
                 
                 if ($data) {
                     echo $data;
                     flush();
-                    $lastSegment++;
+                    
+                    // Minimal delay when actively streaming data
+                    usleep(5000); // 5ms for responsive streaming
                 } else {
                     // No new data, wait briefly
-                    usleep(100000); // 100ms
+                    usleep(20000); // 20ms when waiting for data
                 }
 
                 // Check if stream is still active (less frequently to reduce overhead)
-                if ($lastSegment % 10 === 0) {
+                if ($lastSegment % 25 === 0) { // Check every 25 segments
                     $stats = $this->sharedStreamService->getStreamStats($streamKey);
                     if (!$stats) {
                         Log::channel('ffmpeg')->debug("Stream {$streamKey} no longer active, disconnecting client {$clientId}");
