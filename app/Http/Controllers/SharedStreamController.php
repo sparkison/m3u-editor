@@ -201,14 +201,11 @@ class SharedStreamController extends Controller
             // Register shutdown function to cleanup client
             register_shutdown_function(function () use ($streamKey, $clientId) {
                 $this->sharedStreamService->removeClient($streamKey, $clientId);
-            });
-
-            // Wait for stream to become active before starting streaming loop
+            });            // Wait for stream to become active before starting streaming loop
             while (!connection_aborted() && (time() - $startTime) < $maxWaitTime) {
                 $stats = $this->sharedStreamService->getStreamStats($streamKey);
                 if ($stats && $stats['status'] === 'active') {
                     $streamStarted = true;
-                    Log::channel('ffmpeg')->debug("Stream {$streamKey} is active, starting data flow for client {$clientId}");
                     break;
                 }
                 
@@ -218,7 +215,7 @@ class SharedStreamController extends Controller
                     return;
                 }
                 
-                usleep(200000); // 200ms wait between checks (faster response)
+                usleep(100000); // 100ms wait between checks (faster response)
             }
             
             if (!$streamStarted) {
@@ -227,24 +224,31 @@ class SharedStreamController extends Controller
                 return;
             }
 
-            // Aggressive pre-buffering for VLC compatibility
-            Log::channel('ffmpeg')->debug("Starting aggressive pre-buffering for VLC client {$clientId}");
+            // Optimized startup wait - reduced for better responsiveness
+            Log::channel('ffmpeg')->debug("Stream {$streamKey} is active, starting data flow for client {$clientId}");
+            
+            // Immediate streaming with minimal pre-buffering for faster startup
+            Log::channel('ffmpeg')->debug("Starting optimized streaming for VLC client {$clientId}");
             $preBufferData = '';
             $preBufferAttempts = 0;
-            $maxPreBufferAttempts = 30; // 6 seconds max
-            $targetPreBufferSize = 2 * 1024 * 1024; // 2MB for VLC startup
+            $maxPreBufferAttempts = 10; // Reduced from 30 to 10 for faster startup
+            $targetPreBufferSize = 512 * 1024; // Reduced from 2MB to 512KB for faster startup
             
             while ($preBufferAttempts < $maxPreBufferAttempts && strlen($preBufferData) < $targetPreBufferSize) {
                 $data = $this->sharedStreamService->getNextStreamSegments($streamKey, $clientId, $lastSegment);
                 if ($data) {
                     $preBufferData .= $data;
                     Log::channel('ffmpeg')->debug("Pre-buffer progress: " . strlen($preBufferData) . " bytes");
+                    // Break early if we have a reasonable amount
+                    if (strlen($preBufferData) >= 256000) { // 256KB is sufficient for startup
+                        break;
+                    }
                 } else {
-                    usleep(200000); // 200ms wait for more data
+                    usleep(100000); // Reduced from 200ms to 100ms for faster response
                 }
                 $preBufferAttempts++;
             }
-            
+
             // Send the pre-buffered data as a large chunk for faster VLC startup
             if (!empty($preBufferData)) {
                 echo $preBufferData;
@@ -257,7 +261,7 @@ class SharedStreamController extends Controller
 
             // Now stream with optimized timing for responsive playback
             $consecutiveEmptyReads = 0;
-            $maxEmptyReads = 100; // Allow more empty reads before backing off
+            $maxEmptyReads = 50; // Reduced from 100 for more responsive streaming
             
             while (!connection_aborted()) {
                 // Get next segments with batching for efficiency
@@ -275,27 +279,27 @@ class SharedStreamController extends Controller
                     $consecutiveEmptyReads = 0; // Reset counter
                     
                     // Minimal delay when actively streaming data (more responsive)
-                    usleep(5000); // 5ms for very responsive streaming
+                    usleep(2000); // Reduced from 5ms to 2ms for better responsiveness
                 } else {
                     $consecutiveEmptyReads++;
                     
                     // Adaptive sleep timing based on data availability
-                    if ($consecutiveEmptyReads < 20) {
-                        usleep(10000); // 10ms for first 20 empty reads (200ms total)
-                    } elseif ($consecutiveEmptyReads < 50) {
-                        usleep(25000); // 25ms for next 30 empty reads (750ms more)
+                    if ($consecutiveEmptyReads < 10) {
+                        usleep(5000); // 5ms for first 10 empty reads (faster response)
+                    } elseif ($consecutiveEmptyReads < 25) {
+                        usleep(15000); // 15ms for next 15 empty reads
                     } else {
-                        usleep(50000); // 50ms for subsequent reads (backing off)
+                        usleep(30000); // 30ms for subsequent reads (reduced from 50ms)
                     }
                     
                     // Reset after too many consecutive empty reads to stay responsive
                     if ($consecutiveEmptyReads > $maxEmptyReads) {
-                        $consecutiveEmptyReads = 50; // Keep at moderate back-off level
+                        $consecutiveEmptyReads = 25; // Keep at moderate back-off level
                     }
                 }
 
                 // Check if stream is still active (less frequently to reduce overhead)
-                if ($lastSegment % 200 === 0) { // Check every 200 segments instead of 50
+                if ($lastSegment % 100 === 0) { // Reduced frequency check
                     $stats = $this->sharedStreamService->getStreamStats($streamKey);
                     if (!$stats) {
                         Log::channel('ffmpeg')->debug("Stream {$streamKey} no longer active, disconnecting client {$clientId}");
