@@ -583,8 +583,8 @@ class SharedStreamService
     {
         $bufferKey = self::BUFFER_PREFIX . $streamKey;
         $segmentNumber = 0;
-        $bufferSize = 188 * 1000; // ~188KB chunks
-        $maxWait = 10; // Wait up to 10 seconds for data
+        $bufferSize = 1316 * 1000; // ~1.3MB chunks for better VLC compatibility
+        $maxWait = 15; // Wait up to 15 seconds for data
         $waitTime = 0;
 
         Log::channel('ffmpeg')->debug("Stream {$streamKey}: Starting initial buffering (waiting for FFmpeg data)");
@@ -601,23 +601,23 @@ class SharedStreamService
                 
                 // Update stream segment list
                 $this->redis()->lpush("{$bufferKey}:segments", $segmentNumber);
-                $this->redis()->ltrim("{$bufferKey}:segments", 0, 30);
+                $this->redis()->ltrim("{$bufferKey}:segments", 0, 50);
                 
                 $segmentNumber++;
                 $this->updateStreamActivity($streamKey);
                 
                 Log::channel('ffmpeg')->info("Stream {$streamKey}: First data received! Segment {$segmentNumber} buffered (" . strlen($data) . " bytes)");
                 
-                // Buffer many more segments to get the stream going and drain the pipe
-                for ($i = 1; $i < 10; $i++) {
+                // Build up a more substantial initial buffer for VLC
+                for ($i = 1; $i < 5; $i++) {
                     $moreData = fread($stdout, $bufferSize);
                     if ($moreData !== false && strlen($moreData) > 0) {
                         $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
                         $this->redis()->setex($segmentKey, self::SEGMENT_EXPIRY, $moreData);
                         $this->redis()->lpush("{$bufferKey}:segments", $segmentNumber);
-                        $this->redis()->ltrim("{$bufferKey}:segments", 0, 30);
+                        $this->redis()->ltrim("{$bufferKey}:segments", 0, 50);
                         $segmentNumber++;
-                        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Additional segment {$segmentNumber} buffered (" . strlen($moreData) . " bytes)");
+                        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Initial buffer segment {$segmentNumber} buffered (" . strlen($moreData) . " bytes)");
                     } else {
                         // No more data available immediately, but we have some data
                         break;
@@ -633,8 +633,8 @@ class SharedStreamService
             }
 
             // Wait a bit and try again
-            usleep(500000); // 500ms
-            $waitTime += 0.5;
+            usleep(200000); // 200ms (reduced for faster startup)
+            $waitTime += 0.2;
         }
         
         if ($segmentNumber > 0) {
@@ -645,6 +645,7 @@ class SharedStreamService
             if ($streamInfo) {
                 $streamInfo['status'] = 'active';
                 $streamInfo['first_data_at'] = time();
+                $streamInfo['initial_segments'] = $segmentNumber;
                 $this->setStreamInfo($streamKey, $streamInfo);
                 
                 // Also update database status
@@ -682,41 +683,44 @@ class SharedStreamService
     {
         $bufferKey = self::BUFFER_PREFIX . $streamKey;
         $segmentNumber = 0;
-        $bufferSize = 188 * 1000; // ~188KB chunks (similar to xTeVe's approach)
+        $bufferSize = 1316 * 1000; // ~1.3MB chunks for better VLC compatibility (7 x 188KB)
         $lastActivity = time();
         $maxInactiveTime = 60; // 60 seconds of no data before giving up
 
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffer manager starting continuous read loop");
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffer manager starting continuous read loop with {$bufferSize} byte chunks");
 
         try {
             while (!feof($stdout) && $this->isStreamActive($streamKey)) {
                 $hasData = false;
 
-                // Read data from FFmpeg stdout with improved buffering
+                // Read larger chunks to improve VLC playback quality
                 $data = fread($stdout, $bufferSize);
                 if ($data !== false && strlen($data) > 0) {
-                    // Only store segments that have substantial data to prevent tiny segments
-                    if (strlen($data) >= 1024) { // At least 1KB to avoid tiny segments
-                        $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                        
-                        // Store segment in Redis with expiry
-                        $this->redis()->setex($segmentKey, self::SEGMENT_EXPIRY, $data);
-                        
-                        // Update stream segment list
-                        $this->redis()->lpush("{$bufferKey}:segments", $segmentNumber);
-                        $this->redis()->ltrim("{$bufferKey}:segments", 0, 30); // Keep last 30 segments
-                        
-                        $segmentNumber++;
-                        $hasData = true;
-                        $lastActivity = time();
-                        
-                        // Update stream activity
-                        $this->updateStreamActivity($streamKey);
-                        
-                        // Log progress for performance monitoring
-                        if ($segmentNumber <= 10 || $segmentNumber % 50 === 0) {
-                            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffered segment {$segmentNumber} (" . strlen($data) . " bytes)");
-                        }
+                    // Accept any data size to avoid losing packets, but log small segments
+                    $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                    
+                    // Store segment in Redis with expiry
+                    $this->redis()->setex($segmentKey, self::SEGMENT_EXPIRY, $data);
+                    
+                    // Update stream segment list
+                    $this->redis()->lpush("{$bufferKey}:segments", $segmentNumber);
+                    $this->redis()->ltrim("{$bufferKey}:segments", 0, 50); // Keep more segments for better buffering
+                    
+                    $segmentNumber++;
+                    $hasData = true;
+                    $lastActivity = time();
+                    
+                    // Update stream activity
+                    $this->updateStreamActivity($streamKey);
+                    
+                    // Log progress for performance monitoring
+                    if ($segmentNumber <= 10 || $segmentNumber % 100 === 0) {
+                        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffered segment {$segmentNumber} (" . strlen($data) . " bytes)");
+                    }
+                    
+                    // Warn about small segments that might cause VLC issues
+                    if (strlen($data) < 50000) { // Less than 50KB
+                        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Small segment {$segmentNumber} (" . strlen($data) . " bytes) - may cause playback issues");
                     }
                 }
 
@@ -733,15 +737,15 @@ class SharedStreamService
                     break;
                 }
 
-                // Adaptive sleep based on data availability
+                // Optimized sleep timing for better responsiveness
                 if (!$hasData) {
                     if (time() - $lastActivity > $maxInactiveTime) {
                         Log::channel('ffmpeg')->warning("Stream {$streamKey}: No data for {$maxInactiveTime}s, ending buffer manager");
                         break;
                     }
-                    usleep(50000); // 50ms sleep when no data (reduced from 100ms)
+                    usleep(20000); // 20ms sleep when no data (faster response)
                 } else {
-                    usleep(5000); // 5ms sleep when actively buffering (reduced from 10ms)
+                    usleep(1000); // 1ms sleep when actively buffering (very responsive)
                 }
             }
         } catch (\Exception $e) {
@@ -899,14 +903,17 @@ class SharedStreamService
         $cmd = escapeshellcmd($ffmpegPath) . ' ';
         $cmd .= '-hide_banner -loglevel error ';
         
-        // Optimizations for streaming performance and low latency
-        $cmd .= '-fflags nobuffer+igndts -flags low_delay ';
+        // Reduced latency optimizations for VLC playback
+        $cmd .= '-fflags nobuffer+flush_packets -flags low_delay ';
         $cmd .= '-avoid_negative_ts disabled -fpsprobesize 0 ';
-        $cmd .= '-analyzeduration 1M -probesize 1M -max_delay 500000 ';
+        $cmd .= '-analyzeduration 500000 -probesize 500000 -max_delay 0 ';
+        
+        // More aggressive buffering control for real-time playback
+        $cmd .= '-flush_packets 1 -max_interleave_delta 0 ';
         
         // Connection resilience and error handling
         $cmd .= '-err_detect ignore_err -ignore_unknown ';
-        $cmd .= '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 ';
+        $cmd .= '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 2 ';
         $cmd .= '-multiple_requests 1 -reconnect_on_network_error 1 ';
         $cmd .= '-reconnect_on_http_error 5xx,4xx ';
         
@@ -915,9 +922,11 @@ class SharedStreamService
         $cmd .= '-referer ' . escapeshellarg("MyComputer") . ' ';
         $cmd .= '-i ' . escapeshellarg($streamUrl) . ' ';
         
-        // Output optimization for streaming
+        // Output optimization for real-time streaming
         $cmd .= '-c:v copy -c:a copy -avoid_negative_ts make_zero ';
-        $cmd .= '-f mpegts -mpegts_copyts 1 -async 1 pipe:1';
+        $cmd .= '-f mpegts -mpegts_copyts 1 -async 1 ';
+        $cmd .= '-muxrate 0 -muxdelay 0.1 '; // Remove mux rate limit, minimal mux delay
+        $cmd .= 'pipe:1';
 
         return $cmd;
     }
@@ -940,6 +949,7 @@ class SharedStreamService
     /**
      * Get next stream segments for client streaming
      * This method is called by SharedStreamController to stream data to clients
+     * Optimized for VLC playback performance
      */
     public function getNextStreamSegments(string $streamKey, string $clientId, int &$lastSegment): ?string
     {
@@ -957,6 +967,8 @@ class SharedStreamService
             // Get segments that are newer than lastSegment
             $data = '';
             $segmentsRead = 0;
+            $totalBytes = 0;
+            $maxBytesPerCall = 2 * 1024 * 1024; // 2MB max per call for VLC compatibility
             
             foreach ($segments as $segmentNum) {
                 if ($segmentNum > $lastSegment) {
@@ -964,16 +976,32 @@ class SharedStreamService
                     $segmentData = $redis->get($segmentKey);
                     
                     if ($segmentData) {
+                        // Check if adding this segment would exceed our size limit
+                        if ($totalBytes + strlen($segmentData) > $maxBytesPerCall && $segmentsRead > 0) {
+                            break; // Send what we have so far
+                        }
+                        
                         $data .= $segmentData;
                         $lastSegment = max($lastSegment, $segmentNum);
                         $segmentsRead++;
+                        $totalBytes += strlen($segmentData);
                         
-                        // Limit to a reasonable number of segments per call to prevent memory issues
-                        if ($segmentsRead >= 5) {
+                        // For VLC, prefer fewer but larger chunks - limit segments but allow bigger total size
+                        if ($segmentsRead >= 3 && $totalBytes >= 500000) { // At least 500KB
+                            break;
+                        }
+                        
+                        // Safety limit for very large segments
+                        if ($segmentsRead >= 10) {
                             break;
                         }
                     }
                 }
+            }
+
+            // Log segment delivery for debugging VLC issues
+            if ($segmentsRead > 0) {
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Delivered {$segmentsRead} segments ({$totalBytes} bytes) to client {$clientId}");
             }
 
             return $data ?: null;

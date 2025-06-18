@@ -218,7 +218,7 @@ class SharedStreamController extends Controller
                     return;
                 }
                 
-                usleep(500000); // 500ms wait between checks
+                usleep(200000); // 200ms wait between checks (faster response)
             }
             
             if (!$streamStarted) {
@@ -227,24 +227,59 @@ class SharedStreamController extends Controller
                 return;
             }
 
-            // Now start streaming data with improved delivery
+            // Pre-buffer significant data for VLC before starting the stream
+            Log::channel('ffmpeg')->debug("Pre-buffering data for VLC compatibility for client {$clientId}");
+            $preBufferData = '';
+            $preBufferAttempts = 0;
+            $maxPreBufferAttempts = 20; // 4 seconds max
+            
+            while ($preBufferAttempts < $maxPreBufferAttempts && strlen($preBufferData) < 1048576) { // 1MB pre-buffer
+                $data = $this->sharedStreamService->getNextStreamSegments($streamKey, $clientId, $lastSegment);
+                if ($data) {
+                    $preBufferData .= $data;
+                    Log::channel('ffmpeg')->debug("Pre-buffer progress: " . strlen($preBufferData) . " bytes");
+                } else {
+                    usleep(200000); // 200ms wait for more data
+                }
+                $preBufferAttempts++;
+            }
+            
+            // Send the pre-buffered data immediately for faster VLC startup
+            if (!empty($preBufferData)) {
+                echo $preBufferData;
+                if (ob_get_level()) {
+                    ob_flush();
+                }
+                flush();
+                Log::channel('ffmpeg')->info("Sent " . strlen($preBufferData) . " bytes pre-buffer to VLC client {$clientId}");
+            }
+
+            // Now start streaming data with improved delivery for VLC
             while (!connection_aborted()) {
                 // Get next segments from shared buffer using improved method
                 $data = $this->sharedStreamService->getNextStreamSegments($streamKey, $clientId, $lastSegment);
                 
                 if ($data) {
                     echo $data;
+                    
+                    // Force immediate output for better VLC compatibility
+                    if (ob_get_level()) {
+                        ob_flush();
+                    }
                     flush();
                     
-                    // Minimal delay when actively streaming data
-                    usleep(5000); // 5ms for responsive streaming
+                    // Update segment counter for progress tracking
+                    $lastSegment++;
+                    
+                    // Minimal delay when actively streaming data for responsive playback
+                    usleep(2000); // 2ms for very responsive streaming
                 } else {
-                    // No new data, wait briefly
-                    usleep(20000); // 20ms when waiting for data
+                    // No new data, wait briefly but not too long to avoid VLC timeout
+                    usleep(10000); // 10ms when waiting for data
                 }
 
                 // Check if stream is still active (less frequently to reduce overhead)
-                if ($lastSegment % 25 === 0) { // Check every 25 segments
+                if ($lastSegment % 50 === 0) { // Check every 50 segments
                     $stats = $this->sharedStreamService->getStreamStats($streamKey);
                     if (!$stats) {
                         Log::channel('ffmpeg')->debug("Stream {$streamKey} no longer active, disconnecting client {$clientId}");
@@ -258,9 +293,13 @@ class SharedStreamController extends Controller
             
         }, 200, [
             'Content-Type' => 'video/MP2T',
-            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate, private',
             'Connection' => 'keep-alive',
-            'X-Accel-Buffering' => 'no'
+            'X-Accel-Buffering' => 'no',
+            'Accept-Ranges' => 'none',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+            'Transfer-Encoding' => 'chunked'
         ]);
     }
 
