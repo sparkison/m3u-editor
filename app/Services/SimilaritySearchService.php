@@ -60,7 +60,7 @@ class SimilaritySearchService
 
         if (!$normalizedChan) {
             if ($debug) {
-                Log::info("Channel {$channel->id} '{$fallbackName}' => empty after normalization, skipping");
+                Log::debug("Channel {$channel->id} '{$fallbackName}' => empty after normalization, skipping");
             }
             return null;
         }
@@ -86,7 +86,7 @@ class SimilaritySearchService
 
         if ($epgChannels->count() === 0) {
             if ($debug) {
-                Log::info("Channel {$channel->id} '{$fallbackName}' => no EPG channels found, skipping");
+                Log::debug("Channel {$channel->id} '{$fallbackName}' => no EPG channels found, skipping");
             }
             return null;
         }
@@ -122,7 +122,7 @@ class SimilaritySearchService
         // If we have a best match with Levenshtein < bestFuzzyThreshold, return it
         if ($bestMatch && $bestScore < $this->bestFuzzyThreshold) {
             if ($debug) {
-                Log::info("Channel {$channel->id} '{$fallbackName}' matched with EPG channel_id={$bestMatch->channel_id} (score={$bestScore})");
+                Log::debug("Channel {$channel->id} '{$fallbackName}' matched with EPG channel_id={$bestMatch->channel_id} (score={$bestScore})");
             }
             return $bestMatch;
         }
@@ -137,12 +137,12 @@ class SimilaritySearchService
             $similarity = $this->cosineSimilarity($chanVector, $epgVector);
             if ($similarity >= $this->embedSimThreshold) {
                 if ($debug) {
-                    Log::info("Channel {$channel->id} '{$fallbackName}' matched via cosine similarity with channel_id={$bestEpgForEmbedding->channel_id} (cos-sim={$similarity})");
+                    Log::debug("Channel {$channel->id} '{$fallbackName}' matched via cosine similarity with channel_id={$bestEpgForEmbedding->channel_id} (cos-sim={$similarity})");
                 }
                 return $bestEpgForEmbedding;
             } else {
                 if ($debug) {
-                    Log::info("Channel {$channel->id} '{$fallbackName}' cosine-similarity with '{$bestEpgForEmbedding->name}' = {$similarity}");
+                    Log::debug("Channel {$channel->id} '{$fallbackName}' cosine-similarity with '{$bestEpgForEmbedding->name}' = {$similarity}");
                 }
             }
         }

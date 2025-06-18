@@ -161,14 +161,14 @@ class HlsStreamController extends Controller
                 }
                 if ($actualStreamingModel) {
                     $logTitle = strip_tags($title);
-                    // Log::channel('ffmpeg')->info("HLS Stream: Found existing failover stream for original $type ID {$model->id} ({$logTitle}). Using active $type ID {$actualStreamingModel->id} (" . ($actualStreamingModel->title_custom ?? $actualStreamingModel->title) . ").");
+                    // Log::channel('ffmpeg')->debug("HLS Stream: Found existing failover stream for original $type ID {$model->id} ({$logTitle}). Using active $type ID {$actualStreamingModel->id} (" . ($actualStreamingModel->title_custom ?? $actualStreamingModel->title) . ").");
                 } else {
                     // The mapped model doesn't exist anymore, clear the mapping
                     Cache::forget($streamMappingKey);
                     $activeStreamId = null;
                 }
             } else {
-                // Log::channel('ffmpeg')->info("HLS Stream: Found existing stream for $type ID {$model->id} (" . strip_tags($title) . ").");
+                // Log::channel('ffmpeg')->debug("HLS Stream: Found existing stream for $type ID {$model->id} (" . strip_tags($title) . ").");
             }
         }
 
@@ -189,7 +189,7 @@ class HlsStreamController extends Controller
                     // Cache the mapping between original model and actual streaming model
                     Cache::put($streamMappingKey, $actualStreamingModel->id, now()->addHours(24));
                     
-                    Log::channel('ffmpeg')->info("HLS Stream: Original request for $type ID {$model->id} ({$logTitle}). Actual streaming $type ID {$actualStreamingModel->id} (" . ($actualStreamingModel->title_custom ?? $actualStreamingModel->title) . ").");
+                    Log::channel('ffmpeg')->debug("HLS Stream: Original request for $type ID {$model->id} ({$logTitle}). Actual streaming $type ID {$actualStreamingModel->id} (" . ($actualStreamingModel->title_custom ?? $actualStreamingModel->title) . ").");
                 } else {
                     // No stream (primary or failover) could be started
                     Log::channel('ffmpeg')->error("HLS Stream: No stream could be started for $type ID {$model->id} ({$logTitle}) after trying all sources.");
@@ -208,7 +208,7 @@ class HlsStreamController extends Controller
         $pathPrefix = $type === 'channel' ? '' : 'e/';
         $m3u8Path = Storage::disk('app')->path("hls/$pathPrefix{$actualStreamingModel->id}/stream.m3u8");
 
-        // Log::channel('ffmpeg')->info("HLS Stream: Checking for playlist for $type ID {$actualStreamingModel->id}. Path: {$m3u8Path}. PID found from cache key '{$pidCacheKey}': " . ($pid ?: 'None'));
+        // Log::channel('ffmpeg')->debug("HLS Stream: Checking for playlist for $type ID {$actualStreamingModel->id}. Path: {$m3u8Path}. PID found from cache key '{$pidCacheKey}': " . ($pid ?: 'None'));
 
         // Get configurable loop parameters
         $settings = app(GeneralSettings::class);

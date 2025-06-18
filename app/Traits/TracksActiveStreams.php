@@ -2,6 +2,8 @@
 
 namespace App\Traits;
 
+use App\Events\StreamingStarted;
+use App\Events\StreamingStopped;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 
@@ -32,8 +34,11 @@ trait TracksActiveStreams
             Redis::set($activeStreamsKey, 1);
             $activeStreams = 1;
         }
+
+        // Fire event
+        event(new StreamingStarted($playlistId));
         
-        Log::channel('ffmpeg')->info("Active streams for playlist {$playlistId}: {$activeStreams} (after increment)");
+        Log::channel('ffmpeg')->debug("Active streams for playlist {$playlistId}: {$activeStreams} (after increment)");
         
         return $activeStreams;
     }
@@ -56,8 +61,11 @@ trait TracksActiveStreams
             Redis::set($activeStreamsKey, 0);
             $activeStreams = 0;
         }
+
+        // Fire event
+        event(new StreamingStopped($playlistId));
         
-        Log::channel('ffmpeg')->info("Active streams for playlist {$playlistId}: {$activeStreams} (after decrement)");
+        Log::channel('ffmpeg')->debug("Active streams for playlist {$playlistId}: {$activeStreams} (after decrement)");
         
         return $activeStreams;
     }
@@ -110,24 +118,7 @@ trait TracksActiveStreams
         $activeStreamsKey = "active_streams:{$playlistId}";
         Redis::set($activeStreamsKey, 0);
         
-        Log::channel('ffmpeg')->info("Reset active streams count for playlist {$playlistId} to 0");
+        Log::channel('ffmpeg')->debug("Reset active streams count for playlist {$playlistId} to 0");
     }
-    
-    /**
-     * Register a shutdown function to decrement active streams when the script ends
-     * 
-     * @param int $playlistId
-     * @param string $logContext Additional context for logging
-     * @return void
-     */
-    protected function registerStreamCleanupHandler(int $playlistId, string $logContext = ''): void
-    {
-        register_shutdown_function(function () use ($playlistId, $logContext) {
-            $this->decrementActiveStreams($playlistId);
-            
-            if ($logContext) {
-                Log::channel('ffmpeg')->info("Stream cleanup executed for {$logContext}");
-            }
-        });
-    }
+
 }

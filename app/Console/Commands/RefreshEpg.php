@@ -15,7 +15,7 @@ class RefreshEpg extends Command
      *
      * @var string
      */
-    protected $signature = 'app:refresh-epg {epg?}';
+    protected $signature = 'app:refresh-epg {epg?} {force?}';
 
     /**
      * The console command description.
@@ -31,29 +31,33 @@ class RefreshEpg extends Command
     {
         $epgId = $this->argument('epg');
         if ($epgId) {
+            $force = $this->argument('force') ?? false;
             $this->info("Refreshing EPG with ID: {$epgId}");
             $epg = Epg::findOrFail($epgId);
-            dispatch(new ProcessEpgImport($epg));
+            dispatch(new ProcessEpgImport($epg, (bool)$force));
             $this->info('Dispatched EPG for refresh');
         } else {
             $this->info('Refreshing all EPGs');
-            $fifteenMinutesAgo = now()->subMinutes(15); // lowest interval
+            // Get all EPGs that are not currently processing
             $epgs = Epg::query()->where(
                 'status',
                 '!=',
                 Status::Processing,
-            )->whereDate('synced', '<=', $fifteenMinutesAgo);
-            $count = $epgs->count();
-            if ($count === 0) {
+            )->whereNotNull('synced');
+
+            $totalEpgs = $epgs->count();
+            if ($totalEpgs === 0) {
                 $this->info('No EPGs ready refresh');
                 return;
             }
+
             $count = 0;
             $epgs->get()->each(function (Epg $epg) use (&$count) {
                 // Check the sync interval to see if we need to refresh yet
                 $nextSync = $epg->sync_interval
                     ? $epg->synced->add(CarbonInterval::fromString($epg->sync_interval))
                     : $epg->synced->addDay();
+
                 if (!$nextSync->isFuture()) {
                     $count++;
                     dispatch(new ProcessEpgImport($epg));

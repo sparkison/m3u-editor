@@ -40,6 +40,15 @@ class Episode extends Model
         return $this->belongsTo(Playlist::class);
     }
 
+    /**
+     * Get the effective playlist (currently only the main playlist is used)
+     * This method returns the playlist that should be used for configuration
+     */
+    public function getEffectivePlaylist()
+    {
+        return $this->playlist;
+    }
+
     public function series(): BelongsTo
     {
         return $this->belongsTo(Series::class);

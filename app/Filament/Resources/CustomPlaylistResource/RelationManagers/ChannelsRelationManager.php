@@ -4,8 +4,10 @@ namespace App\Filament\Resources\CustomPlaylistResource\RelationManagers;
 
 use App\Enums\ChannelLogoType;
 use App\Filament\Resources\ChannelResource;
+use App\Models\ChannelFailover;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -14,7 +16,9 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Database\Eloquent\Model;
 use Filament\Tables\Columns\SpatieTagsColumn;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Spatie\Tags\Tag;
 
@@ -42,14 +46,16 @@ class ChannelsRelationManager extends RelationManager
     {
         $ownerRecord = $this->ownerRecord;
         return $table->persistFiltersInSession()
+            ->persistFiltersInSession()
             ->persistSortInSession()
             ->recordTitleAttribute('title')
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
-            // ->modifyQueryUsing(function (Builder $query) {
-            //     $query->with('tags');
-            // })
+            ->modifyQueryUsing(function (Builder $query) {
+                $query->with('tags')
+                    ->withCount('failovers');
+            })
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
             ->columns([
@@ -71,8 +77,12 @@ class ChannelsRelationManager extends RelationManager
                     ->type('number')
                     ->placeholder('Sort Order')
                     ->sortable()
-                    ->tooltip(fn($record) => $record->playlist->auto_sort ? 'Playlist auto-sort enabled; disable to change' : 'Channel sort order')
-                    ->disabled(fn($record) => $record->playlist->auto_sort)
+                    ->tooltip(fn($record) => !$record->is_custom && $record->playlist?->auto_sort ? 'Playlist auto-sort enabled; disable to change' : 'Channel sort order')
+                    ->disabled(fn($record) => !$record->is_custom && $record->playlist?->auto_sort)
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('failovers_count')
+                    ->label('Failovers')
+                    ->sortable()
                     ->toggleable(),
                 Tables\Columns\TextInputColumn::make('stream_id_custom')
                     ->label('ID')
@@ -225,7 +235,53 @@ class ChannelsRelationManager extends RelationManager
                     }),
             ])
             ->headerActions([
+                Tables\Actions\CreateAction::make()
+                    ->label('Create Custom Channel')
+                    ->form(ChannelResource::getForm(customPlaylist: $ownerRecord))
+                    ->modalHeading('New Custom Channel')
+                    ->modalDescription('NOTE: Custom channels need to be associated with a Playlist or Custom Playlist.')
+                    ->using(fn(array $data, string $model): Model => ChannelResource::createCustomChannel(
+                        data: $data,
+                        model: $model,
+                    ))
+                    ->slideOver(),
                 Tables\Actions\AttachAction::make()
+                    ->form(fn(Tables\Actions\AttachAction $action): array => [
+                        $action
+                            ->getRecordSelect()
+                            ->getSearchResultsUsing(function (string $search) {
+                                $searchLower = strtolower($search);
+                                $channels = Auth::user()->channels()
+                                    ->withoutEagerLoads()
+                                    ->with('playlist')
+                                    ->where(function ($query) use ($searchLower) {
+                                        $query->whereRaw('LOWER(title) LIKE ?', ["%{$searchLower}%"])
+                                            ->orWhereRaw('LOWER(title_custom) LIKE ?', ["%{$searchLower}%"])
+                                            ->orWhereRaw('LOWER(name) LIKE ?', ["%{$searchLower}%"])
+                                            ->orWhereRaw('LOWER(name_custom) LIKE ?', ["%{$searchLower}%"])
+                                            ->orWhereRaw('LOWER(stream_id) LIKE ?', ["%{$searchLower}%"])
+                                            ->orWhereRaw('LOWER(stream_id_custom) LIKE ?', ["%{$searchLower}%"]);
+                                    })
+                                    ->limit(50)
+                                    ->get();
+
+                                // Create options array
+                                $options = [];
+                                foreach ($channels as $channel) {
+                                    $displayTitle = $channel->title_custom ?: $channel->title;
+                                    $playlistName = $channel->getEffectivePlaylist()->name ?? 'Unknown';
+                                    $options[$channel->id] = "{$displayTitle} [{$playlistName}]";
+                                }
+
+                                return $options;
+                            })
+                            ->getOptionLabelFromRecordUsing(function ($record) {
+                                $displayTitle = $record->title_custom ?: $record->title;
+                                $playlistName = $record->getEffectivePlaylist()->name ?? 'Unknown';
+                                $options[$record->id] = "{$displayTitle} [{$playlistName}]";
+                                return "{$displayTitle} [{$playlistName}]";
+                            })
+                    ])
 
                 // Advanced attach when adding pivot values:
                 // Tables\Actions\AttachAction::make()->form(fn(Tables\Actions\AttachAction $action): array => [
@@ -241,12 +297,16 @@ class ChannelsRelationManager extends RelationManager
                         ->slideOver()
                         ->form(fn(Tables\Actions\EditAction $action): array => [
                             Forms\Components\Grid::make()
-                                ->schema(ChannelResource::getForm())
+                                ->schema(ChannelResource::getForm(edit: true))
                                 ->columns(2)
                         ]),
                     Tables\Actions\ViewAction::make()
                         ->slideOver(),
                     Tables\Actions\DetachAction::make()
+                        ->color('warning'),
+                    Tables\Actions\DeleteAction::make()
+                        ->hidden(fn(Model $record) => !$record->is_custom)
+                        ->disabled(fn(Model $record) => !$record->is_custom)
                 ])->button()->hiddenLabel()->size('sm'),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
@@ -284,6 +344,103 @@ class ChannelsRelationManager extends RelationManager
                         ->modalIcon('heroicon-o-squares-plus')
                         ->modalDescription('Add to group')
                         ->modalSubmitActionLabel('Yes, add to group'),
+
+                    Tables\Actions\BulkAction::make('failover')
+                        ->label('Add as failover')
+                        ->form(function (Collection $records) {
+                            $existingFailoverIds = $records->pluck('id')->toArray();
+                            $initialMasterOptions = [];
+                            foreach ($records as $record) {
+                                $displayTitle = $record->title_custom ?: $record->title;
+                                $playlistName = $record->getEffectivePlaylist()->name ?? 'Unknown';
+                                $initialMasterOptions[$record->id] = "{$displayTitle} [{$playlistName}]";
+                            }
+                            return [
+                                Forms\Components\ToggleButtons::make('master_source')
+                                    ->label('Choose master from?')
+                                    ->options([
+                                        'selected' => 'Selected Channels',
+                                        'searched' => 'Channel Search',
+                                    ])
+                                    ->icons([
+                                        'selected' => 'heroicon-o-check',
+                                        'searched' => 'heroicon-o-magnifying-glass',
+                                    ])
+                                    ->default('selected')
+                                    ->live()
+                                    ->grouped(),
+                                Forms\Components\Select::make('selected_master_id')
+                                    ->label('Select master channel')
+                                    ->helperText('From the selected channels')
+                                    ->options($initialMasterOptions)
+                                    ->required()
+                                    ->hidden(fn(Get $get) => $get('master_source') !== 'selected')
+                                    ->searchable(),
+                                Forms\Components\Select::make('master_channel_id')
+                                    ->label('Search for master channel')
+                                    ->searchable()
+                                    ->required()
+                                    ->hidden(fn(Get $get) => $get('master_source') !== 'searched')
+                                    ->getSearchResultsUsing(function (string $search) use ($existingFailoverIds) {
+                                        $searchLower = strtolower($search);
+                                        $channels = Auth::user()->channels()
+                                            ->withoutEagerLoads()
+                                            ->with('playlist')
+                                            ->whereNotIn('id', $existingFailoverIds)
+                                            ->where(function ($query) use ($searchLower) {
+                                                $query->whereRaw('LOWER(title) LIKE ?', ["%{$searchLower}%"])
+                                                    ->orWhereRaw('LOWER(title_custom) LIKE ?', ["%{$searchLower}%"])
+                                                    ->orWhereRaw('LOWER(name) LIKE ?', ["%{$searchLower}%"])
+                                                    ->orWhereRaw('LOWER(name_custom) LIKE ?', ["%{$searchLower}%"])
+                                                    ->orWhereRaw('LOWER(stream_id) LIKE ?', ["%{$searchLower}%"])
+                                                    ->orWhereRaw('LOWER(stream_id_custom) LIKE ?', ["%{$searchLower}%"]);
+                                            })
+                                            ->limit(50) // Keep a reasonable limit
+                                            ->get();
+
+                                        // Create options array
+                                        $options = [];
+                                        foreach ($channels as $channel) {
+                                            $displayTitle = $channel->title_custom ?: $channel->title;
+                                            $playlistName = $channel->getEffectivePlaylist()->name ?? 'Unknown';
+                                            $options[$channel->id] = "{$displayTitle} [{$playlistName}]";
+                                        }
+
+                                        return $options;
+                                    })
+                                    ->helperText('To use as the master for the selected channel.')
+                                    ->required(),
+                            ];
+                        })
+                        ->action(function (Collection $records, array $data): void {
+                            // Filter out the master channel from the records to be added as failovers
+                            $masterRecordId = $data['master_source'] === 'selected'
+                                ? $data['selected_master_id']
+                                : $data['master_channel_id'];
+                            $failoverRecords = $records->filter(function ($record) use ($masterRecordId) {
+                                return (int)$record->id !== (int)$masterRecordId;
+                            });
+
+                            foreach ($failoverRecords as $record) {
+                                ChannelFailover::updateOrCreate([
+                                    'channel_id' => $masterRecordId,
+                                    'channel_failover_id' => $record->id,
+                                ]);
+                            }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Channels as failover')
+                                ->body('The selected channels have been added as failovers.')
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-arrow-path-rounded-square')
+                        ->modalIcon('heroicon-o-arrow-path-rounded-square')
+                        ->modalDescription('Add the selected channel(s) to the chosen channel as failover sources.')
+                        ->modalSubmitActionLabel('Add failovers now'),
+
                     Tables\Actions\BulkAction::make('enable')
                         ->label('Enable selected')
                         ->action(function (Collection $records): void {

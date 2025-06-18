@@ -29,51 +29,44 @@ class PruneStaleHlsProcesses extends Command
         $activeChannelIds = Redis::smembers('hls:active_channel_ids');
         $activeEspisodeIds = Redis::smembers('hls:active_episode_ids');
 
-        $this->info("Found " . count($activeChannelIds) . " active channel IDs");
-        $this->info("Found " . count($activeEspisodeIds) . " active episode IDs");
+        $stoppedChannels = 0;
+        $stoppedEpisodes = 0;
 
         // For each active channel, check staleness
         foreach ($activeChannelIds as $channelId) {
-            $this->info("Checking channel {$channelId}");
             $ts = Redis::get("hls:channel_last_seen:{$channelId}");
             if (! $ts) {
-                $this->info("⏰ No last-seen timestamp for {$channelId}");
                 continue;
             }
             $lastSeen = Carbon::createFromTimestamp((int) $ts);
             if ($lastSeen->addSeconds($threshold)->isPast()) {
                 $wasRunning = $this->hlsService->stopStream(type: 'channel', id: $channelId);
-                if (!$wasRunning) {
-                    $this->info("❌ Channel {$channelId} was not running");
-                    continue;
-                } else {
-                    $this->info("❌ Channel {$channelId} was running and has been stopped");
+                if ($wasRunning) {
+                    $stoppedChannels++;
+                    $this->info("🛑 Stopped stale channel {$channelId}");
                 }
-            } else {
-                $this->info("✅ Channel {$channelId} is still active");
             }
         }
 
         // For each active episode, check staleness
         foreach ($activeEspisodeIds as $episodeId) {
-            $this->info("Checking episode {$episodeId}");
             $ts = Redis::get("hls:episode_last_seen:{$episodeId}");
             if (! $ts) {
-                $this->info("⏰ No last-seen timestamp for {$episodeId}");
                 continue;
             }
             $lastSeen = Carbon::createFromTimestamp((int) $ts);
             if ($lastSeen->addSeconds($threshold)->isPast()) {
                 $wasRunning = $this->hlsService->stopStream(type: 'episode', id: $episodeId);
-                if (!$wasRunning) {
-                    $this->info("❌ Episode {$episodeId} was not running");
-                    continue;
-                } else {
-                    $this->info("❌ Episode {$episodeId} was running and has been stopped");
+                if ($wasRunning) {
+                    $stoppedEpisodes++;
+                    $this->info("🛑 Stopped stale episode {$episodeId}");
                 }
-            } else {
-                $this->info("✅ Episode {$episodeId} is still active");
             }
+        }
+
+        // Only output summary if there was activity
+        if ($stoppedChannels > 0 || $stoppedEpisodes > 0) {
+            $this->info("HLS Prune: Stopped {$stoppedChannels} channels and {$stoppedEpisodes} episodes");
         }
     }
 }
