@@ -458,213 +458,47 @@ class SharedStreamService
     }
 
     /**
-     * Start continuous buffering process
+     * Start continuous buffering process (simplified)
      */
     private function startContinuousBuffering(string $streamKey, $stdout, $stderr, $process): void
     {
-        // Make streams non-blocking
+        // Set streams to non-blocking mode immediately
         stream_set_blocking($stdout, false);
         stream_set_blocking($stderr, false);
-
-        // Do initial buffering to ensure the stream starts properly
-        $this->startInitialBuffering($streamKey, $stdout, $stderr, $process);
-
-        // Try to fork a background process to continue buffering
-        if (function_exists('pcntl_fork')) {
-            $pid = pcntl_fork();
-            if ($pid == 0) {
-                // Child process - run continuous buffering
-                $this->runBufferManager($streamKey, $stdout, $stderr, $process);
-                exit(0);
-            } elseif ($pid > 0) {
-                // Parent process - continue normally
-                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Forked buffer manager with PID {$pid}");
-                return;
-            }
-        }
         
-        // Fallback: Use shutdown function for continuous buffering
-        register_shutdown_function(function () use ($streamKey, $stdout, $stderr, $process) {
-            $this->runBufferManager($streamKey, $stdout, $stderr, $process);
-        });
+        // Start immediate buffering to prevent FFmpeg from hanging
+        $this->startImmediateBuffering($streamKey, $stdout, $stderr, $process);
         
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Using shutdown function for continuous buffering");
-    }
-
-    /**
-     * Setup pipe drain to continuously read FFmpeg output
-     */
-    private function setupPipeDrain(string $streamKey, $stdout, $stderr, $process): void
-    {
-        // Create a named pipe or file to redirect FFmpeg output
-        $pipeDir = storage_path("app/stream_pipes");
-        if (!is_dir($pipeDir)) {
-            mkdir($pipeDir, 0755, true);
-        }
-        
-        $pipeFile = "{$pipeDir}/{$streamKey}.ts";
-        
-        // Start a background process to continuously drain the pipe
-        $drainScript = $this->createPipeDrainScript($streamKey, $pipeFile);
-        
-        // Execute the drain script in background
-        $command = "nohup php " . escapeshellarg($drainScript) . " > /dev/null 2>&1 &";
-        exec($command);
-        
-        // Set up a shutdown function to ensure proper resource cleanup
-        register_shutdown_function(function () use ($streamKey, $stdout, $stderr, $process, $pipeFile, $drainScript) {
-            // Quick read to drain any remaining data
-            $maxReads = 5;
-            while ($maxReads-- > 0 && !feof($stdout)) {
-                $data = fread($stdout, 188000);
-                if ($data === false || strlen($data) === 0) {
-                    break;
-                }
-                // Write to pipe file for background script to pick up
-                file_put_contents($pipeFile, $data, FILE_APPEND | LOCK_EX);
-            }
+        // Try to use Laravel job queue for continuous management (preferred)
+        try {
+            \App\Jobs\StreamBufferManager::dispatch($streamKey, $stdout, $stderr, $process)
+                ->onQueue('streams');
             
-            // Clean up resources
-            if (is_resource($stdout)) fclose($stdout);
-            if (is_resource($stderr)) fclose($stderr);
-            if (is_resource($process)) proc_close($process);
+            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Dispatched StreamBufferManager job for continuous buffering");
+            return;
             
-            // Schedule cleanup of temporary files
-            $this->scheduleCleanup($pipeFile, $drainScript);
-        });
-    }
-
-    /**
-     * Create a simple pipe drain script
-     */
-    private function createPipeDrainScript(string $streamKey, string $pipeFile): string
-    {
-        $scriptPath = storage_path("app/stream_pipes/drain_{$streamKey}.php");
-        
-        $script = <<<'PHP'
-<?php
-// Pipe drain script for stream: {STREAM_KEY}
-
-require_once __DIR__ . '/../../vendor/autoload.php';
-use Illuminate\Support\Facades\Redis;
-
-$streamKey = '{STREAM_KEY}';
-$pipeFile = '{PIPE_FILE}';
-$bufferKey = 'stream_buffer:' . $streamKey;
-$segmentNumber = 0;
-$lastActivity = time();
-$maxInactiveTime = 300; // 5 minutes
-
-while (time() - $lastActivity < $maxInactiveTime) {
-    if (file_exists($pipeFile)) {
-        $data = file_get_contents($pipeFile);
-        if ($data !== false && strlen($data) > 0) {
-            // Clear the file after reading
-            file_put_contents($pipeFile, '');
-            
-            // Store in Redis as segments
-            $chunks = str_split($data, 188000); // ~188KB chunks
-            foreach ($chunks as $chunk) {
-                if (strlen($chunk) > 0) {
-                    $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                    Redis::setex($segmentKey, 300, $chunk);
-                    Redis::lpush("{$bufferKey}:segments", $segmentNumber);
-                    Redis::ltrim("{$bufferKey}:segments", 0, 30);
-                    $segmentNumber++;
-                }
-            }
-            $lastActivity = time();
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->warning("Stream {$streamKey}: Failed to dispatch buffer manager job: " . $e->getMessage());
         }
-    }
-    usleep(100000); // 100ms
-}
 
-// Cleanup
-if (file_exists($pipeFile)) {
-    unlink($pipeFile);
-}
-unlink(__FILE__);
-PHP;
-
-        $script = str_replace(['{STREAM_KEY}', '{PIPE_FILE}'], [$streamKey, $pipeFile], $script);
-        file_put_contents($scriptPath, $script);
-        chmod($scriptPath, 0755);
-        
-        return $scriptPath;
+        // Fallback: Direct buffer management in current process
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Using direct buffer management fallback");
+        $this->runDirectBufferManager($streamKey, $stdout, $stderr, $process);
     }
+
+
 
     /**
-     * Schedule cleanup of temporary files
-     */
-    private function scheduleCleanup(string $pipeFile, string $scriptFile): void
-    {
-        // Schedule cleanup after a delay
-        $cleanupScript = storage_path("app/stream_pipes/cleanup_" . uniqid() . ".php");
-        $cleanup = <<<PHP
-<?php
-sleep(10); // Wait 10 seconds
-if (file_exists('$pipeFile')) unlink('$pipeFile');
-if (file_exists('$scriptFile')) unlink('$scriptFile');
-unlink(__FILE__);
-PHP;
-        file_put_contents($cleanupScript, $cleanup);
-        exec("nohup php " . escapeshellarg($cleanupScript) . " > /dev/null 2>&1 &");
-    }
-
-    /**
-     * Fallback continuous buffering when job dispatch fails
-     */
-    private function runContinuousBufferFallback(string $streamKey, $stdout, $stderr, $process): void
-    {
-        // Fork a process to handle continuous buffering if possible
-        if (function_exists('pcntl_fork')) {
-            $pid = pcntl_fork();
-            if ($pid == 0) {
-                // Child process - run the buffer manager
-                $this->runBufferManager($streamKey, $stdout, $stderr, $process);
-                exit(0);
-            } else if ($pid > 0) {
-                // Parent process - continue normally
-                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Forked buffer manager process with PID {$pid}");
-            } else {
-                // Fork failed - use shutdown function as last resort
-                Log::channel('ffmpeg')->warning("Stream {$streamKey}: Fork failed, using shutdown function fallback");
-                register_shutdown_function(function () use ($streamKey, $stdout, $stderr, $process) {
-                    $this->runBufferManager($streamKey, $stdout, $stderr, $process);
-                });
-            }
-        } else {
-            // pcntl not available - use shutdown function as last resort
-            Log::channel('ffmpeg')->warning("Stream {$streamKey}: pcntl not available, using shutdown function fallback");
-            register_shutdown_function(function () use ($streamKey, $stdout, $stderr, $process) {
-                $this->runBufferManager($streamKey, $stdout, $stderr, $process);
-            });
-        }
-    }
-
-    /**
-     * Manage buffering for direct streams (similar to xTeVe)
+     * Manage buffering for direct streams (simplified)
      */
     private function manageDirectStreamBuffer(string $streamKey, $stdout, $stderr, $process): void
     {
-        // This method is now replaced by startContinuousBuffering
+        // This method is now replaced by the simplified startContinuousBuffering
         $this->startContinuousBuffering($streamKey, $stdout, $stderr, $process);
     }
 
     /**
-     * Fork buffer manager process (simplified implementation)
-     */
-    private function forkBufferManager(string $streamKey, $stdout, $stderr, $process): void
-    {
-        // In a production environment, you'd want to use a proper job queue
-        // For now, we'll run the buffer manager immediately in the background
-        
-        // Start the buffer manager immediately instead of waiting for shutdown
-        $this->runBufferManagerBackground($streamKey, $stdout, $stderr, $process);
-    }
-
-    /**
-     * Run buffer manager in background immediately
+     * Run buffer manager in background (simplified)
      */
     private function runBufferManagerBackground(string $streamKey, $stdout, $stderr, $process): void
     {
@@ -675,12 +509,81 @@ PHP;
         // Start reading data immediately to prevent FFmpeg from hanging
         $this->startInitialBuffering($streamKey, $stdout, $stderr, $process);
         
-        // Set up ongoing buffer management via shutdown function as fallback
+        // Set up simple shutdown drain as fallback
         register_shutdown_function(function () use ($streamKey, $stdout, $stderr, $process) {
-            $this->runBufferManager($streamKey, $stdout, $stderr, $process);
+            $this->drainPipesOnShutdown($streamKey, $stdout, $stderr, $process);
         });
         
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffer manager setup completed");
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Simplified buffer manager setup completed");
+    }
+
+    /**
+     * Start immediate buffering to prevent FFmpeg from hanging (simplified version)
+     */
+    private function startImmediateBuffering(string $streamKey, $stdout, $stderr, $process): void
+    {
+        // This is just a rename of the existing method for clarity
+        $this->startInitialBuffering($streamKey, $stdout, $stderr, $process);
+    }
+
+    /**
+     * Run buffer manager directly in current process (simplified fallback)
+     */
+    private function runDirectBufferManager(string $streamKey, $stdout, $stderr, $process): void
+    {
+        // Set up a lightweight buffer reader to prevent pipe overflow
+        register_shutdown_function(function () use ($streamKey, $stdout, $stderr, $process) {
+            $this->drainPipesOnShutdown($streamKey, $stdout, $stderr, $process);
+        });
+        
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Set up direct buffer management with shutdown drain");
+    }
+
+    /**
+     * Simple pipe drain on shutdown to prevent overflow
+     */
+    private function drainPipesOnShutdown(string $streamKey, $stdout, $stderr, $process): void
+    {
+        try {
+            $bufferKey = self::BUFFER_PREFIX . $streamKey;
+            $segmentNumber = 0;
+            $maxReads = 20; // Limit reads to prevent hanging
+            
+            // Quickly drain stdout to prevent pipe overflow
+            while ($maxReads-- > 0 && !feof($stdout)) {
+                $data = fread($stdout, 188000); // ~188KB chunks
+                if ($data === false || strlen($data) === 0) {
+                    break;
+                }
+                
+                // Store in Redis
+                $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                Redis::setex($segmentKey, self::SEGMENT_EXPIRY, $data);
+                Redis::lpush("{$bufferKey}:segments", $segmentNumber);
+                Redis::ltrim("{$bufferKey}:segments", 0, 30);
+                $segmentNumber++;
+            }
+            
+            // Drain stderr for errors
+            while (!feof($stderr)) {
+                $error = fread($stderr, 1024);
+                if ($error !== false && !empty(trim($error))) {
+                    Log::channel('ffmpeg')->error("Stream {$streamKey}: " . trim($error));
+                } else {
+                    break;
+                }
+            }
+            
+            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Shutdown drain completed, read {$segmentNumber} segments");
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Stream {$streamKey}: Error during shutdown drain: " . $e->getMessage());
+        } finally {
+            // Clean up resources
+            if (is_resource($stdout)) fclose($stdout);
+            if (is_resource($stderr)) fclose($stderr);
+            if (is_resource($process)) proc_close($process);
+        }
     }
 
     /**
