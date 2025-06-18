@@ -30,6 +30,14 @@ class SharedStreamService
     const CLIENT_TIMEOUT = 30; // 30 seconds
 
     /**
+     * Get Redis connection instance
+     */
+    private function redis()
+    {
+        return app('redis');
+    }
+
+    /**
      * Get or create a shared stream for the given channel/episode
      * 
      * @param string $type 'channel' or 'episode'
@@ -446,7 +454,7 @@ class SharedStreamService
     private function getProcessPid(string $streamKey): ?int
     {
         $pidKey = "stream_pid:{$streamKey}";
-        return Redis::get($pidKey);
+        return $this->redis()->get($pidKey);
     }
 
     /**
@@ -540,9 +548,9 @@ class SharedStreamService
                 
                 // Store in Redis
                 $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                Redis::setex($segmentKey, self::SEGMENT_EXPIRY, $data);
-                Redis::lpush("{$bufferKey}:segments", $segmentNumber);
-                Redis::ltrim("{$bufferKey}:segments", 0, 30);
+                $this->redis()->setex($segmentKey, self::SEGMENT_EXPIRY, $data);
+                $this->redis()->lpush("{$bufferKey}:segments", $segmentNumber);
+                $this->redis()->ltrim("{$bufferKey}:segments", 0, 30);
                 $segmentNumber++;
             }
             
@@ -589,11 +597,11 @@ class SharedStreamService
                 $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
                 
                 // Store segment in Redis with expiry
-                Redis::setex($segmentKey, self::SEGMENT_EXPIRY, $data);
+                $this->redis()->setex($segmentKey, self::SEGMENT_EXPIRY, $data);
                 
                 // Update stream segment list
-                Redis::lpush("{$bufferKey}:segments", $segmentNumber);
-                Redis::ltrim("{$bufferKey}:segments", 0, 30);
+                $this->redis()->lpush("{$bufferKey}:segments", $segmentNumber);
+                $this->redis()->ltrim("{$bufferKey}:segments", 0, 30);
                 
                 $segmentNumber++;
                 $this->updateStreamActivity($streamKey);
@@ -605,9 +613,9 @@ class SharedStreamService
                     $moreData = fread($stdout, $bufferSize);
                     if ($moreData !== false && strlen($moreData) > 0) {
                         $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                        Redis::setex($segmentKey, self::SEGMENT_EXPIRY, $moreData);
-                        Redis::lpush("{$bufferKey}:segments", $segmentNumber);
-                        Redis::ltrim("{$bufferKey}:segments", 0, 30);
+                        $this->redis()->setex($segmentKey, self::SEGMENT_EXPIRY, $moreData);
+                        $this->redis()->lpush("{$bufferKey}:segments", $segmentNumber);
+                        $this->redis()->ltrim("{$bufferKey}:segments", 0, 30);
                         $segmentNumber++;
                         Log::channel('ffmpeg')->debug("Stream {$streamKey}: Additional segment {$segmentNumber} buffered (" . strlen($moreData) . " bytes)");
                     } else {
@@ -692,11 +700,11 @@ class SharedStreamService
                         $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
                         
                         // Store segment in Redis with expiry
-                        Redis::setex($segmentKey, self::SEGMENT_EXPIRY, $data);
+                        $this->redis()->setex($segmentKey, self::SEGMENT_EXPIRY, $data);
                         
                         // Update stream segment list
-                        Redis::lpush("{$bufferKey}:segments", $segmentNumber);
-                        Redis::ltrim("{$bufferKey}:segments", 0, 30); // Keep last 30 segments
+                        $this->redis()->lpush("{$bufferKey}:segments", $segmentNumber);
+                        $this->redis()->ltrim("{$bufferKey}:segments", 0, 30); // Keep last 30 segments
                         
                         $segmentNumber++;
                         $hasData = true;
@@ -768,13 +776,13 @@ class SharedStreamService
         $this->updateClientActivity($streamKey, $clientId);
 
         $bufferKey = self::BUFFER_PREFIX . $streamKey;
-        $segments = Redis::lrange("{$bufferKey}:segments", 0, -1);
+        $segments = $this->redis()->lrange("{$bufferKey}:segments", 0, -1);
 
         $data = '';
         foreach ($segments as $segmentNum) {
             if ($segmentNum >= $fromSegment) {
                 $segmentKey = "{$bufferKey}:segment_{$segmentNum}";
-                $segmentData = Redis::get($segmentKey);
+                $segmentData = $this->redis()->get($segmentKey);
                 if ($segmentData) {
                     $data .= $segmentData;
                 }
@@ -832,7 +840,7 @@ class SharedStreamService
     public function removeClient(string $streamKey, string $clientId): void
     {
         $clientKey = self::CLIENT_PREFIX . $streamKey;
-        Redis::hdel($clientKey, $clientId);
+        $this->redis()->hdel($clientKey, $clientId);
         
         // Also remove database record
         try {
@@ -941,32 +949,38 @@ class SharedStreamService
 
         $this->updateClientActivity($streamKey, $clientId);
 
-        $bufferKey = self::BUFFER_PREFIX . $streamKey;
-        $segments = Redis::lrange("{$bufferKey}:segments", 0, -1);
-        
-        // Get segments that are newer than lastSegment
-        $data = '';
-        $segmentsRead = 0;
-        
-        foreach ($segments as $segmentNum) {
-            if ($segmentNum > $lastSegment) {
-                $segmentKey = "{$bufferKey}:segment_{$segmentNum}";
-                $segmentData = Redis::get($segmentKey);
-                
-                if ($segmentData) {
-                    $data .= $segmentData;
-                    $lastSegment = max($lastSegment, $segmentNum);
-                    $segmentsRead++;
+        try {
+            $redis = $this->redis();
+            $bufferKey = self::BUFFER_PREFIX . $streamKey;
+            $segments = $redis->lrange("{$bufferKey}:segments", 0, -1);
+            
+            // Get segments that are newer than lastSegment
+            $data = '';
+            $segmentsRead = 0;
+            
+            foreach ($segments as $segmentNum) {
+                if ($segmentNum > $lastSegment) {
+                    $segmentKey = "{$bufferKey}:segment_{$segmentNum}";
+                    $segmentData = $redis->get($segmentKey);
                     
-                    // Limit to a reasonable number of segments per call to prevent memory issues
-                    if ($segmentsRead >= 5) {
-                        break;
+                    if ($segmentData) {
+                        $data .= $segmentData;
+                        $lastSegment = max($lastSegment, $segmentNum);
+                        $segmentsRead++;
+                        
+                        // Limit to a reasonable number of segments per call to prevent memory issues
+                        if ($segmentsRead >= 5) {
+                            break;
+                        }
                     }
                 }
             }
-        }
 
-        return $data ?: null;
+            return $data ?: null;
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error in getNextStreamSegments for {$streamKey}: " . $e->getMessage());
+            return null;
+        }
     }
 
     // ...existing code...
@@ -980,32 +994,50 @@ class SharedStreamService
 
     private function getStreamInfo(string $streamKey): ?array
     {
-        // Try both with and without database prefix
-        $key1 = self::CACHE_PREFIX . $streamKey;
-        $key2 = config('database.redis.options.prefix', '') . self::CACHE_PREFIX . $streamKey;
-        
-        $data = Redis::get($key1);
-        if (!$data) {
-            $data = Redis::get($key2);
-        }
-        
-        // Return null if data is empty or invalid
-        if (!$data || empty(trim($data))) {
+        try {
+            $redis = $this->redis();
+            
+            // Try both with and without database prefix
+            $key1 = self::CACHE_PREFIX . $streamKey;
+            $key2 = config('database.redis.options.prefix', '') . self::CACHE_PREFIX . $streamKey;
+            
+            $data = $redis->get($key1);
+            if (!$data) {
+                $data = $redis->get($key2);
+            }
+            
+            // Return null if data is empty or invalid
+            if (!$data || empty(trim($data))) {
+                return null;
+            }
+            
+            $decoded = json_decode($data, true);
+            return $decoded && !empty($decoded) ? $decoded : null;
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error getting stream info for {$streamKey}: " . $e->getMessage());
             return null;
         }
-        
-        $decoded = json_decode($data, true);
-        return $decoded && !empty($decoded) ? $decoded : null;
     }
 
     public function setStreamInfo(string $streamKey, array $streamInfo): void
     {
-        Redis::setex(self::CACHE_PREFIX . $streamKey, 3600, json_encode($streamInfo));
+        try {
+            $redis = $this->redis();
+            $redis->setex(self::CACHE_PREFIX . $streamKey, 3600, json_encode($streamInfo));
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error setting stream info for {$streamKey}: " . $e->getMessage());
+        }
     }
 
     private function isStreamActive(string $streamKey): bool
     {
-        return Redis::exists(self::CACHE_PREFIX . $streamKey);
+        try {
+            $redis = $this->redis();
+            return $redis->exists(self::CACHE_PREFIX . $streamKey);
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error checking if stream is active for {$streamKey}: " . $e->getMessage());
+            return false;
+        }
     }
 
     private function registerClient(string $streamKey, string $clientId, array $options): void
@@ -1017,8 +1049,8 @@ class SharedStreamService
             'last_activity' => now()->timestamp,
             'options' => $options
         ];
-        Redis::hset($clientKey, $clientId, json_encode($clientData));
-        Redis::expire($clientKey, 3600);
+        $this->redis()->hset($clientKey, $clientId, json_encode($clientData));
+        $this->redis()->expire($clientKey, 3600);
         
         // Also create database record for dashboard tracking
         try {
@@ -1043,16 +1075,16 @@ class SharedStreamService
     private function isClientRegistered(string $streamKey, string $clientId): bool
     {
         $clientKey = self::CLIENT_PREFIX . $streamKey;
-        return Redis::hexists($clientKey, $clientId);
+        return $this->redis()->hexists($clientKey, $clientId);
     }
 
     private function updateClientActivity(string $streamKey, string $clientId): void
     {
         $clientKey = self::CLIENT_PREFIX . $streamKey;
-        if (Redis::hexists($clientKey, $clientId)) {
-            $clientData = json_decode(Redis::hget($clientKey, $clientId), true);
+        if ($this->redis()->hexists($clientKey, $clientId)) {
+            $clientData = json_decode($this->redis()->hget($clientKey, $clientId), true);
             $clientData['last_activity'] = now()->timestamp;
-            Redis::hset($clientKey, $clientId, json_encode($clientData));
+            $this->redis()->hset($clientKey, $clientId, json_encode($clientData));
             
             // Also update database record
             try {
@@ -1077,18 +1109,18 @@ class SharedStreamService
     private function incrementClientCount(string $streamKey): int
     {
         $clientKey = self::CLIENT_PREFIX . $streamKey;
-        return Redis::hlen($clientKey);
+        return $this->redis()->hlen($clientKey);
     }
 
     private function decrementClientCount(string $streamKey): int
     {
         $clientKey = self::CLIENT_PREFIX . $streamKey;
-        return Redis::hlen($clientKey);
+        return $this->redis()->hlen($clientKey);
     }
 
     private function setStreamProcess(string $streamKey, int $pid): void
     {
-        Redis::setex("stream_pid:{$streamKey}", 3600, $pid);
+        $this->redis()->setex("stream_pid:{$streamKey}", 3600, $pid);
     }
 
     private function getStreamStorageDir(string $streamKey): string
