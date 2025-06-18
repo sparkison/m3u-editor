@@ -26,6 +26,7 @@ class SharedStreamService
     const CACHE_PREFIX = 'shared_stream:';
     const CLIENT_PREFIX = 'stream_clients:';
     const BUFFER_PREFIX = 'stream_buffer:';
+    const STREAM_PREFIX = 'shared_stream:'; // For compatibility with existing code
     const SEGMENT_EXPIRY = 300; // 5 minutes
     const CLIENT_TIMEOUT = 30; // 30 seconds
 
@@ -1147,139 +1148,571 @@ class SharedStreamService
     }
 
     /**
-     * Get stream storage directory
+     * Get all active streams with their information and client counts
+     * Called by BufferManagement job and other services
      */
-    private function getStreamStorageDir(string $streamKey): string
-    {
-        return 'shared_streams/' . md5($streamKey);
-    }
-
-    /**
-     * Set stream process PID
-     */
-    private function setStreamProcess(string $streamKey, int $pid): void
-    {
-        $pidKey = "stream_pid:{$streamKey}";
-        $this->redis()->setex($pidKey, self::SEGMENT_EXPIRY, $pid);
-    }
-
-    /**
-     * Clean up stream resources
-     */
-    private function cleanupStream(string $streamKey, bool $removeData = false): void
-    {
-        if ($removeData) {
-            $this->redis()->del($streamKey);
-            $bufferKey = self::BUFFER_PREFIX . $streamKey;
-            $this->redis()->del($bufferKey);
-        }
-        
-        SharedStream::where('stream_id', $streamKey)->update(['status' => 'stopped']);
-    }
-
-    /**
-     * Update stream activity timestamp
-     */
-    private function updateStreamActivity(string $streamKey): void
-    {
-        $streamInfo = $this->getStreamInfo($streamKey);
-        if ($streamInfo) {
-            $streamInfo['last_activity'] = now()->timestamp;
-            $this->setStreamInfo($streamKey, $streamInfo);
-        }
-    }
-
-    /**
-     * Get next stream segments for a client
-     */
-    public function getNextStreamSegments(string $streamKey, string $clientId, int &$lastSegment): ?string
-    {
-        $bufferKey = self::BUFFER_PREFIX . $streamKey;
-        $segmentNumbers = $this->redis()->lrange("{$bufferKey}:segments", 0, -1);
-        
-        if (empty($segmentNumbers)) {
-            return null;
-        }
-        
-        $data = '';
-        foreach ($segmentNumbers as $segmentNumber) {
-            if ($segmentNumber > $lastSegment) {
-                $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                $segmentData = $this->redis()->get($segmentKey);
-                if ($segmentData) {
-                    $data .= $segmentData;
-                    $lastSegment = $segmentNumber;
-                }
-            }
-        }
-        
-        return !empty($data) ? $data : null;
-    }
-
-    /**
-     * Synchronize stream state between Redis and database
-     * Called by ManageSharedStreams command
-     */
-    public function synchronizeState(): void
+    public function getAllActiveStreams(): array
     {
         try {
             $redis = $this->redis();
+            $streams = [];
             
-            // Get all active stream keys from Redis
-            $streamKeys = $redis->keys(self::STREAM_PREFIX . '*');
+            // Get all stream keys from Redis
+            $streamKeys = $redis->keys(self::CACHE_PREFIX . '*');
             
             foreach ($streamKeys as $fullKey) {
-                $streamKey = str_replace(self::STREAM_PREFIX, '', $fullKey);
-                $streamInfo = $this->getStreamInfo($streamKey);
+                $streamKey = str_replace(self::CACHE_PREFIX, '', $fullKey);
+                $streamInfo = $this->getStreamInfo($fullKey);
                 
-                if ($streamInfo) {
-                    // Check if process is still running
-                    $pid = $streamInfo['pid'] ?? null;
-                    $isRunning = false;
+                if ($streamInfo && in_array($streamInfo['status'] ?? '', ['active', 'starting'])) {
+                    // Get client count from Redis client keys
+                    $clientKeys = $redis->keys(self::CLIENT_PREFIX . $fullKey . ':*');
+                    $clientCount = count($clientKeys);
                     
-                    if ($pid) {
-                        $isRunning = $this->isProcessRunning($pid);
-                    }
+                    // Calculate uptime
+                    $uptime = (time() - ($streamInfo['created_at'] ?? time()));
                     
-                    // Update database status based on actual process state
-                    $status = $isRunning ? 'active' : 'stopped';
-                    
-                    SharedStream::where('stream_id', $streamKey)->update([
-                        'status' => $status,
-                        'last_activity' => now()
-                    ]);
-                    
-                    // Clean up if process is dead
-                    if (!$isRunning) {
-                        $this->cleanupStream($streamKey, true);
-                    }
+                    $streams[$streamKey] = [
+                        'stream_info' => $streamInfo,
+                        'client_count' => $clientCount,
+                        'uptime' => $uptime,
+                        'last_activity' => $streamInfo['last_activity'] ?? time()
+                    ];
                 }
             }
             
-            Log::channel('ffmpeg')->debug("Synchronized " . count($streamKeys) . " stream states");
+            return $streams;
             
         } catch (\Exception $e) {
-            Log::channel('ffmpeg')->error("Error synchronizing stream states: " . $e->getMessage());
+            Log::channel('ffmpeg')->error("Error getting all active streams: " . $e->getMessage());
+            return [];
         }
     }
 
     /**
-     * Check if a process is running by PID
+     * Clean up old buffer segments for a stream
      */
-    private function isProcessRunning(int $pid): bool
+    public function cleanupOldBufferSegments(string $streamKey): int
     {
         try {
-            if (function_exists('posix_kill')) {
-                return posix_kill($pid, 0);
+            $bufferKey = self::BUFFER_PREFIX . $streamKey;
+            $segmentNumbers = $this->redis()->lrange("{$bufferKey}:segments", 0, -1);
+            
+            $cleaned = 0;
+            $keepCount = 50; // Keep only the most recent 50 segments
+            
+            if (count($segmentNumbers) > $keepCount) {
+                $toRemove = array_slice($segmentNumbers, $keepCount);
+                foreach ($toRemove as $segmentNumber) {
+                    $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                    if ($this->redis()->del($segmentKey)) {
+                        $cleaned++;
+                    }
+                }
+                
+                // Trim the segments list
+                $this->redis()->ltrim("{$bufferKey}:segments", 0, $keepCount - 1);
             }
             
-            // Fallback for systems without posix functions
-            $result = shell_exec("ps -p $pid");
-            return !empty($result) && strpos($result, (string)$pid) !== false;
+            return $cleaned;
             
         } catch (\Exception $e) {
-            Log::channel('ffmpeg')->warning("Could not check process $pid: " . $e->getMessage());
+            Log::channel('ffmpeg')->error("Error cleaning up buffer segments for {$streamKey}: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Optimize buffer size based on client count
+     */
+    public function optimizeBufferSize(string $streamKey, int $clientCount): bool
+    {
+        try {
+            // Adjust buffer size based on client count
+            $baseSegments = 30;
+            $additionalSegments = min($clientCount * 5, 50); // Max 50 additional segments
+            $targetSegments = $baseSegments + $additionalSegments;
+            
+            $bufferKey = self::BUFFER_PREFIX . $streamKey;
+            $currentSegments = $this->redis()->llen("{$bufferKey}:segments");
+            
+            if ($currentSegments > $targetSegments) {
+                // Trim to target size
+                $this->redis()->ltrim("{$bufferKey}:segments", 0, $targetSegments - 1);
+                return true;
+            }
+            
+            return false;
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error optimizing buffer size for {$streamKey}: " . $e->getMessage());
             return false;
         }
     }
+
+    /**
+     * Get disk usage for a stream's buffers (Redis memory usage estimate)
+     */
+    public function getStreamBufferDiskUsage(string $streamKey): int
+    {
+        try {
+            $bufferKey = self::BUFFER_PREFIX . $streamKey;
+            $segmentNumbers = $this->redis()->lrange("{$bufferKey}:segments", 0, -1);
+            
+            $totalSize = 0;
+            foreach ($segmentNumbers as $segmentNumber) {
+                $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                $data = $this->redis()->get($segmentKey);
+                if ($data) {
+                    $totalSize += strlen($data);
+                }
+            }
+            
+            return $totalSize;
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error getting buffer disk usage for {$streamKey}: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Trim buffer to specified size
+     */
+    public function trimBufferToSize(string $streamKey, int $targetSize): int
+    {
+        try {
+            $bufferKey = self::BUFFER_PREFIX . $streamKey;
+            $segmentNumbers = $this->redis()->lrange("{$bufferKey}:segments", 0, -1);
+            
+            $currentSize = 0;
+            $freedSize = 0;
+            $segmentsToKeep = [];
+            
+            // Calculate current size and determine which segments to keep
+            foreach (array_reverse($segmentNumbers) as $segmentNumber) {
+                $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                $data = $this->redis()->get($segmentKey);
+                if ($data) {
+                    $segmentSize = strlen($data);
+                    if ($currentSize + $segmentSize <= $targetSize) {
+                        $segmentsToKeep[] = $segmentNumber;
+                        $currentSize += $segmentSize;
+                    } else {
+                        // Remove this segment
+                        $this->redis()->del($segmentKey);
+                        $freedSize += $segmentSize;
+                    }
+                }
+            }
+            
+            // Update the segments list
+            if (!empty($segmentsToKeep)) {
+                $this->redis()->del("{$bufferKey}:segments");
+                foreach (array_reverse($segmentsToKeep) as $segmentNumber) {
+                    $this->redis()->lpush("{$bufferKey}:segments", $segmentNumber);
+                }
+            }
+            
+            return $freedSize;
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error trimming buffer for {$streamKey}: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Find orphaned buffer directories
+     */
+    public function findOrphanedBufferDirectories(): array
+    {
+        try {
+            $orphanedDirs = [];
+            $bufferPath = storage_path('app/shared_streams');
+            
+            if (!is_dir($bufferPath)) {
+                return $orphanedDirs;
+            }
+            
+            $activeStreams = $this->getAllActiveStreams();
+            $activeStreamKeys = array_keys($activeStreams);
+            
+            $directories = glob($bufferPath . '/*', GLOB_ONLYDIR);
+            foreach ($directories as $dir) {
+                $dirName = basename($dir);
+                
+                // Check if this directory corresponds to an active stream
+                $isActive = false;
+                foreach ($activeStreamKeys as $streamKey) {
+                    if (md5($streamKey) === $dirName) {
+                        $isActive = true;
+                        break;
+                    }
+                }
+                
+                if (!$isActive) {
+                    $orphanedDirs[] = $dir;
+                }
+            }
+            
+            return $orphanedDirs;
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error finding orphaned buffer directories: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get directory size
+     */
+    public function getDirectorySize(string $dir): int
+    {
+        try {
+            $size = 0;
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($dir, \RecursiveDirectoryIterator::SKIP_DOTS)
+            );
+            
+            foreach ($iterator as $file) {
+                $size += $file->getSize();
+            }
+            
+            return $size;
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error getting directory size for {$dir}: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Remove directory
+     */
+    public function removeDirectory(string $dir): bool
+    {
+        try {
+            if (!is_dir($dir)) {
+                return true;
+            }
+            
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($dir, \RecursiveDirectoryIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::CHILD_FIRST
+            );
+            
+            foreach ($iterator as $file) {
+                if ($file->isDir()) {
+                    rmdir($file->getRealPath());
+                } else {
+                    unlink($file->getRealPath());
+                }
+            }
+            
+            return rmdir($dir);
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error removing directory {$dir}: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Clean up temporary files
+     */
+    public function cleanupTempFiles(int $maxAge = 3600): int
+    {
+        try {
+            $tempPath = storage_path('app/temp');
+            $freedSize = 0;
+            
+            if (!is_dir($tempPath)) {
+                return 0;
+            }
+            
+            $cutoffTime = time() - $maxAge;
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($tempPath, \RecursiveDirectoryIterator::SKIP_DOTS)
+            );
+            
+            foreach ($iterator as $file) {
+                if ($file->getMTime() < $cutoffTime) {
+                    $size = $file->getSize();
+                    if (unlink($file->getRealPath())) {
+                        $freedSize += $size;
+                    }
+                }
+            }
+            
+            return $freedSize;
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error cleaning up temp files: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Get total buffer disk usage across all streams
+     */
+    public function getTotalBufferDiskUsage(): int
+    {
+        try {
+            $totalSize = 0;
+            $activeStreams = $this->getAllActiveStreams();
+            
+            foreach (array_keys($activeStreams) as $streamKey) {
+                $totalSize += $this->getStreamBufferDiskUsage($streamKey);
+            }
+            
+            return $totalSize;
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error getting total buffer disk usage: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Trim oldest buffers to reach target size
+     */
+    public function trimOldestBuffers(int $targetSize): int
+    {
+        try {
+            $activeStreams = $this->getAllActiveStreams();
+            $streamSizes = [];
+            $totalSize = 0;
+            
+            // Calculate sizes for all streams
+            foreach ($activeStreams as $streamKey => $streamData) {
+                $size = $this->getStreamBufferDiskUsage($streamKey);
+                $streamSizes[$streamKey] = [
+                    'size' => $size,
+                    'last_activity' => $streamData['last_activity'] ?? 0
+                ];
+                $totalSize += $size;
+            }
+            
+            if ($totalSize <= $targetSize) {
+                return 0;
+            }
+            
+            // Sort by last activity (oldest first)
+            uasort($streamSizes, function($a, $b) {
+                return $a['last_activity'] <=> $b['last_activity'];
+            });
+            
+            $freedSize = 0;
+            $currentSize = $totalSize;
+            
+            foreach ($streamSizes as $streamKey => $data) {
+                if ($currentSize <= $targetSize) {
+                    break;
+                }
+                
+                // Trim this stream's buffer by 50%
+                $targetStreamSize = $data['size'] * 0.5;
+                $freed = $this->trimBufferToSize($streamKey, (int)$targetStreamSize);
+                $freedSize += $freed;
+                $currentSize -= $freed;
+            }
+            
+            return $freedSize;
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error trimming oldest buffers: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Update stream statistics
+     */
+    public function updateStreamStats(string $streamKey): void
+    {
+        try {
+            $streamInfo = $this->getStreamInfo($streamKey);
+            if (!$streamInfo) {
+                return;
+            }
+            
+            // Update last activity
+            $streamInfo['last_activity'] = time();
+            $this->setStreamInfo($streamKey, $streamInfo);
+            
+            // Update database record
+            SharedStream::where('stream_id', $streamKey)->update([
+                'last_activity' => now(),
+                'client_count' => $streamInfo['client_count'] ?? 0
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error updating stream stats for {$streamKey}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Clean up orphaned Redis keys
+     */
+    public function cleanupOrphanedKeys(): int
+    {
+        try {
+            $redis = $this->redis();
+            $cleaned = 0;
+            
+            // Get all stream keys
+            $streamKeys = $redis->keys(self::CACHE_PREFIX . '*');
+            $activeStreamKeys = [];
+            
+            foreach ($streamKeys as $key) {
+                $streamInfo = $redis->get($key);
+                if ($streamInfo) {
+                    $data = json_decode($streamInfo, true);
+                    if ($data && isset($data['status']) && in_array($data['status'], ['active', 'starting'])) {
+                        $activeStreamKeys[] = str_replace(self::CACHE_PREFIX, '', $key);
+                    } else {
+                        // Remove inactive stream key
+                        $redis->del($key);
+                        $cleaned++;
+                    }
+                }
+            }
+            
+            // Clean up client keys for non-existent streams
+            $clientKeys = $redis->keys(self::CLIENT_PREFIX . '*');
+            foreach ($clientKeys as $clientKey) {
+                $streamKeyPart = str_replace(self::CLIENT_PREFIX, '', $clientKey);
+                $streamKey = explode(':', $streamKeyPart)[0];
+                
+                if (!in_array($streamKey, $activeStreamKeys)) {
+                    $redis->del($clientKey);
+                    $cleaned++;
+                }
+            }
+            
+            // Clean up buffer keys for non-existent streams
+            $bufferKeys = $redis->keys(self::BUFFER_PREFIX . '*');
+            foreach ($bufferKeys as $bufferKey) {
+                $streamKey = str_replace(self::BUFFER_PREFIX, '', $bufferKey);
+                $streamKey = explode(':', $streamKey)[0];
+                
+                if (!in_array($streamKey, $activeStreamKeys)) {
+                    $redis->del($bufferKey);
+                    $cleaned++;
+                }
+            }
+            
+            return $cleaned;
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error cleaning up orphaned keys: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Remove a client from a stream
+     */
+    public function removeClient(string $streamKey, string $clientId): void
+    {
+        try {
+            $clientKey = self::CLIENT_PREFIX . $streamKey . ':' . $clientId;
+            $this->redis()->del($clientKey);
+            
+            // Decrement client count
+            $streamInfo = $this->getStreamInfo($streamKey);
+            if ($streamInfo) {
+                $streamInfo['client_count'] = max(0, ($streamInfo['client_count'] ?? 1) - 1);
+                $streamInfo['last_activity'] = time();
+                $this->setStreamInfo($streamKey, $streamInfo);
+                
+                Log::channel('ffmpeg')->debug("Client {$clientId} removed from stream {$streamKey}. Remaining clients: {$streamInfo['client_count']}");
+            }
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error removing client {$clientId} from stream {$streamKey}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Stop a stream
+     */
+    public function stopStream(string $streamKey): bool
+    {
+        try {
+            $streamInfo = $this->getStreamInfo($streamKey);
+            if (!$streamInfo) {
+                return false;
+            }
+            
+            // Kill the process if it exists
+            $pid = $streamInfo['pid'] ?? null;
+            if ($pid && $this->isProcessRunning($pid)) {
+                if (function_exists('posix_kill')) {
+                    posix_kill($pid, SIGTERM);
+                    sleep(2);
+                    if ($this->isProcessRunning($pid)) {
+                        posix_kill($pid, SIGKILL);
+                    }
+                } else {
+                    exec("kill -TERM $pid");
+                    sleep(2);
+                    exec("kill -KILL $pid 2>/dev/null");
+                }
+            }
+            
+            // Clean up stream
+            $this->cleanupStream($streamKey, true);
+            
+            Log::channel('ffmpeg')->info("Stream {$streamKey} stopped successfully");
+            return true;
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error stopping stream {$streamKey}: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get stream statistics/status
+     */
+    public function getStreamStats(string $streamKey): ?array
+    {
+        try {
+            $streamInfo = $this->getStreamInfo($streamKey);
+            if (!$streamInfo) {
+                return null;
+            }
+            
+            // Get client count
+            $clientKeys = $this->redis()->keys(self::CLIENT_PREFIX . $streamKey . ':*');
+            $clientCount = count($clientKeys);
+            
+            // Check if process is running
+            $pid = $streamInfo['pid'] ?? null;
+            $isProcessRunning = $pid ? $this->isProcessRunning($pid) : false;
+            
+            // Determine status
+            $status = $streamInfo['status'] ?? 'unknown';
+            if ($status === 'active' && !$isProcessRunning) {
+                $status = 'stopped';
+            }
+            
+            return [
+                'status' => $status,
+                'client_count' => $clientCount,
+                'uptime' => time() - ($streamInfo['created_at'] ?? time()),
+                'last_activity' => $streamInfo['last_activity'] ?? time(),
+                'process_running' => $isProcessRunning,
+                'title' => $streamInfo['title'] ?? 'Unknown',
+                'format' => $streamInfo['format'] ?? 'unknown'
+            ];
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error getting stream stats for {$streamKey}: " . $e->getMessage());
+            return null;
+        }
+    }
+
 }
