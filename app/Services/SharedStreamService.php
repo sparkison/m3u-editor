@@ -466,8 +466,29 @@ class SharedStreamService
         stream_set_blocking($stdout, false);
         stream_set_blocking($stderr, false);
 
-        // Start immediate buffer management
-        $this->runBufferManager($streamKey, $stdout, $stderr, $process);
+        // Do initial buffering to ensure the stream starts properly
+        $this->startInitialBuffering($streamKey, $stdout, $stderr, $process);
+
+        // Try to fork a background process to continue buffering
+        if (function_exists('pcntl_fork')) {
+            $pid = pcntl_fork();
+            if ($pid == 0) {
+                // Child process - run continuous buffering
+                $this->runBufferManager($streamKey, $stdout, $stderr, $process);
+                exit(0);
+            } elseif ($pid > 0) {
+                // Parent process - continue normally
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Forked buffer manager with PID {$pid}");
+                return;
+            }
+        }
+        
+        // Fallback: Use shutdown function for continuous buffering
+        register_shutdown_function(function () use ($streamKey, $stdout, $stderr, $process) {
+            $this->runBufferManager($streamKey, $stdout, $stderr, $process);
+        });
+        
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Using shutdown function for continuous buffering");
     }
 
     /**
@@ -694,8 +715,8 @@ PHP;
                 
                 Log::channel('ffmpeg')->info("Stream {$streamKey}: First data received! Segment {$segmentNumber} buffered (" . strlen($data) . " bytes)");
                 
-                // Buffer a few more segments to get the stream going
-                for ($i = 1; $i < 3; $i++) {
+                // Buffer many more segments to get the stream going and drain the pipe
+                for ($i = 1; $i < 10; $i++) {
                     $moreData = fread($stdout, $bufferSize);
                     if ($moreData !== false && strlen($moreData) > 0) {
                         $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
@@ -704,6 +725,9 @@ PHP;
                         Redis::ltrim("{$bufferKey}:segments", 0, 30);
                         $segmentNumber++;
                         Log::channel('ffmpeg')->debug("Stream {$streamKey}: Additional segment {$segmentNumber} buffered (" . strlen($moreData) . " bytes)");
+                    } else {
+                        // No more data available immediately, but we have some data
+                        break;
                     }
                 }
                 break;
