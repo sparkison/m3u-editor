@@ -80,8 +80,9 @@ class StreamMonitorUpdate implements ShouldQueue
                 'total_streams' => count($activeStreams),
                 'unhealthy_streams' => $unhealthyStreams,
                 'total_bandwidth' => $totalBandwidth,
-                'system_load' => $systemStats['cpu_usage'] ?? 0,
-                'memory_usage' => $systemStats['memory_usage'] ?? 0,
+                'system_load' => $systemStats['load_average']['1min'] ?? 0,
+                'memory_usage_percentage' => $systemStats['memory_usage']['percentage'] ?? 0,
+                'redis_connected' => $systemStats['redis_connected'] ?? false,
                 'timestamp' => time()
             ]);
             

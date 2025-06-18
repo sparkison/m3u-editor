@@ -420,11 +420,103 @@ class SharedStreamService
     private function forkBufferManager(string $streamKey, $stdout, $stderr, $process): void
     {
         // In a production environment, you'd want to use a proper job queue
-        // For now, we'll use a simple background process approach
+        // For now, we'll run the buffer manager immediately in the background
         
+        // Start the buffer manager immediately instead of waiting for shutdown
+        $this->runBufferManagerBackground($streamKey, $stdout, $stderr, $process);
+    }
+
+    /**
+     * Run buffer manager in background immediately
+     */
+    private function runBufferManagerBackground(string $streamKey, $stdout, $stderr, $process): void
+    {
+        // Set streams to non-blocking immediately
+        stream_set_blocking($stdout, false);
+        stream_set_blocking($stderr, false);
+        
+        // Start reading data immediately to prevent FFmpeg from hanging
+        $this->startInitialBuffering($streamKey, $stdout, $stderr, $process);
+        
+        // Set up ongoing buffer management via shutdown function as fallback
         register_shutdown_function(function () use ($streamKey, $stdout, $stderr, $process) {
             $this->runBufferManager($streamKey, $stdout, $stderr, $process);
         });
+        
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffer manager setup completed");
+    }
+
+    /**
+     * Start initial buffering to prevent FFmpeg from hanging
+     */
+    private function startInitialBuffering(string $streamKey, $stdout, $stderr, $process): void
+    {
+        $bufferKey = self::BUFFER_PREFIX . $streamKey;
+        $segmentNumber = 0;
+        $bufferSize = 188 * 1000; // ~188KB chunks
+        $maxWait = 10; // Wait up to 10 seconds for data
+        $waitTime = 0;
+
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Starting initial buffering (waiting for FFmpeg data)");
+
+        // Wait for FFmpeg to start producing data
+        while ($waitTime < $maxWait) {
+            // Try to read data (non-blocking)
+            $data = fread($stdout, $bufferSize);
+            if ($data !== false && strlen($data) > 0) {
+                $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                
+                // Store segment in Redis with expiry
+                Redis::setex($segmentKey, self::SEGMENT_EXPIRY, $data);
+                
+                // Update stream segment list
+                Redis::lpush("{$bufferKey}:segments", $segmentNumber);
+                Redis::ltrim("{$bufferKey}:segments", 0, 30);
+                
+                $segmentNumber++;
+                $this->updateStreamActivity($streamKey);
+                
+                Log::channel('ffmpeg')->info("Stream {$streamKey}: First data received! Segment {$segmentNumber} buffered (" . strlen($data) . " bytes)");
+                
+                // Buffer a few more segments to get the stream going
+                for ($i = 1; $i < 3; $i++) {
+                    $moreData = fread($stdout, $bufferSize);
+                    if ($moreData !== false && strlen($moreData) > 0) {
+                        $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                        Redis::setex($segmentKey, self::SEGMENT_EXPIRY, $moreData);
+                        Redis::lpush("{$bufferKey}:segments", $segmentNumber);
+                        Redis::ltrim("{$bufferKey}:segments", 0, 30);
+                        $segmentNumber++;
+                        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Additional segment {$segmentNumber} buffered (" . strlen($moreData) . " bytes)");
+                    }
+                }
+                break;
+            }
+
+            // Check for errors
+            $error = fread($stderr, 1024);
+            if ($error !== false && strlen($error) > 0) {
+                Log::channel('ffmpeg')->error("Stream {$streamKey} FFmpeg error during initial buffering: {$error}");
+            }
+
+            // Wait a bit and try again
+            usleep(500000); // 500ms
+            $waitTime += 0.5;
+        }
+        
+        if ($segmentNumber > 0) {
+            Log::channel('ffmpeg')->info("Stream {$streamKey}: Initial buffering completed successfully with {$segmentNumber} segments");
+            
+            // Update stream status to active since we have data
+            $streamInfo = $this->getStreamInfo($streamKey);
+            if ($streamInfo) {
+                $streamInfo['status'] = 'active';
+                $streamInfo['first_data_at'] = time();
+                $this->setStreamInfo($streamKey, $streamInfo);
+            }
+        } else {
+            Log::channel('ffmpeg')->warning("Stream {$streamKey}: No data received after {$maxWait}s, FFmpeg may have failed to start");
+        }
     }
 
     /**

@@ -527,10 +527,13 @@ class StreamMonitorService
     public function updateSystemStats(): array
     {
         try {
+            $loadAvg = sys_getloadavg();
             $stats = [
                 'memory_usage' => memory_get_usage(true),
                 'memory_peak' => memory_get_peak_usage(true),
-                'load_average' => sys_getloadavg(),
+                'load_average_1min' => $loadAvg[0],
+                'load_average_5min' => $loadAvg[1], 
+                'load_average_15min' => $loadAvg[2],
                 'uptime' => time() - $this->getStartTime(),
                 'updated_at' => time()
             ];
@@ -674,9 +677,24 @@ class StreamMonitorService
             $globalKey = 'shared_streaming:global_stats';
             $current = Redis::hGetAll($globalKey) ?: [];
             
+            // Ensure all values are strings or scalar for Redis hMSet
+            $processedStats = [];
+            foreach ($stats as $key => $value) {
+                if (is_array($value)) {
+                    // Convert arrays to JSON strings
+                    $processedStats[$key] = json_encode($value);
+                } elseif (is_bool($value)) {
+                    // Convert booleans to strings
+                    $processedStats[$key] = $value ? '1' : '0';
+                } else {
+                    // Keep scalars as is
+                    $processedStats[$key] = (string) $value;
+                }
+            }
+            
             // Merge with current stats
-            $merged = array_merge($current, $stats);
-            $merged['last_updated'] = time();
+            $merged = array_merge($current, $processedStats);
+            $merged['last_updated'] = (string) time();
             
             Redis::hMSet($globalKey, $merged);
             

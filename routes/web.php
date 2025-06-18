@@ -67,18 +67,25 @@ Route::get('/stream/e/{encodedId}.{format?}', [\App\Http\Controllers\StreamContr
     ->name('stream.episode');
 
 // Shared streaming routes (xTeVe-like proxy functionality)
-Route::get('/shared/stream/{encodedId}.{format?}', [\App\Http\Controllers\SharedStreamController::class, 'streamChannel'])
-    ->name('shared.stream.channel');
+// More specific routes first to avoid conflicts
 
+// HLS route with specific path structure
+Route::get('/shared/stream/{streamKey}/hls', [\App\Http\Controllers\SharedStreamController::class, 'serveHLS'])
+    ->name('shared.stream.hls')
+    ->where('streamKey', '[a-f0-9]{32}'); // Match 32-character MD5 hashes
+
+// Episode route with /e/ prefix
 Route::get('/shared/stream/e/{encodedId}.{format?}', [\App\Http\Controllers\SharedStreamController::class, 'streamEpisode'])
     ->name('shared.stream.episode');
 
-// Additional shared stream routes
+// Direct stream key access (32-character MD5 hash without extension)
 Route::get('/shared/stream/{streamKey}', [\App\Http\Controllers\SharedStreamController::class, 'serveSharedStream'])
-    ->name('shared.stream.direct');
+    ->name('shared.stream.direct')
+    ->where('streamKey', '[a-f0-9]{32}'); // Match 32-character MD5 hashes
 
-Route::get('/shared/stream/{streamKey}/hls', [\App\Http\Controllers\SharedStreamController::class, 'serveHLS'])
-    ->name('shared.stream.hls');
+// Channel route (catch-all for encoded IDs with optional format)
+Route::get('/shared/stream/{encodedId}.{format?}', [\App\Http\Controllers\SharedStreamController::class, 'streamChannel'])
+    ->name('shared.stream.channel');
 
 
 /*

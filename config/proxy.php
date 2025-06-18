@@ -39,6 +39,12 @@ return [
             
             // Maximum age of buffer segments (seconds)
             'max_age' => env('SHARED_BUFFER_MAX_AGE', 3600),
+            
+            // Number of segments to keep in buffer
+            'segments' => env('SHARED_BUFFER_SEGMENTS', 10),
+            
+            // Segment retention time (seconds)
+            'segment_retention' => env('SHARED_BUFFER_SEGMENT_RETENTION', 300),
         ],
         
         // Stream monitoring
@@ -51,6 +57,12 @@ return [
             
             // Maximum allowed unhealthy duration (seconds)
             'max_unhealthy_duration' => env('SHARED_MAX_UNHEALTHY_DURATION', 600),
+            
+            // Client timeout (seconds) - for monitoring client activity
+            'client_timeout' => env('SHARED_CLIENT_TIMEOUT', 30),
+            
+            // Bandwidth monitoring threshold (kbps)
+            'bandwidth_threshold' => env('SHARED_BANDWIDTH_THRESHOLD', 50000),
         ],
         
         // Client management
