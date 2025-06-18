@@ -261,8 +261,8 @@ class SharedStreamService
         $streamInfo['pid'] = $pid;
         $this->setStreamInfo($streamKey, $streamInfo);
 
-        // Start buffer management for direct streaming
-        $this->manageDirectStreamBuffer($streamKey, $pipes[1], $pipes[2], $process);
+        // Start continuous buffer management for direct streaming
+        $this->startContinuousBuffering($streamKey, $pipes[1], $pipes[2], $process);
 
         Log::channel('ffmpeg')->info("Started direct shared stream {$streamKey} with PID {$pid}");
         Log::channel('ffmpeg')->debug("Direct Command: {$cmd}");
@@ -402,16 +402,67 @@ class SharedStreamService
     }
 
     /**
-     * Manage buffering for direct streams (similar to xTeVe)
+     * Start continuous buffering process
      */
-    private function manageDirectStreamBuffer(string $streamKey, $stdout, $stderr, $process): void
+    private function startContinuousBuffering(string $streamKey, $stdout, $stderr, $process): void
     {
         // Make streams non-blocking
         stream_set_blocking($stdout, false);
         stream_set_blocking($stderr, false);
 
-        // Start buffer management in a separate process/thread
-        $this->forkBufferManager($streamKey, $stdout, $stderr, $process);
+        // Do initial buffering to ensure the stream starts properly
+        $this->startInitialBuffering($streamKey, $stdout, $stderr, $process);
+
+        // Start the continuous buffer manager using a background job
+        // This ensures continuous reading from FFmpeg to prevent pipe blocking
+        try {
+            \App\Jobs\StreamBufferManager::dispatch($streamKey, $stdout, $stderr, $process);
+            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Dispatched continuous buffer manager job");
+        } catch (\Exception $e) {
+            // Fallback to immediate continuous buffering if job dispatch fails
+            Log::channel('ffmpeg')->warning("Stream {$streamKey}: Failed to dispatch buffer manager job, using fallback: " . $e->getMessage());
+            $this->runContinuousBufferFallback($streamKey, $stdout, $stderr, $process);
+        }
+    }
+
+    /**
+     * Fallback continuous buffering when job dispatch fails
+     */
+    private function runContinuousBufferFallback(string $streamKey, $stdout, $stderr, $process): void
+    {
+        // Fork a process to handle continuous buffering if possible
+        if (function_exists('pcntl_fork')) {
+            $pid = pcntl_fork();
+            if ($pid == 0) {
+                // Child process - run the buffer manager
+                $this->runBufferManager($streamKey, $stdout, $stderr, $process);
+                exit(0);
+            } else if ($pid > 0) {
+                // Parent process - continue normally
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Forked buffer manager process with PID {$pid}");
+            } else {
+                // Fork failed - use shutdown function as last resort
+                Log::channel('ffmpeg')->warning("Stream {$streamKey}: Fork failed, using shutdown function fallback");
+                register_shutdown_function(function () use ($streamKey, $stdout, $stderr, $process) {
+                    $this->runBufferManager($streamKey, $stdout, $stderr, $process);
+                });
+            }
+        } else {
+            // pcntl not available - use shutdown function as last resort
+            Log::channel('ffmpeg')->warning("Stream {$streamKey}: pcntl not available, using shutdown function fallback");
+            register_shutdown_function(function () use ($streamKey, $stdout, $stderr, $process) {
+                $this->runBufferManager($streamKey, $stdout, $stderr, $process);
+            });
+        }
+    }
+
+    /**
+     * Manage buffering for direct streams (similar to xTeVe)
+     */
+    private function manageDirectStreamBuffer(string $streamKey, $stdout, $stderr, $process): void
+    {
+        // This method is now replaced by startContinuousBuffering
+        $this->startContinuousBuffering($streamKey, $stdout, $stderr, $process);
     }
 
     /**
@@ -527,44 +578,82 @@ class SharedStreamService
         $bufferKey = self::BUFFER_PREFIX . $streamKey;
         $segmentNumber = 0;
         $bufferSize = 188 * 1000; // ~188KB chunks (similar to xTeVe's approach)
+        $lastActivity = time();
+        $maxInactiveTime = 60; // 60 seconds of no data before giving up
 
-        while (!feof($stdout) && $this->isStreamActive($streamKey)) {
-            $data = fread($stdout, $bufferSize);
-            if ($data !== false && strlen($data) > 0) {
-                $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                
-                // Store segment in Redis with expiry
-                Redis::setex($segmentKey, self::SEGMENT_EXPIRY, $data);
-                
-                // Update stream segment list
-                Redis::lpush("{$bufferKey}:segments", $segmentNumber);
-                Redis::ltrim("{$bufferKey}:segments", 0, 30); // Keep last 30 segments
-                
-                $segmentNumber++;
-                
-                // Update last activity
-                $this->updateStreamActivity($streamKey);
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffer manager starting continuous read loop");
+
+        try {
+            while (!feof($stdout) && $this->isStreamActive($streamKey)) {
+                $hasData = false;
+
+                // Read data from FFmpeg stdout
+                $data = fread($stdout, $bufferSize);
+                if ($data !== false && strlen($data) > 0) {
+                    $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                    
+                    // Store segment in Redis with expiry
+                    Redis::setex($segmentKey, self::SEGMENT_EXPIRY, $data);
+                    
+                    // Update stream segment list
+                    Redis::lpush("{$bufferKey}:segments", $segmentNumber);
+                    Redis::ltrim("{$bufferKey}:segments", 0, 30); // Keep last 30 segments
+                    
+                    $segmentNumber++;
+                    $hasData = true;
+                    $lastActivity = time();
+                    
+                    // Update stream activity
+                    $this->updateStreamActivity($streamKey);
+                    
+                    // Log progress occasionally
+                    if ($segmentNumber <= 10 || $segmentNumber % 100 === 0) {
+                        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffered segment {$segmentNumber} (" . strlen($data) . " bytes)");
+                    }
+                }
+
+                // Check for errors from FFmpeg stderr
+                $error = fread($stderr, 1024);
+                if ($error !== false && strlen($error) > 0) {
+                    Log::channel('ffmpeg')->error("Stream {$streamKey} FFmpeg error: {$error}");
+                }
+
+                // Check if process is still running
+                $status = proc_get_status($process);
+                if (!$status['running']) {
+                    Log::channel('ffmpeg')->warning("Stream {$streamKey}: FFmpeg process terminated (exit code: {$status['exitcode']})");
+                    break;
+                }
+
+                // If no data for a while, check if we should continue
+                if (!$hasData) {
+                    if (time() - $lastActivity > $maxInactiveTime) {
+                        Log::channel('ffmpeg')->warning("Stream {$streamKey}: No data for {$maxInactiveTime}s, ending buffer manager");
+                        break;
+                    }
+                    usleep(100000); // 100ms sleep when no data
+                } else {
+                    usleep(10000); // 10ms sleep when actively buffering
+                }
             }
-
-            // Check for errors
-            $error = fread($stderr, 1024);
-            if ($error !== false && strlen($error) > 0) {
-                Log::channel('ffmpeg')->error("Stream {$streamKey} error: {$error}");
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Stream {$streamKey}: Buffer manager error: " . $e->getMessage());
+        } finally {
+            // Cleanup resources
+            if (is_resource($stdout)) {
+                fclose($stdout);
             }
-
-            usleep(10000); // 10ms sleep to prevent excessive CPU usage
+            if (is_resource($stderr)) {
+                fclose($stderr);
+            }
+            if (is_resource($process)) {
+                proc_close($process);
+            }
+            
+            // Mark stream as stopped
+            $this->cleanupStream($streamKey, true);
+            Log::channel('ffmpeg')->info("Stream {$streamKey}: Buffer manager ended after {$segmentNumber} segments");
         }
-
-        // Cleanup
-        fclose($stdout);
-        fclose($stderr);
-        
-        // Clean up process
-        if (is_resource($process)) {
-            proc_close($process);
-        }
-        
-        $this->cleanupStream($streamKey, true);
     }
 
     /**
