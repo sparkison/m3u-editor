@@ -461,21 +461,9 @@ class SharedStreamService
         // Start immediate buffering to prevent FFmpeg from hanging
         $this->startImmediateBuffering($streamKey, $stdout, $stderr, $process);
         
-        // Try to use Laravel job queue for continuous management (preferred)
-        try {
-            \App\Jobs\StreamBufferManager::dispatch($streamKey, $stdout, $stderr, $process)
-                ->onQueue('streams');
-            
-            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Dispatched StreamBufferManager job for continuous buffering");
-            return;
-            
-        } catch (\Exception $e) {
-            Log::channel('ffmpeg')->warning("Stream {$streamKey}: Failed to dispatch buffer manager job: " . $e->getMessage());
-        }
-
-        // Fallback: Direct buffer management in current process
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Using direct buffer management fallback");
-        $this->runDirectBufferManager($streamKey, $stdout, $stderr, $process);
+        // Use background process to continue buffering (since we can't serialize file handles for jobs)
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Using background buffer management");
+        $this->runBufferManagerBackground($streamKey, $stdout, $stderr, $process);
     }
 
 
@@ -498,15 +486,27 @@ class SharedStreamService
         stream_set_blocking($stdout, false);
         stream_set_blocking($stderr, false);
         
-        // Start reading data immediately to prevent FFmpeg from hanging
-        $this->startInitialBuffering($streamKey, $stdout, $stderr, $process);
+        // Start continuous buffer management
+        if (function_exists('pcntl_fork')) {
+            // Use fork if available (Unix systems)
+            $pid = pcntl_fork();
+            if ($pid == 0) {
+                // Child process - run the buffer manager
+                $this->runBufferManager($streamKey, $stdout, $stderr, $process);
+                exit(0);
+            } else if ($pid > 0) {
+                // Parent process - detach from child
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Forked buffer manager process (PID: {$pid})");
+                return;
+            }
+        }
         
-        // Set up simple shutdown drain as fallback
+        // Fallback: Use shutdown function for basic pipe draining
         register_shutdown_function(function () use ($streamKey, $stdout, $stderr, $process) {
             $this->drainPipesOnShutdown($streamKey, $stdout, $stderr, $process);
         });
         
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Simplified buffer manager setup completed");
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Set up buffer management fallback");
     }
 
     /**
