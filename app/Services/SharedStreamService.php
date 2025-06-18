@@ -325,6 +325,51 @@ class SharedStreamService
     }
 
     /**
+     * Build FFmpeg command for direct streaming (simplified for compatibility)
+     * Uses proven working approach from StreamController
+     */
+    private function buildDirectCommand(string $ffmpegPath, array $streamInfo, string $userAgent): string
+    {
+        $settings = ProxyService::getStreamSettings();
+        $streamUrl = $streamInfo['stream_url'];
+        
+        // Build command using proven working approach from StreamController
+        $cmd = escapeshellcmd($ffmpegPath) . ' ';
+        
+        // Better error handling (from working approach)
+        $cmd .= '-err_detect ignore_err -ignore_unknown ';
+        
+        // HTTP options (simplified to match working approach)
+        $cmd .= "-user_agent " . escapeshellarg($userAgent) . " -referer " . escapeshellarg("MyComputer") . " ";
+        $cmd .= '-multiple_requests 1 -reconnect_on_network_error 1 ';
+        $cmd .= '-reconnect_on_http_error 5xx,4xx -reconnect_streamed 1 ';
+        $cmd .= '-reconnect_delay_max 5 ';
+        $cmd .= '-noautorotate ';
+        
+        // Input
+        $cmd .= '-i ' . escapeshellarg($streamUrl) . ' ';
+        
+        // Output options - simplified to match working direct streaming
+        $videoCodec = $settings['ffmpeg_codec_video'] ?? 'copy';
+        $audioCodec = $settings['ffmpeg_codec_audio'] ?? 'copy';
+        
+        // Use copy by default for shared streaming to reduce CPU load
+        if ($videoCodec === 'copy' || empty($videoCodec)) {
+            $videoCodec = 'copy';
+        }
+        if ($audioCodec === 'copy' || empty($audioCodec)) {
+            $audioCodec = 'copy';
+        }
+        
+        // Output format (simplified to match working approach)
+        $cmd .= "-c:v {$videoCodec} -c:a {$audioCodec} -f mpegts pipe:1";
+        
+        Log::channel('ffmpeg')->debug("SharedStream: Built simplified direct command matching working approach");
+        
+        return $cmd;
+    }
+
+    /**
      * Setup error logging for FFmpeg stderr
      */
     private function setupErrorLogging(string $streamKey, $stderr, $process): void
@@ -1018,3 +1063,223 @@ class SharedStreamService
             Log::channel('ffmpeg')->error("Stream {$streamKey}: Error during final cleanup: " . $e->getMessage());
         }
     }
+
+    /**
+     * Build HLS command for shared HLS streaming
+     */
+    private function buildHLSCommand(string $ffmpegPath, array $streamInfo, string $storageDir, string $userAgent): string
+    {
+        $settings = ProxyService::getStreamSettings();
+        $streamUrl = $streamInfo['stream_url'];
+        
+        $cmd = escapeshellcmd($ffmpegPath) . ' ';
+        $cmd .= '-hide_banner -loglevel error ';
+        $cmd .= '-user_agent ' . escapeshellarg($userAgent) . ' ';
+        $cmd .= '-i ' . escapeshellarg($streamUrl) . ' ';
+        $cmd .= '-c copy -f hls ';
+        $cmd .= '-hls_time 4 -hls_list_size 10 ';
+        $cmd .= '-hls_flags delete_segments ';
+        $cmd .= escapeshellarg($storageDir . '/playlist.m3u8');
+        
+        return $cmd;
+    }
+
+    /**
+     * Generate stream key from type, model ID, and URL
+     */
+    private function getStreamKey(string $type, int $modelId, string $streamUrl): string
+    {
+        return self::CACHE_PREFIX . $type . ':' . $modelId . ':' . md5($streamUrl);
+    }
+
+    /**
+     * Get stream info from Redis
+     */
+    private function getStreamInfo(string $streamKey): ?array
+    {
+        $data = $this->redis()->get($streamKey);
+        return $data ? json_decode($data, true) : null;
+    }
+
+    /**
+     * Set stream info in Redis
+     */
+    private function setStreamInfo(string $streamKey, array $streamInfo): void
+    {
+        $this->redis()->setex($streamKey, self::SEGMENT_EXPIRY, json_encode($streamInfo));
+    }
+
+    /**
+     * Check if stream is active
+     */
+    private function isStreamActive(string $streamKey): bool
+    {
+        $streamInfo = $this->getStreamInfo($streamKey);
+        return $streamInfo && ($streamInfo['status'] === 'active' || $streamInfo['status'] === 'starting');
+    }
+
+    /**
+     * Increment client count for a stream
+     */
+    private function incrementClientCount(string $streamKey): void
+    {
+        $streamInfo = $this->getStreamInfo($streamKey);
+        if ($streamInfo) {
+            $streamInfo['client_count'] = ($streamInfo['client_count'] ?? 0) + 1;
+            $streamInfo['last_activity'] = now()->timestamp;
+            $this->setStreamInfo($streamKey, $streamInfo);
+        }
+    }
+
+    /**
+     * Register a client for a stream
+     */
+    private function registerClient(string $streamKey, string $clientId, array $options = []): void
+    {
+        $clientKey = self::CLIENT_PREFIX . $streamKey . ':' . $clientId;
+        $clientInfo = [
+            'client_id' => $clientId,
+            'connected_at' => now()->timestamp,
+            'last_activity' => now()->timestamp,
+            'options' => $options
+        ];
+        $this->redis()->setex($clientKey, self::CLIENT_TIMEOUT, json_encode($clientInfo));
+    }
+
+    /**
+     * Get stream storage directory
+     */
+    private function getStreamStorageDir(string $streamKey): string
+    {
+        return 'shared_streams/' . md5($streamKey);
+    }
+
+    /**
+     * Set stream process PID
+     */
+    private function setStreamProcess(string $streamKey, int $pid): void
+    {
+        $pidKey = "stream_pid:{$streamKey}";
+        $this->redis()->setex($pidKey, self::SEGMENT_EXPIRY, $pid);
+    }
+
+    /**
+     * Clean up stream resources
+     */
+    private function cleanupStream(string $streamKey, bool $removeData = false): void
+    {
+        if ($removeData) {
+            $this->redis()->del($streamKey);
+            $bufferKey = self::BUFFER_PREFIX . $streamKey;
+            $this->redis()->del($bufferKey);
+        }
+        
+        SharedStream::where('stream_id', $streamKey)->update(['status' => 'stopped']);
+    }
+
+    /**
+     * Update stream activity timestamp
+     */
+    private function updateStreamActivity(string $streamKey): void
+    {
+        $streamInfo = $this->getStreamInfo($streamKey);
+        if ($streamInfo) {
+            $streamInfo['last_activity'] = now()->timestamp;
+            $this->setStreamInfo($streamKey, $streamInfo);
+        }
+    }
+
+    /**
+     * Get next stream segments for a client
+     */
+    public function getNextStreamSegments(string $streamKey, string $clientId, int &$lastSegment): ?string
+    {
+        $bufferKey = self::BUFFER_PREFIX . $streamKey;
+        $segmentNumbers = $this->redis()->lrange("{$bufferKey}:segments", 0, -1);
+        
+        if (empty($segmentNumbers)) {
+            return null;
+        }
+        
+        $data = '';
+        foreach ($segmentNumbers as $segmentNumber) {
+            if ($segmentNumber > $lastSegment) {
+                $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                $segmentData = $this->redis()->get($segmentKey);
+                if ($segmentData) {
+                    $data .= $segmentData;
+                    $lastSegment = $segmentNumber;
+                }
+            }
+        }
+        
+        return !empty($data) ? $data : null;
+    }
+
+    /**
+     * Synchronize stream state between Redis and database
+     * Called by ManageSharedStreams command
+     */
+    public function synchronizeState(): void
+    {
+        try {
+            $redis = $this->redis();
+            
+            // Get all active stream keys from Redis
+            $streamKeys = $redis->keys(self::STREAM_PREFIX . '*');
+            
+            foreach ($streamKeys as $fullKey) {
+                $streamKey = str_replace(self::STREAM_PREFIX, '', $fullKey);
+                $streamInfo = $this->getStreamInfo($streamKey);
+                
+                if ($streamInfo) {
+                    // Check if process is still running
+                    $pid = $streamInfo['pid'] ?? null;
+                    $isRunning = false;
+                    
+                    if ($pid) {
+                        $isRunning = $this->isProcessRunning($pid);
+                    }
+                    
+                    // Update database status based on actual process state
+                    $status = $isRunning ? 'active' : 'stopped';
+                    
+                    SharedStream::where('stream_id', $streamKey)->update([
+                        'status' => $status,
+                        'last_activity' => now()
+                    ]);
+                    
+                    // Clean up if process is dead
+                    if (!$isRunning) {
+                        $this->cleanupStream($streamKey, true);
+                    }
+                }
+            }
+            
+            Log::channel('ffmpeg')->debug("Synchronized " . count($streamKeys) . " stream states");
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error synchronizing stream states: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Check if a process is running by PID
+     */
+    private function isProcessRunning(int $pid): bool
+    {
+        try {
+            if (function_exists('posix_kill')) {
+                return posix_kill($pid, 0);
+            }
+            
+            // Fallback for systems without posix functions
+            $result = shell_exec("ps -p $pid");
+            return !empty($result) && strpos($result, (string)$pid) !== false;
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->warning("Could not check process $pid: " . $e->getMessage());
+            return false;
+        }
+    }
+}
