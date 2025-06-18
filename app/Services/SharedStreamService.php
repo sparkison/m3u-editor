@@ -486,27 +486,17 @@ class SharedStreamService
         stream_set_blocking($stdout, false);
         stream_set_blocking($stderr, false);
         
-        // Start continuous buffer management
-        if (function_exists('pcntl_fork')) {
-            // Use fork if available (Unix systems)
-            $pid = pcntl_fork();
-            if ($pid == 0) {
-                // Child process - run the buffer manager
-                $this->runBufferManager($streamKey, $stdout, $stderr, $process);
-                exit(0);
-            } else if ($pid > 0) {
-                // Parent process - detach from child
-                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Forked buffer manager process (PID: {$pid})");
-                return;
-            }
-        }
-        
-        // Fallback: Use shutdown function for basic pipe draining
+        // Use a register_shutdown_function approach instead of forking
+        // This prevents broken pipe issues caused by parent process file handle closure
         register_shutdown_function(function () use ($streamKey, $stdout, $stderr, $process) {
             $this->drainPipesOnShutdown($streamKey, $stdout, $stderr, $process);
         });
         
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Set up buffer management fallback");
+        // Start continuous buffering immediately in current process
+        // This prevents the broken pipe issue by keeping the parent process active
+        $this->runBufferManager($streamKey, $stdout, $stderr, $process);
+        
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffer manager running in current process");
     }
 
     /**
