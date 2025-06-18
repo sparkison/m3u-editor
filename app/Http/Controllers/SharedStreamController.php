@@ -155,6 +155,9 @@ class SharedStreamController extends Controller
      */
     private function streamHLS(array $streamInfo, string $clientId, Request $request): Response
     {
+        // Disable execution time limit for streaming
+        set_time_limit(0);
+        
         $streamKey = $streamInfo['stream_key'];
         
         // Wait for stream to be ready
@@ -184,6 +187,9 @@ class SharedStreamController extends Controller
         $streamKey = $streamInfo['stream_key'];
 
         return new StreamedResponse(function () use ($streamKey, $clientId, $request) {
+            // Disable execution time limit for streaming
+            set_time_limit(0);
+            
             // Set up client connection monitoring
             ignore_user_abort(false);
             
