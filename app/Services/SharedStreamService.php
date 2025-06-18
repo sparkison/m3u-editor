@@ -658,6 +658,22 @@ class SharedStreamService
             }
         } else {
             Log::channel('ffmpeg')->warning("Stream {$streamKey}: No data received after {$maxWait}s, FFmpeg may have failed to start");
+            
+            // Mark stream as failed since no data was received
+            $streamInfo = $this->getStreamInfo($streamKey);
+            if ($streamInfo) {
+                $streamInfo['status'] = 'error';
+                $streamInfo['error_message'] = 'No data received from FFmpeg within timeout period';
+                $this->setStreamInfo($streamKey, $streamInfo);
+                
+                // Also update database status
+                SharedStream::where('stream_id', $streamKey)->update([
+                    'status' => 'error',
+                    'error_message' => 'No data received from FFmpeg within timeout period'
+                ]);
+                
+                Log::channel('ffmpeg')->error("Stream {$streamKey}: Status updated to 'error' - no data received within {$maxWait}s");
+            }
         }
     }
 
