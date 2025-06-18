@@ -929,6 +929,48 @@ class SharedStreamService
         });
     }
 
+    /**
+     * Get next stream segments for client streaming
+     * This method is called by SharedStreamController to stream data to clients
+     */
+    public function getNextStreamSegments(string $streamKey, string $clientId, int &$lastSegment): ?string
+    {
+        if (!$this->isClientRegistered($streamKey, $clientId)) {
+            return null;
+        }
+
+        $this->updateClientActivity($streamKey, $clientId);
+
+        $bufferKey = self::BUFFER_PREFIX . $streamKey;
+        $segments = Redis::lrange("{$bufferKey}:segments", 0, -1);
+        
+        // Get segments that are newer than lastSegment
+        $data = '';
+        $segmentsRead = 0;
+        
+        foreach ($segments as $segmentNum) {
+            if ($segmentNum > $lastSegment) {
+                $segmentKey = "{$bufferKey}:segment_{$segmentNum}";
+                $segmentData = Redis::get($segmentKey);
+                
+                if ($segmentData) {
+                    $data .= $segmentData;
+                    $lastSegment = max($lastSegment, $segmentNum);
+                    $segmentsRead++;
+                    
+                    // Limit to a reasonable number of segments per call to prevent memory issues
+                    if ($segmentsRead >= 5) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        return $data ?: null;
+    }
+
+    // ...existing code...
+
     // Helper methods for cache management
     
     private function getStreamKey(string $type, int $modelId, string $streamUrl): string
