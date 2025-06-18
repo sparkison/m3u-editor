@@ -2138,9 +2138,10 @@ class SharedStreamService
                 return null;
             }
 
-            // Get client information
+            // Get client information using the correct key format
             $clients = [];
-            $clientData = Redis::hGetAll("stream:{$streamKey}:clients");
+            $clientKey = self::CLIENT_PREFIX . $streamKey;
+            $clientData = $this->redis()->hgetall($clientKey);
             
             foreach ($clientData as $clientId => $clientInfo) {
                 $info = json_decode($clientInfo, true);
@@ -2149,8 +2150,8 @@ class SharedStreamService
                         'id' => $clientId,
                         'connected_at' => $info['connected_at'] ?? null,
                         'last_activity' => $info['last_activity'] ?? null,
-                        'user_agent' => $info['user_agent'] ?? null,
-                        'ip_address' => $info['ip_address'] ?? null
+                        'user_agent' => $info['options']['user_agent'] ?? null,
+                        'ip_address' => $info['options']['ip'] ?? null
                     ];
                 }
             }
