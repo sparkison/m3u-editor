@@ -224,8 +224,7 @@ class SharedStreamController extends Controller
                 
                 if ($stats && $stats['status'] === 'error') {
                     Log::channel('ffmpeg')->error("Stream {$streamKey} failed to start for client {$clientId}");
-                    echo "HTTP/1.1 503 Service Unavailable\r\n\r\nStream failed to start";
-                    return;
+                    return; // Just return without echoing HTTP headers
                 }
                 
                 usleep(100000); // 100ms wait between checks (faster response)
@@ -233,8 +232,7 @@ class SharedStreamController extends Controller
             
             if (!$streamStarted) {
                 Log::channel('ffmpeg')->warning("Stream {$streamKey} did not become active/starting within {$maxWaitTime}s for client {$clientId}");
-                echo "HTTP/1.1 503 Service Unavailable\r\n\r\nStream startup timeout";
-                return;
+                return; // Just return without echoing HTTP headers
             }
 
             // Optimized startup wait - reduced for better responsiveness

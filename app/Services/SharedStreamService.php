@@ -289,6 +289,8 @@ class SharedStreamService
 
         // Build FFmpeg command for direct output
         $cmd = $this->buildDirectCommand($ffmpegPath, $streamInfo, $userAgent);
+        
+        Log::channel('ffmpeg')->debug("Starting shared stream process for {$streamKey}: {$cmd}");
 
         // Use proc_open for direct streaming
         $descriptors = [
@@ -301,6 +303,7 @@ class SharedStreamService
         $process = proc_open($cmd, $descriptors, $pipes);
         
         if (!is_resource($process)) {
+            Log::channel('ffmpeg')->error("Failed to start process for {$streamKey}. Command: {$cmd}");
             throw new \Exception("Failed to start direct stream process for {$streamKey}");
         }
 
@@ -309,6 +312,12 @@ class SharedStreamService
 
         // Get the PID and store it
         $status = proc_get_status($process);
+        if (!$status || !isset($status['pid'])) {
+            Log::channel('ffmpeg')->error("Failed to get process status for {$streamKey}");
+            proc_close($process);
+            throw new \Exception("Failed to get process PID for {$streamKey}");
+        }
+        
         $pid = $status['pid'];
         $this->setStreamProcess($streamKey, $pid);
 
@@ -351,6 +360,14 @@ class SharedStreamService
         // Output options - simplified to match working direct streaming
         $videoCodec = $settings['ffmpeg_codec_video'] ?? 'copy';
         $audioCodec = $settings['ffmpeg_codec_audio'] ?? 'copy';
+        
+        // Ensure codecs are strings, not arrays
+        if (is_array($videoCodec)) {
+            $videoCodec = 'copy';
+        }
+        if (is_array($audioCodec)) {
+            $audioCodec = 'copy';
+        }
         
         // Use copy by default for shared streaming to reduce CPU load
         if ($videoCodec === 'copy' || empty($videoCodec)) {
@@ -1158,24 +1175,27 @@ class SharedStreamService
             // Get all stream keys from Redis
             $streamKeys = $redis->keys(self::CACHE_PREFIX . '*');
             
-            foreach ($streamKeys as $fullKey) {
-                $streamKey = str_replace(self::CACHE_PREFIX, '', $fullKey);
-                $streamInfo = $this->getStreamInfo($fullKey);
-                
-                if ($streamInfo && in_array($streamInfo['status'] ?? '', ['active', 'starting'])) {
-                    // Get client count from Redis client keys
-                    $clientKeys = $redis->keys(self::CLIENT_PREFIX . $fullKey . ':*');
-                    $clientCount = count($clientKeys);
+            // Ensure we have an array before foreach
+            if (is_array($streamKeys)) {
+                foreach ($streamKeys as $fullKey) {
+                    $streamKey = str_replace(self::CACHE_PREFIX, '', $fullKey);
+                    $streamInfo = $this->getStreamInfo($fullKey);
                     
-                    // Calculate uptime
-                    $uptime = (time() - ($streamInfo['created_at'] ?? time()));
-                    
-                    $streams[$streamKey] = [
-                        'stream_info' => $streamInfo,
-                        'client_count' => $clientCount,
-                        'uptime' => $uptime,
-                        'last_activity' => $streamInfo['last_activity'] ?? time()
-                    ];
+                    if ($streamInfo && in_array($streamInfo['status'] ?? '', ['active', 'starting'])) {
+                        // Get client count from Redis client keys
+                        $clientKeys = $redis->keys(self::CLIENT_PREFIX . $fullKey . ':*');
+                        $clientCount = is_array($clientKeys) ? count($clientKeys) : 0;
+                        
+                        // Calculate uptime
+                        $uptime = (time() - ($streamInfo['created_at'] ?? time()));
+                        
+                        $streams[$streamKey] = [
+                            'stream_info' => $streamInfo,
+                            'client_count' => $clientCount,
+                            'uptime' => $uptime,
+                            'last_activity' => $streamInfo['last_activity'] ?? time()
+                        ];
+                    }
                 }
             }
             
@@ -1199,7 +1219,8 @@ class SharedStreamService
             $cleaned = 0;
             $keepCount = 50; // Keep only the most recent 50 segments
             
-            if (count($segmentNumbers) > $keepCount) {
+            // Ensure we have an array before processing
+            if (is_array($segmentNumbers) && count($segmentNumbers) > $keepCount) {
                 $toRemove = array_slice($segmentNumbers, $keepCount);
                 foreach ($toRemove as $segmentNumber) {
                     $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
@@ -1258,11 +1279,13 @@ class SharedStreamService
             $segmentNumbers = $this->redis()->lrange("{$bufferKey}:segments", 0, -1);
             
             $totalSize = 0;
-            foreach ($segmentNumbers as $segmentNumber) {
-                $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                $data = $this->redis()->get($segmentKey);
-                if ($data) {
-                    $totalSize += strlen($data);
+            if (is_array($segmentNumbers)) {
+                foreach ($segmentNumbers as $segmentNumber) {
+                    $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                    $data = $this->redis()->get($segmentKey);
+                    if ($data) {
+                        $totalSize += strlen($data);
+                    }
                 }
             }
             
@@ -1287,28 +1310,31 @@ class SharedStreamService
             $freedSize = 0;
             $segmentsToKeep = [];
             
-            // Calculate current size and determine which segments to keep
-            foreach (array_reverse($segmentNumbers) as $segmentNumber) {
-                $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                $data = $this->redis()->get($segmentKey);
-                if ($data) {
-                    $segmentSize = strlen($data);
-                    if ($currentSize + $segmentSize <= $targetSize) {
-                        $segmentsToKeep[] = $segmentNumber;
-                        $currentSize += $segmentSize;
-                    } else {
-                        // Remove this segment
-                        $this->redis()->del($segmentKey);
-                        $freedSize += $segmentSize;
+            // Ensure we have an array before processing
+            if (is_array($segmentNumbers)) {
+                // Calculate current size and determine which segments to keep
+                foreach (array_reverse($segmentNumbers) as $segmentNumber) {
+                    $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                    $data = $this->redis()->get($segmentKey);
+                    if ($data) {
+                        $segmentSize = strlen($data);
+                        if ($currentSize + $segmentSize <= $targetSize) {
+                            $segmentsToKeep[] = $segmentNumber;
+                            $currentSize += $segmentSize;
+                        } else {
+                            // Remove this segment
+                            $this->redis()->del($segmentKey);
+                            $freedSize += $segmentSize;
+                        }
                     }
                 }
-            }
-            
-            // Update the segments list
-            if (!empty($segmentsToKeep)) {
-                $this->redis()->del("{$bufferKey}:segments");
-                foreach (array_reverse($segmentsToKeep) as $segmentNumber) {
-                    $this->redis()->lpush("{$bufferKey}:segments", $segmentNumber);
+                
+                // Update the segments list
+                if (!empty($segmentsToKeep)) {
+                    $this->redis()->del("{$bufferKey}:segments");
+                    foreach (array_reverse($segmentsToKeep) as $segmentNumber) {
+                        $this->redis()->lpush("{$bufferKey}:segments", $segmentNumber);
+                    }
                 }
             }
             
@@ -1579,25 +1605,29 @@ class SharedStreamService
             
             // Clean up client keys for non-existent streams
             $clientKeys = $redis->keys(self::CLIENT_PREFIX . '*');
-            foreach ($clientKeys as $clientKey) {
-                $streamKeyPart = str_replace(self::CLIENT_PREFIX, '', $clientKey);
-                $streamKey = explode(':', $streamKeyPart)[0];
-                
-                if (!in_array($streamKey, $activeStreamKeys)) {
-                    $redis->del($clientKey);
-                    $cleaned++;
+            if (is_array($clientKeys)) {
+                foreach ($clientKeys as $clientKey) {
+                    $streamKeyPart = str_replace(self::CLIENT_PREFIX, '', $clientKey);
+                    $streamKey = explode(':', $streamKeyPart)[0];
+                    
+                    if (!in_array($streamKey, $activeStreamKeys)) {
+                        $redis->del($clientKey);
+                        $cleaned++;
+                    }
                 }
             }
             
             // Clean up buffer keys for non-existent streams
             $bufferKeys = $redis->keys(self::BUFFER_PREFIX . '*');
-            foreach ($bufferKeys as $bufferKey) {
-                $streamKey = str_replace(self::BUFFER_PREFIX, '', $bufferKey);
-                $streamKey = explode(':', $streamKey)[0];
-                
-                if (!in_array($streamKey, $activeStreamKeys)) {
-                    $redis->del($bufferKey);
-                    $cleaned++;
+            if (is_array($bufferKeys)) {
+                foreach ($bufferKeys as $bufferKey) {
+                    $streamKey = str_replace(self::BUFFER_PREFIX, '', $bufferKey);
+                    $streamKey = explode(':', $streamKey)[0];
+                    
+                    if (!in_array($streamKey, $activeStreamKeys)) {
+                        $redis->del($bufferKey);
+                        $cleaned++;
+                    }
                 }
             }
             
@@ -1829,15 +1859,23 @@ class SharedStreamService
                 // Remove buffer data
                 $bufferKey = self::BUFFER_PREFIX . $streamKey;
                 $segmentNumbers = $this->redis()->lrange("{$bufferKey}:segments", 0, -1);
-                foreach ($segmentNumbers as $segmentNumber) {
-                    $this->redis()->del("{$bufferKey}:segment_{$segmentNumber}");
+                
+                // Ensure we have an array before foreach
+                if (is_array($segmentNumbers)) {
+                    foreach ($segmentNumbers as $segmentNumber) {
+                        $this->redis()->del("{$bufferKey}:segment_{$segmentNumber}");
+                    }
                 }
                 $this->redis()->del("{$bufferKey}:segments");
                 
                 // Remove client keys
                 $clientKeys = $this->redis()->keys(self::CLIENT_PREFIX . $streamKey . ':*');
-                foreach ($clientKeys as $clientKey) {
-                    $this->redis()->del($clientKey);
+                
+                // Ensure we have an array before foreach
+                if (is_array($clientKeys)) {
+                    foreach ($clientKeys as $clientKey) {
+                        $this->redis()->del($clientKey);
+                    }
                 }
                 
                 // Remove process PID
