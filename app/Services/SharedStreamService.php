@@ -131,15 +131,13 @@ class SharedStreamService
             ]
         );
 
-        // Start the streaming process in background (non-blocking)
+        // Start the streaming process directly (temporary fix for queue issues)
         try {
-            // Dispatch the stream startup as a background job to prevent HTTP timeout
-            \App\Jobs\StreamStarter::dispatch($streamKey, $streamInfo);
-            Log::channel('ffmpeg')->debug("Dispatched stream starter job for {$streamKey}");
-        } catch (\Exception $e) {
-            Log::channel('ffmpeg')->warning("Failed to dispatch stream starter job for {$streamKey}, starting inline: " . $e->getMessage());
-            // Fallback to inline startup (with timeout risk)
+            Log::channel('ffmpeg')->debug("Starting stream process inline for {$streamKey}");
             $this->startStreamingProcess($streamKey, $streamInfo);
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Failed to start stream process for {$streamKey}: " . $e->getMessage());
+            throw $e;
         }
 
         Log::channel('ffmpeg')->debug("Created new shared stream {$streamKey} for {$type} {$title}");

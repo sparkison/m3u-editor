@@ -12,7 +12,7 @@ use App\Filament\Widgets\DiscordWidget;
 use App\Filament\Widgets\DocumentsWidget;
 use App\Filament\Widgets\DonateCrypto;
 use App\Filament\Widgets\KoFiWidget;
-
+use App\Filament\Widgets\SharedStreamStatsWidget;
 //use App\Filament\Widgets\PayPalDonateWidget;
 use App\Filament\Widgets\StatsOverview;
 use App\Settings\GeneralSettings;
@@ -96,18 +96,10 @@ class AdminPanelProvider extends PanelProvider
                 // PayPalDonateWidget::class,
                 KoFiWidget::class,
                 // DonateCrypto::class,
+                SharedStreamStatsWidget::class,
                 StatsOverview::class,
-                \App\Filament\Widgets\SharedStreamStatsWidget::class,
-                \App\Filament\Widgets\SystemHealthWidget::class,
-                \App\Filament\Widgets\StreamingAlertsWidget::class,
-                \App\Filament\Widgets\QuickActionsWidget::class,
-                \App\Filament\Widgets\SharedStreamPerformanceChart::class,
-                \App\Filament\Widgets\StreamDistributionChart::class,
-                \App\Filament\Widgets\BandwidthUsageChart::class,
-                \App\Filament\Widgets\SystemResourcesChart::class,
-                \App\Filament\Widgets\TopStreamsTable::class,
-                \App\Filament\Widgets\RecentStreamActivity::class,
-                \App\Filament\Widgets\LiveConnectionMonitor::class,
+                // \App\Filament\Widgets\SystemHealthWidget::class,
+                // \App\Filament\Widgets\QuickActionsWidget::class,
             ])
             ->plugins([
                 FilamentSpatieLaravelBackupPlugin::make()

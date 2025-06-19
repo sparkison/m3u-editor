@@ -41,8 +41,11 @@ class SharedStreamController extends Controller
      */
     public function streamChannel(Request $request, string $encodedId, string $format = 'ts')
     {
+        Log::channel('ffmpeg')->info("SharedStreamController: streamChannel called with encodedId: {$encodedId}, format: {$format}");
+        
         // Validate format
         if (!in_array($format, ['ts', 'hls'])) {
+            Log::channel('ffmpeg')->error("SharedStreamController: Invalid format specified: {$format}");
             abort(400, 'Invalid format specified. Use ts or hls.');
         }
 
@@ -50,7 +53,12 @@ class SharedStreamController extends Controller
         if (strpos($encodedId, '==') === false) {
             $encodedId .= '==';
         }
-        $channel = Channel::findOrFail(base64_decode($encodedId));
+        
+        $channelId = base64_decode($encodedId);
+        Log::channel('ffmpeg')->debug("SharedStreamController: Decoded channel ID: {$channelId}");
+        
+        $channel = Channel::findOrFail($channelId);
+        Log::channel('ffmpeg')->debug("SharedStreamController: Found channel: {$channel->title}");
 
         return $this->handleSharedStream($request, 'channel', $channel, $format);
     }
@@ -84,6 +92,8 @@ class SharedStreamController extends Controller
      */
     private function handleSharedStream(Request $request, string $type, $model, string $format)
     {
+        Log::channel('ffmpeg')->info("SharedStreamController: Starting handleSharedStream for {$type} ID {$model->id}, format: {$format}");
+        
         $title = $type === 'channel' 
             ? ($model->title_custom ?? $model->title)
             : $model->title;
@@ -94,8 +104,11 @@ class SharedStreamController extends Controller
             : $model->url;
 
         if (!$streamUrl) {
+            Log::channel('ffmpeg')->error("SharedStreamController: No stream URL available for {$type} ID {$model->id}");
             abort(404, 'No stream URL available.');
         }
+
+        Log::channel('ffmpeg')->debug("SharedStreamController: Stream URL found for {$title}: {$streamUrl}");
 
         // Get playlist for stream limits
         $playlist = $model->getEffectivePlaylist();
