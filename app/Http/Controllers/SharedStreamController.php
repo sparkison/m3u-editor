@@ -217,28 +217,35 @@ class SharedStreamController extends Controller
             });            // Wait for stream to become active before starting streaming loop
             $checkCount = 0;
             while (!connection_aborted() && (time() - $startTime) < $maxWaitTime) {
-                $stats = $this->sharedStreamService->getStreamStats($streamKey);
-                
-                // Reduced logging to prevent spam - only log every 30 checks (about every 3 seconds)
+                // Only check stats every 3 seconds to reduce load
                 if ($checkCount % 30 === 0) {
-                    if ($stats) {
-                        Log::channel('ffmpeg')->debug("Stream {$streamKey} status check for client {$clientId}: status='{$stats['status']}', process_running=" . ($stats['process_running'] ? 'true' : 'false') . ", client_count={$stats['client_count']}");
-                    } else {
-                        Log::channel('ffmpeg')->debug("Stream {$streamKey} status check for client {$clientId}: No stats returned");
+                    $stats = $this->sharedStreamService->getStreamStats($streamKey);
+                    
+                    // Only log every 60 checks (about every 6 seconds at 100ms intervals)
+                    if ($checkCount % 60 === 0) {
+                        if ($stats) {
+                            Log::channel('ffmpeg')->debug("Stream {$streamKey} status check #{$checkCount} for client {$clientId}: status='{$stats['status']}', process_running=" . ($stats['process_running'] ? 'true' : 'false') . ", client_count={$stats['client_count']}");
+                        } else {
+                            Log::channel('ffmpeg')->debug("Stream {$streamKey} status check #{$checkCount} for client {$clientId}: No stats returned");
+                        }
+                    }
+                    
+                    if ($stats && in_array($stats['status'], ['active', 'starting'])) {
+                        // For active streams, start immediately
+                        // For starting streams, check if data is available
+                        if ($stats['status'] === 'active' || $this->checkStreamHasData($streamKey)) {
+                            $streamStarted = true;
+                            break;
+                        }
+                    }
+                    
+                    if ($stats && $stats['status'] === 'error') {
+                        Log::channel('ffmpeg')->error("Stream {$streamKey} failed to start for client {$clientId}");
+                        return; // Just return without echoing HTTP headers
                     }
                 }
+                
                 $checkCount++;
-                
-                if ($stats && in_array($stats['status'], ['active', 'starting'])) {
-                    $streamStarted = true;
-                    break;
-                }
-                
-                if ($stats && $stats['status'] === 'error') {
-                    Log::channel('ffmpeg')->error("Stream {$streamKey} failed to start for client {$clientId}");
-                    return; // Just return without echoing HTTP headers
-                }
-                
                 usleep(100000); // 100ms wait between checks (faster response)
             }
             
@@ -493,6 +500,22 @@ class SharedStreamController extends Controller
     private function generateClientId(Request $request): string
     {
         return md5($request->ip() . $request->userAgent() . microtime(true));
+    }
+
+    /**
+     * Check if stream has data available (quick data availability check)
+     */
+    private function checkStreamHasData(string $streamKey): bool
+    {
+        try {
+            // Try to get a small amount of data to see if stream is producing
+            $tempClientId = 'data_check_' . microtime(true);
+            $lastSegment = 0;
+            $data = $this->sharedStreamService->getNextStreamSegments($streamKey, $tempClientId, $lastSegment);
+            return !empty($data);
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 
     /**

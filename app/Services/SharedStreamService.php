@@ -1795,11 +1795,27 @@ class SharedStreamService
     public function getStreamStats(string $streamKey): ?array
     {
         try {
+            // Aggressive rate limiting to prevent log spam - only run full check every 30 seconds
+            static $lastFullCheck = [];
+            static $cachedStats = [];
+            $now = time();
+            
+            if (isset($lastFullCheck[$streamKey]) && isset($cachedStats[$streamKey]) && 
+                ($now - $lastFullCheck[$streamKey]) < 30) {
+                // Return cached stats for frequent calls
+                return $cachedStats[$streamKey];
+            }
+            
             // If streamKey doesn't have prefix, add it for Redis lookup
             $redisKey = str_starts_with($streamKey, self::CACHE_PREFIX) ? $streamKey : self::CACHE_PREFIX . $streamKey;
             $streamInfo = $this->getStreamInfo($redisKey);
             if (!$streamInfo) {
-                Log::channel('ffmpeg')->debug("getStreamStats: No stream info found for key {$streamKey} (Redis key: {$redisKey})");
+                // Only log missing streams once every 60 seconds to prevent spam
+                static $lastMissingLog = [];
+                if (!isset($lastMissingLog[$streamKey]) || ($now - $lastMissingLog[$streamKey]) > 60) {
+                    Log::channel('ffmpeg')->debug("getStreamStats: No stream info found for key {$streamKey}");
+                    $lastMissingLog[$streamKey] = $now;
+                }
                 return null;
             }
             
@@ -1815,47 +1831,77 @@ class SharedStreamService
             
             // Determine status - be more lenient about dead processes and add restart logic
             $status = $streamInfo['status'] ?? 'unknown';
+            $statusChanged = false;
             
             // Handle dead processes more intelligently
-            if (!$isProcessRunning && $status === 'active') {
+            if (!$isProcessRunning && in_array($status, ['active', 'starting'])) {
                 if ($clientCount === 0) {
                     // No clients connected, safe to mark as stopped
-                    $status = 'stopped';
+                    if ($status !== 'stopped') {
+                        $status = 'stopped';
+                        $statusChanged = true;
+                        $this->updateStreamStatus($streamKey, $status);
+                    }
                 } else {
                     // Clients are still connected - attempt to restart the stream
-                    Log::channel('ffmpeg')->info("Stream {$streamKey}: Process died but {$clientCount} clients connected, attempting restart");
+                    static $restartAttempts = [];
+                    $lastAttempt = $restartAttempts[$streamKey] ?? 0;
                     
-                    // Try to restart the stream
-                    $restartSuccess = $this->attemptStreamRestart($streamKey, $streamInfo);
-                    
-                    if ($restartSuccess) {
-                        $status = 'starting';
-                        Log::channel('ffmpeg')->info("Stream {$streamKey}: Successfully restarted for {$clientCount} clients");
+                    // Only attempt restart once every 60 seconds to prevent spam
+                    if (($now - $lastAttempt) > 60) {
+                        Log::channel('ffmpeg')->info("Stream {$streamKey}: Process died but {$clientCount} clients connected, attempting restart");
+                        $restartAttempts[$streamKey] = $now;
+                        
+                        // Try to restart the stream
+                        $restartSuccess = $this->attemptStreamRestart($streamKey, $streamInfo);
+                        
+                        if ($restartSuccess) {
+                            $status = 'starting';
+                            $statusChanged = true;
+                            Log::channel('ffmpeg')->info("Stream {$streamKey}: Successfully restarted for {$clientCount} clients");
+                        } else {
+                            $status = 'error'; // Mark as error so clients know something is wrong
+                            $statusChanged = true;
+                            Log::channel('ffmpeg')->error("Stream {$streamKey}: Failed to restart, marking as error");
+                        }
                     } else {
-                        $status = 'starting'; // Keep as starting to allow manual restart
-                        Log::channel('ffmpeg')->warning("Stream {$streamKey}: Failed to restart, keeping as 'starting' for manual intervention");
+                        // Recent restart attempt, keep current status
+                        $status = 'starting';
                     }
+                }
+            } elseif (!$isProcessRunning && $status === 'starting') {
+                // Process should be starting but isn't - check if enough time has passed
+                $startTime = $streamInfo['created_at'] ?? $now;
+                if (($now - $startTime) > 30) { // 30 seconds to start
+                    $status = 'error';
+                    $statusChanged = true;
+                    Log::channel('ffmpeg')->warning("Stream {$streamKey}: Failed to start within 30 seconds, marking as error");
                 }
             }
             
-            // Reduced debug logging to prevent log spam - only log when status changes or every 10 seconds
-            static $lastLogTime = [];
-            $now = time();
-            $logKey = $streamKey . '_' . $status . '_' . ($isProcessRunning ? '1' : '0');
-            if (!isset($lastLogTime[$logKey]) || ($now - $lastLogTime[$logKey]) > 10) {
-                Log::channel('ffmpeg')->debug("getStreamStats for {$streamKey}: status='{$status}', pid={$pid}, processRunning=" . ($isProcessRunning ? 'true' : 'false') . ", clientCount={$clientCount}");
-                $lastLogTime[$logKey] = $now;
-            }
-            
-            return [
+            $stats = [
                 'status' => $status,
                 'client_count' => $clientCount,
-                'uptime' => time() - ($streamInfo['created_at'] ?? time()),
-                'last_activity' => $streamInfo['last_activity'] ?? time(),
+                'uptime' => $now - ($streamInfo['created_at'] ?? $now),
+                'last_activity' => $streamInfo['last_activity'] ?? $now,
                 'process_running' => $isProcessRunning,
                 'title' => $streamInfo['title'] ?? 'Unknown',
                 'format' => $streamInfo['format'] ?? 'unknown'
             ];
+            
+            // Cache the stats and update last check time
+            $cachedStats[$streamKey] = $stats;
+            $lastFullCheck[$streamKey] = $now;
+            
+            // Only log when status changes or periodically (every 5 minutes)
+            static $lastStatusLog = [];
+            $logKey = $streamKey . '_' . $status . '_' . ($isProcessRunning ? '1' : '0');
+            if ($statusChanged || !isset($lastStatusLog[$logKey]) || ($now - $lastStatusLog[$logKey]) > 300) {
+                Log::channel('ffmpeg')->debug("getStreamStats for {$streamKey}: status='{$status}', pid={$pid}, processRunning=" . ($isProcessRunning ? 'true' : 'false') . ", clientCount={$clientCount}");
+                $lastStatusLog[$logKey] = $now;
+            }
+            
+            return $stats;
             
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Error getting stream stats for {$streamKey}: " . $e->getMessage());
@@ -1946,6 +1992,30 @@ class SharedStreamService
         if ($streamInfo) {
             $streamInfo['last_activity'] = time();
             $this->setStreamInfo($streamKey, $streamInfo);
+        }
+    }
+
+    /**
+     * Update stream status
+     */
+    private function updateStreamStatus(string $streamKey, string $status): void
+    {
+        try {
+            $streamInfo = $this->getStreamInfo($streamKey);
+            if ($streamInfo) {
+                $streamInfo['status'] = $status;
+                $streamInfo['last_activity'] = time();
+                $this->setStreamInfo($streamKey, $streamInfo);
+            }
+            
+            // Also update database
+            SharedStream::where('stream_id', $streamKey)->update([
+                'status' => $status,
+                'last_activity' => now()
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error updating stream status for {$streamKey}: " . $e->getMessage());
         }
     }
 
