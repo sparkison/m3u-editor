@@ -75,10 +75,57 @@ class SharedStreamService
             );
             $isNewStream = true;
         } else {
-            // Join existing stream
-            Log::channel('ffmpeg')->debug("Client {$clientId} joining existing shared stream {$streamKey}");
-            $this->incrementClientCount($streamKey);
-            $isNewStream = false;
+            // Check if existing stream process is actually running
+            $pid = $streamInfo['pid'] ?? null;
+            $processRunning = $pid ? $this->isProcessRunning($pid) : false;
+            
+            if (!$processRunning && $streamInfo['status'] !== 'starting') {
+                // Stream exists but process is dead, restart it
+                Log::channel('ffmpeg')->info("Client {$clientId} found dead stream {$streamKey}, attempting restart");
+                
+                try {
+                    // Update status to starting to prevent multiple restart attempts
+                    $streamInfo['status'] = 'starting';
+                    $streamInfo['restart_attempt'] = time();
+                    $this->setStreamInfo($streamKey, $streamInfo);
+                    
+                    // Restart the stream process
+                    if ($streamInfo['format'] === 'hls') {
+                        $this->startHLSStream($streamKey, $streamInfo);
+                    } else {
+                        $this->startDirectStream($streamKey, $streamInfo);
+                    }
+                    
+                    // Update database
+                    SharedStream::where('stream_id', $streamKey)->update([
+                        'status' => 'starting',
+                        'process_id' => $this->getProcessPid($streamKey),
+                        'last_activity' => now()
+                    ]);
+                    
+                    Log::channel('ffmpeg')->info("Successfully restarted dead stream {$streamKey} for client {$clientId}");
+                    $isNewStream = false; // This is a restart, not a new stream
+                    
+                } catch (\Exception $e) {
+                    Log::channel('ffmpeg')->error("Failed to restart dead stream {$streamKey}: " . $e->getMessage());
+                    // If restart fails, fall back to creating a new stream
+                    $streamInfo = $this->createSharedStreamInternal(
+                        $streamKey,
+                        $type,
+                        $modelId,
+                        $streamUrl,
+                        $title,
+                        $format,
+                        $options
+                    );
+                    $isNewStream = true;
+                }
+            } else {
+                // Join existing active stream
+                Log::channel('ffmpeg')->debug("Client {$clientId} joining existing active stream {$streamKey}");
+                $this->incrementClientCount($streamKey);
+                $isNewStream = false;
+            }
         }
 
         // Register this client for the stream AFTER ensuring the stream exists
@@ -1791,8 +1838,14 @@ class SharedStreamService
                 }
             }
             
-            // Debug logging to track the 30-second timeout issue
-            Log::channel('ffmpeg')->debug("getStreamStats for {$streamKey}: status='{$status}', pid={$pid}, processRunning=" . ($isProcessRunning ? 'true' : 'false') . ", clientCount={$clientCount}");
+            // Reduced debug logging to prevent log spam - only log when status changes or every 10 seconds
+            static $lastLogTime = [];
+            $now = time();
+            $logKey = $streamKey . '_' . $status . '_' . ($isProcessRunning ? '1' : '0');
+            if (!isset($lastLogTime[$logKey]) || ($now - $lastLogTime[$logKey]) > 10) {
+                Log::channel('ffmpeg')->debug("getStreamStats for {$streamKey}: status='{$status}', pid={$pid}, processRunning=" . ($isProcessRunning ? 'true' : 'false') . ", clientCount={$clientCount}");
+                $lastLogTime[$logKey] = $now;
+            }
             
             return [
                 'status' => $status,
