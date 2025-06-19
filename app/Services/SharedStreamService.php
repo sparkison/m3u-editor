@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Cache;
 use Symfony\Component\Process\Process as SymfonyProcess;
 
 /**
@@ -28,7 +29,14 @@ class SharedStreamService
     const BUFFER_PREFIX = 'stream_buffer:';
     const STREAM_PREFIX = 'shared_stream:'; // For compatibility with existing code
     const SEGMENT_EXPIRY = 300; // 5 minutes
-    const CLIENT_TIMEOUT = 120; // 2 minutes (increased from 30 seconds)
+    // const CLIENT_TIMEOUT = 120; // Now fetched from config
+
+    private int $clientTimeout;
+
+    public function __construct()
+    {
+        $this->clientTimeout = (int) config('proxy.shared_streaming.clients.timeout', 120);
+    }
 
     /**
      * Get Redis connection instance
@@ -187,7 +195,7 @@ class SharedStreamService
             throw $e;
         }
 
-        Log::channel('ffmpeg')->debug("Created new shared stream {$streamKey} for {$type} {$title}");
+        Log::channel('ffmpeg')->info("Created new shared stream {$streamKey} for {$type} {$title}"); // Changed from debug to info
 
         return $streamInfo;
     }
@@ -390,6 +398,7 @@ class SharedStreamService
         
         // Build command using proven working approach from StreamController
         $cmd = escapeshellcmd($ffmpegPath) . ' ';
+        $cmd .= '-hide_banner -loglevel error '; // Added -hide_banner and -loglevel error globally
         
         // Better error handling and more robust connection options
         $cmd .= '-err_detect ignore_err -ignore_unknown ';
@@ -631,7 +640,7 @@ class SharedStreamService
                     $accumulatedSize = 0;
                     
                     // Build up fewer initial segments for faster startup
-                    if ($segmentNumber >= 2) { // Reduced from 3 to 2 for faster startup
+                    if ($segmentNumber >= 1) { // Reduced from 2 to 1 for even faster startup
                         break;
                     }
                 }
@@ -1096,6 +1105,15 @@ class SharedStreamService
         $cmd = escapeshellcmd($ffmpegPath) . ' ';
         $cmd .= '-hide_banner -loglevel error ';
         $cmd .= '-user_agent ' . escapeshellarg($userAgent) . ' ';
+
+        // Add robust input options similar to buildDirectCommand
+        $cmd .= '-err_detect ignore_err -ignore_unknown ';
+        $cmd .= '-fflags +nobuffer+igndts -flags low_delay '; // Consider if +nobuffer is always needed for HLS
+        $cmd .= '-multiple_requests 1 -reconnect_on_network_error 1 ';
+        $cmd .= '-reconnect_on_http_error 5xx,4xx -reconnect_streamed 1 ';
+        $cmd .= '-reconnect_delay_max 5 ';
+        $cmd .= '-noautorotate ';
+
         $cmd .= '-i ' . escapeshellarg($streamUrl) . ' ';
         $cmd .= '-c copy -f hls ';
         $cmd .= '-hls_time 4 -hls_list_size 10 ';
@@ -1136,7 +1154,8 @@ class SharedStreamService
                 return null;
             }
             
-            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Successfully retrieved stream info from Redis (" . strlen($data) . " bytes)");
+            // This log can be very verbose as getStreamInfo is called frequently.
+            // Log::channel('ffmpeg')->debug("Stream {$streamKey}: Successfully retrieved stream info from Redis (" . strlen($data) . " bytes)");
             return $decoded;
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Stream {$streamKey}: Error retrieving stream info: " . $e->getMessage());
@@ -1160,7 +1179,8 @@ class SharedStreamService
             if (!$result) {
                 Log::channel('ffmpeg')->error("Stream {$streamKey}: Failed to store stream info in Redis");
             } else {
-                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Successfully stored stream info in Redis (" . strlen($jsonData) . " bytes)");
+                // This log can be verbose. Success is implicit if no error is thrown.
+                // Log::channel('ffmpeg')->debug("Stream {$streamKey}: Successfully stored stream info in Redis (" . strlen($jsonData) . " bytes)");
             }
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Stream {$streamKey}: Error storing stream info: " . $e->getMessage());
@@ -1181,11 +1201,27 @@ class SharedStreamService
      */
     private function incrementClientCount(string $streamKey): void
     {
-        $streamInfo = $this->getStreamInfo($streamKey);
-        if ($streamInfo) {
-            $streamInfo['client_count'] = ($streamInfo['client_count'] ?? 0) + 1;
-            $streamInfo['last_activity'] = now()->timestamp;
-            $this->setStreamInfo($streamKey, $streamInfo);
+        $lock = Cache::lock('lock:stream_info_client_count:' . $streamKey, 10); // Lock for 10 seconds
+        if ($lock->get()) {
+            try {
+                $streamInfo = $this->getStreamInfo($streamKey);
+                if ($streamInfo) {
+                    $streamInfo['client_count'] = ($streamInfo['client_count'] ?? 0) + 1;
+                    $streamInfo['last_activity'] = now()->timestamp;
+                    // If a client is joining, it's definitely not clientless anymore
+                    unset($streamInfo['clientless_since']);
+                    $this->setStreamInfo($streamKey, $streamInfo);
+                    Log::channel('ffmpeg')->debug("Incremented client count for {$streamKey} to {$streamInfo['client_count']}. Unset clientless_since if present.");
+                }
+            } finally {
+                $lock->release();
+            }
+        } else {
+            // Failed to acquire lock, log warning. Consider impact if this happens frequently.
+            Log::channel('ffmpeg')->warning("Failed to acquire lock for incrementing client count on {$streamKey}. Client count may be temporarily inaccurate.");
+            // Fallback: attempt non-locked increment or simply skip to avoid blocking indefinitely.
+            // For simplicity here, we'll log and potentially accept a rare miscount under extreme contention.
+            // A retry mechanism could be added if this proves problematic.
         }
     }
 
@@ -1201,7 +1237,12 @@ class SharedStreamService
             'last_activity' => now()->timestamp,
             'options' => $options
         ];
-        $this->redis()->setex($clientKey, self::CLIENT_TIMEOUT, json_encode($clientInfo));
+        $this->redis()->setex($clientKey, $this->getClientTimeoutResolved(), json_encode($clientInfo));
+    }
+
+    private function getClientTimeoutResolved(): int
+    {
+        return $this->clientTimeout;
     }
 
     /**
@@ -1706,13 +1747,32 @@ class SharedStreamService
             $this->redis()->del($clientKey);
             
             // Decrement client count
-            $streamInfo = $this->getStreamInfo($streamKey);
-            if ($streamInfo) {
-                $streamInfo['client_count'] = max(0, ($streamInfo['client_count'] ?? 1) - 1);
-                $streamInfo['last_activity'] = time();
-                $this->setStreamInfo($streamKey, $streamInfo);
-                
-                Log::channel('ffmpeg')->debug("Client {$clientId} removed from stream {$streamKey}. Remaining clients: {$streamInfo['client_count']}");
+            $lock = Cache::lock('lock:stream_info_client_count:' . $streamKey, 10); // Lock for 10 seconds
+            if ($lock->get()) {
+                try {
+                    $streamInfo = $this->getStreamInfo($streamKey);
+                    if ($streamInfo) {
+                        $newCount = max(0, ($streamInfo['client_count'] ?? 1) - 1);
+                        $streamInfo['client_count'] = $newCount;
+                        $streamInfo['last_activity'] = time();
+                        if ($newCount === 0) {
+                            $streamInfo['clientless_since'] = time();
+                            Log::channel('ffmpeg')->debug("Stream {$streamKey} client count reached 0. Marked clientless_since.");
+                        } else {
+                            // Ensure clientless_since is removed if clients rejoin
+                            unset($streamInfo['clientless_since']);
+                        }
+                        $this->setStreamInfo($streamKey, $streamInfo);
+                        Log::channel('ffmpeg')->debug("Client {$clientId} removed from stream {$streamKey}. Client count now {$newCount}.");
+                    }
+                } finally {
+                    $lock->release();
+                }
+            } else {
+                // Failed to acquire lock, log warning.
+                Log::channel('ffmpeg')->warning("Failed to acquire lock for decrementing client count on {$streamKey} for client {$clientId}. Client count may be temporarily inaccurate.");
+                // Fallback: attempt non-locked decrement or log that cleanup might be partial.
+                // For now, logging the issue. A more robust solution might involve retries or a queue.
             }
             
         } catch (\Exception $e) {
@@ -1845,13 +1905,12 @@ class SharedStreamService
             
             // Handle dead processes more intelligently
             if (!$isProcessRunning && in_array($status, ['active', 'starting'])) {
+                // Process is not running, but stream was supposed to be active or starting
+                Log::channel('ffmpeg')->info("Stream {$streamKey}: Process (PID {$pid}) is not running, but status was '{$status}'.");
                 if ($clientCount === 0) {
-                    // No clients connected, safe to mark as stopped
-                    if ($status !== 'stopped') {
-                        $status = 'stopped';
-                        $statusChanged = true;
-                        $this->updateStreamStatus($streamKey, $status);
-                    }
+                    Log::channel('ffmpeg')->info("Stream {$streamKey}: No clients connected to dead/stalled process. Cleaning up immediately.");
+                    $this->stopStream($streamKey); // stopStream calls cleanupStream
+                    return null; // Stream is gone
                 } else {
                     // Clients are still connected - attempt to restart the stream
                     static $restartAttempts = [];
@@ -1886,6 +1945,25 @@ class SharedStreamService
                     $status = 'error';
                     $statusChanged = true;
                     Log::channel('ffmpeg')->warning("Stream {$streamKey}: Failed to start within 30 seconds, marking as error");
+                    // If it failed to start, it's effectively dead, clean up its data
+                    $this->updateStreamStatus($streamKey, $status); // Mark as error
+                    $this->cleanupStream($streamKey, true); // Cleanup data
+                    Log::channel('ffmpeg')->info("Stream {$streamKey}: Failed to start. Cleaning up immediately.");
+                    $this->stopStream($streamKey); // stopStream calls cleanupStream
+                    return null; // Stream is gone
+                }
+            }
+
+            // Check for clientless streams that should be stopped after a grace period
+            if ($clientCount === 0 && isset($streamInfo['clientless_since']) && $isProcessRunning && $status !== 'stopped') {
+                $gracePeriod = (int) config('proxy.shared_streaming.cleanup.clientless_grace_period', 15);
+                $clientlessDuration = time() - $streamInfo['clientless_since'];
+                if ($clientlessDuration >= $gracePeriod) {
+                    Log::channel('ffmpeg')->info("Stream {$streamKey} has been clientless for {$clientlessDuration}s (grace period: {$gracePeriod}s). Stopping stream.");
+                    $this->stopStream($streamKey);
+                    return null; // Stream is now stopped
+                } else {
+                    Log::channel('ffmpeg')->debug("Stream {$streamKey} clientless for {$clientlessDuration}s. Waiting for grace period ({$gracePeriod}s) to elapse.");
                 }
             }
             
@@ -1903,12 +1981,16 @@ class SharedStreamService
             $cachedStats[$streamKey] = $stats;
             $lastFullCheck[$streamKey] = $now;
             
-            // Only log when status changes or periodically (every 5 minutes)
-            static $lastStatusLog = [];
-            $logKey = $streamKey . '_' . $status . '_' . ($isProcessRunning ? '1' : '0');
-            if ($statusChanged || !isset($lastStatusLog[$logKey]) || ($now - $lastStatusLog[$logKey]) > 300) {
-                Log::channel('ffmpeg')->debug("getStreamStats for {$streamKey}: status='{$status}', pid={$pid}, processRunning=" . ($isProcessRunning ? 'true' : 'false') . ", clientCount={$clientCount}");
-                $lastStatusLog[$logKey] = $now;
+
+            // Only log when status changes or periodically (every 5 minutes), and stream still exists
+            if ($status !== 'stopped') { // Avoid logging for streams just stopped by this function
+                static $lastStatusLog = [];
+                $logKey = $streamKey . '_' . $status . '_' . ($isProcessRunning ? '1' : '0') . '_' . $clientCount; // Add clientCount to log key for more granular logging
+                $logInterval = (int) config('proxy.shared_streaming.monitoring.log_status_interval', 300);
+                if ($statusChanged || !isset($lastStatusLog[$logKey]) || ($now - $lastStatusLog[$logKey]) > $logInterval) {
+                    Log::channel('ffmpeg')->debug("getStreamStats for {$streamKey}: status='{$status}', pid={$pid}, processRunning=" . ($isProcessRunning ? 'true' : 'false') . ", clientCount={$clientCount}, clientless_since=" . ($streamInfo['clientless_since'] ?? 'N/A'));
+                    $lastStatusLog[$logKey] = $now;
+                }
             }
             
             return $stats;
@@ -2032,7 +2114,7 @@ class SharedStreamService
             if ($clientData) {
                 $clientData['last_activity'] = time();
                 // Extend the client key expiration when active
-                $this->redis()->setex($clientKey, self::CLIENT_TIMEOUT, json_encode($clientData));
+                $this->redis()->setex($clientKey, $this->getClientTimeoutResolved(), json_encode($clientData));
             }
         } else {
             // Client key expired or doesn't exist, recreate it
@@ -2042,7 +2124,7 @@ class SharedStreamService
                 'last_activity' => time(),
                 'options' => []
             ];
-            $this->redis()->setex($clientKey, self::CLIENT_TIMEOUT, json_encode($clientData));
+            $this->redis()->setex($clientKey, $this->getClientTimeoutResolved(), json_encode($clientData));
         }
         
         // Also update stream activity

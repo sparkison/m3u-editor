@@ -208,7 +208,7 @@ class SharedStreamController extends Controller
             
             $lastSegment = 0;
             $startTime = time();
-            $maxWaitTime = 30; // Wait up to 30 seconds for stream to become active
+            $maxWaitTime = 20; // Wait up to 20 seconds for stream to become active (was 30)
             $streamStarted = false;
             
             // Register shutdown function to cleanup client
@@ -261,20 +261,20 @@ class SharedStreamController extends Controller
             Log::channel('ffmpeg')->debug("Starting optimized streaming for VLC client {$clientId}");
             $preBufferData = '';
             $preBufferAttempts = 0;
-            $maxPreBufferAttempts = 10; // Reduced from 30 to 10 for faster startup
-            $targetPreBufferSize = 512 * 1024; // Reduced from 2MB to 512KB for faster startup
+            $maxPreBufferAttempts = 7; // Reduced from 10 for faster startup
+            $targetPreBufferSize = 256 * 1024; // Reduced from 512KB for faster startup
             
             while ($preBufferAttempts < $maxPreBufferAttempts && strlen($preBufferData) < $targetPreBufferSize) {
                 $data = $this->sharedStreamService->getNextStreamSegments($streamKey, $clientId, $lastSegment);
                 if ($data) {
                     $preBufferData .= $data;
-                    Log::channel('ffmpeg')->debug("Pre-buffer progress: " . strlen($preBufferData) . " bytes");
+                    // Log::channel('ffmpeg')->debug("Pre-buffer progress for client {$clientId}: " . strlen($preBufferData) . " bytes / {$targetPreBufferSize}"); // Kept commented, potentially too verbose.
                     // Break early if we have a reasonable amount
-                    if (strlen($preBufferData) >= 256000) { // 256KB is sufficient for startup
+                    if (strlen($preBufferData) >= 188000) { // Approx 1MB of TS packets, (was 256KB) sufficient for startup
                         break;
                     }
                 } else {
-                    usleep(100000); // Reduced from 200ms to 100ms for faster response
+                    usleep(50000); // Reduced from 100ms for faster response
                 }
                 $preBufferAttempts++;
             }
