@@ -28,7 +28,7 @@ class SharedStreamService
     const BUFFER_PREFIX = 'stream_buffer:';
     const STREAM_PREFIX = 'shared_stream:'; // For compatibility with existing code
     const SEGMENT_EXPIRY = 300; // 5 minutes
-    const CLIENT_TIMEOUT = 30; // 30 seconds
+    const CLIENT_TIMEOUT = 120; // 2 minutes (increased from 30 seconds)
 
     /**
      * Get Redis connection instance
@@ -1214,18 +1214,23 @@ class SharedStreamService
             $redis = $this->redis();
             $streams = [];
             
-            // Get all stream keys from Redis
-            $streamKeys = $redis->keys(self::CACHE_PREFIX . '*');
+            // Get all stream keys from Redis - need to include the Redis database prefix in the pattern
+            $redisPrefix = config('database.redis.options.prefix', '');
+            $pattern = $redisPrefix . self::CACHE_PREFIX . '*';
+            $streamKeys = $redis->keys($pattern);
             
             // Ensure we have an array before foreach
             if (is_array($streamKeys)) {
                 foreach ($streamKeys as $fullKey) {
-                    $streamKey = str_replace(self::CACHE_PREFIX, '', $fullKey);
-                    $streamInfo = $this->getStreamInfo($fullKey);
+                    // Extract clean stream key by removing both the Redis database prefix and our cache prefix
+                    $cleanFullKey = str_replace($redisPrefix, '', $fullKey);
+                    $streamKey = str_replace(self::CACHE_PREFIX, '', $cleanFullKey);
+                    $streamInfo = $this->getStreamInfo($cleanFullKey); // Use the key without Redis prefix for getStreamInfo
                     
                     if ($streamInfo && in_array($streamInfo['status'] ?? '', ['active', 'starting'])) {
-                        // Get client count from Redis client keys
-                        $clientKeys = $redis->keys(self::CLIENT_PREFIX . $fullKey . ':*');
+                        // Get client count from Redis client keys - use the full key pattern for client search
+                        $clientSearchKey = $cleanFullKey; // This already has the cache prefix but not the Redis prefix
+                        $clientKeys = $redis->keys($redisPrefix . self::CLIENT_PREFIX . $clientSearchKey . ':*');
                         $clientCount = is_array($clientKeys) ? count($clientKeys) : 0;
                         
                         // Calculate uptime
@@ -1819,11 +1824,16 @@ class SharedStreamService
                 return null;
             }
             
-            // Get client count - use clean streamKey for client lookup
-            $cleanStreamKey = str_starts_with($streamKey, self::CACHE_PREFIX) ? 
-                str_replace(self::CACHE_PREFIX, '', $streamKey) : $streamKey;
-            $clientKeys = $this->redis()->keys(self::CLIENT_PREFIX . $cleanStreamKey . ':*');
+            // Get client count - use the full streamKey for client lookup (clients are stored with full key)
+            $clientSearchKey = str_starts_with($streamKey, self::CACHE_PREFIX) ? $streamKey : self::CACHE_PREFIX . $streamKey;
+            $clientKeys = $this->redis()->keys(self::CLIENT_PREFIX . $clientSearchKey . ':*');
             $clientCount = count($clientKeys);
+            
+            // Debug logging for client count issues
+            if ($clientCount === 0) {
+                $searchPattern = self::CLIENT_PREFIX . $clientSearchKey . ':*';
+                Log::channel('ffmpeg')->debug("getStreamStats: No clients found for {$streamKey}, clientSearchKey: {$clientSearchKey}, searched pattern: {$searchPattern}");
+            }
             
             // Check if process is running
             $pid = $streamInfo['pid'] ?? null;
@@ -1922,15 +1932,29 @@ class SharedStreamService
         }
         
         $data = '';
+        $segmentsRetrieved = 0;
+        $maxSegmentsPerCall = 5; // Limit segments per call to prevent overwhelming clients
+        
+        // Convert segment numbers to integers and sort them
+        $segmentNumbers = array_map('intval', $segmentNumbers);
+        sort($segmentNumbers);
+        
         foreach ($segmentNumbers as $segmentNumber) {
-            if ($segmentNumber > $lastSegment) {
+            // Only get segments newer than the last one sent to this client
+            if ($segmentNumber > $lastSegment && $segmentsRetrieved < $maxSegmentsPerCall) {
                 $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
                 $segmentData = $this->redis()->get($segmentKey);
                 if ($segmentData) {
                     $data .= $segmentData;
-                    $lastSegment = $segmentNumber;
+                    $lastSegment = $segmentNumber; // Update the reference variable
+                    $segmentsRetrieved++;
                 }
             }
+        }
+        
+        // Update client activity if we retrieved data
+        if (!empty($data)) {
+            $this->updateClientActivity($streamKey, $clientId);
         }
         
         return !empty($data) ? $data : null;
@@ -1993,6 +2017,36 @@ class SharedStreamService
             $streamInfo['last_activity'] = time();
             $this->setStreamInfo($streamKey, $streamInfo);
         }
+    }
+
+    /**
+     * Update client activity timestamp
+     */
+    private function updateClientActivity(string $streamKey, string $clientId): void
+    {
+        $clientKey = self::CLIENT_PREFIX . $streamKey . ':' . $clientId;
+        $clientInfo = $this->redis()->get($clientKey);
+        
+        if ($clientInfo) {
+            $clientData = json_decode($clientInfo, true);
+            if ($clientData) {
+                $clientData['last_activity'] = time();
+                // Extend the client key expiration when active
+                $this->redis()->setex($clientKey, self::CLIENT_TIMEOUT, json_encode($clientData));
+            }
+        } else {
+            // Client key expired or doesn't exist, recreate it
+            $clientData = [
+                'client_id' => $clientId,
+                'connected_at' => time(),
+                'last_activity' => time(),
+                'options' => []
+            ];
+            $this->redis()->setex($clientKey, self::CLIENT_TIMEOUT, json_encode($clientData));
+        }
+        
+        // Also update stream activity
+        $this->updateStreamActivity($streamKey);
     }
 
     /**

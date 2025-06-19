@@ -9,21 +9,6 @@ use Illuminate\Support\Facades\Redis;
 
 class ManageSharedStreams extends Command
 {
-    /**
-     * The name and signature of the console         foreach ($streams as $streamKey => $streamData) {
-            $health = $this->monitorService->checkStreamHealth($streamKey);
-            $status = ($health['healthy'] ?? false) ? '<info>✓ Healthy</info>' : '<error>✗ Unhealthy</error>';
-            $reason = $health['reason'] ?? '';
-            
-            $streamInfo = $streamData['stream_info'];
-            $title = substr($streamInfo['title'] ?? 'Unknown', 0, 30);
-            
-            $this->line("{$title}: {$status}" . ($reason ? " ({$reason})" : ""));
-            
-            if (!($health['healthy'] ?? false)) {
-                $unhealthyCount++;
-            }
-        }*/
     protected $signature = 'app:shared-streams {action} {--stream-key=} {--force}';
 
     /**
@@ -55,36 +40,36 @@ class ManageSharedStreams extends Command
         switch ($action) {
             case 'list':
                 return $this->listStreams();
-            
+
             case 'stop':
                 if (!$streamKey) {
                     $this->error('--stream-key is required for stop action');
                     return 1;
                 }
                 return $this->stopStream($streamKey, $force);
-            
+
             case 'stop-all':
                 return $this->stopAllStreams($force);
-            
+
             case 'restart':
                 if (!$streamKey) {
                     $this->error('--stream-key is required for restart action');
                     return 1;
                 }
                 return $this->restartStream($streamKey);
-            
+
             case 'cleanup':
                 return $this->cleanupStreams($force);
-            
+
             case 'sync':
                 return $this->synchronizeState();
-            
+
             case 'stats':
                 return $this->showStats();
-            
+
             case 'health':
                 return $this->checkHealth();
-            
+
             default:
                 $this->error("Unknown action: {$action}");
                 $this->line('Available actions: list, stop, stop-all, restart, cleanup, sync, stats, health');
@@ -95,7 +80,7 @@ class ManageSharedStreams extends Command
     private function listStreams(): int
     {
         $streams = $this->sharedStreamService->getAllActiveStreams();
-        
+
         if (empty($streams)) {
             $this->info('No active shared streams found.');
             return 0;
@@ -110,7 +95,7 @@ class ManageSharedStreams extends Command
         foreach ($streams as $streamKey => $streamData) {
             $streamInfo = $streamData['stream_info'];
             $uptime = $this->formatUptime($streamData['uptime'] ?? 0);
-            
+
             $rows[] = [
                 substr($streamKey, 0, 16) . '...',
                 $streamInfo['type'] ?? 'unknown',
@@ -124,7 +109,7 @@ class ManageSharedStreams extends Command
 
         $this->table($headers, $rows);
         $this->info(sprintf('Total: %d active streams', count($streams)));
-        
+
         return 0;
     }
 
@@ -145,7 +130,7 @@ class ManageSharedStreams extends Command
         }
 
         $this->info("Stopping stream: {$streamKey}");
-        
+
         // Stop the stream
         $success = $this->sharedStreamService->stopStream($streamKey);
         if ($success) {
@@ -160,7 +145,7 @@ class ManageSharedStreams extends Command
     private function stopAllStreams(bool $force): int
     {
         $streams = $this->sharedStreamService->getAllActiveStreams();
-        
+
         if (empty($streams)) {
             $this->info('No active streams to stop.');
             return 0;
@@ -196,7 +181,7 @@ class ManageSharedStreams extends Command
         }
 
         $this->info("Restarting stream: {$streamKey}");
-        
+
         try {
             $success = $this->sharedStreamService->restartStream($streamKey);
             if ($success) {
@@ -215,19 +200,19 @@ class ManageSharedStreams extends Command
     private function cleanupStreams(bool $force): int
     {
         $this->info('Starting shared stream cleanup...');
-        
+
         try {
             $activeStreams = $this->sharedStreamService->getAllActiveStreams();
             $cleanedUp = 0;
-            
+
             // First, check Redis streams
             foreach ($activeStreams as $streamKey => $streamData) {
                 $clientCount = $streamData['client_count'];
                 $lastActivity = $streamData['last_activity'] ?? time();
-                
+
                 // Clean up streams with no clients and inactive for more than 1 minute (or force cleanup)
                 $isStale = $clientCount === 0 && ((time() - $lastActivity) > 60 || $force);
-                
+
                 if ($isStale) {
                     $this->line("Cleaning up stale stream: {$streamKey}");
                     $success = $this->sharedStreamService->cleanupStream($streamKey, true);
@@ -236,30 +221,30 @@ class ManageSharedStreams extends Command
                     }
                 }
             }
-            
+
             // Second, check database streams for phantom processes
             $this->line("Checking database streams for phantom processes...");
             $dbStreams = \App\Models\SharedStream::whereIn('status', ['starting', 'active'])->get();
-            
+
             foreach ($dbStreams as $stream) {
                 $pid = $stream->process_id;
                 $isProcessRunning = false;
-                
+
                 if ($pid) {
                     // Check if the process is actually running
                     $isProcessRunning = $this->isProcessRunning($pid);
                 }
-                
+
                 if (!$isProcessRunning) {
                     $this->line("Found phantom stream: {$stream->stream_id} (PID: " . ($pid ?: 'none') . ")");
-                    
+
                     // Update database status
                     $stream->update([
                         'status' => 'failed',
                         'error_message' => 'Process not running (phantom stream)',
                         'stopped_at' => now()
                     ]);
-                    
+
                     // Clean up Redis data
                     $this->sharedStreamService->cleanupStream($stream->stream_id, true);
                     $cleanedUp++;
@@ -274,14 +259,14 @@ class ManageSharedStreams extends Command
             $this->line("- Cleaned up {$cleanedUp} streams");
             $this->line("- Removed {$orphanedKeys} orphaned keys");
             $this->line("- Cleaned {$tempFiles} bytes of temp files");
-            
+
             return 0;
         } catch (\Exception $e) {
             $this->error("Cleanup failed: " . $e->getMessage());
             return 1;
         }
     }
-    
+
     /**
      * Check if a process is running
      */
@@ -290,7 +275,7 @@ class ManageSharedStreams extends Command
         if (!$pid) {
             return false;
         }
-        
+
         // Use ps command to check if process exists
         $result = shell_exec("ps -p {$pid} > /dev/null 2>&1; echo $?");
         return trim($result) === '0';
@@ -300,10 +285,10 @@ class ManageSharedStreams extends Command
     {
         $streams = $this->sharedStreamService->getAllActiveStreams();
         $systemStats = $this->monitorService->getSystemStats();
-        
+
         $totalClients = array_sum(array_column($streams, 'client_count'));
         $totalBandwidth = 0;
-        
+
         // Calculate total bandwidth
         foreach ($streams as $streamData) {
             $health = $this->monitorService->checkStreamHealth($streamData['stream_info']['stream_key'] ?? '');
@@ -314,12 +299,12 @@ class ManageSharedStreams extends Command
 
         $this->info('Shared Streaming Statistics:');
         $this->newLine();
-        
+
         $this->line("Total Active Streams: " . count($streams));
         $this->line("Total Connected Clients: {$totalClients}");
         $this->line("Total Bandwidth: " . $this->formatBytes($totalBandwidth) . "/s");
         $this->newLine();
-        
+
         $this->line("System Stats:");
         $this->line("- CPU Usage: " . round($systemStats['cpu_usage'] ?? 0, 1) . "%");
         $this->line("- Memory Usage: " . round($systemStats['memory_usage']['percentage'] ?? 0, 1) . "%");
@@ -327,7 +312,7 @@ class ManageSharedStreams extends Command
         $this->line("- Load Average: " . ($systemStats['load_average']['1min'] ?? 'N/A'));
         $this->line("- Active FFmpeg Processes: " . ($systemStats['processes']['ffmpeg_processes'] ?? 0));
         $this->line("- Redis Connected: " . ($systemStats['redis_connected'] ? 'Yes' : 'No'));
-        
+
         return 0;
     }
 
@@ -335,47 +320,47 @@ class ManageSharedStreams extends Command
     {
         $streams = $this->sharedStreamService->getAllActiveStreams();
         $unhealthyCount = 0;
-        
+
         $this->info('Checking stream health...');
         $this->newLine();
-        
+
         foreach ($streams as $streamKey => $streamData) {
             $health = $this->monitorService->checkStreamHealth($streamKey);
             $status = $health['healthy'] ? '<info>✓ Healthy</info>' : '<error>✗ Unhealthy</error>';
             $reason = $health['reason'] ?? '';
-            
+
             $streamInfo = $streamData['stream_info'];
             $title = substr($streamInfo['title'] ?? 'Unknown', 0, 30);
-            
+
             $this->line("{$title}: {$status}" . ($reason ? " ({$reason})" : ""));
-            
+
             if (!$health['healthy']) {
                 $unhealthyCount++;
             }
         }
-        
+
         $this->newLine();
         if ($unhealthyCount === 0) {
             $this->info("All streams are healthy!");
         } else {
             $this->warn("{$unhealthyCount} unhealthy streams detected.");
         }
-        
+
         return $unhealthyCount > 0 ? 1 : 0;
     }
 
     private function synchronizeState(): int
     {
         $this->info('Synchronizing shared stream state between database and Redis...');
-        
+
         try {
             $stats = $this->sharedStreamService->synchronizeState();
-            
+
             $this->info('Synchronization completed:');
             $this->line("- Database records updated: {$stats['db_updated']}");
             $this->line("- Redis entries cleaned: {$stats['redis_cleaned']}");
             $this->line("- Inconsistencies fixed: {$stats['inconsistencies_fixed']}");
-            
+
             return 0;
         } catch (\Exception $e) {
             $this->error("Synchronization failed: " . $e->getMessage());
@@ -388,7 +373,7 @@ class ManageSharedStreams extends Command
         $hours = floor($seconds / 3600);
         $minutes = floor(($seconds % 3600) / 60);
         $seconds = $seconds % 60;
-        
+
         if ($hours > 0) {
             return sprintf('%dh %dm %ds', $hours, $minutes, $seconds);
         } elseif ($minutes > 0) {
