@@ -15,6 +15,7 @@ use App\Filament\Widgets\KoFiWidget;
 
 //use App\Filament\Widgets\PayPalDonateWidget;
 use App\Filament\Widgets\StatsOverview;
+use App\Livewire\ProfileComponent;
 use App\Settings\GeneralSettings;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -36,7 +37,7 @@ use Hydrat\TableLayoutToggle\TableLayoutTogglePlugin;
 use Filament\Widgets\AccountWidget;
 use ShuvroRoy\FilamentSpatieLaravelBackup\FilamentSpatieLaravelBackupPlugin;
 use Jeffgreco13\FilamentBreezy\BreezyCore;
-use App\Livewire\ProfileComponent;
+use Saade\FilamentLaravelLog\FilamentLaravelLogPlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -54,15 +55,49 @@ class AdminPanelProvider extends PanelProvider
             'navigation_position' => 'left',
             'show_breadcrumbs' => true,
             'content_width' => MaxWidth::ScreenLarge,
+            'show_logs' => false,
         ];
         try {
             $settings = [
                 'navigation_position' => $userPreferences->navigation_position ?? $settings['navigation_position'],
                 'show_breadcrumbs' => $userPreferences->show_breadcrumbs ?? $settings['show_breadcrumbs'],
                 'content_width' => $userPreferences->content_width ?? $settings['content_width'],
+                'show_logs' => $userPreferences->show_logs ?? $settings['show_logs'],
             ];
         } catch (Exception $e) {
             // Ignore
+        }
+        $widgets = [
+            UpdateNoticeWidget::class,
+            AccountWidget::class,
+            DocumentsWidget::class,
+            DiscordWidget::class,
+            // PayPalDonateWidget::class,
+            KoFiWidget::class,
+            // DonateCrypto::class,
+            StatsOverview::class,
+        ];
+        $plugins = [
+            FilamentSpatieLaravelBackupPlugin::make()
+                ->authorize(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true))
+                ->usingPage(Backups::class),
+            TableLayoutTogglePlugin::make(),
+            BreezyCore::make()
+                ->myProfile(
+                    slug: 'profile',
+                    userMenuLabel: 'Profile',
+                )
+                ->enableTwoFactorAuthentication()
+                ->enableSanctumTokens()
+                ->myProfileComponents([
+                    'personal_info' => ProfileComponent::class
+                ])
+        ];
+        if ($settings['show_logs']) {
+            $plugins[] = FilamentLaravelLogPlugin::make()
+                ->navigationGroup('Tools')
+                ->navigationSort(99)
+                ->authorize(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true));
         }
         $adminPanel = $panel
             ->default()
@@ -86,42 +121,8 @@ class AdminPanelProvider extends PanelProvider
                 CustomDashboard::class
             ])
             ->breadcrumbs($settings['show_breadcrumbs'])
-            // Don't auto discover widgets, we'll manually register them
-            // ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
-            ->widgets([
-                UpdateNoticeWidget::class,
-                AccountWidget::class,
-                DocumentsWidget::class,
-                DiscordWidget::class,
-                // PayPalDonateWidget::class,
-                KoFiWidget::class,
-                // DonateCrypto::class,
-                StatsOverview::class,
-            ])
-            ->plugins([
-                FilamentSpatieLaravelBackupPlugin::make()
-                    ->authorize(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true))
-                    ->usingPage(Backups::class),
-                TableLayoutTogglePlugin::make(),
-                BreezyCore::make()
-                    ->myProfile(
-                        slug: 'profile',
-                        userMenuLabel: 'Profile',
-                    )
-                    ->enableTwoFactorAuthentication()
-                    ->enableSanctumTokens(
-                        // permissions: ['my','custom','permissions'] // optional, customize the permissions (default = ["create", "view", "update", "delete"])
-                    )
-                    ->myProfileComponents([
-                        'personal_info' => ProfileComponent::class
-                    ])
-                    // ->passwordUpdateRules(
-                    //     rules: [
-                    //         'min:4'
-                    //     ],
-                    //     requiresCurrentPassword: false
-                    // ),
-            ])
+            ->widgets($widgets)
+            ->plugins($plugins)
             ->maxContentWidth($settings['content_width'])
             ->middleware([
                 EncryptCookies::class,
