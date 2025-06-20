@@ -511,9 +511,10 @@ class SharedStreamService
         
         Log::channel('ffmpeg')->debug("Stream {$streamKey}: Starting xTeVe-style buffer management");
         
-        // Run buffer manager in the same process to avoid file handle serialization issues
-        // Background jobs cannot serialize file handles, so we need to run this inline
-        $this->runOptimizedBufferManager($streamKey, $stdout, $stderr, $process);
+        // Start buffer manager in a way that doesn't block the HTTP response
+        // We'll use a simple approach: buffer a few more segments then return,
+        // letting the stream continue via process cleanup
+        $this->runShortInitialBuffering($streamKey, $stdout, $stderr, $process);
     }
 
 
@@ -671,7 +672,8 @@ class SharedStreamService
                         Log::channel('ffmpeg')->debug("Stream {$streamKey}: Initial buffer segment {$segmentNumber} buffered ({$accumulatedSize} bytes)");
                         
                         // Requirement 1.a: Update status to 'active' after first segment
-                        if ($segmentNumber == 0) { // This means it's the first segment successfully processed (about to be incremented)
+                        if ($segmentNumber == 0) // This means it's the first segment successfully processed (about to be incremented)
+                        {
                             $streamInfo = $this->getStreamInfo($streamKey);
                             if ($streamInfo) {
                                 $streamInfo['status'] = 'active';
@@ -767,6 +769,73 @@ class SharedStreamService
                 Log::channel('ffmpeg')->info("Stream {$streamKey}: Status updated to 'error' due to no initial data. FFmpeg stderr logged.");
             }
         }
+    }
+
+    /**
+     * Run short initial buffering to build up a small buffer without blocking HTTP response
+     */
+    private function runShortInitialBuffering(string $streamKey, $stdout, $stderr, $process): void
+    {
+        $bufferKey = self::BUFFER_PREFIX . $streamKey;
+        $targetSegments = 5; // Buffer 5 segments then return
+        $segmentNumber = 1; // Start from 1 since initial buffering already created segment 0
+        $accumulatedData = '';
+        $accumulatedSize = 0;
+        $targetChunkSize = 188 * 1000; // 188KB chunks
+        $redis = $this->redis();
+        $maxWaitTime = 3; // Maximum 3 seconds for this initial buffering
+        $startTime = time();
+        
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Starting short initial buffering for {$targetSegments} segments");
+        
+        while ($segmentNumber < $targetSegments && (time() - $startTime) < $maxWaitTime) {
+            // Quick non-blocking read
+            $chunk = fread($stdout, 32768);
+            if ($chunk !== false && strlen($chunk) > 0) {
+                $accumulatedData .= $chunk;
+                $accumulatedSize += strlen($chunk);
+                
+                // Flush when we have enough data
+                if ($accumulatedSize >= $targetChunkSize) {
+                    $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                    $redis->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
+                    $redis->lpush("{$bufferKey}:segments", $segmentNumber);
+                    $redis->ltrim("{$bufferKey}:segments", 0, 50);
+                    
+                    Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffered initial segment {$segmentNumber}");
+                    
+                    $segmentNumber++;
+                    $accumulatedData = '';
+                    $accumulatedSize = 0;
+                    
+                    $this->updateStreamActivity($streamKey);
+                }
+            } else {
+                // No data available, small sleep
+                usleep(10000); // 10ms
+            }
+            
+            // Check for errors
+            $error = fread($stderr, 1024);
+            if ($error !== false && strlen($error) > 0) {
+                Log::channel('ffmpeg')->error("Stream {$streamKey}: {$error}");
+            }
+        }
+        
+        // Flush any remaining data
+        if ($accumulatedSize > 0) {
+            $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+            $redis->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
+            $redis->lpush("{$bufferKey}:segments", $segmentNumber);
+            $segmentNumber++;
+            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Flushed remaining data as segment {$segmentNumber}");
+        }
+        
+        Log::channel('ffmpeg')->info("Stream {$streamKey}: Short initial buffering completed with {$segmentNumber} total segments, allowing HTTP response to complete");
+        
+        // At this point, we return and let the HTTP response complete
+        // The FFmpeg process will continue running, and clients can read from the buffered segments
+        // When the process eventually ends, it will be cleaned up by the cleanup processes
     }
 
     /**
@@ -1167,15 +1236,26 @@ class SharedStreamService
                 proc_close($process);
             }
             
-            // Update stream status in database only (avoid Redis operations in shutdown function)
-            // This prevents Redis connection issues during cleanup
+            // Update stream status in both Redis and database when buffer manager ends
             try {
+                // Update Redis stream info to reflect the stopped status
+                $streamInfo = $this->getStreamInfo($streamKey);
+                if ($streamInfo) {
+                    $streamInfo['status'] = 'stopped';
+                    $streamInfo['stopped_at'] = time();
+                    $streamInfo['stop_reason'] = 'buffer_manager_ended';
+                    $this->setStreamInfo($streamKey, $streamInfo);
+                }
+                
+                // Also update database
                 SharedStream::where('stream_id', $streamKey)->update([
                     'status' => 'stopped',
                     'stopped_at' => now()
                 ]);
+                
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Updated status to 'stopped' in both Redis and database");
             } catch (\Exception $e) {
-                // Don't log errors during shutdown to avoid recursive issues
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Error updating status during cleanup: " . $e->getMessage());
             }
             
         } catch (\Exception $e) {
@@ -1702,7 +1782,8 @@ class SharedStreamService
     public function getTotalBufferDiskUsage(): int
     {
         try {
-            $totalSize = 0;
+
+                       $totalSize = 0;
             $activeStreams = $this->getAllActiveStreams();
             
             foreach (array_keys($activeStreams) as $streamKey) {
@@ -2008,6 +2089,7 @@ class SharedStreamService
             if (!$streamInfo) {
                 // Only log missing streams once every 60 seconds to prevent spam
                 static $lastMissingLog = [];
+                $now = time();
                 if (!isset($lastMissingLog[$streamKey]) || ($now - $lastMissingLog[$streamKey]) > 60) {
                     Log::channel('ffmpeg')->debug("getStreamStats: No stream info found for key {$streamKey}");
                     $lastMissingLog[$streamKey] = $now;
