@@ -22,8 +22,8 @@ class SharedStreamMonitor extends Page
     protected static ?string $navigationIcon = 'heroicon-o-signal';
     protected static ?string $navigationLabel = 'Shared Streams';
     protected static ?string $title = 'Shared Stream Monitor';
-    protected static ?string $navigationGroup = 'Streaming';
-    protected static ?int $navigationSort = 1;
+    protected static ?string $navigationGroup = 'Tools';
+    protected static ?int $navigationSort = 15;
 
     protected static string $view = 'filament.pages.shared-stream-monitor';
 
