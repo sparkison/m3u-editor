@@ -320,11 +320,11 @@ class Preferences extends SettingsPage
                                             }),
                                         Forms\Components\Actions\Action::make('view_logs')
                                             ->label('View Logs')
-                                            ->icon('heroicon-o-arrow-top-right-on-square')
+                                            ->color('gray')
+                                            ->icon('heroicon-o-document-text')
                                             ->iconPosition('after')
                                             ->size('sm')
-                                            ->url('/logs')
-                                            ->openUrlInNewTab(true),
+                                            ->url('/logs'),
                                         Forms\Components\Actions\Action::make('view_queue_manager')
                                             ->label('Queue Manager')
                                             ->icon('heroicon-o-arrow-top-right-on-square')
@@ -335,7 +335,11 @@ class Preferences extends SettingsPage
                                     ])->schema([
                                         Forms\Components\Toggle::make('show_logs')
                                             ->label('Make log files viewable')
-                                            ->helperText('When enabled you can view the log files using the "View Logs" button. When disabled, the logs endpoint will return a 403 (Unauthorized).'),
+                                            ->hintIcon(
+                                                'heroicon-m-question-mark-circle',
+                                                tooltip: 'You may need to refresh the page after applying this setting to view the logs. When disabled you will get a 404.'
+                                            )
+                                            ->helperText('When enabled, there will be an additional navigation item (Logs) to view the log file content.'),
                                         Forms\Components\Toggle::make('show_queue_manager')
                                             ->label('Allow queue manager access')
                                             ->helperText('When enabled you can access the queue manager using the "Queue Manager" button. When disabled, the queue manager endpoint will return a 403 (Unauthorized).'),
