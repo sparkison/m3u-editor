@@ -509,13 +509,11 @@ class SharedStreamService
         // Start immediate buffering to prevent FFmpeg from hanging
         $this->startInitialBuffering($streamKey, $stdout, $stderr, $process);
         
-        Log::channel('ffmpeg')->info("Stream {$streamKey}: Starting background buffer manager job");
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Starting xTeVe-style buffer management");
         
-        // Dispatch background job to handle continuous buffering
-        // This keeps the buffer manager running even after the HTTP request completes
-        \App\Jobs\StreamBufferManager::dispatch($streamKey, $stdout, $stderr, $process);
-        
-        Log::channel('ffmpeg')->info("Stream {$streamKey}: Background buffer manager dispatched successfully");
+        // Run buffer manager in the same process to avoid file handle serialization issues
+        // Background jobs cannot serialize file handles, so we need to run this inline
+        $this->runOptimizedBufferManager($streamKey, $stdout, $stderr, $process);
     }
 
 
@@ -1086,7 +1084,7 @@ class SharedStreamService
                         $segmentNumber++;
                         Log::channel('ffmpeg')->debug("Stream {$streamKey}: Flushed final accumulated segment {$segmentNumber} before exit due to process end.");
                     }
-                    Log::channel('ffmpeg')->info("Stream {$streamKey}: FFmpeg process (PID ".($streamInfo['pid'] ?? 'unknown').") ended (status code: ".($status['exitcode'] ?? 'unknown')."), stopping buffer manager.");
+                    Log::channel('ffmpeg')->info("Stream {$streamKey}: FFmpeg process ended (status code: ".($status['exitcode'] ?? 'unknown')."), stopping buffer manager.");
 
                     // Requirement 4.b.c: Capture final stderr output
                     if (is_resource($stderr)) {
