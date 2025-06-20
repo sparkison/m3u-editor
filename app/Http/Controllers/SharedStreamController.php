@@ -199,6 +199,41 @@ class SharedStreamController extends Controller
     {
         $streamKey = $streamInfo['stream_key'];
 
+        // Step 2.1: Wait for stream to become active
+        $streamReadyTimeout = 25; // seconds
+        $startTime = time();
+        $streamReady = false;
+
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Client {$clientId} waiting up to {$streamReadyTimeout}s for stream to become active.");
+
+        while (time() - $startTime < $streamReadyTimeout) {
+            $stats = $this->sharedStreamService->getStreamStats($streamKey);
+
+            if (!$stats) {
+                Log::channel('ffmpeg')->error("Stream {$streamKey}: Client {$clientId} - Stream stats became null while waiting for active status.");
+                abort(503, 'Stream failed to start or is unavailable.');
+            }
+
+            if (in_array($stats['status'], ['error', 'stopped'])) {
+                Log::channel('ffmpeg')->error("Stream {$streamKey}: Client {$clientId} - Stream status is '{$stats['status']}' while waiting for active. Aborting.");
+                abort(503, 'Stream failed to start or is unavailable.');
+            }
+
+            if ($stats['status'] === 'active') {
+                Log::channel('ffmpeg')->info("Stream {$streamKey}: Client {$clientId} - Stream is now active. Proceeding.");
+                $streamReady = true;
+                break;
+            }
+
+            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Client {$clientId} - Waiting for active status. Current: {$stats['status']}. Time elapsed: " . (time() - $startTime) . "s.");
+            usleep(500000); // 0.5 seconds
+        }
+
+        if (!$streamReady) {
+            Log::channel('ffmpeg')->error("Stream {$streamKey}: Client {$clientId} - Stream did not become active within {$streamReadyTimeout}s timeout. Aborting.");
+            abort(503, 'Stream not ready within timeout period.');
+        }
+
         return new StreamedResponse(function () use ($streamKey, $clientId, $request) {
             set_time_limit(0);
             ignore_user_abort(true);
@@ -222,9 +257,15 @@ class SharedStreamController extends Controller
                     $data = $this->sharedStreamService->getNextStreamSegments($streamKey, $clientId, $lastSegment);
                     
                     if ($data) {
+                        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Client {$clientId} received " . strlen($data) . " bytes. Last segment: {$lastSegment}. Echoing data.");
                         echo $data;
-                        if (ob_get_level()) ob_flush();
-                        flush();
+                        if (ob_get_level() > 0) {
+                            ob_flush();
+                            flush();
+                            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Client {$clientId} flushed output buffer.");
+                        } else {
+                            flush(); // Still flush if output buffering is not active at level > 0
+                        }
                         
                         if (!$dataSent) {
                             Log::channel('ffmpeg')->info("Sent initial " . strlen($data) . " bytes to client {$clientId}");
@@ -236,12 +277,12 @@ class SharedStreamController extends Controller
                     } else {
                         // No data from stream
                         if (!$dataSent && (time() - $lastDataTime) > $initialTimeout) {
-                             Log::channel('ffmpeg')->warning("Stream {$streamKey} did not provide initial data within {$initialTimeout}s for client {$clientId}.");
+                             Log::channel('ffmpeg')->warning("Stream {$streamKey}: Client {$clientId} - Initial data timeout. No data received for {$initialTimeout}s. DataSent: " . ($dataSent ? 'yes' : 'no'));
                              break;
                         }
 
                         if ($dataSent && (time() - $lastDataTime > 20)) {
-                            Log::channel('ffmpeg')->warning("No data from stream {$streamKey} for 20s, assuming stream ended for client {$clientId}.");
+                            Log::channel('ffmpeg')->warning("Stream {$streamKey}: Client {$clientId} - Subsequent data timeout. No data from stream for 20s. DataSent: " . ($dataSent ? 'yes' : 'no'));
                             break;
                         }
                         
@@ -258,7 +299,9 @@ class SharedStreamController extends Controller
                     }
                 }
             } finally {
+                Log::channel('ffmpeg')->info("Stream {$streamKey}: Client {$clientId} disconnecting. Attempting to remove client from stream service.");
                 $this->sharedStreamService->removeClient($streamKey, $clientId);
+                Log::channel('ffmpeg')->info("Stream {$streamKey}: Client {$clientId} successfully removed by stream service.");
             }
             
         }, 200, [
