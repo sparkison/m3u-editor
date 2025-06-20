@@ -208,7 +208,7 @@ class SharedStreamController extends Controller
             
             $lastSegment = 0;
             $startTime = time();
-            $maxWaitTime = 20; // Wait up to 20 seconds for stream to become active (was 30)
+            $maxWaitTime = 40; // Wait up to 40 seconds for stream to become active (was 20)
             $streamStarted = false;
             
             // Register shutdown function to cleanup client
@@ -231,12 +231,8 @@ class SharedStreamController extends Controller
                     }
                     
                     if ($stats && in_array($stats['status'], ['active', 'starting'])) {
-                        // For active streams, start immediately
-                        // For starting streams, check if data is available
-                        if ($stats['status'] === 'active' || $this->checkStreamHasData($streamKey)) {
-                            $streamStarted = true;
-                            break;
-                        }
+                        $streamStarted = true;
+                        break;
                     }
                     
                     if ($stats && $stats['status'] === 'error') {
@@ -261,7 +257,7 @@ class SharedStreamController extends Controller
             Log::channel('ffmpeg')->debug("Starting optimized streaming for VLC client {$clientId}");
             $preBufferData = '';
             $preBufferAttempts = 0;
-            $maxPreBufferAttempts = 7; // Reduced from 10 for faster startup
+            $maxPreBufferAttempts = 400; // Wait up to 40s for pre-buffer data (400 * 100ms)
             $targetPreBufferSize = 256 * 1024; // Reduced from 512KB for faster startup
             
             while ($preBufferAttempts < $maxPreBufferAttempts && strlen($preBufferData) < $targetPreBufferSize) {
@@ -274,7 +270,7 @@ class SharedStreamController extends Controller
                         break;
                     }
                 } else {
-                    usleep(50000); // Reduced from 100ms for faster response
+                    usleep(100000); // was 50000
                 }
                 $preBufferAttempts++;
             }
@@ -287,6 +283,9 @@ class SharedStreamController extends Controller
                 }
                 flush();
                 Log::channel('ffmpeg')->info("Sent " . strlen($preBufferData) . " bytes pre-buffer to VLC client {$clientId}");
+            } else {
+                Log::channel('ffmpeg')->warning("Stream {$streamKey} did not provide data for client {$clientId} after waiting.");
+                return;
             }
 
             // Now stream with optimized timing for responsive playback
@@ -505,6 +504,7 @@ class SharedStreamController extends Controller
     /**
      * Check if stream has data available (quick data availability check)
      */
+    /*
     private function checkStreamHasData(string $streamKey): bool
     {
         try {
@@ -517,6 +517,7 @@ class SharedStreamController extends Controller
             return false;
         }
     }
+    */
 
     /**
      * Serve shared stream directly (for testing)
