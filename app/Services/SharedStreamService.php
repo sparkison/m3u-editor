@@ -509,10 +509,13 @@ class SharedStreamService
         // Start immediate buffering to prevent FFmpeg from hanging
         $this->startInitialBuffering($streamKey, $stdout, $stderr, $process);
         
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Starting xTeVe-style buffer management");
+        Log::channel('ffmpeg')->info("Stream {$streamKey}: Starting background buffer manager job");
         
-        // Use a background approach that doesn't block the main thread
-        $this->runAsyncBufferManager($streamKey, $stdout, $stderr, $process);
+        // Dispatch background job to handle continuous buffering
+        // This keeps the buffer manager running even after the HTTP request completes
+        \App\Jobs\StreamBufferManager::dispatch($streamKey, $stdout, $stderr, $process);
+        
+        Log::channel('ffmpeg')->info("Stream {$streamKey}: Background buffer manager dispatched successfully");
     }
 
 
@@ -987,6 +990,9 @@ class SharedStreamService
         $lastActivity = time();
         $maxInactiveTime = 60; // 60 seconds of no data before giving up
         
+        $lastFlushTime = time();
+        $maxAccumulationTime = 2; // Max 2 seconds before force-flushing
+        
         while ($this->isStreamActive($streamKey)) {
             $read = [$stdout, $stderr];
             $write = null;
@@ -1007,8 +1013,32 @@ class SharedStreamService
                         $hasData = true;
                         $lastActivity = time();
                         
-                        // Flush when we have enough data
+                        // Determine if we should flush
+                        $shouldFlush = false;
+                        
+                        // Flush when we have enough data for a full chunk
                         if ($accumulatedSize >= $targetChunkSize) {
+                            $shouldFlush = true;
+                        }
+                        // Flush if we've been accumulating for too long (prevents stalling)
+                        elseif (time() - $lastFlushTime >= $maxAccumulationTime && $accumulatedSize > 0) {
+                            $shouldFlush = true;
+                        }
+                        // Flush if we have reasonable amount and no immediate data available
+                        elseif ($accumulatedSize >= 64000) { // 64KB minimum for reasonable chunks
+                            // Check if more data is immediately available
+                            stream_set_blocking($stdout, false);
+                            $peek = fread($stdout, 1);
+                            if ($peek === false || strlen($peek) === 0) {
+                                $shouldFlush = true;
+                            } else {
+                                // Put the peeked byte back into accumulated data
+                                $accumulatedData .= $peek;
+                                $accumulatedSize += 1;
+                            }
+                        }
+                        
+                        if ($shouldFlush) {
                             $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
                             $redis->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
                             $redis->lpush("{$bufferKey}:segments", $segmentNumber);
@@ -1017,6 +1047,7 @@ class SharedStreamService
                             $segmentNumber++;
                             $accumulatedData = '';
                             $accumulatedSize = 0;
+                            $lastFlushTime = time();
                             
                             // Update stream activity
                             $this->updateStreamActivity($streamKey);
@@ -1074,8 +1105,33 @@ class SharedStreamService
             
             // Check for inactivity timeout
             if (time() - $lastActivity > $maxInactiveTime) {
+                // Flush any remaining data before ending due to timeout
+                if ($accumulatedSize > 0) {
+                    $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                    $redis->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
+                    $redis->lpush("{$bufferKey}:segments", $segmentNumber);
+                    $segmentNumber++;
+                    Log::channel('ffmpeg')->debug("Stream {$streamKey}: Flushed timeout segment {$segmentNumber} ({$accumulatedSize} bytes)");
+                }
                 Log::channel('ffmpeg')->warning("Stream {$streamKey}: No data for {$maxInactiveTime}s, ending buffer manager");
                 break;
+            }
+            
+            // Check if we need to flush data due to time constraint (even without new data)
+            if ($accumulatedSize > 0 && time() - $lastFlushTime >= $maxAccumulationTime) {
+                $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                $redis->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
+                $redis->lpush("{$bufferKey}:segments", $segmentNumber);
+                $redis->ltrim("{$bufferKey}:segments", 0, 50);
+                
+                $segmentNumber++;
+                $accumulatedData = '';
+                $accumulatedSize = 0;
+                $lastFlushTime = time();
+                
+                $this->updateStreamActivity($streamKey);
+                
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Flushed timeout segment {$segmentNumber} due to time constraint");
             }
             
             // Small sleep to prevent CPU spinning
