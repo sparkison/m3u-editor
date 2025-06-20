@@ -210,8 +210,9 @@ class SharedStreamController extends Controller
             $stats = $this->sharedStreamService->getStreamStats($streamKey);
 
             if (!$stats) {
-                Log::channel('ffmpeg')->error("Stream {$streamKey}: Client {$clientId} - Stream stats became null while waiting for active status.");
-                abort(503, 'Stream failed to start or is unavailable.');
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Client {$clientId} - Stream stats are null, possibly during a restart. Waiting.");
+                usleep(500000); // 0.5 seconds
+                continue;
             }
 
             if (in_array($stats['status'], ['error', 'stopped'])) {
