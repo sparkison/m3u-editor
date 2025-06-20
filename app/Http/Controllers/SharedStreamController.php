@@ -200,89 +200,24 @@ class SharedStreamController extends Controller
         $streamKey = $streamInfo['stream_key'];
 
         return new StreamedResponse(function () use ($streamKey, $clientId, $request) {
-            // Disable execution time limit for streaming
             set_time_limit(0);
-            
-            // Let the script handle cleanup on user abort
             ignore_user_abort(true);
-            
+
             try {
-                $lastSegment = 0;
-                $startTime = time();
-                $maxWaitTime = 40; // Wait up to 40 seconds for stream to become active
-                $streamStarted = false;
-                
-                // Wait for stream to become active
-                $checkCount = 0;
-                while (!connection_aborted() && (time() - $startTime) < $maxWaitTime) {
-                    if ($checkCount % 30 === 0) { // Check every 3s
-                        $stats = $this->sharedStreamService->getStreamStats($streamKey);
-                        
-                        if ($checkCount % 60 === 0) {
-                            if ($stats) {
-                                Log::channel('ffmpeg')->debug("Stream {$streamKey} status check #{$checkCount} for client {$clientId}: status='{$stats['status']}', process_running=" . ($stats['process_running'] ? 'true' : 'false') . ", client_count={$stats['client_count']}");
-                            } else {
-                                Log::channel('ffmpeg')->debug("Stream {$streamKey} status check #{$checkCount} for client {$clientId}: No stats returned");
-                            }
-                        }
-                        
-                        if ($stats && in_array($stats['status'], ['active', 'starting'])) {
-                            $streamStarted = true;
-                            break;
-                        }
-                        
-                        if ($stats && $stats['status'] === 'error') {
-                            Log::channel('ffmpeg')->error("Stream {$streamKey} failed to start for client {$clientId}");
-                            return;
-                        }
-                    }
-                    $checkCount++;
-                    usleep(100000); // 100ms
-                }
-                
-                if (!$streamStarted) {
-                    Log::channel('ffmpeg')->warning("Stream {$streamKey} did not become active within {$maxWaitTime}s for client {$clientId}");
+                // Stream should already be active or starting from the service
+                $stats = $this->sharedStreamService->getStreamStats($streamKey);
+                if (!$stats || !in_array($stats['status'], ['active', 'starting'])) {
+                    Log::channel('ffmpeg')->warning("Stream {$streamKey} is not active, aborting for client {$clientId}. Status: " . ($stats['status'] ?? 'unknown'));
                     return;
                 }
 
                 Log::channel('ffmpeg')->debug("Stream {$streamKey} is active, starting data flow for client {$clientId}");
                 
-                // Pre-buffering
-                $preBufferData = '';
-                $preBufferAttempts = 0;
-                $maxPreBufferAttempts = 400; // 40s
-                $targetPreBufferSize = 256 * 1024;
-                
-                while (!connection_aborted() && $preBufferAttempts < $maxPreBufferAttempts && strlen($preBufferData) < $targetPreBufferSize) {
-                    $data = $this->sharedStreamService->getNextStreamSegments($streamKey, $clientId, $lastSegment);
-                    if ($data) {
-                        $preBufferData .= $data;
-                        if (strlen($preBufferData) >= 188000) {
-                            break;
-                        }
-                    } else {
-                        usleep(100000);
-                    }
-                    $preBufferAttempts++;
-                }
-
-                if (connection_aborted()) return;
-
-                if (!empty($preBufferData)) {
-                    echo $preBufferData;
-                    if (ob_get_level()) ob_flush();
-                    flush();
-                    Log::channel('ffmpeg')->info("Sent " . strlen($preBufferData) . " bytes pre-buffer to VLC client {$clientId}");
-                } else {
-                    Log::channel('ffmpeg')->warning("Stream {$streamKey} did not provide data for client {$clientId} after waiting.");
-                    return;
-                }
-
-                // Main streaming loop
-                $consecutiveEmptyReads = 0;
-                $maxEmptyReads = 50;
+                $lastSegment = 0;
                 $lastDataTime = time();
-                
+                $dataSent = false;
+                $initialTimeout = 30; // 30 seconds to get the first chunk of data
+
                 while (!connection_aborted()) {
                     $data = $this->sharedStreamService->getNextStreamSegments($streamKey, $clientId, $lastSegment);
                     
@@ -291,36 +226,38 @@ class SharedStreamController extends Controller
                         if (ob_get_level()) ob_flush();
                         flush();
                         
-                        $consecutiveEmptyReads = 0;
+                        if (!$dataSent) {
+                            Log::channel('ffmpeg')->info("Sent initial " . strlen($data) . " bytes to client {$clientId}");
+                            $dataSent = true;
+                        }
+                        
                         $lastDataTime = time();
-                        usleep(2000);
+                        usleep(5000); // Small delay to prevent high CPU usage
                     } else {
-                        $consecutiveEmptyReads++;
-                        
-                        if ($consecutiveEmptyReads < 10) usleep(5000);
-                        elseif ($consecutiveEmptyReads < 25) usleep(15000);
-                        else usleep(30000);
-                        
-                        if ($consecutiveEmptyReads > $maxEmptyReads) {
-                            $consecutiveEmptyReads = 25;
+                        // No data from stream
+                        if (!$dataSent && (time() - $lastDataTime) > $initialTimeout) {
+                             Log::channel('ffmpeg')->warning("Stream {$streamKey} did not provide initial data within {$initialTimeout}s for client {$clientId}.");
+                             break;
                         }
 
-                        if (time() - $lastDataTime > 20) { // Increased timeout
+                        if ($dataSent && (time() - $lastDataTime > 20)) {
                             Log::channel('ffmpeg')->warning("No data from stream {$streamKey} for 20s, assuming stream ended for client {$clientId}.");
                             break;
                         }
+                        
+                        usleep(100000); // Wait before trying for more data
                     }
 
+                    // Check stream status periodically to detect if the source has died
                     if ($lastSegment > 0 && $lastSegment % 100 === 0) {
-                        $stats = $this->sharedStreamService->getStreamStats($streamKey);
-                        if (!$stats || !in_array($stats['status'], ['active', 'starting'])) {
+                        $currentStats = $this->sharedStreamService->getStreamStats($streamKey);
+                        if (!$currentStats || !in_array($currentStats['status'], ['active', 'starting'])) {
                             Log::channel('ffmpeg')->info("Stream {$streamKey} is no longer active, disconnecting client {$clientId}.");
                             break;
                         }
                     }
                 }
             } finally {
-                // Ensure client is always removed, regardless of how the stream ends
                 $this->sharedStreamService->removeClient($streamKey, $clientId);
             }
             
