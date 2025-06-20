@@ -7,6 +7,7 @@ use App\Models\SharedStreamStat;
 use App\Services\SharedStreamService;
 use App\Services\StreamMonitorService;
 use Filament\Actions;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Enums\ActionSize;
 use Filament\Support\Enums\IconPosition;
@@ -86,9 +87,10 @@ class SharedStreamMonitor extends Page
         $this->sharedStreamService->cleanupInactiveStreams();
         $this->refreshData();
         
-        $this->getNotification('Cleanup completed successfully.')
-             ->success()
-             ->send();
+        Notification::make()
+            ->title('Cleanup completed successfully.')
+            ->success()
+            ->send();
     }
 
     public function stopStream(string $streamId): void
@@ -96,13 +98,15 @@ class SharedStreamMonitor extends Page
         $success = $this->sharedStreamService->stopStream($streamId);
         
         if ($success) {
-            $this->getNotification("Stream {$streamId} stopped successfully.")
-                 ->success()
-                 ->send();
+            Notification::make()
+                ->title("Stream {$streamId} stopped successfully.")
+                ->success()
+                ->send();
         } else {
-            $this->getNotification("Failed to stop stream {$streamId}.")
-                 ->danger()
-                 ->send();
+            Notification::make()
+                ->title("Failed to stop stream {$streamId}.")
+                ->danger()
+                ->send();
         }
         
         $this->refreshData();
@@ -113,9 +117,10 @@ class SharedStreamMonitor extends Page
         $stream = SharedStream::where('stream_id', $streamId)->first();
         
         if (!$stream) {
-            $this->getNotification("Stream not found.")
-                 ->danger()
-                 ->send();
+            Notification::make()
+                ->title("Stream not found.")
+                ->danger()
+                ->send();
             return;
         }
 
@@ -132,13 +137,15 @@ class SharedStreamMonitor extends Page
         );
         
         if ($newStreamId) {
-            $this->getNotification("Stream restarted with new ID: {$newStreamId}")
-                 ->success()
-                 ->send();
+            Notification::make()
+                ->title("Stream restarted with new ID: {$newStreamId}")
+                ->success()
+                ->send();
         } else {
-            $this->getNotification("Failed to restart stream.")
-                 ->danger()
-                 ->send();
+            Notification::make()
+                ->title("Failed to restart stream.")
+                ->danger()
+                ->send();
         }
         
         $this->refreshData();
@@ -251,9 +258,10 @@ class SharedStreamMonitor extends Page
 
         $this->refreshInterval = $data['refresh_interval'];
 
-        $this->getNotification('Settings saved successfully.')
-             ->success()
-             ->send();
+        Notification::make()
+            ->title('Settings saved successfully.')
+            ->success()
+            ->send();
     }
 
     public function getSubheading(): ?string
