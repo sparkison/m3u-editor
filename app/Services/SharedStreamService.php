@@ -1783,6 +1783,8 @@ class SharedStreamService
     {
         try {
 
+
+
                        $totalSize = 0;
             $activeStreams = $this->getAllActiveStreams();
             
@@ -2334,254 +2336,77 @@ class SharedStreamService
     }
 
     /**
-     * Update stream activity timestamp
+     * Cleanup inactive streams
+     * 
+     * Stops streams that have no active clients and cleans up orphaned data
      */
-    private function updateStreamActivity(string $streamKey): void
+    public function cleanupInactiveStreams(): array
     {
-        $streamInfo = $this->getStreamInfo($streamKey);
-        if ($streamInfo) {
-            $streamInfo['last_activity'] = time();
-            $this->setStreamInfo($streamKey, $streamInfo);
-        }
-    }
-
-    /**
-     * Update client activity timestamp
-     */
-    private function updateClientActivity(string $streamKey, string $clientId): void
-    {
-        $clientKey = self::CLIENT_PREFIX . $streamKey . ':' . $clientId;
-        $clientInfo = $this->redis()->get($clientKey);
-        
-        if ($clientInfo) {
-            $clientData = json_decode($clientInfo, true);
-            if ($clientData) {
-                $clientData['last_activity'] = time();
-                // Extend the client key expiration when active
-                $this->redis()->setex($clientKey, $this->getClientTimeoutResolved(), json_encode($clientData));
-            }
-        } else {
-            // Client key expired or doesn't exist, recreate it
-            $clientData = [
-                'client_id' => $clientId,
-                'connected_at' => time(),
-                'last_activity' => time(),
-                'options' => []
+        try {
+            $cleanupResults = [
+                'streams_stopped' => 0,
+                'orphaned_keys_cleaned' => 0,
+                'temp_files_cleaned' => 0,
+                'errors' => []
             ];
-            $this->redis()->setex($clientKey, $this->getClientTimeoutResolved(), json_encode($clientData));
-        }
-        
-        // Also update stream activity
-        $this->updateStreamActivity($streamKey);
-    }
 
-    /**
-     * Update stream status
-     */
-    private function updateStreamStatus(string $streamKey, string $status): void
-    {
-        try {
-            $streamInfo = $this->getStreamInfo($streamKey);
-            if ($streamInfo) {
-                $streamInfo['status'] = $status;
-                $streamInfo['last_activity'] = time();
-                $this->setStreamInfo($streamKey, $streamInfo);
-            }
-            
-            // Also update database
-            SharedStream::where('stream_id', $streamKey)->update([
-                'status' => $status,
-                'last_activity' => now()
-            ]);
-            
-        } catch (\Exception $e) {
-            Log::channel('ffmpeg')->error("Error updating stream status for {$streamKey}: " . $e->getMessage());
-        }
-    }
+            Log::channel('ffmpeg')->info("Starting cleanup of inactive streams");
 
-    /**
-     * Get stream storage directory
-     */
-    private function getStreamStorageDir(string $streamKey): string
-    {
-        return 'shared_streams/' . md5($streamKey);
-    }
+            // Get streams from database that should be stopped
+            $streamsToStop = SharedStream::whereIn('status', ['starting', 'active'])
+                ->where(function($query) {
+                    // No clients for more than 5 minutes
+                    $query->where('client_count', '=', 0)
+                          ->where('last_client_activity', '<', now()->subMinutes(5))
+                          // Or streams that were supposed to start but have been starting for too long
+                          ->orWhere(function($subQuery) {
+                              $subQuery->where('status', 'starting')
+                                       ->where('started_at', '<', now()->subMinutes(2));
+                          });
+                })
+                ->get();
 
-    /**
-     * Set stream process PID
-     */
-    private function setStreamProcess(string $streamKey, int $pid): void
-    {
-        $pidKey = "stream_pid:{$streamKey}";
-        $this->redis()->setex($pidKey, self::SEGMENT_EXPIRY, $pid);
-    }
-
-    /**
-     * Clean up stream resources
-     */
-    private function cleanupStream(string $streamKey, bool $removeData = false): void
-    {
-        try {
-            if ($removeData) {
-                // Use a separate Redis connection for cleanup to avoid connection issues
-                $redis = $this->redis();
-                
-                // Remove stream info from Redis
-                $redis->del($streamKey);
-                
-                // Remove buffer data
-                $bufferKey = self::BUFFER_PREFIX . $streamKey;
-                $segmentNumbers = $redis->lrange("{$bufferKey}:segments", 0, -1);
-                
-                // Ensure we have an array before foreach
-                if (is_array($segmentNumbers)) {
-                    foreach ($segmentNumbers as $segmentNumber) {
-                        $redis->del("{$bufferKey}:segment_{$segmentNumber}");
+            foreach ($streamsToStop as $stream) {
+                try {
+                    Log::channel('ffmpeg')->info("Stopping inactive stream {$stream->stream_id}: No clients for extended period");
+                    
+                    if ($this->stopStream($stream->stream_id)) {
+                        $cleanupResults['streams_stopped']++;
+                    } else {
+                        $cleanupResults['errors'][] = "Failed to stop stream {$stream->stream_id}";
                     }
+                } catch (\Exception $e) {
+                    $cleanupResults['errors'][] = "Error stopping stream {$stream->stream_id}: " . $e->getMessage();
+                    Log::channel('ffmpeg')->error("Error during cleanup of stream {$stream->stream_id}: " . $e->getMessage());
                 }
-                $redis->del("{$bufferKey}:segments");
-                
-                // Remove client keys
-                $clientKeys = $redis->keys(self::CLIENT_PREFIX . $streamKey . ':*');
-                
-                // Ensure we have an array before foreach
-                if (is_array($clientKeys)) {
-                    foreach ($clientKeys as $clientKey) {
-                        $redis->del($clientKey);
-                    }
-                }
-                
-                // Remove process PID
-                $redis->del("stream_pid:{$streamKey}");
-                
-                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Redis cleanup completed");
             }
-            
-            // Update database status
-            SharedStream::where('stream_id', $streamKey)->update([
-                'status' => 'stopped',
-                'stopped_at' => now()
-            ]);
-            
-        } catch (\Exception $e) {
-            Log::channel('ffmpeg')->error("Error cleaning up stream {$streamKey}: " . $e->getMessage());
-        }
-    }
 
-    /**
-     * Check if a process is running by PID
-     */
-    private function isProcessRunning(int $pid): bool
-    {
-        try {
-            if (function_exists('posix_kill')) {
-                return posix_kill($pid, 0);
-            }
-            
-            // Fallback for systems without posix functions
-            $result = shell_exec("ps -p $pid");
-            return !empty($result) && strpos($result, (string)$pid) !== false;
-            
-        } catch (\Exception $e) {
-            return false;
-        }
-    }
-
-    /**
-     * Synchronize a single stream's client count from Redis to the database.
-     *
-     * @param string $streamKey The stream key (usually with CACHE_PREFIX).
-     * @return void
-     */
-    public function synchronizeClientCountToDb(string $streamKey): void
-    {
-        try {
-            // Ensure $streamKey has the CACHE_PREFIX for Redis client lookups
-            $redisPrefixedStreamKey = str_starts_with($streamKey, self::CACHE_PREFIX)
-                ? $streamKey
-                : self::CACHE_PREFIX . $streamKey;
-
-            // The stream_id in the database does NOT have the CACHE_PREFIX
-            $dbStreamKey = str_replace(self::CACHE_PREFIX, '', $streamKey);
-
-            $clientKeys = $this->redis()->keys(self::CLIENT_PREFIX . $redisPrefixedStreamKey . ':*');
-            $redisClientCount = is_array($clientKeys) ? count($clientKeys) : 0;
-
-            $sharedStream = SharedStream::where('stream_id', $dbStreamKey)->first();
-
-            if ($sharedStream) {
-                $originalDbCount = $sharedStream->client_count;
-                if ($originalDbCount !== $redisClientCount) {
-                    $sharedStream->client_count = $redisClientCount;
-                    $sharedStream->save();
-                    Log::channel('ffmpeg')->info("Stream {$dbStreamKey}: Synchronized client count. Redis: {$redisClientCount}, DB was: {$originalDbCount}, updated to: {$redisClientCount}.");
-                } else {
-                    Log::channel('ffmpeg')->debug("Stream {$dbStreamKey}: Client count already synchronized. Redis: {$redisClientCount}, DB: {$originalDbCount}.");
-                }
-            } else {
-                Log::channel('ffmpeg')->warning("Stream {$dbStreamKey}: Could not find SharedStream model to synchronize client count.");
-            }
-        } catch (\Exception $e) {
-            Log::channel('ffmpeg')->error("Stream {$streamKey}: Error synchronizing client count to DB: " . $e->getMessage());
-        }
-    }
-
-    /**
-     * Synchronize all active streams' client counts from Redis to the database.
-     *
-     * @return array Summary of the operation.
-     */
-    public function synchronizeAllClientCountsToDb(): array
-    {
-        $activeStreamsData = $this->getAllActiveStreams(); // This returns keys without CACHE_PREFIX
-        $processedCount = 0;
-        $updatedCount = 0;
-        $errorCount = 0;
-
-        Log::channel('ffmpeg')->info("Starting synchronization of all client counts to DB for " . count($activeStreamsData) . " active streams.");
-
-        foreach ($activeStreamsData as $streamKeyNoPrefix => $streamData) {
+            // Clean up orphaned Redis keys
             try {
-                // $streamKeyNoPrefix is the key as stored in DB and as returned by getAllActiveStreams
-                // For synchronizeClientCountToDb, we need to pass the key that it expects,
-                // which it will then prefix for Redis and de-prefix for DB.
-                // So, passing $streamKeyNoPrefix is fine.
-
-                $sharedStream = SharedStream::where('stream_id', $streamKeyNoPrefix)->first();
-                if (!$sharedStream) {
-                    Log::channel('ffmpeg')->warning("SynchronizeAll: Stream {$streamKeyNoPrefix} not found in DB for client count sync.");
-                    $errorCount++;
-                    continue;
-                }
-                $originalDbCount = $sharedStream->client_count;
-
-                // Construct the prefixed key for Redis lookup within synchronizeClientCountToDb logic
-                $redisPrefixedStreamKey = self::CACHE_PREFIX . $streamKeyNoPrefix;
-                $clientKeys = $this->redis()->keys(self::CLIENT_PREFIX . $redisPrefixedStreamKey . ':*');
-                $redisClientCount = is_array($clientKeys) ? count($clientKeys) : 0;
-
-                if ($originalDbCount !== $redisClientCount) {
-                    $sharedStream->client_count = $redisClientCount;
-                    $sharedStream->save();
-                    Log::channel('ffmpeg')->info("Stream {$streamKeyNoPrefix}: Synchronized client count during all. Redis: {$redisClientCount}, DB was: {$originalDbCount}, updated to: {$redisClientCount}.");
-                    $updatedCount++;
-                } else {
-                     // Log::channel('ffmpeg')->debug("Stream {$streamKeyNoPrefix}: Client count already synchronized during all. Redis: {$redisClientCount}, DB: {$originalDbCount}.");
-                }
-                $processedCount++;
+                $orphanedCount = $this->cleanupOrphanedKeys();
+                $cleanupResults['orphaned_keys_cleaned'] = $orphanedCount;
+                Log::channel('ffmpeg')->info("Cleaned up {$orphanedCount} orphaned Redis keys");
             } catch (\Exception $e) {
-                Log::channel('ffmpeg')->error("Stream {$streamKeyNoPrefix}: Error during synchronizeAllClientCountsToDb: " . $e->getMessage());
-                $errorCount++;
+                $cleanupResults['errors'][] = "Error cleaning orphaned keys: " . $e->getMessage();
+                Log::channel('ffmpeg')->error("Error cleaning orphaned keys: " . $e->getMessage());
             }
-        }
 
-        $summary = [
-            'total_active_streams_checked' => count($activeStreamsData),
-            'processed_successfully' => $processedCount,
-            'db_client_counts_updated' => $updatedCount,
-            'errors' => $errorCount
-        ];
-        Log::channel('ffmpeg')->info("Finished synchronization of all client counts to DB.", $summary);
-        return $summary;
+            // Clean up old temp files
+            try {
+                $tempFilesCount = $this->cleanupTempFiles(3600); // Clean files older than 1 hour
+                $cleanupResults['temp_files_cleaned'] = $tempFilesCount;
+                Log::channel('ffmpeg')->info("Cleaned up {$tempFilesCount} old temp files");
+            } catch (\Exception $e) {
+                $cleanupResults['errors'][] = "Error cleaning temp files: " . $e->getMessage();
+                Log::channel('ffmpeg')->error("Error cleaning temp files: " . $e->getMessage());
+            }
+
+            Log::channel('ffmpeg')->info("Cleanup completed", $cleanupResults);
+            return $cleanupResults;
+
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error during cleanup: " . $e->getMessage());
+            throw $e;
+        }
     }
 }
