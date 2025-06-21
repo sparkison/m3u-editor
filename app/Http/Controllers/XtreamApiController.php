@@ -23,39 +23,124 @@ class XtreamApiController extends Controller
      * This endpoint serves as the primary interface for Xtream API interactions.
      * It requires authentication via username and password query parameters.
      * The 'action' query parameter dictates the specific operation to perform and the structure of the response.
-     * Common actions include 'panel' (default, retrieves player_api.php equivalent), 'get_live_streams', 'get_vod_streams', 
-     * 'get_live_categories', and 'get_vod_categories'.
-     * The detailed response structure for each action is documented in inline PHPDoc blocks within the method implementation.
+     * 
+     * ## Supported Actions:
+     * 
+     * ### panel (default)
+     * Returns user authentication info and server details.
+     * 
+     * ### get_live_streams
+     * Returns a JSON array of live stream objects. Only enabled, non-VOD channels are included.
+     * Each stream object contains: num, name, stream_type, stream_id, stream_icon, epg_channel_id, 
+     * added, category_id, tv_archive, direct_source, tv_archive_duration.
+     * 
+     * ### get_vod_streams
+     * Returns a JSON array of VOD stream objects (series and VOD channels). Only enabled content is included.
+     * Each object contains: num, name, series_id, cover, plot, cast, director, genre, releaseDate, 
+     * last_modified, rating, rating_5based, backdrop_path, youtube_trailer, episode_run_time, category_id.
+     * 
+     * ### get_live_categories
+     * Returns a JSON array of live stream categories/groups. Only groups with enabled, non-VOD channels are included.
+     * Each category contains: category_id, category_name, parent_id.
+     * 
+     * ### get_vod_categories
+     * Returns a JSON array of VOD categories. Includes categories from series and groups with VOD channels.
+     * Each category contains: category_id, category_name, parent_id.
      *
      * @param string $uuid The UUID of the playlist (required path parameter)
      * @param \Illuminate\Http\Request $request The HTTP request containing query parameters:
      *   - username (string, required): User's Xtream API username
      *   - password (string, required): User's Xtream API password  
-     *   - action (string, optional): Defaults to 'panel'. Determines the API action (e.g., 'panel', 'get_live_streams', 'get_vod_streams', 'get_live_categories', 'get_vod_categories')
+     *   - action (string, optional): Defaults to 'panel'. Determines the API action
      *
-     * @response 200 scenario="Successful response (structure varies by action)"
-     * Example for 'panel' action:
-     * @responseField user_info object User authentication and subscription details.
-     * @responseField user_info.username string The username.
-     * @responseField user_info.password string The password.
-     * @responseField user_info.message string Optional message from server.
-     * @responseField user_info.auth int Authentication status (1 for success).
-     * @responseField user_info.status string Subscription status (e.g., "Active").
-     * @responseField user_info.exp_date string Subscription expiry timestamp or null.
-     * @responseField user_info.is_trial string "0" or "1".
-     * @responseField user_info.active_cons int Number of active connections.
-     * @responseField user_info.created_at string Account creation timestamp.
-     * @responseField user_info.max_connections string Maximum allowed connections.
-     * @responseField user_info.allowed_output_formats array Allowed output formats (e.g., ["m3u8", "ts"]).
-     * @responseField server_info object Server details and features.
-     * @responseField server_info.url string Server URL.
-     * @responseField server_info.port string Server port.
-     * @responseField server_info.https_port string Server HTTPS port.
-     * @responseField server_info.server_protocol string Server protocol (http/https).
-     * @responseField server_info.timezone string Server timezone.
-     * @responseField server_info.server_software string Name of the server software.
-     * @responseField server_info.timestamp_now string Current server timestamp.
-     * @responseField server_info.time_now string Current server time (YYYY-MM-DD HH:MM:SS).
+     * @response 200 scenario="Panel action response" {
+     *   "user_info": {
+     *     "username": "test_user",
+     *     "password": "test_pass",
+     *     "message": "",
+     *     "auth": 1,
+     *     "status": "Active",
+     *     "exp_date": "1767225600",
+     *     "is_trial": "0",
+     *     "active_cons": 1,
+     *     "created_at": "1640995200",
+     *     "max_connections": "2",
+     *     "allowed_output_formats": ["m3u8", "ts"]
+     *   },
+     *   "server_info": {
+     *     "url": "https://example.com",
+     *     "port": "443",
+     *     "https_port": "443",
+     *     "server_protocol": "https",
+     *     "timezone": "UTC",
+     *     "server_software": "M3U Proxy Editor Xtream API",
+     *     "timestamp_now": "1719187200",
+     *     "time_now": "2025-06-20 12:00:00"
+     *   }
+     * }
+     * 
+     * @response 200 scenario="Live streams response" [
+     *   {
+     *     "num": 1,
+     *     "name": "CNN HD",
+     *     "stream_type": "live",
+     *     "stream_id": "12345",
+     *     "stream_icon": "https://example.com/logos/cnn.png",
+     *     "epg_channel_id": "cnn.us",
+     *     "added": "1640995200",
+     *     "category_id": "1",
+     *     "tv_archive": 1,
+     *     "direct_source": "https://example.com/live/user/pass/12345.ts",
+     *     "tv_archive_duration": 24
+     *   }
+     * ]
+     * 
+     * @response 200 scenario="VOD streams response" [
+     *   {
+     *     "num": 1,
+     *     "name": "Breaking Bad",
+     *     "series_id": 101,
+     *     "cover": "https://example.com/covers/breaking_bad.jpg",
+     *     "plot": "A high school chemistry teacher turned meth cook...",
+     *     "cast": "Bryan Cranston, Aaron Paul",
+     *     "director": "Vince Gilligan",
+     *     "genre": "Crime, Drama",
+     *     "releaseDate": "2008-01-20",
+     *     "last_modified": "1640995200",
+     *     "rating": "9.5",
+     *     "rating_5based": 4.75,
+     *     "backdrop_path": [],
+     *     "youtube_trailer": "HhesaQXLuRY",
+     *     "episode_run_time": "47",
+     *     "category_id": "2"
+     *   }
+     * ]
+     * 
+     * @response 200 scenario="Live categories response" [
+     *   {
+     *     "category_id": "1",
+     *     "category_name": "News",
+     *     "parent_id": 0
+     *   },
+     *   {
+     *     "category_id": "2",
+     *     "category_name": "Sports",
+     *     "parent_id": 0
+     *   }
+     * ]
+     * 
+     * @response 200 scenario="VOD categories response" [
+     *   {
+     *     "category_id": "1",
+     *     "category_name": "Drama Series",
+     *     "parent_id": 0
+     *   },
+     *   {
+     *     "category_id": "2",
+     *     "category_name": "Action Movies",
+     *     "parent_id": 0
+     *   }
+     * ]
      *
      * @response 400 scenario="Bad Request" {"error": "Invalid action"}
      * @response 401 scenario="Unauthorized - Missing Credentials" {"error": "Unauthorized - Missing credentials"}
@@ -170,29 +255,6 @@ class XtreamApiController extends Controller
                 'server_info' => $serverInfo
             ]);
         }
-        /**
-         * Action: get_live_streams
-         * Returns a JSON array of live stream objects for the authenticated playlist.
-         * Only enabled channels are included.
-         *
-         * Response Structure:
-         * [
-         *   {
-         *     "num": int, (Sequential number)
-         *     "name": string, (Channel name)
-         *     "stream_type": "live",
-         *     "stream_id": int, (Channel ID)
-         *     "stream_icon": string, (URL to channel icon)
-         *     "epg_channel_id": string, (EPG channel ID)
-         *     "added": string, (Timestamp of when channel was added)
-         *     "category_id": string, (Category ID)
-         *     "tv_archive": int, (0 or 1 if TV archive is enabled)
-         *     "direct_source": string, (Direct stream URL, potentially empty if not applicable)
-         *     "tv_archive_duration": int (Duration of TV archive in hours, e.g., 72)
-         *   },
-         *   ...
-         * ]
-         */
         else if ($action === 'get_live_streams') {
             $enabledChannels = $playlist->channels()
                 ->where('enabled', true)
@@ -234,34 +296,6 @@ class XtreamApiController extends Controller
             }
             return response()->json($liveStreams);
         }
-        /**
-         * Action: get_vod_streams
-         * Returns a JSON array of VOD (Video on Demand) stream objects, representing series or movies.
-         * Only enabled series/movies are included.
-         *
-         * Response Structure:
-         * [
-         *   {
-         *     "num": int, (Sequential number)
-         *     "name": string, (Series/Movie name)
-         *     "series_id": int, (Series/Movie ID)
-         *     "cover": string, (URL to cover image)
-         *     "plot": string, (Plot summary)
-         *     "cast": string, (Cast members)
-         *     "director": string, (Director name)
-         *     "genre": string, (Genre)
-         *     "releaseDate": string, (Release date, YYYY-MM-DD)
-         *     "last_modified": string, (Timestamp of last modification)
-         *     "rating": string, (Rating, e.g., "8.5")
-         *     "rating_5based": float, (Rating converted to a 5-based scale)
-         *     "backdrop_path": array, (Array of backdrop image URLs, often empty)
-         *     "youtube_trailer": string, (YouTube trailer ID or URL)
-         *     "episode_run_time": string, (Episode run time, e.g., "25")
-         *     "category_id": string (Category ID)
-         *   },
-         *   ...
-         * ]
-         */
         else if ($action === 'get_vod_streams') {
             $enabledSeriesCollection = $playlist->series()->where('enabled', true)->get();
             $enabledVodChannels = $playlist->channels()
@@ -343,21 +377,6 @@ class XtreamApiController extends Controller
             }
             return response()->json($vodSeries);
         }
-        /**
-         * Action: get_live_categories
-         * Returns a JSON array of live stream categories/groups.
-         * Used to organize live channels into categories.
-         *
-         * Response Structure:
-         * [
-         *   {
-         *     "category_id": string, (Group ID)
-         *     "category_name": string, (Group name)
-         *     "parent_id": int (Parent category ID, typically 0 for top-level)
-         *   },
-         *   ...
-         * ]
-         */
         else if ($action === 'get_live_categories') {
             $liveCategories = [];
             
@@ -388,21 +407,6 @@ class XtreamApiController extends Controller
 
             return response()->json($liveCategories);
         }
-        /**
-         * Action: get_vod_categories
-         * Returns a JSON array of VOD categories/groups.
-         * Used to organize VOD content (series and VOD channels) into categories.
-         *
-         * Response Structure:
-         * [
-         *   {
-         *     "category_id": string, (Category/Group ID)
-         *     "category_name": string, (Category/Group name)
-         *     "parent_id": int (Parent category ID, typically 0 for top-level)
-         *   },
-         *   ...
-         * ]
-         */
         else if ($action === 'get_vod_categories') {
             $vodCategories = [];
             
