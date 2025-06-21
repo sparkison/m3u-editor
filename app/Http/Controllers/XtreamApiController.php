@@ -204,8 +204,8 @@ class XtreamApiController extends Controller
             $authenticated = true;
         }
 
-        if (!$authenticated && $username === 'm3ue') {
-            if ($playlist->user && Hash::check($password, $playlist->user->password)) {
+        if (!$authenticated) {
+            if ($playlist->user->name === $username && $playlist->user && Hash::check($password, $playlist->user->password)) {
                 $authenticated = true;
             }
         }
