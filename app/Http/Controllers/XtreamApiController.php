@@ -194,7 +194,10 @@ class XtreamApiController extends Controller
          * ]
          */
         else if ($action === 'get_live_streams') {
-            $enabledChannels = $playlist->channels()->where('enabled', true)->get();
+            $enabledChannels = $playlist->channels()
+                ->where('enabled', true)
+                ->where('is_vod', false)
+                ->get();
             $liveStreams = [];
             if ($enabledChannels instanceof \Illuminate\Database\Eloquent\Collection) {
                 foreach ($enabledChannels as $index => $channel) {
@@ -261,9 +264,14 @@ class XtreamApiController extends Controller
          */
         else if ($action === 'get_vod_streams') {
             $enabledSeriesCollection = $playlist->series()->where('enabled', true)->get();
+            $enabledVodChannels = $playlist->channels()
+                ->where('enabled', true)
+                ->where('is_vod', true)
+                ->get();
             $vodSeries = [];
             $now = Carbon::now(); // Ensure $now is available
 
+            // First, add series/movies from the series table
             if ($enabledSeriesCollection instanceof \Illuminate\Database\Eloquent\Collection) {
                 foreach ($enabledSeriesCollection as $index => $seriesItem) {
                     $seriesCategoryId = 'all'; // Default category_id
@@ -291,6 +299,45 @@ class XtreamApiController extends Controller
                         'youtube_trailer' => $seriesItem->youtube_trailer ?? '',
                         'episode_run_time' => (string)($seriesItem->episode_run_time ?? 0),
                         'category_id' => $seriesCategoryId,
+                    ];
+                }
+            }
+
+            // Then, add VOD channels (movies/content marked as VOD in channels table)
+            if ($enabledVodChannels instanceof \Illuminate\Database\Eloquent\Collection) {
+                $seriesCount = count($vodSeries);
+                foreach ($enabledVodChannels as $index => $vodChannel) {
+                    $channelCategoryId = 'all'; // Default category_id
+                    if ($vodChannel->group_id) {
+                        $channelCategoryId = (string)$vodChannel->group_id;
+                    } elseif ($vodChannel->group && $vodChannel->group->id) {
+                        $channelCategoryId = (string)$vodChannel->group->id;
+                    }
+
+                    $streamIcon = url('/placeholder.png');
+                    if ($vodChannel->logo_type === ChannelLogoType::Epg && $vodChannel->epgChannel && $vodChannel->epgChannel->icon) {
+                        $streamIcon = $vodChannel->epgChannel->icon;
+                    } elseif ($vodChannel->logo_type === ChannelLogoType::Channel && $vodChannel->logo) {
+                        $streamIcon = filter_var($vodChannel->logo, FILTER_VALIDATE_URL) ? $vodChannel->logo : url($vodChannel->logo);
+                    }
+
+                    $vodSeries[] = [
+                        'num' => $seriesCount + $index + 1,
+                        'name' => $vodChannel->title_custom ?? $vodChannel->title,
+                        'series_id' => (int)$vodChannel->id,
+                        'cover' => $streamIcon,
+                        'plot' => '', // VOD channels don't typically have plot info
+                        'cast' => '',
+                        'director' => '',
+                        'genre' => $vodChannel->group ?? '',
+                        'releaseDate' => $vodChannel->created_at ? $vodChannel->created_at->format('Y-m-d') : '',
+                        'last_modified' => (string)($vodChannel->updated_at ? $vodChannel->updated_at->timestamp : $now->timestamp),
+                        'rating' => '0',
+                        'rating_5based' => 0.0,
+                        'backdrop_path' => [],
+                        'youtube_trailer' => '',
+                        'episode_run_time' => '0',
+                        'category_id' => $channelCategoryId,
                     ];
                 }
             }
@@ -372,34 +419,51 @@ class XtreamApiController extends Controller
             }
 
             $seriesItem = null;
+            $vodChannel = null;
+            
+            // First, try to find in series
             $enabledSeries = $playlist->series()->where('enabled', true)->get();
             if ($enabledSeries instanceof \Illuminate\Database\Eloquent\Collection && $enabledSeries->isNotEmpty()) {
                 $seriesItem = $enabledSeries->firstWhere('id', $vodId);
             }
-
+            
+            // If not found in series, try to find in VOD channels
             if (!$seriesItem) {
+                $enabledVodChannels = $playlist->channels()
+                    ->where('enabled', true)
+                    ->where('is_vod', true)
+                    ->get();
+                if ($enabledVodChannels instanceof \Illuminate\Database\Eloquent\Collection && $enabledVodChannels->isNotEmpty()) {
+                    $vodChannel = $enabledVodChannels->firstWhere('id', $vodId);
+                }
+            }
+
+            if (!$seriesItem && !$vodChannel) {
                 return response()->json(['error' => 'VOD not found or not enabled'], 404);
             }
 
             $now = Carbon::now();
-            $seriesInfo = [
-                'name' => $seriesItem->name,
-                'cover' => $seriesItem->cover ? (filter_var($seriesItem->cover, FILTER_VALIDATE_URL) ? $seriesItem->cover : url($seriesItem->cover)) : url('/placeholder.png'),
-                'plot' => $seriesItem->plot ?? '',
-                'cast' => $seriesItem->cast ?? '',
-                'director' => $seriesItem->director ?? '',
-                'genre' => $seriesItem->genre ?? '',
-                'releaseDate' => $seriesItem->release_date ? Carbon::parse($seriesItem->release_date)->format('Y-m-d') : '',
-                'last_modified' => (string)($seriesItem->updated_at ? $seriesItem->updated_at->timestamp : $now->timestamp),
-                'rating' => (string)($seriesItem->rating ?? 0),
-                'rating_5based' => round((floatval($seriesItem->rating ?? 0)) / 2, 1),
-                'backdrop_path' => $seriesItem->backdrop_path ?? [],
-                'youtube_trailer' => $seriesItem->youtube_trailer ?? '',
-                'episode_run_time' => (string)($seriesItem->episode_run_time ?? '0'), // Ensure string for consistency
-                'category_id' => (string)($seriesItem->category_id ?? ($seriesItem->category ? $seriesItem->category->id : 'all')),
-            ];
+            
+            // Handle series item
+            if ($seriesItem) {
+                $seriesInfo = [
+                    'name' => $seriesItem->name,
+                    'cover' => $seriesItem->cover ? (filter_var($seriesItem->cover, FILTER_VALIDATE_URL) ? $seriesItem->cover : url($seriesItem->cover)) : url('/placeholder.png'),
+                    'plot' => $seriesItem->plot ?? '',
+                    'cast' => $seriesItem->cast ?? '',
+                    'director' => $seriesItem->director ?? '',
+                    'genre' => $seriesItem->genre ?? '',
+                    'releaseDate' => $seriesItem->release_date ? Carbon::parse($seriesItem->release_date)->format('Y-m-d') : '',
+                    'last_modified' => (string)($seriesItem->updated_at ? $seriesItem->updated_at->timestamp : $now->timestamp),
+                    'rating' => (string)($seriesItem->rating ?? 0),
+                    'rating_5based' => round((floatval($seriesItem->rating ?? 0)) / 2, 1),
+                    'backdrop_path' => $seriesItem->backdrop_path ?? [],
+                    'youtube_trailer' => $seriesItem->youtube_trailer ?? '',
+                    'episode_run_time' => (string)($seriesItem->episode_run_time ?? '0'), // Ensure string for consistency
+                    'category_id' => (string)($seriesItem->category_id ?? ($seriesItem->category ? $seriesItem->category->id : 'all')),
+                ];
 
-            $episodesBySeason = [];
+                $episodesBySeason = [];
             if ($seriesItem->seasons && $seriesItem->seasons->isNotEmpty()) {
                 foreach ($seriesItem->seasons as $season) {
                     $seasonNumber = $season->season_number;
@@ -471,7 +535,6 @@ class XtreamApiController extends Controller
                 ];
             }
 
-
             return response()->json([
                 'info' => $seriesInfo,
                 'episodes' => $episodesBySeason,
@@ -498,6 +561,89 @@ class XtreamApiController extends Controller
                     // This example assumes episodes are always structured, even for movies (as season 1, episode 1)
                 ]
             ]);
+            } else {
+                // Handle VOD channel
+                $streamIcon = url('/placeholder.png');
+                if ($vodChannel->logo_type === ChannelLogoType::Epg && $vodChannel->epgChannel && $vodChannel->epgChannel->icon) {
+                    $streamIcon = $vodChannel->epgChannel->icon;
+                } elseif ($vodChannel->logo_type === ChannelLogoType::Channel && $vodChannel->logo) {
+                    $streamIcon = filter_var($vodChannel->logo, FILTER_VALIDATE_URL) ? $vodChannel->logo : url($vodChannel->logo);
+                }
+
+                $channelCategoryId = 'all';
+                if ($vodChannel->group_id) {
+                    $channelCategoryId = (string)$vodChannel->group_id;
+                } elseif ($vodChannel->group && $vodChannel->group->id) {
+                    $channelCategoryId = (string)$vodChannel->group->id;
+                }
+
+                $vodInfo = [
+                    'name' => $vodChannel->title_custom ?? $vodChannel->title,
+                    'cover' => $streamIcon,
+                    'plot' => '', // VOD channels don't typically have plot info
+                    'cast' => '',
+                    'director' => '',
+                    'genre' => $vodChannel->group ?? '',
+                    'releaseDate' => $vodChannel->created_at ? $vodChannel->created_at->format('Y-m-d') : '',
+                    'last_modified' => (string)($vodChannel->updated_at ? $vodChannel->updated_at->timestamp : $now->timestamp),
+                    'rating' => '0',
+                    'rating_5based' => 0.0,
+                    'backdrop_path' => [],
+                    'youtube_trailer' => '',
+                    'episode_run_time' => '0',
+                    'category_id' => $channelCategoryId,
+                ];
+
+                // VOD channels are treated as single movies (season 1, episode 1)
+                $containerExtension = 'ts'; // Default extension for VOD channels
+                $episodesBySeason = [
+                    1 => [
+                        [
+                            'id' => (string)$vodChannel->id,
+                            'episode_num' => 1,
+                            'title' => $vodChannel->title_custom ?? $vodChannel->title,
+                            'container_extension' => $containerExtension,
+                            'info' => [
+                                'movie_image' => $streamIcon,
+                                'plot' => '', // VOD channels don't have plot
+                                'duration_secs' => 0, // VOD channels don't have duration info
+                                'duration' => '00:00:00',
+                                'video' => [],
+                                'audio' => [],
+                                'bitrate' => 0,
+                                'rating' => '0',
+                            ],
+                            'added' => (string)($vodChannel->created_at ? $vodChannel->created_at->timestamp : $now->timestamp),
+                            'season' => 1,
+                            'stream_id' => base64_encode($vodChannel->id),
+                            'direct_source' => url("/live/{$username}/{$password}/" . base64_encode($vodChannel->id) . ".{$containerExtension}")
+                        ]
+                    ]
+                ];
+
+                return response()->json([
+                    'info' => $vodInfo,
+                    'episodes' => $episodesBySeason,
+                    'movie_data' => [
+                        'stream_id' => (int)$vodChannel->id,
+                        'name' => $vodChannel->title_custom ?? $vodChannel->title,
+                        'title' => $vodChannel->title_custom ?? $vodChannel->title,
+                        'year' => $vodChannel->created_at ? $vodChannel->created_at->format('Y') : '',
+                        'episode_run_time' => '0',
+                        'plot' => '',
+                        'cast' => '',
+                        'director' => '',
+                        'genre' => $vodChannel->group ?? '',
+                        'releaseDate' => $vodChannel->created_at ? $vodChannel->created_at->format('Y-m-d') : '',
+                        'last_modified' => (string)($vodChannel->updated_at ? $vodChannel->updated_at->timestamp : $now->timestamp),
+                        'rating' => '0',
+                        'rating_5based' => 0.0,
+                        'cover_big' => $streamIcon,
+                        'youtube_trailer' => '',
+                        'backdrop_path' => [],
+                    ]
+                ]);
+            }
         } else {
             return response()->json(['error' => "Action '{$action}' not implemented"]);
         }
