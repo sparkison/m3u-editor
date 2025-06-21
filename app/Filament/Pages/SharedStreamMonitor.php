@@ -78,7 +78,9 @@ class SharedStreamMonitor extends Page
                 ->size(ActionSize::Small)
                 ->modalSubmitActionLabel('Save Settings')
                 ->form($this->getSettingsForm())
-                ->action('saveSettings'),
+                ->action(function (array $data): void {
+                    $this->saveSettings($data);
+                }),
         ];
     }
 
