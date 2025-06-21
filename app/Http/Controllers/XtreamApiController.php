@@ -23,14 +23,15 @@ class XtreamApiController extends Controller
      * This endpoint serves as the primary interface for Xtream API interactions.
      * It requires authentication via username and password query parameters.
      * The 'action' query parameter dictates the specific operation to perform and the structure of the response.
-     * Common actions include 'panel' (default, retrieves player_api.php equivalent), 'get_live_streams', 'get_vod_streams', and 'get_vod_info'.
+     * Common actions include 'panel' (default, retrieves player_api.php equivalent), 'get_live_streams', 'get_vod_streams', 
+     * 'get_live_categories', 'get_vod_categories', and 'get_vod_info'.
      * The detailed response structure for each action is documented in inline PHPDoc blocks within the method implementation.
      *
      * @param string $uuid The UUID of the playlist (required path parameter)
      * @param \Illuminate\Http\Request $request The HTTP request containing query parameters:
      *   - username (string, required): User's Xtream API username
      *   - password (string, required): User's Xtream API password  
-     *   - action (string, optional): Defaults to 'panel'. Determines the API action (e.g., 'panel', 'get_live_streams', 'get_vod_streams', 'get_vod_info')
+     *   - action (string, optional): Defaults to 'panel'. Determines the API action (e.g., 'panel', 'get_live_streams', 'get_vod_streams', 'get_live_categories', 'get_vod_categories', 'get_vod_info')
      *   - vod_id (int, optional): Required if action is 'get_vod_info'. The ID of the VOD item
      *
      * @response 200 scenario="Successful response (structure varies by action)"
@@ -342,6 +343,120 @@ class XtreamApiController extends Controller
                 }
             }
             return response()->json($vodSeries);
+        }
+        /**
+         * Action: get_live_categories
+         * Returns a JSON array of live stream categories/groups.
+         * Used to organize live channels into categories.
+         *
+         * Response Structure:
+         * [
+         *   {
+         *     "category_id": string, (Group ID)
+         *     "category_name": string, (Group name)
+         *     "parent_id": int (Parent category ID, typically 0 for top-level)
+         *   },
+         *   ...
+         * ]
+         */
+        else if ($action === 'get_live_categories') {
+            $liveCategories = [];
+            
+            // Get all groups that have live channels (non-VOD channels)
+            $groups = $playlist->groups()
+                ->whereHas('channels', function($query) {
+                    $query->where('enabled', true)
+                          ->where('is_vod', false);
+                })
+                ->get();
+
+            foreach ($groups as $group) {
+                $liveCategories[] = [
+                    'category_id' => (string)$group->id,
+                    'category_name' => $group->name,
+                    'parent_id' => 0, // Flat structure for now
+                ];
+            }
+
+            // Add a default "All" category if no specific groups exist
+            if (empty($liveCategories)) {
+                $liveCategories[] = [
+                    'category_id' => 'all',
+                    'category_name' => 'All',
+                    'parent_id' => 0,
+                ];
+            }
+
+            return response()->json($liveCategories);
+        }
+        /**
+         * Action: get_vod_categories
+         * Returns a JSON array of VOD categories/groups.
+         * Used to organize VOD content (series and VOD channels) into categories.
+         *
+         * Response Structure:
+         * [
+         *   {
+         *     "category_id": string, (Category/Group ID)
+         *     "category_name": string, (Category/Group name)
+         *     "parent_id": int (Parent category ID, typically 0 for top-level)
+         *   },
+         *   ...
+         * ]
+         */
+        else if ($action === 'get_vod_categories') {
+            $vodCategories = [];
+            
+            // Get categories from series
+            $seriesCategories = $playlist->series()
+                ->where('enabled', true)
+                ->with('category')
+                ->get()
+                ->pluck('category')
+                ->filter()
+                ->unique('id');
+
+            foreach ($seriesCategories as $category) {
+                $vodCategories[] = [
+                    'category_id' => (string)$category->id,
+                    'category_name' => $category->name,
+                    'parent_id' => 0,
+                ];
+            }
+
+            // Get groups from VOD channels
+            $vodGroups = $playlist->groups()
+                ->whereHas('channels', function($query) {
+                    $query->where('enabled', true)
+                          ->where('is_vod', true);
+                })
+                ->get();
+
+            foreach ($vodGroups as $group) {
+                // Check if this group is not already added from series categories
+                $exists = collect($vodCategories)->contains(function($cat) use ($group) {
+                    return $cat['category_id'] === (string)$group->id;
+                });
+
+                if (!$exists) {
+                    $vodCategories[] = [
+                        'category_id' => (string)$group->id,
+                        'category_name' => $group->name,
+                        'parent_id' => 0,
+                    ];
+                }
+            }
+
+            // Add a default "All" category if no specific categories exist
+            if (empty($vodCategories)) {
+                $vodCategories[] = [
+                    'category_id' => 'all',
+                    'category_name' => 'All',
+                    'parent_id' => 0,
+                ];
+            }
+
+            return response()->json($vodCategories);
         }
         /**
          * Action: get_vod_info
