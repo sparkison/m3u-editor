@@ -7,6 +7,7 @@ use App\Models\Channel;
 use App\Models\Episode;
 use App\Services\ProxyService;
 use App\Exceptions\SourceNotResponding;
+use App\Exceptions\MaxRetriesReachedException; // Added this line
 use App\Traits\TracksActiveStreams;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -118,6 +119,14 @@ class StreamController extends Controller
                 $this->decrementActiveStreams($playlist->id);
                 Log::channel('ffmpeg')->error("Source not responding for channel {$title}: " . $e->getMessage());
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, $e->getMessage());
+
+                // Try the next failover channel
+                continue;
+            } catch (MaxRetriesReachedException $e) {
+                // This specific stream URL failed mid-stream after all retries.
+                $this->decrementActiveStreams($playlist->id);
+                Log::channel('ffmpeg')->error("Max retries reached mid-stream for channel {$title}: " . $e->getMessage() . ". Attempting next failover stream.");
+                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, "Max retries reached mid-stream: " . $e->getMessage());
 
                 // Try the next failover channel
                 continue;
@@ -463,8 +472,8 @@ class StreamController extends Controller
                     Log::channel('ffmpeg')
                         ->error("FFmpeg error: max retries of $maxRetries reached for stream for $type $title.");
 
-                    // ...break and try the next stream
-                    break;
+                    // Throw an exception to be caught by the __invoke method to try the next failover stream.
+                    throw new MaxRetriesReachedException("Max retries of $maxRetries reached for stream $type $title.");
                 }
                 // Wait a short period before trying to reconnect.
                 sleep(min(8, $retries));
