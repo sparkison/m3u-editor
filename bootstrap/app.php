@@ -23,12 +23,20 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (\App\Exceptions\MaxRetriesReachedException $e, \Illuminate\Http\Request $request) {
             // Log the error fully
-            \Illuminate\Support\Facades\Log::error('Stream failed with MaxRetriesReachedException: ' . $e->getMessage(), [
+            \Illuminate\Support\Facades\Log::error('Stream failed with MaxRetriesReachedException (minimal handler): ' . $e->getMessage(), [
                 'exception' => $e,
                 'url' => $request->fullUrl(),
             ]);
 
-            // Return a simple text response to avoid the HTML error page, which causes "headers already sent"
-            return new \Illuminate\Http\Response('Stream failed after multiple retries.', 503, ['Content-Type' => 'text/plain']);
+            if (!headers_sent()) {
+                // Attempt to send a minimal plain text error response
+                // This might still fail if StreamedResponse partially sent headers, but it's the best attempt.
+                http_response_code(503);
+                header('Content-Type: text/plain; charset=UTF-8');
+                echo 'Stream failed after multiple retries.';
+            }
+            // Crucially, exit here to prevent Laravel's default error handler
+            // from trying to render an HTML page, which causes the "headers already sent" fatal error.
+            exit;
         });
     })->create();
