@@ -31,11 +31,13 @@ class XtreamApiController extends Controller
      * 
      * ### get_live_streams
      * Returns a JSON array of live stream objects. Only enabled, non-VOD channels are included.
+     * Supports optional category filtering via category_id parameter.
      * Each stream object contains: num, name, stream_type, stream_id, stream_icon, epg_channel_id, 
      * added, category_id, tv_archive, direct_source, tv_archive_duration.
      * 
      * ### get_vod_streams
      * Returns a JSON array of VOD stream objects (series and VOD channels). Only enabled content is included.
+     * Supports optional category filtering via category_id parameter.
      * Each object contains: num, name, series_id, cover, plot, cast, director, genre, releaseDate, 
      * last_modified, rating, rating_5based, backdrop_path, youtube_trailer, episode_run_time, category_id.
      * 
@@ -52,6 +54,7 @@ class XtreamApiController extends Controller
      *   - username (string, required): User's Xtream API username
      *   - password (string, required): User's Xtream API password  
      *   - action (string, optional): Defaults to 'panel'. Determines the API action
+     *   - category_id (string, optional): Filter results by category ID (only valid for get_live_streams and get_vod_streams actions)
      *
      * @response 200 scenario="Panel action response" {
      *   "user_info": {
@@ -256,10 +259,18 @@ class XtreamApiController extends Controller
             ]);
         }
         else if ($action === 'get_live_streams') {
-            $enabledChannels = $playlist->channels()
+            $categoryId = $request->input('category_id');
+            
+            $channelsQuery = $playlist->channels()
                 ->where('enabled', true)
-                ->where('is_vod', false)
-                ->get();
+                ->where('is_vod', false);
+            
+            // Apply category filtering if category_id is provided
+            if ($categoryId && $categoryId !== 'all') {
+                $channelsQuery->where('group_id', $categoryId);
+            }
+            
+            $enabledChannels = $channelsQuery->get();
             $liveStreams = [];
             if ($enabledChannels instanceof \Illuminate\Database\Eloquent\Collection) {
                 foreach ($enabledChannels as $index => $channel) {
@@ -297,11 +308,24 @@ class XtreamApiController extends Controller
             return response()->json($liveStreams);
         }
         else if ($action === 'get_vod_streams') {
-            $enabledSeriesCollection = $playlist->series()->where('enabled', true)->get();
-            $enabledVodChannels = $playlist->channels()
+            $categoryId = $request->input('category_id');
+            
+            // Get series with optional category filtering
+            $seriesQuery = $playlist->series()->where('enabled', true);
+            if ($categoryId && $categoryId !== 'all') {
+                $seriesQuery->where('category_id', $categoryId);
+            }
+            $enabledSeriesCollection = $seriesQuery->get();
+            
+            // Get VOD channels with optional category filtering
+            $vodChannelsQuery = $playlist->channels()
                 ->where('enabled', true)
-                ->where('is_vod', true)
-                ->get();
+                ->where('is_vod', true);
+            if ($categoryId && $categoryId !== 'all') {
+                $vodChannelsQuery->where('group_id', $categoryId);
+            }
+            $enabledVodChannels = $vodChannelsQuery->get();
+            
             $vodSeries = [];
             $now = Carbon::now(); // Ensure $now is available
 
