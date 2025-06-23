@@ -57,10 +57,24 @@ class EpgMapResource extends Resource
                     ->sortable()
                     ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
                     ->toggleable(),
+                Tables\Columns\TextColumn::make('total_channel_count')
+                    ->label('Total Channels')
+                    ->tooltip('Total number of channels available for this mapping.')
+                    ->toggleable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('current_mapped_count')
+                    ->label('Currently Mapped')
+                    ->tooltip('Number of channels that were already mapped to an EPG entry.')
+                    ->toggleable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('channel_count')
+                    ->label('Search & Map')
+                    ->tooltip('Number of channels that were searched for a matching EPG entry in this mapping. If the "Override" option is enabled, this will also include channels that were previously mapped. If the "Override" option is disabled, this will only include channels that were not previously mapped.')
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('mapped_count')
+                    ->label('Newly Mapped')
+                    ->tooltip('Number of channels that were successfully matched to an EPG entry in this mapping. When "Override" is disabled, it is normal for this count to be 0 on subsequent syncs.')
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\ToggleColumn::make('override')
