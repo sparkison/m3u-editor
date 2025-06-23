@@ -115,6 +115,16 @@ class XtreamService
         return $this->call(url: $url, timeout: 5)['user_info'] ?? []; // set short timeout
     }
 
+    public function getLiveCategories(): array
+    {
+        return $this->call($this->makeUrl('get_live_categories'));
+    }   
+
+    public function getLiveStreams(string $catId): array
+    {
+        return $this->call($this->makeUrl('get_live_streams', ['category_id' => $catId]));
+    }
+
     public function getVodCategories(): array
     {
         return $this->call($this->makeUrl('get_vod_categories'));
