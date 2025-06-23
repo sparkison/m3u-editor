@@ -109,6 +109,15 @@ class ChannelResource extends Resource
                     ->counts('failovers')
                     ->toggleable()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('is_vod')
+                    ->label('Type')
+                    ->formatStateUsing(fn($record) => new HtmlString(
+                        $record->is_vod
+                            ? '<span class="text-blue-500">VOD</span>'
+                            : '<span class="text-green-500">Live</span>'
+                    ))
+                    ->toggleable()
+                    ->sortable(),
                 Tables\Columns\TextInputColumn::make('stream_id_custom')
                     ->label('ID')
                     ->rules(['min:0', 'max:255'])
@@ -971,6 +980,41 @@ class ChannelResource extends Resource
                         ->helperText('Indicates the shift of the program schedule, use the values -2,-1,0,1,2,.. and so on.')
                         ->rules(['nullable', 'numeric']),
                 ]),
+            Forms\Components\Fieldset::make('VOD Settings')
+                ->columns(2)
+                ->columnSpanFull()
+                ->schema([
+                    Forms\Components\Toggle::make('is_vod')
+                        ->label('VOD')
+                        ->helperText('Flag this channel as a VOD channel.')
+                        ->default(false)
+                        ->columnSpanFull()
+                        ->live(),
+                    Forms\Components\TextInput::make('container_extension')
+                        ->label('Container Extension')
+                        ->helperText('The file extension of the VOD container (e.g., mp4, mkv, etc.).')
+                        ->placeholder('mp4')
+                        ->rules(['nullable', 'string', 'max:10'])
+                        ->hidden(fn(Get $get) => !$get('is_vod')),
+                    Forms\Components\TextInput::make('year')
+                        ->label('Year')
+                        ->helperText('The year of the VOD content.')
+                        ->placeholder('2000')
+                        ->rules(['nullable', 'integer', 'digits:4'])
+                        ->hidden(fn(Get $get) => !$get('is_vod')),
+                    Forms\Components\TextInput::make('rating')
+                        ->label('Rating')
+                        ->helperText('10 based rating of the VOD content.')
+                        ->placeholder('8.7')
+                        ->rules(['nullable', 'string', 'max:10'])
+                        ->hidden(fn(Get $get) => !$get('is_vod')),
+                    Forms\Components\TextInput::make('rating_5based')
+                        ->label('Rating (5-based)')
+                        ->helperText('The rating of the VOD content on a scale of 0 to 5.')
+                        ->placeholder('5')
+                        ->rules(['nullable', 'numeric', 'min:0', 'max:5'])
+                        ->hidden(fn(Get $get) => !$get('is_vod')),
+                ])->hidden(fn(Get $get) => !$get('is_custom')),
             Forms\Components\Fieldset::make('Failover Channels')
                 ->schema([
                     Forms\Components\Repeater::make('failovers')
