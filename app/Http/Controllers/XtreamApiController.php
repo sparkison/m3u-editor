@@ -18,11 +18,15 @@ use Illuminate\Support\Facades\URL;
 class XtreamApiController extends Controller
 {
     /**
-     * Main Xtream API request handler.
+     * Xtream API request handler.
      * 
      * This endpoint serves as the primary interface for Xtream API interactions.
      * It requires authentication via username and password query parameters.
-     * The 'action' query parameter dictates the specific operation to perform and the structure of the response.
+     * The `action` query parameter dictates the specific operation to perform and the structure of the response.
+     * 
+     * The `username` and `password` parameters are mandatory for all actions, and will default to your m3u editor login credentials (default is admin/admin).
+     * 
+     * If the Playlist has a Playlist Auth assigned, it will check that first for authentication, and then fall back to the User's credentials.
      * 
      * ## Supported Actions:
      * 
@@ -31,23 +35,23 @@ class XtreamApiController extends Controller
      * 
      * ### get_live_streams
      * Returns a JSON array of live stream objects. Only enabled, non-VOD channels are included.
-     * Supports optional category filtering via category_id parameter.
-     * Each stream object contains: num, name, stream_type, stream_id, stream_icon, epg_channel_id, 
-     * added, category_id, tv_archive, direct_source, tv_archive_duration.
+     * Supports optional category filtering via `category_id` parameter.
+     * Each stream object contains: `num`, `name`, `stream_type`, `stream_id`, `stream_icon`, `epg_channel_id`, 
+     * `added`, `category_id`, `tv_archive`, `direct_source`, `tv_archive_duration`.
      * 
      * ### get_vod_streams
      * Returns a JSON array of VOD stream objects (series and VOD channels). Only enabled content is included.
-     * Supports optional category filtering via category_id parameter.
-     * Each object contains: num, name, series_id, cover, plot, cast, director, genre, releaseDate, 
-     * last_modified, rating, rating_5based, backdrop_path, youtube_trailer, episode_run_time, category_id.
+     * Supports optional category filtering via `category_id` parameter.
+     * Each object contains: `num`, `name`, `series_id`, `cover`, `plot`, `cast`, `director`, `genre`, `releaseDate`, 
+     * `last_modified`, `rating`, `rating_5based`, `backdrop_path`, `youtube_trailer`, `episode_run_time`, `category_id`.
      * 
      * ### get_live_categories
      * Returns a JSON array of live stream categories/groups. Only groups with enabled, non-VOD channels are included.
-     * Each category contains: category_id, category_name, parent_id.
+     * Each category contains: `category_id`, `category_name`, `parent_id`.
      * 
      * ### get_vod_categories
      * Returns a JSON array of VOD categories. Includes categories from series and groups with VOD channels.
-     * Each category contains: category_id, category_name, parent_id.
+     * Each category contains: `category_id`, `category_name`, `parent_id`.
      *
      * @param string $uuid The UUID of the playlist (required path parameter)
      * @param \Illuminate\Http\Request $request The HTTP request containing query parameters:
