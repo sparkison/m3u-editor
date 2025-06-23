@@ -465,15 +465,15 @@ class PlaylistResource extends Resource
                 ->columns(3)
                 ->schema([
                     Forms\Components\Toggle::make('edit_uuid')
-                        ->label('Change Unique Identifier')
-                        ->columnSpan(1)
+                        ->label('View/Update Unique Identifier')
+                        ->columnSpanFull()
                         ->inline(false)
                         ->live()
                         ->dehydrated(false)
                         ->default(false),
                     Forms\Components\TextInput::make('uuid')
                         ->label('Unique Identifier')
-                        ->columnSpan(2)
+                        ->columnSpanFull()
                         ->rules(function ($record) {
                             return [
                                 'required',
