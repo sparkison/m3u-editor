@@ -104,11 +104,10 @@ class TestXtream extends Command implements PromptsForMissingInput
             $this->generateMovies($xtream, $movies, $catName);
         } else {
             $id = $movieMap[$pick];
+            $movie = $movies[array_search($pick, array_column($movies, 'name'))];
             $this->generateMovies($xtream, [
                 [
-                    'name' => $pick,
-                    'stream_id' => $id,
-                    'container_extension' => $movies[array_search($pick, array_column($movies, 'name'))]['container_extension']
+                    ...$movie
                 ]
             ], $catName);
         }

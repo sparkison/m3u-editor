@@ -79,6 +79,8 @@ Route::get('/xtream/{uuid}/live/{username}/{password}/{encodedId}.{format}', [Ap
     ->name('xtream.stream.live');
 Route::get('/xtream/{uuid}/movie/{username}/{password}/{encodedId}', [App\Http\Controllers\XtreamStreamController::class, 'handleVod'])
     ->name('xtream.stream.vod');
+Route::get('/xtream/{uuid}/series/{username}/{password}/{encodedId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleSeries'])
+    ->name('xtream.stream.series');
 
 
 /*

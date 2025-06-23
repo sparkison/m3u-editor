@@ -166,4 +166,42 @@ class XtreamStreamController extends Controller
 
         return response()->json(['error' => 'Unauthorized or stream not found'], 403);
     }
+
+    /**
+     * Series episode stream requests.
+     * 
+     * @tags Xtream API Streams
+     * @summary Provides series episode stream access.
+     * @description Authenticates the request based on Xtream credentials provided in the path.
+     * If successful and the requested episode is valid and part of an authorized playlist,
+     * this endpoint redirects to the actual internal stream URL for the episode.
+     * The route for this endpoint is typically `/xtream/{uuid}/series/{username}/{password}/{episodeId}.{format}`.
+     *
+     * @param \Illuminate\Http\Request $request The HTTP request
+     * @param string $uuid The UUID of the Xtream API (path parameter)
+     * @param string $username User's Xtream API username (path parameter)
+     * @param string $password User's Xtream API password (path parameter)
+     * @param int $streamId The ID of the episode (path parameter)
+     * @param string $format The requested stream format (e.g., 'mp4', 'mkv') (path parameter)
+     *
+     * @response 302 scenario="Successful redirect to stream URL" description="Redirects to the internal episode stream URL."
+     * @response 403 scenario="Forbidden/Unauthorized" {"error": "Unauthorized or stream not found"}
+     * 
+     * @unauthenticated
+     */
+    public function handleSeries(Request $request, string $uuid, string $username, string $password, int $streamId, string $format = 'mp4')
+    {
+        // Find the episode by ID
+        if (strpos($streamId, '==') === false) {
+            $streamId .= '=='; // right pad to ensure proper decoding
+        }
+        $streamId = base64_decode($streamId);
+        $episode = $this->findAuthenticatedPlaylistAndStreamModel($uuid, $username, $password, $streamId, 'episode');
+
+        if ($episode instanceof Episode) {
+            return Redirect::to(route('stream.episode', ['encodedId' => $streamId, 'format' => $format]));
+        }
+
+        return response()->json(['error' => 'Unauthorized or stream not found'], 403);
+    }
 }
