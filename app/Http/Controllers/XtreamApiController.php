@@ -42,8 +42,8 @@ class XtreamApiController extends Controller
      * ### get_vod_streams
      * Returns a JSON array of VOD channel objects (movies marked as VOD). Only enabled VOD channels are included.
      * Supports optional category filtering via `category_id` parameter.
-     * Each object contains: `num`, `name`, `stream_type`, `stream_id`, `stream_icon`, `epg_channel_id`, 
-     * `added`, `category_id`, `tv_archive`, `direct_source`, `tv_archive_duration`.
+     * Each object contains: `num`, `name`, `title`, `year`, `stream_type` (always "movie"), `stream_id`, `stream_icon`, 
+     * `rating`, `rating_5based`, `added`, `category_id`, `category_ids`, `container_extension`, `custom_sid`, `direct_source`.
      * 
      * ### get_series
      * Returns a JSON array of series objects. Only enabled series are included.
@@ -122,15 +122,19 @@ class XtreamApiController extends Controller
      *   {
      *     "num": 1,
      *     "name": "The Matrix",
+     *     "title": "The Matrix",
+     *     "year": "1999",
      *     "stream_type": "movie",
      *     "stream_id": "67890",
      *     "stream_icon": "https://example.com/covers/matrix.jpg",
-     *     "epg_channel_id": "matrix",
+     *     "rating": "8.7",
+     *     "rating_5based": 4.35,
      *     "added": "1640995200",
      *     "category_id": "3",
-     *     "tv_archive": 0,
-     *     "direct_source": "https://example.com/xtream/uuid/movie/user/pass/67890",
-     *     "tv_archive_duration": 0
+     *     "category_ids": ["3"],
+     *     "container_extension": "mkv",
+     *     "custom_sid": "",
+     *     "direct_source": ""
      *   }
      * ]
      * 
@@ -437,13 +441,23 @@ class XtreamApiController extends Controller
                     }
 
                     $streamId = rtrim(base64_encode($channel->id), '=');
-                    $extension = $channel->container_extension ?? 'mkv';
+                    
                     $vodStreams[] = [
+                        'num' => $index + 1,
                         'name' => $channel->title_custom ?? $channel->title,
+                        'title' => $channel->title_custom ?? $channel->title,
+                        'year' => $channel->year ?? '',
+                        'stream_type' => 'movie',
                         'stream_id' => $streamId,
+                        'stream_icon' => $streamIcon,
+                        'rating' => $channel->rating ?? '',
+                        'rating_5based' => $channel->rating_5based ?? 0,
                         'added' => (string)$channel->created_at->timestamp,
-                        'container_extension' => $extension,
-                        'direct_source' => url("/xtream/{$uuid}/movie/{$username}/{$password}/" . $streamId . ".ts"),
+                        'category_id' => $channelCategoryId,
+                        'category_ids' => [$channelCategoryId],
+                        'container_extension' => $channel->container_extension ?? 'mkv',
+                        'custom_sid' => '',
+                        'direct_source' => ''
                     ];
                 }
             }
