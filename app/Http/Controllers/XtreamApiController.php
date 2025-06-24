@@ -184,14 +184,16 @@ class XtreamApiController extends Controller
      *         "title": "Pilot",
      *         "container_extension": "mp4",
      *         "info": {
-     *           "movie_image": "https://example.com/episode_thumb.jpg",
-     *           "plot": "Walter White starts cooking meth...",
-     *           "duration_secs": 2700,
-     *           "duration": "00:45:00",
-     *           "video": [],
-     *           "audio": [],
-     *           "bitrate": 5000,
-     *           "rating": "9.0"
+     *             "release_date" => "2024-06-29"
+     *             "plot" => "Kafka's final fate is determined as the monster within him tries to take control."
+     *             "duration_secs" => 1440
+     *             "duration" => "00:24:00"
+     *             "movie_image" => "http://23.227.147.172:80/images/e11236b82442615bc6e44d3555dce478.jpg"
+     *             "bitrate" => 0
+     *             "rating" => "7.3"
+     *             "season" => "1"
+     *             "tmdb_id" => "5188924"
+     *             "cover_big" => "http://23.227.147.172:80/images/e11236b82442615bc6e44d3555dce478.jpg"
      *         },
      *         "added": "1640995200",
      *         "season": 1,
@@ -402,9 +404,12 @@ class XtreamApiController extends Controller
                         'epg_channel_id' => $channel->epgChannel->epg_channel_id ?? $channel->stream_id_custom ?? $channel->stream_id ?? (string)$channel->id,
                         'added' => (string)$channel->created_at->timestamp,
                         'category_id' => $channelCategoryId, // Ensure this category_id is valid based on your categories logic
+                        'category_ids' => [$channelCategoryId],
                         'tv_archive' => !empty($channel->catchup) ? 1 : 0, // Based on catchup field availability
                         'direct_source' => url("xtream/{$uuid}/live/{$username}/{$password}/" . $streamId . ".ts"),
                         'tv_archive_duration' => !empty($channel->catchup) ? 24 : 0, // Default 24 hours if catchup available
+                        'custom_sid' => '',
+                        'thumbnail' => '',
                     ];
                 }
             }
@@ -562,16 +567,7 @@ class XtreamApiController extends Controller
                                 'episode_num' => $episode->episode_num,
                                 'title' => $episode->title ?? "Episode {$episode->episode_num}",
                                 'container_extension' => $containerExtension,
-                                'info' => [
-                                    'movie_image' => $episode->thumbnail_url ?? ($seriesItem->cover ? (filter_var($seriesItem->cover, FILTER_VALIDATE_URL) ? $seriesItem->cover : url($seriesItem->cover)) : url('/placeholder.png')),
-                                    'plot' => $episode->plot ?? '',
-                                    'duration_secs' => $episode->duration_seconds ?? 0,
-                                    'duration' => gmdate("H:i:s", $episode->duration_seconds ?? 0),
-                                    'video' => [],
-                                    'audio' => [],
-                                    'bitrate' => $episode->bitrate ?? 0,
-                                    'rating' => (string)($episode->rating ?? 0),
-                                ],
+                                'info' => $episode->info,
                                 'added' => $episode->added,
                                 'season' => $episode->season,
                                 'custom_sid' => $espisode->custom_sid ?? '',
