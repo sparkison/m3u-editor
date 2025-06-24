@@ -104,7 +104,7 @@ trait TracksActiveStreams
             return false; // Unlimited streams
         }
         
-        return $currentActiveStreams >= $availableStreams;
+        return $currentActiveStreams > $availableStreams;
     }
     
     /**

@@ -181,7 +181,7 @@ class SeriesResource extends Resource
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\Action::make('process')
+                    Tables\Actions\BulkAction::make('process')
                         ->label('Process Selected Series')
                         ->icon('heroicon-o-arrow-path')
                         ->action(function ($records) {
@@ -204,7 +204,7 @@ class SeriesResource extends Resource
                         ->modalIcon('heroicon-o-arrow-path')
                         ->modalDescription('Process selected series now? This will fetch all episodes and seasons for this series. This may take a while depending on the number of series selected.')
                         ->modalSubmitActionLabel('Yes, process now'),
-                    Tables\Actions\Action::make('sync')
+                    Tables\Actions\BulkAction::make('sync')
                         ->label('Sync Series .strm files')
                         ->action(function ($records) {
                             foreach ($records as $record) {

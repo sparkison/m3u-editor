@@ -3,6 +3,7 @@
 use App\Http\Controllers\EpgFileController;
 use App\Http\Controllers\EpgGenerateController;
 use App\Http\Controllers\PlaylistGenerateController;
+use App\Http\Controllers\XtreamApiController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -65,6 +66,47 @@ Route::get('/stream/{encodedId}.{format?}', \App\Http\Controllers\StreamControll
 
 Route::get('/stream/e/{encodedId}.{format?}', [\App\Http\Controllers\StreamController::class, 'episode'])
     ->name('stream.episode');
+
+
+/*
+ * Shared streaming routes (xTeVe-like proxy functionality)
+ */
+
+// More specific routes first to avoid conflicts
+
+// HLS route with specific path structure
+Route::get('/shared/stream/{streamKey}/hls', [\App\Http\Controllers\SharedStreamController::class, 'serveHLS'])
+    ->name('shared.stream.hls')
+    ->where('streamKey', '[a-f0-9]{32}'); // Match 32-character MD5 hashes
+
+// Episode route with /e/ prefix
+Route::get('/shared/stream/e/{encodedId}.{format?}', [\App\Http\Controllers\SharedStreamController::class, 'streamEpisode'])
+    ->name('shared.stream.episode');
+
+// Direct stream key access (32-character MD5 hash without extension)
+Route::get('/shared/stream/{streamKey}', [\App\Http\Controllers\SharedStreamController::class, 'serveSharedStream'])
+    ->name('shared.stream.direct')
+    ->where('streamKey', '[a-f0-9]{32}'); // Match 32-character MD5 hashes
+
+// Channel route (catch-all for encoded IDs with optional format)
+Route::get('/shared/stream/{encodedId}.{format?}', [\App\Http\Controllers\SharedStreamController::class, 'streamChannel'])
+    ->name('shared.stream.channel');
+
+
+/*
+ * Xtream API route
+ */
+
+// Xtream API handling route
+Route::get('/xtream/{uuid}/player_api.php', [XtreamApiController::class, 'handle'])->name('playlist.xtream.api');
+
+// Xtream API Stream Handling Routes
+Route::get('/xtream/{uuid}/live/{username}/{password}/{encodedId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleLive'])
+    ->name('xtream.stream.live');
+Route::get('/xtream/{uuid}/movie/{username}/{password}/{encodedId}', [App\Http\Controllers\XtreamStreamController::class, 'handleVod'])
+    ->name('xtream.stream.vod');
+Route::get('/xtream/{uuid}/series/{username}/{password}/{encodedId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleSeries'])
+    ->name('xtream.stream.series');
 
 
 /*

@@ -98,11 +98,19 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
             // Fetch the playlist (if set)
             $channels = [];
             if ($this->channels) {
+                $totalChannelCount = count($this->channels);
+                $mappedCount = collect($this->channels)
+                    ->filter(fn($channel) => $channel->epg_channel_id !== null)
+                    ->count();
                 $channels = Channel::whereIn('id', $this->channels)
                     ->when(!$this->force, function ($query) {
                         $query->where('epg_channel_id', null);
                     })->cursor();
             } else if ($playlist) {
+                $totalChannelCount = $playlist->channels()->count();
+                $mappedCount = $playlist->channels()
+                    ->whereNotNull('epg_channel_id')
+                    ->count();
                 $channels = $playlist->channels()
                     ->when(!$this->force, function ($query) {
                         $query->where('epg_channel_id', null);
@@ -111,7 +119,11 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
 
             // Update the progress
             $progress = 0;
-            $map->update(['progress' => $progress += 2]); // start at 2%
+            $map->update([
+                'total_channel_count' => $totalChannelCount,
+                'current_mapped_count' => $mappedCount,
+                'progress' => $progress += 2, // start at 2%
+            ]);
 
             // Map the channels
             $channelCount = 0;

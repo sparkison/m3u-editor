@@ -28,3 +28,28 @@ Schedule::command('app:refresh-epg')
 Schedule::command('app:hls-prune')
     ->everyFifteenSeconds()
     ->withoutOverlapping();
+
+// Shared stream management jobs
+Schedule::job(new \App\Jobs\StreamMonitorUpdate())
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->name('shared-stream-monitor');
+
+Schedule::job(new \App\Jobs\SharedStreamCleanup())
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->name('shared-stream-cleanup');
+
+Schedule::job(new \App\Jobs\BufferManagement())
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->name('shared-stream-buffer-management');
+
+// Shared stream maintenance
+Schedule::command('app:shared-streams cleanup')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();
+
+Schedule::command('app:shared-streams sync')
+    ->everyTenMinutes()
+    ->withoutOverlapping();

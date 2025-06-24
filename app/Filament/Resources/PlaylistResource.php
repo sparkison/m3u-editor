@@ -28,6 +28,7 @@ use App\Filament\Resources\PlaylistSyncStatusResource\Pages\EditPlaylistSyncStat
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ListPlaylistSyncStatuses;
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ViewPlaylistSyncStatus;
 use App\Forms\Components\MediaFlowProxyUrl;
+use App\Forms\Components\XtreamApiInfo;
 use App\Models\PlaylistSyncStatus;
 use App\Models\SourceGroup;
 use App\Services\XtreamService;
@@ -185,7 +186,6 @@ class PlaylistResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ActionGroup::make([
-                    Tables\Actions\EditAction::make(),
                     Tables\Actions\Action::make('process')
                         ->label(fn($record): string => $record->xtream ? 'Process All' : 'Process')
                         ->icon('heroicon-o-arrow-path')
@@ -345,6 +345,7 @@ class PlaylistResource extends Resource
                         ->modalSubmitActionLabel('Yes, reset now'),
                     Tables\Actions\DeleteAction::make(),
                 ])->button()->hiddenLabel()->size('sm'),
+                Tables\Actions\EditAction::make()->button()->hiddenLabel()->size('sm'),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -465,15 +466,15 @@ class PlaylistResource extends Resource
                 ->columns(3)
                 ->schema([
                     Forms\Components\Toggle::make('edit_uuid')
-                        ->label('Change Unique Identifier')
-                        ->columnSpan(1)
+                        ->label('View/Update Unique Identifier')
+                        ->columnSpanFull()
                         ->inline(false)
                         ->live()
                         ->dehydrated(false)
                         ->default(false),
                     Forms\Components\TextInput::make('uuid')
                         ->label('Unique Identifier')
-                        ->columnSpan(2)
+                        ->columnSpanFull()
                         ->rules(function ($record) {
                             return [
                                 'required',
@@ -912,6 +913,17 @@ class PlaylistResource extends Resource
                                         ->searchable()
                                         ->preload()
                                         ->helperText('NOTE: only the first enabled auth will be used if multiple assigned.'),
+                                ]),
+                            Forms\Components\Section::make('Xtream API')
+                                ->icon('heroicon-m-bolt')
+                                ->collapsible()
+                                ->columnSpan(2)
+                                ->collapsed(true)
+                                ->schema([
+                                    XtreamApiInfo::make('xtream_api_info')
+                                        ->label('Xtream API Info')
+                                        ->columnSpan(2)
+                                        ->dehydrated(false), // don't save the value in the database
                                 ]),
                             Forms\Components\Section::make('Links')
                                 ->icon('heroicon-m-link')

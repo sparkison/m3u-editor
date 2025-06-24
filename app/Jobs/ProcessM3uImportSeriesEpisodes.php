@@ -105,7 +105,10 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
             foreach ($episodes as $ep) {
                 $episodeCount++;
                 $url = $xtream->buildSeriesUrl($ep['id'], $ep['container_extension']);
-                $title = preg_match('/S\d{2}E\d{2} - (.*)/', $ep['title'], $m) ? $m[1] : 'Unknown';
+                $title = preg_match('/S\d{2}E\d{2} - (.*)/', $ep['title'], $m) ? $m[1] : null;
+                if (!$title) {
+                    $title = $ep['title'] ?? "Episode {$ep['episode_num']}";
+                }
                 $bulk[] = [
                     'title' => $title,
                     'source_episode_id' => (int) $ep['id'],
@@ -120,6 +123,18 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
                     'added' => $ep['added'] ?? null,
                     'season' => (int) $season,
                     'url' => $url,
+                    'info' => json_encode([
+                        'release_date' => $ep['info']['release_date'] ?? null,
+                        'plot' => $ep['info']['plot'] ?? null,
+                        'duration_secs' => $ep['info']['duration_secs'] ?? null,
+                        'duration' => $ep['info']['duration'] ?? null,
+                        'movie_image' => $ep['info']['movie_image'] ?? null,
+                        'bitrate' => $ep['info']['bitrate'] ?? 0,
+                        'rating' => $ep['info']['rating'] ?? null,
+                        'season' => $ep['info']['season'] ?? null,
+                        'tmdb_id' => $ep['info']['tmdb_id'] ?? null,
+                        'cover_big' => $ep['info']['cover_big'] ?? null,
+                    ]),
                 ];
             }
 
@@ -136,6 +151,7 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
                     'added',
                     'season',
                     'url',
+                    'info'
                 ]
             );
         }
