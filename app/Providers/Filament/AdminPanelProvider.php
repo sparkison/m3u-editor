@@ -67,38 +67,6 @@ class AdminPanelProvider extends PanelProvider
         } catch (Exception $e) {
             // Ignore
         }
-        $widgets = [
-            UpdateNoticeWidget::class,
-            AccountWidget::class,
-            DocumentsWidget::class,
-            DiscordWidget::class,
-            // PayPalDonateWidget::class,
-            KoFiWidget::class,
-            // DonateCrypto::class,
-            StatsOverview::class,
-        ];
-        $plugins = [
-            FilamentSpatieLaravelBackupPlugin::make()
-                ->authorize(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true))
-                ->usingPage(Backups::class),
-            TableLayoutTogglePlugin::make(),
-            BreezyCore::make()
-                ->myProfile(
-                    slug: 'profile',
-                    userMenuLabel: 'Profile',
-                )
-                ->enableTwoFactorAuthentication()
-                ->enableSanctumTokens()
-                ->myProfileComponents([
-                    'personal_info' => ProfileComponent::class
-                ])
-        ];
-        if ($settings['show_logs']) {
-            $plugins[] = FilamentLaravelLogPlugin::make()
-                ->navigationGroup('Tools')
-                ->navigationSort(99)
-                ->authorize(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true));
-        }
         $adminPanel = $panel
             ->default()
             ->id('admin')
@@ -121,8 +89,36 @@ class AdminPanelProvider extends PanelProvider
                 CustomDashboard::class
             ])
             ->breadcrumbs($settings['show_breadcrumbs'])
-            ->widgets($widgets)
-            ->plugins($plugins)
+            ->widgets([
+                UpdateNoticeWidget::class,
+                AccountWidget::class,
+                DocumentsWidget::class,
+                DiscordWidget::class,
+                // PayPalDonateWidget::class,
+                KoFiWidget::class,
+                // DonateCrypto::class,
+                StatsOverview::class,
+            ])
+            ->plugins([
+                FilamentSpatieLaravelBackupPlugin::make()
+                    ->authorize(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true))
+                    ->usingPage(Backups::class),
+                TableLayoutTogglePlugin::make(),
+                BreezyCore::make()
+                    ->myProfile(
+                        slug: 'profile',
+                        userMenuLabel: 'Profile',
+                    )
+                    ->enableTwoFactorAuthentication()
+                    ->enableSanctumTokens()
+                    ->myProfileComponents([
+                        'personal_info' => ProfileComponent::class
+                    ]),
+                FilamentLaravelLogPlugin::make()
+                    ->navigationGroup('Tools')
+                    ->navigationSort(99)
+                    ->authorize(fn(): bool => $settings['show_logs'] && in_array(auth()->user()->email, config('dev.admin_emails'), true))
+            ])
             ->maxContentWidth($settings['content_width'])
             ->middleware([
                 EncryptCookies::class,
