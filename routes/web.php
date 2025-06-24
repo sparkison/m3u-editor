@@ -3,6 +3,7 @@
 use App\Http\Controllers\EpgFileController;
 use App\Http\Controllers\EpgGenerateController;
 use App\Http\Controllers\PlaylistGenerateController;
+use App\Http\Controllers\XtreamApiController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -66,7 +67,11 @@ Route::get('/stream/{encodedId}.{format?}', \App\Http\Controllers\StreamControll
 Route::get('/stream/e/{encodedId}.{format?}', [\App\Http\Controllers\StreamController::class, 'episode'])
     ->name('stream.episode');
 
-// Shared streaming routes (xTeVe-like proxy functionality)
+
+/*
+ * Shared streaming routes (xTeVe-like proxy functionality)
+ */
+
 // More specific routes first to avoid conflicts
 
 // HLS route with specific path structure
@@ -86,6 +91,22 @@ Route::get('/shared/stream/{streamKey}', [\App\Http\Controllers\SharedStreamCont
 // Channel route (catch-all for encoded IDs with optional format)
 Route::get('/shared/stream/{encodedId}.{format?}', [\App\Http\Controllers\SharedStreamController::class, 'streamChannel'])
     ->name('shared.stream.channel');
+
+
+/*
+ * Xtream API route
+ */
+
+// Xtream API handling route
+Route::get('/xtream/{uuid}/player_api.php', [XtreamApiController::class, 'handle'])->name('playlist.xtream.api');
+
+// Xtream API Stream Handling Routes
+Route::get('/xtream/{uuid}/live/{username}/{password}/{encodedId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleLive'])
+    ->name('xtream.stream.live');
+Route::get('/xtream/{uuid}/movie/{username}/{password}/{encodedId}', [App\Http\Controllers\XtreamStreamController::class, 'handleVod'])
+    ->name('xtream.stream.vod');
+Route::get('/xtream/{uuid}/series/{username}/{password}/{encodedId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleSeries'])
+    ->name('xtream.stream.series');
 
 
 /*

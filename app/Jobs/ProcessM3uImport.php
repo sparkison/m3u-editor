@@ -287,6 +287,10 @@ class ProcessM3uImport implements ShouldQueue
                 'shift' => 0,
                 'tvg_shift' => null,
                 'is_vod' => false, // default false
+                'container_extension' => null, // default null, will be set for VOD streams
+                'year' => null, // new field for year
+                'rating' => null, // new field for rating
+                'rating_5based' => null, // new field for 5-based rating
             ];
 
             // Update progress
@@ -376,6 +380,10 @@ class ProcessM3uImport implements ShouldQueue
                             'stream_id' => $item['stream_id'],
                             'channel' => $item['num'] ?? null,
                             'is_vod' => true, // mark as VOD
+                            'container_extension' => $extension, // store the container extension
+                            'year' => $item['year'] ?? null, // new field for year
+                            'rating' => $item['rating'] ?? null, // new field for rating
+                            'rating_5based' => $item['rating_5based'] ?? null, // new field for 5-based rating
                         ];
                         if ($autoSort) {
                             $channel['sort'] = $channelNo;

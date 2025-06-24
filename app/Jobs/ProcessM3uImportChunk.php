@@ -93,6 +93,10 @@ class ProcessM3uImportChunk implements ShouldQueue
                 'catchup_source',
                 'tvg_shift', // new field for TVG shift
                 'is_vod', // new field for VOD
+                'container_extension', // new field for container extension
+                'year', // new field for year
+                'rating', // new field for rating
+                'rating_5based', // new field for 5-based rating
             ]);
         }
     }

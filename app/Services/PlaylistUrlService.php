@@ -67,6 +67,36 @@ class PlaylistUrlService
     }
 
     /**
+     * Get Xtream API info for the given playlist
+     *
+     * @param  Playlist|MergedPlaylist|CustomPlaylist $playlist
+     * @return array
+     */
+    public static function getXtreamInfo($playlist)
+    {
+        // Get the first auth
+        $playlistAuth = $playlist->playlistAuths()->where('enabled', true)->first();
+        $auth = null;
+        if ($playlistAuth) {
+            $auth = [
+                'username' => $playlistAuth->username,
+                'password' => $playlistAuth->password,
+            ];
+        } else {
+            $auth = [
+                'username' => $playlist->user->name,
+                'password' => 'YOUR_M3U_EDITOR_PASSWORD',
+            ];
+        }
+
+        // Return the results
+        return [
+            'url' => str_replace('/player_api.php', '', route('playlist.xtream.api', ['uuid' => $playlist->uuid])),
+            ...$auth
+        ];
+    }
+
+    /**
      * Get the media flow proxy server URL
      *
      * @return string

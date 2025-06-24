@@ -34,6 +34,7 @@ class Channel extends Model
         'extvlcopt' => 'array',
         'kodidrop' => 'array',
         'is_custom' => 'boolean',
+        'is_vod' => 'boolean',
         'logo_type' => ChannelLogoType::class,
     ];
 
