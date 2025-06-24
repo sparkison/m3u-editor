@@ -18,6 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
             ->trustProxies(at: ['*'])
             ->validateCsrfTokens(except: [
                 'webhook/test',
+            ])
+            ->web(append: [
+                \App\Http\Middleware\XtreamRootInterceptor::class,
             ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

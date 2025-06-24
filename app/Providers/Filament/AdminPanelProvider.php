@@ -149,6 +149,8 @@ class AdminPanelProvider extends PanelProvider
                 'series/*/*/*/*',
                 // Xtream API get_account_info at root with specific parameters
                 '/?*action=get_account_info*',
+                '/?username=*&password=*&action=get_account_info*',
+                '/?password=*&username=*&action=get_account_info*',
             ]);
         if ($settings['navigation_position'] === 'top') {
             $adminPanel->topNavigation();

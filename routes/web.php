@@ -67,20 +67,7 @@ Route::get('/stream/{encodedId}.{format?}', \App\Http\Controllers\StreamControll
 Route::get('/stream/e/{encodedId}.{format?}', [\App\Http\Controllers\StreamController::class, 'episode'])
     ->name('stream.episode');
 
-/*
- * Xtream API route
- */
 
-// Xtream API handling route
-Route::get('/xtream/{uuid}/player_api.php', [XtreamApiController::class, 'handle'])->name('playlist.xtream.api');
-
-// Xtream API Stream Handling Routes
-Route::get('/xtream/{uuid}/live/{username}/{password}/{encodedId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleLive'])
-    ->name('xtream.stream.live');
-Route::get('/xtream/{uuid}/movie/{username}/{password}/{encodedId}', [App\Http\Controllers\XtreamStreamController::class, 'handleVod'])
-    ->name('xtream.stream.vod');
-Route::get('/xtream/{uuid}/series/{username}/{password}/{encodedId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleSeries'])
-    ->name('xtream.stream.series');
 
 
 /*
@@ -111,9 +98,17 @@ Route::group(['prefix' => 'epg'], function () {
 });
 
 /*
- * Xtream API get_account_info endpoint at root 
- * This route is placed after other routes and uses SPA exceptions to bypass Filament
+ * Xtream API endpoints at root
  */
-Route::get('/', [\App\Http\Controllers\XtreamApiController::class, 'handle'])
-    ->where('action', 'get_account_info')
-    ->name('playlist.xtream.account_info');
+// Main Xtream API endpoint at /player_api.php
+Route::get('/player_api.php', [XtreamApiController::class, 'handle'])->name('xtream.api');
+
+// Stream endpoints
+Route::get('/live/{username}/{password}/{streamId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleLive'])
+    ->name('xtream.stream.live.root');
+Route::get('/movie/{username}/{password}/{streamId}', [App\Http\Controllers\XtreamStreamController::class, 'handleVod'])
+    ->name('xtream.stream.vod.root');
+Route::get('/series/{username}/{password}/{streamId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleSeries'])
+    ->name('xtream.stream.series.root');
+
+
