@@ -19,7 +19,7 @@ class XtreamStreamController extends Controller
     /**
      * Authenticates a playlist based on credentials and retrieves the validated stream Model (Channel or Episode).
      */
-    private function findAuthenticatedPlaylistAndStreamModel(string $uuid, string $username, string $password, int $streamId, string $streamType): ?Model
+    private function findAuthenticatedPlaylistAndStreamModel(string $uuid, string $username, string $password, int $streamId, string $streamType): array
     {
         $streamModel = null;
         $playlistModel = Playlist::where('uuid', $uuid)->first();
@@ -44,7 +44,7 @@ class XtreamStreamController extends Controller
                 $streamModel = $this->getValidatedStreamFromPlaylist($playlistModel, $streamId, $streamType);
             }
         }
-        return $streamModel; // Returns Channel or Episode model, or null
+        return [$playlistModel, $streamModel]; // Returns Channel or Episode model, or null
     }
 
     /**
@@ -114,16 +114,20 @@ class XtreamStreamController extends Controller
             $streamId .= '=='; // right pad to ensure proper decoding
         }
         $channelId = base64_decode($streamId);
-        $channel = $this->findAuthenticatedPlaylistAndStreamModel($uuid, $username, $password, (int)$channelId, 'live');
+        list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($uuid, $username, $password, (int)$channelId, 'live');
 
         if ($channel instanceof Channel) {
-            $internalUrl = '';
-            if (strtolower($format) === 'm3u8') {
-                $internalUrl = route('stream.hls.playlist', ['encodedId' => $streamId]); // Use $streamId
+            if ($playlist->enable_proxy) {
+                $internalUrl = '';
+                if (strtolower($format) === 'm3u8') {
+                    $internalUrl = route('stream.hls.playlist', ['encodedId' => $streamId]); // Use $streamId
+                } else {
+                    $internalUrl = route('stream', ['encodedId' => $streamId, 'format' => $format]); // Use $streamId
+                }
+                return Redirect::to($internalUrl);
             } else {
-                $internalUrl = route('stream', ['encodedId' => $streamId, 'format' => $format]); // Use $streamId
+                return Redirect::to($channel->url_custom ?? $channel->url);
             }
-            return Redirect::to($internalUrl);
         }
 
         return response()->json(['error' => 'Unauthorized or stream not found'], 403);
@@ -158,10 +162,14 @@ class XtreamStreamController extends Controller
             $streamId .= '=='; // right pad to ensure proper decoding
         }
         $channelId = base64_decode($streamId);
-        $channel = $this->findAuthenticatedPlaylistAndStreamModel($uuid, $username, $password, (int)$channelId, 'vod');
+        list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($uuid, $username, $password, (int)$channelId, 'vod');
 
         if ($channel instanceof Channel) {
-            return Redirect::to(route('stream', ['encodedId' => $streamId, 'format' => 'ts']));
+            if ($playlist->enable_proxy) {
+                return Redirect::to(route('stream', ['encodedId' => $streamId, 'format' => 'ts']));
+            } else {
+                return Redirect::to($channel->url_custom ?? $channel->url);
+            }
         }
 
         return response()->json(['error' => 'Unauthorized or stream not found'], 403);
@@ -196,10 +204,14 @@ class XtreamStreamController extends Controller
             $streamId .= '=='; // right pad to ensure proper decoding
         }
         $episodeId = base64_decode($streamId);
-        $episode = $this->findAuthenticatedPlaylistAndStreamModel($uuid, $username, $password, (int)$episodeId, 'episode');
+        list($playlist, $episode) = $this->findAuthenticatedPlaylistAndStreamModel($uuid, $username, $password, (int)$episodeId, 'episode');
 
         if ($episode instanceof Episode) {
-            return Redirect::to(route('stream.episode', ['encodedId' => $streamId, 'format' => $format]));
+            if ($playlist->enable_proxy) {
+                return Redirect::to(route('stream.episode', ['encodedId' => $streamId, 'format' => $format]));
+            } else {
+                return Redirect::to($episode->url);
+            }
         }
 
         return response()->json(['error' => 'Unauthorized or stream not found'], 403);
