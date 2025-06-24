@@ -404,9 +404,12 @@ class XtreamApiController extends Controller
                         'epg_channel_id' => $channel->epgChannel->epg_channel_id ?? $channel->stream_id_custom ?? $channel->stream_id ?? (string)$channel->id,
                         'added' => (string)$channel->created_at->timestamp,
                         'category_id' => $channelCategoryId, // Ensure this category_id is valid based on your categories logic
+                        'category_ids' => [$channelCategoryId],
                         'tv_archive' => !empty($channel->catchup) ? 1 : 0, // Based on catchup field availability
                         'direct_source' => url("xtream/{$uuid}/live/{$username}/{$password}/" . $streamId . ".ts"),
                         'tv_archive_duration' => !empty($channel->catchup) ? 24 : 0, // Default 24 hours if catchup available
+                        'custom_sid' => '',
+                        'thumbnail' => '',
                     ];
                 }
             }
