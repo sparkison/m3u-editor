@@ -4,7 +4,10 @@ use App\Http\Controllers\EpgFileController;
 use App\Http\Controllers\EpgGenerateController;
 use App\Http\Controllers\PlaylistGenerateController;
 use App\Http\Controllers\XtreamApiController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+
+
 
 /*
  * Playlist/EPG output routes
@@ -110,5 +113,6 @@ Route::get('/movie/{username}/{password}/{streamId}', [App\Http\Controllers\Xtre
     ->name('xtream.stream.vod.root');
 Route::get('/series/{username}/{password}/{streamId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleSeries'])
     ->name('xtream.stream.series.root');
+
 
 

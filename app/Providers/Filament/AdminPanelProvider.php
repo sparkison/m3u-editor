@@ -124,6 +124,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->maxContentWidth($settings['content_width'])
             ->middleware([
+                \App\Http\Middleware\HandleXtreamAccountInfo::class,
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
