@@ -104,13 +104,8 @@ class TestXtream extends Command implements PromptsForMissingInput
         if ($pick === 'All') {
             $this->generateMovies($xtream, $movies, $catName);
         } else {
-            $id = $movieMap[$pick];
             $movie = $movies[array_search($pick, array_column($movies, 'name'))];
-            $this->generateMovies($xtream, [
-                [
-                    ...$movie
-                ]
-            ], $catName);
+            $this->generateMovies($xtream, [$movie], $catName);
         }
     }
 

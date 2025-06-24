@@ -699,7 +699,7 @@ class XtreamApiController extends Controller
                 'allowed_output_formats' => ['m3u8', 'ts'],
             ];
 
-            return response()->json($userInfo);
+            return response()->json(['user_info' => $userInfo]);
         } else {
             return response()->json(['error' => "Action '{$action}' not implemented"]);
         }
