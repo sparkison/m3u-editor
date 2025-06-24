@@ -276,38 +276,41 @@ class XtreamApiController extends Controller
      * 
      * @unauthenticated
      */
-    public function handle(Request $request, string $uuid)
+    public function handle(Request $request)
     {
-        $playlist = null;
-        // $playlistModelType = null; // Not strictly needed here anymore
+        $username = $request->input('username');
+        $password = $request->input('password'); // This is the playlist UUID
+        
+        if (empty($username) || empty($password)) {
+            return response()->json(['error' => 'Unauthorized - Missing credentials'], 401);
+        }
 
+        $playlist = null;
+
+        // Try to find playlist by UUID (password parameter)
         try {
             $playlist = Playlist::with([
-                'playlistAuths',
                 'user',
                 'channels' => fn($q) => $q->where('enabled', true)->with(['group', 'epgChannel']),
                 'series' => fn($q) => $q->where('enabled', true)->with(['seasons.episodes', 'category'])
-            ])->where('uuid', $uuid)->firstOrFail();
-            // $playlistModelType = 'Playlist';
+            ])->where('uuid', $password)->firstOrFail();
         } catch (ModelNotFoundException $e) {
             try {
                 $playlist = MergedPlaylist::with([
-                    'playlistAuths',
                     'user',
                     'channels' => fn($q) => $q->where('enabled', true)->with(['group', 'epgChannel'])
-                ])->where('uuid', $uuid)->firstOrFail();
-                // $playlistModelType = 'MergedPlaylist';
+                ])->where('uuid', $password)->firstOrFail();
+                
                 if (method_exists($playlist, 'series')) {
                     $playlist->load(['series' => fn($q) => $q->where('enabled', true)->with(['seasons.episodes', 'category'])]);
                 }
             } catch (ModelNotFoundException $e) {
                 try {
                     $playlist = CustomPlaylist::with([
-                        'playlistAuths',
                         'user',
                         'channels' => fn($q) => $q->where('enabled', true)->with(['group', 'epgChannel'])
-                    ])->where('uuid', $uuid)->firstOrFail();
-                    // $playlistModelType = 'CustomPlaylist';
+                    ])->where('uuid', $password)->firstOrFail();
+                    
                     if (method_exists($playlist, 'series')) {
                         $playlist->load(['series' => fn($q) => $q->where('enabled', true)->with(['seasons.episodes', 'category'])]);
                     }
@@ -317,27 +320,8 @@ class XtreamApiController extends Controller
             }
         }
 
-        $username = $request->input('username');
-        $password = $request->input('password');
-        $authenticated = false;
-
-        if (empty($username) || empty($password)) {
-            return response()->json(['error' => 'Unauthorized - Missing credentials'], 401);
-        }
-
-        // Check for PlaylistAuth authentication
-        $enabledAuth = $playlist->playlistAuths->where('enabled', true)->first();
-        if ($enabledAuth && $enabledAuth->username === $username && $enabledAuth->password === $password) {
-            $authenticated = true;
-        }
-
-        if (!$authenticated) {
-            if ($playlist->user->name === $username && $playlist->user && Hash::check($password, $playlist->user->password)) {
-                $authenticated = true;
-            }
-        }
-
-        if (!$authenticated) {
+        // Verify username matches playlist owner's name
+        if ($playlist->user->name !== $username) {
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
@@ -426,7 +410,7 @@ class XtreamApiController extends Controller
                         'category_id' => $channelCategoryId, // Ensure this category_id is valid based on your categories logic
                         'category_ids' => [$channelCategoryId],
                         'tv_archive' => !empty($channel->catchup) ? 1 : 0, // Based on catchup field availability
-                        'direct_source' => url("xtream/{$uuid}/live/{$username}/{$password}/" . $streamId . ".ts"),
+                        'direct_source' => url("/live/{$username}/{$password}/" . $streamId . ".ts"),
                         'tv_archive_duration' => !empty($channel->catchup) ? 24 : 0, // Default 24 hours if catchup available
                         'custom_sid' => '',
                         'thumbnail' => '',
@@ -592,7 +576,7 @@ class XtreamApiController extends Controller
                                 'season' => $episode->season,
                                 'custom_sid' => $espisode->custom_sid ?? '',
                                 'stream_id' => $streamId,
-                                'direct_source' => url("/xtream/{$uuid}/series/{$username}/{$password}/" . $streamId . ".{$containerExtension}")
+                                'direct_source' => url("/series/{$username}/{$password}/" . $episode->id . ".{$containerExtension}")
                             ];
                         }
                     }

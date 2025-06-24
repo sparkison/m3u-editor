@@ -109,3 +109,11 @@ Route::group(['prefix' => 'epg'], function () {
     Route::get('{uuid}/sync', [\App\Http\Controllers\EpgController::class, 'refreshEpg'])
         ->name('api.epg.sync');
 });
+
+/*
+ * Xtream API get_account_info endpoint at root 
+ * This route is placed after other routes and uses SPA exceptions to bypass Filament
+ */
+Route::get('/', [\App\Http\Controllers\XtreamApiController::class, 'handle'])
+    ->where('action', 'get_account_info')
+    ->name('playlist.xtream.account_info');

@@ -139,15 +139,15 @@ class XtreamStreamController extends Controller
      * @tags Xtream API Streams
      * @summary Provides VOD stream access.
      * @description Authenticates the request based on Xtream credentials provided in the path.
-     * If successful and the requested VOD episode is valid and part of an authorized playlist,
-     * this endpoint redirects to the actual internal stream URL for the episode.
+     * If successful and the requested VOD channel is valid and part of an authorized playlist,
+     * this endpoint redirects to the actual internal stream URL for the channel.
      * The route for this endpoint is typically `/series/{username}/{password}/{streamId}.{format}`.
      *
      * @param \Illuminate\Http\Request $request The HTTP request
      * @param string $uuid The UUID of the Xtream API (path parameter)
      * @param string $username User's Xtream API username (path parameter)
      * @param string $password User's Xtream API password (path parameter)
-     * @param string $streamId The ID of the VOD stream (episode ID) (path parameter)
+     * @param string $streamId The ID of the VOD stream (channel ID) (path parameter)
      *
      * @response 302 scenario="Successful redirect to stream URL" description="Redirects to the internal VOD episode stream URL."
      * @response 403 scenario="Forbidden/Unauthorized" {"error": "Unauthorized or stream not found"}
@@ -200,15 +200,11 @@ class XtreamStreamController extends Controller
     public function handleSeries(Request $request, string $uuid, string $username, string $password, int $streamId, string $format = 'mp4')
     {
         // Find the episode by ID
-        if (strpos($streamId, '==') === false) {
-            $streamId .= '=='; // right pad to ensure proper decoding
-        }
-        $episodeId = base64_decode($streamId);
-        list($playlist, $episode) = $this->findAuthenticatedPlaylistAndStreamModel($uuid, $username, $password, (int)$episodeId, 'episode');
+        list($playlist, $episode) = $this->findAuthenticatedPlaylistAndStreamModel($uuid, $username, $password, $streamId, 'episode');
 
         if ($episode instanceof Episode) {
             if ($playlist->enable_proxy) {
-                return Redirect::to(route('stream.episode', ['encodedId' => $streamId, 'format' => $format]));
+                return Redirect::to(route('stream.episode', ['encodedId' => rtrim(base64_encode($streamId), '='), 'format' => $format]));
             } else {
                 return Redirect::to($episode->url);
             }
