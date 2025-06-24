@@ -122,18 +122,6 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('delete-backup', function (User $user) {
             return in_array($user->email, config('dev.admin_emails'), true);
         });
-
-        // Add log viewer auth
-        $userPreferences = app(GeneralSettings::class);
-        try {
-            $showLogs = $userPreferences->show_logs;
-        } catch (Exception $e) {
-            $showLogs = false;
-        }
-        if (!$showLogs) {
-            Gate::define('viewLogViewer', fn() => false);
-        }
-        LogViewer::auth(fn($request) => $showLogs);
     }
 
     /**
@@ -262,7 +250,6 @@ class AppServiceProvider extends ServiceProvider
                 }
                 return $channelFailover;
             });
-
         } catch (\Throwable $e) {
             // Log the error
             report($e);
@@ -311,7 +298,8 @@ class AppServiceProvider extends ServiceProvider
                 return Str::startsWith($route->uri, [
                     'playlist/',
                     'epg/',
-                    'user/'
+                    'user/',
+                    'xtream/'
                 ]);
             })
             ->withDocumentTransformers(function (OpenApi $openApi) {
