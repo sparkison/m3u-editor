@@ -14,6 +14,9 @@ class ProcessVodChannels implements ShouldQueue
 {
     use Queueable;
 
+    // Giving a timeout of 15 minutes to the Job to process the file
+    public $timeout = 60 * 15;
+
     /**
      * Create a new job instance.
      */
@@ -74,7 +77,11 @@ class ProcessVodChannels implements ShouldQueue
                     });
                 });
             $total = $query->count();
-            $channels = $query->cursor();
+            $channels = $query->get([
+                'id',
+                'name',
+                'source_id',
+            ]);
         }
         foreach ($channels as $index => $channel) {
             try {
@@ -106,11 +113,11 @@ class ProcessVodChannels implements ShouldQueue
                 ]);
                 return; // Exit the job if an error occurs
             }
-            sleep(1); // Throttle processing to avoid overwhelming the Xtream API
             if ($index % 10 === 0) {
                 // Update progress every 10 channels processed
                 $progress = min(99, ($index / $total) * 100);
                 $playlist->update(['progress' => $progress]);
+                sleep(1); // Throttle processing to avoid overwhelming the Xtream API
             }
         }
 
