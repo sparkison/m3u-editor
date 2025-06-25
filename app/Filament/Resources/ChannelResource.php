@@ -118,6 +118,9 @@ class ChannelResource extends Resource
                     ))
                     ->toggleable()
                     ->sortable(),
+                Tables\Columns\IconColumn::make('has_metadata')
+                    ->icon(fn($record): string => $record->has_metadata ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
+                    ->color(fn($record): string => $record->has_metadata ? 'success' : 'gray'),
                 Tables\Columns\TextInputColumn::make('stream_id_custom')
                     ->label('ID')
                     ->rules(['min:0', 'max:255'])
@@ -282,6 +285,26 @@ class ChannelResource extends Resource
                     ->toggle()
                     ->query(function ($query) {
                         return $query->where('epg_channel_id', '=', null);
+                    }),
+                Tables\Filters\Filter::make('has_metadata')
+                    ->label('VOD Has metadata')
+                    ->toggle()
+                    ->query(function ($query) {
+                        return $query->where([
+                            ['is_vod', '=', true],
+                            ['info', '!=', null],
+                            ['movie_data', '!=', null],
+                        ]);
+                    }),
+                Tables\Filters\Filter::make('does_not_have_metadata')
+                    ->label('VOD Does not have metadata')
+                    ->toggle()
+                    ->query(function ($query) {
+                        return $query->where([
+                            ['is_vod', '=', true],
+                            ['info', '=', null],
+                            ['movie_data', '=', null],
+                        ]);
                     }),
             ])
             ->actions([

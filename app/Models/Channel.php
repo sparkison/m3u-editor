@@ -98,6 +98,17 @@ class Channel extends Model
     }
 
     /**
+     * Check if the channel has metadata.
+     * 
+     * @return bool
+     */
+    public function getHasMetadataAttribute(): bool
+    {
+        // Check if the channel has metadata (info or movie_data)
+        return !empty($this->info) || !empty($this->movie_data);
+    }
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var string
