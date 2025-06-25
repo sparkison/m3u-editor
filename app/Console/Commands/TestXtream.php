@@ -104,8 +104,13 @@ class TestXtream extends Command implements PromptsForMissingInput
         if ($pick === 'All') {
             $this->generateMovies($xtream, $movies, $catName);
         } else {
+            $id = $movieMap[$pick];
             $movie = $movies[array_search($pick, array_column($movies, 'name'))];
-            $this->generateMovies($xtream, [$movie], $catName);
+            $this->generateMovies($xtream, [
+                [
+                    ...$movie
+                ]
+            ], $catName);
         }
     }
 
@@ -113,10 +118,9 @@ class TestXtream extends Command implements PromptsForMissingInput
     {
         $folder = Str::of($catName)->replace(' | ', ' - ')->trim();
         foreach ($movies as $movie) {
-            $info = $xtream->getVodInfo($movie['stream_id']);
             $this->info("[Movie] {$movie['name']}");
             $this->info("[Category] {$folder}");
-            $this->line(json_encode($info, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+            $this->line(json_encode($movie, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         }
     }
 

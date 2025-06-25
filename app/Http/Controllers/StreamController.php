@@ -608,6 +608,10 @@ class StreamController extends Controller
 
             // Get base ffmpeg output codec formats (these are defaults or from non-QSV/VA-API settings)
             $audioCodec = (config('proxy.ffmpeg_codec_audio') ?: ($settings['ffmpeg_codec_audio'] ?? null)) ?: 'copy';
+            if ($audioCodec === 'opus') {
+                $audioCodec = 'libopus';
+                Log::channel('ffmpeg')->debug("Switched audio codec from 'opus' to 'libopus'.");
+            }
             $subtitleCodec = (config('proxy.ffmpeg_codec_subtitles') ?: ($settings['ffmpeg_codec_subtitles'] ?? null)) ?: 'copy';
 
             // Hardware Acceleration Logic
@@ -727,6 +731,10 @@ class StreamController extends Controller
 
             $videoCodecForTemplate = $settings['ffmpeg_codec_video'] ?: 'copy';
             $audioCodecForTemplate = (config('proxy.ffmpeg_codec_audio') ?: ($settings['ffmpeg_codec_audio'] ?? null)) ?: 'copy';
+            if ($audioCodecForTemplate === 'opus') {
+                $audioCodecForTemplate = 'libopus';
+                Log::channel('ffmpeg')->debug("Switched audio codec (template) from 'opus' to 'libopus'.");
+            }
             $subtitleCodecForTemplate = (config('proxy.ffmpeg_codec_subtitles') ?: ($settings['ffmpeg_codec_subtitles'] ?? null)) ?: 'copy';
 
             $outputCommandSegment = $format === 'ts'

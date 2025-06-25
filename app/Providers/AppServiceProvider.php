@@ -299,7 +299,7 @@ class AppServiceProvider extends ServiceProvider
                     'playlist/',
                     'epg/',
                     'user/',
-                    'player_api.php'
+                    'xtream/'
                 ]);
             })
             ->withDocumentTransformers(function (OpenApi $openApi) {

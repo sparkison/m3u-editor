@@ -211,7 +211,7 @@ class PlaylistResource extends Resource
                         ->modalDescription('Process playlist now?')
                         ->modalSubmitActionLabel('Yes, process now'),
                     Tables\Actions\Action::make('process_series')
-                        ->label('Process Series')
+                        ->label('Process Series Only')
                         ->icon('heroicon-o-arrow-path')
                         ->action(function ($record) {
                             $record->update([
@@ -233,32 +233,7 @@ class PlaylistResource extends Resource
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
-                        ->modalDescription('Process playlist series now? Only enabled series will be included.')
-                        ->modalSubmitActionLabel('Yes, process now'),
-                    Tables\Actions\Action::make('process_vod')
-                        ->label('Process VOD')
-                        ->icon('heroicon-o-arrow-path')
-                        ->action(function ($record) {
-                            $record->update([
-                                'status' => Status::Processing,
-                                'series_progress' => 0,
-                            ]);
-                            app('Illuminate\Contracts\Bus\Dispatcher')
-                                ->dispatch(new \App\Jobs\ProcessVodChannels(playlist: $record));
-                        })->after(function () {
-                            Notification::make()
-                                ->success()
-                                ->title('Playlist is processing VOD data')
-                                ->body('Playlist VOD channels are being processed in the background. Depending on the number of VOD entries, this may take a while. You will be notified on completion.')
-                                ->duration(10000)
-                                ->send();
-                        })
-                        ->disabled(fn($record): bool => $record->status === Status::Processing)
-                        ->hidden(fn($record): bool => !$record->xtream)
-                        ->requiresConfirmation()
-                        ->icon('heroicon-o-arrow-path')
-                        ->modalIcon('heroicon-o-arrow-path')
-                        ->modalDescription('Fetch VOD metadata for this playlist now? Only enabled channels will be included.')
+                        ->modalDescription('Process playlist series now?')
                         ->modalSubmitActionLabel('Yes, process now'),
                     Tables\Actions\Action::make('Download M3U')
                         ->label('Download M3U')

@@ -74,16 +74,24 @@ class PlaylistUrlService
      */
     public static function getXtreamInfo($playlist)
     {
-        // For Xtream API, we use the playlist UUID as the password
-        // and the user's name as the username
-        $auth = [
-            'username' => $playlist->user->name,
-            'password' => $playlist->uuid,
-        ];
+        // Get the first auth
+        $playlistAuth = $playlist->playlistAuths()->where('enabled', true)->first();
+        $auth = null;
+        if ($playlistAuth) {
+            $auth = [
+                'username' => $playlistAuth->username,
+                'password' => $playlistAuth->password,
+            ];
+        } else {
+            $auth = [
+                'username' => $playlist->user->name,
+                'password' => 'YOUR_M3U_EDITOR_PASSWORD',
+            ];
+        }
 
         // Return the results
         return [
-            'url' => url(''), // Base URL of the application
+            'url' => str_replace('/player_api.php', '', route('playlist.xtream.api', ['uuid' => $playlist->uuid])),
             ...$auth
         ];
     }
