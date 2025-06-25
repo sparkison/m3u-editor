@@ -118,6 +118,10 @@ class ChannelResource extends Resource
                     ))
                     ->toggleable()
                     ->sortable(),
+                Tables\Columns\IconColumn::make('has_metadata')
+                    ->label('Metadata')
+                    ->icon(fn($record): string => $record->has_metadata ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
+                    ->color(fn($record): string => $record->has_metadata ? 'success' : 'gray'),
                 Tables\Columns\TextInputColumn::make('stream_id_custom')
                     ->label('ID')
                     ->rules(['min:0', 'max:255'])
@@ -283,6 +287,26 @@ class ChannelResource extends Resource
                     ->query(function ($query) {
                         return $query->where('epg_channel_id', '=', null);
                     }),
+                Tables\Filters\Filter::make('has_metadata')
+                    ->label('VOD Has metadata')
+                    ->toggle()
+                    ->query(function ($query) {
+                        return $query->where([
+                            ['is_vod', '=', true],
+                            ['info', '!=', null],
+                            ['movie_data', '!=', null],
+                        ]);
+                    }),
+                Tables\Filters\Filter::make('does_not_have_metadata')
+                    ->label('VOD Does not have metadata')
+                    ->toggle()
+                    ->query(function ($query) {
+                        return $query->where([
+                            ['is_vod', '=', true],
+                            ['info', '=', null],
+                            ['movie_data', '=', null],
+                        ]);
+                    }),
             ])
             ->actions([
                 Tables\Actions\ActionGroup::make([
@@ -295,8 +319,8 @@ class ChannelResource extends Resource
                         })->after(function () {
                             Notification::make()
                                 ->success()
-                                ->title('Processing VOD data for channel')
-                                ->body('The VOD data processing has been started. You will be notified when it is complete.')
+                                ->title('Fetching VOD metadata for channel')
+                                ->body('The VOD metadata fetching and processing has been started. You will be notified when it is complete.')
                                 ->duration(10000)
                                 ->send();
                         })
@@ -305,7 +329,7 @@ class ChannelResource extends Resource
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
-                        ->modalDescription('Fetch and process VOD data for the selected channel.')
+                        ->modalDescription('Fetch and process VOD metadata for the selected channel.')
                         ->modalSubmitActionLabel('Yes, process now'),
                     Tables\Actions\EditAction::make('edit_custom')
                         ->slideOver()
