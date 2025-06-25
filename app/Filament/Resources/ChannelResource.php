@@ -286,6 +286,27 @@ class ChannelResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('process_vod')
+                        ->label('Process VOD')
+                        ->icon('heroicon-o-arrow-path')
+                        ->action(function ($record) {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new \App\Jobs\ProcessVodChannels(channel: $record));
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Processing VOD data for channel')
+                                ->body('The VOD data processing has been started. You will be notified when it is complete.')
+                                ->duration(10000)
+                                ->send();
+                        })
+                        ->disabled(fn($record): bool => !$record->is_vod)
+                        ->hidden(fn($record): bool => !$record->is_vod)
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-arrow-path')
+                        ->modalIcon('heroicon-o-arrow-path')
+                        ->modalDescription('Fetch and process VOD data for the selected channel.')
+                        ->modalSubmitActionLabel('Yes, process now'),
                     Tables\Actions\EditAction::make('edit_custom')
                         ->slideOver()
                         ->form(fn(Tables\Actions\EditAction $action): array => [
@@ -293,8 +314,8 @@ class ChannelResource extends Resource
                                 ->schema(self::getForm(edit: true))
                                 ->columns(2)
                         ]),
-                    Tables\Actions\DeleteAction::make()
-                ])->button()->hiddenLabel()->size('sm')->hidden(fn(Model $record) => !$record->is_custom),
+                    Tables\Actions\DeleteAction::make()->hidden(fn(Model $record) => $record->is_vod),
+                ])->button()->hiddenLabel()->size('sm')->hidden(fn(Model $record) => !($record->is_custom || $record->is_vod)),
                 Tables\Actions\EditAction::make('edit')
                     ->slideOver()
                     ->form(fn(Tables\Actions\EditAction $action): array => [
@@ -304,8 +325,8 @@ class ChannelResource extends Resource
                     ])
                     ->button()
                     ->hiddenLabel()
-                    ->disabled(fn(Model $record) => $record->is_custom)
-                    ->hidden(fn(Model $record) => $record->is_custom),
+                    ->disabled(fn(Model $record) => $record->is_custom || $record->is_vod)
+                    ->hidden(fn(Model $record) => $record->is_custom || $record->is_vod),
                 Tables\Actions\ViewAction::make()
                     ->button()
                     ->hiddenLabel()
