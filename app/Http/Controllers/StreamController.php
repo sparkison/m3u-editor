@@ -427,7 +427,8 @@ class StreamController extends Controller
                 $process->setTimeout(null); // No timeout for the process itself
                 $process->setIdleTimeout(30); // Timeout if no output for 30s (prevents zombie processes)
 
-                $process->run(function ($type, $buffer) {
+                $stderrOutput = '';
+                $process->run(function ($type, $buffer) use (&$stderrOutput) {
                     if (connection_aborted()) {
                         // This exception helps break out of $process->run()
                         throw new Exception("Connection aborted by client during ffmpeg run.");
@@ -438,6 +439,7 @@ class StreamController extends Controller
                     } elseif ($type === SymfonyProcess::ERR) {
                         if (!empty(trim($buffer))) {
                             Log::channel('ffmpeg')->error($buffer);
+                            $stderrOutput .= $buffer; // Collect stderr
                         }
                     }
                 });
@@ -447,6 +449,18 @@ class StreamController extends Controller
                     Log::channel('ffmpeg')->info("Connection aborted for {$type} {$title} during/after ffmpeg run.");
                     // Cleanup is handled by shutdown function
                     return; // Exit startStream
+                }
+
+                // Check for specific errors in stderr that should trigger failover, even if exit code is 0
+                $prematureEndErrors = [
+                    'Stream ends prematurely',
+                    'Error during demuxing: I/O error',
+                ];
+                foreach ($prematureEndErrors as $errorString) {
+                    if (str_contains($stderrOutput, $errorString)) {
+                        Log::channel('ffmpeg')->error("Detected premature end error for {$type} {$title}: '{$errorString}'. Triggering failover.");
+                        throw new SourceNotResponding("ffmpeg_premature_end: {$errorString}");
+                    }
                 }
 
                 // If process was not successful (e.g., ffmpeg error)
