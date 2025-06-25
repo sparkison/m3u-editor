@@ -607,10 +607,19 @@ class StreamController extends Controller
             $codecSpecificArgs = ''; // For QSV or other codec-specific args not part of -vf
 
             // Get base ffmpeg output codec formats (these are defaults or from non-QSV/VA-API settings)
+            // Get base ffmpeg output codec formats (these are defaults or from non-QSV/VA-API settings)
             $audioCodec = (config('proxy.ffmpeg_codec_audio') ?: ($settings['ffmpeg_codec_audio'] ?? null)) ?: 'copy';
+            $audioBitrateArgs = '';
             if ($audioCodec === 'opus') {
                 $audioCodec = 'libopus';
                 Log::channel('ffmpeg')->debug("Switched audio codec from 'opus' to 'libopus'.");
+            }
+            if ($audioCodec === 'libopus') {
+                // libopus requires a bitrate or it will fail if not in a specific VBR quality mode.
+                // Default to 128k if no other audio bitrate is implicitly set via global options.
+                // Note: More sophisticated handling might check if a global audio bitrate is already set.
+                $audioBitrateArgs = '-b:a 128k ';
+                Log::channel('ffmpeg')->debug("Setting default bitrate for libopus: 128k.");
             }
             $subtitleCodec = (config('proxy.ffmpeg_codec_subtitles') ?: ($settings['ffmpeg_codec_subtitles'] ?? null)) ?: 'copy';
 
@@ -650,8 +659,14 @@ class StreamController extends Controller
 
             // Set the output format and codecs
             $output = $format === 'ts'
-                ? "-c:v {$videoCodec} " . ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "") . "-c:a {$audioCodec} -c:s {$subtitleCodec} -f mpegts pipe:1"
-                : "-c:v {$videoCodec} -ac 2 -f mp4 -movflags frag_keyframe+empty_moov+default_base_moof pipe:1";
+                ? "-c:v {$videoCodec} " . ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "") . "-c:a {$audioCodec} {$audioBitrateArgs}-c:s {$subtitleCodec} -f mpegts pipe:1"
+                : "-c:v {$videoCodec} -ac 2 " . ($audioCodec === 'copy' ? '-c:a copy ' : "-c:a {$audioCodec} {$audioBitrateArgs}") . "-f mp4 -movflags frag_keyframe+empty_moov+default_base_moof pipe:1";
+
+            // Ensure that if audio codec is copy, bitrate args are not applied to mp4
+            if ($format === 'mp4' && $audioCodec === 'copy') {
+                // Handled in the ternary above for mp4
+            }
+
 
             // Determine if it's an MKV file by extension
             $isMkv = stripos($streamUrl, '.mkv') !== false;
@@ -731,18 +746,33 @@ class StreamController extends Controller
 
             $videoCodecForTemplate = $settings['ffmpeg_codec_video'] ?: 'copy';
             $audioCodecForTemplate = (config('proxy.ffmpeg_codec_audio') ?: ($settings['ffmpeg_codec_audio'] ?? null)) ?: 'copy';
+            $audioBitrateArgsForTemplate = '';
             if ($audioCodecForTemplate === 'opus') {
                 $audioCodecForTemplate = 'libopus';
                 Log::channel('ffmpeg')->debug("Switched audio codec (template) from 'opus' to 'libopus'.");
             }
+            if ($audioCodecForTemplate === 'libopus' && $audioCodecForTemplate !== 'copy') {
+                // Add default bitrate for libopus if not copying
+                $audioBitrateArgsForTemplate = ' -b:a 128k'; // Note the leading space
+                Log::channel('ffmpeg')->debug("Setting default bitrate (template) for libopus: 128k.");
+            }
             $subtitleCodecForTemplate = (config('proxy.ffmpeg_codec_subtitles') ?: ($settings['ffmpeg_codec_subtitles'] ?? null)) ?: 'copy';
 
+            // Construct audio codec arguments including bitrate if applicable
+            $audioCodecArgs = "-c:a {$audioCodecForTemplate}";
+            if ($audioCodecForTemplate === 'libopus' && $audioCodecForTemplate !== 'copy') { // ensure not copy
+                 $audioCodecArgs .= $audioBitrateArgsForTemplate;
+            }
+
+
             $outputCommandSegment = $format === 'ts'
-                ? "-c:v {$videoCodecForTemplate} -c:a {$audioCodecForTemplate} -c:s {$subtitleCodecForTemplate} -f mpegts pipe:1"
-                : "-c:v {$videoCodecForTemplate} -ac 2 -f mp4 -movflags frag_keyframe+empty_moov+default_base_moof pipe:1";
+                ? "-c:v {$videoCodecForTemplate} {$audioCodecArgs} -c:s {$subtitleCodecForTemplate} -f mpegts pipe:1"
+                : "-c:v {$videoCodecForTemplate} -ac 2 {$audioCodecArgs} -f mp4 -movflags frag_keyframe+empty_moov+default_base_moof pipe:1";
+            // For the template, we assume {OUTPUT_OPTIONS} or specific codec args will handle this.
+            // The individual {AUDIO_CODEC_ARGS} should now include the bitrate.
 
             $videoCodecArgs = "-c:v {$videoCodecForTemplate}";
-            $audioCodecArgs = "-c:a {$audioCodecForTemplate}";
+            // $audioCodecArgs is already constructed above
             $subtitleCodecArgs = "-c:s {$subtitleCodecForTemplate}";
 
             // Perform replacements
