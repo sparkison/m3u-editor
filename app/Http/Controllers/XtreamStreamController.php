@@ -27,23 +27,13 @@ class XtreamStreamController extends Controller
 
         // Try to find playlist by UUID (password parameter)
         try {
-            $playlist = Playlist::with([
-                'user',
-                'channels' => fn($q) => $q->where('enabled', true),
-                'series' => fn($q) => $q->where('enabled', true)->with(['seasons.episodes'])
-            ])->where('uuid', $password)->firstOrFail();
+            $playlist = Playlist::with(['user'])->where('uuid', $password)->firstOrFail();
         } catch (ModelNotFoundException $e) {
             try {
-                $playlist = MergedPlaylist::with([
-                    'user',
-                    'channels' => fn($q) => $q->where('enabled', true)
-                ])->where('uuid', $password)->firstOrFail();
+                $playlist = MergedPlaylist::with(['user'])->where('uuid', $password)->firstOrFail();
             } catch (ModelNotFoundException $e) {
                 try {
-                    $playlist = CustomPlaylist::with([
-                        'user',
-                        'channels' => fn($q) => $q->where('enabled', true)
-                    ])->where('uuid', $password)->firstOrFail();
+                    $playlist = CustomPlaylist::with(['user'])->where('uuid', $password)->firstOrFail();
                 } catch (ModelNotFoundException $e) {
                     return [null, null];
                 }
