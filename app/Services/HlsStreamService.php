@@ -608,6 +608,21 @@ class HlsStreamService
             // Get ffmpeg output codec formats
             $audioCodec = config('proxy.ffmpeg_codec_audio') ?: $settings['ffmpeg_codec_audio'];
             $subtitleCodec = config('proxy.ffmpeg_codec_subtitles') ?: $settings['ffmpeg_codec_subtitles'];
+            $audioParams = '';
+
+            if ($audioCodec === 'opus') {
+                $audioCodec = 'libopus';
+                Log::channel('ffmpeg')->debug("HLS: Switched audio codec from 'opus' to 'libopus'.");
+            }
+
+            if ($audioCodec === 'libopus' && $audioCodec !== 'copy') {
+                $audioParams = ' -b:a 128k -vbr on';
+                Log::channel('ffmpeg')->debug("HLS: Setting default bitrate and VBR for libopus: 128k, on.");
+            } elseif (($audioCodec === 'vorbis' || $audioCodec === 'libvorbis') && $audioCodec !== 'copy') {
+                $audioParams = ' -strict -2';
+                Log::channel('ffmpeg')->debug("HLS: Setting -strict -2 for vorbis.");
+            }
+
 
             // Start building ffmpeg output codec formats
             $outputFormat = "-c:v {$outputVideoCodec} " .
@@ -615,7 +630,7 @@ class HlsStreamService
 
             // Conditionally add audio codec
             if (!empty($audioCodec)) {
-                $outputFormat .= "-c:a {$audioCodec} ";
+                $outputFormat .= "-c:a {$audioCodec}{$audioParams} ";
             }
 
             // Conditionally add subtitle codec
@@ -697,13 +712,28 @@ class HlsStreamService
             $videoCodecForTemplate = $settings['ffmpeg_codec_video'] ?: 'copy';
             $audioCodecForTemplate = $settings['ffmpeg_codec_audio'] ?: 'copy';
             $subtitleCodecForTemplate = $settings['ffmpeg_codec_subtitles'] ?: 'copy';
+            $audioParamsForTemplate = '';
+
+            if ($audioCodecForTemplate === 'opus') {
+                $audioCodecForTemplate = 'libopus';
+                Log::channel('ffmpeg')->debug("HLS: Switched audio codec (template) from 'opus' to 'libopus'.");
+            }
+
+            if ($audioCodecForTemplate === 'libopus' && $audioCodecForTemplate !== 'copy') {
+                $audioParamsForTemplate = ' -b:a 128k -vbr on';
+                Log::channel('ffmpeg')->debug("HLS: Setting default bitrate and VBR (template) for libopus: 128k, on.");
+            } elseif (($audioCodecForTemplate === 'vorbis' || $audioCodecForTemplate === 'libvorbis') && $audioCodecForTemplate !== 'copy') {
+                $audioParamsForTemplate = ' -strict -2';
+                Log::channel('ffmpeg')->debug("HLS: Setting -strict -2 (template) for vorbis.");
+            }
+
 
             $outputCommandSegment = "-c:v {$outputVideoCodec} " .
                 ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "") .
-                "-c:a {$audioCodecForTemplate} -c:s {$subtitleCodecForTemplate}";
+                "-c:a {$audioCodecForTemplate}{$audioParamsForTemplate} -c:s {$subtitleCodecForTemplate}";
 
             $videoCodecArgs = "-c:v {$videoCodecForTemplate}" . ($codecSpecificArgs ? " " . trim($codecSpecificArgs) : "");
-            $audioCodecArgs = "-c:a {$audioCodecForTemplate}";
+            $audioCodecArgs = "-c:a {$audioCodecForTemplate}{$audioParamsForTemplate}";
             $subtitleCodecArgs = "-c:s {$subtitleCodecForTemplate}";
 
             // Perform replacements

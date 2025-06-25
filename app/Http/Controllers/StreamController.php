@@ -617,9 +617,8 @@ class StreamController extends Controller
             if ($audioCodec === 'libopus') {
                 // libopus requires a bitrate or it will fail if not in a specific VBR quality mode.
                 // Default to 128k if no other audio bitrate is implicitly set via global options.
-                // Note: More sophisticated handling might check if a global audio bitrate is already set.
-                $audioBitrateArgs = '-b:a 128k ';
-                Log::channel('ffmpeg')->debug("Setting default bitrate for libopus: 128k.");
+                $audioBitrateArgs = '-b:a 128k -vbr on '; // Added -vbr on
+                Log::channel('ffmpeg')->debug("Setting default bitrate and VBR for libopus: 128k, on.");
             }
             $subtitleCodec = (config('proxy.ffmpeg_codec_subtitles') ?: ($settings['ffmpeg_codec_subtitles'] ?? null)) ?: 'copy';
 
@@ -660,14 +659,21 @@ class StreamController extends Controller
             // Explicitly determine audio arguments for QSV path
             $qsvAudioArguments = "-c:a {$audioCodec}"; // Use $audioCodec determined & switched at the top
             if ($audioCodec === 'libopus') {
-                // Add default bitrate for libopus if no other audio bitrate is implicitly set by other args
-                // We assume if user specified 'opus', they want it transcoded with sensible defaults if not overridden.
+                // Add default bitrate and VBR for libopus if no other audio bitrate is implicitly set by other args
                 if (strpos($userArgs, '-b:a') === false && strpos($codecSpecificArgs, '-b:a') === false) {
-                    $qsvAudioArguments .= " -b:a 128k";
-                    Log::channel('ffmpeg')->debug("QSV Path: Added default bitrate for libopus. Audio Args: {$qsvAudioArguments}");
+                    $qsvAudioArguments .= " -b:a 128k -vbr on";
+                    Log::channel('ffmpeg')->debug("QSV Path: Added default bitrate and VBR for libopus. Audio Args: {$qsvAudioArguments}");
+                } elseif (strpos($userArgs, '-vbr') === false && strpos($codecSpecificArgs, '-vbr') === false) {
+                    // If bitrate is set but VBR is not, add VBR on
+                    $qsvAudioArguments .= " -vbr on";
+                    Log::channel('ffmpeg')->debug("QSV Path: Added VBR on for libopus as bitrate was already set. Audio Args: {$qsvAudioArguments}");
                 } else {
-                    Log::channel('ffmpeg')->debug("QSV Path: Bitrate for libopus seems to be set by other arguments. Current Audio Args: {$qsvAudioArguments}");
+                    Log::channel('ffmpeg')->debug("QSV Path: Bitrate and VBR for libopus seem to be set by other arguments. Current Audio Args: {$qsvAudioArguments}");
                 }
+            } elseif ($audioCodec === 'vorbis' || $audioCodec === 'libvorbis') {
+                // Add -strict -2 for vorbis encoder
+                $qsvAudioArguments .= " -strict -2";
+                Log::channel('ffmpeg')->debug("QSV Path: Added -strict -2 for vorbis. Audio Args: {$qsvAudioArguments}");
             }
 
             // Set the output format and codecs
@@ -756,23 +762,25 @@ class StreamController extends Controller
 
             $videoCodecForTemplate = $settings['ffmpeg_codec_video'] ?: 'copy';
             $audioCodecForTemplate = (config('proxy.ffmpeg_codec_audio') ?: ($settings['ffmpeg_codec_audio'] ?? null)) ?: 'copy';
-            $audioBitrateArgsForTemplate = '';
+            $audioParamsForTemplate = '';
             if ($audioCodecForTemplate === 'opus') {
                 $audioCodecForTemplate = 'libopus';
                 Log::channel('ffmpeg')->debug("Switched audio codec (template) from 'opus' to 'libopus'.");
             }
+
             if ($audioCodecForTemplate === 'libopus' && $audioCodecForTemplate !== 'copy') {
-                // Add default bitrate for libopus if not copying
-                $audioBitrateArgsForTemplate = ' -b:a 128k'; // Note the leading space
-                Log::channel('ffmpeg')->debug("Setting default bitrate (template) for libopus: 128k.");
+                // Add default bitrate and VBR for libopus if not copying
+                $audioParamsForTemplate = ' -b:a 128k -vbr on';
+                Log::channel('ffmpeg')->debug("Setting default bitrate and VBR (template) for libopus: 128k, on.");
+            } elseif (($audioCodecForTemplate === 'vorbis' || $audioCodecForTemplate === 'libvorbis') && $audioCodecForTemplate !== 'copy') {
+                // Add -strict -2 for vorbis encoder
+                $audioParamsForTemplate = ' -strict -2';
+                Log::channel('ffmpeg')->debug("Setting -strict -2 (template) for vorbis.");
             }
             $subtitleCodecForTemplate = (config('proxy.ffmpeg_codec_subtitles') ?: ($settings['ffmpeg_codec_subtitles'] ?? null)) ?: 'copy';
 
             // Construct audio codec arguments including bitrate if applicable
-            $audioCodecArgs = "-c:a {$audioCodecForTemplate}";
-            if ($audioCodecForTemplate === 'libopus' && $audioCodecForTemplate !== 'copy') { // ensure not copy
-                 $audioCodecArgs .= $audioBitrateArgsForTemplate;
-            }
+            $audioCodecArgs = "-c:a {$audioCodecForTemplate}{$audioParamsForTemplate}";
 
 
             $outputCommandSegment = $format === 'ts'
