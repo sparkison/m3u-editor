@@ -132,7 +132,7 @@ Route::get('/player_api.php', [XtreamApiController::class, 'handle'])->name('xtr
 // Stream endpoints
 Route::get('/live/{username}/{password}/{streamId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleLive'])
     ->name('xtream.stream.live.root');
-Route::get('/movie/{username}/{password}/{streamId}', [App\Http\Controllers\XtreamStreamController::class, 'handleVod'])
+Route::get('/movie/{username}/{password}/{streamId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleVod'])
     ->name('xtream.stream.vod.root');
 Route::get('/series/{username}/{password}/{streamId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleSeries'])
     ->name('xtream.stream.series.root');

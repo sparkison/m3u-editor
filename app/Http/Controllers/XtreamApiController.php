@@ -450,6 +450,7 @@ class XtreamApiController extends Controller
                     }
 
                     $streamId = rtrim(base64_encode($channel->id), '=');
+                    $extension = $channel->container_extension ?? 'mkv';
 
                     $vodStreams[] = [
                         'num' => $index + 1,
@@ -466,7 +467,7 @@ class XtreamApiController extends Controller
                         'category_ids' => [$channelCategoryId],
                         'container_extension' => $channel->container_extension ?? 'mkv',
                         'custom_sid' => '',
-                        'direct_source' => ''
+                        'direct_source' => url("/movie/{$username}/{$password}/" . $streamId . "." . $extension),
                     ];
                 }
             }
