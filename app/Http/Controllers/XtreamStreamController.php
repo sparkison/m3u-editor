@@ -57,7 +57,7 @@ class XtreamStreamController extends Controller
 
         // Get the stream model
         $streamModel = $this->getValidatedStreamFromPlaylist($playlist, $streamId, $streamType);
-        
+
         return [$playlist, $streamModel];
     }
 
@@ -135,7 +135,7 @@ class XtreamStreamController extends Controller
 
         if ($channel instanceof Channel) {
             if ($playlist->enable_proxy) {
-                return Redirect::to(route('stream', ['encodedId' => $streamId, 'format' => $format]));
+                return Redirect::to(route('stream', ['encodedId' => rtrim($streamId, '='), 'format' => $format]));
             } else {
                 return Redirect::to($channel->url_custom ?? $channel->url);
             }
@@ -158,7 +158,7 @@ class XtreamStreamController extends Controller
 
         if ($channel instanceof Channel) {
             if ($playlist->enable_proxy) {
-                return Redirect::to(route('stream', ['encodedId' => $streamId, 'format' => 'ts']));
+                return Redirect::to(route('stream', ['encodedId' => rtrim($streamId, '='), 'format' => 'ts']));
             } else {
                 return Redirect::to($channel->url_custom ?? $channel->url);
             }
