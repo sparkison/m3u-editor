@@ -132,30 +132,48 @@ class StreamController extends Controller
                 $this->decrementActiveStreams($playlist->id);
                 Log::channel('ffmpeg')->error("Source not responding for channel {$title} (URL: {$streamUrl}): " . $e->getMessage());
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, "SourceNotResponding: " . $e->getMessage());
-                // If headers were already sent by a previous stream attempt, we can't try another.
+                // If headers were already sent.
                 if ($headersSentInfo['value']) {
-                    Log::channel('ffmpeg')->error("SourceNotResponding for {$title}, but headers already sent. Terminating request.");
-                    exit;
+                    // Check if the failing stream is the primary one.
+                    if ($sourceChannel->id == $currentStreamToTry->id) {
+                        Log::channel('ffmpeg')->warning("Primary stream {$title} (ID: {$currentStreamToTry->id}) failed with SourceNotResponding after sending headers. Allowing failover attempt.");
+                        // Do not exit, allow continue for primary stream failure
+                    } else {
+                        Log::channel('ffmpeg')->error("Failover stream {$title} (ID: {$currentStreamToTry->id}) failed with SourceNotResponding, and headers were already sent (possibly by a previous attempt or this one). Terminating request.");
+                        exit;
+                    }
                 }
                 continue; // Try next stream
             } catch (MaxRetriesReachedException $e) {
                 $this->decrementActiveStreams($playlist->id);
                 Log::channel('ffmpeg')->error("Max retries reached mid-stream for channel {$title} (URL: {$streamUrl}): " . $e->getMessage() . ". Attempting next failover stream.");
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, "MaxRetriesReached: " . $e->getMessage());
-                // If headers were already sent by this (now failed) stream attempt, we can't try another.
+                // If headers were already sent.
                 if ($headersSentInfo['value']) {
-                    Log::channel('ffmpeg')->error("MaxRetriesReachedException for {$title}, but headers already sent by this stream. Terminating request.");
-                    exit;
+                    // Check if the failing stream is the primary one.
+                    if ($sourceChannel->id == $currentStreamToTry->id) {
+                        Log::channel('ffmpeg')->warning("Primary stream {$title} (ID: {$currentStreamToTry->id}) failed with MaxRetriesReachedException after sending headers. Allowing failover attempt.");
+                        // Do not exit, allow continue for primary stream failure
+                    } else {
+                        Log::channel('ffmpeg')->error("Failover stream {$title} (ID: {$currentStreamToTry->id}) failed with MaxRetriesReachedException, and headers were already sent. Terminating request.");
+                        exit;
+                    }
                 }
                 continue; // Try next stream
             } catch (Exception $e) {
                 $this->decrementActiveStreams($playlist->id);
                 Log::channel('ffmpeg')->error("Generic error streaming channel {$title} (URL: {$streamUrl}): " . $e->getMessage() . \PHP_EOL . $e->getTraceAsString());
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, "GenericError: " . $e->getMessage());
-                // If headers were already sent by a previous stream attempt, we can't try another.
+                // If headers were already sent.
                 if ($headersSentInfo['value']) {
-                    Log::channel('ffmpeg')->error("Generic error for {$title}, but headers already sent. Terminating request.");
-                    exit;
+                    // Check if the failing stream is the primary one.
+                    if ($sourceChannel->id == $currentStreamToTry->id) {
+                        Log::channel('ffmpeg')->warning("Primary stream {$title} (ID: {$currentStreamToTry->id}) failed with Generic Exception after sending headers. Allowing failover attempt.");
+                        // Do not exit, allow continue for primary stream failure
+                    } else {
+                        Log::channel('ffmpeg')->error("Failover stream {$title} (ID: {$currentStreamToTry->id}) failed with Generic Exception, and headers were already sent. Terminating request.");
+                        exit;
+                    }
                 }
                 continue; // Try next stream
             }
