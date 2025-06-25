@@ -6,14 +6,10 @@ use App\Enums\ChannelLogoType;
 use App\Models\CustomPlaylist;
 use App\Models\MergedPlaylist;
 use App\Models\Playlist;
-use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\URL;
 
 class XtreamApiController extends Controller
 {
@@ -73,6 +69,12 @@ class XtreamApiController extends Controller
      * This provides the same user information as the panel action but in a more focused format.
      * Contains: `username`, `password`, `message`, `auth`, `status`, `exp_date`, `is_trial`, 
      * `active_cons`, `created_at`, `max_connections`, `allowed_output_formats`.
+     * 
+     * ### get_vod_info
+     * Returns detailed information for a specific VOD/movie stream.
+     * Requires `vod_id` parameter to specify which VOD stream to retrieve.
+     * Returns movie information and metadata in a structured format.
+     * Uses channel's `info` and `movie_data` fields when available, or builds data from other channel fields.
      *
      * @param string $uuid The UUID of the playlist (required path parameter)
      * @param \Illuminate\Http\Request $request The HTTP request containing query parameters:
@@ -280,7 +282,7 @@ class XtreamApiController extends Controller
     {
         $username = $request->input('username');
         $password = $request->input('password'); // This is the playlist UUID
-        
+
         if (empty($username) || empty($password)) {
             return response()->json(['error' => 'Unauthorized - Missing credentials'], 401);
         }
@@ -300,7 +302,7 @@ class XtreamApiController extends Controller
                     'user',
                     'channels' => fn($q) => $q->where('enabled', true)->with(['group', 'epgChannel'])
                 ])->where('uuid', $password)->firstOrFail();
-                
+
                 if (method_exists($playlist, 'series')) {
                     $playlist->load(['series' => fn($q) => $q->where('enabled', true)->with(['seasons.episodes', 'category'])]);
                 }
@@ -310,7 +312,7 @@ class XtreamApiController extends Controller
                         'user',
                         'channels' => fn($q) => $q->where('enabled', true)->with(['group', 'epgChannel'])
                     ])->where('uuid', $password)->firstOrFail();
-                    
+
                     if (method_exists($playlist, 'series')) {
                         $playlist->load(['series' => fn($q) => $q->where('enabled', true)->with(['seasons.episodes', 'category'])]);
                     }
@@ -365,19 +367,18 @@ class XtreamApiController extends Controller
                 'user_info' => $userInfo,
                 'server_info' => $serverInfo
             ]);
-        }
-        else if ($action === 'get_live_streams') {
+        } else if ($action === 'get_live_streams') {
             $categoryId = $request->input('category_id');
-            
+
             $channelsQuery = $playlist->channels()
                 ->where('enabled', true)
                 ->where('is_vod', false);
-            
+
             // Apply category filtering if category_id is provided
             if ($categoryId && $categoryId !== 'all') {
                 $channelsQuery->where('group_id', $categoryId);
             }
-            
+
             $enabledChannels = $channelsQuery->get();
             $liveStreams = [];
             if ($enabledChannels instanceof \Illuminate\Database\Eloquent\Collection) {
@@ -418,19 +419,18 @@ class XtreamApiController extends Controller
                 }
             }
             return response()->json($liveStreams);
-        }
-        else if ($action === 'get_vod_streams') {
+        } else if ($action === 'get_vod_streams') {
             $categoryId = $request->input('category_id');
-            
+
             $channelsQuery = $playlist->channels()
                 ->where('enabled', true)
                 ->where('is_vod', true);
-            
+
             // Apply category filtering if category_id is provided
             if ($categoryId && $categoryId !== 'all') {
                 $channelsQuery->where('group_id', $categoryId);
             }
-            
+
             $enabledVodChannels = $channelsQuery->get();
             $vodStreams = [];
             if ($enabledVodChannels instanceof \Illuminate\Database\Eloquent\Collection) {
@@ -450,7 +450,7 @@ class XtreamApiController extends Controller
                     }
 
                     $streamId = rtrim(base64_encode($channel->id), '=');
-                    
+
                     $vodStreams[] = [
                         'num' => $index + 1,
                         'name' => $channel->title_custom ?? $channel->title,
@@ -471,23 +471,22 @@ class XtreamApiController extends Controller
                 }
             }
             return response()->json($vodStreams);
-        }
-        else if ($action === 'get_series') {
+        } else if ($action === 'get_series') {
             $categoryId = $request->input('category_id');
-            
+
             // Require category_id for series endpoint
             if (!$categoryId || $categoryId === 'all') {
                 return response()->json(['error' => 'category_id parameter is required for get_series action'], 400);
             }
-            
+
             $seriesQuery = $playlist->series()
                 ->where('enabled', true)
                 ->where('category_id', $categoryId);
-            
+
             $enabledSeries = $seriesQuery->get();
             $seriesList = [];
             $now = Carbon::now();
-            
+
             if ($enabledSeries instanceof \Illuminate\Database\Eloquent\Collection) {
                 foreach ($enabledSeries as $index => $seriesItem) {
                     $seriesCategoryId = 'all'; // Default category_id
@@ -518,26 +517,25 @@ class XtreamApiController extends Controller
                 }
             }
             return response()->json($seriesList);
-        }
-        else if ($action === 'get_series_info') {
+        } else if ($action === 'get_series_info') {
             $seriesId = $request->input('series_id');
-            
+
             if (!$seriesId) {
                 return response()->json(['error' => 'series_id parameter is required for get_series_info action'], 400);
             }
-            
+
             $seriesItem = $playlist->series()
                 ->where('enabled', true)
                 ->where('id', $seriesId)
                 ->with(['seasons.episodes', 'category'])
                 ->first();
-                
+
             if (!$seriesItem) {
                 return response()->json(['error' => 'Series not found or not enabled'], 404);
             }
-            
+
             $now = Carbon::now();
-            
+
             $seriesInfo = [
                 'name' => $seriesItem->name,
                 'cover' => $seriesItem->cover ? (filter_var($seriesItem->cover, FILTER_VALIDATE_URL) ? $seriesItem->cover : url($seriesItem->cover)) : url('/placeholder.png'),
@@ -591,15 +589,14 @@ class XtreamApiController extends Controller
                 'episodes' => $episodesBySeason,
                 'seasons' => $episodesBySeason // Alias for compatibility
             ]);
-        }
-        else if ($action === 'get_live_categories') {
+        } else if ($action === 'get_live_categories') {
             $liveCategories = [];
-            
+
             // Get all groups that have live channels (non-VOD channels)
             $groups = $playlist->groups()
-                ->whereHas('channels', function($query) {
+                ->whereHas('channels', function ($query) {
                     $query->where('enabled', true)
-                          ->where('is_vod', false);
+                        ->where('is_vod', false);
                 })
                 ->get();
 
@@ -621,15 +618,14 @@ class XtreamApiController extends Controller
             }
 
             return response()->json($liveCategories);
-        }
-        else if ($action === 'get_vod_categories') {
+        } else if ($action === 'get_vod_categories') {
             $vodCategories = [];
-            
+
             // Get groups from VOD channels only
             $vodGroups = $playlist->groups()
-                ->whereHas('channels', function($query) {
+                ->whereHas('channels', function ($query) {
                     $query->where('enabled', true)
-                          ->where('is_vod', true);
+                        ->where('is_vod', true);
                 })
                 ->get();
 
@@ -651,10 +647,9 @@ class XtreamApiController extends Controller
             }
 
             return response()->json($vodCategories);
-        }
-        else if ($action === 'get_series_categories') {
+        } else if ($action === 'get_series_categories') {
             $seriesCategories = [];
-            
+
             // Get categories from series only
             $categories = $playlist->series()
                 ->where('enabled', true)
@@ -682,8 +677,86 @@ class XtreamApiController extends Controller
             }
 
             return response()->json($seriesCategories);
-        }
-        else if ($action === 'get_account_info') {
+        } else if ($action === 'get_vod_info') {
+            $vodId = $request->input('vod_id');
+
+            if (empty($vodId)) {
+                return response()->json(['error' => 'vod_id parameter is required'], 400);
+            }
+
+            // Find the VOD channel by the encoded ID
+            if (strpos($vodId, '==') === false) {
+                $vodId .= '=='; // right pad to ensure proper decoding
+            }
+            $channelId = base64_decode($vodId);
+
+            // Find the channel
+            $channel = $playlist->channels()
+                ->where('enabled', true)
+                ->where('id', $channelId)
+                ->where('is_vod', true)
+                ->first();
+
+            if (!$channel) {
+                return response()->json(['error' => 'VOD not found'], 404);
+            }
+
+            // Build info section - use channel's info field if available, otherwise build from channel data
+            $info = $channel->info ?? [];
+
+            // Fill in missing info fields with channel data
+            $defaultInfo = [
+                'kinopoisk_url' => $info['kinopoisk_url'] ?? '',
+                'tmdb_id' => $info['tmdb_id'] ?? 0,
+                'name' => $info['name'] ?? $channel->name,
+                'o_name' => $info['o_name'] ?? $channel->name,
+                'cover_big' => $info['cover_big'] ?? $channel->logo,
+                'movie_image' => $info['movie_image'] ?? $channel->logo,
+                'release_date' => $info['release_date'] ?? $channel->year,
+                'episode_run_time' => $info['episode_run_time'] ?? 0,
+                'youtube_trailer' => $info['youtube_trailer'] ?? null,
+                'director' => $info['director'] ?? '',
+                'actors' => $info['actors'] ?? '',
+                'cast' => $info['cast'] ?? '',
+                'description' => $info['description'] ?? '',
+                'plot' => $info['plot'] ?? '',
+                'age' => $info['age'] ?? '',
+                'mpaa_rating' => $info['mpaa_rating'] ?? $channel->rating,
+                'rating_count_kinopoisk' => $info['rating_count_kinopoisk'] ?? 0,
+                'country' => $info['country'] ?? '',
+                'genre' => $info['genre'] ?? '',
+                'backdrop_path' => $info['backdrop_path'] ?? [],
+                'duration_secs' => $info['duration_secs'] ?? 0,
+                'duration' => $info['duration'] ?? '00:00:00',
+                'bitrate' => $info['bitrate'] ?? 0,
+                'rating' => $info['rating'] ?? 0,
+                'releasedate' => $info['releasedate'] ?? $channel->year,
+                'subtitles' => $info['subtitles'] ?? [],
+            ];
+
+            // Build movie_data section - use channel's movie_data field if available, otherwise build from channel data
+            $movieData = $channel->movie_data ?? [];
+
+            $streamId = rtrim(base64_encode($channel->id), '=');
+            $extension = $movieData['container_extension'] ?? $channel->container_extension ?? 'mp4';
+            $defaultMovieData = [
+                'stream_id' => $streamId,
+                'name' => $movieData['name'] ?? $channel->name,
+                'title' => $movieData['title'] ?? $channel->name,
+                'year' => $movieData['year'] ?? $channel->year,
+                'added' => $movieData['added'] ?? (string)($channel->created_at ? $channel->created_at->timestamp : time()),
+                'category_id' => (string)($channel->group_id ?? ''),
+                'category_ids' => ($channel->group_id ? [$channel->group_id] : []),
+                'container_extension' => $extension,
+                'custom_sid' => $movieData['custom_sid'] ?? '',
+                'direct_source' => url("/movie/{$username}/{$password}/" . $vodId . '.' . $extension),
+            ];
+
+            return response()->json([
+                'info' => $defaultInfo,
+                'movie_data' => $defaultMovieData,
+            ]);
+        } else if ($action === 'get_account_info') {
             // Return the same user info as panel action but in a focused format
             $userInfo = [
                 'username' => $username,
