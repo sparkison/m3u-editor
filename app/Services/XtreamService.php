@@ -148,6 +148,11 @@ class XtreamService
         return $this->call($this->makeUrl('get_series', ['category_id' => $catId]));
     }
 
+    public function getVodInfo(string $vodId): array
+    {
+        return $this->call($this->makeUrl('get_vod_info', ['vod_id' => $vodId]));
+    }
+
     public function getSeriesInfo(string $seriesId): array
     {
         return $this->call($this->makeUrl('get_series_info', ['series_id' => $seriesId]));
