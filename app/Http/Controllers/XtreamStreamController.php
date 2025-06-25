@@ -79,7 +79,7 @@ class XtreamStreamController extends Controller
             if (!$episode) {
                 return null; // Episode or its hierarchy not found
             }
-            $series = $episode->season()?->series ?? null;
+            $series = $episode->season()->first()->series ?? null;
             if (!$series) {
                 return null; // Series not found
             }
@@ -130,15 +130,18 @@ class XtreamStreamController extends Controller
         if (strpos($streamId, '==') === false) {
             $streamId .= '=='; // right pad to ensure proper decoding
         }
-        $channelId = base64_decode($streamId);
-        list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, (int)$channelId, 'live');
+        $channelId = (int)base64_decode($streamId);
+        list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $channelId, 'live');
 
         if ($channel instanceof Channel) {
             if ($playlist->enable_proxy) {
-                return Redirect::to(route('stream', ['encodedId' => rtrim($streamId, '='), 'format' => $format]));
+                $url = rtrim(route('stream', [
+                    'encodedId' => rtrim($streamId, '=')
+                ]), '.');
             } else {
-                return Redirect::to($channel->url_custom ?? $channel->url);
+                $url = $channel->url_custom ?? $channel->url;
             }
+            return Redirect::to($url);
         }
 
         return response()->json(['error' => 'Unauthorized or stream not found'], 403);
@@ -147,21 +150,24 @@ class XtreamStreamController extends Controller
     /**
      * VOD stream requests.
      */
-    public function handleVod(Request $request, string $username, string $password, string $streamId)
+    public function handleVod(Request $request, string $username, string $password, string $streamId, string $format = 'ts')
     {
         // Decode the stream ID
         if (strpos($streamId, '==') === false) {
             $streamId .= '=='; // right pad to ensure proper decoding
         }
-        $channelId = base64_decode($streamId);
-        list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, (int)$channelId, 'vod');
+        $channelId = (int)base64_decode($streamId);
+        list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $channelId, 'vod');
 
         if ($channel instanceof Channel) {
             if ($playlist->enable_proxy) {
-                return Redirect::to(route('stream', ['encodedId' => rtrim($streamId, '='), 'format' => 'ts']));
+                $url = rtrim(route('stream', [
+                    'encodedId' => rtrim($streamId, '=')
+                ]), '.');
             } else {
-                return Redirect::to($channel->url_custom ?? $channel->url);
+                $url = $channel->url_custom ?? $channel->url;
             }
+            return Redirect::to($url);
         }
 
         return response()->json(['error' => 'Unauthorized or stream not found'], 403);
@@ -176,10 +182,13 @@ class XtreamStreamController extends Controller
 
         if ($episode instanceof Episode) {
             if ($playlist->enable_proxy) {
-                return Redirect::to(route('stream.episode', ['encodedId' => rtrim(base64_encode($streamId), '='), 'format' => $format]));
+                $url = rtrim(route('stream.episode', [
+                    'encodedId' => rtrim(base64_encode($streamId), '=')
+                ]), '.');
             } else {
-                return Redirect::to($episode->url);
+                $url = $episode->url;
             }
+            return Redirect::to($url);
         }
 
         return response()->json(['error' => 'Unauthorized or stream not found'], 403);
