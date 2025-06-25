@@ -657,16 +657,26 @@ class StreamController extends Controller
                 }
             }
 
-            // Set the output format and codecs
-            $output = $format === 'ts'
-                ? "-c:v {$videoCodec} " . ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "") . "-c:a {$audioCodec} {$audioBitrateArgs}-c:s {$subtitleCodec} -f mpegts pipe:1"
-                : "-c:v {$videoCodec} -ac 2 " . ($audioCodec === 'copy' ? '-c:a copy ' : "-c:a {$audioCodec} {$audioBitrateArgs}") . "-f mp4 -movflags frag_keyframe+empty_moov+default_base_moof pipe:1";
-
-            // Ensure that if audio codec is copy, bitrate args are not applied to mp4
-            if ($format === 'mp4' && $audioCodec === 'copy') {
-                // Handled in the ternary above for mp4
+            // Explicitly determine audio arguments for QSV path
+            $qsvAudioArguments = "-c:a {$audioCodec}"; // Use $audioCodec determined & switched at the top
+            if ($audioCodec === 'libopus') {
+                // Add default bitrate for libopus if no other audio bitrate is implicitly set by other args
+                // We assume if user specified 'opus', they want it transcoded with sensible defaults if not overridden.
+                if (strpos($userArgs, '-b:a') === false && strpos($codecSpecificArgs, '-b:a') === false) {
+                    $qsvAudioArguments .= " -b:a 128k";
+                    Log::channel('ffmpeg')->debug("QSV Path: Added default bitrate for libopus. Audio Args: {$qsvAudioArguments}");
+                } else {
+                    Log::channel('ffmpeg')->debug("QSV Path: Bitrate for libopus seems to be set by other arguments. Current Audio Args: {$qsvAudioArguments}");
+                }
             }
 
+            // Set the output format and codecs
+            $output = $format === 'ts'
+                ? "-c:v {$videoCodec} " . ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "") . " {$qsvAudioArguments} -c:s {$subtitleCodec} -f mpegts pipe:1"
+                : "-c:v {$videoCodec} -ac 2 {$qsvAudioArguments} -f mp4 -movflags frag_keyframe+empty_moov+default_base_moof pipe:1";
+
+            // Note: The previous complex ternary for mp4 audio was simplified as $qsvAudioArguments now correctly forms the full audio part.
+            // If $audioCodec was 'copy', $qsvAudioArguments is just '-c:a copy' and no bitrate is added.
 
             // Determine if it's an MKV file by extension
             $isMkv = stripos($streamUrl, '.mkv') !== false;
