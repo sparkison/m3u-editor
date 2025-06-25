@@ -45,7 +45,7 @@
         </div>
         <div class="mt-4">
             <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                NOTE: You will use your <strong>m3u editor</strong> username and the Playlist <strong>unique identifier</strong> to use the Xtream API for this playlist.
+                NOTE: You will use your <strong>m3u editor</strong> username and the Playlist <strong>unique identifier</strong> as the password to use the Xtream API for this playlist.
             </p>
         </div>
     </div>
