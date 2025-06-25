@@ -650,36 +650,43 @@ class StreamController extends Controller
                 }
 
                 // Additional QSV specific options
-                $codecSpecificArgs = $settings['ffmpeg_qsv_encoder_options'] ? escapeshellarg($settings['ffmpeg_qsv_encoder_options']) : '-preset medium -global_quality 23';
+                if ($settings['ffmpeg_qsv_encoder_options']) {
+                    $codecSpecificArgs = escapeshellarg($settings['ffmpeg_qsv_encoder_options']);
+                } else {
+                    // Default QSV encoder options
+                    $codecSpecificArgs = '-preset medium';
+                    // Only add -global_quality if NOT using libopus, as it might interfere
+                    if ($audioCodec !== 'libopus') {
+                        $codecSpecificArgs .= ' -global_quality 23';
+                    }
+                }
                 if (!empty($settings['ffmpeg_qsv_additional_args'])) {
                     $userArgs = trim($settings['ffmpeg_qsv_additional_args']) . ($userArgs ? " " . $userArgs : "");
                 }
             }
 
-            // Explicitly determine audio arguments for QSV path
-            $qsvAudioArguments = "-c:a {$audioCodec}"; // Use $audioCodec determined & switched at the top
+            // Explicitly determine audio arguments
+            $audioOutputArgs = "-c:a {$audioCodec}";
             if ($audioCodec === 'libopus') {
-                // Add default bitrate and VBR for libopus if no other audio bitrate is implicitly set by other args
-                if (strpos($userArgs, '-b:a') === false && strpos($codecSpecificArgs, '-b:a') === false) {
-                    $qsvAudioArguments .= " -b:a 128k -vbr 1"; // Changed from -vbr on
-                    Log::channel('ffmpeg')->debug("QSV Path: Added default bitrate and VBR for libopus. Audio Args: {$qsvAudioArguments}");
-                } elseif (strpos($userArgs, '-vbr') === false && strpos($codecSpecificArgs, '-vbr') === false) {
-                    // If bitrate is set but VBR is not, add VBR 1
-                    $qsvAudioArguments .= " -vbr 1"; // Changed from -vbr on
-                    Log::channel('ffmpeg')->debug("QSV Path: Added VBR 1 for libopus as bitrate was already set. Audio Args: {$qsvAudioArguments}");
-                } else {
-                    Log::channel('ffmpeg')->debug("QSV Path: Bitrate and VBR for libopus seem to be set by other arguments. Current Audio Args: {$qsvAudioArguments}");
+                $opusArgs = " -vbr 1";
+                // Add default bitrate for libopus if no other audio bitrate is implicitly set by other args
+                // Check against $userArgs only, as $codecSpecificArgs is for video.
+                if (strpos($userArgs, '-b:a') === false) {
+                    $opusArgs .= " -b:a 128k";
                 }
+                $audioOutputArgs .= $opusArgs;
+                Log::channel('ffmpeg')->debug("StreamController: Updated libopus audio arguments. Audio Args: {$audioOutputArgs}");
+
             } elseif ($audioCodec === 'vorbis' || $audioCodec === 'libvorbis') {
                 // Add -strict -2 for vorbis encoder
-                $qsvAudioArguments .= " -strict -2";
-                Log::channel('ffmpeg')->debug("QSV Path: Added -strict -2 for vorbis. Audio Args: {$qsvAudioArguments}");
+                $audioOutputArgs .= " -strict -2";
+                Log::channel('ffmpeg')->debug("StreamController: Added -strict -2 for vorbis. Audio Args: {$audioOutputArgs}");
             }
 
             // Set the output format and codecs
             $output = $format === 'ts'
-                ? "-c:v {$videoCodec} " . ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "") . " {$qsvAudioArguments} -c:s {$subtitleCodec} -f mpegts pipe:1"
-                : "-c:v {$videoCodec} -ac 2 {$qsvAudioArguments} -f mp4 -movflags frag_keyframe+empty_moov+default_base_moof pipe:1";
+                ? "-c:v {$videoCodec} " . ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "") . " {$audioOutputArgs} -c:s {$subtitleCodec} -f mpegts pipe:1"
+                : "-c:v {$videoCodec} -ac 2 {$audioOutputArgs} -f mp4 -movflags frag_keyframe+empty_moov+default_base_moof pipe:1";
 
             // Note: The previous complex ternary for mp4 audio was simplified as $qsvAudioArguments now correctly forms the full audio part.
             // If $audioCodec was 'copy', $qsvAudioArguments is just '-c:a copy' and no bitrate is added.
@@ -769,9 +776,15 @@ class StreamController extends Controller
             }
 
             if ($audioCodecForTemplate === 'libopus' && $audioCodecForTemplate !== 'copy') {
-                // Add default bitrate and VBR for libopus if not copying
-                $audioParamsForTemplate = ' -b:a 128k -vbr 1'; // Changed from -vbr on
-                Log::channel('ffmpeg')->debug("Setting default bitrate and VBR (template) for libopus: 128k, 1.");
+                // Add default VBR and bitrate for libopus if not copying, ensuring -vbr 1 comes first
+                $audioParamsForTemplate = ' -vbr 1 -b:a 128k';
+                Log::channel('ffmpeg')->debug("Setting default VBR and bitrate (template) for libopus: 1, 128k.");
+                // If QSV is enabled and we're using libopus, ensure QSV_ENCODER_OPTIONS doesn't add -global_quality
+                if ($settings['ffmpeg_qsv_enabled'] ?? false) {
+                    if (empty($settings['ffmpeg_qsv_encoder_options'])) { // Only override if user hasn't set their own
+                        $qsvEncoderOptionsValue = '-preset medium'; // Remove global_quality
+                    }
+                }
             } elseif (($audioCodecForTemplate === 'vorbis' || $audioCodecForTemplate === 'libvorbis') && $audioCodecForTemplate !== 'copy') {
                 // Add -strict -2 for vorbis encoder
                 $audioParamsForTemplate = ' -strict -2';
