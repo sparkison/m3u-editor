@@ -233,7 +233,7 @@ class PlaylistResource extends Resource
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
-                        ->modalDescription('Process playlist series now?')
+                        ->modalDescription('Process playlist series now? Only enabled series will be included.')
                         ->modalSubmitActionLabel('Yes, process now'),
                     Tables\Actions\Action::make('process_vod')
                         ->label('Process VOD')
@@ -258,7 +258,7 @@ class PlaylistResource extends Resource
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
-                        ->modalDescription('Process VOD now?')
+                        ->modalDescription('Fetch VOD metadata for this playlist now? Only enabled channels will be included.')
                         ->modalSubmitActionLabel('Yes, process now'),
                     Tables\Actions\Action::make('Download M3U')
                         ->label('Download M3U')

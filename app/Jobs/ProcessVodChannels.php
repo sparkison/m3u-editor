@@ -130,10 +130,10 @@ class ProcessVodChannels implements ShouldQueue
                 ->broadcast($playlist->user)
                 ->sendToDatabase($playlist->user);
         } else {
-            Log::info('Completed processing VOD data for channel ID ' . $channel->id);
+            Log::info('Completed processing VOD data for channel ID ' . $this->channel->id);
             Notification::make()
                 ->title('VOD Channel Processed')
-                ->body('Successfully processed VOD data for channel: ' . $channel->name)
+                ->body('Successfully processed VOD data for channel: ' . $this->channel->name)
                 ->success()
                 ->broadcast($playlist->user)
                 ->sendToDatabase($playlist->user);
