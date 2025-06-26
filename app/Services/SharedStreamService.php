@@ -1117,7 +1117,7 @@ class SharedStreamService
         $lock = Cache::lock('lock:stream_info_client_count:' . $streamKey, 10); // Lock for 10 seconds
         if ($lock->get()) {
             try {
-                // Remove client from Redis
+                // Remove client from Redis (individual client key)
                 $clientKey = self::CLIENT_PREFIX . $streamKey . ':' . $clientId;
                 $this->redis()->del($clientKey);
                 
@@ -1132,47 +1132,34 @@ class SharedStreamService
                     // If no clients left, mark when it became clientless
                     if ($newCount === 0) {
                         $streamInfo['clientless_since'] = now()->timestamp;
-                    }
-                    
-                    $this->setStreamInfo($streamKey, $streamInfo);
-                    
-                    // Update database client count
-                    SharedStream::where('stream_id', $streamKey)->update([
-                        'client_count' => $newCount,
-                        'last_client_activity' => now()
-                    ]);
-                    
-                    Log::channel('ffmpeg')->debug("Decremented client count for {$streamKey} to {$newCount}. Client {$clientId} removed.");
-                    
-                    // If no clients left, check if stream should be stopped
-                    if ($newCount === 0) {
-                        Log::channel('ffmpeg')->info("Stream {$streamKey} now has no clients. Checking if process is still running.");
+                        Log::channel('ffmpeg')->info("Stream {$streamKey} now has no clients. Starting cleanup process.");
                         
-                        // Check if the FFmpeg process is still running
-                        $pid = $this->getProcessPid($streamKey);
-                        if ($pid && !$this->isProcessRunning($pid)) {
-                            Log::channel('ffmpeg')->info("Stream {$streamKey} has no clients and dead process (PID: {$pid}). Marking as stopped.");
-                            
-                            // Update database to stopped status
-                            SharedStream::where('stream_id', $streamKey)->update([
-                                'status' => 'stopped',
-                                'stopped_at' => now(),
-                                'process_id' => null
-                            ]);
-                            
-                            // Update Redis stream info
-                            $streamInfo = $this->getStreamInfo($streamKey);
-                            if ($streamInfo) {
-                                $streamInfo['status'] = 'stopped';
-                                $streamInfo['stopped_at'] = now()->timestamp;
-                                unset($streamInfo['pid']);
-                                $this->setStreamInfo($streamKey, $streamInfo);
-                            }
-                            
-                            Log::channel('ffmpeg')->info("Stream {$streamKey} marked as stopped due to no clients and dead process.");
-                        } else {
-                            Log::channel('ffmpeg')->info("Stream {$streamKey} has no clients but process is still running. Marked as clientless for potential cleanup.");
-                        }
+                        // Clean up the stream completely
+                        $this->cleanupStream($streamKey, true);
+                        
+                        // Update database to stopped status and reset all metrics
+                        SharedStream::where('stream_id', $streamKey)->update([
+                            'status' => 'stopped',
+                            'started_at' => null,
+                            'stopped_at' => now(),
+                            'process_id' => null,
+                            'client_count' => 0,
+                            'bandwidth_kbps' => 0,
+                            'bytes_transferred' => 0
+                        ]);
+                        
+                        Log::channel('ffmpeg')->info("Stream {$streamKey} completely cleaned up due to no clients.");
+                        return; // Exit early since stream is cleaned up
+                    } else {
+                        $this->setStreamInfo($streamKey, $streamInfo);
+                        
+                        // Update database client count
+                        SharedStream::where('stream_id', $streamKey)->update([
+                            'client_count' => $newCount,
+                            'last_client_activity' => now()
+                        ]);
+                        
+                        Log::channel('ffmpeg')->debug("Decremented client count for {$streamKey} to {$newCount}. Client {$clientId} removed.");
                     }
                 }
             } finally {
@@ -1783,6 +1770,14 @@ class SharedStreamService
         Redis::del("stream_clients:{$streamKey}");
         Redis::del("stream_buffer:{$streamKey}");
         
+        // Clean up individual client keys
+        $clientPattern = self::CLIENT_PREFIX . $streamKey . ':*';
+        $clientKeys = Redis::keys($clientPattern);
+        if (!empty($clientKeys)) {
+            Redis::del($clientKeys);
+            Log::channel('ffmpeg')->debug("Cleaned up " . count($clientKeys) . " client keys for stream {$streamKey}");
+        }
+        
         // Clean up files if requested
         if ($removeFiles) {
             $storageDir = $this->getStreamStorageDir($streamKey);
@@ -1791,13 +1786,15 @@ class SharedStreamService
             }
         }
         
-        // Update database
+        // Update database - reset all metrics
         SharedStream::where('stream_id', $streamKey)->update([
             'status' => 'stopped',
+            'started_at' => null,
             'stopped_at' => now(),
+            'process_id' => null,
             'client_count' => 0,
             'bandwidth_kbps' => 0,
-            'process_id' => null
+            'bytes_transferred' => 0
         ]);
     }
 
@@ -2348,7 +2345,9 @@ class SharedStreamService
      */
     public function getClientCount(string $streamId): int
     {
-        $clientKey = self::CLIENT_PREFIX . $streamId;
-        return Redis::hlen($clientKey);
+        // Count individual client keys
+        $pattern = self::CLIENT_PREFIX . $streamId . ':*';
+        $clientKeys = Redis::keys($pattern);
+        return count($clientKeys);
     }
 }
