@@ -1143,9 +1143,35 @@ class SharedStreamService
                     
                     Log::channel('ffmpeg')->debug("Decremented client count for {$streamKey} to {$newCount}. Client {$clientId} removed.");
                     
-                    // If no clients left, consider cleanup
+                    // If no clients left, check if stream should be stopped
                     if ($newCount === 0) {
-                        Log::channel('ffmpeg')->info("Stream {$streamKey} now has no clients. Marked as clientless for potential cleanup.");
+                        Log::channel('ffmpeg')->info("Stream {$streamKey} now has no clients. Checking if process is still running.");
+                        
+                        // Check if the FFmpeg process is still running
+                        $pid = $this->getProcessPid($streamKey);
+                        if ($pid && !$this->isProcessRunning($pid)) {
+                            Log::channel('ffmpeg')->info("Stream {$streamKey} has no clients and dead process (PID: {$pid}). Marking as stopped.");
+                            
+                            // Update database to stopped status
+                            SharedStream::where('stream_id', $streamKey)->update([
+                                'status' => 'stopped',
+                                'stopped_at' => now(),
+                                'process_id' => null
+                            ]);
+                            
+                            // Update Redis stream info
+                            $streamInfo = $this->getStreamInfo($streamKey);
+                            if ($streamInfo) {
+                                $streamInfo['status'] = 'stopped';
+                                $streamInfo['stopped_at'] = now()->timestamp;
+                                unset($streamInfo['pid']);
+                                $this->setStreamInfo($streamKey, $streamInfo);
+                            }
+                            
+                            Log::channel('ffmpeg')->info("Stream {$streamKey} marked as stopped due to no clients and dead process.");
+                        } else {
+                            Log::channel('ffmpeg')->info("Stream {$streamKey} has no clients but process is still running. Marked as clientless for potential cleanup.");
+                        }
                     }
                 }
             } finally {
@@ -1579,32 +1605,25 @@ class SharedStreamService
         }
         
         try {
-            // Use kill -0 to check if process exists without actually killing it
-            $result = shell_exec("kill -0 {$pid} 2>/dev/null; echo $?");
-            $exitCode = (int)trim($result);
+            // Use ps to check process status (works on both Linux and macOS)
+            $output = shell_exec("ps -p {$pid} -o stat= 2>/dev/null");
             
-            // Exit code 0 means process exists and is running
-            if ($exitCode === 0) {
-                // Double-check that it's not a zombie process by checking its state
-                $statusFile = "/proc/{$pid}/stat";
-                if (file_exists($statusFile)) {
-                    $stat = file_get_contents($statusFile);
-                    if ($stat !== false) {
-                        $parts = explode(' ', $stat);
-                        if (isset($parts[2])) {
-                            $state = $parts[2];
-                            // Z = zombie, X = dead
-                            if (in_array($state, ['Z', 'X'])) {
-                                Log::channel('ffmpeg')->debug("Process {$pid} exists but is in state '{$state}' (zombie/dead)");
-                                return false;
-                            }
-                        }
-                    }
-                }
-                return true;
+            if (empty(trim($output))) {
+                // Process doesn't exist
+                return false;
             }
             
-            return false;
+            $stat = trim($output);
+            // Check for zombie or dead processes
+            // Z = zombie, X = dead on most systems
+            if (preg_match('/^[ZX]/', $stat)) {
+                Log::channel('ffmpeg')->debug("Process {$pid} exists but is in state '{$stat}' (zombie/dead)");
+                return false;
+            }
+            
+            // Process exists and is not zombie/dead
+            return true;
+            
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Error checking if process {$pid} is running: " . $e->getMessage());
             return false;
