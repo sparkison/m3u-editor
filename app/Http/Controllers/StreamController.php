@@ -690,9 +690,20 @@ class StreamController extends Controller
             }
 
             // Set the output format and codecs
-            $output = $format === 'ts'
-                ? "-c:v {$videoCodec} " . ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "") . " {$audioOutputArgs} -c:s {$subtitleCodec} -f mpegts pipe:1"
-                : "-c:v {$videoCodec} -ac 2 {$audioOutputArgs} -f mp4 -movflags frag_keyframe+empty_moov+default_base_moof pipe:1";
+            if ($format === 'ts') {
+                $output = "-c:v {$videoCodec} " . ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "") . " {$audioOutputArgs} -c:s {$subtitleCodec} -f mpegts pipe:1";
+            } else {
+                // For mp4 format
+                $bsfArgs = '';
+                if ($audioCodec === 'copy') {
+                    // Check if the source audio is AAC, as the filter is specific to AAC ADTS
+                    // This is a heuristic. A more robust check would involve ffprobe output if available here.
+                    // For now, we apply it if copying audio to mp4, as it's a common scenario for this issue.
+                    $bsfArgs = '-bsf:a aac_adtstoasc ';
+                    Log::channel('ffmpeg')->debug("Adding aac_adtstoasc bitstream filter for mp4 output with audio copy.");
+                }
+                $output = "-c:v {$videoCodec} -ac 2 {$audioOutputArgs} {$bsfArgs}-f mp4 -movflags frag_keyframe+empty_moov+default_base_moof pipe:1";
+            }
 
             // Note: The previous complex ternary for mp4 audio was simplified as $qsvAudioArguments now correctly forms the full audio part.
             // If $audioCodec was 'copy', $qsvAudioArguments is just '-c:a copy' and no bitrate is added.
