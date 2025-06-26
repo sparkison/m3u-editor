@@ -20,9 +20,9 @@ class XtreamApiController extends Controller
      * It requires authentication via username and password query parameters.
      * The `action` query parameter dictates the specific operation to perform and the structure of the response.
      * 
-     * The `username` and `password` parameters are mandatory for all actions, and will default to your m3u editor login credentials (default is admin/admin).
+     * The `username` and `password` parameters are mandatory for all actions. 
      * 
-     * If the Playlist has a Playlist Auth assigned, it will check that first for authentication, and then fall back to the User's credentials.
+     * You will use your m3u editor login username (default is admin), and the password will be your playlist unique identifier for the playlist you would like to access via the Xtream API.
      * 
      * ## Supported Actions:
      * 
