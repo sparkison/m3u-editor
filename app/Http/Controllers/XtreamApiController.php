@@ -280,9 +280,6 @@ class XtreamApiController extends Controller
      */
     public function handle(Request $request)
     {
-
-        dump($request->all());
-
         $username = $request->input('username');
         $password = $request->input('password'); // This is the playlist UUID
 
