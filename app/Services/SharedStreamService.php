@@ -1903,6 +1903,53 @@ class SharedStreamService
     }
 
     /**
+     * Clean up orphaned Redis keys that don't have corresponding database records
+     */
+    public function cleanupOrphanedKeys(): int
+    {
+        $cleanedKeys = 0;
+        
+        try {
+            // Get all shared stream keys from Redis
+            $pattern1 = 'shared_stream:*';
+            $pattern2 = '*shared_stream:*';
+            
+            $keys1 = Redis::keys($pattern1);
+            $keys2 = Redis::keys($pattern2);
+            $allKeys = array_merge($keys1, $keys2);
+            
+            // Filter to only main stream info keys (not buffer, PID, etc.)
+            $streamInfoKeys = array_filter($allKeys, function($key) {
+                return preg_match('/shared_stream:channel:\d+:[a-f0-9]+$/', str_replace(config('database.redis.options.prefix', ''), '', $key));
+            });
+            
+            foreach ($streamInfoKeys as $redisKey) {
+                $streamKey = str_replace([
+                    config('database.redis.options.prefix', ''),
+                    'shared_stream:'
+                ], '', $redisKey);
+                
+                $streamKey = 'shared_stream:' . $streamKey;
+                
+                // Check if corresponding database record exists
+                $dbRecord = SharedStream::where('stream_id', $streamKey)->first();
+                
+                if (!$dbRecord) {
+                    // Orphaned Redis key - clean it up
+                    Redis::del($redisKey);
+                    $cleanedKeys++;
+                    Log::info("Cleaned up orphaned Redis key: {$redisKey}");
+                }
+            }
+            
+        } catch (\Exception $e) {
+            Log::error('Error during orphaned keys cleanup: ' . $e->getMessage());
+        }
+        
+        return $cleanedKeys;
+    }
+
+    /**
      * Dummy method to satisfy interface or parent class
      */
     public function dummyMethod(): void
