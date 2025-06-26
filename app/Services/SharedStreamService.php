@@ -1846,7 +1846,7 @@ class SharedStreamService
                     Log::info("Stream data found for {$streamKey}, status: " . ($streamData['status'] ?? 'unknown'));
                 
                     $shouldCleanup = false;
-                    $lastActivity = $streamData['last_activity'] ??   0;
+                    $lastActivity = $streamData['last_activity'] ??     0;
                     $status = $streamData['status'] ?? 'unknown';
                 
                     // Check if stream is inactive
@@ -2338,5 +2338,17 @@ class SharedStreamService
         }
 
         return $stats;
+    }
+
+    /**
+     * Get the current client count for a stream
+     * 
+     * @param string $streamId
+     * @return int
+     */
+    public function getClientCount(string $streamId): int
+    {
+        $clientKey = self::CLIENT_PREFIX . $streamId;
+        return Redis::hlen($clientKey);
     }
 }
