@@ -82,6 +82,7 @@ class SharedStreamService
                 $options
             );
             $isNewStream = true;
+            // For new streams, the client count is already set to 1 in createSharedStreamInternal
         } else {
             // Check if existing stream process is actually running
             $pid = $streamInfo['pid'] ?? null;
@@ -197,12 +198,14 @@ class SharedStreamService
         $this->setStreamInfo($streamKey, $streamInfo);
 
         // Also create database record for persistent tracking
-        SharedStream::firstOrCreate(
+        SharedStream::updateOrCreate(
             ['stream_id' => $streamKey],
             [
                 'source_url' => $streamUrl,
                 'format' => $format,
                 'status' => 'starting',
+                'client_count' => 1, // Set initial client count
+                'last_client_activity' => now(),
                 'stream_info' => json_encode($streamInfo),
                 'started_at' => now()
             ]
@@ -1106,6 +1109,54 @@ class SharedStreamService
     }
 
     /**
+     * Remove a client from a stream and decrement client count
+     */
+    public function removeClient(string $streamKey, string $clientId): void
+    {
+        $lock = Cache::lock('lock:stream_info_client_count:' . $streamKey, 10); // Lock for 10 seconds
+        if ($lock->get()) {
+            try {
+                // Remove client from Redis
+                $clientKey = self::CLIENT_PREFIX . $streamKey . ':' . $clientId;
+                $this->redis()->del($clientKey);
+                
+                // Update stream info
+                $streamInfo = $this->getStreamInfo($streamKey);
+                if ($streamInfo) {
+                    $currentCount = $streamInfo['client_count'] ?? 0;
+                    $newCount = max(0, $currentCount - 1); // Ensure count doesn't go negative
+                    $streamInfo['client_count'] = $newCount;
+                    $streamInfo['last_client_activity'] = now()->timestamp;
+                    
+                    // If no clients left, mark when it became clientless
+                    if ($newCount === 0) {
+                        $streamInfo['clientless_since'] = now()->timestamp;
+                    }
+                    
+                    $this->setStreamInfo($streamKey, $streamInfo);
+                    
+                    // Update database client count
+                    SharedStream::where('stream_id', $streamKey)->update([
+                        'client_count' => $newCount,
+                        'last_client_activity' => now()
+                    ]);
+                    
+                    Log::channel('ffmpeg')->debug("Decremented client count for {$streamKey} to {$newCount}. Client {$clientId} removed.");
+                    
+                    // If no clients left, consider cleanup
+                    if ($newCount === 0) {
+                        Log::channel('ffmpeg')->info("Stream {$streamKey} now has no clients. Marked as clientless for potential cleanup.");
+                    }
+                }
+            } finally {
+                $lock->release();
+            }
+        } else {
+            Log::channel('ffmpeg')->warning("Failed to acquire lock for removing client {$clientId} from {$streamKey}. Client count may be temporarily inaccurate.");
+        }
+    }
+
+    /**
      * Register a client for a stream
      */
     private function registerClient(string $streamKey, string $clientId, array $options = []): void
@@ -1751,21 +1802,32 @@ class SharedStreamService
             $deadProcessThreshold = now()->subMinutes(5)->timestamp; // 5 minutes for dead processes
             
             foreach ($keys as $key) {
-                $streamKey = str_replace([
-                    config('database.redis.options.prefix', ''),
-                    'shared_stream:'
-                ], '', $key);
+                // Only process main stream info keys, not buffer/PID keys
+                if (!str_contains($key, ':segment_') && 
+                    !str_contains($key, 'stream_buffer:') && 
+                    !str_contains($key, 'stream_pid:') && 
+                    !str_contains($key, 'bandwidth:')) {
+                    
+                    $streamKey = str_replace([
+                        config('database.redis.options.prefix', ''),
+                        'shared_stream:'
+                    ], '', $key);
+                    
+                    Log::info("Processing stream key for cleanup: {$streamKey} (from Redis key: {$key})");
+                    
+                    $redisData = Redis::get($key);
+                    $streamData = $redisData ? json_decode($redisData, true) : null;
+                    
+                    if (!$streamData) {
+                        Log::info("No stream data found for key: {$key}");
+                        continue;
+                    }
+                    
+                    Log::info("Stream data found for {$streamKey}, status: " . ($streamData['status'] ?? 'unknown'));
                 
-                $redisData = Redis::get($key);
-                $streamData = $redisData ? json_decode($redisData, true) : null;
-                
-                if (!$streamData) {
-                    continue;
-                }
-                
-                $shouldCleanup = false;
-                $lastActivity = $streamData['last_activity'] ?? 0;
-                $status = $streamData['status'] ?? 'unknown';
+                    $shouldCleanup = false;
+                    $lastActivity = $streamData['last_activity'] ?? 0;
+                    $status = $streamData['status'] ?? 'unknown';
                 
                 // Check if stream is inactive
                 if ($lastActivity < $inactiveThreshold) {
@@ -1807,7 +1869,7 @@ class SharedStreamService
                         if (!$clientData) {
                             continue;
                         }
-                        $clientLastActivity = $clientData['last_activity'] ?? 0;
+                        $clientLastActivity = $clientData['last_activity'] ??  0;
                         
                         if ($clientLastActivity < $inactiveThreshold) {
                             Redis::hdel($clientKey, $clientId);
