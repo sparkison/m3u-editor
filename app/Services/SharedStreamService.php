@@ -113,7 +113,7 @@ class SharedStreamService
                         'status' => 'starting',
                         'process_id' => $this->getProcessPid($streamKey), // getProcessPid fetches from Redis, which startHLS/Direct sets
                         'error_message' => null, // Clear previous errors on successful restart initiation
-                        'last_activity' => now()
+                        'last_client_activity' => now()
                     ]);
                     
                     // Requirement 5.1.c: Log PID update
@@ -189,7 +189,7 @@ class SharedStreamService
             'status' => 'starting',
             'client_count' => 1,
             'created_at' => now()->timestamp,
-            'last_activity' => now()->timestamp,
+            'last_client_activity' => now()->timestamp,
             'options' => $options
         ];
 
@@ -1080,7 +1080,7 @@ class SharedStreamService
                 $streamInfo = $this->getStreamInfo($streamKey);
                 if ($streamInfo) {
                     $streamInfo['client_count'] = ($streamInfo['client_count'] ?? 0) + 1;
-                    $streamInfo['last_activity'] = now()->timestamp;
+                    $streamInfo['last_client_activity'] = now()->timestamp;
                     // If a client is joining, it's definitely not clientless anymore
                     unset($streamInfo['clientless_since']);
                     $this->setStreamInfo($streamKey, $streamInfo);
@@ -1107,7 +1107,7 @@ class SharedStreamService
         $clientInfo = [
             'client_id' => $clientId,
             'connected_at' => now()->timestamp,
-            'last_activity' => now()->timestamp,
+            'last_client_activity' => now()->timestamp,
             'options' => $options
         ];
         $this->redis()->setex($clientKey, $this->getClientTimeoutResolved(), json_encode($clientInfo));
@@ -1528,7 +1528,7 @@ class SharedStreamService
             
             // Update database record
             SharedStream::where('stream_id', $streamKey)->update([
-                'last_activity' => now(),
+                'last_client_activity' => now(),
                 'client_count' => $streamInfo['client_count'] ?? 0
             ]);
             
@@ -1716,7 +1716,7 @@ class SharedStreamService
             SharedStream::where('stream_id', $streamKey)->update([
                 'status' => 'starting',
                 'process_id' => $this->getProcessPid($streamKey),
-                'last_activity' => now()
+                'last_client_activity' => now()
             ]);
             
             return true;
