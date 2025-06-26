@@ -517,7 +517,13 @@ class StreamController extends Controller
         } finally {
             // Ensure process is stopped if it's still running (e.g. if loop exited unexpectedly)
             if ($process && $process->isRunning()) {
-                $process->stop(0); // Attempt graceful stop
+                try {
+                    $process->stop(0); // Attempt graceful stop
+                } catch (Exception $stopException) {
+                    Log::channel('ffmpeg')->error("Exception during ffmpeg process stop in finally block for {$type} {$title}: " . $stopException->getMessage());
+                    // Do not re-throw, allow startStream to proceed to its own exit logic
+                    // if the main error was a handled client abort.
+                }
             }
             // Unregister the specific shutdown function for this attempt if we are throwing MaxRetriesReached
             // So __invoke's decrement is the one that counts for the failover attempt.
