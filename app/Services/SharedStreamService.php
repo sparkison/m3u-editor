@@ -1846,4 +1846,157 @@ class SharedStreamService
     {
         // No operation
     }
+
+    /**
+     * Get next stream segments for a client
+     */
+    public function getNextStreamSegments(string $streamKey, string $clientId, int &$lastSegment): ?string
+    {
+        $bufferKey = self::BUFFER_PREFIX . $streamKey;
+        $segmentNumbers = $this->redis()->lrange("{$bufferKey}:segments", 0, -1);
+        
+        $data = '';
+        $segmentsRetrieved = 0;
+        $maxSegmentsPerCall = 5; // Limit segments per call to prevent overwhelming clients
+        
+        // First, try to get data from existing buffered segments
+        if (!empty($segmentNumbers)) {
+            // Convert segment numbers to integers and sort them
+            $segmentNumbers = array_map('intval', $segmentNumbers);
+            sort($segmentNumbers);
+            
+            foreach ($segmentNumbers as $segmentNumber) {
+                // Only get segments newer than the last one sent to this client
+
+                if ($segmentNumber > $lastSegment && $segmentsRetrieved < $maxSegmentsPerCall) {
+                    $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                    $segmentData = $this->redis()->get($segmentKey);
+                    if ($segmentData) {
+                        $data .= $segmentData;
+                        $lastSegment = $segmentNumber; // Update the reference variable
+                        $segmentsRetrieved++;
+                    }
+                }
+            }
+        }
+        
+        // If no buffered data is available, try to read directly from FFmpeg
+        if (empty($data) && isset($this->activeProcesses[$streamKey])) {
+            $data = $this->readDirectFromFFmpeg($streamKey, $lastSegment);
+        }
+        
+        // Update client activity if we retrieved data
+        if (!empty($data)) {
+            $this->updateClientActivity($streamKey, $clientId);
+            $this->trackBandwidth($streamKey, strlen($data));
+        }
+        
+        return !empty($data) ? $data : null;
+    }
+
+    /**
+     * Read data directly from FFmpeg process
+     */
+    private function readDirectFromFFmpeg(string $streamKey, int &$lastSegment): ?string
+    {
+        if (!isset($this->activeProcesses[$streamKey])) {
+            return null;
+        }
+        
+        $processInfo = $this->activeProcesses[$streamKey];
+        $stdout = $processInfo['stdout'];
+        $stderr = $processInfo['stderr'];
+        $process = $processInfo['process'];
+        
+        // Check if process is still running
+        $status = proc_get_status($process);
+        if (!$status['running']) {
+            Log::channel('ffmpeg')->info("Stream {$streamKey}: FFmpeg process ended, removing from active processes");
+            unset($this->activeProcesses[$streamKey]);
+            return null;
+        }
+        
+        $bufferKey = self::BUFFER_PREFIX . $streamKey;
+        $redis = $this->redis();
+        $targetChunkSize = 188 * 1000; // 188KB chunks
+        $accumulatedData = '';
+        $accumulatedSize = 0;
+        $maxReadTime = 2; // Maximum 2 seconds to read data
+        $startTime = time();
+        $readAttempts = 0;
+        $maxReadAttempts = 20; // Maximum read attempts
+        
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Reading directly from FFmpeg process");
+        
+        while ($accumulatedSize < $targetChunkSize && 
+               (time() - $startTime) < $maxReadTime && 
+               $readAttempts < $maxReadAttempts) {
+            
+            $readAttempts++;
+            
+            // Try to read data from FFmpeg stdout
+            $chunk = fread($stdout, 32768); // Read 32KB chunks
+            if ($chunk !== false && strlen($chunk) > 0) {
+                $accumulatedData .= $chunk;
+                $accumulatedSize += strlen($chunk);
+                
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Read " . strlen($chunk) . " bytes from FFmpeg (total: {$accumulatedSize})");
+            } else {
+                // No immediate data available, small sleep
+                usleep(100000); // 100ms
+            }
+            
+            // Check for errors
+            $error = fread($stderr, 1024);
+            if ($error !== false && strlen($error) > 0) {
+                Log::channel('ffmpeg')->error("Stream {$streamKey}: FFmpeg error: {$error}");
+            }
+        }
+        
+        if ($accumulatedSize > 0) {
+            // Store the data as a new segment
+            $currentSegments = $redis->llen("{$bufferKey}:segments");
+            $newSegmentNumber = $currentSegments;
+            
+            $segmentKey = "{$bufferKey}:segment_{$newSegmentNumber}";
+            $redis->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
+            $redis->lpush("{$bufferKey}:segments", $newSegmentNumber);
+            
+            // Keep only recent segments (prevent memory bloat)
+            $redis->ltrim("{$bufferKey}:segments", 0, 50);
+            
+            // Clean up old segments
+            $oldSegmentNumber = $newSegmentNumber - 50;
+            if ($oldSegmentNumber >= 0) {
+                $redis->del("{$bufferKey}:segment_{$oldSegmentNumber}");
+            }
+            
+            $lastSegment = $newSegmentNumber;
+            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Stored {$accumulatedSize} bytes as segment {$newSegmentNumber}");
+            
+            return $accumulatedData;
+        }
+        
+        return null;
+    }
+
+    /**
+     * Get stream statistics/status information
+     */
+    public function getStreamStats(string $streamKey): ?array
+    {
+        $streamInfo = $this->getStreamInfo($streamKey);
+        if (!$streamInfo) {
+            return null;
+        }
+
+        return [
+            'status' => $streamInfo['status'] ?? 'unknown',
+            'client_count' => $streamInfo['client_count'] ?? 0,
+            'created_at' => $streamInfo['created_at'] ?? null,
+            'last_activity' => $streamInfo['last_activity'] ?? null,
+            'process_id' => $streamInfo['process_id'] ?? null,
+            'uptime' => isset($streamInfo['created_at']) ? (time() - $streamInfo['created_at']) : 0
+        ];
+    }
 }
