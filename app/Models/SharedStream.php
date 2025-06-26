@@ -205,11 +205,11 @@ class SharedStream extends Model
     }
 
     /**
-     * Scope for active streams
+     * Scope to get only active streams
      */
     public function scopeActive($query)
     {
-        return $query->where('status', 'active');
+        return $query->whereIn('status', ['starting', 'active']);
     }
 
     /**

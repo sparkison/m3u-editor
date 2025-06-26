@@ -1084,6 +1084,13 @@ class SharedStreamService
                     // If a client is joining, it's definitely not clientless anymore
                     unset($streamInfo['clientless_since']);
                     $this->setStreamInfo($streamKey, $streamInfo);
+                    
+                    // Update database client count
+                    SharedStream::where('stream_id', $streamKey)->update([
+                        'client_count' => $streamInfo['client_count'],
+                        'last_client_activity' => now()
+                    ]);
+                    
                     Log::channel('ffmpeg')->debug("Incremented client count for {$streamKey} to {$streamInfo['client_count']}. Unset clientless_since if present.");
                 }
             } finally {
@@ -1512,609 +1519,45 @@ class SharedStreamService
     }
 
     /**
-     * Update stream statistics
+     * Check if a process is currently running
      */
-    public function updateStreamStats(string $streamKey): void
-    {
-        try {
-            $streamInfo = $this->getStreamInfo($streamKey);
-            if (!$streamInfo) {
-                return;
-            }
-            
-            // Update last activity
-            $streamInfo['last_activity'] = time();
-            $this->setStreamInfo($streamKey, $streamInfo);
-            
-            // Update database record
-            SharedStream::where('stream_id', $streamKey)->update([
-                'last_client_activity' => now(),
-                'client_count' => $streamInfo['client_count'] ?? 0
-            ]);
-            
-        } catch (\Exception $e) {
-            Log::channel('ffmpeg')->error("Error updating stream stats for {$streamKey}: " . $e->getMessage());
-        }
-    }
-
-    /**
-     * Clean up orphaned Redis keys
-     */
-    public function cleanupOrphanedKeys(): int
-    {
-        try {
-            $redis = $this->redis();
-            $cleaned = 0;
-            
-            // Get all stream keys
-            $streamKeys = $redis->keys(self::CACHE_PREFIX . '*');
-            $activeStreamKeys = [];
-            
-            foreach ($streamKeys as $key) {
-                $streamInfo = $redis->get($key);
-                if ($streamInfo) {
-                    $data = json_decode($streamInfo, true);
-                    $streamKey = str_replace(self::CACHE_PREFIX, '', $key);
-                    $status = $data['status'] ?? 'UNKNOWN';
-                    
-                    if ($data && isset($data['status']) && in_array($data['status'], ['active', 'starting'])) {
-                        $activeStreamKeys[] = $streamKey;
-                        Log::channel('ffmpeg')->debug("CleanupOrphanedKeys: Keeping active stream {$streamKey} (status: {$status})");
-                    } else {
-                        // Remove inactive stream key
-                        Log::channel('ffmpeg')->info("CleanupOrphanedKeys: Removing inactive stream {$streamKey} (status: {$status})");
-                        $redis->del($key);
-                        $cleaned++;
-                    }
-                } else {
-                    $streamKey = str_replace(self::CACHE_PREFIX, '', $key);
-                    Log::channel('ffmpeg')->info("CleanupOrphanedKeys: Removing empty stream key {$streamKey}");
-                    $redis->del($key);
-                    $cleaned++;
-                }
-            }
-            
-            // Clean up client keys for non-existent streams
-            $clientKeys = $redis->keys(self::CLIENT_PREFIX . '*');
-            if (is_array($clientKeys)) {
-                foreach ($clientKeys as $clientKey) {
-                    $streamKeyPart = str_replace(self::CLIENT_PREFIX, '', $clientKey);
-                    $streamKey = explode(':', $streamKeyPart)[0];
-                    
-                    if (!in_array($streamKey, $activeStreamKeys)) {
-                        $redis->del($clientKey);
-                        $cleaned++;
-                    }
-                }
-            }
-            
-            // Clean up buffer keys for non-existent streams
-            $bufferKeys = $redis->keys(self::BUFFER_PREFIX . '*');
-            if (is_array($bufferKeys)) {
-                foreach ($bufferKeys as $bufferKey) {
-                    $streamKey = str_replace(self::BUFFER_PREFIX, '', $bufferKey);
-                    $streamKey = explode(':', $streamKey)[0];
-                    
-                    if (!in_array($streamKey, $activeStreamKeys)) {
-                        $redis->del($bufferKey);
-                        $cleaned++;
-                    }
-                }
-            }
-            
-            return $cleaned;
-            
-        } catch (\Exception $e) {
-            Log::channel('ffmpeg')->error("Error cleaning up orphaned keys: " . $e->getMessage());
-            return 0;
-        }
-    }
-
-    /**
-     * Remove a client from a stream
-     */
-    public function removeClient(string $streamKey, string $clientId): void
-    {
-        try {
-            $clientKey = self::CLIENT_PREFIX . $streamKey . ':' . $clientId;
-            $this->redis()->del($clientKey);
-            
-            // Decrement client count
-            $lock = Cache::lock('lock:stream_info_client_count:' . $streamKey, 10); // Lock for 10 seconds
-            if ($lock->get()) {
-                try {
-                    $streamInfo = $this->getStreamInfo($streamKey);
-                    if ($streamInfo) {
-                        $newCount = max(0, ($streamInfo['client_count'] ?? 1) - 1);
-                        $streamInfo['client_count'] = $newCount;
-                        $streamInfo['last_activity'] = time();
-                        if ($newCount === 0) {
-                            $streamInfo['clientless_since'] = time();
-                            Log::channel('ffmpeg')->debug("Stream {$streamKey} client count reached 0. Marked clientless_since.");
-                        } else {
-                            // Ensure clientless_since is removed if clients rejoin
-                            unset($streamInfo['clientless_since']);
-                        }
-                        $this->setStreamInfo($streamKey, $streamInfo);
-                        Log::channel('ffmpeg')->debug("Client {$clientId} removed from stream {$streamKey}. Client count now {$newCount}.");
-                    }
-                } finally {
-                    $lock->release();
-                }
-            } else {
-                // Failed to acquire lock, log warning.
-                Log::channel('ffmpeg')->warning("Failed to acquire lock for decrementing client count on {$streamKey} for client {$clientId}. Client count may be temporarily inaccurate.");
-                // Fallback: attempt non-locked decrement or log that cleanup might be partial.
-                // For now, logging the issue. A more robust solution might involve retries or a queue.
-            }
-            
-        } catch (\Exception $e) {
-            Log::channel('ffmpeg')->error("Error removing client {$clientId} from stream {$streamKey}: " . $e->getMessage());
-        }
-    }
-
-    /**
-     * Stop a stream
-     */
-    public function stopStream(string $streamKey): bool
-    {
-        try {
-            $streamInfo = $this->getStreamInfo($streamKey);
-            if (!$streamInfo) {
-                return false;
-            }
-            
-            // Kill the process if it exists
-            $pid = $streamInfo['pid'] ?? null;
-            if ($pid && $this->isProcessRunning($pid)) {
-                if (function_exists('posix_kill')) {
-                    posix_kill($pid, SIGTERM);
-                    sleep(2);
-                    if ($this->isProcessRunning($pid)) {
-                        posix_kill($pid, SIGKILL);
-                    }
-                } else {
-                    exec("kill -TERM $pid");
-                    sleep(2);
-                    exec("kill -KILL $pid 2>/dev/null");
-                }
-            }
-            
-            // Clean up stream
-            $this->cleanupStream($streamKey, true);
-            
-            Log::channel('ffmpeg')->info("Stream {$streamKey} stopped successfully");
-            return true;
-            
-        } catch (\Exception $e) {
-            Log::channel('ffmpeg')->error("Error stopping stream {$streamKey}: " . $e->getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Attempt to restart a stream that died but still has clients
-     */
-    private function attemptStreamRestart(string $streamKey, array $streamInfo): bool
-    {
-        try {
-            Log::channel('ffmpeg')->info("Stream {$streamKey}: Attempting automatic restart");
-            
-            // Update stream status to starting
-            $streamInfo['status'] = 'starting';
-            $streamInfo['restart_attempt'] = time();
-            $this->setStreamInfo($streamKey, $streamInfo);
-            
-            // Start the streaming process based on format
-            if ($streamInfo['format'] === 'hls') {
-                $this->startHLSStream($streamKey, $streamInfo);
-            } else {
-                $this->startDirectStream($streamKey, $streamInfo);
-            }
-            
-            // Update database
-            SharedStream::where('stream_id', $streamKey)->update([
-                'status' => 'starting',
-                'process_id' => $this->getProcessPid($streamKey),
-                'last_client_activity' => now()
-            ]);
-            
-            return true;
-            
-        } catch (\Exception $e) {
-            Log::channel('ffmpeg')->error("Stream {$streamKey}: Failed to restart - " . $e->getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Get stream statistics/status
-     */
-    public function getStreamStats(string $streamKey): ?array
-    {
-        try {
-            // Aggressive rate limiting to prevent log spam - only run full check every 30 seconds
-            static $lastFullCheck = [];
-            static $cachedStats = [];
-            $now = time();
-            
-            if (isset($lastFullCheck[$streamKey]) && isset($cachedStats[$streamKey]) && 
-                ($now - $lastFullCheck[$streamKey]) < 30) {
-                // Return cached stats for frequent calls
-                return $cachedStats[$streamKey];
-            }
-            
-            // If streamKey doesn't have prefix, add it for Redis lookup
-            $redisKey = str_starts_with($streamKey, self::CACHE_PREFIX) ? $streamKey : self::CACHE_PREFIX . $streamKey;
-            $streamInfo = $this->getStreamInfo($redisKey);
-            if (!$streamInfo) {
-                // Only log missing streams once every 60 seconds to prevent spam
-                static $lastMissingLog = [];
-                $now = time();
-                if (!isset($lastMissingLog[$streamKey]) || ($now - $lastMissingLog[$streamKey]) > 60) {
-                    Log::channel('ffmpeg')->debug("getStreamStats: No stream info found for key {$streamKey}");
-                    $lastMissingLog[$streamKey] = $now;
-                }
-                return null;
-            }
-            
-            // Get client count - use the full streamKey for client lookup (clients are stored with full key)
-            $clientSearchKey = str_starts_with($streamKey, self::CACHE_PREFIX) ? $streamKey : self::CACHE_PREFIX . $streamKey;
-            $clientKeys = $this->redis()->keys(self::CLIENT_PREFIX . $clientSearchKey . ':*');
-            $clientCount = count($clientKeys);
-            
-            // Debug logging for client count issues
-            if ($clientCount === 0) {
-                $searchPattern = self::CLIENT_PREFIX . $clientSearchKey . ':*';
-                Log::channel('ffmpeg')->debug("getStreamStats: No clients found for {$streamKey}, clientSearchKey: {$clientSearchKey}, searched pattern: {$searchPattern}");
-            }
-            
-            // Check if process is running
-            $pid = $streamInfo['pid'] ?? null;
-            $isProcessRunning = $pid ? $this->isProcessRunning($pid) : false;
-            
-            // Determine status - be more lenient about dead processes and add restart logic
-            $status = $streamInfo['status'] ?? 'unknown';
-            $statusChanged = false;
-            
-            // Handle dead processes more intelligently
-            if (!$isProcessRunning && in_array($status, ['active', 'starting'])) {
-                // Process is not running, but stream was supposed to be active or starting
-                Log::channel('ffmpeg')->info("Stream {$streamKey}: Process (PID {$pid}) is not running, but status was '{$status}'. Client count from Redis keys: {$clientCount}.");
-
-                if ($clientCount === 0) {
-                    Log::channel('ffmpeg')->info("Stream {$streamKey}: No clients connected (based on Redis keys) to dead/stalled process. Cleaning up immediately.");
-                    $this->stopStream($streamKey); // stopStream calls cleanupStream
-                    $cachedStats[$streamKey] = null; // Ensure we don't return stale cache
-                    $lastFullCheck[$streamKey] = $now; // Update check time
-                    return null; // Stream is gone
-                } else {
-                    // Requirement 3.b: Check for genuinely active clients before restarting
-                    $genuinelyActiveClientCount = 0;
-                    $staleThreshold = $now - 60; // 60 seconds threshold
-                    
-                    // $clientSearchKey is the key with CACHE_PREFIX, suitable for Redis client lookups
-                    // $clientKeys are already fetched above and $clientCount is derived from it.
-                    // We need to iterate these $clientKeys to check last_activity.
-                    $redisClientKeys = $this->redis()->keys(self::CLIENT_PREFIX . $clientSearchKey . ':*'); // Re-fetch to be certain, or use $clientKeys if available and correct
-
-                    foreach ($redisClientKeys as $singleClientFullKey) {
-                        $clientDataJson = $this->redis()->get($singleClientFullKey);
-                        if ($clientDataJson) {
-                            $clientData = json_decode($clientDataJson, true);
-                            if ($clientData && isset($clientData['last_activity']) && $clientData['last_activity'] > $staleThreshold) {
-                                $genuinelyActiveClientCount++;
-                            }
-                        }
-                    }
-
-                    if ($genuinelyActiveClientCount === 0) {
-                        Log::channel('ffmpeg')->info("Stream {$streamKey}: Process is dead and all {$clientCount} client(s) appear stale (last_activity > 60s ago). Stopping stream instead of restarting.");
-                        $this->stopStream($streamKey);
-                        $cachedStats[$streamKey] = null;
-                        $lastFullCheck[$streamKey] = $now;
-                        return null;
-                    } else {
-                        Log::channel('ffmpeg')->info("Stream {$streamKey}: Process is dead but found {$genuinelyActiveClientCount} genuinely active client(s) out of {$clientCount}. Proceeding with restart attempt.");
-                        // Clients are still connected - attempt to restart the stream
-                        static $restartAttempts = []; // This static var needs to be managed carefully if this function is called with different streamKeys
-                        $lastAttempt = $restartAttempts[$streamKey] ?? 0;
-                        
-                        // Only attempt restart once every 60 seconds to prevent spam
-                        if (($now - $lastAttempt) > 60) {
-                            Log::channel('ffmpeg')->info("Stream {$streamKey}: Attempting restart for {$genuinelyActiveClientCount} active clients.");
-                            $restartAttempts[$streamKey] = $now;
-
-                            $restartSuccess = $this->attemptStreamRestart($streamKey, $streamInfo);
-
-                            if ($restartSuccess) {
-                                $status = 'starting';
-                                $statusChanged = true;
-                                Log::channel('ffmpeg')->info("Stream {$streamKey}: Successfully initiated restart for {$genuinelyActiveClientCount} clients");
-                            } else {
-                                $status = 'error'; // Mark as error so clients know something is wrong
-                                $statusChanged = true;
-                                Log::channel('ffmpeg')->error("Stream {$streamKey}: Failed to restart, marking as error");
-                            }
-                        } else {
-                            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Recent restart attempt made at {$lastAttempt}. Current status '{$status}', effective 'starting'.");
-                            // If a restart was attempted recently, it's effectively in 'starting' state for clients.
-                            $status = 'starting';
-                        }
-                    }
-                }
-            } elseif (!$isProcessRunning && $status === 'starting') {
-                // Process should be starting but isn't - check if enough time has passed
-                $startTime = $streamInfo['created_at'] ?? $now;
-                if (($now - $startTime) > 30) { // 30 seconds to start
-                    $status = 'error';
-                    $statusChanged = true;
-                    Log::channel('ffmpeg')->warning("Stream {$streamKey}: Failed to start within 30 seconds, marking as error");
-                    // If it failed to start, it's effectively dead, clean up its data
-                    $this->updateStreamStatus($streamKey, $status); // Mark as error
-                    $this->cleanupStream($streamKey, true); // Cleanup data
-                    Log::channel('ffmpeg')->info("Stream {$streamKey}: Failed to start. Cleaning up immediately.");
-                    $this->stopStream($streamKey); // stopStream calls cleanupStream
-                    return null; // Stream is gone
-                }
-            }
-
-            // Check for clientless streams that should be stopped after a grace period
-            if ($clientCount === 0 && isset($streamInfo['clientless_since']) && $isProcessRunning && $status !== 'stopped') {
-                $gracePeriod = (int) config('proxy.shared_streaming.cleanup.clientless_grace_period', 15);
-                $clientlessDuration = time() - $streamInfo['clientless_since'];
-                if ($clientlessDuration >= $gracePeriod) {
-                    Log::channel('ffmpeg')->info("Stream {$streamKey} has been clientless for {$clientlessDuration}s (grace period: {$gracePeriod}s). Stopping stream.");
-                    $this->stopStream($streamKey);
-                    return null; // Stream is now stopped
-                } else {
-                    Log::channel('ffmpeg')->debug("Stream {$streamKey} clientless for {$clientlessDuration}s. Waiting for grace period ({$gracePeriod}s) to elapse.");
-                }
-            }
-            
-            $stats = [
-                'status' => $status,
-                'client_count' => $clientCount,
-                'uptime' => $now - ($streamInfo['created_at'] ?? $now),
-                'last_activity' => $streamInfo['last_activity'] ?? $now,
-                'process_running' => $isProcessRunning,
-                'title' => $streamInfo['title'] ?? 'Unknown',
-                'format' => $streamInfo['format'] ?? 'unknown'
-            ];
-            
-            // Cache the stats and update last check time
-            $cachedStats[$streamKey] = $stats;
-            $lastFullCheck[$streamKey] = $now;
-            
-
-            // Only log when status changes or periodically (every 5 minutes), and stream still exists
-            if ($status !== 'stopped') { // Avoid logging for streams just stopped by this function
-                static $lastStatusLog = [];
-                $logKey = $streamKey . '_' . $status . '_' . ($isProcessRunning ? '1' : '0') . '_' . $clientCount; // Add clientCount to log key for more granular logging
-                $logInterval = (int) config('proxy.shared_streaming.monitoring.log_status_interval', 300);
-                if ($statusChanged || !isset($lastStatusLog[$logKey]) || ($now - $lastStatusLog[$logKey]) > $logInterval) {
-                    Log::channel('ffmpeg')->debug("getStreamStats for {$streamKey}: status='{$status}', pid={$pid}, processRunning=" . ($isProcessRunning ? 'true' : 'false') . ", clientCount={$clientCount}, clientless_since=" . ($streamInfo['clientless_since'] ?? 'N/A'));
-                    $lastStatusLog[$logKey] = $now;
-                }
-            }
-            
-            return $stats;
-            
-        } catch (\Exception $e) {
-            Log::channel('ffmpeg')->error("Error getting stream stats for {$streamKey}: " . $e->getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * Get next stream segments for a client
-     */
-    public function getNextStreamSegments(string $streamKey, string $clientId, int &$lastSegment): ?string
-    {
-        $bufferKey = self::BUFFER_PREFIX . $streamKey;
-        $segmentNumbers = $this->redis()->lrange("{$bufferKey}:segments", 0, -1);
-        
-        $data = '';
-        $segmentsRetrieved = 0;
-        $maxSegmentsPerCall = 5; // Limit segments per call to prevent overwhelming clients
-        
-        // First, try to get data from existing buffered segments
-        if (!empty($segmentNumbers)) {
-            // Convert segment numbers to integers and sort them
-            $segmentNumbers = array_map('intval', $segmentNumbers);
-            sort($segmentNumbers);
-            
-            foreach ($segmentNumbers as $segmentNumber) {
-                // Only get segments newer than the last one sent to this client
-                if ($segmentNumber > $lastSegment && $segmentsRetrieved < $maxSegmentsPerCall) {
-                    $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                    $segmentData = $this->redis()->get($segmentKey);
-                    if ($segmentData) {
-                        $data .= $segmentData;
-                        $lastSegment = $segmentNumber; // Update the reference variable
-                        $segmentsRetrieved++;
-                    }
-                }
-            }
-        }
-        
-        // If no buffered data is available, try to read directly from FFmpeg
-        if (empty($data) && isset($this->activeProcesses[$streamKey])) {
-            $data = $this->readDirectFromFFmpeg($streamKey, $lastSegment);
-        }
-        
-        // Update client activity if we retrieved data
-        if (!empty($data)) {
-            $this->updateClientActivity($streamKey, $clientId);
-        }
-        
-        return !empty($data) ? $data : null;
-    }
-
-    /**
-     * Read data directly from FFmpeg process
-     */
-    private function readDirectFromFFmpeg(string $streamKey, int &$lastSegment): ?string
-    {
-        if (!isset($this->activeProcesses[$streamKey])) {
-            return null;
-        }
-        
-        $processInfo = $this->activeProcesses[$streamKey];
-        $stdout = $processInfo['stdout'];
-        $stderr = $processInfo['stderr'];
-        $process = $processInfo['process'];
-        
-        // Check if process is still running
-        $status = proc_get_status($process);
-        if (!$status['running']) {
-            Log::channel('ffmpeg')->info("Stream {$streamKey}: FFmpeg process ended, removing from active processes");
-            unset($this->activeProcesses[$streamKey]);
-            return null;
-        }
-        
-        $bufferKey = self::BUFFER_PREFIX . $streamKey;
-        $redis = $this->redis();
-        $targetChunkSize = 188 * 1000; // 188KB chunks
-        $accumulatedData = '';
-        $accumulatedSize = 0;
-        $maxReadTime = 2; // Maximum 2 seconds to read data
-        $startTime = time();
-        $readAttempts = 0;
-        $maxReadAttempts = 20; // Maximum read attempts
-        
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Reading directly from FFmpeg process");
-        
-        while ($accumulatedSize < $targetChunkSize && 
-               (time() - $startTime) < $maxReadTime && 
-               $readAttempts < $maxReadAttempts) {
-            
-            $readAttempts++;
-            
-            // Try to read data from FFmpeg stdout
-            $chunk = fread($stdout, 32768); // Read 32KB chunks
-            if ($chunk !== false && strlen($chunk) > 0) {
-                $accumulatedData .= $chunk;
-                $accumulatedSize += strlen($chunk);
-                
-                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Read " . strlen($chunk) . " bytes from FFmpeg (total: {$accumulatedSize})");
-            } else {
-                // No immediate data available, small sleep
-                usleep(100000); // 100ms
-            }
-            
-            // Check for errors
-            $error = fread($stderr, 1024);
-            if ($error !== false && strlen($error) > 0) {
-                Log::channel('ffmpeg')->error("Stream {$streamKey}: FFmpeg error: {$error}");
-            }
-        }
-        
-        if ($accumulatedSize > 0) {
-            // Store the data as a new segment
-            $currentSegments = $redis->llen("{$bufferKey}:segments");
-            $newSegmentNumber = $currentSegments;
-            
-            $segmentKey = "{$bufferKey}:segment_{$newSegmentNumber}";
-            $redis->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
-            $redis->lpush("{$bufferKey}:segments", $newSegmentNumber);
-            
-            // Keep only recent segments (prevent memory bloat)
-            $redis->ltrim("{$bufferKey}:segments", 0, 50);
-            
-            // Clean up old segments
-            $oldSegmentNumber = $newSegmentNumber - 50;
-            if ($oldSegmentNumber >= 0) {
-                $redis->del("{$bufferKey}:segment_{$oldSegmentNumber}");
-            }
-            
-            $lastSegment = $newSegmentNumber;
-            $this->updateStreamActivity($streamKey);
-            
-            Log::channel('ffmpeg')->info("Stream {$streamKey}: Created new segment {$newSegmentNumber} from direct FFmpeg read ({$accumulatedSize} bytes)");
-            
-            return $accumulatedData;
-        }
-        
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: No data available from direct FFmpeg read after {$readAttempts} attempts");
-        return null;
-    }
-
-    /**
-     * Create a shared stream with minimal parameters (for restarts)
-     */
-    public function createSharedStream(string $sourceUrl, string $format = 'ts'): ?string
-    {
-        // Generate a simple stream key for restart scenarios
-        $streamKey = 'restart_' . md5($sourceUrl . time());
-        
-        // Use defaults for restart scenarios
-        $type = 'channel'; // Default type
-        $modelId = 0; // Default model ID for restart
-        $title = 'Restarted Stream';
-        $clientId = 'system_restart';
-        $options = [];
-        
-        try {
-            $streamInfo = $this->getOrCreateSharedStream(
-                $type,
-                $modelId,
-                $sourceUrl,
-                $title,
-                $format,
-                $clientId,
-                $options
-            );
-            
-            return $streamInfo['stream_key'] ?? null;
-        } catch (\Exception $e) {
-            Log::error('Failed to create shared stream for restart', [
-                'source_url' => $sourceUrl,
-                'format' => $format,
-                'error' => $e->getMessage()
-            ]);
-            return null;
-        }
-    }
-
-    /**
-     * Check if a process is running by PID
-     */
-    private function isProcessRunning($pid): bool
+    private function isProcessRunning(?int $pid): bool
     {
         if (!$pid) {
             return false;
         }
         
         try {
-            // Check if the process exists
-            if (!posix_kill($pid, 0)) {
-                return false;
-            }
+            // Use kill -0 to check if process exists without actually killing it
+            $result = shell_exec("kill -0 {$pid} 2>/dev/null; echo $?");
+            $exitCode = (int)trim($result);
             
-            // Additional check for zombie processes - they exist but are not really running
-            $output = shell_exec("ps -p $pid -o state= 2>/dev/null");
-            if ($output !== null) {
-                $state = trim($output);
-                // Z = zombie, D = uninterruptible sleep (usually dead), T = stopped
-                if (in_array($state, ['Z', 'D'])) {
-                    return false;
+            // Exit code 0 means process exists and is running
+            if ($exitCode === 0) {
+                // Double-check that it's not a zombie process by checking its state
+                $statusFile = "/proc/{$pid}/stat";
+                if (file_exists($statusFile)) {
+                    $stat = file_get_contents($statusFile);
+                    if ($stat !== false) {
+                        $parts = explode(' ', $stat);
+                        if (isset($parts[2])) {
+                            $state = $parts[2];
+                            // Z = zombie, X = dead
+                            if (in_array($state, ['Z', 'X'])) {
+                                Log::channel('ffmpeg')->debug("Process {$pid} exists but is in state '{$state}' (zombie/dead)");
+                                return false;
+                            }
+                        }
+                    }
                 }
+                return true;
             }
             
-            return true;
+            return false;
         } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error checking if process {$pid} is running: " . $e->getMessage());
             return false;
         }
-    }
-
-    /**
-     * Get stream storage directory
-     */
-    private function getStreamStorageDir(string $streamKey): string
-    {
-        $baseDir = storage_path('app/shared_streams');
-        return $baseDir . '/' . $streamKey;
     }
 
     /**
@@ -2126,6 +1569,85 @@ class SharedStreamService
         if ($streamInfo) {
             $streamInfo['last_activity'] = now()->timestamp;
             $this->setStreamInfo($streamKey, $streamInfo);
+        }
+    }
+
+    /**
+     * Get the storage directory for a stream
+     */
+    private function getStreamStorageDir(string $streamKey): string
+    {
+        $bufferPath = config('proxy.shared_streaming.storage.buffer_path', 'shared_streams');
+        $fullPath = storage_path('app/' . $bufferPath . '/' . $streamKey);
+        return $fullPath;
+    }
+
+    /**
+     * Track bandwidth usage for a stream
+     */
+    private function trackBandwidth(string $streamKey, int $bytesTransferred): void
+    {
+        try {
+            // Get current time
+            $now = time();
+            
+            // Get or initialize bandwidth tracking data
+            $bandwidthKey = "bandwidth:{$streamKey}";
+            $bandwidthData = Redis::get($bandwidthKey);
+            
+            if ($bandwidthData) {
+                $data = json_decode($bandwidthData, true);
+            } else {
+                $data = [
+                    'total_bytes' => 0,
+                    'samples' => [],
+                    'last_update' => $now
+                ];
+            }
+            
+            // Add bytes to total
+            $data['total_bytes'] += $bytesTransferred;
+            
+            // Add sample for bandwidth calculation (keep last 10 samples)
+            $data['samples'][] = [
+                'timestamp' => $now,
+                'bytes' => $bytesTransferred
+            ];
+            
+            // Keep only last 10 samples for bandwidth calculation
+            if (count($data['samples']) > 10) {
+                $data['samples'] = array_slice($data['samples'], -10);
+            }
+            
+            // Calculate current bandwidth (kbps) over last 10 seconds
+            $recentSamples = array_filter($data['samples'], function($sample) use ($now) {
+                return ($now - $sample['timestamp']) <= 10;
+            });
+            
+            if (count($recentSamples) > 1) {
+                $totalBytes = array_sum(array_column($recentSamples, 'bytes'));
+                $timeSpan = max(1, $now - min(array_column($recentSamples, 'timestamp')));
+                $bandwidthKbps = ($totalBytes * 8) / ($timeSpan * 1000); // Convert to kbps
+            } else {
+                $bandwidthKbps = 0;
+            }
+            
+            $data['last_update'] = $now;
+            $data['current_bandwidth_kbps'] = round($bandwidthKbps, 2);
+            
+            // Store bandwidth data in Redis (expires in 1 hour)
+            Redis::setex($bandwidthKey, 3600, json_encode($data));
+            
+            // Update database periodically (every 10 seconds to avoid too many writes)
+            if ($now % 10 === 0) {
+                SharedStream::where('stream_id', $streamKey)->update([
+                    'bytes_transferred' => $data['total_bytes'],
+                    'bandwidth_kbps' => (int)$bandwidthKbps
+                ]);
+            }
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error tracking bandwidth for {$streamKey}: " . $e->getMessage());
         }
     }
 
@@ -2201,7 +1723,10 @@ class SharedStreamService
         // Update database
         SharedStream::where('stream_id', $streamKey)->update([
             'status' => 'stopped',
-            'stopped_at' => now()
+            'stopped_at' => now(),
+            'client_count' => 0,
+            'bandwidth_kbps' => 0,
+            'process_id' => null
         ]);
     }
 
