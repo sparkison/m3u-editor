@@ -1090,6 +1090,7 @@ class SharedStreamService
                     
                     // Update database client count
                     SharedStream::where('stream_id', $streamKey)->update([
+                        'status' => 'active', // Ensure status is active on client join
                         'client_count' => $streamInfo['client_count'],
                         'last_client_activity' => now()
                     ]);
@@ -1845,7 +1846,7 @@ class SharedStreamService
                     Log::info("Stream data found for {$streamKey}, status: " . ($streamData['status'] ?? 'unknown'));
                 
                     $shouldCleanup = false;
-                    $lastActivity = $streamData['last_activity'] ?? 0;
+                    $lastActivity = $streamData['last_activity'] ??   0;
                     $status = $streamData['status'] ?? 'unknown';
                 
                     // Check if stream is inactive
@@ -2127,5 +2128,215 @@ class SharedStreamService
             'process_id' => $streamInfo['process_id'] ?? null,
             'uptime' => isset($streamInfo['created_at']) ? (time() - $streamInfo['created_at']) : 0
         ];
+    }
+
+    /**
+     * Stop a specific stream manually (for monitor interface)
+     */
+    public function stopStream(string $streamId): bool
+    {
+        try {
+            Log::channel('ffmpeg')->info("Manual stop requested for stream: {$streamId}");
+            
+            // Get stream info first
+            $streamInfo = $this->getStreamInfo($streamId);
+            if (!$streamInfo) {
+                Log::channel('ffmpeg')->warning("Stream {$streamId} not found in Redis for manual stop");
+                
+                // Still try to update database record if it exists
+                $dbStream = SharedStream::where('stream_id', $streamId)->first();
+                if ($dbStream) {
+                    $dbStream->update([
+                        'status' => 'stopped',
+                        'stopped_at' => now(),
+                        'process_id' => null,
+                        'client_count' => 0
+                    ]);
+                    Log::channel('ffmpeg')->info("Updated database record for {$streamId} to stopped status");
+                    return true;
+                }
+                return false;
+            }
+            
+            // Stop the FFmpeg process if it exists (will be handled by cleanupStream)
+            $pid = $this->getProcessPid($streamId);
+            if ($pid) {
+                Log::channel('ffmpeg')->info("Stopping FFmpeg process (PID: {$pid}) for stream {$streamId}");
+            }
+            
+            // Clean up the stream data (this will also stop the process)
+            $this->cleanupStream($streamId, true);
+            
+            // Update database
+            SharedStream::where('stream_id', $streamId)->update([
+                'status' => 'stopped',
+                'stopped_at' => now(),
+                'process_id' => null,
+                'client_count' => 0
+            ]);
+            
+            Log::channel('ffmpeg')->info("Successfully stopped stream {$streamId} manually");
+            return true;
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error stopping stream {$streamId}: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Create a new shared stream manually (for monitor interface)
+     */
+    public function createSharedStream(string $sourceUrl, string $format = 'ts'): ?string
+    {
+        try {
+            // Generate a stream key for the new stream
+            $streamKey = 'shared_stream:manual:' . time() . ':' . md5($sourceUrl);
+            
+            Log::channel('ffmpeg')->info("Creating manual shared stream: {$streamKey}");
+            
+            $streamInfo = [
+                'stream_key' => $streamKey,
+                'type' => 'manual',
+                'model_id' => 0,
+                'stream_url' => $sourceUrl,
+                'title' => 'Manual Stream',
+                'format' => $format,
+                'status' => 'starting',
+                'client_count' => 0,
+                'created_at' => now()->timestamp,
+                'last_client_activity' => now()->timestamp,
+                'options' => []
+            ];
+            
+            // Store stream info in Redis
+            $this->setStreamInfo($streamKey, $streamInfo);
+            
+            // Create database record
+            SharedStream::create([
+                'stream_id' => $streamKey,
+                'source_url' => $sourceUrl,
+                'format' => $format,
+                'status' => 'starting',
+                'client_count' => 0,
+                'last_client_activity' => now(),
+                'stream_info' => json_encode($streamInfo),
+                'started_at' => now()
+            ]);
+            
+            // Start the streaming process
+            $this->startStreamingProcess($streamKey, $streamInfo);
+            
+            Log::channel('ffmpeg')->info("Created manual shared stream: {$streamKey}");
+            return $streamKey;
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error creating manual stream: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Synchronize state between database and Redis
+     * 
+     * @return array<string, int>
+     */
+    public function synchronizeState(): array
+    {
+        $stats = [
+            'db_updated' => 0,
+            'redis_cleaned' => 0,
+            'inconsistencies_fixed' => 0
+        ];
+
+        try {
+            // Get all Redis stream keys
+            $redisKeys = Redis::keys(self::STREAM_PREFIX . '*');
+            $activeRedisStreams = [];
+            
+            foreach ($redisKeys as $key) {
+                if (strpos($key, ':clients') === false && strpos($key, ':buffer') === false) {
+                    $streamId = str_replace(self::STREAM_PREFIX, '', $key);
+                    $activeRedisStreams[] = $streamId;
+                }
+            }
+
+            // Get all database streams
+            $dbStreams = SharedStream::all();
+            
+            // Check Redis streams that don't exist in DB
+            foreach ($activeRedisStreams as $streamId) {
+                $dbStream = $dbStreams->firstWhere('stream_id', $streamId);
+                if (!$dbStream) {
+                    // Redis stream without DB record - clean up Redis
+                    $this->cleanupStream($streamId, true);
+                    $stats['redis_cleaned']++;
+                    $stats['inconsistencies_fixed']++;
+                }
+            }
+
+            // Check DB streams for inconsistencies
+            foreach ($dbStreams as $dbStream) {
+                $streamKey = self::STREAM_PREFIX . $dbStream->stream_id;
+                $redisExists = Redis::exists($streamKey);
+                $processRunning = $dbStream->process_id ? $this->isProcessRunning($dbStream->process_id) : false;
+
+                $needsUpdate = false;
+
+                // If DB says active but no Redis data and no process
+                if ($dbStream->status === 'active' && !$redisExists && !$processRunning) {
+                    $dbStream->update([
+                        'status' => 'stopped',
+                        'process_id' => null,
+                        'client_count' => 0
+                    ]);
+                    $needsUpdate = true;
+                    $stats['inconsistencies_fixed']++;
+                }
+
+                // If DB says stopped but Redis data exists
+                if ($dbStream->status === 'stopped' && $redisExists) {
+                    // Check if there are actually clients
+                    $clientCount = $this->getClientCount($dbStream->stream_id);
+                    if ($clientCount > 0 && $processRunning) {
+                        $dbStream->update([
+                            'status' => 'active',
+                            'client_count' => $clientCount
+                        ]);
+                        $needsUpdate = true;
+                    } else {
+                        // Clean up orphaned Redis data
+                        $this->cleanupStream($dbStream->stream_id, true);
+                        $stats['redis_cleaned']++;
+                    }
+                    $stats['inconsistencies_fixed']++;
+                }
+
+                // Update client count if mismatch
+                if ($redisExists) {
+                    $actualClientCount = $this->getClientCount($dbStream->stream_id);
+                    if ($dbStream->client_count !== $actualClientCount) {
+                        $dbStream->update(['client_count' => $actualClientCount]);
+                        $needsUpdate = true;
+                    }
+                }
+
+                if ($needsUpdate) {
+                    $stats['db_updated']++;
+                }
+            }
+
+            // Clean up orphaned Redis keys
+            $orphanedKeys = $this->cleanupOrphanedKeys();
+            $stats['redis_cleaned'] += $orphanedKeys;
+
+            Log::info('Stream state synchronization completed', $stats);
+
+        } catch (\Exception $e) {
+            Log::error('Stream state synchronization failed: ' . $e->getMessage());
+            throw $e;
+        }
+
+        return $stats;
     }
 }
