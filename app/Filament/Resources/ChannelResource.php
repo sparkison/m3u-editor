@@ -346,8 +346,8 @@ class ChannelResource extends Resource
                                 ->schema(self::getForm(edit: true))
                                 ->columns(2)
                         ]),
-                    Tables\Actions\DeleteAction::make()->hidden(fn(Model $record) => $record->is_vod),
-                ])->button()->hiddenLabel()->size('sm')->hidden(fn(Model $record) => !($record->is_custom || $record->is_vod)),
+                    Tables\Actions\DeleteAction::make()
+                ])->button()->hiddenLabel()->size('sm')->hidden(fn(Model $record) => !$record->is_custom),
                 Tables\Actions\EditAction::make('edit')
                     ->slideOver()
                     ->form(fn(Tables\Actions\EditAction $action): array => [
@@ -357,8 +357,8 @@ class ChannelResource extends Resource
                     ])
                     ->button()
                     ->hiddenLabel()
-                    ->disabled(fn(Model $record) => $record->is_custom || $record->is_vod)
-                    ->hidden(fn(Model $record) => $record->is_custom || $record->is_vod),
+                    ->disabled(fn(Model $record) => $record->is_custom)
+                    ->hidden(fn(Model $record) => $record->is_custom),
                 Tables\Actions\ViewAction::make()
                     ->button()
                     ->hiddenLabel()

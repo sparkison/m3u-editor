@@ -33,8 +33,6 @@ class Channel extends Model
         'group_id' => 'integer',
         'extvlcopt' => 'array',
         'kodidrop' => 'array',
-        'info' => 'array',
-        'movie_data' => 'array',
         'is_custom' => 'boolean',
         'is_vod' => 'boolean',
         'logo_type' => ChannelLogoType::class,
