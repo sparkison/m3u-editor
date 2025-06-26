@@ -31,6 +31,7 @@ class SharedStreamService
     // const CLIENT_TIMEOUT = 120; // Now fetched from config
 
     private int $clientTimeout;
+    private array $activeProcesses = []; // Store active FFmpeg processes
 
     public function __construct()
     {
@@ -397,6 +398,14 @@ class SharedStreamService
         $pid = $status['pid'];
         $this->setStreamProcess($streamKey, $pid);
 
+        // Store process handles for direct access during streaming
+        $this->activeProcesses[$streamKey] = [
+            'process' => $process,
+            'stdout' => $pipes[1],
+            'stderr' => $pipes[2],
+            'pid' => $pid
+        ];
+
         // Store process info in stream data
         $streamInfo['pid'] = $pid;
         $this->setStreamInfo($streamKey, $streamInfo);
@@ -552,7 +561,7 @@ class SharedStreamService
         
         // Start continuous buffering immediately in current process
         // This prevents the broken pipe issue by keeping the parent process active
-        $this->runBufferManager($streamKey, $stdout, $stderr, $process);
+        $this->runContinuousBuffering($streamKey, $stdout, $stderr, $process);
         
         Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffer manager running in current process");
     }
@@ -842,375 +851,106 @@ class SharedStreamService
             Log::channel('ffmpeg')->debug("Stream {$streamKey}: Flushed remaining data as segment {$segmentNumber}");
         }
         
-        Log::channel('ffmpeg')->info("Stream {$streamKey}: Short initial buffering completed with {$segmentNumber} total segments, allowing HTTP response to complete");
+        Log::channel('ffmpeg')->info("Stream {$streamKey}: Short initial buffering completed with {$segmentNumber} total segments");
         
-        // At this point, we return and let the HTTP response complete
-        // The FFmpeg process will continue running, and clients can read from the buffered segments
-        // When the process eventually ends, it will be cleaned up by the cleanup processes
+        // Initial buffering is complete. The process handles are stored for on-demand reading.
+        // Clients will read additional data via getNextStreamSegments() which can read directly from FFmpeg.
     }
 
     /**
-     * Run the buffer manager (reads from FFmpeg, stores in Redis for sharing)
-     * Optimized for performance and VLC compatibility
+     * Start continuous buffering in the background
      */
-    private function runBufferManager(string $streamKey, $stdout, $stderr, $process): void
+    private function startContinuousBufferJob(string $streamKey, $stdout, $stderr, $process): void
+    {
+        // Use a simpler approach: just continue buffering in current process
+        // without forking to avoid file descriptor issues
+        
+        Log::channel('ffmpeg')->info("Stream {$streamKey}: Starting continuous buffering in current process");
+        
+        // Start continuous buffering without forking
+        // This will run in the background naturally as the process continues
+        $this->runContinuousBuffering($streamKey, $stdout, $stderr, $process);
+    }
+
+    /**
+     * Run continuous buffering for the stream
+     */
+    private function runContinuousBuffering(string $streamKey, $stdout, $stderr, $process): void
     {
         $bufferKey = self::BUFFER_PREFIX . $streamKey;
-        $segmentNumber = 0;
-        
-        // Optimized buffer settings based on xTeVe approach
-        $targetChunkSize = 188 * 1000; // 188KB chunks (similar to xTeVe default)
-        $readChunkSize = 32768; // 32KB reads for better performance
-        $maxSegmentsInMemory = 100; // Keep more segments for better client experience
-        
-        $lastActivity = time();
-        $maxInactiveTime = 60; // 60 seconds of no data before giving up
-
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffer manager starting with {$targetChunkSize} byte chunks, {$readChunkSize} read size");
-
-        try {
-            $accumulatedData = '';
-            $accumulatedSize = 0;
-            $lastFlushTime = time();
-            $maxAccumulationTime = 1; // Max 1 second before force-flushing (more responsive)
-            $redis = $this->redis();
-
-            while (!feof($stdout) && $this->isStreamActive($streamKey)) {
-                $hasData = false;
-
-                // Read larger chunks for better performance
-                $chunk = fread($stdout, $readChunkSize);
-                if ($chunk !== false && strlen($chunk) > 0) {
-                    $accumulatedData .= $chunk;
-                    $accumulatedSize += strlen($chunk);
-                    $hasData = true;
-                    $lastActivity = time();
-                    
-                    // More aggressive flushing for better responsiveness
-                    $shouldFlush = false;
-                    
-                    // Flush when we have enough data for a good chunk
-                    if ($accumulatedSize >= $targetChunkSize) {
-                        $shouldFlush = true;
-                    }
-                    // Flush if we've been accumulating for too long (prevents delays)
-                    elseif (time() - $lastFlushTime >= $maxAccumulationTime) {
-                        $shouldFlush = true;
-                    }
-                    // Flush if we have reasonable amount and no immediate data
-                    elseif ($accumulatedSize >= 64000) { // 64KB minimum for reasonable chunks
-                        // Check if more data is immediately available
-                        stream_set_blocking($stdout, false);
-                        $peek = fread($stdout, 1);
-                        if ($peek === false || strlen($peek) === 0) {
-                            $shouldFlush = true;
-                        } else {
-                            // Put the peeked byte back into accumulated data
-                            $accumulatedData .= $peek;
-                            $accumulatedSize += 1;
-                        }
-                    }
-                    
-                    if ($shouldFlush && $accumulatedSize > 0) {
-                        // Use pipeline for better Redis performance
-                        $pipeline = $redis->pipeline();
-                        
-                        $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                        $pipeline->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
-                        $pipeline->lpush("{$bufferKey}:segments", $segmentNumber);
-                        $pipeline->ltrim("{$bufferKey}:segments", 0, $maxSegmentsInMemory);
-                        
-                        // Update stream activity
-                        $pipeline->setex("{$bufferKey}:activity", 300, time());
-                        
-                        $pipeline->execute();
-                        
-                        // Log progress less frequently to reduce overhead
-                        if ($segmentNumber <= 10 || $segmentNumber % 200 === 0) {
-                            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffered segment {$segmentNumber} ({$accumulatedSize} bytes)");
-                        }
-                        
-                        $segmentNumber++;
-                        $accumulatedData = '';
-                        $accumulatedSize = 0;
-                        $lastFlushTime = time();
-                    }
-                }
-
-                // Check for errors from FFmpeg stderr (less frequently)
-                if ($segmentNumber % 10 === 0) { // Check every 10 segments
-                    $error = fread($stderr, 1024);
-                    if ($error !== false && strlen($error) > 0) {
-                        Log::channel('ffmpeg')->error("Stream {$streamKey} FFmpeg error: {$error}");
-                    }
-                }
-
-                // Check if process is still running (less frequently)
-                if ($segmentNumber % 50 === 0 || !$hasData) { // Check every 50 segments or when no data
-                    $status = proc_get_status($process);
-                    if (!$status['running']) {
-                        // Flush any remaining accumulated data before ending
-                        if ($accumulatedSize > 0) {
-                            $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                            $redis->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
-                            $redis->lpush("{$bufferKey}:segments", $segmentNumber);
-                            $redis->ltrim("{$bufferKey}:segments", 0, $maxSegmentsInMemory);
-                            $segmentNumber++;
-                            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Flushed final segment {$segmentNumber} ({$accumulatedSize} bytes)");
-                        }
-                        Log::channel('ffmpeg')->warning("Stream {$streamKey}: FFmpeg process terminated (exit code: {$status['exitcode']})");
-                        break;
-                    }
-                }
-
-                // Optimized sleep timing for better responsiveness
-                if (!$hasData) {
-                    if (time() - $lastActivity > $maxInactiveTime) {
-                        // Flush any remaining data before ending
-                        if ($accumulatedSize > 0) {
-                            $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                            $redis->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
-                            $redis->lpush("{$bufferKey}:segments", $segmentNumber);
-                            $redis->ltrim("{$bufferKey}:segments", 0, $maxSegmentsInMemory);
-                            $segmentNumber++;
-                            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Flushed timeout segment {$segmentNumber} ({$accumulatedSize} bytes)");
-                        }
-                        Log::channel('ffmpeg')->warning("Stream {$streamKey}: No data for {$maxInactiveTime}s, ending buffer manager");
-                        break;
-                    }
-                    usleep(10000); // 10ms sleep when no data (faster response than before)
-                } else {
-                    usleep(500); // 0.5ms sleep when actively buffering (very responsive)
-                }
-            }
-        } catch (\Exception $e) {
-            Log::channel('ffmpeg')->error("Stream {$streamKey}: Buffer manager error: " . $e->getMessage());
-        } finally {
-            // Safer cleanup that doesn't cause Redis connection issues
-            try {
-                if (is_resource($stdout)) {
-                    fclose($stdout);
-                }
-                if (is_resource($stderr)) {
-                    fclose($stderr);
-                }
-                if (is_resource($process)) {
-                    proc_close($process);
-                }
-                
-                // Update database status only (avoid Redis cleanup that can cause connection errors)
-                SharedStream::where('stream_id', $streamKey)->update([
-                    'status' => 'stopped',
-                    'stopped_at' => now()
-                ]);
-                
-            } catch (\Exception $e) {
-                Log::channel('ffmpeg')->error("Stream {$streamKey}: Error during safe cleanup: " . $e->getMessage());
-            }
-            
-            Log::channel('ffmpeg')->info("Stream {$streamKey}: Buffer manager ended after {$segmentNumber} segments");
-        }
-    }
-
-    /**
-     * Run buffer manager asynchronously using xTeVe-inspired approach
-     */
-    private function runAsyncBufferManager(string $streamKey, $stdout, $stderr, $process): void
-    {
-        // IMPORTANT: Don't use pcntl_fork in web context as it causes issues with:
-        // - Redis connections being shared across processes
-        // - File handle inheritance problems
-        // - HTTP response handling
-        
-        // Instead, use a more stable approach that keeps everything in the same process
-        // but uses non-blocking I/O and proper resource management
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Starting buffer manager in current process (no fork)");
-        
-        // Run the optimized buffer manager that uses stream_select for efficient I/O
-        $this->runOptimizedBufferManager($streamKey, $stdout, $stderr, $process);
-    }
-
-    /**
-     * Optimized buffer manager inspired by xTeVe's approach
-     */
-    private function runOptimizedBufferManager(string $streamKey, $stdout, $stderr, $process): void
-    {
-        // Set up immediate non-blocking streams
-        stream_set_blocking($stdout, false);
-        stream_set_blocking($stderr, false);
-        
-        // DON'T register shutdown function here - it causes race condition
-        // where cleanup happens immediately after stream starts successfully
-        // Instead, let the stream run and only clean up when actually needed
-        
-        // Start a background buffer reader using stream_select for efficiency
-        $this->startStreamSelector($streamKey, $stdout, $stderr, $process);
-    }
-
-    /**
-     * Use stream_select for efficient I/O handling (xTeVe-style)
-     */
-    private function startStreamSelector(string $streamKey, $stdout, $stderr, $process): void
-    {
-        $bufferKey = self::BUFFER_PREFIX . $streamKey;
-        $segmentNumber = 0;
+        $redis = $this->redis();
+        $targetChunkSize = 188 * 1000; // 188KB chunks
         $accumulatedData = '';
         $accumulatedSize = 0;
-        $targetChunkSize = 188 * 1000; // xTeVe-compatible chunk size
-        $redis = $this->redis();
+        $maxIdleTime = 30; // Stop after 30 seconds of no data
+        $lastDataTime = time();
         
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Starting stream selector buffer manager");
+        // Get current segment count to continue numbering
+        $segmentNumber = $redis->llen("{$bufferKey}:segments");
         
-        // Remove arbitrary iteration limit that was causing premature termination
-        $lastActivity = time();
-        $maxInactiveTime = 60; // 60 seconds of no data before giving up
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Continuous buffering started from segment {$segmentNumber}");
         
-        $lastFlushTime = time();
-        $maxAccumulationTime = 2; // Max 2 seconds before force-flushing
-        
-        while ($this->isStreamActive($streamKey)) {
-            $read = [$stdout, $stderr];
-            $write = null;
-            $except = null;
-            
-            // Use stream_select with short timeout for responsiveness
-            $result = stream_select($read, $write, $except, 0, 100000); // 100ms timeout
-            
-            if ($result > 0) {
-                $hasData = false;
-                
-                // Data available on stdout
-                if (in_array($stdout, $read)) {
-                    $chunk = fread($stdout, 32768);
-                    if ($chunk !== false && strlen($chunk) > 0) {
-                        $accumulatedData .= $chunk;
-                        $accumulatedSize += strlen($chunk);
-                        $hasData = true;
-                        $lastActivity = time();
-                        
-                        // Determine if we should flush
-                        $shouldFlush = false;
-                        
-                        // Flush when we have enough data for a full chunk
-                        if ($accumulatedSize >= $targetChunkSize) {
-                            $shouldFlush = true;
-                        }
-                        // Flush if we've been accumulating for too long (prevents stalling)
-                        elseif (time() - $lastFlushTime >= $maxAccumulationTime && $accumulatedSize > 0) {
-                            $shouldFlush = true;
-                        }
-                        // Flush if we have reasonable amount and no immediate data available
-                        elseif ($accumulatedSize >= 64000) { // 64KB minimum for reasonable chunks
-                            // Check if more data is immediately available
-                            stream_set_blocking($stdout, false);
-                            $peek = fread($stdout, 1);
-                            if ($peek === false || strlen($peek) === 0) {
-                                $shouldFlush = true;
-                            } else {
-                                // Put the peeked byte back into accumulated data
-                                $accumulatedData .= $peek;
-                                $accumulatedSize += 1;
-                            }
-                        }
-                        
-                        if ($shouldFlush) {
-                            $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                            $redis->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
-                            $redis->lpush("{$bufferKey}:segments", $segmentNumber);
-                            $redis->ltrim("{$bufferKey}:segments", 0, 50);
-                            
-                            $segmentNumber++;
-                            $accumulatedData = '';
-                            $accumulatedSize = 0;
-                            $lastFlushTime = time();
-                            
-                            // Update stream activity
-                            $this->updateStreamActivity($streamKey);
-                            
-                            // Log progress for first few segments and then periodically
-                            if ($segmentNumber <= 10 || $segmentNumber % 100 === 0) {
-                                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffered segment {$segmentNumber}");
-                            }
-                        }
-                    }
-                }
-                
-                // Handle stderr
-                if (in_array($stderr, $read)) {
-                    $error = fread($stderr, 1024);
-                    if ($error !== false && strlen($error) > 0) {
-                        Log::channel('ffmpeg')->error("Stream {$streamKey}: {$error}");
-                    }
-                }
-                
-                // Check if we have any data activity
-                if ($hasData) {
-                    $lastActivity = time();
-                }
-            }
-            
-            // Check if process is still running periodically
-            if ($segmentNumber % 50 === 0 || (time() - $lastActivity) > 10) {
-                $status = proc_get_status($process);
-                if (!$status['running']) {
-                    // Flush any remaining data before ending
-                    if ($accumulatedSize > 0) {
-                        $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                        $redis->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
-                        $redis->lpush("{$bufferKey}:segments", $segmentNumber);
-                        $segmentNumber++;
-                        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Flushed final accumulated segment {$segmentNumber} before exit due to process end.");
-                    }
-                    Log::channel('ffmpeg')->info("Stream {$streamKey}: FFmpeg process ended (status code: ".($status['exitcode'] ?? 'unknown')."), stopping buffer manager.");
-
-                    // Requirement 4.b.c: Capture final stderr output
-                    if (is_resource($stderr)) {
-                        $finalStderr = '';
-                        // stream_set_blocking($stderr, false); // Should already be non-blocking
-                        while (($line = fgets($stderr)) !== false) { // Using fgets for potentially multi-line output
-                            $finalStderr .= $line;
-                        }
-                        if (!empty(trim($finalStderr))) {
-                            Log::channel('ffmpeg')->error("Stream {$streamKey}: Final FFmpeg stderr output upon process end: " . trim($finalStderr));
-                        }
-                    }
-                    break;
-                }
-            }
-            
-            // Check for inactivity timeout
-            if (time() - $lastActivity > $maxInactiveTime) {
-                // Flush any remaining data before ending due to timeout
-                if ($accumulatedSize > 0) {
-                    $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                    $redis->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
-                    $redis->lpush("{$bufferKey}:segments", $segmentNumber);
-                    $segmentNumber++;
-                    Log::channel('ffmpeg')->debug("Stream {$streamKey}: Flushed timeout segment {$segmentNumber} ({$accumulatedSize} bytes)");
-                }
-                Log::channel('ffmpeg')->warning("Stream {$streamKey}: No data for {$maxInactiveTime}s, ending buffer manager");
+        while (true) {
+            // Check if the process is still running
+            $status = proc_get_status($process);
+            if (!$status['running']) {
+                Log::channel('ffmpeg')->info("Stream {$streamKey}: FFmpeg process ended, stopping continuous buffering");
                 break;
             }
             
-            // Check if we need to flush data due to time constraint (even without new data)
-            if ($accumulatedSize > 0 && time() - $lastFlushTime >= $maxAccumulationTime) {
-                $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                $redis->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
-                $redis->lpush("{$bufferKey}:segments", $segmentNumber);
-                $redis->ltrim("{$bufferKey}:segments", 0, 50);
-                
-                $segmentNumber++;
-                $accumulatedData = '';
-                $accumulatedSize = 0;
-                $lastFlushTime = time();
-                
-                $this->updateStreamActivity($streamKey);
-                
-                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Flushed timeout segment {$segmentNumber} due to time constraint");
+            // Check if stream should be stopped (no clients for too long)
+            $streamInfo = $this->getStreamInfo($streamKey);
+            if (!$streamInfo || $streamInfo['status'] === 'stopped') {
+                Log::channel('ffmpeg')->info("Stream {$streamKey}: Stream marked for stop, ending continuous buffering");
+                break;
             }
             
-            // Small sleep to prevent CPU spinning
-            usleep(1000); // 1ms sleep
+            // Try to read data
+            $chunk = fread($stdout, 32768);
+            if ($chunk !== false && strlen($chunk) > 0) {
+                $accumulatedData .= $chunk;
+                $accumulatedSize += strlen($chunk);
+                $lastDataTime = time();
+                
+                // Create segment when we have enough data
+                if ($accumulatedSize >= $targetChunkSize) {
+                    $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                    $redis->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
+                    $redis->lpush("{$bufferKey}:segments", $segmentNumber);
+                    
+                    // Keep only recent segments (prevent memory bloat)
+                    $redis->ltrim("{$bufferKey}:segments", 0, 50);
+                    
+                    // Clean up old segments
+                    $oldSegmentNumber = $segmentNumber - 50;
+                    if ($oldSegmentNumber >= 0) {
+                        $redis->del("{$bufferKey}:segment_{$oldSegmentNumber}");
+                    }
+                    
+                    Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffered continuous segment {$segmentNumber} ({$accumulatedSize} bytes)");
+                    
+                    $segmentNumber++;
+                    $accumulatedData = '';
+                    $accumulatedSize = 0;
+                    
+                    $this->updateStreamActivity($streamKey);
+                }
+            } else {
+                // No data available
+                if ((time() - $lastDataTime) > $maxIdleTime) {
+                    Log::channel('ffmpeg')->warning("Stream {$streamKey}: No data for {$maxIdleTime}s, stopping continuous buffering");
+                    break;
+                }
+                
+                // Small sleep to prevent high CPU usage
+                usleep(50000); // 50ms
+            }
+            
+            // Check for FFmpeg errors
+            $error = fread($stderr, 1024);
+            if ($error !== false && strlen($error) > 0) {
+                Log::channel('ffmpeg')->error("Stream {$streamKey}: {$error}");
+            }
         }
         
         // Flush any remaining data
@@ -1218,99 +958,13 @@ class SharedStreamService
             $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
             $redis->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
             $redis->lpush("{$bufferKey}:segments", $segmentNumber);
-            $segmentNumber++;
-            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Flushed final segment {$segmentNumber} after stream_selector loop completion.");
+            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Final continuous segment {$segmentNumber} flushed");
         }
         
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Stream selector completed with {$segmentNumber} segments");
-    }
-
-    /**
-     * Perform final cleanup safely without causing Redis connection issues
-     */
-    private function performFinalCleanupSafe(string $streamKey, $stdout, $stderr, $process): void
-    {
-        try {
-            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Starting safe final cleanup");
-            
-            // Close file handles first
-            if (is_resource($stdout)) {
-                fclose($stdout);
-            }
-            if (is_resource($stderr)) {
-                fclose($stderr);
-            }
-            if (is_resource($process)) {
-                proc_close($process);
-            }
-            
-            // Update stream status in both Redis and database when buffer manager ends
-            try {
-                // Update Redis stream info to reflect the stopped status
-                $streamInfo = $this->getStreamInfo($streamKey);
-                if ($streamInfo) {
-                    $streamInfo['status'] = 'stopped';
-                    $streamInfo['stopped_at'] = time();
-                    $streamInfo['stop_reason'] = 'buffer_manager_ended';
-                    $this->setStreamInfo($streamKey, $streamInfo);
-                }
-                
-                // Also update database
-                SharedStream::where('stream_id', $streamKey)->update([
-                    'status' => 'stopped',
-                    'stopped_at' => now()
-                ]);
-                
-                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Updated status to 'stopped' in both Redis and database");
-            } catch (\Exception $e) {
-                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Error updating status during cleanup: " . $e->getMessage());
-            }
-            
-        } catch (\Exception $e) {
-            // Silent handling to prevent cascading errors during shutdown
-        }
-    }
-
-    /**
-     * Perform final cleanup on shutdown
-     */
-    private function performFinalCleanup(string $streamKey, $stdout, $stderr, $process): void
-    {
-        try {
-            // Quick drain of any remaining data
-            if (is_resource($stdout)) {
-                while (!feof($stdout)) {
-                    $data = fread($stdout, 8192);
-                    if ($data === false || strlen($data) === 0) break;
-                }
-                fclose($stdout);
-            }
-            
-            if (is_resource($stderr)) {
-                while (!feof($stderr)) {
-                    $error = fread($stderr, 1024);
-                    if ($error === false || strlen($error) === 0) break;
-                    if (!empty(trim($error))) {
-                        Log::channel('ffmpeg')->error("Stream {$streamKey} final: {$error}");
-                    }
-                }
-                fclose($stderr);
-            }
-            
-            if (is_resource($process)) {
-                proc_close($process);
-            }
-            
-            // Mark stream as stopped
-            $streamInfo = $this->getStreamInfo($streamKey);
-            if ($streamInfo) {
-                $streamInfo['status'] = 'stopped';
-                $this->setStreamInfo($streamKey, $streamInfo);
-            }
-            
-        } catch (\Exception $e) {
-            Log::channel('ffmpeg')->error("Stream {$streamKey}: Error during final cleanup: " . $e->getMessage());
-        }
+        Log::channel('ffmpeg')->info("Stream {$streamKey}: Continuous buffering ended");
+        
+        // Close the process
+        proc_close($process);
     }
 
     /**
@@ -1782,7 +1436,7 @@ class SharedStreamService
             Log::channel('ffmpeg')->error("Error cleaning up temp files: " . $e->getMessage());
             return 0;
         }
-    }
+       }
 
     /**
      * Get total buffer disk usage across all streams
@@ -2260,29 +1914,33 @@ class SharedStreamService
         $bufferKey = self::BUFFER_PREFIX . $streamKey;
         $segmentNumbers = $this->redis()->lrange("{$bufferKey}:segments", 0, -1);
         
-        if (empty($segmentNumbers)) {
-            return null;
-        }
-        
         $data = '';
         $segmentsRetrieved = 0;
         $maxSegmentsPerCall = 5; // Limit segments per call to prevent overwhelming clients
         
-        // Convert segment numbers to integers and sort them
-        $segmentNumbers = array_map('intval', $segmentNumbers);
-        sort($segmentNumbers);
-        
-        foreach ($segmentNumbers as $segmentNumber) {
-            // Only get segments newer than the last one sent to this client
-            if ($segmentNumber > $lastSegment && $segmentsRetrieved < $maxSegmentsPerCall) {
-                $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                $segmentData = $this->redis()->get($segmentKey);
-                if ($segmentData) {
-                    $data .= $segmentData;
-                    $lastSegment = $segmentNumber; // Update the reference variable
-                    $segmentsRetrieved++;
+        // First, try to get data from existing buffered segments
+        if (!empty($segmentNumbers)) {
+            // Convert segment numbers to integers and sort them
+            $segmentNumbers = array_map('intval', $segmentNumbers);
+            sort($segmentNumbers);
+            
+            foreach ($segmentNumbers as $segmentNumber) {
+                // Only get segments newer than the last one sent to this client
+                if ($segmentNumber > $lastSegment && $segmentsRetrieved < $maxSegmentsPerCall) {
+                    $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                    $segmentData = $this->redis()->get($segmentKey);
+                    if ($segmentData) {
+                        $data .= $segmentData;
+                        $lastSegment = $segmentNumber; // Update the reference variable
+                        $segmentsRetrieved++;
+                    }
                 }
             }
+        }
+        
+        // If no buffered data is available, try to read directly from FFmpeg
+        if (empty($data) && isset($this->activeProcesses[$streamKey])) {
+            $data = $this->readDirectFromFFmpeg($streamKey, $lastSegment);
         }
         
         // Update client activity if we retrieved data
@@ -2291,6 +1949,95 @@ class SharedStreamService
         }
         
         return !empty($data) ? $data : null;
+    }
+
+    /**
+     * Read data directly from FFmpeg process
+     */
+    private function readDirectFromFFmpeg(string $streamKey, int &$lastSegment): ?string
+    {
+        if (!isset($this->activeProcesses[$streamKey])) {
+            return null;
+        }
+        
+        $processInfo = $this->activeProcesses[$streamKey];
+        $stdout = $processInfo['stdout'];
+        $stderr = $processInfo['stderr'];
+        $process = $processInfo['process'];
+        
+        // Check if process is still running
+        $status = proc_get_status($process);
+        if (!$status['running']) {
+            Log::channel('ffmpeg')->info("Stream {$streamKey}: FFmpeg process ended, removing from active processes");
+            unset($this->activeProcesses[$streamKey]);
+            return null;
+        }
+        
+        $bufferKey = self::BUFFER_PREFIX . $streamKey;
+        $redis = $this->redis();
+        $targetChunkSize = 188 * 1000; // 188KB chunks
+        $accumulatedData = '';
+        $accumulatedSize = 0;
+        $maxReadTime = 2; // Maximum 2 seconds to read data
+        $startTime = time();
+        $readAttempts = 0;
+        $maxReadAttempts = 20; // Maximum read attempts
+        
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Reading directly from FFmpeg process");
+        
+        while ($accumulatedSize < $targetChunkSize && 
+               (time() - $startTime) < $maxReadTime && 
+               $readAttempts < $maxReadAttempts) {
+            
+            $readAttempts++;
+            
+            // Try to read data from FFmpeg stdout
+            $chunk = fread($stdout, 32768); // Read 32KB chunks
+            if ($chunk !== false && strlen($chunk) > 0) {
+                $accumulatedData .= $chunk;
+                $accumulatedSize += strlen($chunk);
+                
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Read " . strlen($chunk) . " bytes from FFmpeg (total: {$accumulatedSize})");
+            } else {
+                // No immediate data available, small sleep
+                usleep(100000); // 100ms
+            }
+            
+            // Check for errors
+            $error = fread($stderr, 1024);
+            if ($error !== false && strlen($error) > 0) {
+                Log::channel('ffmpeg')->error("Stream {$streamKey}: FFmpeg error: {$error}");
+            }
+        }
+        
+        if ($accumulatedSize > 0) {
+            // Store the data as a new segment
+            $currentSegments = $redis->llen("{$bufferKey}:segments");
+            $newSegmentNumber = $currentSegments;
+            
+            $segmentKey = "{$bufferKey}:segment_{$newSegmentNumber}";
+            $redis->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
+            $redis->lpush("{$bufferKey}:segments", $newSegmentNumber);
+            
+            // Keep only recent segments (prevent memory bloat)
+            $redis->ltrim("{$bufferKey}:segments", 0, 50);
+            
+            // Clean up old segments
+            $oldSegmentNumber = $newSegmentNumber - 50;
+            if ($oldSegmentNumber >= 0) {
+                $redis->del("{$bufferKey}:segment_{$oldSegmentNumber}");
+            }
+            
+            $lastSegment = $newSegmentNumber;
+            $this->updateStreamActivity($streamKey);
+            
+            Log::channel('ffmpeg')->info("Stream {$streamKey}: Created new segment {$newSegmentNumber} from direct FFmpeg read ({$accumulatedSize} bytes)");
+            
+            return $accumulatedData;
+        }
+        
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: No data available from direct FFmpeg read after {$readAttempts} attempts");
+        return null;
     }
 
     /**
@@ -2340,7 +2087,22 @@ class SharedStreamService
         }
         
         try {
-            return posix_kill($pid, 0);
+            // Check if the process exists
+            if (!posix_kill($pid, 0)) {
+                return false;
+            }
+            
+            // Additional check for zombie processes - they exist but are not really running
+            $output = shell_exec("ps -p $pid -o state= 2>/dev/null");
+            if ($output !== null) {
+                $state = trim($output);
+                // Z = zombie, D = uninterruptible sleep (usually dead), T = stopped
+                if (in_array($state, ['Z', 'D'])) {
+                    return false;
+                }
+            }
+            
+            return true;
         } catch (\Exception $e) {
             return false;
         }
@@ -2402,6 +2164,27 @@ class SharedStreamService
      */
     private function cleanupStream(string $streamKey, bool $removeFiles = false): void
     {
+        // Clean up active process if it exists
+        if (isset($this->activeProcesses[$streamKey])) {
+            $processInfo = $this->activeProcesses[$streamKey];
+            
+            // Close file handles
+            if (is_resource($processInfo['stdout'])) {
+                fclose($processInfo['stdout']);
+            }
+            if (is_resource($processInfo['stderr'])) {
+                fclose($processInfo['stderr']);
+            }
+            
+            // Close the process
+            if (is_resource($processInfo['process'])) {
+                proc_close($processInfo['process']);
+            }
+            
+            unset($this->activeProcesses[$streamKey]);
+            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Cleaned up active process handles");
+        }
+        
         // Remove Redis data
         Redis::del("shared_stream:{$streamKey}");
         Redis::del("stream_clients:{$streamKey}");
