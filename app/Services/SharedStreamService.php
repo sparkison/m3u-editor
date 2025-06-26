@@ -113,6 +113,8 @@ class SharedStreamService
                     SharedStream::where('stream_id', $streamKey)->update([
                         'status' => 'starting',
                         'process_id' => $this->getProcessPid($streamKey), // getProcessPid fetches from Redis, which startHLS/Direct sets
+                        'client_count' => 1, // Reset client count for restarted stream
+                        'started_at' => now(), // Reset start time for restarted stream
                         'error_message' => null, // Clear previous errors on successful restart initiation
                         'last_client_activity' => now()
                     ]);
@@ -161,6 +163,15 @@ class SharedStreamService
 
         // Register this client for the stream AFTER ensuring the stream exists
         $this->registerClient($streamKey, $clientId, $options);
+
+        // Always increment client count when a client connects (whether new or existing stream)
+        if ($isNewStream) {
+            // For new streams, the initial client count is set to 1, but we still need to ensure consistency
+            Log::channel('ffmpeg')->debug("Client {$clientId} registered for new stream {$streamKey}");
+        } else {
+            // For existing streams, incrementClientCount was already called above
+            Log::channel('ffmpeg')->debug("Client {$clientId} registered for existing stream {$streamKey}");
+        }
 
         // Add metadata about whether this was a new stream
         $streamInfo['is_new_stream'] = $isNewStream;
@@ -1744,6 +1755,32 @@ class SharedStreamService
      */
     private function cleanupStream(string $streamKey, bool $removeFiles = false): void
     {
+        // First, kill the FFmpeg process if it exists
+        $pid = $this->getProcessPid($streamKey);
+        if ($pid && $this->isProcessRunning($pid)) {
+            Log::channel('ffmpeg')->info("Terminating FFmpeg process (PID: {$pid}) for stream {$streamKey}");
+            
+            // Try graceful termination first (SIGTERM)
+            exec("kill -TERM {$pid} 2>/dev/null");
+            
+            // Wait a moment for graceful shutdown
+            sleep(1);
+            
+            // If still running, force kill (SIGKILL)
+            if ($this->isProcessRunning($pid)) {
+                Log::channel('ffmpeg')->warning("FFmpeg process {$pid} didn't respond to SIGTERM, using SIGKILL");
+                exec("kill -KILL {$pid} 2>/dev/null");
+                sleep(1); // Give it a moment to die
+            }
+            
+            // Verify it's actually dead
+            if (!$this->isProcessRunning($pid)) {
+                Log::channel('ffmpeg')->info("FFmpeg process {$pid} successfully terminated for stream {$streamKey}");
+            } else {
+                Log::channel('ffmpeg')->error("Failed to terminate FFmpeg process {$pid} for stream {$streamKey}");
+            }
+        }
+        
         // Clean up active process if it exists
         if (isset($this->activeProcesses[$streamKey])) {
             $processInfo = $this->activeProcesses[$streamKey];
@@ -2215,7 +2252,7 @@ class SharedStreamService
                 'source_url' => $sourceUrl,
                 'format' => $format,
                 'status' => 'starting',
-                'client_count' => 0,
+                'client_count' => 1, // Start with 1 since we have the initial client
                 'last_client_activity' => now(),
                 'stream_info' => json_encode($streamInfo),
                 'started_at' => now()
