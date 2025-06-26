@@ -498,6 +498,16 @@ class SharedStreamService
     }
 
     /**
+     * Set process PID for a stream
+     */
+    private function setStreamProcess(string $streamKey, int $pid): void
+    {
+        $pidKey = "stream_pid:{$streamKey}";
+        $this->redis()->set($pidKey, $pid);
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Stored process PID {$pid} in Redis");
+    }
+
+    /**
      * Start continuous buffering process (xTeVe-style optimized)
      */
     private function startContinuousBuffering(string $streamKey, $stdout, $stderr, $process): void
@@ -672,7 +682,8 @@ class SharedStreamService
                         Log::channel('ffmpeg')->debug("Stream {$streamKey}: Initial buffer segment {$segmentNumber} buffered ({$accumulatedSize} bytes)");
                         
                         // Requirement 1.a: Update status to 'active' after first segment
-                        if ($segmentNumber == 0) // This means it's the first segment successfully processed (about to be incremented)
+                        if ($segmentNumber == 0 // This means it's the first segment successfully processed (about to be incremented)
+                        )
                         {
                             $streamInfo = $this->getStreamInfo($streamKey);
                             if ($streamInfo) {
@@ -1782,10 +1793,7 @@ class SharedStreamService
     public function getTotalBufferDiskUsage(): int
     {
         try {
-
-
-
-                       $totalSize = 0;
+            $totalSize = 0;
             $activeStreams = $this->getAllActiveStreams();
             
             foreach (array_keys($activeStreams) as $streamKey) {
@@ -2407,6 +2415,158 @@ class SharedStreamService
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Error during cleanup: " . $e->getMessage());
             throw $e;
+        }
+    }
+
+    /**
+     * Check if a process is running by PID
+     */
+    private function isProcessRunning(int $pid): bool
+    {
+        if (!$pid) {
+            return false;
+        }
+
+        try {
+            // Use posix_kill with signal 0 to check if process exists without killing it
+            if (function_exists('posix_kill')) {
+                return posix_kill($pid, 0);
+            }
+            
+            // Fallback to ps command if posix_kill is not available
+            $result = shell_exec("ps -p {$pid} > /dev/null 2>&1; echo $?");
+            return trim($result) === '0';
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->debug("Error checking process {$pid}: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Update stream activity timestamp
+     */
+    private function updateStreamActivity(string $streamKey): void
+    {
+        $activityKey = self::BUFFER_PREFIX . $streamKey . ':activity';
+        $this->redis()->set($activityKey, time());
+    }
+
+    /**
+     * Update client activity timestamp
+     */
+    private function updateClientActivity(string $streamKey, string $clientId): void
+    {
+        $clientKey = self::CLIENT_PREFIX . $streamKey . ':' . $clientId;
+        $clientData = $this->redis()->get($clientKey);
+        
+        if ($clientData) {
+            $data = json_decode($clientData, true);
+            $data['last_activity'] = time();
+            $this->redis()->set($clientKey, json_encode($data));
+        }
+    }
+
+    /**
+     * Update stream status
+     */
+    private function updateStreamStatus(string $streamKey, string $status): void
+    {
+        $streamInfo = $this->getStreamInfo($streamKey);
+        if ($streamInfo) {
+            $streamInfo['status'] = $status;
+            $streamInfo['last_activity'] = time();
+            $this->setStreamInfo($streamKey, $streamInfo);
+        }
+    }
+
+    /**
+     * Get stream storage directory
+     */
+    private function getStreamStorageDir(string $streamKey): string
+    {
+        return "shared_streams/{$streamKey}";
+    }
+
+    /**
+     * Clean up stream data and processes
+     */
+    private function cleanupStream(string $streamKey, bool $force = false): bool
+    {
+        try {
+            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Starting cleanup (force: " . ($force ? 'yes' : 'no') . ")");
+            
+            // Get stream info before cleanup
+            $streamInfo = $this->getStreamInfo($streamKey);
+            $pid = $streamInfo['pid'] ?? null;
+            
+            // Stop the process if it's running
+            if ($pid && $this->isProcessRunning($pid)) {
+                $this->stopStreamProcess($pid);
+            }
+            
+            // Clean up Redis keys
+            $redis = $this->redis();
+            
+            // Remove main stream info
+            $redis->del(self::STREAM_PREFIX . $streamKey);
+            
+            // Remove PID key
+            $redis->del("stream_pid:{$streamKey}");
+            
+            // Remove client keys
+            $clientKeys = $redis->keys(self::CLIENT_PREFIX . $streamKey . ':*');
+            if ($clientKeys) {
+                $redis->del($clientKeys);
+            }
+            
+            // Remove buffer keys
+            $bufferKey = self::BUFFER_PREFIX . $streamKey;
+            $segmentKeys = $redis->keys("{$bufferKey}:*");
+            if ($segmentKeys) {
+                $redis->del($segmentKeys);
+            }
+            
+            // Update database
+            SharedStream::where('stream_id', $streamKey)->update([
+                'status' => 'stopped',
+                'stopped_at' => now()
+            ]);
+            
+            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Redis cleanup completed");
+            return true;
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Stream {$streamKey}: Error during cleanup: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Stop a stream process by PID
+     */
+    private function stopStreamProcess(int $pid): bool
+    {
+        try {
+            if (function_exists('posix_kill')) {
+                // Try graceful termination first
+                posix_kill($pid, SIGTERM);
+                sleep(2);
+                
+                // Force kill if still running
+                if ($this->isProcessRunning($pid)) {
+                    posix_kill($pid, SIGKILL);
+                }
+            } else {
+                // Fallback to exec commands
+                exec("kill -TERM {$pid}");
+                sleep(2);
+                exec("kill -KILL {$pid} 2>/dev/null");
+            }
+            
+            return true;
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error stopping process {$pid}: " . $e->getMessage());
+            return false;
         }
     }
 }
