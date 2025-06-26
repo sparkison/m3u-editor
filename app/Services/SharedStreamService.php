@@ -1045,9 +1045,6 @@ class SharedStreamService
         
         // Start a background buffer reader using stream_select for efficiency
         $this->startStreamSelector($streamKey, $stdout, $stderr, $process);
-        
-        // Only perform cleanup here if the stream actually ended/failed
-        $this->performFinalCleanupSafe($streamKey, $stdout, $stderr, $process);
     }
 
     /**
@@ -2423,5 +2420,122 @@ class SharedStreamService
             'status' => 'stopped',
             'stopped_at' => now()
         ]);
+    }
+
+    /**
+     * Cleanup inactive streams and disconnected clients
+     */
+    public function cleanupInactiveStreams(): array
+    {
+        $cleanedStreams = 0;
+        $cleanedClients = 0;
+        
+        try {
+            // Get all shared stream keys
+            $pattern1 = 'shared_stream:*';
+            $pattern2 = '*shared_stream:*';
+            
+            $keys1 = Redis::keys($pattern1);
+            $keys2 = Redis::keys($pattern2);
+            $keys = array_merge($keys1, $keys2);
+            
+            $inactiveThreshold = now()->subMinutes(30)->timestamp; // 30 minutes
+            $deadProcessThreshold = now()->subMinutes(5)->timestamp; // 5 minutes for dead processes
+            
+            foreach ($keys as $key) {
+                $streamKey = str_replace([
+                    config('database.redis.options.prefix', ''),
+                    'shared_stream:'
+                ], '', $key);
+                
+                $redisData = Redis::get($key);
+                $streamData = $redisData ? json_decode($redisData, true) : null;
+                
+                if (!$streamData) {
+                    continue;
+                }
+                
+                $shouldCleanup = false;
+                $lastActivity = $streamData['last_activity'] ?? 0;
+                $status = $streamData['status'] ?? 'unknown';
+                
+                // Check if stream is inactive
+                if ($lastActivity < $inactiveThreshold) {
+                    Log::info("Stream {$streamKey} inactive since " . date('Y-m-d H:i:s', $lastActivity));
+                    $shouldCleanup = true;
+                }
+                
+                // Check if process is dead
+                $pid = $this->getProcessPid($streamKey);
+                if ($pid && !$this->isProcessRunning($pid) && $lastActivity < $deadProcessThreshold) {
+                    Log::info("Stream {$streamKey} has dead process (PID: {$pid})");
+                    $shouldCleanup = true;
+                }
+                
+                // Check if status indicates error or stopped
+                if (in_array($status, ['error', 'stopped'])) {
+                    Log::info("Stream {$streamKey} has status: {$status}");
+                    $shouldCleanup = true;
+                }
+                
+                if ($shouldCleanup) {
+                    // Count clients before cleanup
+                    $clientKey = "stream_clients:{$streamKey}";
+                    $clients = Redis::hgetall($clientKey);
+                    $cleanedClients += count($clients);
+                    
+                    // Cleanup the stream
+                    $this->cleanupStream($streamKey, true);
+                    $cleanedStreams++;
+                    
+                    Log::info("Cleaned up inactive stream: {$streamKey}");
+                } else {
+                    // Clean up disconnected clients for active streams
+                    $clientKey = "stream_clients:{$streamKey}";
+                    $clients = Redis::hgetall($clientKey);
+                    
+                    foreach ($clients as $clientId => $clientDataJson) {
+                        $clientData = $clientDataJson ? json_decode($clientDataJson, true) : null;
+                        if (!$clientData) {
+                            continue;
+                        }
+                        $clientLastActivity = $clientData['last_activity'] ?? 0;
+                        
+                        if ($clientLastActivity < $inactiveThreshold) {
+                            Redis::hdel($clientKey, $clientId);
+                            $cleanedClients++;
+                            Log::info("Removed inactive client {$clientId} from stream {$streamKey}");
+                        }
+                    }
+                    
+                    // Update stream client count
+                    $remainingClients = Redis::hlen($clientKey);
+                    $streamData['client_count'] = $remainingClients;
+                    $this->setStreamInfo($streamKey, $streamData);
+                    
+                    // Update database
+                    SharedStream::where('stream_id', $streamKey)
+                        ->update(['client_count' => $remainingClients]);
+                }
+            }
+            
+            Log::info("Cleanup completed: {$cleanedStreams} streams, {$cleanedClients} clients");
+            
+        } catch (\Exception $e) {
+            Log::error('Error during stream cleanup: ' . $e->getMessage());
+        }
+        
+        return [
+            'cleaned_streams' => $cleanedStreams,
+            'cleaned_clients' => $cleanedClients
+        ];
+    }
+
+    /**
+     * Dummy method to satisfy interface or parent class
+     */
+    public function dummyMethod(): void
+    {
+        // No operation
     }
 }
