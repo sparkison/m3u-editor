@@ -114,9 +114,11 @@ class ProcessVodChannels implements ShouldQueue
                 return; // Exit the job if an error occurs
             }
             if ($index % 10 === 0) {
-                // Update progress every 10 channels processed
-                $progress = min(99, ($index / $total) * 100);
-                $playlist->update(['progress' => $progress]);
+                if (!$this->channel) {
+                    // Update progress every 10 channels processed
+                    $progress = min(99, ($index / $total) * 100);
+                    $playlist->update(['progress' => $progress]);
+                }
                 sleep(1); // Throttle processing to avoid overwhelming the Xtream API
             }
         }
