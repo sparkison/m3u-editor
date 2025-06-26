@@ -323,17 +323,17 @@ class XtreamApiController extends Controller
 
         $action = $request->input('action', 'panel');
 
-        if ($action === 'panel' || empty($request->input('action'))) {
+        if ($action === 'panel' || $action === 'get_account_info' || empty($request->input('action'))) {
             $now = Carbon::now();
             $userInfo = [
                 'username' => $username,
                 'password' => $password,
-                'message' => '',
+                'message' => 'Welcome to m3u editor Xtream API',
                 'auth' => 1,
                 'status' => 'Active',
-                'exp_date' => (string)$now->copy()->addYears(10)->timestamp,
+                'exp_date' => (string)$now->copy()->startOfYear()->addYears(1)->timestamp,
                 'is_trial' => '0',
-                'active_cons' => 1,
+                'active_cons' => '0',
                 'created_at' => (string)($playlist->user ? $playlist->user->created_at->timestamp : $now->timestamp),
                 'max_connections' => (string)($playlist->streams ?? 1),
                 'allowed_output_formats' => ['m3u8', 'ts'],
@@ -343,18 +343,21 @@ class XtreamApiController extends Controller
             $host = $request->getHost();
             $currentPort = $request->getPort();
             $baseUrl = $scheme . '://' . $host;
-            $httpsPort = ($scheme === 'https') ? (string)$currentPort : "443";
+            $httpsPort = ($scheme === 'https') ? (string)$currentPort : "";
 
             $serverInfo = [
+                'xui' => false, // Assuming this is not an XUI panel
+                'version' => null, // Placeholder version, update as needed
+                'revision' => null, // No revision info available
                 'url' => $baseUrl,
                 'port' => (string)$currentPort,
                 'https_port' => $httpsPort,
-                'rtmp_port' => null, // RTMP not available currently
                 'server_protocol' => $scheme,
-                'timezone' => Config::get('app.timezone', 'UTC'),
+                'rtmp_port' => "", // RTMP not available currently
                 'server_software' => config('app.name') . ' Xtream API',
-                'timestamp_now' => (string)$now->timestamp,
+                'timestamp_now' => $now->timestamp,
                 'time_now' => $now->toDateTimeString(),
+                'timezone' => Config::get('app.timezone', 'UTC'),
             ];
 
             return response()->json([
@@ -394,22 +397,21 @@ class XtreamApiController extends Controller
                     // It's better to ensure category_id exists in a predefined list of categories if strict adherence is needed.
                     // For now, defaulting to 'all' if not found or being more robust based on actual category data available.
 
-                    $streamId = rtrim(base64_encode($channel->id), '=');
                     $liveStreams[] = [
                         'num' => $channel->channel ?? null,
                         'name' => $channel->title_custom ?? $channel->title,
                         'stream_type' => 'live',
-                        'stream_id' => $streamId,
+                        'stream_id' => $channel->id,
                         'stream_icon' => $streamIcon,
                         'epg_channel_id' => $channel->epgChannel->epg_channel_id ?? $channel->stream_id_custom ?? $channel->stream_id ?? (string)$channel->id,
                         'added' => (string)$channel->created_at->timestamp,
                         'category_id' => $channelCategoryId,
-                        'category_ids' => [$channelCategoryId],
+                        'category_ids' => [(int)$channelCategoryId],
                         'tv_archive' => $channel->catchup ? 1 : 0,
                         'tv_archive_duration' => $channel->shift ?? 0,
                         'custom_sid' => '',
                         'thumbnail' => '',
-                        'direct_source' => url("/live/{$username}/{$password}/" . $streamId . ".ts"),
+                        'direct_source' => url("/live/{$username}/{$password}/" . $channel->id . ".ts"),
                     ];
                 }
             }
@@ -445,15 +447,14 @@ class XtreamApiController extends Controller
                         $channelCategoryId = (string)$channel->group->id;
                     }
 
-                    $streamId = rtrim(base64_encode($channel->id), '=');
-
+                    $extension = $channel->container_extension ?? 'mkv';
                     $vodStreams[] = [
                         'num' => $index + 1,
                         'name' => $channel->title_custom ?? $channel->title,
                         'title' => $channel->title_custom ?? $channel->title,
                         'year' => $channel->year ?? '',
                         'stream_type' => 'movie',
-                        'stream_id' => $streamId,
+                        'stream_id' => $channel->id,
                         'stream_icon' => $streamIcon,
                         'rating' => $channel->rating ?? '',
                         'rating_5based' => $channel->rating_5based ?? 0,
@@ -462,7 +463,7 @@ class XtreamApiController extends Controller
                         'category_ids' => [$channelCategoryId],
                         'container_extension' => $channel->container_extension ?? 'mkv',
                         'custom_sid' => '',
-                        'direct_source' => ''
+                        'direct_source' => url("/movie/{$username}/{$password}/" . $channel->id . "." . $extension),
                     ];
                 }
             }
@@ -560,8 +561,6 @@ class XtreamApiController extends Controller
                         $orderedEpisodes = $season->episodes->sortBy('episode_num');
                         foreach ($orderedEpisodes as $episode) {
                             $containerExtension = $episode->container_extension ?? 'mp4';
-
-                            $streamId = rtrim(base64_encode($episode->id), '=');
                             $seasonEpisodes[] = [
                                 'id' => (string)$episode->id,
                                 'episode_num' => $episode->episode_num,
@@ -571,8 +570,8 @@ class XtreamApiController extends Controller
                                 'added' => $episode->added,
                                 'season' => $episode->season,
                                 'custom_sid' => $espisode->custom_sid ?? '',
-                                'stream_id' => $streamId,
-                                'direct_source' => url("/xtream/{$uuid}/series/{$username}/{$password}/" . $streamId . ".{$containerExtension}")
+                                'stream_id' => $episode->id,
+                                'direct_source' => url("/series/{$username}/{$password}/" . $episode->id . ".{$containerExtension}")
                             ];
                         }
                     }
@@ -678,8 +677,75 @@ class XtreamApiController extends Controller
             }
 
             return response()->json($seriesCategories);
-        } else {
-            return response()->json(['error' => "Action '{$action}' not implemented"]);
+        } else if ($action === 'get_vod_info') {
+            $channelId = $request->input('vod_id');
+
+            // Find the channel
+            $channel = $playlist->channels()
+                ->where('enabled', true)
+                ->where('id', $channelId)
+                ->where('is_vod', true)
+                ->first();
+
+            if (!$channel) {
+                return response()->json(['error' => 'VOD not found'], 404);
+            }
+
+            // Build info section - use channel's info field if available, otherwise build from channel data
+            $info = $channel->info ?? [];
+
+            // Fill in missing info fields with channel data
+            $defaultInfo = [
+                'kinopoisk_url' => $info['kinopoisk_url'] ?? '',
+                'tmdb_id' => $info['tmdb_id'] ?? 0,
+                'name' => $info['name'] ?? $channel->name,
+                'o_name' => $info['o_name'] ?? $channel->name,
+                'cover_big' => $info['cover_big'] ?? $channel->logo,
+                'movie_image' => $info['movie_image'] ?? $channel->logo,
+                'release_date' => $info['release_date'] ?? $channel->year,
+                'episode_run_time' => $info['episode_run_time'] ?? 0,
+                'youtube_trailer' => $info['youtube_trailer'] ?? null,
+                'director' => $info['director'] ?? '',
+                'actors' => $info['actors'] ?? '',
+                'cast' => $info['cast'] ?? '',
+                'description' => $info['description'] ?? '',
+                'plot' => $info['plot'] ?? '',
+                'age' => $info['age'] ?? '',
+                'mpaa_rating' => $info['mpaa_rating'] ?? $channel->rating,
+                'rating_count_kinopoisk' => $info['rating_count_kinopoisk'] ?? 0,
+                'country' => $info['country'] ?? '',
+                'genre' => $info['genre'] ?? '',
+                'backdrop_path' => $info['backdrop_path'] ?? [],
+                'duration_secs' => $info['duration_secs'] ?? 0,
+                'duration' => $info['duration'] ?? '00:00:00',
+                'bitrate' => $info['bitrate'] ?? 0,
+                'rating' => $info['rating'] ?? 0,
+                'releasedate' => $info['releasedate'] ?? $channel->year,
+                'subtitles' => $info['subtitles'] ?? [],
+            ];
+
+            // Build movie_data section - use channel's movie_data field if available, otherwise build from channel data
+            $movieData = $channel->movie_data ?? [];
+
+            $streamId = rtrim(base64_encode($channel->id), '=');
+            $extension = $movieData['container_extension'] ?? $channel->container_extension ?? 'mp4';
+            $defaultMovieData = [
+                'stream_id' => $channel->id,
+                'name' => $movieData['name'] ?? $channel->name,
+                'title' => $movieData['title'] ?? $channel->name,
+                'year' => $movieData['year'] ?? $channel->year,
+                'added' => $movieData['added'] ?? (string)($channel->created_at ? $channel->created_at->timestamp : time()),
+                'category_id' => (string)($channel->group_id ?? ''),
+                'category_ids' => ($channel->group_id ? [$channel->group_id] : []),
+                'container_extension' => $extension,
+                'custom_sid' => $movieData['custom_sid'] ?? '',
+                'direct_source' => url("/movie/{$username}/{$password}/" . $channel->id . '.' . $extension),
+            ];
+
+            return response()->json([
+                'info' => $defaultInfo,
+                'movie_data' => $defaultMovieData,
+            ]);
         }
     }
 }

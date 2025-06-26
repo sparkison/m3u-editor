@@ -107,24 +107,18 @@ class XtreamStreamController extends Controller
      * 
      * @unauthenticated
      */
-    public function handleLive(Request $request, string $uuid, string $username, string $password, string $streamId, string $format)
+    /**
+     * Live stream requests.
+     */
+    public function handleLive(Request $request, string $username, string $password, int $streamId, string $format = 'ts')
     {
-        // Find the channel by ID
-        if (strpos($streamId, '==') === false) {
-            $streamId .= '=='; // right pad to ensure proper decoding
-        }
-        $channelId = base64_decode($streamId);
-        list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($uuid, $username, $password, (int)$channelId, 'live');
+        list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'live');
 
         if ($channel instanceof Channel) {
             if ($playlist->enable_proxy) {
-                $internalUrl = '';
-                if (strtolower($format) === 'm3u8') {
-                    $internalUrl = route('stream.hls.playlist', ['encodedId' => $streamId]); // Use $streamId
-                } else {
-                    $internalUrl = route('stream', ['encodedId' => $streamId, 'format' => $format]); // Use $streamId
-                }
-                return Redirect::to($internalUrl);
+                $url = rtrim(route('stream', [
+                    'encodedId' => rtrim(base64_encode($streamId), '=')
+                ]), '.');
             } else {
                 return Redirect::to($channel->url_custom ?? $channel->url);
             }
@@ -135,38 +129,16 @@ class XtreamStreamController extends Controller
 
     /**
      * VOD stream requests.
-     *
-     * @tags Xtream API Streams
-     * @summary Provides VOD stream access.
-     * @description Authenticates the request based on Xtream credentials provided in the path.
-     * If successful and the requested VOD episode is valid and part of an authorized playlist,
-     * this endpoint redirects to the actual internal stream URL for the episode.
-     * The route for this endpoint is typically `/series/{username}/{password}/{streamId}.{format}`.
-     *
-     * @param \Illuminate\Http\Request $request The HTTP request
-     * @param string $uuid The UUID of the Xtream API (path parameter)
-     * @param string $username User's Xtream API username (path parameter)
-     * @param string $password User's Xtream API password (path parameter)
-     * @param string $streamId The ID of the VOD stream (episode ID) (path parameter)
-     *
-     * @response 302 scenario="Successful redirect to stream URL" description="Redirects to the internal VOD episode stream URL."
-     * @response 403 scenario="Forbidden/Unauthorized" {"error": "Unauthorized or stream not found"}
-     * @response 404 scenario="Not Found (e.g., VOD item not found before auth)" description="This can occur if the episode ID does not exist or its series is disabled, even before full authentication of the playlist completes. The error message might still be the generic 403 from the controller's main error path."
-     *
-     * @unauthenticated
      */
-    public function handleVod(Request $request, string $uuid, string $username, string $password, string $streamId)
+    public function handleVod(Request $request, string $username, string $password, string $streamId, string $format = 'ts')
     {
-        // Find the channel by ID
-        if (strpos($streamId, '==') === false) {
-            $streamId .= '=='; // right pad to ensure proper decoding
-        }
-        $channelId = base64_decode($streamId);
-        list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($uuid, $username, $password, (int)$channelId, 'vod');
+        list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'vod');
 
         if ($channel instanceof Channel) {
             if ($playlist->enable_proxy) {
-                return Redirect::to(route('stream', ['encodedId' => $streamId, 'format' => 'ts']));
+                $url = rtrim(route('stream', [
+                    'encodedId' => rtrim(base64_encode($streamId), '=')
+                ]), '.');
             } else {
                 return Redirect::to($channel->url_custom ?? $channel->url);
             }
