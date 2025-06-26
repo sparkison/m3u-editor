@@ -705,19 +705,22 @@ class SharedStreamService
                         Log::channel('ffmpeg')->debug("Stream {$streamKey}: Initial buffer segment {$segmentNumber} buffered ({$accumulatedSize} bytes)");
                         
                         // Requirement 1.a: Update status to 'active' after first segment
-                        if ($segmentNumber == 0 // This means it's the first segment successfully processed (about to be incremented)
-                        )
+                        if ($segmentNumber == 0) // This is the first segment successfully processed
                         {
                             $streamInfo = $this->getStreamInfo($streamKey);
                             if ($streamInfo) {
                                 $streamInfo['status'] = 'active';
-                                $streamInfo['first_data_at'] = time(); // Keep this for consistency
+                                $streamInfo['first_data_at'] = time();
                                 $this->setStreamInfo($streamKey, $streamInfo);
 
-                                SharedStream::where('stream_id', $streamKey)->update([
+                                // Update database status to active
+                                $updateResult = SharedStream::where('stream_id', $streamKey)->update([
                                     'status' => 'active'
                                 ]);
-                                Log::channel('ffmpeg')->info("Stream {$streamKey}: Initial segment " . ($segmentNumber + 1) . " buffered. Marking stream as ACTIVE.");
+                                
+                                Log::channel('ffmpeg')->info("Stream {$streamKey}: Initial segment " . ($segmentNumber + 1) . " buffered. Marking stream as ACTIVE. DB update result: {$updateResult}");
+                            } else {
+                                Log::channel('ffmpeg')->warning("Stream {$streamKey}: Could not get stream info to update status to active");
                             }
                         }
 
