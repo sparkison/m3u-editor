@@ -94,22 +94,6 @@ Route::get('/shared/stream/{encodedId}.{format?}', [\App\Http\Controllers\Shared
 
 
 /*
- * Xtream API route
- */
-
-// Xtream API handling route
-Route::get('/xtream/{uuid}/player_api.php', [XtreamApiController::class, 'handle'])->name('playlist.xtream.api');
-
-// Xtream API Stream Handling Routes
-Route::get('/xtream/{uuid}/live/{username}/{password}/{encodedId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleLive'])
-    ->name('xtream.stream.live');
-Route::get('/xtream/{uuid}/movie/{username}/{password}/{encodedId}', [App\Http\Controllers\XtreamStreamController::class, 'handleVod'])
-    ->name('xtream.stream.vod');
-Route::get('/xtream/{uuid}/series/{username}/{password}/{encodedId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleSeries'])
-    ->name('xtream.stream.series');
-
-
-/*
  * API routes
  */
 
@@ -135,3 +119,17 @@ Route::group(['prefix' => 'epg'], function () {
     Route::get('{uuid}/sync', [\App\Http\Controllers\EpgController::class, 'refreshEpg'])
         ->name('api.epg.sync');
 });
+
+/*
+ * Xtream API endpoints at root
+ */
+// Main Xtream API endpoint at /player_api.php
+Route::get('/player_api.php', [XtreamApiController::class, 'handle'])->name('xtream.api');
+
+// Stream endpoints
+Route::get('/live/{username}/{password}/{streamId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleLive'])
+    ->name('xtream.stream.live.root');
+Route::get('/movie/{username}/{password}/{streamId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleVod'])
+    ->name('xtream.stream.vod.root');
+Route::get('/series/{username}/{password}/{streamId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleSeries'])
+    ->name('xtream.stream.series.root');
