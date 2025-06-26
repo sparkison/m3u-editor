@@ -13,31 +13,32 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('channels', function (Blueprint $table) {
-            $table->string('source_id')->nullable()->after('stream_id');
-        });
+        // Make sure the column does not already exist
+        if (!Schema::hasColumn('channels', 'source_id')) {
+            Schema::table('channels', function (Blueprint $table) {
+                $table->string('source_id')->nullable()->after('stream_id');
+            });
+        }
 
         // Update existing channels to set source_id to their stream_id
         // The `url` variable will contain the stream ID in the last path, minus the extension
         // E.g., "https://example.com/stream/12345.m3u8" will set source_id to "12345"
         // This assumes that the URL is well-formed and contains a stream ID at the end
-        $channels = Channel::query()
-            ->whereNotNull('url')
-            ->cursor();
 
-        foreach ($channels->chunk(500) as $chunk) {
-            $bulk = [];
-            foreach ($chunk as $channel) {
-                $urlParts = explode('/', $channel->url);
-                $streamIdWithExtension = end($urlParts);
-                $streamId = pathinfo($streamIdWithExtension, PATHINFO_FILENAME); // Get
-                $bulk[] = [
-                    'id' => $channel->id,
-                    'source_id' => $streamId,
-                ];
-            }
-            Channel::upsert($bulk, ['id'], ['source_id']);
-        }
+        // Process channels in smaller batches to avoid memory issues
+        Channel::whereNotNull('url')
+            ->chunkById(100, function ($channels) {
+                foreach ($channels as $channel) {
+                    $urlParts = explode('/', $channel->url);
+                    $streamIdWithExtension = end($urlParts);
+                    $streamId = pathinfo($streamIdWithExtension, PATHINFO_FILENAME);
+
+                    // Use DB::table for direct update to avoid model events and potential issues
+                    DB::table('channels')
+                        ->where('id', $channel->id)
+                        ->update(['source_id' => $streamId]);
+                }
+            });
     }
 
     /**
