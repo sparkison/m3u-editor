@@ -18,6 +18,12 @@ class StreamTestController extends Controller
      */
     public function testStream(Request $request, int $timeout = 0): StreamedResponse
     {
+        // Prevent timeouts, etc.
+        // These are typically set at the beginning of a script that does direct output.
+        @ini_set('max_execution_time', 0);
+        @ini_set('output_buffering', 'off');
+        @ini_set('implicit_flush', 1);
+        
         // Validate timeout
         if ($timeout < 0) {
             abort(400, 'Timeout must be 0 or positive integer');
