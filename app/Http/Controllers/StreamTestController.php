@@ -103,10 +103,20 @@ class StreamTestController extends Controller
                 '-f', 'lavfi',
                 '-i', 'testsrc2=size=1280x720:rate=25', // 720p test pattern at 25fps
                 '-f', 'lavfi',
-                '-i', 'sine=frequency=1000:sample_rate=48000', // 1kHz tone
+                '-i', 'sine=frequency=1000:sample_rate=48000', // 1kHz tone  
                 '-filter_complex', "[0:v]drawtext=text='{$filterText}':fontsize=48:fontcolor=white:x=(w-tw)/2:y=(h-th)/2:box=1:boxcolor=black@0.5[v]",
                 '-map', '[v]',
-                '-map', '1:a',
+                '-map', '1:a'
+            ];
+            
+            // Add timeout before codec options if specified
+            if ($timeout > 0) {
+                $cmd[] = '-t';
+                $cmd[] = (string)$timeout;
+            }
+            
+            // Add codec and output options
+            $cmd = array_merge($cmd, [
                 '-c:v', 'libx264',
                 '-preset', 'ultrafast',
                 '-tune', 'zerolatency',
@@ -117,36 +127,36 @@ class StreamTestController extends Controller
                 '-b:a', '128k',
                 '-f', 'mpegts',
                 'pipe:1'
-            ];
-            
-            if ($timeout > 0) {
-                $cmd[] = '-t';
-                $cmd[] = (string)$timeout;
-            }
+            ]);
 
-            Log::info("Starting continuous FFmpeg stream", ['timeout' => $timeout]);
+            Log::info("Starting continuous FFmpeg stream", ['timeout' => $timeout, 'cmd' => implode(' ', $cmd)]);
 
             $process = new Process($cmd);
-            $process->setTimeout($timeout > 0 ? $timeout + 10 : null);
+            $process->setTimeout($timeout > 0 ? $timeout + 5 : null);
+            
+            Log::info("Starting FFmpeg process", [
+                'timeout' => $timeout,
+                'process_timeout' => $timeout > 0 ? $timeout + 5 : null
+            ]);
             
             $process->start();
             
+            if (!$process->isStarted()) {
+                Log::error("Failed to start FFmpeg process");
+                throw new \Exception("Failed to start FFmpeg process");
+            }
+            
             $lastOutput = time();
+            $totalBytes = 0;
             
             // Stream output as it becomes available
             while ($process->isRunning()) {
-                // Check timeout first - exit if we've reached the limit
-                if ($timeout > 0 && (time() - $startTime) >= $timeout) {
-                    $process->stop();
-                    Log::info("Test stream timeout reached", ['elapsed' => time() - $startTime]);
-                    break;
-                }
-                
                 // Read available output
                 $output = $process->getIncrementalOutput();
                 
                 if (!empty($output)) {
                     echo $output;
+                    $totalBytes += strlen($output);
                     if (ob_get_level()) {
                         ob_flush();
                     }
@@ -161,13 +171,25 @@ class StreamTestController extends Controller
                     break;
                 }
                 
+                // Safety timeout check (should not be needed if FFmpeg -t works)
+                if ($timeout > 0 && (time() - $startTime) >= ($timeout + 3)) {
+                    Log::warning("FFmpeg process exceeded expected timeout, force stopping", [
+                        'elapsed' => time() - $startTime,
+                        'expected_timeout' => $timeout,
+                        'bytes_sent' => $totalBytes
+                    ]);
+                    $process->stop();
+                    break;
+                }
+                
                 // Check if process is stalled (but give more time for finite streams)
                 $stallTimeout = $timeout > 0 ? min(15, $timeout + 5) : 15;
                 if ((time() - $lastOutput) > $stallTimeout) {
                     Log::warning("FFmpeg process seems stalled, stopping", [
                         'last_output' => $lastOutput,
                         'current_time' => time(),
-                        'stall_timeout' => $stallTimeout
+                        'stall_timeout' => $stallTimeout,
+                        'bytes_sent' => $totalBytes
                     ]);
                     $process->stop();
                     break;
@@ -176,6 +198,21 @@ class StreamTestController extends Controller
                 // Small sleep to prevent busy waiting
                 usleep(10000); // 10ms
             }
+            
+            // Check if process exited due to error
+            if ($process->getExitCode() > 0) {
+                Log::error("FFmpeg process exited with error", [
+                    'exit_code' => $process->getExitCode(),
+                    'error_output' => $process->getErrorOutput(),
+                    'bytes_sent' => $totalBytes
+                ]);
+            }
+            
+            Log::info("FFmpeg process finished", [
+                'exit_code' => $process->getExitCode(),
+                'bytes_sent' => $totalBytes,
+                'elapsed' => time() - $startTime
+            ]);
             
             // Get any remaining output
             $remainingOutput = $process->getIncrementalOutput();
