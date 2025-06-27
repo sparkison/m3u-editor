@@ -96,6 +96,15 @@ class PlaylistAuth extends Model
     }
 
     /**
+     * Get the name of the currently assigned model
+     */
+    public function getAssignedModelNameAttribute(): ?string
+    {
+        $model = $this->getAssignedModel();
+        return $model ? $model->name : '';
+    }
+
+    /**
      * @throws ValidationException
      */
     public function setRelation($relation, $value)
