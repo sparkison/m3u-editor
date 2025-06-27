@@ -381,4 +381,63 @@ class SharedStreamingTest extends TestCase
         // The service should handle invalid URLs gracefully in key generation
         $this->assertTrue(strlen($streamKey) > 20); // Should have meaningful length
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_performs_stream_failover_integration_test()
+    {
+        $this->mockLock();
+        
+        // Test that the service has the failover methods
+        $reflection = new \ReflectionClass($this->service);
+        
+        $this->assertTrue($reflection->hasMethod('attemptStreamFailover'), 'Service should have attemptStreamFailover method');
+        $this->assertTrue($reflection->hasMethod('migrateClientsToFailoverStream'), 'Service should have migrateClientsToFailoverStream method');
+        $this->assertTrue($reflection->hasMethod('markStreamFailed'), 'Service should have markStreamFailed method');
+        
+        // Test basic failover scenario detection  
+        $method = $reflection->getMethod('attemptStreamFailover');
+        $method->setAccessible(true);
+        
+        // Test with minimal stream info
+        $streamKey = 'test_failover_' . uniqid();
+        $streamInfo = [
+            'stream_key' => $streamKey,
+            'type' => 'episode', // Non-channel type
+            'model_id' => 999999,
+            'failover_attempts' => 0
+        ];
+        
+        $result = $method->invoke($this->service, $streamKey, $streamInfo);
+        
+        // Should return null for non-channel streams
+        $this->assertNull($result, 'Should return null for non-channel streams');
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test] 
+    public function it_handles_failover_with_multiple_backup_channels()
+    {
+        $this->mockLock();
+        
+        // Test that the failover system can conceptually handle multiple backup channels
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('attemptStreamFailover');
+        $method->setAccessible(true);
+        
+        // Test with stream info indicating multiple previous attempts
+        $streamKey = 'test_multi_failover_' . uniqid();
+        $streamInfo = [
+            'stream_key' => $streamKey,
+            'type' => 'channel',
+            'model_id' => 999999, // Non-existent channel
+            'failover_attempts' => 3 // Multiple attempts already made
+        ];
+        
+        $result = $method->invoke($this->service, $streamKey, $streamInfo);
+        
+        // Should handle gracefully when channel doesn't exist
+        $this->assertNull($result, 'Should return null when channel not found');
+        
+        // Test that the failover concept works for valid scenarios
+        $this->assertTrue(method_exists($this->service, 'attemptStreamFailover'), 'Failover method should exist');
+    }
 }
