@@ -1,23 +1,15 @@
 # Test Stream Documentation
 
-The `StreamTestController` provides endpoints for testing continuous streams with configurable timeouts. This is useful for testing stream stability, proxy functionality, and behavior when streams fail mid-stream.
+The `StreamTestController` provides endpoints for testing continuous TS streams with configurable timeouts. This is useful for testing stream stability, proxy functionality, and behavior when streams fail mid-stream.
 
 ## Endpoints
 
-### HLS Playlist (Recommended)
-```
-GET /api/stream/test/{timeout}.m3u8
-```
-
-### Individual Segments 
-```
-GET /api/stream/test/{timeout}/segment_{segment}.ts
-```
-
-### Direct Stream (For Proxy Testing)
+### Direct TS Stream (Primary Endpoint)
 ```
 GET /api/stream/test/{timeout}.ts
 ```
+
+**Note:** HLS streaming endpoints have been removed to focus on the more reliable direct TS streaming for proxy testing.
 
 ## Parameters
 
@@ -41,27 +33,23 @@ GET /api/stream/test/{timeout}.ts
 - **Purpose**: Designed for proxy testing and long-running scenarios
 - **Behavior**: Continuous stream that runs indefinitely until connection is closed
 - **Display**: Shows runtime counter (Runtime: 00:00, 00:04, 00:08, etc.)
-- **HLS**: Creates live playlist without `#EXT-X-ENDLIST`
 - **Proxy Compatible**: Tested with FFmpeg stream copying for extended periods
 
 #### Finite Streams (`timeout>0`)
 - **Purpose**: Testing timeout scenarios and stream termination
 - **Behavior**: Stream runs for specified duration then terminates cleanly
 - **Display**: Shows countdown timer (Countdown: 00:30, 00:26, 00:22, etc.)
-- **HLS**: Creates VOD playlist with `#EXT-X-ENDLIST`
 
 ## Examples
 
 ### Infinite test stream for proxy testing (shows runtime counter)  
 ```
-http://localhost:36400/api/stream/test/0.m3u8
-http://localhost:36400/api/stream/test/0.ts
+http://m3ueditor.test/api/stream/test/0.ts
 ```
 
 ### 30-second test stream (shows countdown)
 ```
-http://localhost:36400/api/stream/test/30.m3u8
-http://localhost:36400/api/stream/test/30.ts
+http://m3ueditor.test/api/stream/test/30.ts
 ```
 - **Resolution**: 720p (1280x720) with H.264 video and AAC audio
 - **Format**: MPEG-TS segments suitable for HLS streaming
@@ -163,7 +151,7 @@ The infinite test streams (`timeout=0`) are specifically designed for testing pr
 
 ### Proxy Compatibility
 - **Stream Copying**: Compatible with FFmpeg's `-c:v copy -c:a copy` stream copying
-- **Extended Duration**: Tested for 45+ seconds without timeout issues  
+- **Extended Duration**: Tested for extended periods without timeout issues  
 - **Real-time Output**: Uses proper timing for consistent proxy behavior
 - **Connection Handling**: Handles proxy disconnections gracefully
 
@@ -172,13 +160,13 @@ The infinite test streams (`timeout=0`) are specifically designed for testing pr
 #### FFmpeg Stream Copy (Most Common)
 ```bash
 # Proxy the infinite test stream with stream copying
-ffmpeg -i "http://localhost:36400/api/stream/test/0.ts" \
+ffmpeg -i "http://m3ueditor.test/api/stream/test/0.ts" \
        -c:v copy -c:a copy \
        -f mpegts \
        pipe:1
 
 # Proxy with timeout (useful for testing)
-ffmpeg -i "http://localhost:36400/api/stream/test/0.ts" \
+ffmpeg -i "http://m3ueditor.test/api/stream/test/0.ts" \
        -c:v copy -c:a copy \
        -t 60 \
        -f mpegts \
@@ -187,14 +175,14 @@ ffmpeg -i "http://localhost:36400/api/stream/test/0.ts" \
 
 #### Testing Internal Proxy Systems
 ```bash
-# Test your proxy by replacing the source URL
-# Replace "your-proxy-command" with your actual proxy implementation
-your-proxy-command --source="http://localhost:36400/api/stream/test/0.ts" --output=mp4
+# Test your proxy by using the test stream as source
+# Replace with your actual proxy implementation
+your-proxy-command --source="http://m3ueditor.test/api/stream/test/0.ts" --output=mp4
 ```
 
 ### Troubleshooting Proxy Issues
 
 1. **30-second timeouts**: The infinite streams resolve common proxy timeout issues
-2. **Stream ending unexpectedly**: Use `timeout=0` for continuous streams
+2. **Stream ending unexpectedly**: Use `timeout=0` for continuous streams  
 3. **Compatibility issues**: The streams use standard H.264/AAC encoding compatible with most players
 4. **Buffering problems**: Real-time output ensures consistent data flow

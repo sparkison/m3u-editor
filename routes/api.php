@@ -26,20 +26,10 @@ Route::group(['prefix' => 'stream'], function () {
         ->where('segment', 'segment_[0-9]{3}\.ts')
         ->name('stream.hls.segment');
     
-    // Test stream endpoint
+    // Test stream endpoint (TS only)
     Route::get('test/{timeout}.ts', [\App\Http\Controllers\StreamTestController::class, 'testStream'])
         ->where('timeout', '[0-9]+')
         ->name('stream.test');
-    
-    // Test stream playlist
-    Route::get('test/{timeout}.m3u8', [\App\Http\Controllers\StreamTestController::class, 'testPlaylist'])
-        ->where('timeout', '[0-9]+')
-        ->name('stream.test.playlist');
-    
-    // Test stream segments
-    Route::get('test/{timeout}/segment_{segment}.ts', [\App\Http\Controllers\StreamTestController::class, 'testSegment'])
-        ->where(['timeout' => '[0-9]+', 'segment' => '[0-9]+'])
-        ->name('stream.test.segment');
 });
 
 // Shared streaming API routes (xTeVe-like proxy functionality)
