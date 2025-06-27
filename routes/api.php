@@ -25,6 +25,16 @@ Route::group(['prefix' => 'stream'], function () {
     Route::get('{channelId}/{segment}', [\App\Http\Controllers\HlsStreamController::class, 'serveChannelSegment'])
         ->where('segment', 'segment_[0-9]{3}\.ts')
         ->name('stream.hls.segment');
+    
+    // Test stream endpoint
+    Route::get('test/{timeout}.ts', [\App\Http\Controllers\StreamTestController::class, 'testStream'])
+        ->where('timeout', '[0-9]+')
+        ->name('stream.test');
+    
+    // Test stream playlist
+    Route::get('test/{timeout}.m3u8', [\App\Http\Controllers\StreamTestController::class, 'testPlaylist'])
+        ->where('timeout', '[0-9]+')
+        ->name('stream.test.playlist');
 });
 
 // Shared streaming API routes (xTeVe-like proxy functionality)

@@ -14,18 +14,7 @@ The enhanced stats system provides real-time monitoring, analytics, and manageme
 
 ## Dashboard Components
 
-### 1. Streaming Dashboard (`/admin/streaming-dashboard`)
-
-Comprehensive analytics page featuring:
-
-- **Performance Metrics**: Active streams, connected clients, bandwidth usage
-- **Efficiency Scoring**: System utilization and performance indicators
-- **Bandwidth Analytics**: Format-based distribution and trends
-- **Stream Statistics**: Top performers, health distribution
-- **System Health**: Memory, CPU, disk, and Redis status
-- **Historical Data**: Performance trends over time
-
-### 2. Shared Stream Monitor (`/admin/shared-stream-monitor`)
+### Shared Stream Monitor (`/admin/shared-stream-monitor`)
 
 Real-time monitoring interface with:
 
@@ -41,20 +30,10 @@ Real-time monitoring interface with:
 
 1. **SharedStreamStatsWidget**: Key performance indicators
 2. **SystemHealthWidget**: System resource monitoring
-3. **StreamingAlertsWidget**: Critical alerts and notifications
 
 ### Analytics Widgets
 
-4. **SharedStreamPerformanceChart**: 24-hour performance trends
-5. **StreamDistributionChart**: Format distribution visualization
-6. **BandwidthUsageChart**: Bandwidth trends and patterns
-7. **SystemResourcesChart**: Real-time system resource usage
-
-### Data Tables
-
-8. **TopStreamsTable**: Best performing streams
-9. **RecentStreamActivity**: Latest client connections
-10. **LiveConnectionMonitor**: Real-time connection events
+3. **SharedStreamPerformanceChart**: 24-hour performance trends
 
 ## API Endpoints
 
