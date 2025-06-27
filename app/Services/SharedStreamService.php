@@ -1083,7 +1083,23 @@ class SharedStreamService
     private function isStreamActive(string $streamKey): bool
     {
         $streamInfo = $this->getStreamInfo($streamKey);
-        return $streamInfo && ($streamInfo['status'] === 'active' || $streamInfo['status'] === 'starting');
+        if (!$streamInfo || !in_array($streamInfo['status'] ?? '', ['active', 'starting'])) {
+            return false;
+        }
+        
+        // Check if the process is actually running (phantom stream detection)
+        $pid = $streamInfo['pid'] ?? null;
+        if ($pid && !$this->isProcessRunning($pid)) {
+            Log::channel('ffmpeg')->warning("Phantom stream detected for {$streamKey} with PID {$pid} - process not running");
+            
+            // Clean up phantom stream
+            $this->cleanupStream($streamKey, true);
+            SharedStream::where('stream_id', $streamKey)->delete();
+            
+            return false;
+        }
+        
+        return true;
     }
 
     /**
@@ -2185,16 +2201,11 @@ class SharedStreamService
             if (!$streamInfo) {
                 Log::channel('ffmpeg')->warning("Stream {$streamId} not found in Redis for manual stop");
                 
-                // Still try to update database record if it exists
+                // Still try to delete database record if it exists
                 $dbStream = SharedStream::where('stream_id', $streamId)->first();
                 if ($dbStream) {
-                    $dbStream->update([
-                        'status' => 'stopped',
-                        'stopped_at' => now(),
-                        'process_id' => null,
-                        'client_count' => 0
-                    ]);
-                    Log::channel('ffmpeg')->info("Updated database record for {$streamId} to stopped status");
+                    $dbStream->delete();
+                    Log::channel('ffmpeg')->info("Deleted database record for {$streamId}");
                     return true;
                 }
                 return false;
@@ -2209,13 +2220,8 @@ class SharedStreamService
             // Clean up the stream data (this will also stop the process)
             $this->cleanupStream($streamId, true);
             
-            // Update database
-            SharedStream::where('stream_id', $streamId)->update([
-                'status' => 'stopped',
-                'stopped_at' => now(),
-                'process_id' => null,
-                'client_count' => 0
-            ]);
+            // Delete database record completely
+            SharedStream::where('stream_id', $streamId)->delete();
             
             Log::channel('ffmpeg')->info("Successfully stopped stream {$streamId} manually");
             return true;
