@@ -100,6 +100,7 @@ class StreamTestController extends Controller
             // Create FFmpeg command for continuous stream
             $cmd = [
                 'ffmpeg',
+                '-re', // Force real-time output
                 '-f', 'lavfi',
                 '-i', 'testsrc2=size=1280x720:rate=25', // 720p test pattern at 25fps
                 '-f', 'lavfi',
@@ -519,11 +520,13 @@ class StreamTestController extends Controller
                 $timeText = sprintf("Runtime: %02d:%02d", floor($displayTime / 60), $displayTime % 60);
             }
 
-            // Create FFmpeg command for a single segment
+            // Prepare filter text (escape special characters for FFmpeg)
             $filterText = str_replace(['"', "'", ':', '\n'], ['\"', "\'", '\\:', '\\n'], $timeText . "\\nSegment: " . $segment);
-            
+
+            // Create FFmpeg command for a single segment
             $cmd = [
                 'ffmpeg',
+                '-re', // Force real-time output for consistent timing
                 '-f', 'lavfi',
                 '-i', 'testsrc2=size=1280x720:rate=25', // 720p test pattern at 25fps
                 '-f', 'lavfi', 
