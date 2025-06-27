@@ -214,6 +214,13 @@ class AppServiceProvider extends ServiceProvider
                 if ($mergedPlaylist->isDirty('short_urls_enabled')) {
                     $mergedPlaylist->generateShortUrl();
                 }
+                if ($mergedPlaylist->isDirty('uuid')) {
+                    // If changing the UUID, remove the old short URLs and generate new ones
+                    if ($mergedPlaylist->short_urls_enabled) {
+                        $mergedPlaylist->removeShortUrls();
+                        $mergedPlaylist->generateShortUrl();
+                    }
+                }
                 return $mergedPlaylist;
             });
 
@@ -229,6 +236,13 @@ class AppServiceProvider extends ServiceProvider
             CustomPlaylist::updating(function (CustomPlaylist $customPlaylist) {
                 if ($customPlaylist->isDirty('short_urls_enabled')) {
                     $customPlaylist->generateShortUrl();
+                }
+                if ($customPlaylist->isDirty('uuid')) {
+                    // If changing the UUID, remove the old short URLs and generate new ones
+                    if ($customPlaylist->short_urls_enabled) {
+                        $customPlaylist->removeShortUrls();
+                        $customPlaylist->generateShortUrl();
+                    }
                 }
                 return $customPlaylist;
             });
