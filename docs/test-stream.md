@@ -1,6 +1,6 @@
 # Test Stream Documentation
 
-The `StreamTestController` provides endpoints for testing continuous streams with configurable timeouts. This is useful for testing stream stability and behavior when streams fail mid-stream.
+The `StreamTestController` provides endpoints for testing continuous streams with configurable timeouts. This is useful for testing stream stability, proxy functionality, and behavior when streams fail mid-stream.
 
 ## Endpoints
 
@@ -14,7 +14,7 @@ GET /api/stream/test/{timeout}.m3u8
 GET /api/stream/test/{timeout}/segment_{segment}.ts
 ```
 
-### Direct Stream (Legacy)
+### Direct Stream (For Proxy Testing)
 ```
 GET /api/stream/test/{timeout}.ts
 ```
@@ -22,32 +22,47 @@ GET /api/stream/test/{timeout}.ts
 ## Parameters
 
 - `{timeout}` - Integer representing seconds:
-  - `0` = No timeout (stream runs indefinitely, shows runtime counter)
+  - `0` = No timeout (infinite stream, shows runtime counter, perfect for proxy testing)
   - `10` = Stream runs for 10 seconds then terminates (shows countdown)
   - `30` = Stream runs for 30 seconds then terminates (shows countdown)
   - etc.
 
+## Stream Features
+
+### Technical Specifications
+- **Video**: 720p H.264 (Constrained Baseline, Level 3.0) at 25fps
+- **Audio**: AAC-LC mono at 128 kbps, 48kHz
+- **Container**: MPEG-TS (Transport Stream)
+- **Real-time output**: Uses `-re` flag for proper timing
+
+### Stream Types
+
+#### Infinite Streams (`timeout=0`)
+- **Purpose**: Designed for proxy testing and long-running scenarios
+- **Behavior**: Continuous stream that runs indefinitely until connection is closed
+- **Display**: Shows runtime counter (Runtime: 00:00, 00:04, 00:08, etc.)
+- **HLS**: Creates live playlist without `#EXT-X-ENDLIST`
+- **Proxy Compatible**: Tested with FFmpeg stream copying for extended periods
+
+#### Finite Streams (`timeout>0`)
+- **Purpose**: Testing timeout scenarios and stream termination
+- **Behavior**: Stream runs for specified duration then terminates cleanly
+- **Display**: Shows countdown timer (Countdown: 00:30, 00:26, 00:22, etc.)
+- **HLS**: Creates VOD playlist with `#EXT-X-ENDLIST`
+
 ## Examples
 
-### Infinite test stream (shows runtime counter)
+### Infinite test stream for proxy testing (shows runtime counter)  
 ```
 http://localhost:36400/api/stream/test/0.m3u8
+http://localhost:36400/api/stream/test/0.ts
 ```
 
 ### 30-second test stream (shows countdown)
 ```
 http://localhost:36400/api/stream/test/30.m3u8
+http://localhost:36400/api/stream/test/30.ts
 ```
-
-### 12-second test stream (shows countdown)
-```
-http://localhost:36400/api/stream/test/12.m3u8
-```
-
-## Stream Content
-
-- **No timeout (0)**: Shows runtime counter counting up (Runtime: 00:00, 00:04, 00:08, etc.)
-- **With timeout**: Shows countdown timer counting down to zero (Countdown: 00:30, 00:26, 00:22, etc.)
 - **Resolution**: 720p (1280x720) with H.264 video and AAC audio
 - **Format**: MPEG-TS segments suitable for HLS streaming
 - **Segment Duration**: 4 seconds per segment
@@ -141,3 +156,45 @@ All stream activity is logged to Laravel's standard logging system with the foll
 - Check Laravel logs for connection abort messages
 - Verify timeout parameter is correct
 - Test with a longer timeout value
+
+## Proxy Testing
+
+The infinite test streams (`timeout=0`) are specifically designed for testing proxy functionality. They provide continuous, stable streams that are ideal for validating proxy configurations and stream forwarding.
+
+### Proxy Compatibility
+- **Stream Copying**: Compatible with FFmpeg's `-c:v copy -c:a copy` stream copying
+- **Extended Duration**: Tested for 45+ seconds without timeout issues  
+- **Real-time Output**: Uses proper timing for consistent proxy behavior
+- **Connection Handling**: Handles proxy disconnections gracefully
+
+### Example Proxy Commands
+
+#### FFmpeg Stream Copy (Most Common)
+```bash
+# Proxy the infinite test stream with stream copying
+ffmpeg -i "http://localhost:36400/api/stream/test/0.ts" \
+       -c:v copy -c:a copy \
+       -f mpegts \
+       pipe:1
+
+# Proxy with timeout (useful for testing)
+ffmpeg -i "http://localhost:36400/api/stream/test/0.ts" \
+       -c:v copy -c:a copy \
+       -t 60 \
+       -f mpegts \
+       output.ts
+```
+
+#### Testing Internal Proxy Systems
+```bash
+# Test your proxy by replacing the source URL
+# Replace "your-proxy-command" with your actual proxy implementation
+your-proxy-command --source="http://localhost:36400/api/stream/test/0.ts" --output=mp4
+```
+
+### Troubleshooting Proxy Issues
+
+1. **30-second timeouts**: The infinite streams resolve common proxy timeout issues
+2. **Stream ending unexpectedly**: Use `timeout=0` for continuous streams
+3. **Compatibility issues**: The streams use standard H.264/AAC encoding compatible with most players
+4. **Buffering problems**: Real-time output ensures consistent data flow

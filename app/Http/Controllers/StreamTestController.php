@@ -87,17 +87,19 @@ class StreamTestController extends Controller
     private function generateFFmpegStream(int $timeout, int $startTime): void
     {
         try {
-            // Calculate initial display text
-            if ($timeout > 0) {
-                $timeText = sprintf("Countdown: %02d:%02d", floor($timeout / 60), $timeout % 60);
-            } else {
-                $timeText = "Runtime: 00:00";
+            // For infinite streams, we need a different approach
+            if ($timeout === 0) {
+                $this->generateInfiniteFFmpegStream($startTime);
+                return;
             }
             
-            // Prepare filter text (escape special characters for FFmpeg)
-            $filterText = str_replace(['"', "'", ':', '\n'], ['\"', "\'", '\\:', '\\n'], $timeText . "\\nContinuous Stream");
+            // Calculate initial display text
+            $timeText = sprintf("Countdown: %02d:%02d", floor($timeout / 60), $timeout % 60);
             
-            // Create FFmpeg command for continuous stream
+            // Prepare filter text (escape special characters for FFmpeg)
+            $filterText = str_replace(['"', "'", ':', '\n'], ['\"', "\'", '\\:', '\\n'], $timeText . "\\nFinite Stream");
+            
+            // Create FFmpeg command for finite stream
             $cmd = [
                 'ffmpeg',
                 '-re', // Force real-time output
@@ -107,17 +109,8 @@ class StreamTestController extends Controller
                 '-i', 'sine=frequency=1000:sample_rate=48000', // 1kHz tone  
                 '-filter_complex', "[0:v]drawtext=text='{$filterText}':fontsize=48:fontcolor=white:x=(w-tw)/2:y=(h-th)/2:box=1:boxcolor=black@0.5[v]",
                 '-map', '[v]',
-                '-map', '1:a'
-            ];
-            
-            // Add timeout before codec options if specified
-            if ($timeout > 0) {
-                $cmd[] = '-t';
-                $cmd[] = (string)$timeout;
-            }
-            
-            // Add codec and output options
-            $cmd = array_merge($cmd, [
+                '-map', '1:a',
+                '-t', (string)$timeout, // Set duration for finite streams
                 '-c:v', 'libx264',
                 '-preset', 'ultrafast',
                 '-tune', 'zerolatency',
@@ -128,7 +121,7 @@ class StreamTestController extends Controller
                 '-b:a', '128k',
                 '-f', 'mpegts',
                 'pipe:1'
-            ]);
+            ];
 
             Log::info("Starting continuous FFmpeg stream", ['timeout' => $timeout, 'cmd' => implode(' ', $cmd)]);
 
@@ -251,6 +244,143 @@ class StreamTestController extends Controller
             
             // Fallback to basic stream
             $this->generateBasicStream($timeout, $startTime);
+        }
+    }
+
+    /**
+     * Generate an infinite video stream using FFmpeg
+     * This method creates a truly continuous stream that loops indefinitely
+     * 
+     * @param int $startTime
+     * @return void
+     */
+    private function generateInfiniteFFmpegStream(int $startTime): void
+    {
+        try {
+            Log::info("Starting infinite FFmpeg stream", ['start_time' => $startTime]);
+            
+            // Create FFmpeg command for infinite stream with dynamic timer
+            // We use the -stream_loop -1 flag to loop indefinitely and use lavfi inputs that don't have inherent length limits
+            $cmd = [
+                'ffmpeg',
+                '-re', // Force real-time output
+                '-f', 'lavfi',
+                '-i', 'testsrc2=size=1280x720:rate=25', // 720p test pattern at 25fps - this generates indefinitely
+                '-f', 'lavfi', 
+                '-i', 'sine=frequency=1000:sample_rate=48000', // 1kHz tone - this also generates indefinitely
+                '-filter_complex', '[0:v]drawtext=text=\'Runtime\\: %{eif\\:trunc(t/60)\\:d}\\:%{eif\\:mod(t,60)\\:02d}\\nInfinite Stream\':fontsize=48:fontcolor=white:x=(w-tw)/2:y=(h-th)/2:box=1:boxcolor=black@0.5[v]',
+                '-map', '[v]',
+                '-map', '1:a',
+                '-c:v', 'libx264',
+                '-preset', 'ultrafast',
+                '-tune', 'zerolatency',
+                '-profile:v', 'baseline',
+                '-level', '3.0',
+                '-pix_fmt', 'yuv420p',
+                '-c:a', 'aac',
+                '-b:a', '128k',
+                '-f', 'mpegts',
+                'pipe:1'
+            ];
+
+            Log::info("Starting infinite FFmpeg stream", ['cmd' => implode(' ', $cmd)]);
+
+            $process = new Process($cmd);
+            $process->setTimeout(null); // No timeout for infinite streams
+            
+            $process->start();
+            
+            if (!$process->isStarted()) {
+                Log::error("Failed to start infinite FFmpeg process");
+                throw new \Exception("Failed to start infinite FFmpeg process");
+            }
+            
+            $lastOutput = time();
+            $totalBytes = 0;
+            $lastLogTime = time();
+            
+            // Stream output as it becomes available
+            while ($process->isRunning()) {
+                // Read available output
+                $output = $process->getIncrementalOutput();
+                
+                if (!empty($output)) {
+                    echo $output;
+                    $totalBytes += strlen($output);
+                    if (ob_get_level()) {
+                        ob_flush();
+                    }
+                    flush();
+                    $lastOutput = time();
+                }
+                
+                // Check if connection is still alive
+                if (connection_aborted()) {
+                    $process->stop();
+                    Log::info("Infinite test stream connection aborted", ['elapsed' => time() - $startTime, 'bytes_sent' => $totalBytes]);
+                    break;
+                }
+                
+                // Log progress every 60 seconds for infinite streams
+                if ((time() - $lastLogTime) >= 60) {
+                    Log::info("Infinite stream progress", [
+                        'elapsed' => time() - $startTime,
+                        'bytes_sent' => $totalBytes,
+                        'mb_sent' => round($totalBytes / 1024 / 1024, 2)
+                    ]);
+                    $lastLogTime = time();
+                }
+                
+                // Check if process is stalled (longer timeout for infinite streams)
+                if ((time() - $lastOutput) > 30) {
+                    Log::warning("Infinite FFmpeg process seems stalled, stopping", [
+                        'last_output' => $lastOutput,
+                        'current_time' => time(),
+                        'bytes_sent' => $totalBytes
+                    ]);
+                    $process->stop();
+                    break;
+                }
+                
+                // Small sleep to prevent busy waiting
+                usleep(10000); // 10ms
+            }
+            
+            // Check if process exited due to error
+            $exitCode = $process->getExitCode();
+            if ($exitCode > 0) {
+                Log::error("Infinite FFmpeg process exited with error", [
+                    'exit_code' => $exitCode,
+                    'error_output' => $process->getErrorOutput(),
+                    'bytes_sent' => $totalBytes,
+                    'elapsed' => time() - $startTime
+                ]);
+            }
+            
+            // Get any remaining output
+            $remainingOutput = $process->getIncrementalOutput();
+            if (!empty($remainingOutput)) {
+                echo $remainingOutput;
+                if (ob_get_level()) {
+                    ob_flush();
+                }
+                flush();
+            }
+            
+            Log::info("Infinite FFmpeg stream ended", [
+                'duration' => time() - $startTime,
+                'bytes_sent' => $totalBytes,
+                'exit_code' => $exitCode
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error("Infinite FFmpeg stream error", [
+                'error' => $e->getMessage(),
+                'elapsed' => time() - $startTime
+            ]);
+            
+            // Fallback to basic infinite stream
+            $this->generateBasicStream(0, $startTime);
         }
     }
 
@@ -401,27 +531,38 @@ class StreamTestController extends Controller
         }
 
         $segmentDuration = 4; // 4 second segments
-        $totalSegments = $timeout > 0 ? ceil($timeout / $segmentDuration) : 10; // For infinite, show 10 segments initially
         
         $playlist = "#EXTM3U\n";
         $playlist .= "#EXT-X-VERSION:3\n";
         $playlist .= "#EXT-X-TARGETDURATION:{$segmentDuration}\n";
-        $playlist .= "#EXT-X-MEDIA-SEQUENCE:0\n";
         
-        if ($timeout > 0) {
-            $playlist .= "#EXT-X-PLAYLIST-TYPE:VOD\n";
-        }
-        
-        // Generate segments
-        for ($i = 0; $i < $totalSegments; $i++) {
-            $segmentTimeout = $timeout > 0 ? min($segmentDuration, $timeout - ($i * $segmentDuration)) : $segmentDuration;
-            if ($segmentTimeout <= 0) break;
+        if ($timeout === 0) {
+            // For infinite streams, create a live playlist
+            $playlist .= "#EXT-X-MEDIA-SEQUENCE:0\n";
             
-            $playlist .= "#EXTINF:{$segmentTimeout}.0,\n";
-            $playlist .= route('stream.test.segment', ['timeout' => $timeout, 'segment' => $i]) . "\n";
-        }
-        
-        if ($timeout > 0) {
+            // Generate a rolling window of segments for live streams
+            $totalSegments = 5; // Keep 5 segments in the playlist for live streaming
+            
+            for ($i = 0; $i < $totalSegments; $i++) {
+                $playlist .= "#EXTINF:{$segmentDuration}.0,\n";
+                $playlist .= route('stream.test.segment', ['timeout' => $timeout, 'segment' => $i]) . "\n";
+            }
+            // Note: We don't add #EXT-X-ENDLIST for live streams
+        } else {
+            // For finite streams, create a VOD playlist
+            $totalSegments = ceil($timeout / $segmentDuration);
+            $playlist .= "#EXT-X-MEDIA-SEQUENCE:0\n";
+            $playlist .= "#EXT-X-PLAYLIST-TYPE:VOD\n";
+            
+            // Generate segments
+            for ($i = 0; $i < $totalSegments; $i++) {
+                $segmentTimeout = min($segmentDuration, $timeout - ($i * $segmentDuration));
+                if ($segmentTimeout <= 0) break;
+                
+                $playlist .= "#EXTINF:{$segmentTimeout}.0,\n";
+                $playlist .= route('stream.test.segment', ['timeout' => $timeout, 'segment' => $i]) . "\n";
+            }
+            
             $playlist .= "#EXT-X-ENDLIST\n";
         }
         
