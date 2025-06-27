@@ -129,7 +129,8 @@ class SharedStreamController extends Controller
                     'user_agent' => $userAgent,
                     'playlist_id' => $playlist->id,
                     'ip' => $request->ip()
-                ]
+                ],
+                $model // Pass the full model for failover support
             );
 
             // Only check and increment stream limits for NEW streams
