@@ -18,7 +18,7 @@ class PlaylistUrlService
      */
     public static function getUrls($playlist)
     {
-        // Get the first auth
+        // Get the first enabled auth (URLs can only contain one set of credentials)
         $playlistAuth = $playlist->playlistAuths()->where('enabled', true)->first();
         $auth = null;
         if ($playlistAuth) {
@@ -111,7 +111,7 @@ class PlaylistUrlService
      */
     public function getMediaFlowProxyUrls($playlist)
     {
-        // Get the first auth
+        // Get the first enabled auth (URLs can only contain one set of credentials)
         $playlistAuth = $playlist->playlistAuths()->where('enabled', true)->first();
         $auth = null;
         if ($playlistAuth) {
