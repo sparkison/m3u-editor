@@ -9,8 +9,6 @@ The `StreamTestController` provides endpoints for testing continuous TS streams 
 GET /api/stream/test/{timeout}.ts
 ```
 
-**Note:** HLS streaming endpoints have been removed to focus on the more reliable direct TS streaming for proxy testing.
-
 ## Parameters
 
 - `{timeout}` - Integer representing seconds:
@@ -60,7 +58,6 @@ http://localhost:36400/api/stream/test/30.ts
 ## Features
 
 - **FFmpeg Integration**: Uses FFmpeg for proper video generation with timer overlay
-- **HLS Segmented Streaming**: Proper HLS playlist with individual TS segments
 - **Connection Monitoring**: Automatically stops when client disconnects
 - **Logging**: Comprehensive logging for debugging stream behavior
 - **CORS Support**: Includes CORS headers for web player compatibility
@@ -71,28 +68,16 @@ http://localhost:36400/api/stream/test/30.ts
 ### VLC
 1. Open VLC
 2. Media → Open Network Stream
-3. Enter: `http://localhost:36400/api/stream/test/30.m3u8`
+3. Enter: `http://localhost:36400/api/stream/test/30.ts`
 4. Click Play
 
 ### FFplay
 ```bash
 # Test 30-second countdown stream
-ffplay http://localhost:36400/api/stream/test/30.m3u8
+ffplay http://localhost:36400/api/stream/test/30.ts
 
 # Test infinite runtime stream  
-ffplay http://localhost:36400/api/stream/test/0.m3u8
-```
-
-### Web Players (HLS.js, Video.js, etc.)
-The `.m3u8` playlist format is compatible with most web-based HLS players.
-
-### cURL Testing
-```bash
-# Download first segment
-curl "http://localhost:36400/api/stream/test/30/segment_0.ts" -o segment.ts
-
-# Verify segment with ffprobe
-ffprobe segment.ts
+ffplay http://localhost:36400/api/stream/test/0.ts
 ```
 
 ## Use Cases
@@ -102,15 +87,8 @@ ffprobe segment.ts
 3. **Player Compatibility**: Test different video players with a known-good stream
 4. **Network Testing**: Use as a test stream for network performance analysis
 5. **Development**: Quick test stream without needing external sources
-6. **HLS Testing**: Test HLS playlist parsing and segment fetching
 
 ## Technical Details
-
-### Playlist Structure
-- **VOD Playlist**: For streams with timeout (finite duration)
-- **Live-like Playlist**: For infinite streams (shows first 10 segments)
-- **Segment Duration**: 4 seconds each
-- **Target Duration**: 4 seconds
 
 ### Video Specifications
 - **Container**: MPEG-TS
@@ -123,7 +101,6 @@ ffprobe segment.ts
 ## Logs
 
 All stream activity is logged to Laravel's standard logging system with the following information:
-- Segment generation start/completion
 - FFmpeg command execution
 - Connection status and errors
 - Process timeouts and failures
