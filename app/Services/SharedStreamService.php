@@ -1805,18 +1805,23 @@ class SharedStreamService
             Log::channel('ffmpeg')->debug("Stream {$streamKey}: Cleaned up active process handles");
         }
         
-        // Remove Redis data
-        Redis::del("shared_stream:{$streamKey}");
-        Redis::del("stream_clients:{$streamKey}");
-        Redis::del("stream_buffer:{$streamKey}");
+        // Remove all Redis data related to this stream
+        // Use the unique part of the stream identifier (1223568:hash)
+        preg_match('/channel:(\d+:[a-f0-9]+)/', $streamKey, $matches);
+        $streamIdentifier = $matches[1] ?? str_replace('shared_stream:', '', $streamKey);
         
-        // Clean up individual client keys
-        $clientPattern = self::CLIENT_PREFIX . $streamKey . ':*';
-        $clientKeys = Redis::keys($clientPattern);
-        if (!empty($clientKeys)) {
-            Redis::del($clientKeys);
-            Log::channel('ffmpeg')->debug("Cleaned up " . count($clientKeys) . " client keys for stream {$streamKey}");
+        // Use shell command since Laravel Redis isn't finding the keys correctly
+        $deleteCommand = "redis-cli --scan --pattern '*{$streamIdentifier}*' | xargs redis-cli del 2>/dev/null";
+        $output = shell_exec($deleteCommand);
+        $deletedCount = (int) trim($output);
+        
+        if ($deletedCount > 0) {
+            Log::channel('ffmpeg')->info("Stream {$streamKey}: Cleaned up {$deletedCount} Redis keys including all buffer segments via shell command");
+        } else {
+            Log::channel('ffmpeg')->debug("Stream {$streamKey}: No Redis keys found to clean up (pattern: *{$streamIdentifier}*)");
         }
+        
+        Log::channel('ffmpeg')->info("Stream {$streamKey}: All Redis buffer data and keys cleaned up");
         
         // Clean up files if requested
         if ($removeFiles) {
