@@ -62,7 +62,7 @@ class PlaylistResource extends Resource
     public static function getGlobalSearchEloquentQuery(): Builder
     {
         return parent::getGlobalSearchEloquentQuery()
-            ->where('user_id', auth()->id());
+            ->where('user_id', \Illuminate\Support\Facades\Auth::id());
     }
 
     protected static ?string $navigationIcon = 'heroicon-o-play';
@@ -931,13 +931,72 @@ class PlaylistResource extends Resource
                                 ->collapsed(true)
                                 ->columnSpan(2)
                                 ->schema([
-                                    Forms\Components\Select::make('auth')
-                                        ->relationship('playlistAuths', 'playlist_auths.name')
-                                        ->label('Assigned Auth(s)')
+                                    Forms\Components\Select::make('assigned_auth_ids')
+                                        ->label('Assigned Auths')
                                         ->multiple()
+                                        ->options(function ($record) {
+                                            $options = [];
+                                            
+                                            // Get currently assigned auths for this playlist
+                                            if ($record) {
+                                                $currentAuths = $record->playlistAuths()->get();
+                                                foreach ($currentAuths as $auth) {
+                                                    $options[$auth->id] = $auth->name . ' (currently assigned)';
+                                                }
+                                            }
+                                            
+                                            // Get unassigned auths
+                                            $unassignedAuths = \App\Models\PlaylistAuth::where('user_id', \Illuminate\Support\Facades\Auth::id())
+                                                ->whereDoesntHave('assignedPlaylist')
+                                                ->get();
+                                            
+                                            foreach ($unassignedAuths as $auth) {
+                                                $options[$auth->id] = $auth->name;
+                                            }
+                                            
+                                            return $options;
+                                        })
                                         ->searchable()
-                                        ->preload()
-                                        ->helperText('NOTE: only the first enabled auth will be used if multiple assigned.'),
+                                        ->nullable()
+                                        ->placeholder('Select auths or leave empty')
+                                        ->default(function ($record) {
+                                            if ($record) {
+                                                return $record->playlistAuths()->pluck('playlist_auths.id')->toArray();
+                                            }
+                                            return [];
+                                        })
+                                        ->afterStateHydrated(function ($component, $state, $record) {
+                                            if ($record) {
+                                                $currentAuthIds = $record->playlistAuths()->pluck('playlist_auths.id')->toArray();
+                                                $component->state($currentAuthIds);
+                                            }
+                                        })
+                                        ->helperText('Only unassigned auths are available. Each auth can only be assigned to one playlist at a time.')
+                                        ->afterStateUpdated(function ($state, $record) {
+                                            if (!$record) return;
+                                            
+                                            $currentAuthIds = $record->playlistAuths()->pluck('playlist_auths.id')->toArray();
+                                            $newAuthIds = $state ? (is_array($state) ? $state : [$state]) : [];
+                                            
+                                            // Find auths to remove (currently assigned but not in new selection)
+                                            $authsToRemove = array_diff($currentAuthIds, $newAuthIds);
+                                            foreach ($authsToRemove as $authId) {
+                                                $auth = \App\Models\PlaylistAuth::find($authId);
+                                                if ($auth) {
+                                                    $auth->clearAssignment();
+                                                }
+                                            }
+                                            
+                                            // Find auths to add (in new selection but not currently assigned)
+                                            $authsToAdd = array_diff($newAuthIds, $currentAuthIds);
+                                            foreach ($authsToAdd as $authId) {
+                                                $auth = \App\Models\PlaylistAuth::find($authId);
+                                                if ($auth) {
+                                                    $auth->assignTo($record);
+                                                }
+                                            }
+                                        })
+                                        ->dehydrated(false), // Don't save this field directly
                                 ]),
                             Forms\Components\Section::make('Xtream API')
                                 ->icon('heroicon-m-bolt')
