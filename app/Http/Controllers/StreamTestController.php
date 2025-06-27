@@ -135,6 +135,13 @@ class StreamTestController extends Controller
             
             // Stream output as it becomes available
             while ($process->isRunning()) {
+                // Check timeout first - exit if we've reached the limit
+                if ($timeout > 0 && (time() - $startTime) >= $timeout) {
+                    $process->stop();
+                    Log::info("Test stream timeout reached", ['elapsed' => time() - $startTime]);
+                    break;
+                }
+                
                 // Read available output
                 $output = $process->getIncrementalOutput();
                 
@@ -147,13 +154,6 @@ class StreamTestController extends Controller
                     $lastOutput = time();
                 }
                 
-                // Check timeout manually for infinite streams
-                if ($timeout > 0 && (time() - $startTime) >= $timeout) {
-                    $process->stop();
-                    Log::info("Test stream timeout reached", ['elapsed' => time() - $startTime]);
-                    break;
-                }
-                
                 // Check if connection is still alive
                 if (connection_aborted()) {
                     $process->stop();
@@ -161,9 +161,14 @@ class StreamTestController extends Controller
                     break;
                 }
                 
-                // Check if process is stalled
-                if ((time() - $lastOutput) > 15) {
-                    Log::warning("FFmpeg process seems stalled, stopping");
+                // Check if process is stalled (but give more time for finite streams)
+                $stallTimeout = $timeout > 0 ? min(15, $timeout + 5) : 15;
+                if ((time() - $lastOutput) > $stallTimeout) {
+                    Log::warning("FFmpeg process seems stalled, stopping", [
+                        'last_output' => $lastOutput,
+                        'current_time' => time(),
+                        'stall_timeout' => $stallTimeout
+                    ]);
                     $process->stop();
                     break;
                 }
@@ -183,13 +188,21 @@ class StreamTestController extends Controller
             }
             
             $exitCode = $process->getExitCode();
+            $finalElapsed = time() - $startTime;
+            
             if ($exitCode !== 0 && $exitCode !== null) {
                 Log::error("FFmpeg continuous stream failed", [
                     'exit_code' => $exitCode,
-                    'error' => $process->getErrorOutput()
+                    'error' => $process->getErrorOutput(),
+                    'elapsed' => $finalElapsed,
+                    'timeout' => $timeout
                 ]);
             } else {
-                Log::info("FFmpeg continuous stream completed", ['duration' => time() - $startTime]);
+                Log::info("FFmpeg continuous stream completed", [
+                    'duration' => $finalElapsed,
+                    'timeout' => $timeout,
+                    'exit_code' => $exitCode
+                ]);
             }
             
         } catch (\Exception $e) {
