@@ -1,4 +1,4 @@
-# Test Stream Controller Documentation
+# Test Stream Documentation
 
 The `StreamTestController` provides endpoints for testing continuous streams with configurable timeouts. This is useful for testing stream stability and behavior when streams fail mid-stream.
 
@@ -31,17 +31,17 @@ GET /api/stream/test/{timeout}.ts
 
 ### Infinite test stream (shows runtime counter)
 ```
-http://m3ueditor.test/api/stream/test/0.m3u8
+http://localhost:36400/api/stream/test/0.m3u8
 ```
 
 ### 30-second test stream (shows countdown)
 ```
-http://m3ueditor.test/api/stream/test/30.m3u8
+http://localhost:36400/api/stream/test/30.m3u8
 ```
 
 ### 12-second test stream (shows countdown)
 ```
-http://m3ueditor.test/api/stream/test/12.m3u8
+http://localhost:36400/api/stream/test/12.m3u8
 ```
 
 ## Stream Content
@@ -68,16 +68,16 @@ http://m3ueditor.test/api/stream/test/12.m3u8
 ### VLC
 1. Open VLC
 2. Media → Open Network Stream
-3. Enter: `http://m3ueditor.test/api/stream/test/30.m3u8`
+3. Enter: `http://localhost:36400/api/stream/test/30.m3u8`
 4. Click Play
 
 ### FFplay
 ```bash
 # Test 30-second countdown stream
-ffplay http://m3ueditor.test/api/stream/test/30.m3u8
+ffplay http://localhost:36400/api/stream/test/30.m3u8
 
 # Test infinite runtime stream  
-ffplay http://m3ueditor.test/api/stream/test/0.m3u8
+ffplay http://localhost:36400/api/stream/test/0.m3u8
 ```
 
 ### Web Players (HLS.js, Video.js, etc.)
@@ -86,7 +86,7 @@ The `.m3u8` playlist format is compatible with most web-based HLS players.
 ### cURL Testing
 ```bash
 # Download first segment
-curl "http://m3ueditor.test/api/stream/test/30/segment_0.ts" -o segment.ts
+curl "http://localhost:36400/api/stream/test/30/segment_0.ts" -o segment.ts
 
 # Verify segment with ffprobe
 ffprobe segment.ts

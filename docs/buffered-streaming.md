@@ -1,4 +1,4 @@
-# Shared Streaming Analytics & Dashboard
+# Buffered Streaming Documentation
 
 This document describes the comprehensive analytics and dashboard system for the xTeVe-like shared streaming functionality.
 
@@ -54,13 +54,13 @@ Real-time monitoring interface with:
 
 ```bash
 # Get real-time metrics
-curl http://localhost/api/monitor/realtime
+curl http://localhost:36400/api/monitor/realtime
 
 # Get system health
-curl http://localhost/api/monitor/health
+curl http://localhost:36400/api/monitor/health
 
 # Get performance history for last 24 hours
-curl http://localhost/api/monitor/performance?period=24h&metric=bandwidth
+curl http://localhost:36400/api/monitor/performance?period=24h&metric=bandwidth
 ```
 
 ## Database Schema
@@ -195,18 +195,11 @@ php artisan test --filter SharedStreamingTest
 
 ```bash
 # Prometheus metrics endpoint
-curl http://localhost/api/monitor/realtime | jq '.data'
+curl http://localhost:36400/api/monitor/realtime | jq '.data'
 
 # Grafana dashboard integration
-curl http://localhost/api/monitor/performance?period=1h
+curl http://localhost:36400/api/monitor/performance?period=1h
 ```
-
-### WebSocket Integration (Future)
-
-Plans for WebSocket support to provide:
-- Real-time dashboard updates
-- Instant alert notifications
-- Live client connection events
 
 ## Troubleshooting
 
@@ -234,11 +227,8 @@ php artisan shared-streams:manage --cleanup
 
 ### Planned Features
 
-- WebSocket real-time updates
 - Advanced analytics and reporting
 - Stream quality monitoring
-- Geographic client distribution
-- Load balancing integration
 - Custom alert rules
 - Export/import functionality
 - Advanced caching strategies
