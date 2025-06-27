@@ -87,33 +87,59 @@ class StreamTestController extends Controller
     private function generateFFmpegStream(int $timeout, int $startTime): void
     {
         try {
-            // Create FFmpeg command for test pattern with timer
+            // Calculate initial display text
+            if ($timeout > 0) {
+                $timeText = sprintf("Countdown: %02d:%02d", floor($timeout / 60), $timeout % 60);
+            } else {
+                $timeText = "Runtime: 00:00";
+            }
+            
+            // Prepare filter text (escape special characters for FFmpeg)
+            $filterText = str_replace(['"', "'", ':', '\n'], ['\"', "\'", '\\:', '\\n'], $timeText . "\\nContinuous Stream");
+            
+            // Create FFmpeg command for continuous stream
             $cmd = [
                 'ffmpeg',
                 '-f', 'lavfi',
-                '-i', 'testsrc2=size=1280x720:rate=25', // 720p test pattern
+                '-i', 'testsrc2=size=1280x720:rate=25', // 720p test pattern at 25fps
                 '-f', 'lavfi',
                 '-i', 'sine=frequency=1000:sample_rate=48000', // 1kHz tone
-                '-filter_complex', $this->buildFFmpegFilter($timeout, $startTime),
+                '-filter_complex', "[0:v]drawtext=text='{$filterText}':fontsize=48:fontcolor=white:x=(w-tw)/2:y=(h-th)/2:box=1:boxcolor=black@0.5[v]",
+                '-map', '[v]',
+                '-map', '1:a',
                 '-c:v', 'libx264',
                 '-preset', 'ultrafast',
                 '-tune', 'zerolatency',
+                '-profile:v', 'baseline',
+                '-level', '3.0',
+                '-pix_fmt', 'yuv420p',
                 '-c:a', 'aac',
                 '-b:a', '128k',
                 '-f', 'mpegts',
-                '-'
+                'pipe:1'
             ];
+            
+            if ($timeout > 0) {
+                $cmd[] = '-t';
+                $cmd[] = (string)$timeout;
+            }
+
+            Log::info("Starting continuous FFmpeg stream", ['timeout' => $timeout]);
 
             $process = new Process($cmd);
-            $process->setTimeout($timeout > 0 ? $timeout + 5 : null);
+            $process->setTimeout($timeout > 0 ? $timeout + 10 : null);
             
             $process->start();
             
             $lastOutput = time();
             
-            foreach ($process as $type => $data) {
-                if ($type === Process::OUT) {
-                    echo $data;
+            // Stream output as it becomes available
+            while ($process->isRunning()) {
+                // Read available output
+                $output = $process->getIncrementalOutput();
+                
+                if (!empty($output)) {
+                    echo $output;
                     if (ob_get_level()) {
                         ob_flush();
                     }
@@ -121,9 +147,10 @@ class StreamTestController extends Controller
                     $lastOutput = time();
                 }
                 
-                // Check timeout
+                // Check timeout manually for infinite streams
                 if ($timeout > 0 && (time() - $startTime) >= $timeout) {
                     $process->stop();
+                    Log::info("Test stream timeout reached", ['elapsed' => time() - $startTime]);
                     break;
                 }
                 
@@ -135,11 +162,34 @@ class StreamTestController extends Controller
                 }
                 
                 // Check if process is stalled
-                if ((time() - $lastOutput) > 10) {
+                if ((time() - $lastOutput) > 15) {
                     Log::warning("FFmpeg process seems stalled, stopping");
                     $process->stop();
                     break;
                 }
+                
+                // Small sleep to prevent busy waiting
+                usleep(10000); // 10ms
+            }
+            
+            // Get any remaining output
+            $remainingOutput = $process->getIncrementalOutput();
+            if (!empty($remainingOutput)) {
+                echo $remainingOutput;
+                if (ob_get_level()) {
+                    ob_flush();
+                }
+                flush();
+            }
+            
+            $exitCode = $process->getExitCode();
+            if ($exitCode !== 0 && $exitCode !== null) {
+                Log::error("FFmpeg continuous stream failed", [
+                    'exit_code' => $exitCode,
+                    'error' => $process->getErrorOutput()
+                ]);
+            } else {
+                Log::info("FFmpeg continuous stream completed", ['duration' => time() - $startTime]);
             }
             
         } catch (\Exception $e) {
@@ -150,27 +200,6 @@ class StreamTestController extends Controller
             
             // Fallback to basic stream
             $this->generateBasicStream($timeout, $startTime);
-        }
-    }
-
-    /**
-     * Build FFmpeg filter for timer overlay
-     * 
-     * @param int $timeout
-     * @param int $startTime
-     * @return string
-     */
-    private function buildFFmpegFilter(int $timeout, int $startTime): string
-    {
-        if ($timeout > 0) {
-            // Countdown timer
-            return sprintf(
-                "[0:v]drawtext=text='Test Stream - Countdown\\: %%{eif\\:max(0\\,%d-t)\\:d}s':fontsize=48:fontcolor=white:x=(w-tw)/2:y=(h-th)/2:box=1:boxcolor=black@0.5[v]",
-                $timeout
-            );
-        } else {
-            // Runtime timer
-            return "[0:v]drawtext=text='Test Stream - Runtime\\: %{pts\\:gmtime\\:0\\:%H\\\\\\:%M\\\\\\:%S}':fontsize=48:fontcolor=white:x=(w-tw)/2:y=(h-th)/2:box=1:boxcolor=black@0.5[v]";
         }
     }
 
