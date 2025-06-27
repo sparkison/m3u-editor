@@ -35,6 +35,11 @@ Route::group(['prefix' => 'stream'], function () {
     Route::get('test/{timeout}.m3u8', [\App\Http\Controllers\StreamTestController::class, 'testPlaylist'])
         ->where('timeout', '[0-9]+')
         ->name('stream.test.playlist');
+    
+    // Test stream segments
+    Route::get('test/{timeout}/segment_{segment}.ts', [\App\Http\Controllers\StreamTestController::class, 'testSegment'])
+        ->where(['timeout' => '[0-9]+', 'segment' => '[0-9]+'])
+        ->name('stream.test.segment');
 });
 
 // Shared streaming API routes (xTeVe-like proxy functionality)
