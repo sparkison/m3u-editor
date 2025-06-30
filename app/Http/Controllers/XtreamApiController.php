@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\ChannelLogoType;
+use App\Enums\PlaylistChannelId;
 use App\Models\Channel;
 use App\Models\CustomPlaylist;
 use App\Models\MergedPlaylist;
@@ -388,6 +389,7 @@ class XtreamApiController extends Controller
                 ->get();
             $liveStreams = [];
             if ($enabledChannels instanceof Collection) {
+                $channelNumber = $playlist->auto_channel_increment ? $playlist->channel_start - 1 : 0;
                 foreach ($enabledChannels as $index => $channel) {
                     $streamIcon = url('/placeholder.png');
                     if ($channel->logo_type === ChannelLogoType::Epg && $channel->epgChannel && $channel->epgChannel->icon) {
@@ -413,13 +415,35 @@ class XtreamApiController extends Controller
                         }
                     }
 
+                    $idChannelBy = $playlist->id_channel_by;
+                    $channelNo = $channel->channel;
+                    if (!$channelNo && $playlist->auto_channel_increment) {
+                        $channelNo = ++$channelNumber;
+                    }
+
+                    // Get the TVG ID
+                    switch ($idChannelBy) {
+                        case PlaylistChannelId::ChannelId:
+                            $tvgId = $channelNo;
+                            break;
+                        case PlaylistChannelId::Name:
+                            $tvgId = $channel->name_custom ?? $channel->name;
+                            break;
+                        case PlaylistChannelId::Title:
+                            $tvgId = $channel->title_custom ?? $channel->title;
+                            break;
+                        default:
+                            $tvgId = $channel->stream_id_custom ?? $channel->stream_id;
+                            break;
+                    }
+
                     $liveStreams[] = [
-                        'num' => $channel->channel ?? null,
+                        'num' => $channelNo,
                         'name' => $channel->title_custom ?? $channel->title,
                         'stream_type' => 'live',
                         'stream_id' => $channel->id,
                         'stream_icon' => $streamIcon,
-                        'epg_channel_id' => $channel->epgChannel->epg_channel_id ?? $channel->stream_id_custom ?? $channel->stream_id ?? (string)$channel->id,
+                        'epg_channel_id' => $tvgId,
                         'added' => (string)$channel->created_at->timestamp,
                         'category_id' => $channelCategoryId,
                         'category_ids' => [$channelCategoryId],
