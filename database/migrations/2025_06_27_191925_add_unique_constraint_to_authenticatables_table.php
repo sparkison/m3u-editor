@@ -13,12 +13,17 @@ return new class extends Migration
     public function up(): void
     {
         // First, remove duplicate records - keep only the most recent one for each playlist_auth_id
-        DB::statement("
-            DELETE a1 FROM authenticatables a1
-            INNER JOIN authenticatables a2 
-            WHERE a1.playlist_auth_id = a2.playlist_auth_id 
-            AND a1.id < a2.id
-        ");
+        // Use a database-agnostic approach that works with SQLite, MySQL, and PostgreSQL
+        $duplicateIds = DB::table('authenticatables as a1')
+            ->join('authenticatables as a2', function ($join) {
+                $join->on('a1.playlist_auth_id', '=', 'a2.playlist_auth_id')
+                     ->whereColumn('a1.id', '<', 'a2.id');
+            })
+            ->pluck('a1.id');
+
+        if ($duplicateIds->isNotEmpty()) {
+            DB::table('authenticatables')->whereIn('id', $duplicateIds)->delete();
+        }
 
         // Now add the unique constraint
         Schema::table('authenticatables', function (Blueprint $table) {
