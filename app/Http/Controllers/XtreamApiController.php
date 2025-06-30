@@ -285,11 +285,11 @@ class XtreamApiController extends Controller
     public function handle(Request $request)
     {
         // Authenticate the user based on the provided credentials
-        $auth = $this->authenticate($request);
-        if ($auth === false) {
-            return response()->json(['error' => 'Unauthorized - Missing credentials'], 401);
-        }
-        list($playlist, $authMethod, $username, $password) = $auth;
+        $request->validate([
+            'username' => 'required|string',
+            'password' => 'required|string',
+        ]);
+        list($playlist, $authMethod, $username, $password) = $this->authenticate($request);
 
         // If no authentication method worked, return error
         if (!$playlist || $authMethod === 'none') {
@@ -733,11 +733,11 @@ class XtreamApiController extends Controller
     public function epg(Request $request)
     {
         // Authenticate the user based on the provided credentials
-        $auth = $this->authenticate($request);
-        if ($auth === false) {
-            return response()->json(['error' => 'Unauthorized - Missing credentials'], 401);
-        }
-        list($playlist, $authMethod, $username, $password) = $auth;
+        $request->validate([
+            'username' => 'required|string',
+            'password' => 'required|string',
+        ]);
+        list($playlist, $authMethod, $username, $password) = $this->authenticate($request);
 
         // If no authentication method worked, return error
         if (!$playlist || $authMethod === 'none') {
