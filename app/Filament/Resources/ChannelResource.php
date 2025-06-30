@@ -120,7 +120,7 @@ class ChannelResource extends Resource
                     ->sortable(),
                 Tables\Columns\IconColumn::make('has_metadata')
                     ->label('Metadata')
-                    ->icon(function($record): string {
+                    ->icon(function ($record): string {
                         if ($record->has_metadata) {
                             return 'heroicon-o-check-circle';
                         }

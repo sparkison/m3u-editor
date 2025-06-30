@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Model;
 use Filament\Tables\Columns\SpatieTagsColumn;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\HtmlString;
 use Spatie\Tags\Tag;
 
 class ChannelsRelationManager extends RelationManager
@@ -85,6 +86,27 @@ class ChannelsRelationManager extends RelationManager
                     ->label('Failovers')
                     ->sortable()
                     ->toggleable(),
+                Tables\Columns\TextColumn::make('is_vod')
+                    ->label('Type')
+                    ->formatStateUsing(fn($record) => new HtmlString(
+                        $record->is_vod
+                            ? '<span class="text-blue-500">VOD</span>'
+                            : '<span class="text-green-500">Live</span>'
+                    ))
+                    ->toggleable()
+                    ->sortable(),
+                Tables\Columns\IconColumn::make('has_metadata')
+                    ->label('Metadata')
+                    ->icon(function ($record): string {
+                        if ($record->has_metadata) {
+                            return 'heroicon-o-check-circle';
+                        }
+                        if ($record->is_vod) {
+                            return 'heroicon-o-x-circle';
+                        }
+                        return 'heroicon-o-minus';
+                    })
+                    ->color(fn($record): string => $record->has_metadata ? 'success' : 'gray'),
                 Tables\Columns\TextInputColumn::make('stream_id_custom')
                     ->label('ID')
                     ->rules(['min:0', 'max:255'])
@@ -135,16 +157,46 @@ class ChannelsRelationManager extends RelationManager
                 SpatieTagsColumn::make('tags')
                     ->label('Playlist Group')
                     ->type($ownerRecord->uuid)
-                    ->toggleable()
-                    ->searchable(query: function (Builder $query, string $search) use ($ownerRecord): Builder {
+                    ->toggleable()->searchable(query: function (Builder $query, string $search) use ($ownerRecord): Builder {
                         return $query->whereHas('tags', function (Builder $query) use ($search, $ownerRecord) {
-                            $query->where('tags.type', $ownerRecord->uuid)
-                                  ->where(function (Builder $query) use ($search) {
-                                      $query->whereRaw('LOWER(JSON_EXTRACT(tags.name, "$")) LIKE ?', ['%' . strtolower($search) . '%']);
-                                  });
+                            $query->where('tags.type', $ownerRecord->uuid);
+
+                            // Cross-database compatible JSON search
+                            $connection = $query->getConnection();
+                            $driver = $connection->getDriverName();
+
+                            switch ($driver) {
+                                case 'pgsql':
+                                    // PostgreSQL uses ->> operator for JSON
+                                    $query->whereRaw('LOWER(tags.name->>\'$\') LIKE ?', ['%' . strtolower($search) . '%']);
+                                    break;
+                                case 'mysql':
+                                    // MySQL uses JSON_EXTRACT
+                                    $query->whereRaw('LOWER(JSON_EXTRACT(tags.name, "$")) LIKE ?', ['%' . strtolower($search) . '%']);
+                                    break;
+                                case 'sqlite':
+                                    // SQLite uses json_extract
+                                    $query->whereRaw('LOWER(json_extract(tags.name, "$")) LIKE ?', ['%' . strtolower($search) . '%']);
+                                    break;
+                                default:
+                                    // Fallback - try to search the JSON as text
+                                    $query->where(DB::raw('LOWER(CAST(tags.name AS TEXT))'), 'LIKE', '%' . strtolower($search) . '%');
+                                    break;
+                            }
                         });
                     })
                     ->sortable(query: function (Builder $query, string $direction) use ($ownerRecord): Builder {
+                        $connection = $query->getConnection();
+                        $driver = $connection->getDriverName();
+
+                        // Build the ORDER BY clause based on database type
+                        $orderByClause = match ($driver) {
+                            'pgsql' => 'tags.name->>\'$\'',
+                            'mysql' => 'JSON_EXTRACT(tags.name, "$")',
+                            'sqlite' => 'json_extract(tags.name, "$")',
+                            default => 'CAST(tags.name AS TEXT)'
+                        };
+
                         return $query
                             ->leftJoin('taggables', function ($join) {
                                 $join->on('channels.id', '=', 'taggables.taggable_id')
@@ -154,7 +206,7 @@ class ChannelsRelationManager extends RelationManager
                                 $join->on('taggables.tag_id', '=', 'tags.id')
                                     ->where('tags.type', '=', $ownerRecord->uuid);
                             })
-                            ->orderBy('tags.name', $direction)
+                            ->orderByRaw("{$orderByClause} {$direction}")
                             ->select('channels.*')
                             ->distinct();
                     }),
@@ -320,6 +372,27 @@ class ChannelsRelationManager extends RelationManager
             ])
             ->actions([
                 Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('process_vod')
+                        ->label('Process VOD')
+                        ->icon('heroicon-o-arrow-path')
+                        ->action(function ($record) {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new \App\Jobs\ProcessVodChannels(channel: $record));
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Fetching VOD metadata for channel')
+                                ->body('The VOD metadata fetching and processing has been started. You will be notified when it is complete.')
+                                ->duration(10000)
+                                ->send();
+                        })
+                        ->disabled(fn($record): bool => !$record->is_vod)
+                        ->hidden(fn($record): bool => !$record->is_vod)
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-arrow-path')
+                        ->modalIcon('heroicon-o-arrow-path')
+                        ->modalDescription('Fetch and process VOD metadata for the selected channel.')
+                        ->modalSubmitActionLabel('Yes, process now'),
                     Tables\Actions\EditAction::make()
                         ->slideOver()
                         ->form(fn(Tables\Actions\EditAction $action): array => [
@@ -327,14 +400,16 @@ class ChannelsRelationManager extends RelationManager
                                 ->schema(ChannelResource::getForm(edit: true))
                                 ->columns(2)
                         ]),
-                    Tables\Actions\ViewAction::make()
-                        ->slideOver(),
                     Tables\Actions\DetachAction::make()
                         ->color('warning'),
                     Tables\Actions\DeleteAction::make()
                         ->hidden(fn(Model $record) => !$record->is_custom)
                         ->disabled(fn(Model $record) => !$record->is_custom)
                 ])->button()->hiddenLabel()->size('sm'),
+                Tables\Actions\ViewAction::make()
+                    ->button()->hiddenLabel()
+                    ->size('sm')
+                    ->slideOver(),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
