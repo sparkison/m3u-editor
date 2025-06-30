@@ -55,6 +55,18 @@ class MergedPlaylist extends Model
         );
     }
 
+    public function groups(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            Group::class,
+            MergedPlaylistPivot::class,
+            'merged_playlist_id',
+            'playlist_id',
+            'id',
+            'playlist_id'
+        );
+    }
+
     public function enabled_channels(): HasManyThrough
     {
         return $this->channels()->where('enabled', true);
