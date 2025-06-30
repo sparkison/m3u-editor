@@ -136,7 +136,7 @@ class ChannelsRelationManager extends RelationManager
                     ->type($ownerRecord->uuid)
                     ->toggleable()
                     // ->searchable()
-                    ->sortable(),
+                    ->sortable(false),
                 Tables\Columns\TextColumn::make('group')
                     ->label('Default Group')
                     ->toggleable()
