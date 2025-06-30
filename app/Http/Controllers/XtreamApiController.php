@@ -3,14 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Enums\ChannelLogoType;
+use App\Models\Channel;
 use App\Models\CustomPlaylist;
 use App\Models\MergedPlaylist;
 use App\Models\Playlist;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Redirect;
+use Spatie\Tags\Tag;
 
 class XtreamApiController extends Controller
 {
@@ -18,7 +21,7 @@ class XtreamApiController extends Controller
      * Xtream API request handler.
      * 
      * This endpoint serves as the primary interface for Xtream API interactions.
-     * It requires authentication via username and password query parameters.
+     * It requires authentication via username and password provided as query parameters.
      * The `action` query parameter dictates the specific operation to perform and the structure of the response.
      * 
      * The `username` and `password` parameters are mandatory for all actions. 
@@ -347,17 +350,44 @@ class XtreamApiController extends Controller
             $categoryId = $request->input('category_id');
 
             $channelsQuery = $playlist->channels()
-                ->where('enabled', true)
-                ->where('is_vod', false);
+                ->leftJoin('groups', 'channels.group_id', '=', 'groups.id')
+                ->where('channels.enabled', true)
+                ->where('channels.is_vod', false)
+                ->with(['epgChannel', 'tags', 'group'])
+                ->select('channels.*');
 
             // Apply category filtering if category_id is provided
             if ($categoryId && $categoryId !== 'all') {
-                $channelsQuery->where('group_id', $categoryId);
+                if ($playlist instanceof CustomPlaylist) {
+                    // For CustomPlaylist, filter by tag ID or group_id
+                    $channelsQuery->where(function ($query) use ($categoryId, $playlist) {
+                        // Channels with custom tags matching the category ID
+                        $query->whereHas('tags', function ($tagQuery) use ($categoryId, $playlist) {
+                            $tagQuery->where('type', $playlist->uuid)
+                                ->where('id', $categoryId); // Use tag ID instead of name
+                        })
+                            // OR channels without custom tags but with matching group_id
+                            ->orWhere(function ($subQuery) use ($categoryId, $playlist) {
+                                $subQuery->whereDoesntHave('tags', function ($tagQuery) use ($playlist) {
+                                    $tagQuery->where('type', $playlist->uuid);
+                                })
+                                    ->where('group_id', $categoryId); // Use group_id instead of group
+                            });
+                    });
+                } else {
+                    // For regular Playlist and MergedPlaylist, filter by group_id
+                    $channelsQuery->where('group_id', $categoryId);
+                }
             }
 
-            $enabledChannels = $channelsQuery->get();
+            $enabledChannels = $channelsQuery
+                ->orderBy('groups.sort_order')
+                ->orderBy('channels.sort')
+                ->orderBy('channels.channel')
+                ->orderBy('channels.title')
+                ->get();
             $liveStreams = [];
-            if ($enabledChannels instanceof \Illuminate\Database\Eloquent\Collection) {
+            if ($enabledChannels instanceof Collection) {
                 foreach ($enabledChannels as $index => $channel) {
                     $streamIcon = url('/placeholder.png');
                     if ($channel->logo_type === ChannelLogoType::Epg && $channel->epgChannel && $channel->epgChannel->icon) {
@@ -366,14 +396,22 @@ class XtreamApiController extends Controller
                         $streamIcon = filter_var($channel->logo, FILTER_VALIDATE_URL) ? $channel->logo : url($channel->logo);
                     }
 
+                    // Determine category_id based on playlist type
                     $channelCategoryId = 'all';
-                    if ($channel->group_id) {
-                        $channelCategoryId = (string)$channel->group_id;
-                    } elseif ($channel->group && $channel->group->id) {
-                        $channelCategoryId = (string)$channel->group->id;
+                    if ($playlist instanceof CustomPlaylist) {
+                        // For CustomPlaylist, prioritize custom tags over group_id
+                        $customGroup = $channel->tags->where('type', $playlist->uuid)->first();
+                        if ($customGroup) {
+                            $channelCategoryId = (string)$customGroup->id; // Use tag ID
+                        } elseif ($channel->group_id) {
+                            $channelCategoryId = (string)$channel->group_id; // Use group_id
+                        }
+                    } else {
+                        // For regular playlists, use group_id
+                        if ($channel->group_id) {
+                            $channelCategoryId = (string)$channel->group_id;
+                        }
                     }
-                    // It's better to ensure category_id exists in a predefined list of categories if strict adherence is needed.
-                    // For now, defaulting to 'all' if not found or being more robust based on actual category data available.
 
                     $liveStreams[] = [
                         'num' => $channel->channel ?? null,
@@ -384,7 +422,7 @@ class XtreamApiController extends Controller
                         'epg_channel_id' => $channel->epgChannel->epg_channel_id ?? $channel->stream_id_custom ?? $channel->stream_id ?? (string)$channel->id,
                         'added' => (string)$channel->created_at->timestamp,
                         'category_id' => $channelCategoryId,
-                        'category_ids' => [(int)$channelCategoryId],
+                        'category_ids' => [$channelCategoryId],
                         'tv_archive' => $channel->catchup ? 1 : 0,
                         'tv_archive_duration' => $channel->shift ?? 0,
                         'custom_sid' => '',
@@ -398,17 +436,44 @@ class XtreamApiController extends Controller
             $categoryId = $request->input('category_id');
 
             $channelsQuery = $playlist->channels()
-                ->where('enabled', true)
-                ->where('is_vod', true);
+                ->leftJoin('groups', 'channels.group_id', '=', 'groups.id')
+                ->where('channels.enabled', true)
+                ->where('channels.is_vod', true)
+                ->with(['epgChannel', 'tags', 'group'])
+                ->select('channels.*');
 
             // Apply category filtering if category_id is provided
             if ($categoryId && $categoryId !== 'all') {
-                $channelsQuery->where('group_id', $categoryId);
+                if ($playlist instanceof CustomPlaylist) {
+                    // For CustomPlaylist, filter by tag ID or group_id
+                    $channelsQuery->where(function ($query) use ($categoryId, $playlist) {
+                        // Channels with custom tags matching the category ID
+                        $query->whereHas('tags', function ($tagQuery) use ($categoryId, $playlist) {
+                            $tagQuery->where('type', $playlist->uuid)
+                                ->where('id', $categoryId); // Use tag ID instead of name
+                        })
+                            // OR channels without custom tags but with matching group_id
+                            ->orWhere(function ($subQuery) use ($categoryId, $playlist) {
+                                $subQuery->whereDoesntHave('tags', function ($tagQuery) use ($playlist) {
+                                    $tagQuery->where('type', $playlist->uuid);
+                                })
+                                    ->where('group_id', $categoryId); // Use group_id instead of group
+                            });
+                    });
+                } else {
+                    // For regular Playlist and MergedPlaylist, filter by group_id
+                    $channelsQuery->where('group_id', $categoryId);
+                }
             }
 
-            $enabledVodChannels = $channelsQuery->get();
+            $enabledVodChannels = $channelsQuery
+                ->orderBy('groups.sort_order')
+                ->orderBy('channels.sort')
+                ->orderBy('channels.channel')
+                ->orderBy('channels.title')
+                ->get();
             $vodStreams = [];
-            if ($enabledVodChannels instanceof \Illuminate\Database\Eloquent\Collection) {
+            if ($enabledVodChannels instanceof Collection) {
                 foreach ($enabledVodChannels as $index => $channel) {
                     $streamIcon = url('/placeholder.png');
                     if ($channel->logo_type === ChannelLogoType::Epg && $channel->epgChannel && $channel->epgChannel->icon) {
@@ -417,11 +482,21 @@ class XtreamApiController extends Controller
                         $streamIcon = filter_var($channel->logo, FILTER_VALIDATE_URL) ? $channel->logo : url($channel->logo);
                     }
 
+                    // Determine category_id based on playlist type
                     $channelCategoryId = 'all';
-                    if ($channel->group_id) {
-                        $channelCategoryId = (string)$channel->group_id;
-                    } elseif ($channel->group && $channel->group->id) {
-                        $channelCategoryId = (string)$channel->group->id;
+                    if ($playlist instanceof CustomPlaylist) {
+                        // For CustomPlaylist, prioritize custom tags over group_id
+                        $customGroup = $channel->tags->where('type', $playlist->uuid)->first();
+                        if ($customGroup) {
+                            $channelCategoryId = (string)$customGroup->id; // Use tag ID
+                        } elseif ($channel->group_id) {
+                            $channelCategoryId = (string)$channel->group_id; // Use group_id
+                        }
+                    } else {
+                        // For regular playlists, use group_id
+                        if ($channel->group_id) {
+                            $channelCategoryId = (string)$channel->group_id;
+                        }
                     }
 
                     $extension = $channel->container_extension ?? 'mkv';
@@ -461,7 +536,7 @@ class XtreamApiController extends Controller
             $seriesList = [];
             $now = Carbon::now();
 
-            if ($enabledSeries instanceof \Illuminate\Database\Eloquent\Collection) {
+            if ($enabledSeries instanceof Collection) {
                 foreach ($enabledSeries as $index => $seriesItem) {
                     $seriesCategoryId = 'all'; // Default category_id
                     if ($seriesItem->category_id) {
@@ -564,20 +639,45 @@ class XtreamApiController extends Controller
         } else if ($action === 'get_live_categories') {
             $liveCategories = [];
 
-            // Get all groups that have live channels (non-VOD channels)
-            $groups = $playlist->groups()
-                ->whereHas('channels', function ($query) {
-                    $query->where('enabled', true)
-                        ->where('is_vod', false);
-                })
-                ->get();
+            if ($playlist instanceof CustomPlaylist) {
+                // For CustomPlaylist, get unique tags (groups) from channels with live content
+                $channelIds = $playlist->channels()
+                    ->where('enabled', true)
+                    ->where('is_vod', false)
+                    ->pluck('id');
 
-            foreach ($groups as $group) {
-                $liveCategories[] = [
-                    'category_id' => (string)$group->id,
-                    'category_name' => $group->name,
-                    'parent_id' => 0, // Flat structure for now
-                ];
+                $tags = Tag::where('type', $playlist->uuid)
+                    ->whereIn('id', function ($query) use ($channelIds) {
+                        $query->select('tag_id')
+                            ->from('taggables')
+                            ->where('taggable_type', Channel::class)
+                            ->whereIn('taggable_id', $channelIds);
+                    })
+                    ->get();
+
+                foreach ($tags as $tag) {
+                    $liveCategories[] = [
+                        'category_id' => (string)$tag->id, // Use tag ID instead of name
+                        'category_name' => $tag->name,
+                        'parent_id' => 0,
+                    ];
+                }
+            } else {
+                // For regular Playlist and MergedPlaylist, use the groups() relationship
+                $groups = $playlist->groups()
+                    ->whereHas('channels', function ($query) {
+                        $query->where('enabled', true)
+                            ->where('is_vod', false);
+                    })
+                    ->get();
+
+                foreach ($groups as $group) {
+                    $liveCategories[] = [
+                        'category_id' => (string)$group->id,
+                        'category_name' => $group->name,
+                        'parent_id' => 0,
+                    ];
+                }
             }
 
             // Add a default "All" category if no specific groups exist
@@ -593,20 +693,45 @@ class XtreamApiController extends Controller
         } else if ($action === 'get_vod_categories') {
             $vodCategories = [];
 
-            // Get groups from VOD channels only
-            $vodGroups = $playlist->groups()
-                ->whereHas('channels', function ($query) {
-                    $query->where('enabled', true)
-                        ->where('is_vod', true);
-                })
-                ->get();
+            if ($playlist instanceof CustomPlaylist) {
+                // For CustomPlaylist, get unique tags (groups) from channels with VOD content
+                $channelIds = $playlist->channels()
+                    ->where('enabled', true)
+                    ->where('is_vod', true)
+                    ->pluck('id');
 
-            foreach ($vodGroups as $group) {
-                $vodCategories[] = [
-                    'category_id' => (string)$group->id,
-                    'category_name' => $group->name,
-                    'parent_id' => 0,
-                ];
+                $tags = Tag::where('type', $playlist->uuid)
+                    ->whereIn('id', function ($query) use ($channelIds) {
+                        $query->select('tag_id')
+                            ->from('taggables')
+                            ->where('taggable_type', Channel::class)
+                            ->whereIn('taggable_id', $channelIds);
+                    })
+                    ->get();
+
+                foreach ($tags as $tag) {
+                    $vodCategories[] = [
+                        'category_id' => (string)$tag->id, // Use tag ID instead of name
+                        'category_name' => $tag->name,
+                        'parent_id' => 0,
+                    ];
+                }
+            } else {
+                // For regular Playlist and MergedPlaylist, use the groups() relationship
+                $vodGroups = $playlist->groups()
+                    ->whereHas('channels', function ($query) {
+                        $query->where('enabled', true)
+                            ->where('is_vod', true);
+                    })
+                    ->get();
+
+                foreach ($vodGroups as $group) {
+                    $vodCategories[] = [
+                        'category_id' => (string)$group->id,
+                        'category_name' => $group->name,
+                        'parent_id' => 0,
+                    ];
+                }
             }
 
             // Add a default "All" category if no specific categories exist
