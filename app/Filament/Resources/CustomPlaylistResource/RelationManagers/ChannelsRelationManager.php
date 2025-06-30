@@ -4,6 +4,7 @@ namespace App\Filament\Resources\CustomPlaylistResource\RelationManagers;
 
 use App\Enums\ChannelLogoType;
 use App\Filament\Resources\ChannelResource;
+use App\Models\Channel;
 use App\Models\ChannelFailover;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -136,7 +137,20 @@ class ChannelsRelationManager extends RelationManager
                     ->type($ownerRecord->uuid)
                     ->toggleable()
                     // ->searchable()
-                    ->sortable(false),
+                    ->sortable(query: function (Builder $query, string $direction) use ($ownerRecord): Builder {
+                        return $query
+                            ->leftJoin('taggables', function ($join) {
+                                $join->on('channels.id', '=', 'taggables.taggable_id')
+                                    ->where('taggables.taggable_type', '=', Channel::class);
+                            })
+                            ->leftJoin('tags', function ($join) use ($ownerRecord) {
+                                $join->on('taggables.tag_id', '=', 'tags.id')
+                                    ->where('tags.type', '=', $ownerRecord->uuid);
+                            })
+                            ->orderBy('tags.name', $direction)
+                            ->select('channels.*')
+                            ->distinct();
+                    }),
                 Tables\Columns\TextColumn::make('group')
                     ->label('Default Group')
                     ->toggleable()
