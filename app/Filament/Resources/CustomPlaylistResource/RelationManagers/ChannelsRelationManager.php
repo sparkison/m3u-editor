@@ -136,7 +136,14 @@ class ChannelsRelationManager extends RelationManager
                     ->label('Playlist Group')
                     ->type($ownerRecord->uuid)
                     ->toggleable()
-                    // ->searchable()
+                    ->searchable(query: function (Builder $query, string $search) use ($ownerRecord): Builder {
+                        return $query->whereHas('tags', function (Builder $query) use ($search, $ownerRecord) {
+                            $query->where('tags.type', $ownerRecord->uuid)
+                                  ->where(function (Builder $query) use ($search) {
+                                      $query->whereRaw('LOWER(JSON_EXTRACT(tags.name, "$")) LIKE ?', ['%' . strtolower($search) . '%']);
+                                  });
+                        });
+                    })
                     ->sortable(query: function (Builder $query, string $direction) use ($ownerRecord): Builder {
                         return $query
                             ->leftJoin('taggables', function ($join) {
@@ -174,7 +181,11 @@ class ChannelsRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('epgChannel.name')
                     ->label('EPG Channel')
                     ->toggleable()
-                    ->searchable()
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->whereHas('epgChannel', function (Builder $query) use ($search) {
+                            $query->where('epg_channels.name', 'like', "%{$search}%");
+                        });
+                    })
                     ->limit(40)
                     ->sortable(),
                 Tables\Columns\SelectColumn::make('logo_type')
@@ -212,7 +223,9 @@ class ChannelsRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('name')
                     ->label('Default Name')
                     ->sortable()
-                    ->searchable()
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->where('channels.name', 'like', "%{$search}%");
+                    })
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('url')
                     ->label('Default URL')
