@@ -70,6 +70,9 @@ class XtreamApiController extends Controller
      * Contains: `username`, `password`, `message`, `auth`, `status`, `exp_date`, `is_trial`, 
      * `active_cons`, `created_at`, `max_connections`, `allowed_output_formats`.
      * 
+     * ### get_server_info
+     * Returns server information including URL, port, protocol, timezone, and current timestamp.
+     * 
      * ### get_vod_info
      * Returns detailed information for a specific VOD/movie stream.
      * Requires `vod_id` parameter to specify which VOD stream to retrieve.
@@ -375,7 +378,12 @@ class XtreamApiController extends Controller
 
         $action = $request->input('action', 'panel');
 
-        if ($action === 'panel' || $action === 'get_account_info' || empty($request->input('action'))) {
+        if (
+            $action === 'panel' ||
+            $action === 'get_account_info' ||
+            $action === 'get_server_info' ||
+            empty($request->input('action'))
+        ) {
             $now = Carbon::now();
             $userInfo = [
                 'username' => $username,
