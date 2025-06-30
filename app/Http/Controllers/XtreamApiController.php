@@ -689,6 +689,7 @@ class XtreamApiController extends Controller
             } else {
                 // For regular Playlist and MergedPlaylist, use the groups() relationship
                 $groups = $playlist->groups()
+                    ->orderBy('sort_order')
                     ->whereHas('channels', function ($query) {
                         $query->where('enabled', true)
                             ->where('is_vod', false);
@@ -743,6 +744,7 @@ class XtreamApiController extends Controller
             } else {
                 // For regular Playlist and MergedPlaylist, use the groups() relationship
                 $vodGroups = $playlist->groups()
+                    ->orderBy('sort_order')
                     ->whereHas('channels', function ($query) {
                         $query->where('enabled', true)
                             ->where('is_vod', true);
