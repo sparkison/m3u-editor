@@ -66,9 +66,6 @@ class SharedStreamCleanup implements ShouldQueue
                         $cleanedUp++;
                         if ($isStale) $staleStreams++;
                     }
-                } else {
-                    // Stream is active, just update its statistics
-                    $sharedStreamService->updateStreamStats($streamKey);
                 }
             }
 
