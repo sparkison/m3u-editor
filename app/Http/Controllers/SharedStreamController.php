@@ -283,8 +283,20 @@ class SharedStreamController extends Controller
                              break;
                         }
 
-                        if ($dataSent && (time() - $lastDataTime > 20)) {
-                            Log::channel('ffmpeg')->warning("Stream {$streamKey}: Client {$clientId} - Subsequent data timeout. No data from stream for 20s. DataSent: " . ($dataSent ? 'yes' : 'no'));
+                        // Check if a failover is happening and extend timeout accordingly
+                        $timeoutSeconds = 20; // Default timeout
+                        $failoverExtendedTimeout = 60; // Extended timeout during failover
+                        
+                        // Check if we're in the middle of a failover
+                        $isFailoverHappening = $this->sharedStreamService->isFailoverInProgress($streamKey);
+                        
+                        if ($isFailoverHappening) {
+                            $timeoutSeconds = $failoverExtendedTimeout;
+                            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Client {$clientId} - Failover detected, extending timeout to {$timeoutSeconds}s");
+                        }
+
+                        if ($dataSent && (time() - $lastDataTime > $timeoutSeconds)) {
+                            Log::channel('ffmpeg')->warning("Stream {$streamKey}: Client {$clientId} - Subsequent data timeout. No data from stream for {$timeoutSeconds}s. DataSent: " . ($dataSent ? 'yes' : 'no') . ". Failover: " . ($isFailoverHappening ? 'yes' : 'no'));
                             break;
                         }
                         
