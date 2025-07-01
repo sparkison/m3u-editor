@@ -428,49 +428,6 @@ class SharedStreamService
     }
 
     /**
-     * Start the actual streaming process (FFmpeg) - Async version for background jobs
-     */
-    public function startStreamingProcessAsync(string $streamKey, array $streamInfo): void
-    {
-        $format = $streamInfo['format'];
-        $streamUrl = $streamInfo['stream_url'];
-        $title = $streamInfo['title'];
-
-        try {
-            Log::channel('ffmpeg')->info("Starting async streaming process for {$streamKey} ({$title})");
-
-            if ($format === 'hls') {
-                $this->startHLSStream($streamKey, $streamInfo);
-            } else {
-                $this->startDirectStream($streamKey, $streamInfo);
-            }
-
-            // Don't set status to 'active' here - let startInitialBuffering do it when data is actually received
-            // Just update the process ID in the database
-            SharedStream::where('stream_id', $streamKey)->update([
-                'process_id' => $this->getProcessPid($streamKey)
-            ]);
-
-            Log::channel('ffmpeg')->info("Successfully started async streaming process for {$streamKey} - waiting for data");
-        } catch (\Exception $e) {
-            Log::channel('ffmpeg')->error("Failed to start async streaming process for {$streamKey}: " . $e->getMessage());
-
-            // Update stream status to error
-            $streamInfo['status'] = 'error';
-            $streamInfo['error_message'] = $e->getMessage();
-            $this->setStreamInfo($streamKey, $streamInfo);
-
-            // Update database status
-            SharedStream::where('stream_id', $streamKey)->update([
-                'status' => 'error',
-                'error_message' => $e->getMessage()
-            ]);
-
-            throw $e;
-        }
-    }
-
-    /**
      * Start HLS streaming with segment buffering
      */
     private function startHLSStream(string $streamKey, array $streamInfo): void
@@ -704,102 +661,6 @@ class SharedStreamService
         $this->runShortInitialBuffering($streamKey, $stdout, $stderr, $process);
     }
 
-
-
-    /**
-     * Manage buffering for direct streams (simplified)
-     */
-    private function manageDirectStreamBuffer(string $streamKey, $stdout, $stderr, $process): void
-    {
-        // This method is now replaced by the simplified startContinuousBuffering
-        $this->startContinuousBuffering($streamKey, $stdout, $stderr, $process);
-    }
-
-    /**
-     * Run buffer manager in background (simplified)
-     */
-    private function runBufferManagerBackground(string $streamKey, $stdout, $stderr, $process): void
-    {
-        // Set streams to non-blocking immediately
-        stream_set_blocking($stdout, false);
-        stream_set_blocking($stderr, false);
-
-        // DON'T use register_shutdown_function here - it causes premature cleanup
-        // This was causing race conditions where cleanup happens immediately
-
-        // Start continuous buffering immediately in current process
-        // This prevents the broken pipe issue by keeping the parent process active
-        $this->runContinuousBuffering($streamKey, $stdout, $stderr, $process);
-
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffer manager running in current process");
-    }
-
-    /**
-     * Start immediate buffering to prevent FFmpeg from hanging (simplified version)
-     */
-    private function startImmediateBuffering(string $streamKey, $stdout, $stderr, $process): void
-    {
-        // This is just a rename of the existing method for clarity
-        $this->startInitialBuffering($streamKey, $stdout, $stderr, $process);
-    }
-
-    /**
-     * Run buffer manager directly in current process (simplified fallback)
-     */
-    private function runDirectBufferManager(string $streamKey, $stdout, $stderr, $process): void
-    {
-        // DON'T use register_shutdown_function here - it causes race conditions
-        // where cleanup happens immediately after stream starts successfully
-
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Set up direct buffer management");
-    }
-
-    /**
-     * Simple pipe drain on shutdown to prevent overflow
-     */
-    private function drainPipesOnShutdown(string $streamKey, $stdout, $stderr, $process): void
-    {
-        try {
-            $bufferKey = self::BUFFER_PREFIX . $streamKey;
-            $segmentNumber = 0;
-            $maxReads = 20; // Limit reads to prevent hanging
-
-            // Quickly drain stdout to prevent pipe overflow
-            while ($maxReads-- > 0 && !feof($stdout)) {
-                $data = fread($stdout, 188000); // ~188KB chunks
-                if ($data === false || strlen($data) === 0) {
-                    break;
-                }
-
-                // Store in Redis
-                $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                $this->redis()->setex($segmentKey, self::SEGMENT_EXPIRY, $data);
-                $this->redis()->lpush("{$bufferKey}:segments", $segmentNumber);
-                $this->redis()->ltrim("{$bufferKey}:segments", 0, 30);
-                $segmentNumber++;
-            }
-
-            // Drain stderr for errors
-            while (!feof($stderr)) {
-                $error = fread($stderr, 1024);
-                if ($error !== false && !empty(trim($error))) {
-                    Log::channel('ffmpeg')->error("Stream {$streamKey}: " . trim($error));
-                } else {
-                    break;
-                }
-            }
-
-            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Shutdown drain completed, read {$segmentNumber} segments");
-        } catch (\Exception $e) {
-            Log::channel('ffmpeg')->error("Stream {$streamKey}: Error during shutdown drain: " . $e->getMessage());
-        } finally {
-            // Clean up resources
-            if (is_resource($stdout)) fclose($stdout);
-            if (is_resource($stderr)) fclose($stderr);
-            if (is_resource($process)) proc_close($process);
-        }
-    }
-
     /**
      * Start initial buffering to prevent FFmpeg from hanging
      * Optimized for faster startup and better VLC compatibility
@@ -1027,116 +888,6 @@ class SharedStreamService
 
         // Initial buffering is complete. The process handles are stored for on-demand reading.
         // Clients will read additional data via getNextStreamSegments() which can read directly from FFmpeg.
-    }
-
-    /**
-     * Start continuous buffering in the background
-     */
-    private function startContinuousBufferJob(string $streamKey, $stdout, $stderr, $process): void
-    {
-        // Use a simpler approach: just continue buffering in current process
-        // without forking to avoid file descriptor issues
-
-        Log::channel('ffmpeg')->info("Stream {$streamKey}: Starting continuous buffering in current process");
-
-        // Start continuous buffering without forking
-        // This will run in the background naturally as the process continues
-        $this->runContinuousBuffering($streamKey, $stdout, $stderr, $process);
-    }
-
-    /**
-     * Run continuous buffering for the stream
-     */
-    private function runContinuousBuffering(string $streamKey, $stdout, $stderr, $process): void
-    {
-        $bufferKey = self::BUFFER_PREFIX . $streamKey;
-        $redis = $this->redis();
-        $targetChunkSize = 188 * 1000; // 188KB chunks
-        $accumulatedData = '';
-        $accumulatedSize = 0;
-        $maxIdleTime = 30; // Stop after 30 seconds of no data
-        $lastDataTime = time();
-
-        // Get current segment count to continue numbering
-        $segmentNumber = $redis->llen("{$bufferKey}:segments");
-
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Continuous buffering started from segment {$segmentNumber}");
-
-        while (true) {
-            // Check if the process is still running
-            $status = proc_get_status($process);
-            if (!$status['running']) {
-                Log::channel('ffmpeg')->info("Stream {$streamKey}: FFmpeg process ended, stopping continuous buffering");
-                break;
-            }
-
-            // Check if stream should be stopped (no clients for too long)
-            $streamInfo = $this->getStreamInfo($streamKey);
-            if (!$streamInfo || $streamInfo['status'] === 'stopped') {
-                Log::channel('ffmpeg')->info("Stream {$streamKey}: Stream marked for stop, ending continuous buffering");
-                break;
-            }
-
-            // Try to read data
-            $chunk = fread($stdout, 32768);
-            if ($chunk !== false && strlen($chunk) > 0) {
-                $accumulatedData .= $chunk;
-                $accumulatedSize += strlen($chunk);
-                $lastDataTime = time();
-
-                // Create segment when we have enough data
-                if ($accumulatedSize >= $targetChunkSize) {
-                    $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                    $redis->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
-                    $redis->lpush("{$bufferKey}:segments", $segmentNumber);
-
-                    // Keep only recent segments (prevent memory bloat)
-                    $redis->ltrim("{$bufferKey}:segments", 0, 50);
-
-                    // Clean up old segments
-                    $oldSegmentNumber = $segmentNumber - 50;
-                    if ($oldSegmentNumber >= 0) {
-                        $redis->del("{$bufferKey}:segment_{$oldSegmentNumber}");
-                    }
-
-                    Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffered continuous segment {$segmentNumber} ({$accumulatedSize} bytes)");
-
-                    $segmentNumber++;
-                    $accumulatedData = '';
-                    $accumulatedSize = 0;
-
-                    $this->updateStreamActivity($streamKey);
-                }
-            } else {
-                // No data available
-                if ((time() - $lastDataTime) > $maxIdleTime) {
-                    Log::channel('ffmpeg')->warning("Stream {$streamKey}: No data for {$maxIdleTime}s, stopping continuous buffering");
-                    break;
-                }
-
-                // Small sleep to prevent high CPU usage
-                usleep(50000); // 50ms
-            }
-
-            // Check for FFmpeg errors
-            $error = fread($stderr, 1024);
-            if ($error !== false && strlen($error) > 0) {
-                Log::channel('ffmpeg')->error("Stream {$streamKey}: {$error}");
-            }
-        }
-
-        // Flush any remaining data
-        if ($accumulatedSize > 0) {
-            $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-            $redis->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
-            $redis->lpush("{$bufferKey}:segments", $segmentNumber);
-            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Final continuous segment {$segmentNumber} flushed");
-        }
-
-        Log::channel('ffmpeg')->info("Stream {$streamKey}: Continuous buffering ended");
-
-        // Close the process
-        proc_close($process);
     }
 
     /**
@@ -1896,24 +1647,9 @@ class SharedStreamService
     }
 
     /**
-     * Update stream status
-     */
-    private function updateStreamStatus(string $streamKey, string $status): void
-    {
-        $streamInfo = $this->getStreamInfo($streamKey);
-        if ($streamInfo) {
-            $streamInfo['status'] = $status;
-            $this->setStreamInfo($streamKey, $streamInfo);
-
-            // Also update database
-            SharedStream::where('stream_id', $streamKey)->update(['status' => $status]);
-        }
-    }
-
-    /**
      * Cleanup stream data
      */
-    private function cleanupStream(string $streamKey, bool $removeFiles = false): void
+    public function cleanupStream(string $streamKey, bool $removeFiles = false): void
     {
         // First, kill the FFmpeg process if it exists
         $pid = $this->getProcessPid($streamKey);
@@ -2159,14 +1895,6 @@ class SharedStreamService
         }
 
         return $cleanedKeys;
-    }
-
-    /**
-     * Dummy method to satisfy interface or parent class
-     */
-    public function dummyMethod(): void
-    {
-        // No operation
     }
 
     /**
