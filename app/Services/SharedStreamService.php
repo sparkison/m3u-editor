@@ -950,6 +950,12 @@ class SharedStreamService
                 return null;
             }
 
+            // Ensure we return an array or null
+            if (!is_array($decoded)) {
+                Log::channel('ffmpeg')->error("Stream {$streamKey}: Stream info is not an array, got: " . gettype($decoded) . " (data: " . substr($data, 0, 100) . ")");
+                return null;
+            }
+
             // This log can be very verbose as getStreamInfo is called frequently.
             // Log::channel('ffmpeg')->debug("Stream {$streamKey}: Successfully retrieved stream info from Redis (" . strlen($data) . " bytes)");
             return $decoded;
@@ -1941,7 +1947,10 @@ class SharedStreamService
 
         // If no buffered data is available, try to read directly from FFmpeg
         if (empty($data) && isset($this->activeProcesses[$streamKey])) {
+            Log::channel('ffmpeg')->debug("Stream {$streamKey}: No buffered data, attempting to read directly from FFmpeg");
             $data = $this->readDirectFromFFmpeg($streamKey, $lastSegment);
+        } else if (empty($data)) {
+            Log::channel('ffmpeg')->debug("Stream {$streamKey}: No buffered data and no active FFmpeg process");
         }
 
         // Update client activity if we retrieved data
@@ -1975,8 +1984,13 @@ class SharedStreamService
             
             // Attempt failover if this is a channel stream
             $streamInfo = $this->getStreamInfo($streamKey);
+            Log::channel('ffmpeg')->info("Stream {$streamKey}: Retrieved stream info for failover check - Type: " . ($streamInfo['type'] ?? 'null') . ", Model ID: " . ($streamInfo['model_id'] ?? 'null'));
+            
             if ($streamInfo && ($streamInfo['type'] ?? '') === 'channel') {
+                Log::channel('ffmpeg')->info("Stream {$streamKey}: Calling attemptStreamFailover for channel {$streamInfo['model_id']}");
                 return $this->attemptStreamFailover($streamKey, $streamInfo);
+            } else {
+                Log::channel('ffmpeg')->info("Stream {$streamKey}: No failover attempt - not a channel stream or no stream info");
             }
             
             return null;
@@ -2333,6 +2347,7 @@ class SharedStreamService
                     $streamInfo['active_channel_id'] = $failoverChannel->id;
                     $streamInfo['failover_attempts'] = $attemptNumber;
                     $streamInfo['is_failover'] = true;
+                    $streamInfo['primary_channel_id'] = $modelId; // Add this critical field
                     $streamInfo['stream_url'] = $failoverUrl;
                     $streamInfo['title'] = $failoverTitle;
                     $streamInfo['model_id'] = $failoverChannel->id;
@@ -2347,18 +2362,30 @@ class SharedStreamService
                         $this->startDirectStream($failoverStreamKey, $streamInfo);
                     }
                     
-                    // Update stream info with new details
+                    // Update stream info with new details - UPDATE AFTER STARTING
+                    $streamInfo['status'] = 'active'; // Mark as active after successful start
                     $this->setStreamInfo($failoverStreamKey, $streamInfo);
                     
-                    // Update database with failover information
-                    SharedStream::where('stream_id', $originalStreamKey)->update([
-                        'stream_id' => $failoverStreamKey,
-                        'source_url' => $failoverUrl,
-                        'status' => 'active',
-                        'process_id' => $this->getProcessPid($failoverStreamKey),
-                        'error_message' => null,
-                        'started_at' => now()
-                    ]);
+                    // Update database with failover information - use INSERT OR UPDATE to handle duplicates
+                    try {
+                        SharedStream::updateOrCreate(
+                            ['stream_id' => $failoverStreamKey],
+                            [
+                                'source_url' => $failoverUrl,
+                                'status' => 'active',
+                                'process_id' => $this->getProcessPid($failoverStreamKey),
+                                'error_message' => null,
+                                'started_at' => now()
+                            ]
+                        );
+                        
+                        // Remove the old stream record
+                        SharedStream::where('stream_id', $originalStreamKey)->delete();
+                        
+                    } catch (\Exception $dbError) {
+                        Log::channel('ffmpeg')->warning("Stream {$originalStreamKey}: Database update failed during failover: " . $dbError->getMessage());
+                        // Continue with failover even if DB update fails
+                    }
                     
                     // Don't immediately clean up original stream Redis data - leave redirect info
                     // Store redirect mapping for future client requests  
@@ -2478,14 +2505,51 @@ class SharedStreamService
      */
     public function isFailoverInProgress(string $streamKey): bool
     {
+        // Use a short-term cache to prevent excessive calls
+        $cacheKey = "failover_check_cache:{$streamKey}";
+        $cached = $this->redis()->get($cacheKey);
+        if ($cached !== null && $cached !== false) {
+            return (bool) $cached;
+        }
+        
+        try {
+            $result = $this->checkFailoverProgress($streamKey);
+            
+            // Cache the result for 5 seconds to prevent excessive checks
+            $this->redis()->setex($cacheKey, 5, $result ? '1' : '0');
+            
+            return $result;
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->warning("Stream {$streamKey}: Error checking failover progress: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Internal method to check failover progress
+     */
+    private function checkFailoverProgress(string $streamKey): bool
+    {
         try {
             // Check if original stream is marked as failed_over
             $streamInfo = $this->getStreamInfo($streamKey);
-            if ($streamInfo && isset($streamInfo['status']) && $streamInfo['status'] === 'failed_over') {
-                // Check how recent the failover was (allow up to 2 minutes for failover to complete)
-                $failedOverAt = $streamInfo['failed_over_at'] ?? 0;
-                if ($failedOverAt > 0 && (time() - $failedOverAt) < 120) {
-                    return true;
+            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Checking failover progress - Stream info status: " . ($streamInfo['status'] ?? 'null'));
+            
+            if ($streamInfo && isset($streamInfo['status']) && ($streamInfo['status'] === 'failed_over' || $streamInfo['status'] === 'error')) {
+                if ($streamInfo['status'] === 'failed_over') {
+                    // Check how recent the failover was (allow up to 2 minutes for failover to complete)
+                    $failedOverAt = $streamInfo['failed_over_at'] ?? 0;
+                    if ($failedOverAt > 0 && (time() - $failedOverAt) < 120) {
+                        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Recent failover detected (failed over " . (time() - $failedOverAt) . "s ago)");
+                        return true;
+                    }
+                } elseif ($streamInfo['status'] === 'error') {
+                    // Check if this is a recent error that might indicate failed process (potential failover scenario)
+                    $lastActivity = $streamInfo['last_activity'] ?? 0;
+                    if ($lastActivity > 0 && (time() - $lastActivity) < 120) {
+                        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Recent error detected, treating as potential failover scenario");
+                        return true;
+                    }
                 }
             }
             
@@ -2493,9 +2557,11 @@ class SharedStreamService
             $failoverKey = "stream_failover_redirect:{$streamKey}";
             $redirectStreamKey = $this->redis()->get($failoverKey);
             if ($redirectStreamKey) {
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Found failover redirect to {$redirectStreamKey}");
                 // Check if the redirect target is actually active 
                 $redirectStreamInfo = $this->getStreamInfo($redirectStreamKey);
                 if ($redirectStreamInfo && isset($redirectStreamInfo['status']) && $redirectStreamInfo['status'] === 'active') {
+                    Log::channel('ffmpeg')->debug("Stream {$streamKey}: Failover redirect target is active");
                     return true;
                 }
             }
@@ -2506,6 +2572,7 @@ class SharedStreamService
                 // Only consider it a failover if it has failover_attempts > 0 and is recent
                 $hasFailoverAttempts = isset($streamInfo['failover_attempts']) && $streamInfo['failover_attempts'] > 0;
                 if ($restartAttempt > 0 && (time() - $restartAttempt) < 60 && $hasFailoverAttempts) {
+                    Log::channel('ffmpeg')->debug("Stream {$streamKey}: Recent failover startup detected");
                     return true;
                 }
             }
@@ -2565,7 +2632,10 @@ class SharedStreamService
                 
                 // Look for active streams with failover indicators for this model_id
                 $allStreamKeys = $this->redis()->keys(self::CACHE_PREFIX . '*');
+                
                 foreach ($allStreamKeys as $key) {
+                    $key = str_replace('m3u_editor_database_', '', $key); // Remove the prefix to get the actual key
+                    
                     $streamInfo = $this->getStreamInfo($key);
                     if ($streamInfo && 
                         isset($streamInfo['is_failover']) && $streamInfo['is_failover'] === true &&
