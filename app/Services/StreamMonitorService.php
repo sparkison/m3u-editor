@@ -255,6 +255,9 @@ class StreamMonitorService
         
         // Process count
         $totalProcesses = $this->getActiveProcessCount();
+        
+        // CPU count
+        $cpuCount = $this->getCpuCount();
 
         return [
             'load_average' => [
@@ -262,6 +265,7 @@ class StreamMonitorService
                 '5min' => $loadAvg[1],
                 '15min' => $loadAvg[2]
             ],
+            'cpu_count' => $cpuCount,
             'memory_usage' => $memoryInfo,
             'disk_space' => $diskInfo,
             'redis_connected' => $this->checkRedisConnection(),
@@ -797,6 +801,53 @@ class StreamMonitorService
             return true;
         } catch (\Exception $e) {
             return false;
+        }
+    }
+
+    /**
+     * Get number of CPU cores
+     */
+    private function getCpuCount(): int
+    {
+        try {
+            // Try different approaches to get CPU count
+            
+            // Method 1: Use nproc if available (Linux/Unix)
+            $output = shell_exec('nproc 2>/dev/null');
+            if ($output !== null && is_numeric(trim($output))) {
+                return (int) trim($output);
+            }
+            
+            // Method 2: Parse /proc/cpuinfo (Linux)
+            if (is_readable('/proc/cpuinfo')) {
+                $cpuinfo = file_get_contents('/proc/cpuinfo');
+                if ($cpuinfo !== false) {
+                    $processors = substr_count($cpuinfo, 'processor');
+                    if ($processors > 0) {
+                        return $processors;
+                    }
+                }
+            }
+            
+            // Method 3: Use sysctl (macOS/BSD)
+            $output = shell_exec('sysctl -n hw.ncpu 2>/dev/null');
+            if ($output !== null && is_numeric(trim($output))) {
+                return (int) trim($output);
+            }
+            
+            // Method 4: Use wmic (Windows - unlikely in this context but comprehensive)
+            $output = shell_exec('wmic cpu get NumberOfCores /value 2>/dev/null | find "NumberOfCores"');
+            if ($output !== null) {
+                preg_match('/NumberOfCores=(\d+)/', $output, $matches);
+                if (isset($matches[1]) && is_numeric($matches[1])) {
+                    return (int) $matches[1];
+                }
+            }
+            
+            // Fallback: return 1 if we can't determine
+            return 1;
+        } catch (\Exception $e) {
+            return 1;
         }
     }
 

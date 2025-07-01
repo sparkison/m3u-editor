@@ -15,7 +15,9 @@ use App\Filament\Widgets\KoFiWidget;
 use App\Filament\Widgets\SharedStreamStatsWidget;
 //use App\Filament\Widgets\PayPalDonateWidget;
 use App\Filament\Widgets\StatsOverview;
+use App\Filament\Widgets\SystemHealthWidget;
 use App\Livewire\ProfileComponent;
+use App\Models\SharedStream;
 use App\Settings\GeneralSettings;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -98,6 +100,8 @@ class AdminPanelProvider extends PanelProvider
                 KoFiWidget::class,
                 // DonateCrypto::class,
                 StatsOverview::class,
+                SharedStreamStatsWidget::class,
+                SystemHealthWidget::class,
             ])
             ->plugins([
                 FilamentSpatieLaravelBackupPlugin::make()
