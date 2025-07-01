@@ -259,18 +259,24 @@ class SharedStreamController extends Controller
                     $data = $this->sharedStreamService->getNextStreamSegments($streamKey, $clientId, $lastSegment);
                     
                     if ($data) {
-                        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Client {$clientId} received " . strlen($data) . " bytes. Last segment: {$lastSegment}. Echoing data.");
+                        // Only log significant data transfers based on config
+                        $debugLogging = config('app.shared_streaming.debug_logging', false);
+                        $logThreshold = config('app.shared_streaming.log_data_threshold', 51200);
+                        
+                        if (!$dataSent || $debugLogging || strlen($data) > $logThreshold) {
+                            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Client {$clientId} received " . round(strlen($data)/1024, 1) . "KB. Segment: {$lastSegment}");
+                        }
+                        
                         echo $data;
                         if (ob_get_level() > 0) {
                             ob_flush();
                             flush();
-                            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Client {$clientId} flushed output buffer.");
                         } else {
-                            flush(); // Still flush if output buffering is not active at level > 0
+                            flush();
                         }
                         
                         if (!$dataSent) {
-                            Log::channel('ffmpeg')->info("Sent initial " . strlen($data) . " bytes to client {$clientId}");
+                            Log::channel('ffmpeg')->info("Sent initial " . round(strlen($data)/1024, 1) . "KB to client {$clientId}");
                             $dataSent = true;
                         }
                         

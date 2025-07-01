@@ -129,4 +129,20 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Shared Streaming Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configuration options for the shared streaming system (xTeVe-like proxy)
+    |
+    */
+
+    'shared_streaming' => [
+        'debug_logging' => env('SHARED_STREAMING_DEBUG', false),
+        'max_redirects' => env('SHARED_STREAMING_MAX_REDIRECTS', 3),
+        'redirect_ttl' => env('SHARED_STREAMING_REDIRECT_TTL', 30),
+        'log_data_threshold' => env('SHARED_STREAMING_LOG_THRESHOLD', 51200), // 50KB
+    ],
+
 ];

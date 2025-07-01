@@ -9,12 +9,12 @@ use Illuminate\Support\Facades\Redis;
 
 class ManageSharedStreams extends Command
 {
-    protected $signature = 'app:shared-streams {action} {--stream-key=} {--force}';
+    protected $signature = 'app:shared-streams {action} {--stream-key=} {--force} {--debug}';
 
     /**
      * The console command description.
      */
-    protected $description = 'Manage shared streams (list, stop, restart, cleanup, sync)';
+    protected $description = 'Manage shared streams (list, stop, restart, cleanup, sync, debug)';
 
     private SharedStreamService $sharedStreamService;
     private StreamMonitorService $monitorService;
@@ -36,11 +36,17 @@ class ManageSharedStreams extends Command
         $action = $this->argument('action');
         $streamKey = $this->option('stream-key');
         $force = $this->option('force');
+        $debug = $this->option('debug');
+
+        // Set debug logging if requested
+        if ($debug) {
+            $this->info('Debug mode enabled - detailed logging will be shown');
+        }
 
         switch ($action) {
             case 'list':
                 return $this->listStreams();
-
+                
             case 'stop':
                 if (!$streamKey) {
                     $this->error('--stream-key is required for stop action');
@@ -69,10 +75,20 @@ class ManageSharedStreams extends Command
 
             case 'health':
                 return $this->checkHealth();
+                
+            case 'debug':
+                if (!$streamKey) {
+                    $this->error('--stream-key is required for debug action');
+                    return 1;
+                }
+                return $this->debugStream($streamKey);
+
+            case 'clear-redirects':
+                return $this->clearFailoverRedirects($force);
 
             default:
                 $this->error("Unknown action: {$action}");
-                $this->line('Available actions: list, stop, stop-all, restart, cleanup, sync, stats, health');
+                $this->info('Available actions: list, stop, stop-all, restart, cleanup, sync, stats, health, debug, clear-redirects');
                 return 1;
         }
     }
@@ -388,5 +404,94 @@ class ManageSharedStreams extends Command
         $units = ['B', 'KB', 'MB', 'GB'];
         $factor = floor((strlen($bytes) - 1) / 3);
         return sprintf("%.2f %s", $bytes / pow(1024, $factor), $units[$factor]);
+    }
+
+    private function debugStream(string $streamKey): int
+    {
+        $this->info("Debug information for stream: {$streamKey}");
+        $this->newLine();
+
+        try {
+            // Get stream info from Redis
+            $redis = app('redis')->connection();
+            $streamInfo = $redis->hgetall("shared_stream:{$streamKey}");
+            
+            if (empty($streamInfo)) {
+                $this->error('Stream not found in Redis');
+                return 1;
+            }
+
+            $this->info('Stream Info:');
+            foreach ($streamInfo as $key => $value) {
+                $this->line("  {$key}: {$value}");
+            }
+            $this->newLine();
+
+            // Check for failover redirects
+            $failoverKey = "stream_failover_redirect:{$streamKey}";
+            $failoverTarget = $redis->get($failoverKey);
+            if ($failoverTarget) {
+                $this->info("Failover redirect: {$streamKey} -> {$failoverTarget}");
+                $ttl = $redis->ttl($failoverKey);
+                $this->line("  TTL: {$ttl} seconds");
+            } else {
+                $this->line('No active failover redirects');
+            }
+            $this->newLine();
+
+            // Check for active clients
+            $clientKeys = $redis->keys("stream_clients:{$streamKey}:*");
+            $this->info('Active clients: ' . count($clientKeys));
+            foreach ($clientKeys as $clientKey) {
+                $clientId = substr($clientKey, strlen("stream_clients:{$streamKey}:"));
+                $clientData = $redis->hgetall($clientKey);
+                $this->line("  Client {$clientId}: " . json_encode($clientData));
+            }
+            $this->newLine();
+
+            // Check buffer status
+            $bufferKey = "stream_buffer:{$streamKey}";
+            $segments = $redis->lrange("{$bufferKey}:segments", 0, -1);
+            $this->info('Buffer segments: ' . count($segments));
+            if (!empty($segments)) {
+                $this->line('  Segments: ' . implode(', ', array_slice($segments, 0, 10)) . (count($segments) > 10 ? '...' : ''));
+            }
+
+            return 0;
+
+        } catch (\Exception $e) {
+            $this->error('Error getting debug info: ' . $e->getMessage());
+            return 1;
+        }
+    }
+
+    private function clearFailoverRedirects(bool $force): int
+    {
+        if (!$force && !$this->confirm('Clear all failover redirects? This may affect active streams.')) {
+            return 0;
+        }
+
+        try {
+            $redis = app('redis')->connection();
+            $redirectKeys = $redis->keys('stream_failover_redirect:*');
+            
+            if (empty($redirectKeys)) {
+                $this->info('No failover redirects found');
+                return 0;
+            }
+
+            $deleted = 0;
+            foreach ($redirectKeys as $key) {
+                $redis->del($key);
+                $deleted++;
+            }
+
+            $this->info("Cleared {$deleted} failover redirects");
+            return 0;
+
+        } catch (\Exception $e) {
+            $this->error('Error clearing redirects: ' . $e->getMessage());
+            return 1;
+        }
     }
 }

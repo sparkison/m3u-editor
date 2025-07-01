@@ -32,10 +32,18 @@ class SharedStreamService
 
     private int $clientTimeout;
     private array $activeProcesses = []; // Store active FFmpeg processes
+    private bool $debugLogging;
+    private int $maxRedirects;
+    private int $redirectTtl;
+    private int $logDataThreshold;
 
     public function __construct()
     {
         $this->clientTimeout = (int) config('proxy.shared_streaming.clients.timeout', 120);
+        $this->debugLogging = config('app.shared_streaming.debug_logging', false);
+        $this->maxRedirects = config('app.shared_streaming.max_redirects', 3);
+        $this->redirectTtl = config('app.shared_streaming.redirect_ttl', 30);
+        $this->logDataThreshold = config('app.shared_streaming.log_data_threshold', 51200);
     }
 
     /**
@@ -855,7 +863,10 @@ class SharedStreamService
                     $redis->lpush("{$bufferKey}:segments", $segmentNumber);
                     $redis->ltrim("{$bufferKey}:segments", 0, 50);
 
-                    Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffered initial segment {$segmentNumber}");
+                    // Only log every few segments to reduce noise
+                    if ($segmentNumber <= 5 || $segmentNumber % 5 === 0) {
+                        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Buffered initial segment {$segmentNumber}");
+                    }
 
                     $segmentNumber++;
                     $accumulatedData = '';
@@ -1908,13 +1919,30 @@ class SharedStreamService
      */
     public function getNextStreamSegments(string $streamKey, string $clientId, int &$lastSegment): ?string
     {
+        // Prevent infinite redirect loops by using Redis to track redirects with TTL
+        $redirectTrackingKey = "redirect_tracking:{$clientId}:{$streamKey}";
+        $redirectCount = (int)$this->redis()->get($redirectTrackingKey);
+        
         // Check if this stream has been failed over and redirect if necessary
         $redirectedStreamKey = $this->checkForFailoverRedirect($streamKey, $clientId);
         if ($redirectedStreamKey && $redirectedStreamKey !== $streamKey) {
-            Log::channel('ffmpeg')->info("Stream {$streamKey}: Redirecting client {$clientId} to failover stream {$redirectedStreamKey}");
+            if ($redirectCount >= $this->maxRedirects) {
+                Log::channel('ffmpeg')->warning("Stream {$streamKey}: Client {$clientId} reached maximum redirect attempts, stopping failover");
+                $this->redis()->del($redirectTrackingKey);
+                return null;
+            }
+            
+            // Increment redirect count with configurable TTL
+            $this->redis()->setex($redirectTrackingKey, $this->redirectTtl, $redirectCount + 1);
+            
+            Log::channel('ffmpeg')->info("Stream {$streamKey}: Redirecting client {$clientId} to failover stream {$redirectedStreamKey} (attempt " . ($redirectCount + 1) . ")");
+            
             $streamKey = $redirectedStreamKey;
             // Reset last segment for the new stream to start fresh
             $lastSegment = -1;
+        } else {
+            // Reset redirect count if we're not redirecting
+            $this->redis()->del($redirectTrackingKey);
         }
 
         $bufferKey = self::BUFFER_PREFIX . $streamKey;
@@ -1932,7 +1960,6 @@ class SharedStreamService
 
             foreach ($segmentNumbers as $segmentNumber) {
                 // Only get segments newer than the last one sent to this client
-
                 if ($segmentNumber > $lastSegment && $segmentsRetrieved < $maxSegmentsPerCall) {
                     $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
                     $segmentData = $this->redis()->get($segmentKey);
@@ -1947,16 +1974,18 @@ class SharedStreamService
 
         // If no buffered data is available, try to read directly from FFmpeg
         if (empty($data) && isset($this->activeProcesses[$streamKey])) {
-            Log::channel('ffmpeg')->debug("Stream {$streamKey}: No buffered data, attempting to read directly from FFmpeg");
             $data = $this->readDirectFromFFmpeg($streamKey, $lastSegment);
-        } else if (empty($data)) {
-            Log::channel('ffmpeg')->debug("Stream {$streamKey}: No buffered data and no active FFmpeg process");
         }
 
         // Update client activity if we retrieved data
         if (!empty($data)) {
             $this->updateClientActivity($streamKey, $clientId);
             $this->trackBandwidth($streamKey, strlen($data));
+            
+            // Only log significant data transfers based on config
+            if ($this->debugLogging || strlen($data) > $this->logDataThreshold) {
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Client {$clientId} received " . round(strlen($data)/1024, 1) . "KB");
+            }
         }
 
         return !empty($data) ? $data : null;
@@ -1984,13 +2013,23 @@ class SharedStreamService
             
             // Attempt failover if this is a channel stream
             $streamInfo = $this->getStreamInfo($streamKey);
-            Log::channel('ffmpeg')->info("Stream {$streamKey}: Retrieved stream info for failover check - Type: " . ($streamInfo['type'] ?? 'null') . ", Model ID: " . ($streamInfo['model_id'] ?? 'null'));
             
             if ($streamInfo && ($streamInfo['type'] ?? '') === 'channel') {
-                Log::channel('ffmpeg')->info("Stream {$streamKey}: Calling attemptStreamFailover for channel {$streamInfo['model_id']}");
-                return $this->attemptStreamFailover($streamKey, $streamInfo);
-            } else {
-                Log::channel('ffmpeg')->info("Stream {$streamKey}: No failover attempt - not a channel stream or no stream info");
+                Log::channel('ffmpeg')->info("Stream {$streamKey}: Attempting failover for channel {$streamInfo['model_id']}");
+                $failoverStreamKey = $this->attemptStreamFailover($streamKey, $streamInfo);
+                
+                if ($failoverStreamKey && $failoverStreamKey !== $streamKey) {
+                    // Failover succeeded, try to get initial data from the new stream
+                    Log::channel('ffmpeg')->info("Stream {$streamKey}: Failover completed, getting data from new stream {$failoverStreamKey}");
+                    
+                    // Wait a moment for the new stream to be ready
+                    sleep(1);
+                    
+                    // Try to get data from the new stream
+                    if (isset($this->activeProcesses[$failoverStreamKey])) {
+                        return $this->readDirectFromFFmpeg($failoverStreamKey, $lastSegment);
+                    }
+                }
             }
             
             return null;
@@ -2006,8 +2045,6 @@ class SharedStreamService
         $readAttempts = 0;
         $maxReadAttempts = 20; // Maximum read attempts
 
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Reading directly from FFmpeg process");
-
         while (
             $accumulatedSize < $targetChunkSize &&
             (time() - $startTime) < $maxReadTime &&
@@ -2022,7 +2059,10 @@ class SharedStreamService
                 $accumulatedData .= $chunk;
                 $accumulatedSize += strlen($chunk);
 
-                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Read " . strlen($chunk) . " bytes from FFmpeg (total: {$accumulatedSize})");
+                // Only log significant reads to reduce log noise
+                if ($accumulatedSize >= $targetChunkSize || $readAttempts === 1) {
+                    Log::channel('ffmpeg')->debug("Stream {$streamKey}: Read " . round($accumulatedSize/1024, 1) . "KB from FFmpeg in {$readAttempts} attempts");
+                }
             } else {
                 // No immediate data available, small sleep
                 usleep(100000); // 100ms
@@ -2047,14 +2087,18 @@ class SharedStreamService
             // Keep only recent segments (prevent memory bloat)
             $redis->ltrim("{$bufferKey}:segments", 0, 50);
 
-            // Clean up old segments
-            $oldSegmentNumber = $newSegmentNumber - 50;
-            if ($oldSegmentNumber >= 0) {
-                $redis->del("{$bufferKey}:segment_{$oldSegmentNumber}");
+            // Clean up old segments - only log significant actions
+            for ($i = $newSegmentNumber - 51; $i >= 0; $i--) {
+                $oldSegmentKey = "{$bufferKey}:segment_{$i}";
+                $redis->del($oldSegmentKey);
             }
 
             $lastSegment = $newSegmentNumber;
-            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Stored {$accumulatedSize} bytes as segment {$newSegmentNumber}");
+            
+            // Only log if this is a significant segment (reduces log noise)
+            if ($newSegmentNumber % 10 === 0 || $accumulatedSize > 100000) {
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Stored " . round($accumulatedSize/1024, 1) . "KB as segment {$newSegmentNumber}");
+            }
 
             return $accumulatedData;
         }
@@ -2404,8 +2448,8 @@ class SharedStreamService
                     
                     Log::channel('ffmpeg')->info("Stream {$originalStreamKey}: Successfully failed over to channel {$failoverChannel->id} (attempt #{$attemptNumber}). New stream key: {$failoverStreamKey}");
                     
-                    // Return some data to indicate successful failover
-                    return "FAILOVER_SUCCESS";
+                    // Return the failover stream key so the client can be redirected
+                    return $failoverStreamKey;
                     
                 } catch (\Exception $e) {
                     Log::channel('ffmpeg')->error("Stream {$originalStreamKey}: Failover attempt #{$attemptNumber} to channel {$failoverChannel->id} failed: " . $e->getMessage());
