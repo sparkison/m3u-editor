@@ -1919,30 +1919,51 @@ class SharedStreamService
      */
     public function getNextStreamSegments(string $streamKey, string $clientId, int &$lastSegment): ?string
     {
-        // Prevent infinite redirect loops by using Redis to track redirects with TTL
-        $redirectTrackingKey = "redirect_tracking:{$clientId}:{$streamKey}";
+        // Prevent infinite redirect loops by tracking redirects per client across all streams for this channel
+        $streamInfo = $this->getStreamInfo($streamKey);
+        $channelId = $streamInfo['primary_channel_id'] ?? $streamInfo['model_id'] ?? 'unknown';
+        
+        // Use channel-based redirect tracking instead of stream-based to prevent loops
+        $redirectTrackingKey = "redirect_tracking:{$clientId}:channel:{$channelId}";
         $redirectCount = (int)$this->redis()->get($redirectTrackingKey);
         
-        // Check if this stream has been failed over and redirect if necessary
-        $redirectedStreamKey = $this->checkForFailoverRedirect($streamKey, $clientId);
-        if ($redirectedStreamKey && $redirectedStreamKey !== $streamKey) {
-            if ($redirectCount >= $this->maxRedirects) {
-                Log::channel('ffmpeg')->warning("Stream {$streamKey}: Client {$clientId} reached maximum redirect attempts, stopping failover");
-                $this->redis()->del($redirectTrackingKey);
-                return null;
+        // Check if we're already on a failover stream and give it time to buffer
+        $isFailoverStream = isset($streamInfo['is_failover']) && $streamInfo['is_failover'] === true;
+        $streamAge = isset($streamInfo['created_at']) ? (time() - $streamInfo['created_at']) : 0;
+        $failoverGracePeriod = 30; // Give failover streams 30 seconds to start producing data
+        
+        $shouldCheckForFailover = true;
+        
+        // If we're on a failover stream that's still young, don't look for more failovers yet
+        if ($isFailoverStream && $streamAge < $failoverGracePeriod) {
+            $shouldCheckForFailover = false;
+            Log::channel('ffmpeg')->debug("Stream {$streamKey}: On failover stream (age: {$streamAge}s), waiting for buffering to complete");
+        }
+        
+        // Only check for failover if the current stream has actually failed
+        if ($shouldCheckForFailover) {
+            $redirectedStreamKey = $this->checkForFailoverRedirect($streamKey, $clientId);
+            if ($redirectedStreamKey && $redirectedStreamKey !== $streamKey) {
+                if ($redirectCount >= $this->maxRedirects) {
+                    Log::channel('ffmpeg')->warning("Stream {$streamKey}: Client {$clientId} reached maximum redirect attempts for channel {$channelId}, stopping failover");
+                    $this->redis()->del($redirectTrackingKey);
+                    return null;
+                }
+                
+                // Increment redirect count with configurable TTL
+                $this->redis()->setex($redirectTrackingKey, $this->redirectTtl, $redirectCount + 1);
+                
+                Log::channel('ffmpeg')->info("Stream {$streamKey}: Redirecting client {$clientId} to failover stream {$redirectedStreamKey} (attempt " . ($redirectCount + 1) . " for channel {$channelId})");
+                
+                $streamKey = $redirectedStreamKey;
+                // Reset last segment for the new stream to start fresh
+                $lastSegment = -1;
+            } else {
+                // Reset redirect count if we're not redirecting (stream is working)
+                if ($redirectCount > 0) {
+                    $this->redis()->del($redirectTrackingKey);
+                }
             }
-            
-            // Increment redirect count with configurable TTL
-            $this->redis()->setex($redirectTrackingKey, $this->redirectTtl, $redirectCount + 1);
-            
-            Log::channel('ffmpeg')->info("Stream {$streamKey}: Redirecting client {$clientId} to failover stream {$redirectedStreamKey} (attempt " . ($redirectCount + 1) . ")");
-            
-            $streamKey = $redirectedStreamKey;
-            // Reset last segment for the new stream to start fresh
-            $lastSegment = -1;
-        } else {
-            // Reset redirect count if we're not redirecting
-            $this->redis()->del($redirectTrackingKey);
         }
 
         $bufferKey = self::BUFFER_PREFIX . $streamKey;
@@ -1982,9 +2003,12 @@ class SharedStreamService
             $this->updateClientActivity($streamKey, $clientId);
             $this->trackBandwidth($streamKey, strlen($data));
             
-            // Only log significant data transfers based on config
-            if ($this->debugLogging || strlen($data) > $this->logDataThreshold) {
-                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Client {$clientId} received " . round(strlen($data)/1024, 1) . "KB");
+            // Only log data transfers larger than 50KB or every 20th call to reduce log noise
+            static $callCount = [];
+            $callCount[$clientId] = ($callCount[$clientId] ?? 0) + 1;
+            
+            if (strlen($data) > 50000 || $callCount[$clientId] % 20 === 0) {
+                Log::channel('ffmpeg')->info("Stream {$streamKey}: Client {$clientId} received " . round(strlen($data)/1024, 1) . "KB (segments: {$segmentsRetrieved})");
             }
         }
 
@@ -2059,8 +2083,8 @@ class SharedStreamService
                 $accumulatedData .= $chunk;
                 $accumulatedSize += strlen($chunk);
 
-                // Only log significant reads to reduce log noise
-                if ($accumulatedSize >= $targetChunkSize || $readAttempts === 1) {
+                // Only log every 10th read attempt or when target size is reached to reduce noise
+                if ($accumulatedSize >= $targetChunkSize || ($readAttempts % 10 === 0 && $readAttempts > 0)) {
                     Log::channel('ffmpeg')->debug("Stream {$streamKey}: Read " . round($accumulatedSize/1024, 1) . "KB from FFmpeg in {$readAttempts} attempts");
                 }
             } else {
@@ -2076,9 +2100,14 @@ class SharedStreamService
         }
 
         if ($accumulatedSize > 0) {
-            // Store the data as a new segment
-            $currentSegments = $redis->llen("{$bufferKey}:segments");
-            $newSegmentNumber = $currentSegments;
+            // Get the highest existing segment number and increment it
+            $existingSegments = $redis->lrange("{$bufferKey}:segments", 0, -1);
+            $newSegmentNumber = 0;
+            
+            if (!empty($existingSegments)) {
+                $maxSegment = max(array_map('intval', $existingSegments));
+                $newSegmentNumber = $maxSegment + 1;
+            }
 
             $segmentKey = "{$bufferKey}:segment_{$newSegmentNumber}";
             $redis->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
@@ -2087,17 +2116,18 @@ class SharedStreamService
             // Keep only recent segments (prevent memory bloat)
             $redis->ltrim("{$bufferKey}:segments", 0, 50);
 
-            // Clean up old segments - only log significant actions
-            for ($i = $newSegmentNumber - 51; $i >= 0; $i--) {
-                $oldSegmentKey = "{$bufferKey}:segment_{$i}";
+            // Clean up old segments - only delete segments that are definitely old
+            $segmentsToCleanup = $redis->lrange("{$bufferKey}:segments", 50, -1);
+            foreach ($segmentsToCleanup as $oldSegmentNum) {
+                $oldSegmentKey = "{$bufferKey}:segment_{$oldSegmentNum}";
                 $redis->del($oldSegmentKey);
             }
 
             $lastSegment = $newSegmentNumber;
             
-            // Only log if this is a significant segment (reduces log noise)
-            if ($newSegmentNumber % 10 === 0 || $accumulatedSize > 100000) {
-                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Stored " . round($accumulatedSize/1024, 1) . "KB as segment {$newSegmentNumber}");
+            // Only log every 10th segment to reduce noise, unless it's the first few segments
+            if ($newSegmentNumber <= 5 || $newSegmentNumber % 10 === 0) {
+                Log::channel('ffmpeg')->info("Stream {$streamKey}: Stored " . round($accumulatedSize/1024, 1) . "KB as segment {$newSegmentNumber}");
             }
 
             return $accumulatedData;
@@ -2640,6 +2670,11 @@ class SharedStreamService
             if ($originalStreamInfo && isset($originalStreamInfo['status'])) {
                 if ($originalStreamInfo['status'] === 'active') {
                     // Stream is still active, no redirect needed
+                    // If this is already a failover stream, don't look for another failover
+                    if (isset($originalStreamInfo['is_failover']) && $originalStreamInfo['is_failover'] === true) {
+                        Log::channel('ffmpeg')->debug("Stream {$originalStreamKey}: Already on active failover stream, no further redirect needed");
+                        return $originalStreamKey; // Return the current stream, don't look for alternatives
+                    }
                     return $originalStreamKey;
                 } elseif ($originalStreamInfo['status'] === 'failed_over' && isset($originalStreamInfo['failover_stream_key'])) {
                     // Stream has failover info in its metadata
@@ -2651,6 +2686,13 @@ class SharedStreamService
                     if ($failoverStreamInfo && isset($failoverStreamInfo['status']) && $failoverStreamInfo['status'] === 'active') {
                         return $failoverStreamKey;
                     }
+                } elseif ($originalStreamInfo['status'] === 'failed' || $originalStreamInfo['status'] === 'stopped') {
+                    // Only look for failovers if the stream has actually failed
+                    Log::channel('ffmpeg')->debug("Stream {$originalStreamKey}: Stream status is {$originalStreamInfo['status']}, looking for failover");
+                } else {
+                    // Stream is in some other state, don't redirect yet
+                    Log::channel('ffmpeg')->debug("Stream {$originalStreamKey}: Stream status is {$originalStreamInfo['status']}, not looking for failover yet");
+                    return $originalStreamKey;
                 }
             }
 
@@ -2679,6 +2721,11 @@ class SharedStreamService
                 
                 foreach ($allStreamKeys as $key) {
                     $key = str_replace('m3u_editor_database_', '', $key); // Remove the prefix to get the actual key
+                    
+                    // Skip if this is the same stream we're checking for (prevent self-redirect)
+                    if ($key === $originalStreamKey) {
+                        continue;
+                    }
                     
                     $streamInfo = $this->getStreamInfo($key);
                     if ($streamInfo && 
