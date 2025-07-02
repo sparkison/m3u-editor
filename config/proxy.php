@@ -8,7 +8,7 @@ return [
     'ffmpeg_codec_video' => env('PROXY_FFMPEG_CODEC_VIDEO', null),
     'ffmpeg_codec_audio' => env('PROXY_FFMPEG_CODEC_AUDIO', null),
     'ffmpeg_codec_subtitles' => env('PROXY_FFMPEG_CODEC_SUBTITLES', null),
-    
+
     /*
     |--------------------------------------------------------------------------
     | Shared Streaming Configuration (xTeVe-like proxy functionality)
@@ -18,10 +18,10 @@ return [
     | multiple clients to share the same upstream stream, reducing server load.
     |
     */
-    
+
     'shared_streaming' => [
         // Enable shared streaming functionality
-        'enabled' => env('SHARED_STREAMING_ENABLED', true),
+        'enabled' => env('SHARED_STREAMING_ENABLED', false),
         
         // Maximum concurrent shared streams
         'max_concurrent_streams' => env('SHARED_MAX_CONCURRENT_STREAMS', 50),

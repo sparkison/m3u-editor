@@ -22,16 +22,32 @@ class ProxyService
     {
         $proxyUrlOverride = config('proxy.url_override');
         $proxyFormat = $format ?? config('proxy.proxy_format', 'ts');
+        $sharedStreamingEnabled = config('proxy.shared_streaming.enabled', false);
         $id = rtrim(base64_encode($id), '=');
         if ($proxyUrlOverride && !$preview) {
             $proxyUrlOverride = rtrim($proxyUrlOverride, '/');
             if ($proxyFormat === 'hls') {
+                if ($sharedStreamingEnabled) {
+                    return "$proxyUrlOverride/shared/stream/$id/hls";
+                }
                 return "$proxyUrlOverride/api/stream/$id/playlist.m3u8";
             } else {
+                if ($sharedStreamingEnabled) {
+                    return "$proxyUrlOverride/shared/stream/$id";
+                }
                 return "$proxyUrlOverride/stream/$id.ts";
             }
         }
 
+        if ($sharedStreamingEnabled) {
+            return $proxyFormat === 'hls'
+                ? route('shared.stream.hls', [
+                    'streamKey' => $id,
+                ])
+                : route('shared.stream.direct', [
+                    'streamKey' => $id,
+                ]);
+        }
         return $proxyFormat === 'hls'
             ? route('stream.hls.playlist', [
                 'encodedId' => $id
