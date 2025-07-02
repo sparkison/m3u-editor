@@ -483,24 +483,6 @@ class SharedStreamController extends Controller
     }
 
     /**
-     * Check if stream has data available (quick data availability check)
-     */
-    /*
-    private function checkStreamHasData(string $streamKey): bool
-    {
-        try {
-            // Try to get a small amount of data to see if stream is producing
-            $tempClientId = 'data_check_' . microtime(true);
-            $lastSegment = 0;
-            $data = $this->sharedStreamService->getNextStreamSegments($streamKey, $tempClientId, $lastSegment);
-            return !empty($data);
-        } catch (\Exception $e) {
-            return false;
-        }
-    }
-    */
-
-    /**
      * Serve shared stream directly (for testing)
      */
     public function serveSharedStream(Request $request, string $streamKey)
