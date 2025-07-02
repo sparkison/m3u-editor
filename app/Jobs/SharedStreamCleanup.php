@@ -36,7 +36,7 @@ class SharedStreamCleanup implements ShouldQueue
         Log::channel('ffmpeg')->debug('SharedStreamCleanup: Starting cleanup process');
 
         try {
-            // Get all active streams
+            // Get all active streams from Redis
             $activeStreams = $sharedStreamService->getAllActiveStreams();
             $cleanedUp = 0;
             $staleStreams = 0;
@@ -49,37 +49,46 @@ class SharedStreamCleanup implements ShouldQueue
                 $createdAt = $streamInfo['created_at'] ?? time();
                 $streamAge = time() - $createdAt;
                 
-                // Check if stream is stale (no clients and inactive for more than 10 minutes, but only if stream is older than 2 minutes)
-                $isStale = $clientCount === 0 && (time() - $lastActivity) > 600 && $streamAge > 120;
+                // Check if the process is still running
+                $pid = $streamInfo['pid'] ?? null;
+                $isProcessRunning = $pid ? $sharedStreamService->isProcessRunning($pid) : false;
+
+                // Condition 1: Stream is stale (no clients, inactive, and process is not running)
+                $isStale = $clientCount === 0 && !$isProcessRunning && (time() - $lastActivity) > 600 && $streamAge > 120;
                 
-                // Check if stream is stuck (running for more than 4 hours with no recent activity)
-                $isStuck = $uptime > 14400 && (time() - $lastActivity) > 1800; // 30 minutes
-                
-                if ($isStale || $isStuck) {
-                    $reason = $isStale ? 'no clients for 10+ minutes' : 'stuck/inactive';
-                    Log::channel('ffmpeg')->info("SharedStreamCleanup: Cleaning up stream {$streamKey} ({$reason}, age: {$streamAge}s)");
+                // Condition 2: Stream is a phantom (marked active, but process is dead)
+                $isPhantom = !$isProcessRunning && in_array($streamInfo['status'], ['active', 'starting']);
+
+                // Condition 3: Stream is stuck (running for a long time with no activity)
+                $isStuck = $isProcessRunning && $uptime > 14400 && (time() - $lastActivity) > 1800; // 4 hours uptime, 30 mins inactivity
+
+                if ($isStale || $isPhantom || $isStuck) {
+                    $reason = 'unknown';
+                    if ($isStale) $reason = 'stale (no clients for 10+ mins)';
+                    if ($isPhantom) $reason = 'phantom (process not running)';
+                    if ($isStuck) $reason = 'stuck/inactive';
+
+                    Log::channel('ffmpeg')->info("SharedStreamCleanup: Cleaning up stream {$streamKey} ({$reason}, age: {$streamAge}s, PID: {$pid})");
                     
                     // Force cleanup of the stream
-                    $success = $sharedStreamService->cleanupStream($streamKey, true);
+                    $sharedStreamService->cleanupStream($streamKey, true);
                     
-                    if ($success) {
-                        $cleanedUp++;
-                        if ($isStale) $staleStreams++;
-                    }
+                    $cleanedUp++;
+                    if ($isStale) $staleStreams++;
                 }
             }
 
-            // Clean up orphaned Redis keys
+            // Clean up orphaned Redis keys that don't have a database entry
             $orphanedKeys = $sharedStreamService->cleanupOrphanedKeys();
 
-            // Clean up temporary files older than 24 hours
+            // Clean up old temporary files
             $tempFilesCleanup = $sharedStreamService->cleanupTempFiles();
 
-            Log::channel('ffmpeg')->info("SharedStreamCleanup: Completed - Cleaned {$cleanedUp} streams ({$staleStreams} stale), {$orphanedKeys} orphaned keys, {$tempFilesCleanup} temp files");
+            Log::channel('ffmpeg')->info("SharedStreamCleanup: Completed - Cleaned {$cleanedUp} streams ({$staleStreams} stale), {$orphanedKeys} orphaned keys, {$tempFilesCleanup} temp files cleaned");
 
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error('SharedStreamCleanup: Error during cleanup: ' . $e->getMessage());
-            throw $e; // Re-throw to trigger retry logic if configured
+            throw $e; // Re-throw to allow for retries if configured
         }
     }
 
