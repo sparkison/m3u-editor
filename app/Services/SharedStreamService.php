@@ -1003,22 +1003,29 @@ class SharedStreamService
     /**
      * Check if stream is active
      */
-    private function isStreamActive(string $streamKey): bool
+    public function isStreamActive(string $streamKey, bool $checkProcess = true): bool
     {
         $streamInfo = $this->getStreamInfo($streamKey);
         if (!$streamInfo || !in_array($streamInfo['status'] ?? '', ['active', 'starting'])) {
             return false;
         }
 
+        // If checkProcess is false, we only check the Redis status
+        if (!$checkProcess) {
+            return true;
+        }
+
         // Check if the process is actually running (phantom stream detection)
         $pid = $streamInfo['pid'] ?? null;
         if ($pid && !$this->isProcessRunning($pid)) {
             Log::channel('ffmpeg')->warning("Phantom stream detected for {$streamKey} with PID {$pid} - process not running");
-
-            // Clean up phantom stream
-            $this->cleanupStream($streamKey, true);
-            SharedStream::where('stream_id', $streamKey)->delete();
-
+            
+            // Mark the stream as errored instead of deleting it immediately
+            $streamInfo['status'] = 'error';
+            $streamInfo['error_message'] = 'Phantom process detected';
+            $this->setStreamInfo($streamKey, $streamInfo);
+            
+            // The cleanup job will handle the final removal
             return false;
         }
 
