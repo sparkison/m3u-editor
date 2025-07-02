@@ -42,7 +42,7 @@ class SharedStreamController extends Controller
     public function streamChannel(Request $request, string $encodedId, string $format = 'ts')
     {
         Log::channel('ffmpeg')->info("SharedStreamController: streamChannel called with encodedId: {$encodedId}, format: {$format}");
-        
+
         // Validate format
         if (!in_array($format, ['ts', 'hls'])) {
             Log::channel('ffmpeg')->error("SharedStreamController: Invalid format specified: {$format}");
@@ -53,10 +53,10 @@ class SharedStreamController extends Controller
         if (strpos($encodedId, '==') === false) {
             $encodedId .= '==';
         }
-        
+
         $channelId = base64_decode($encodedId);
         Log::channel('ffmpeg')->debug("SharedStreamController: Decoded channel ID: {$channelId}");
-        
+
         $channel = Channel::findOrFail($channelId);
         Log::channel('ffmpeg')->debug("SharedStreamController: Found channel: {$channel->title}");
 
@@ -93,8 +93,8 @@ class SharedStreamController extends Controller
     private function handleSharedStream(Request $request, string $type, $model, string $format)
     {
         Log::channel('ffmpeg')->info("SharedStreamController: Starting handleSharedStream for {$type} ID {$model->id}, format: {$format}");
-        
-        $title = $type === 'channel' 
+
+        $title = $type === 'channel'
             ? ($model->title_custom ?? $model->title)
             : $model->title;
         $title = strip_tags($title);
@@ -112,7 +112,7 @@ class SharedStreamController extends Controller
 
         // Get playlist for stream limits
         $playlist = $model->getEffectivePlaylist();
-        
+
         $clientId = $this->generateClientId($request);
         $userAgent = $playlist->user_agent ?? 'VLC/3.0.21';
 
@@ -153,7 +153,6 @@ class SharedStreamController extends Controller
             } else {
                 return $this->streamDirect($streamInfo, $clientId, $request);
             }
-
         } catch (\Exception $e) {
             // Only decrement if we incremented (for new streams)
             if (isset($streamInfo) && ($streamInfo['is_new_stream'] ?? false)) {
@@ -171,9 +170,9 @@ class SharedStreamController extends Controller
     {
         // Disable execution time limit for streaming
         set_time_limit(0);
-        
+
         $streamKey = $streamInfo['stream_key'];
-        
+
         // Wait for stream to be ready
         $maxWait = 30; // 30 seconds
         $waited = 0;
@@ -249,7 +248,7 @@ class SharedStreamController extends Controller
                 }
 
                 Log::channel('ffmpeg')->debug("Stream {$streamKey} is active, starting data flow for client {$clientId}");
-                
+
                 $lastSegment = -1; // Start at -1 so segment 0 will be retrieved
                 $lastDataTime = time();
                 $dataSent = false;
@@ -257,16 +256,16 @@ class SharedStreamController extends Controller
 
                 while (!connection_aborted()) {
                     $data = $this->sharedStreamService->getNextStreamSegments($streamKey, $clientId, $lastSegment);
-                    
+
                     if ($data) {
                         // Only log significant data transfers based on config
                         $debugLogging = config('app.shared_streaming.debug_logging', false);
                         $logThreshold = config('app.shared_streaming.log_data_threshold', 51200);
-                        
+
                         if (!$dataSent || $debugLogging || strlen($data) > $logThreshold) {
-                            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Client {$clientId} received " . round(strlen($data)/1024, 1) . "KB. Segment: {$lastSegment}");
+                            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Client {$clientId} received " . round(strlen($data) / 1024, 1) . "KB. Segment: {$lastSegment}");
                         }
-                        
+
                         echo $data;
                         if (ob_get_level() > 0) {
                             ob_flush();
@@ -274,28 +273,28 @@ class SharedStreamController extends Controller
                         } else {
                             flush();
                         }
-                        
+
                         if (!$dataSent) {
-                            Log::channel('ffmpeg')->info("Sent initial " . round(strlen($data)/1024, 1) . "KB to client {$clientId}");
+                            Log::channel('ffmpeg')->info("Sent initial " . round(strlen($data) / 1024, 1) . "KB to client {$clientId}");
                             $dataSent = true;
                         }
-                        
+
                         $lastDataTime = time();
                         usleep(5000); // Small delay to prevent high CPU usage
                     } else {
                         // No data from stream
                         if (!$dataSent && (time() - $lastDataTime) > $initialTimeout) {
-                             Log::channel('ffmpeg')->warning("Stream {$streamKey}: Client {$clientId} - Initial data timeout. No data received for {$initialTimeout}s. DataSent: " . ($dataSent ? 'yes' : 'no'));
-                             break;
+                            Log::channel('ffmpeg')->warning("Stream {$streamKey}: Client {$clientId} - Initial data timeout. No data received for {$initialTimeout}s. DataSent: " . ($dataSent ? 'yes' : 'no'));
+                            break;
                         }
 
                         // Check if a failover is happening and extend timeout accordingly
                         $timeoutSeconds = 20; // Default timeout
                         $failoverExtendedTimeout = 60; // Extended timeout during failover
-                        
+
                         // Check if we're in the middle of a failover
                         $isFailoverHappening = $this->sharedStreamService->isFailoverInProgress($streamKey);
-                        
+
                         if ($isFailoverHappening) {
                             $timeoutSeconds = $failoverExtendedTimeout;
                             Log::channel('ffmpeg')->debug("Stream {$streamKey}: Client {$clientId} - Failover detected, extending timeout to {$timeoutSeconds}s");
@@ -305,7 +304,7 @@ class SharedStreamController extends Controller
                             Log::channel('ffmpeg')->warning("Stream {$streamKey}: Client {$clientId} - Subsequent data timeout. No data from stream for {$timeoutSeconds}s. DataSent: " . ($dataSent ? 'yes' : 'no') . ". Failover: " . ($isFailoverHappening ? 'yes' : 'no'));
                             break;
                         }
-                        
+
                         usleep(100000); // Wait before trying for more data
                     }
 
@@ -323,7 +322,6 @@ class SharedStreamController extends Controller
                 $this->sharedStreamService->removeClient($streamKey, $clientId);
                 Log::channel('ffmpeg')->info("Stream {$streamKey}: Client {$clientId} successfully removed by stream service.");
             }
-            
         }, 200, [
             'Content-Type' => 'video/MP2T',
             'Cache-Control' => 'no-cache, no-store, must-revalidate, private',
@@ -346,10 +344,10 @@ class SharedStreamController extends Controller
             $encodedId .= '==';
         }
         $modelId = base64_decode($encodedId);
-        
+
         // Generate client ID and stream key
         $clientId = $this->generateClientId($request);
-        
+
         // Try to find the stream (we need to determine if it's channel or episode)
         $streamKey = null;
         $model = Channel::find($modelId);
@@ -370,7 +368,7 @@ class SharedStreamController extends Controller
 
         // Get segment data from shared stream
         $segmentData = $this->sharedStreamService->getHLSSegment($streamKey, $clientId, $segment);
-        
+
         if (!$segmentData) {
             abort(404, 'Segment not found');
         }
@@ -388,7 +386,7 @@ class SharedStreamController extends Controller
     public function getStreamStats(Request $request): \Illuminate\Http\JsonResponse
     {
         $streams = $this->sharedStreamService->getAllActiveStreams();
-        
+
         $stats = [
             'total_streams' => count($streams),
             'total_clients' => array_sum(array_column($streams, 'client_count')),
@@ -465,11 +463,10 @@ class SharedStreamController extends Controller
             return response()->json([
                 'message' => 'Test stream started successfully',
                 'stream_key' => $streamInfo['stream_key'],
-                'stream_url' => $format === 'hls' 
+                'stream_url' => $format === 'hls'
                     ? route('shared.stream.hls', ['streamKey' => $streamInfo['stream_key']])
                     : route('shared.stream.direct', ['streamKey' => $streamInfo['stream_key']])
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'error' => 'Failed to start test stream: ' . $e->getMessage()
@@ -509,20 +506,19 @@ class SharedStreamController extends Controller
     public function serveSharedStream(Request $request, string $streamKey)
     {
         $clientId = $this->generateClientId($request);
-        
+
         try {
             $data = $this->sharedStreamService->getStreamData($streamKey, $clientId);
-            
+
             if (!$data) {
                 abort(404, 'Stream not found or no data available');
             }
-            
+
             return response($data, 200, [
                 'Content-Type' => 'video/MP2T',
                 'Cache-Control' => 'no-cache, no-store, must-revalidate',
                 'Connection' => 'keep-alive'
             ]);
-            
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Error serving shared stream {$streamKey}: " . $e->getMessage());
             abort(500, 'Stream error');
@@ -535,20 +531,19 @@ class SharedStreamController extends Controller
     public function serveHLS(Request $request, string $streamKey)
     {
         $clientId = $this->generateClientId($request);
-        
+
         try {
             $playlist = $this->sharedStreamService->getHLSPlaylist($streamKey, $clientId);
-            
+
             if (!$playlist) {
                 abort(404, 'Stream not found or playlist not ready');
             }
-            
+
             return response($playlist, 200, [
                 'Content-Type' => 'application/vnd.apple.mpegurl',
                 'Cache-Control' => 'no-cache, no-store, must-revalidate',
                 'Connection' => 'keep-alive'
             ]);
-            
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Error serving HLS playlist for {$streamKey}: " . $e->getMessage());
             abort(500, 'Stream error');

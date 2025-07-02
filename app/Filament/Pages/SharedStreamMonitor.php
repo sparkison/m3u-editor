@@ -62,7 +62,7 @@ class SharedStreamMonitor extends Page
                 ->icon('heroicon-o-arrow-path')
                 ->size(ActionSize::Small)
                 ->action('refreshData'),
-            
+
             Actions\Action::make('cleanup')
                 ->label('Cleanup Streams')
                 ->icon('heroicon-o-trash')
@@ -71,7 +71,7 @@ class SharedStreamMonitor extends Page
                 ->requiresConfirmation()
                 ->modalDescription('This will stop all inactive streams and clean up orphaned processes.')
                 ->action('cleanupStreams'),
-            
+
             Actions\Action::make('settings')
                 ->label('Settings')
                 ->icon('heroicon-o-cog-6-tooth')
@@ -88,7 +88,7 @@ class SharedStreamMonitor extends Page
     {
         $this->sharedStreamService->cleanupInactiveStreams();
         $this->refreshData();
-        
+
         Notification::make()
             ->title('Cleanup completed successfully.')
             ->success()
@@ -98,7 +98,7 @@ class SharedStreamMonitor extends Page
     public function stopStream(string $streamId): void
     {
         $success = $this->sharedStreamService->stopStream($streamId);
-        
+
         if ($success) {
             Notification::make()
                 ->title("Stream {$streamId} stopped successfully.")
@@ -110,14 +110,14 @@ class SharedStreamMonitor extends Page
                 ->danger()
                 ->send();
         }
-        
+
         $this->refreshData();
     }
 
     public function restartStream(string $streamId): void
     {
         $stream = SharedStream::where('stream_id', $streamId)->first();
-        
+
         if (!$stream) {
             Notification::make()
                 ->title("Stream not found.")
@@ -128,16 +128,16 @@ class SharedStreamMonitor extends Page
 
         // Stop the current stream
         $this->sharedStreamService->stopStream($streamId);
-        
+
         // Wait a moment for cleanup
         sleep(1);
-        
+
         // Start a new stream with the same source
         $newStreamId = $this->sharedStreamService->createSharedStream(
             $stream->source_url,
             $stream->format
         );
-        
+
         if ($newStreamId) {
             Notification::make()
                 ->title("Stream restarted with new ID: {$newStreamId}")
@@ -149,7 +149,7 @@ class SharedStreamMonitor extends Page
                 ->danger()
                 ->send();
         }
-        
+
         $this->refreshData();
     }
 
@@ -157,9 +157,9 @@ class SharedStreamMonitor extends Page
     {
         // Get streams from database instead of just Redis
         $streams = SharedStream::with(['clients', 'stats'])
-                              ->whereIn('status', ['starting', 'active'])
-                              ->orderBy('started_at', 'desc')
-                              ->get();
+            ->whereIn('status', ['starting', 'active'])
+            ->orderBy('started_at', 'desc')
+            ->get();
 
         return $streams->map(function ($stream) {
             $recentStats = $stream->recentStats(5)->first();
@@ -206,7 +206,7 @@ class SharedStreamMonitor extends Page
         $totalMemory = $this->getSystemMemory();
         $diskSpace = $this->getDiskSpace();
         $bufferPath = config('proxy.shared_streaming.buffer_path', '/tmp/m3u-proxy-buffers');
-        
+
         return [
             'total_streams' => SharedStream::count(),
             'active_streams' => SharedStream::active()->count(),
@@ -229,17 +229,17 @@ class SharedStreamMonitor extends Page
                 ->default($this->refreshInterval)
                 ->minValue(1)
                 ->maxValue(60),
-            
+
             \Filament\Forms\Components\Toggle::make('auto_cleanup')
                 ->label('Auto Cleanup Inactive Streams')
                 ->default(true),
-            
+
             \Filament\Forms\Components\TextInput::make('cleanup_interval')
                 ->label('Cleanup Interval (minutes)')
                 ->numeric()
                 ->default(10)
                 ->minValue(1),
-            
+
             \Filament\Forms\Components\TextInput::make('max_buffer_size')
                 ->label('Max Buffer Size (MB)')
                 ->numeric()
@@ -272,8 +272,8 @@ class SharedStreamMonitor extends Page
         $totalClients = array_sum(array_column($this->streams, 'client_count'));
         $totalBandwidth = array_sum(array_column($this->streams, 'bandwidth_kbps'));
 
-        return "Active: {$activeCount} streams | Clients: {$totalClients} | Bandwidth: " . 
-               ($totalBandwidth > 1000 ? round($totalBandwidth / 1000, 1) . ' Mbps' : $totalBandwidth . ' kbps');
+        return "Active: {$activeCount} streams | Clients: {$totalClients} | Bandwidth: " .
+            ($totalBandwidth > 1000 ? round($totalBandwidth / 1000, 1) . ' Mbps' : $totalBandwidth . ' kbps');
     }
 
     // Helper methods
@@ -282,17 +282,17 @@ class SharedStreamMonitor extends Page
         if (strlen($url) <= $maxLength) {
             return $url;
         }
-        
+
         return substr($url, 0, $maxLength - 3) . '...';
     }
 
     protected function formatBytes(int $bytes): string
     {
         if ($bytes === 0) return '0 B';
-        
+
         $units = ['B', 'KB', 'MB', 'GB', 'TB'];
         $i = floor(log($bytes, 1024));
-        
+
         return round($bytes / pow(1024, $i), 2) . ' ' . $units[$i];
     }
 
@@ -305,11 +305,11 @@ class SharedStreamMonitor extends Page
 
         preg_match('/MemTotal:\s+(\d+)/', $meminfo, $total);
         preg_match('/MemAvailable:\s+(\d+)/', $meminfo, $available);
-        
+
         $totalMem = isset($total[1]) ? (int)$total[1] * 1024 : 0;
         $availableMem = isset($available[1]) ? (int)$available[1] * 1024 : 0;
         $usedMem = $totalMem - $availableMem;
-        
+
         return [
             'total' => $this->formatBytes($totalMem),
             'free' => $this->formatBytes($availableMem),
@@ -324,7 +324,7 @@ class SharedStreamMonitor extends Page
         $total = disk_total_space($path);
         $free = disk_free_space($path);
         $used = $total - $free;
-        
+
         return [
             'total' => $this->formatBytes($total),
             'free' => $this->formatBytes($free),
@@ -349,12 +349,12 @@ class SharedStreamMonitor extends Page
         if (!$uptime) {
             return 'N/A';
         }
-        
+
         $seconds = (int)explode(' ', $uptime)[0];
         $days = floor($seconds / 86400);
         $hours = floor(($seconds % 86400) / 3600);
         $minutes = floor(($seconds % 3600) / 60);
-        
+
         return "{$days}d {$hours}h {$minutes}m";
     }
 

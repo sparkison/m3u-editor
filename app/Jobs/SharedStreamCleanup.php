@@ -48,14 +48,14 @@ class SharedStreamCleanup implements ShouldQueue
                 $uptime = $streamData['uptime'] ?? 0;
                 $createdAt = $streamInfo['created_at'] ?? time();
                 $streamAge = time() - $createdAt;
-                
+
                 // Check if the process is still running
                 $pid = $streamInfo['pid'] ?? null;
                 $isProcessRunning = $pid ? $sharedStreamService->isProcessRunning($pid) : false;
 
                 // Condition 1: Stream is stale (no clients, inactive, and process is not running)
                 $isStale = $clientCount === 0 && !$isProcessRunning && (time() - $lastActivity) > 600 && $streamAge > 120;
-                
+
                 // Condition 2: Stream is a phantom (marked active, but process is dead)
                 $isPhantom = !$isProcessRunning && in_array($streamInfo['status'], ['active', 'starting']);
 
@@ -69,10 +69,10 @@ class SharedStreamCleanup implements ShouldQueue
                     if ($isStuck) $reason = 'stuck/inactive';
 
                     Log::channel('ffmpeg')->info("SharedStreamCleanup: Cleaning up stream {$streamKey} ({$reason}, age: {$streamAge}s, PID: {$pid})");
-                    
+
                     // Force cleanup of the stream
                     $sharedStreamService->cleanupStream($streamKey, true);
-                    
+
                     $cleanedUp++;
                     if ($isStale) $staleStreams++;
                 }
@@ -85,7 +85,6 @@ class SharedStreamCleanup implements ShouldQueue
             $tempFilesCleanup = $sharedStreamService->cleanupTempFiles();
 
             Log::channel('ffmpeg')->info("SharedStreamCleanup: Completed - Cleaned {$cleanedUp} streams ({$staleStreams} stale), {$orphanedKeys} orphaned keys, {$tempFilesCleanup} temp files cleaned");
-
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error('SharedStreamCleanup: Error during cleanup: ' . $e->getMessage());
             throw $e; // Re-throw to allow for retries if configured
