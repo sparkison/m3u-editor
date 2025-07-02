@@ -2871,4 +2871,50 @@ class SharedStreamService
             return null;
         }
     }
+
+    /**
+     * Retrieve the HLS playlist for a given stream key.
+     */
+    public function getHLSPlaylist(string $streamKey): ?string
+    {
+        $bufferKey = self::BUFFER_PREFIX . $streamKey;
+        $playlistKey = "{$bufferKey}:playlist";
+
+        try {
+            $playlistData = $this->redis()->get($playlistKey);
+            if ($playlistData) {
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Retrieved HLS playlist ({" . strlen($playlistData) . " bytes)");
+                return $playlistData;
+            } else {
+                Log::channel('ffmpeg')->warning("Stream {$streamKey}: HLS playlist not found in buffer");
+                return null;
+            }
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Stream {$streamKey}: Error retrieving HLS playlist: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Retrieve HLS segment data for a given stream key and segment name.
+     */
+    public function getHLSSegment(string $streamKey, string $segmentName): ?string
+    {
+        $bufferKey = self::BUFFER_PREFIX . $streamKey;
+        $segmentKey = "{$bufferKey}:segment_{$segmentName}";
+
+        try {
+            $segmentData = $this->redis()->get($segmentKey);
+            if ($segmentData) {
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Retrieved HLS segment {$segmentName} ({" . strlen($segmentData) . " bytes)");
+                return $segmentData;
+            } else {
+                Log::channel('ffmpeg')->warning("Stream {$streamKey}: HLS segment {$segmentName} not found in buffer");
+                return null;
+            }
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Stream {$streamKey}: Error retrieving HLS segment {$segmentName}: " . $e->getMessage());
+            return null;
+        }
+    }
 }
