@@ -1917,7 +1917,7 @@ class SharedStreamService
     /**
      * Get next stream segments for a client
      */
-    public function getNextStreamSegments(string $streamKey, string $clientId, int &$lastSegment): ?string
+    public function getNextStreamSegments(string &$streamKey, string $clientId, int &$lastSegment): ?string
     {
         // Prevent infinite redirect loops by tracking redirects per client across all streams for this channel
         $streamInfo = $this->getStreamInfo($streamKey);
@@ -1955,7 +1955,9 @@ class SharedStreamService
                 
                 Log::channel('ffmpeg')->info("Stream {$streamKey}: Redirecting client {$clientId} to failover stream {$redirectedStreamKey} (attempt " . ($redirectCount + 1) . " for channel {$channelId})");
                 
+                // Update the streamKey by reference
                 $streamKey = $redirectedStreamKey;
+                
                 // Reset last segment for the new stream to start fresh
                 $lastSegment = -1;
             } else {
@@ -1998,22 +2000,108 @@ class SharedStreamService
             $data = $this->readDirectFromFFmpeg($streamKey, $lastSegment);
         }
 
-        // Update client activity if we retrieved data
-        if (!empty($data)) {
-            $this->updateClientActivity($streamKey, $clientId);
-            $this->trackBandwidth($streamKey, strlen($data));
-            
-            // Only log data transfers larger than 50KB or every 20th call to reduce log noise
-            static $callCount = [];
-            $callCount[$clientId] = ($callCount[$clientId] ?? 0) + 1;
-            
-            if (strlen($data) > 50000 || $callCount[$clientId] % 20 === 0) {
-                Log::channel('ffmpeg')->info("Stream {$streamKey}: Client {$clientId} received " . round(strlen($data)/1024, 1) . "KB (segments: {$segmentsRetrieved})");
+        return $data;
+    }
+
+    /**
+     * Attempt to failover to a backup channel
+     */
+    private function attemptFailover(string $streamKey, string $clientId): ?string
+    {
+        $originalStreamInfo = $this->getStreamInfo($streamKey);
+        if (!$originalStreamInfo) {
+            Log::channel('ffmpeg')->error("Stream {$streamKey}: Cannot attempt failover, original stream info not found.");
+            return null;
+        }
+
+        $primaryChannelId = $originalStreamInfo['primary_channel_id'] ?? $originalStreamInfo['model_id'];
+        $primaryChannel = Channel::find($primaryChannelId);
+
+        if (!$primaryChannel || !$primaryChannel->failoverChannels) {
+            Log::channel('ffmpeg')->info("Stream {$streamKey}: No failover channels configured for primary channel {$primaryChannelId}");
+            return null;
+        }
+
+        $failoverChannels = $primaryChannel->failoverChannels;
+        Log::channel('ffmpeg')->info("Stream {$streamKey}: Primary channel {$primaryChannelId} failed, attempting failover to " . $failoverChannels->count() . " backup channels");
+
+        foreach ($failoverChannels as $index => $failoverChannel) {
+            try {
+                Log::channel('ffmpeg')->info("Stream {$streamKey}: Attempting failover #" . ($index + 1) . " to channel {$failoverChannel->id} ({$failoverChannel->title})");
+
+                // Use getOrCreateSharedStream to handle creating the new stream
+                $failoverStreamInfo = $this->getOrCreateSharedStream(
+                    'channel',
+                    $failoverChannel->id,
+                    $failoverChannel->url_custom ?? $failoverChannel->url,
+                    $failoverChannel->title_custom ?? $failoverChannel->title,
+                    $originalStreamInfo['format'],
+                    $clientId, // Pass client ID to register with the new stream
+                    $originalStreamInfo['options'],
+                    $failoverChannel
+                );
+
+                if ($failoverStreamInfo && isset($failoverStreamInfo['stream_key'])) {
+                    $newStreamKey = $failoverStreamInfo['stream_key'];
+                    
+                    // Mark the old stream to redirect to the new one
+                    $originalStreamInfo['status'] = 'failed_over';
+                    $originalStreamInfo['failover_to_stream_key'] = $newStreamKey;
+                    $this->setStreamInfo($streamKey, $originalStreamInfo);
+
+                    // Migrate clients to the new stream
+                    $this->migrateClients($streamKey, $newStreamKey);
+
+                    Log::channel('ffmpeg')->info("Stream {$streamKey}: Successfully failed over to channel {$failoverChannel->id} (attempt #" . ($index + 1) . "). New stream key: {$newStreamKey}");
+                    return $newStreamKey;
+                }
+            } catch (\Exception $e) {
+                Log::channel('ffmpeg')->error("Stream {$streamKey}: Failover attempt #" . ($index + 1) . " to channel {$failoverChannel->id} failed: " . $e->getMessage());
+                continue;
             }
         }
 
-        return !empty($data) ? $data : null;
+        Log::channel('ffmpeg')->error("Stream {$streamKey}: All failover attempts failed for primary channel {$primaryChannelId}");
+        return null;
     }
+
+    /**
+     * Migrate clients from an old stream to a new one
+     */
+    private function migrateClients(string $oldStreamKey, string $newStreamKey): void
+    {
+        $clientKeys = $this->redis()->keys(self::CLIENT_PREFIX . $oldStreamKey . ':*');
+        if (empty($clientKeys)) {
+            return;
+        }
+
+        Log::channel('ffmpeg')->info("Migrating " . count($clientKeys) . " clients from {$oldStreamKey} to {$newStreamKey}");
+
+        foreach ($clientKeys as $oldClientKey) {
+            $clientData = $this->redis()->get($oldClientKey);
+            if ($clientData) {
+                $clientId = last(explode(':', $oldClientKey));
+                $newClientKey = self::CLIENT_PREFIX . $newStreamKey . ':' . $clientId;
+                
+                // Register client with the new stream
+                $this->redis()->setex($newClientKey, $this->getClientTimeoutResolved(), $clientData);
+                
+                // Increment client count on the new stream
+                $this->incrementClientCount($newStreamKey);
+                
+                // Remove client from the old stream (without triggering cleanup)
+                $this->redis()->del($oldClientKey);
+            }
+        }
+
+        // Decrement client count on the old stream to zero
+        $oldStreamInfo = $this->getStreamInfo($oldStreamKey);
+        if ($oldStreamInfo) {
+            $oldStreamInfo['client_count'] = 0;
+            $this->setStreamInfo($oldStreamKey, $oldStreamInfo);
+        }
+    }
+
 
     /**
      * Read data directly from FFmpeg process
