@@ -2127,6 +2127,11 @@ class SharedStreamService
                 ]);
             }
         }
+
+        // Update the client count in the database for the failover stream
+        $clientCount = count($clientKeys);
+        SharedStream::where('stream_id', $newStreamKey)->update(['client_count' => $clientCount]);
+        Log::channel('ffmpeg')->info("Updated client count for failover stream {$newStreamKey} to {$clientCount}");
     }
 
 
@@ -2687,6 +2692,11 @@ class SharedStreamService
                 Log::channel('ffmpeg')->debug("Migrated client {$clientId} from {$originalStreamKey} to {$failoverStreamKey}");
             }
         }
+
+        // Update the client count in the database for the failover stream
+        $clientCount = count($clientKeys);
+        SharedStream::where('stream_id', $failoverStreamKey)->update(['client_count' => $clientCount]);
+        Log::channel('ffmpeg')->info("Updated client count for failover stream {$failoverStreamKey} to {$clientCount}");
     }
 
     /**
