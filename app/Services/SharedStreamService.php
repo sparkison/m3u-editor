@@ -1081,6 +1081,7 @@ class SharedStreamService
                 $streamInfo = $this->getStreamInfo($streamKey);
                 if ($streamInfo) {
                     $currentCount = $streamInfo['client_count'] ?? 0;
+                    $playlistId = $streamInfo['options']['playlist_id'] ?? null;
                     $newCount = max(0, $currentCount - 1); // Ensure count doesn't go negative
                     $streamInfo['client_count'] = $newCount;
                     $streamInfo['last_client_activity'] = now()->timestamp;
@@ -1092,6 +1093,11 @@ class SharedStreamService
 
                         // Clean up the stream completely
                         $this->cleanupStream($streamKey, true);
+
+                        // Decrement active stream count for playlist
+                        if ($playlistId) {
+                            $this->decrementActiveStreams($playlistId);
+                        }
 
                         // Update database to stopped status and reset all metrics
                         SharedStream::where('stream_id', $streamKey)->update([
