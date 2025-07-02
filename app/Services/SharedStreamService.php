@@ -2000,6 +2000,11 @@ class SharedStreamService
             $data = $this->readDirectFromFFmpeg($streamKey, $lastSegment);
         }
 
+        if (!empty($data)) {
+            $this->trackBandwidth($streamKey, strlen($data));
+            $this->updateClientActivity($streamKey, $clientId);
+        }
+
         return $data;
     }
 
@@ -2070,35 +2075,50 @@ class SharedStreamService
      */
     private function migrateClients(string $oldStreamKey, string $newStreamKey): void
     {
-        $clientKeys = $this->redis()->keys(self::CLIENT_PREFIX . $oldStreamKey . ':*');
+        $clientKeysPattern = self::CLIENT_PREFIX . $oldStreamKey . ':*';
+        $clientKeys = $this->redis()->keys($clientKeysPattern);
+        
         if (empty($clientKeys)) {
             return;
         }
 
+        $migratedCount = 0;
         Log::channel('ffmpeg')->info("Migrating " . count($clientKeys) . " clients from {$oldStreamKey} to {$newStreamKey}");
 
         foreach ($clientKeys as $oldClientKey) {
-            $clientData = $this->redis()->get($oldClientKey);
-            if ($clientData) {
-                $clientId = last(explode(':', $oldClientKey));
-                $newClientKey = self::CLIENT_PREFIX . $newStreamKey . ':' . $clientId;
+            $clientDataJson = $this->redis()->get($oldClientKey);
+            if ($clientDataJson) {
+                $clientData = json_decode($clientDataJson, true);
+                $clientId = $clientData['client_id'] ?? last(explode(':', $oldClientKey));
                 
                 // Register client with the new stream
-                $this->redis()->setex($newClientKey, $this->getClientTimeoutResolved(), $clientData);
+                $this->registerClient($newStreamKey, $clientId, $clientData['options'] ?? []);
                 
                 // Increment client count on the new stream
                 $this->incrementClientCount($newStreamKey);
                 
-                // Remove client from the old stream (without triggering cleanup)
+                // Remove client from the old stream's client list
                 $this->redis()->del($oldClientKey);
+                $migratedCount++;
             }
         }
 
-        // Decrement client count on the old stream to zero
-        $oldStreamInfo = $this->getStreamInfo($oldStreamKey);
-        if ($oldStreamInfo) {
-            $oldStreamInfo['client_count'] = 0;
-            $this->setStreamInfo($oldStreamKey, $oldStreamInfo);
+        // Decrement client count on the old stream in both Redis and DB
+        if ($migratedCount > 0) {
+            $oldStreamInfo = $this->getStreamInfo($oldStreamKey);
+            if ($oldStreamInfo) {
+                $newCount = max(0, ($oldStreamInfo['client_count'] ?? 0) - $migratedCount);
+                $oldStreamInfo['client_count'] = $newCount;
+                if ($newCount === 0) {
+                    $oldStreamInfo['clientless_since'] = now()->timestamp;
+                }
+                $this->setStreamInfo($oldStreamKey, $oldStreamInfo);
+
+                // Update database for old stream
+                SharedStream::where('stream_id', $oldStreamKey)->update([
+                    'client_count' => $newCount
+                ]);
+            }
         }
     }
 
