@@ -172,23 +172,6 @@ Schedule::job(new BufferManagement)->everyTenMinutes();
 php artisan test --filter SharedStreamingTest
 ```
 
-## Deployment Notes
-
-### Production Setup
-
-1. Configure Redis for session storage
-2. Set up background job processing
-3. Configure log rotation
-4. Monitor disk space for buffers
-5. Set up external monitoring integration
-
-### Scaling Considerations
-
-- Multiple server support via Redis clustering
-- Load balancing for API endpoints
-- Database query optimization
-- Buffer storage distribution
-
 ## Integration Examples
 
 ### External Monitoring
@@ -214,13 +197,13 @@ curl http://localhost:36400/api/monitor/performance?period=1h
 
 ```bash
 # Check active streams
-php artisan shared-streams:manage --list
+php artisan app:shared-streams  --list
 
 # View system health
-php artisan shared-streams:manage --stats
+php artisan app:shared-streams  --stats
 
 # Cleanup manually
-php artisan shared-streams:manage --cleanup
+php artisan app:shared-streams  --cleanup
 ```
 
 ## Future Enhancements

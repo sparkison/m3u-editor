@@ -21,3 +21,4 @@ Some of the relevant files for the Shared Streaming functionality include:
 - `app/Jobs/StreamMonitorUpdate.php`: The job for updating the stream monitor.
 - `app/Models/SharedStream.php`: The model representing a shared stream instance.
 - `app/Services/SharedStreamService.php`: The service class that contains the business logic for shared streaming.
+- `docs/buffered-streaming.md`: The documentation for the buffered streaming feature.
