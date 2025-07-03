@@ -170,10 +170,10 @@
                                 </div>
                                 
                                 <div class="flex items-center space-x-2">
-                                    <button wire:click="restartStream('{{ $stream['stream_id'] }}')" 
+                                    {{-- <button wire:click="restartStream('{{ $stream['stream_id'] }}')" 
                                             class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-yellow-500">
                                         Restart
-                                    </button>
+                                    </button> --}}
                                     <button wire:click="stopStream('{{ $stream['stream_id'] }}')" 
                                             class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-red-500">
                                         Stop
@@ -227,20 +227,12 @@
                                         <div class="font-mono text-xs break-all text-gray-900 dark:text-gray-100">{{ $stream['stream_id'] }}</div>
                                     </div>
                                     <div>
-                                        <span class="text-gray-500 dark:text-gray-400">Health Status:</span>
-                                        <div class="font-medium text-gray-900 dark:text-gray-100">{{ $stream['health_status'] ?? 'Unknown' }}</div>
-                                    </div>
-                                    <div>
                                         <span class="text-gray-500 dark:text-gray-400">Buffer Size:</span>
                                         <div class="font-medium text-gray-900 dark:text-gray-100">{{ $stream['buffer_size'] }}</div>
                                     </div>
                                     <div>
                                         <span class="text-gray-500 dark:text-gray-400">Started At:</span>
                                         <div class="font-medium text-gray-900 dark:text-gray-100">{{ $stream['started_at'] ?? 'N/A' }}</div>
-                                    </div>
-                                    <div>
-                                        <span class="text-gray-500 dark:text-gray-400">Last Activity:</span>
-                                        <div class="font-medium text-gray-900 dark:text-gray-100">{{ $stream['last_activity'] }}</div>
                                     </div>
                                     <div>
                                         <span class="text-gray-500 dark:text-gray-400">Process Status:</span>
