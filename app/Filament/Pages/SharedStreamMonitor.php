@@ -163,18 +163,18 @@ class SharedStreamMonitor extends Page
 
         return $streams->map(function ($stream) {
             $recentStats = $stream->recentStats(5)->first();
-            $clientsData = $stream->activeClients->map(function ($client) {
+            $clientInfo = $this->sharedStreamService->getClients($stream->stream_id);
+            $clientsData = array_map(function ($client) {
+                $connectedAt = date('H:i:s', $client['connected_at']);
+                $duration = isset($client['connected_at']) ? now()->diffInSeconds(now()->setTimestamp($client['connected_at'])) : 0;
                 return [
-                    'id' => $client->client_id,
-                    'ip' => $client->ip_address,
-                    'connected_at' => $client->connected_at->format('H:i:s'),
-                    'duration' => $client->duration,
-                    'bytes_received' => $this->formatBytes($client->bytes_received),
-                    'bandwidth' => $client->bandwidth_kbps . ' kbps',
-                    'is_active' => $client->isActive(),
+                    'ip' => $client['options']['ip'],
+                    'client_id' => $client['client_id'],
+                    'connected_at' => $connectedAt,
+                    'user_agent' => $client['options']['user_agent'] ?? 'Unknown',
+                    'duration' => $duration,
                 ];
-            })->toArray();
-
+            }, $clientInfo);
             return [
                 'stream_id' => $stream->stream_id,
                 'source_url' => $this->truncateUrl($stream->source_url),
