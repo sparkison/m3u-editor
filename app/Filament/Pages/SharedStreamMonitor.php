@@ -2,6 +2,8 @@
 
 namespace App\Filament\Pages;
 
+use App\Models\Channel;
+use App\Models\Episode;
 use App\Models\SharedStream;
 use App\Models\SharedStreamStat;
 use App\Services\SharedStreamService;
@@ -164,6 +166,10 @@ class SharedStreamMonitor extends Page
         return $streams->map(function ($stream) {
             $recentStats = $stream->recentStats(5)->first();
             $clientInfo = $this->sharedStreamService->getClients($stream->stream_id);
+            $model = $stream->stream_info['type'] === 'episode'
+                ? Episode::find($stream->stream_info['model_id'])
+                : Channel::find($stream->stream_info['model_id']);
+
             $clientsData = array_map(function ($client) {
                 $connectedAt = date('H:i:s', $client['connected_at']);
                 $duration = isset($client['connected_at']) ? now()->diffInSeconds(now()->setTimestamp($client['connected_at'])) : 0;
@@ -175,6 +181,7 @@ class SharedStreamMonitor extends Page
                     'duration' => $duration,
                 ];
             }, $clientInfo);
+
             return [
                 'stream_id' => $stream->stream_id,
                 'source_url' => $this->truncateUrl($stream->source_url),
@@ -190,6 +197,12 @@ class SharedStreamMonitor extends Page
                 'clients' => $clientsData,
                 'peak_clients' => $recentStats?->client_count ?? 0,
                 'avg_bandwidth' => $recentStats?->bandwidth_kbps ?? 0,
+                'model' => $model ? [
+                    'id' => $model->id,
+                    'title' => $model->title,
+                    'type' => $stream->stream_info['type'],
+                    'logo' => $model->logo ?? null,
+                ] : null,
             ];
         })->toArray();
     }
