@@ -937,7 +937,7 @@ class SharedStreamService
     /**
      * Get stream info from Redis
      */
-    private function getStreamInfo(string $streamKey): ?array
+    public function getStreamInfo(string $streamKey): ?array
     {
         try {
             $data = $this->redis()->get($streamKey);
@@ -1132,6 +1132,34 @@ class SharedStreamService
     }
 
     /**
+     * Get all clients for a specific stream
+     */
+    public function getClients(string $streamKey): array
+    {
+        try {
+            $clientKeys = $this->redis()->keys(self::CLIENT_PREFIX . $streamKey . ':*');
+            $clients = [];
+
+            foreach ($clientKeys as $key) {
+                $clientData = $this->redis()->get($key);
+                if ($clientData) {
+                    $clientInfo = json_decode($clientData, true);
+                    if (is_array($clientInfo)) {
+                        $clients[] = $clientInfo;
+                    } else {
+                        Log::channel('ffmpeg')->error("Invalid client data for {$key}: " . json_last_error_msg());
+                    }
+                }
+            }
+
+            return $clients;
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error retrieving clients for {$streamKey}: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
      * Register a client for a stream
      */
     private function registerClient(string $streamKey, string $clientId, array $options = []): void
@@ -1144,6 +1172,9 @@ class SharedStreamService
             'options' => $options
         ];
         $this->redis()->setex($clientKey, $this->getClientTimeoutResolved(), json_encode($clientInfo));
+
+        // Update last client activity for the stream
+        $this->updateLastClientActivity($streamKey);
     }
 
     private function getClientTimeoutResolved(): int
@@ -1577,6 +1608,31 @@ class SharedStreamService
             $streamInfo['last_activity'] = now()->timestamp;
             $this->setStreamInfo($streamKey, $streamInfo);
         }
+    }
+
+    /**
+     * Update last client activity timestamp for a stream.
+     *
+     * @param string $streamKey
+     * @return void
+     */
+    public function updateLastClientActivity(string $streamKey): void
+    {
+        $timestamp = now()->timestamp;
+
+        // Update in Redis
+        $streamInfo = $this->getStreamInfo($streamKey);
+        if ($streamInfo) {
+            $streamInfo['last_client_activity'] = $timestamp;
+            $this->setStreamInfo($streamKey, $streamInfo);
+        }
+
+        // Update in database
+        SharedStream::where('stream_id', $streamKey)->update([
+            'last_client_activity' => now()
+        ]);
+
+        Log::debug("Updated last_client_activity for stream {$streamKey} to {$timestamp}");
     }
 
     /**
@@ -2041,7 +2097,15 @@ class SharedStreamService
 
         foreach ($failoverChannels as $index => $failoverChannel) {
             try {
-                Log::channel('ffmpeg')->info("Stream {$streamKey}: Attempting failover #" . ($index + 1) . " to channel {$failoverChannel->id} ({$failoverChannel->title})");
+                $failoverUrl = $failoverChannel->url_custom ?? $failoverChannel->url;
+                $failoverTitle = $failoverChannel->title_custom ?? $failoverChannel->title;
+
+                if (!$failoverUrl) {
+                    Log::channel('ffmpeg')->debug("Stream {$streamKey}: Failover channel {$failoverChannel->id} has no URL, skipping");
+                    continue;
+                }
+
+                Log::channel('ffmpeg')->info("Stream {$streamKey}: Attempting failover #" . ($index + 1) . " to channel {$failoverChannel->id} ({$failoverTitle})");
 
                 // Use getOrCreateSharedStream to handle creating the new stream
                 $failoverStreamInfo = $this->getOrCreateSharedStream(

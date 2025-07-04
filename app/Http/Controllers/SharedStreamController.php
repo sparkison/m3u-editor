@@ -115,6 +115,7 @@ class SharedStreamController extends Controller
 
         $clientId = $this->generateClientId($request);
         $userAgent = $playlist->user_agent ?? 'VLC/3.0.21';
+        $ip = $request->headers->get('X-Forwarded-For', $request->ip());
 
         try {
             // Get or create shared stream
@@ -126,9 +127,9 @@ class SharedStreamController extends Controller
                 $format,
                 $clientId,
                 [
+                    'ip' => $ip,
                     'user_agent' => $userAgent,
                     'playlist_id' => $playlist->id,
-                    'ip' => $request->ip()
                 ],
                 $model // Pass the full model for failover support
             );
@@ -179,6 +180,9 @@ class SharedStreamController extends Controller
         while ($waited < $maxWait) {
             $playlist = $this->sharedStreamService->getHLSPlaylist($streamKey, $clientId);
             if ($playlist) {
+                // Update last client activity
+                $this->sharedStreamService->updateLastClientActivity($streamKey);
+
                 return response($playlist, 200, [
                     'Content-Type' => 'application/vnd.apple.mpegurl',
                     'Cache-Control' => 'no-cache, no-store, must-revalidate',
