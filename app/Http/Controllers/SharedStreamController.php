@@ -487,7 +487,8 @@ class SharedStreamController extends Controller
      */
     private function generateClientId(Request $request): string
     {
-        return md5($request->ip() . $request->userAgent() . microtime(true));
+        $ip = $request->headers->get('X-Forwarded-For', $request->ip());
+        return md5($ip . $request->userAgent() . microtime(true));
     }
 
     /**

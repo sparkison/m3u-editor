@@ -1137,11 +1137,11 @@ class SharedStreamService
     public function getClients(string $streamKey): array
     {
         try {
-            $clientKeys = $this->redis()->keys(self::CLIENT_PREFIX . $streamKey . ':*');
+            $pattern = self::CLIENT_PREFIX . $streamKey . ':*';
+            $clientKeys = Redis::keys($pattern);
             $clients = [];
-
             foreach ($clientKeys as $key) {
-                $clientData = $this->redis()->get($key);
+                $clientData = Redis::get($key);
                 if ($clientData) {
                     $clientInfo = json_decode($clientData, true);
                     if (is_array($clientInfo)) {
@@ -1151,7 +1151,6 @@ class SharedStreamService
                     }
                 }
             }
-
             return $clients;
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Error retrieving clients for {$streamKey}: " . $e->getMessage());
@@ -1720,6 +1719,8 @@ class SharedStreamService
     {
         $clientKey = "stream_clients:{$streamKey}";
         $clientData = Redis::hget($clientKey, $clientId);
+
+        Log::channel('ffmpeg')->debug(">>>>> Updating client activity for {$streamKey} - client ID: {$clientId}");
 
         if ($clientData) {
             $clientInfo = json_decode($clientData, true);
