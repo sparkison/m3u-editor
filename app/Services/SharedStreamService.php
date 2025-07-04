@@ -983,7 +983,7 @@ class SharedStreamService
                 return;
             }
 
-            $result = $this->redis()->setex($streamKey, self::SEGMENT_EXPIRY, $jsonData);
+            $result = $this->redis()->set($streamKey, $jsonData);
             if (!$result) {
                 Log::channel('ffmpeg')->error("Stream {$streamKey}: Failed to store stream info in Redis");
             } else {
@@ -1171,7 +1171,7 @@ class SharedStreamService
             'last_client_activity' => now()->timestamp,
             'options' => $options
         ];
-        $this->redis()->setex($clientKey, $this->getClientTimeoutResolved(), json_encode($clientInfo));
+        $this->redis()->set($clientKey, json_encode($clientInfo));
     }
 
     private function getClientTimeoutResolved(): int
@@ -1698,6 +1698,7 @@ class SharedStreamService
         if ($clientData) {
             $clientInfo = json_decode($clientData, true);
             $clientInfo['last_activity'] = now()->timestamp;
+            $clientInfo['last_client_activity'] = now()->timestamp;
             Redis::hset($clientKey, $clientId, json_encode($clientInfo));
         }
     }
@@ -2039,6 +2040,7 @@ class SharedStreamService
             $data = $this->readDirectFromFFmpeg($streamKey, $lastSegment);
         }
 
+        // If data is not empty, track bandwidth and update activity
         if (!empty($data)) {
             $this->trackBandwidth($streamKey, strlen($data));
             $this->updateStreamActivity($streamKey);

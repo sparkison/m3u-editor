@@ -115,8 +115,6 @@ class SharedStreamController extends Controller
 
         $clientId = $this->generateClientId($request);
         $userAgent = $playlist->user_agent ?? 'VLC/3.0.21';
-        $ip = $request->headers->get('X-Forwarded-For', $request->ip());
-
         try {
             // Get or create shared stream
             $streamInfo = $this->sharedStreamService->getOrCreateSharedStream(
@@ -127,7 +125,6 @@ class SharedStreamController extends Controller
                 $format,
                 $clientId,
                 [
-                    'ip' => $ip,
                     'user_agent' => $userAgent,
                     'playlist_id' => $playlist->id,
                 ],
