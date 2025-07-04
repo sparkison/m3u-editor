@@ -2041,6 +2041,7 @@ class SharedStreamService
 
         if (!empty($data)) {
             $this->trackBandwidth($streamKey, strlen($data));
+            $this->updateStreamActivity($streamKey);
             $this->updateClientActivity($streamKey, $clientId);
         }
 
