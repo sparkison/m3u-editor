@@ -1679,9 +1679,16 @@ class SharedStreamService
     private function updateStreamActivity(string $streamKey): void
     {
         $streamInfo = $this->getStreamInfo($streamKey);
+        $data = Redis::get($streamKey);
+        $streamInfo = json_decode($data, true) ?? null;
+
         if ($streamInfo) {
+            Log::channel('ffmpeg')->debug(">>>>> Updating stream activity for {$streamKey}");
+
             $streamInfo['last_activity'] = now()->timestamp;
             $this->setStreamInfo($streamKey, $streamInfo);
+        } else {
+            Log::channel('ffmpeg')->warning("Stream {$streamKey}: No stream info found to update activity timestamp");
         }
     }
 
@@ -1693,13 +1700,15 @@ class SharedStreamService
         $clientKey = self::CLIENT_PREFIX . $streamKey;
         $clientData = Redis::hget($clientKey, $clientId);
 
-        Log::channel('ffmpeg')->debug(">>>>> Updating client activity for {$streamKey} - client ID: {$clientId}");
-
         if ($clientData) {
+            Log::channel('ffmpeg')->debug(">>>>> Updating client activity for {$streamKey} - client ID: {$clientId}");
+
             $clientInfo = json_decode($clientData, true);
             $clientInfo['last_activity'] = now()->timestamp;
             $clientInfo['last_client_activity'] = now()->timestamp;
             Redis::hset($clientKey, $clientId, json_encode($clientInfo));
+        } else {
+            Log::channel('ffmpeg')->warning("Stream {$streamKey}: No client data found for client ID {$clientId} to update activity timestamp");
         }
     }
 
