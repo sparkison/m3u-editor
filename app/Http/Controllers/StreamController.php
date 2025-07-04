@@ -723,10 +723,15 @@ class StreamController extends Controller
             $cmd .= "-user_agent " . $userAgent . " -referer " . escapeshellarg("MyComputer") . " " .
                 '-multiple_requests 1 -reconnect_on_network_error 1 ' .
                 '-reconnect_on_http_error 5xx,4xx -reconnect_streamed 1 ' .
-                '-reconnect_delay_max 5';
+                '-reconnect_delay_max 5 ';
+
+            // Add rw_timeout for all http/https inputs to make ffmpeg fail faster on stall
+            if (preg_match('/^https?:\/\//', $streamUrl)) {
+                $cmd .= '-rw_timeout 20000000 '; // 20 seconds in microseconds
+            }
 
             if ($isMkv) {
-                $cmd .= ' -analyzeduration 10M -probesize 10M';
+                $cmd .= ' -analyzeduration 10M -probesize 10M ';
             }
             $cmd .= ' -noautorotate ';
 
