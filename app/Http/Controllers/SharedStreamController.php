@@ -170,7 +170,9 @@ class SharedStreamController extends Controller
     private function streamHLS(array $streamInfo, string $clientId, Request $request): Response
     {
         // Disable execution time limit for streaming
-        set_time_limit(0);
+        @ini_set('max_execution_time', 0);
+        @ini_set('output_buffering', 'off');
+        @ini_set('implicit_flush', 1);
 
         $streamKey = $streamInfo['stream_key'];
 
@@ -240,7 +242,9 @@ class SharedStreamController extends Controller
         }
 
         return new StreamedResponse(function () use ($streamKey, $clientId, $request) {
-            set_time_limit(0);
+            @ini_set('max_execution_time', 0);
+            @ini_set('output_buffering', 'off');
+            @ini_set('implicit_flush', 1);
             ignore_user_abort(true);
 
             try {
