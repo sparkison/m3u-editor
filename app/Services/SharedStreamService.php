@@ -1596,18 +1596,6 @@ class SharedStreamService
     }
 
     /**
-     * Update stream activity timestamp
-     */
-    private function updateStreamActivity(string $streamKey): void
-    {
-        $streamInfo = $this->getStreamInfo($streamKey);
-        if ($streamInfo) {
-            $streamInfo['last_activity'] = now()->timestamp;
-            $this->setStreamInfo($streamKey, $streamInfo);
-        }
-    }
-
-    /**
      * Get the storage directory for a stream
      */
     private function getStreamStorageDir(string $streamKey): string
@@ -1682,6 +1670,18 @@ class SharedStreamService
             }
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Error tracking bandwidth for {$streamKey}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Update stream activity timestamp
+     */
+    private function updateStreamActivity(string $streamKey): void
+    {
+        $streamInfo = $this->getStreamInfo($streamKey);
+        if ($streamInfo) {
+            $streamInfo['last_activity'] = now()->timestamp;
+            $this->setStreamInfo($streamKey, $streamInfo);
         }
     }
 
