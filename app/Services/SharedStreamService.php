@@ -184,32 +184,32 @@ class SharedStreamService
                     }
                 }
             } else {
-                 // This case ($primaryChannel is null) should ideally not happen if $model is passed.
-                 // If it does, attempt to create stream without playlist checks.
+                // This case ($primaryChannel is null) should ideally not happen if $model is passed.
+                // If it does, attempt to create stream without playlist checks.
                 try {
                     $streamInfo = $this->createSharedStreamInternal(
                         $streamKey,
                         $type,
-                    $modelId,
-                    $streamUrl,
-                    $title,
-                    $format,
-                    $options
-                );
-                $streamInfo['primary_channel_id'] = $modelId;
-                $streamInfo['active_channel_id'] = $modelId;
-                $streamInfo['failover_attempts'] = 0;
-                $this->registerClient($streamKey, $clientId, $options);
-                $streamInfo['is_new_stream'] = true;
-                Log::channel('ffmpeg')->info("SharedStream: Successfully created primary stream for channel {$modelId} (no primary channel model for limit check).");
-                $primarySucceeded = true;
-                return $streamInfo;
+                        $modelId,
+                        $streamUrl,
+                        $title,
+                        $format,
+                        $options
+                    );
+                    $streamInfo['primary_channel_id'] = $modelId;
+                    $streamInfo['active_channel_id'] = $modelId;
+                    $streamInfo['failover_attempts'] = 0;
+                    $this->registerClient($streamKey, $clientId, $options);
+                    $streamInfo['is_new_stream'] = true;
+                    Log::channel('ffmpeg')->info("SharedStream: Successfully created primary stream for channel {$modelId} (no primary channel model for limit check).");
+                    $primarySucceeded = true;
+                    return $streamInfo;
                 } catch (\Exception $e) {
                     Log::channel('ffmpeg')->error("SharedStream: Primary channel {$modelId} (no primary model) failed to start: " . $e->getMessage());
                 }
             }
         } else { // Stream already exists and is active, or starting
-             // Check if existing stream process is actually running
+            // Check if existing stream process is actually running
             $pid = $streamInfo['pid'] ?? null;
             $processRunning = $pid ? $this->isProcessRunning($pid) : false;
 
@@ -218,7 +218,17 @@ class SharedStreamService
                 Log::channel('ffmpeg')->info("SharedStream: Client {$clientId} found dead stream {$streamKey}, attempting restart with failover");
                 // This will internally handle playlist limits for the restart attempt.
                 return $this->restartStreamWithFailover(
-                    $streamKey, $type, $modelId, $streamUrl, $title, $format, $clientId, $options, $primaryChannel, $failoverChannels, $exhaustedPlaylistIds
+                    $streamKey,
+                    $type,
+                    $modelId,
+                    $streamUrl,
+                    $title,
+                    $format,
+                    $clientId,
+                    $options,
+                    $primaryChannel,
+                    $failoverChannels,
+                    $exhaustedPlaylistIds
                 );
             } else {
                 // Join existing active stream
@@ -270,7 +280,13 @@ class SharedStreamService
                     $failoverStreamKey = $this->getStreamKey($type, $failoverChannel->id, $failoverUrl);
 
                     $streamInfo = $this->createSharedStreamInternal(
-                        $failoverStreamKey, $type, $failoverChannel->id, $failoverUrl, $failoverTitle, $format, $options
+                        $failoverStreamKey,
+                        $type,
+                        $failoverChannel->id,
+                        $failoverUrl,
+                        $failoverTitle,
+                        $format,
+                        $options
                     );
 
                     $streamInfo['primary_channel_id'] = $modelId; // Original modelId
@@ -282,7 +298,6 @@ class SharedStreamService
                     $streamInfo['stream_key'] = $failoverStreamKey;
                     Log::channel('ffmpeg')->info("SharedStream: Successfully failed over to channel {$failoverChannel->id} after " . ($index + 1) . " attempts.");
                     return $streamInfo;
-
                 } catch (\Exception $failoverError) {
                     if ($failoverPlaylist) $this->decrementActiveStreams($failoverPlaylist->id); // Decrement if create failed
                     Log::channel('ffmpeg')->error("SharedStream: Failover channel {$failoverChannel->id} also failed: " . $failoverError->getMessage());
@@ -299,17 +314,17 @@ class SharedStreamService
         // Or if primary was attempted, succeeded, and returned. Or all failovers failed.
         // If $streamInfo is null here and we haven't thrown, it's an issue.
         if (!$streamInfo) {
-             Log::channel('ffmpeg')->error("SharedStream: Reached end of getOrCreateSharedStreamWithFailover without valid streamInfo for model {$modelId}. This should not happen.");
-             throw new \Exception("Failed to get or create a stream for model {$modelId}.");
+            Log::channel('ffmpeg')->error("SharedStream: Reached end of getOrCreateSharedStreamWithFailover without valid streamInfo for model {$modelId}. This should not happen.");
+            throw new \Exception("Failed to get or create a stream for model {$modelId}.");
         }
 
         // If primary was not attempted (e.g. stream already running), just return existing streamInfo
         if (!$primaryAttempted) {
-             Log::channel('ffmpeg')->debug("SharedStream: Client {$clientId} joining existing active stream {$streamKey} (no new attempt needed).");
-             $this->incrementClientCount($streamKey);
-             $this->registerClient($streamKey, $clientId, $options);
-             $streamInfo['is_new_stream'] = false;
-             return $streamInfo;
+            Log::channel('ffmpeg')->debug("SharedStream: Client {$clientId} joining existing active stream {$streamKey} (no new attempt needed).");
+            $this->incrementClientCount($streamKey);
+            $this->registerClient($streamKey, $clientId, $options);
+            $streamInfo['is_new_stream'] = false;
+            return $streamInfo;
         }
 
         // Should have returned or thrown by now if primary was attempted.
@@ -369,8 +384,12 @@ class SharedStreamService
                         }
 
                         SharedStream::where('stream_id', $streamKey)->update([
-                            'status' => 'starting', 'process_id' => $this->getProcessPid($streamKey),
-                            'client_count' => 1, 'started_at' => now(), 'error_message' => null, 'last_client_activity' => now()
+                            'status' => 'starting',
+                            'process_id' => $this->getProcessPid($streamKey),
+                            'client_count' => 1,
+                            'started_at' => now(),
+                            'error_message' => null,
+                            'last_client_activity' => now()
                         ]);
                         Log::channel('ffmpeg')->info("SharedStream: Successfully restarted original stream {$streamKey} for client {$clientId}");
                         $this->registerClient($streamKey, $clientId, $options);
@@ -384,26 +403,28 @@ class SharedStreamService
                     }
                 }
             } else {
-                 Log::channel('ffmpeg')->warning("SharedStream: Primary channel for dead stream {$streamKey} has no effective playlist. Cannot check stream limits for restart.");
-                 // If no playlist, proceed with restart attempt without limit check
-                 try {
-                        if ($streamInfo) {
-                            $streamInfo['status'] = 'starting'; $streamInfo['restart_attempt'] = time();
-                            unset($streamInfo['error_message']); unset($streamInfo['ffmpeg_stderr']);
-                            $this->setStreamInfo($streamKey, $streamInfo);
-                        }
-                        Log::channel('ffmpeg')->info("SharedStream: Stream {$streamKey} (no playlist): Marked as 'starting' before restart.");
-                        if ($streamInfo && $streamInfo['format'] === 'hls') $this->startHLSStream($streamKey, $streamInfo);
-                        elseif ($streamInfo) $this->startDirectStream($streamKey, $streamInfo);
-                        SharedStream::where('stream_id', $streamKey)->update(['status' => 'starting', 'process_id' => $this->getProcessPid($streamKey), 'client_count' => 1, 'started_at' => now(), 'error_message' => null, 'last_client_activity' => now()]);
-                        Log::channel('ffmpeg')->info("SharedStream: Successfully restarted original stream {$streamKey} (no playlist) for client {$clientId}");
-                        $this->registerClient($streamKey, $clientId, $options);
-                        if ($streamInfo) $streamInfo['is_new_stream'] = false;
-                        $restartedOriginal = true;
-                        return $streamInfo ?: $this->getStreamInfo($streamKey);
-                 } catch (\Exception $e) {
-                     Log::channel('ffmpeg')->error("SharedStream: Failed to restart original stream {$streamKey} (no playlist): " . $e->getMessage());
-                 }
+                Log::channel('ffmpeg')->warning("SharedStream: Primary channel for dead stream {$streamKey} has no effective playlist. Cannot check stream limits for restart.");
+                // If no playlist, proceed with restart attempt without limit check
+                try {
+                    if ($streamInfo) {
+                        $streamInfo['status'] = 'starting';
+                        $streamInfo['restart_attempt'] = time();
+                        unset($streamInfo['error_message']);
+                        unset($streamInfo['ffmpeg_stderr']);
+                        $this->setStreamInfo($streamKey, $streamInfo);
+                    }
+                    Log::channel('ffmpeg')->info("SharedStream: Stream {$streamKey} (no playlist): Marked as 'starting' before restart.");
+                    if ($streamInfo && $streamInfo['format'] === 'hls') $this->startHLSStream($streamKey, $streamInfo);
+                    elseif ($streamInfo) $this->startDirectStream($streamKey, $streamInfo);
+                    SharedStream::where('stream_id', $streamKey)->update(['status' => 'starting', 'process_id' => $this->getProcessPid($streamKey), 'client_count' => 1, 'started_at' => now(), 'error_message' => null, 'last_client_activity' => now()]);
+                    Log::channel('ffmpeg')->info("SharedStream: Successfully restarted original stream {$streamKey} (no playlist) for client {$clientId}");
+                    $this->registerClient($streamKey, $clientId, $options);
+                    if ($streamInfo) $streamInfo['is_new_stream'] = false;
+                    $restartedOriginal = true;
+                    return $streamInfo ?: $this->getStreamInfo($streamKey);
+                } catch (\Exception $e) {
+                    Log::channel('ffmpeg')->error("SharedStream: Failed to restart original stream {$streamKey} (no playlist): " . $e->getMessage());
+                }
             }
         }
 
@@ -429,7 +450,7 @@ class SharedStreamService
                         continue;
                     }
                 } else {
-                     Log::channel('ffmpeg')->warning("SharedStream: Failover channel {$failoverChannel->id} for restart has no effective playlist. Cannot check stream limits.");
+                    Log::channel('ffmpeg')->warning("SharedStream: Failover channel {$failoverChannel->id} for restart has no effective playlist. Cannot check stream limits.");
                 }
 
                 try {
@@ -451,7 +472,13 @@ class SharedStreamService
 
                     $failoverStreamKey = $this->getStreamKey($type, $failoverChannel->id, $failoverUrl);
                     $newStreamInfo = $this->createSharedStreamInternal(
-                        $failoverStreamKey, $type, $failoverChannel->id, $failoverUrl, $failoverTitle, $format, $options
+                        $failoverStreamKey,
+                        $type,
+                        $failoverChannel->id,
+                        $failoverUrl,
+                        $failoverTitle,
+                        $format,
+                        $options
                     );
 
                     $newStreamInfo['primary_channel_id'] = $modelId; // original modelId
@@ -464,7 +491,6 @@ class SharedStreamService
 
                     Log::channel('ffmpeg')->info("SharedStream: Successfully failed over (restarted) to channel {$failoverChannel->id}. New stream key: {$failoverStreamKey}");
                     return $newStreamInfo;
-
                 } catch (\Exception $failoverError) {
                     if ($failoverPlaylist) $this->decrementActiveStreams($failoverPlaylist->id);
                     Log::channel('ffmpeg')->error("SharedStream: Failover restart to channel {$failoverChannel->id} failed: " . $failoverError->getMessage());
