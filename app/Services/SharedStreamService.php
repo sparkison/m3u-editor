@@ -485,7 +485,7 @@ class SharedStreamService
         }
         throw new \Exception("Failed to restart stream and all failover channels failed or were skipped.");
     }
-    }
+    // Correctly closing restartStreamWithFailover method here
 
     /**
      * Create a new shared stream (internal method)
