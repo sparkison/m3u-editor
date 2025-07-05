@@ -70,6 +70,9 @@ class HlsStreamService
         // Add to active IDs set for the original model
         Redis::sadd("hls:active_{$type}_ids", $model->id);
 
+        // Keep track of playlists that have exhausted their available streams during this request
+        $exhaustedPlaylistIds = [];
+
         // Loop over the failover channels and grab the first one that works.
         foreach ($streams as $stream) { // $stream is the current primary or failover channel being attempted
             // URL for the current stream being attempted
@@ -85,6 +88,12 @@ class HlsStreamService
 
             // Check if playlist is specified for the current stream
             $playlist = $stream->getEffectivePlaylist();
+
+            // If this stream's playlist is already marked as exhausted for this request, skip it.
+            if (in_array($playlist->id, $exhaustedPlaylistIds)) {
+                Log::channel('ffmpeg')->debug("HLS Stream: Playlist {$playlist->name} ({$playlist->id}) previously marked as exhausted. Skipping channel {$currentStreamTitle} ({$stream->id}).");
+                continue;
+            }
 
             // Make sure we have a valid source channel (using current stream's ID and its playlist ID)
             $badSourceCacheKey = ProxyService::BAD_SOURCE_CACHE_PREFIX . $stream->id . ':' . $playlist->id;
@@ -104,7 +113,11 @@ class HlsStreamService
             if ($this->wouldExceedStreamLimit($playlist->id, $playlist->available_streams, $activeStreams)) {
                 // We're over limit, so decrement and skip
                 $this->decrementActiveStreams($playlist->id);
-                Log::channel('ffmpeg')->debug("Max streams reached for playlist {$playlist->name} ({$playlist->id}). Skipping channel {$currentStreamTitle}.");
+                Log::channel('ffmpeg')->debug("HLS Stream: Max streams reached for playlist {$playlist->name} ({$playlist->id}). Skipping channel {$currentStreamTitle}. Adding playlist to exhausted list for this request.");
+                // Add this playlist to the exhausted list for the current request scope
+                if (!in_array($playlist->id, $exhaustedPlaylistIds)) {
+                    $exhaustedPlaylistIds[] = $playlist->id;
+                }
                 continue;
             }
 
