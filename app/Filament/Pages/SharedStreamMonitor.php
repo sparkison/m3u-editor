@@ -175,11 +175,12 @@ class SharedStreamMonitor extends Page
                 $connectedAt = date('H:i:s', $client['connected_at']);
                 $duration = isset($client['connected_at']) ? now()->diffInSeconds(now()->setTimestamp($client['connected_at'])) : 0;
                 return [
-                    'ip' => $client['options']['ip'],
+                    'ip' => $client['ip_address'],
                     'client_id' => $client['client_id'],
                     'connected_at' => $connectedAt,
-                    'user_agent' => $client['options']['user_agent'] ?? 'Unknown',
+                    'user_agent' => $client['user_agent'] ?? 'Unknown',
                     'duration' => $duration,
+                    'is_active' => $client['status'] === 'connected',
                 ];
             }, $clientInfo);
 

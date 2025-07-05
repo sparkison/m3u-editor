@@ -193,8 +193,8 @@
                                                     <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Client IP</th>
                                                     <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Connected</th>
                                                     <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Duration</th>
-                                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Data Received</th>
-                                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Bandwidth</th>
+                                                    {{-- <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Data Received</th> --}}
+                                                    {{-- <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Bandwidth</th> --}}
                                                     <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                                                 </tr>
                                             </thead>
@@ -206,11 +206,11 @@
                                                         <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ gmdate('H:i:s', $client['duration']) }}</td>
                                                         {{-- <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $client['bytes_received'] }}</td> --}}
                                                         {{-- <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $client['bandwidth'] }}</td> --}}
-                                                        {{-- <td class="px-3 py-2 whitespace-nowrap">
+                                                        <td class="px-3 py-2 whitespace-nowrap">
                                                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $client['is_active'] ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200' }}">
                                                                 {{ $client['is_active'] ? 'Active' : 'Inactive' }}
                                                             </span>
-                                                        </td> --}}
+                                                        </td>
                                                     </tr>
                                                 @endforeach
                                             </tbody>

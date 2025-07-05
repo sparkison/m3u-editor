@@ -24,7 +24,6 @@ class SharedStreamService
     use TracksActiveStreams;
 
     const CACHE_PREFIX = 'shared_stream:';
-    const CLIENT_PREFIX = 'stream_clients:';
     const BUFFER_PREFIX = 'stream_buffer:';
     const STREAM_PREFIX = 'shared_stream:'; // For compatibility with existing code
     const SEGMENT_EXPIRY = 300; // 5 minutes
@@ -630,8 +629,8 @@ class SharedStreamService
      */
     private function getProcessPid(string $streamKey): ?int
     {
-        $pidKey = "stream_pid:{$streamKey}";
-        return $this->redis()->get($pidKey);
+        $sharedStream = SharedStream::where('stream_id', $streamKey)->first();
+        return $sharedStream ? $sharedStream->process_id : null;
     }
 
     /**
@@ -639,14 +638,10 @@ class SharedStreamService
      */
     private function setStreamProcess(string $streamKey, int $pid): void
     {
-        // Store in Redis for quick access
-        $pidKey = "stream_pid:{$streamKey}";
-        $this->redis()->set($pidKey, $pid);
-        
-        // Also store in database for persistence
+        // Store in database for persistence
         SharedStream::where('stream_id', $streamKey)->update(['process_id' => $pid]);
         
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Stored process PID {$pid} in Redis and database");
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Stored process PID {$pid} in database");
     }
 
     /**
@@ -945,49 +940,31 @@ class SharedStreamService
     public function getStreamInfo(string $streamKey): ?array
     {
         try {
-            // First try to get from database (primary source)
+            // Get from database (primary and only source)
             $sharedStream = SharedStream::where('stream_id', $streamKey)->first();
             
-            if ($sharedStream && $sharedStream->stream_info) {
-                // Convert database model to array format expected by the service
-                $streamInfo = $sharedStream->stream_info;
-                
-                // Ensure we have the basic required fields
-                $streamInfo['stream_key'] = $streamKey;
-                $streamInfo['status'] = $sharedStream->status;
-                $streamInfo['pid'] = $sharedStream->process_id;
-                $streamInfo['created_at'] = $sharedStream->started_at ? $sharedStream->started_at->timestamp : time();
-                $streamInfo['last_activity'] = $sharedStream->last_client_activity ? $sharedStream->last_client_activity->timestamp : time();
-                $streamInfo['client_count'] = $sharedStream->client_count ?? 0;
-                
-                return $streamInfo;
+            if (!$sharedStream) {
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: No stream info found in database");
+                return null;
             }
             
-            // Fallback to Redis for backward compatibility during transition
-            $data = $this->redis()->get($streamKey);
-            if ($data === null || $data === false) {
-                Log::channel('ffmpeg')->debug("Stream {$streamKey}: No stream info found in Redis or database");
+            if (!$sharedStream->stream_info) {
+                Log::channel('ffmpeg')->warning("Stream {$streamKey}: Empty stream info data in database");
                 return null;
             }
-
-            if (empty($data)) {
-                Log::channel('ffmpeg')->warning("Stream {$streamKey}: Empty stream info data in Redis");
-                return null;
-            }
-
-            $decoded = json_decode($data, true);
-            if ($decoded === null && json_last_error() !== JSON_ERROR_NONE) {
-                Log::channel('ffmpeg')->error("Stream {$streamKey}: Failed to decode stream info JSON: " . json_last_error_msg() . " (data: " . substr($data, 0, 100) . ")");
-                return null;
-            }
-
-            // Ensure we return an array or null
-            if (!is_array($decoded)) {
-                Log::channel('ffmpeg')->error("Stream {$streamKey}: Stream info is not an array, got: " . gettype($decoded) . " (data: " . substr($data, 0, 100) . ")");
-                return null;
-            }
-
-            return $decoded;
+            
+            // Convert database model to array format expected by the service
+            $streamInfo = $sharedStream->stream_info;
+            
+            // Ensure we have the basic required fields
+            $streamInfo['stream_key'] = $streamKey;
+            $streamInfo['status'] = $sharedStream->status;
+            $streamInfo['pid'] = $sharedStream->process_id;
+            $streamInfo['created_at'] = $sharedStream->started_at ? $sharedStream->started_at->timestamp : time();
+            $streamInfo['last_activity'] = $sharedStream->last_client_activity ? $sharedStream->last_client_activity->timestamp : time();
+            $streamInfo['client_count'] = $sharedStream->client_count ?? 0;
+            
+            return $streamInfo;
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Stream {$streamKey}: Error retrieving stream info: " . $e->getMessage());
             return null;
@@ -995,12 +972,12 @@ class SharedStreamService
     }
 
     /**
-     * Set stream info in SharedStream model (database) with Redis backup
+     * Set stream info in SharedStream model (database only)
      */
     private function setStreamInfo(string $streamKey, array $streamInfo): void
     {
         try {
-            // Update database record first (primary storage)
+            // Update database record (primary and only storage)
             $sharedStream = SharedStream::where('stream_id', $streamKey)->first();
             
             if ($sharedStream) {
@@ -1026,18 +1003,6 @@ class SharedStreamService
                 Log::channel('ffmpeg')->debug("Stream {$streamKey}: Successfully updated stream info in database");
             } else {
                 Log::channel('ffmpeg')->warning("Stream {$streamKey}: No database record found to update stream info");
-            }
-            
-            // Also store in Redis for backward compatibility and quick access
-            $jsonData = json_encode($streamInfo);
-            if ($jsonData === false) {
-                Log::channel('ffmpeg')->error("Stream {$streamKey}: Failed to encode stream info to JSON: " . json_last_error_msg());
-                return;
-            }
-
-            $result = $this->redis()->set($streamKey, $jsonData);
-            if (!$result) {
-                Log::channel('ffmpeg')->error("Stream {$streamKey}: Failed to store stream info in Redis backup");
             }
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Stream {$streamKey}: Error storing stream info: " . $e->getMessage());
@@ -1852,6 +1817,7 @@ class SharedStreamService
         }
 
         // Remove all Redis data related to this stream
+       
         // Use the unique part of the stream identifier (1223568:hash)
         preg_match('/channel:(\d+:[a-f0-9]+)/', $streamKey, $matches);
         $streamIdentifier = $matches[1] ?? str_replace('shared_stream:', '', $streamKey);
@@ -1891,106 +1857,66 @@ class SharedStreamService
         $cleanedClients = 0;
 
         try {
-            // Get all shared stream keys
-            $pattern1 = 'shared_stream:*';
-            $pattern2 = '*shared_stream:*';
+            // Get all shared streams from database
+            $inactiveThreshold = now()->subMinutes(30); // 30 minutes
+            $deadProcessThreshold = now()->subMinutes(5); // 5 minutes for dead processes
 
-            $keys1 = Redis::keys($pattern1);
-            $keys2 = Redis::keys($pattern2);
-            $keys = array_merge($keys1, $keys2);
+            $sharedStreams = SharedStream::all();
 
-            $inactiveThreshold = now()->subMinutes(30)->timestamp; // 30 minutes
-            $deadProcessThreshold = now()->subMinutes(5)->timestamp; // 5 minutes for dead processes
+            foreach ($sharedStreams as $sharedStream) {
+                $streamKey = $sharedStream->stream_id;
+                $shouldCleanup = false;
 
-            foreach ($keys as $key) {
-                // Only process main stream info keys, not buffer/PID keys
-                if (
-                    !str_contains($key, ':segment_') &&
-                    !str_contains($key, 'stream_buffer:') &&
-                    !str_contains($key, 'stream_pid:') &&
-                    !str_contains($key, 'bandwidth:')
-                ) {
+                Log::info("Processing stream for cleanup: {$streamKey}");
 
-                    $streamKey = str_replace([
-                        config('database.redis.options.prefix', ''),
-                        'shared_stream:'
-                    ], '', $key);
+                // Check if stream is inactive
+                if ($sharedStream->last_client_activity && $sharedStream->last_client_activity < $inactiveThreshold) {
+                    Log::info("Stream {$streamKey} inactive since " . $sharedStream->last_client_activity->format('Y-m-d H:i:s'));
+                    $shouldCleanup = true;
+                }
 
-                    Log::info("Processing stream key for cleanup: {$streamKey} (from Redis key: {$key})");
+                // Check if process is dead
+                if ($sharedStream->process_id && !$this->isProcessRunning($sharedStream->process_id) && 
+                    $sharedStream->last_client_activity && $sharedStream->last_client_activity < $deadProcessThreshold) {
+                    Log::info("Stream {$streamKey} has dead process (PID: {$sharedStream->process_id})");
+                    $shouldCleanup = true;
+                }
 
-                    $redisData = Redis::get($key);
-                    $streamData = $redisData ? json_decode($redisData, true) : null;
+                // Check if status indicates error or stopped
+                if (in_array($sharedStream->status, ['error', 'stopped'])) {
+                    Log::info("Stream {$streamKey} has status: {$sharedStream->status}");
+                    $shouldCleanup = true;
+                }
 
-                    if (!$streamData) {
-                        Log::info("No stream data found for key: {$key}");
-                        continue;
+                if ($shouldCleanup) {
+                    // Count clients before cleanup
+                    $clientCount = SharedStreamClient::where('stream_id', $streamKey)->count();
+                    $cleanedClients += $clientCount;
+
+                    // Cleanup the stream
+                    $this->cleanupStream($streamKey, true);
+                    $cleanedStreams++;
+
+                    Log::info("Cleaned up inactive stream: {$streamKey}");
+                } else {
+                    // Clean up disconnected clients for active streams
+                    $inactiveClients = SharedStreamClient::where('stream_id', $streamKey)
+                        ->where('last_activity', '<', $inactiveThreshold)
+                        ->get();
+
+                    foreach ($inactiveClients as $client) {
+                        $client->delete();
+                        $cleanedClients++;
+                        Log::info("Removed inactive client {$client->client_id} from stream {$streamKey}");
                     }
 
-                    Log::info("Stream data found for {$streamKey}, status: " . ($streamData['status'] ?? 'unknown'));
-
-                    $shouldCleanup = false;
-                    $lastActivity = $streamData['last_activity'] ??     0;
-                    $status = $streamData['status'] ?? 'unknown';
-
-                    // Check if stream is inactive
-                    if ($lastActivity < $inactiveThreshold) {
-                        Log::info("Stream {$streamKey} inactive since " . date('Y-m-d H:i:s', $lastActivity));
-                        $shouldCleanup = true;
-                    }
-
-                    // Check if process is dead
-                    $pid = $this->getProcessPid($streamKey);
-                    if ($pid && !$this->isProcessRunning($pid) && $lastActivity < $deadProcessThreshold) {
-                        Log::info("Stream {$streamKey} has dead process (PID: {$pid})");
-                        $shouldCleanup = true;
-                    }
-
-                    // Check if status indicates error or stopped
-                    if (in_array($status, ['error', 'stopped'])) {
-                        Log::info("Stream {$streamKey} has status: {$status}");
-                        $shouldCleanup = true;
-                    }
-
-                    if ($shouldCleanup) {
-                        // Count clients before cleanup
-                        $clientKey = self::CLIENT_PREFIX . $streamKey;
-                        $clients = Redis::hgetall($clientKey);
-                        $cleanedClients += count($clients);
-
-                        // Cleanup the stream
-                        $this->cleanupStream($streamKey, true);
-                        $cleanedStreams++;
-
-                        Log::info("Cleaned up inactive stream: {$streamKey}");
-                    } else {
-                        // Clean up disconnected clients for active streams
-                        $clientKey = self::CLIENT_PREFIX .  $streamKey;
-                        $clients = Redis::hgetall($clientKey);
-
-                        foreach ($clients as $clientId => $clientDataJson) {
-                            $clientData = $clientDataJson ? json_decode($clientDataJson, true) : null;
-                            if (!$clientData) {
-                                continue;
-                            }
-                            $clientLastActivity = $clientData['last_activity'] ??  0;
-
-                            if ($clientLastActivity < $inactiveThreshold) {
-                                Redis::hdel($clientKey, $clientId);
-                                $cleanedClients++;
-                                Log::info("Removed inactive client {$clientId} from stream {$streamKey}");
-                            }
-                        }
-
-                        // Update stream client count
-                        $remainingClients = Redis::hlen($clientKey);
-                        $streamData['client_count'] = $remainingClients;
-                        $this->setStreamInfo($streamKey, $streamData);
-
-                        // Update database
-                        SharedStream::where('stream_id', $streamKey)
-                            ->update(['client_count' => $remainingClients]);
-                    }
-                } // Close the if block for filtering keys
+                    // Update stream client count
+                    $remainingClients = SharedStreamClient::where('stream_id', $streamKey)
+                        ->where('status', 'connected')
+                        ->count();
+                    
+                    $sharedStream->update(['client_count' => $remainingClients]);
+                }
             }
 
             Log::info("Cleanup completed: {$cleanedStreams} streams, {$cleanedClients} clients");
@@ -2221,56 +2147,49 @@ class SharedStreamService
      */
     private function migrateClients(string $oldStreamKey, string $newStreamKey): void
     {
-        $clientKeysPattern = self::CLIENT_PREFIX . $oldStreamKey . ':*';
-        $clientKeys = $this->redis()->keys($clientKeysPattern);
+        // Get clients from database instead of Redis
+        $clients = SharedStreamClient::where('stream_id', $oldStreamKey)
+            ->where('status', 'connected')
+            ->get();
 
-        if (empty($clientKeys)) {
+        if ($clients->isEmpty()) {
             return;
         }
 
         $migratedCount = 0;
-        Log::channel('ffmpeg')->info("Migrating " . count($clientKeys) . " clients from {$oldStreamKey} to {$newStreamKey}");
+        Log::channel('ffmpeg')->info("Migrating " . $clients->count() . " clients from {$oldStreamKey} to {$newStreamKey}");
 
-        foreach ($clientKeys as $oldClientKey) {
-            $clientDataJson = $this->redis()->get($oldClientKey);
-            if ($clientDataJson) {
-                $clientData = json_decode($clientDataJson, true);
-                $clientId = $clientData['client_id'] ?? last(explode(':', $oldClientKey));
+        foreach ($clients as $client) {
+            // Register client with the new stream
+            $this->registerClient($newStreamKey, $client->client_id, $client->options ?? []);
 
-                // Register client with the new stream
-                $this->registerClient($newStreamKey, $clientId, $clientData['options'] ?? []);
-
-                // Increment client count on the new stream
-                $this->incrementClientCount($newStreamKey);
-
-                // Remove client from the old stream's client list
-                $this->redis()->del($oldClientKey);
-                $migratedCount++;
-            }
+            // Remove client from the old stream
+            $client->delete();
+            $migratedCount++;
         }
 
-        // Decrement client count on the old stream in both Redis and DB
+        // Update client counts in the database
         if ($migratedCount > 0) {
-            $oldStreamInfo = $this->getStreamInfo($oldStreamKey);
-            if ($oldStreamInfo) {
-                $newCount = max(0, ($oldStreamInfo['client_count'] ?? 0) - $migratedCount);
-                $oldStreamInfo['client_count'] = $newCount;
-                if ($newCount === 0) {
-                    $oldStreamInfo['clientless_since'] = now()->timestamp;
-                }
-                $this->setStreamInfo($oldStreamKey, $oldStreamInfo);
+            // Update old stream client count
+            $oldStreamClientCount = SharedStreamClient::where('stream_id', $oldStreamKey)
+                ->where('status', 'connected')
+                ->count();
+            
+            SharedStream::where('stream_id', $oldStreamKey)->update([
+                'client_count' => $oldStreamClientCount
+            ]);
 
-                // Update database for old stream
-                SharedStream::where('stream_id', $oldStreamKey)->update([
-                    'client_count' => $newCount
-                ]);
-            }
+            // Update new stream client count
+            $newStreamClientCount = SharedStreamClient::where('stream_id', $newStreamKey)
+                ->where('status', 'connected')
+                ->count();
+            
+            SharedStream::where('stream_id', $newStreamKey)->update([
+                'client_count' => $newStreamClientCount
+            ]);
+
+            Log::channel('ffmpeg')->info("Updated client count for failover stream {$newStreamKey} to {$newStreamClientCount}");
         }
-
-        // Update the client count in the database for the failover stream
-        $clientCount = count($clientKeys);
-        SharedStream::where('stream_id', $newStreamKey)->update(['client_count' => $clientCount]);
-        Log::channel('ffmpeg')->info("Updated client count for failover stream {$newStreamKey} to {$clientCount}");
     }
 
 
@@ -2620,10 +2539,10 @@ class SharedStreamService
      */
     public function getClientCount(string $streamId): int
     {
-        // Count individual client keys
-        $pattern = self::CLIENT_PREFIX . $streamId;
-        $clientKeys = Redis::hgetall($pattern);
-        return count($clientKeys);
+        // Count clients from database
+        return SharedStreamClient::where('stream_id', $streamId)
+            ->where('status', 'connected')
+            ->count();
     }
 
     /**
@@ -2800,39 +2719,41 @@ class SharedStreamService
      */
     private function migrateClientsToFailoverStream(string $originalStreamKey, string $failoverStreamKey): void
     {
-        // Get all client keys for the original stream
-        $clientKeys = $this->redis()->keys(self::CLIENT_PREFIX . $originalStreamKey . ':*');
+        // Get all clients for the original stream from database
+        $clients = SharedStreamClient::where('stream_id', $originalStreamKey)
+            ->where('status', 'connected')
+            ->get();
 
-        if (empty($clientKeys)) {
+        if ($clients->isEmpty()) {
             return;
         }
 
-        Log::channel('ffmpeg')->info("Migrating " . count($clientKeys) . " clients from {$originalStreamKey} to {$failoverStreamKey}");
+        Log::channel('ffmpeg')->info("Migrating " . $clients->count() . " clients from {$originalStreamKey} to {$failoverStreamKey}");
 
-        foreach ($clientKeys as $clientKey) {
-            // Extract client ID from key
-            $clientId = substr($clientKey, strlen(self::CLIENT_PREFIX . $originalStreamKey . ':'));
+        foreach ($clients as $client) {
+            // Register client with the failover stream
+            $this->registerClient($failoverStreamKey, $client->client_id, $client->options ?? []);
 
-            // Get client data
-            $clientData = $this->redis()->hgetall($clientKey);
+            // Remove client from the original stream
+            $client->delete();
 
-            if (!empty($clientData)) {
-                // Create new client key for failover stream
-                $newClientKey = self::CLIENT_PREFIX . $failoverStreamKey . ':' . $clientId;
-                $this->redis()->hmset($newClientKey, $clientData);
-                //$this->redis()->expire($newClientKey, $this->getClientTimeoutResolved());
-
-                // Remove old client key
-                $this->redis()->del($clientKey);
-
-                Log::channel('ffmpeg')->debug("Migrated client {$clientId} from {$originalStreamKey} to {$failoverStreamKey}");
-            }
+            Log::channel('ffmpeg')->debug("Migrated client {$client->client_id} from {$originalStreamKey} to {$failoverStreamKey}");
         }
 
-        // Update the client count in the database for the failover stream
-        $clientCount = count($clientKeys);
-        SharedStream::where('stream_id', $failoverStreamKey)->update(['client_count' => $clientCount]);
-        Log::channel('ffmpeg')->info("Updated client count for failover stream {$failoverStreamKey} to {$clientCount}");
+        // Update the client count in the database for both streams
+        $failoverClientCount = SharedStreamClient::where('stream_id', $failoverStreamKey)
+            ->where('status', 'connected')
+            ->count();
+        
+        SharedStream::where('stream_id', $failoverStreamKey)->update(['client_count' => $failoverClientCount]);
+        
+        $originalClientCount = SharedStreamClient::where('stream_id', $originalStreamKey)
+            ->where('status', 'connected')
+            ->count();
+        
+        SharedStream::where('stream_id', $originalStreamKey)->update(['client_count' => $originalClientCount]);
+        
+        Log::channel('ffmpeg')->info("Updated client count for failover stream {$failoverStreamKey} to {$failoverClientCount}");
     }
 
     /**
@@ -2891,6 +2812,7 @@ class SharedStreamService
             // Check if there's an active failover redirect for this stream
             $failoverKey = "stream_failover_redirect:{$streamKey}";
             $redirectStreamKey = $this->redis()->get($failoverKey);
+
             if ($redirectStreamKey) {
                 Log::channel('ffmpeg')->debug("Stream {$streamKey}: Found failover redirect to {$redirectStreamKey}");
                 // Check if the redirect target is actually active 
