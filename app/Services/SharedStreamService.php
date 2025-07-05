@@ -7,6 +7,7 @@ use App\Models\Episode;
 use App\Models\SharedStream;
 use App\Models\SharedStreamClient;
 use App\Traits\TracksActiveStreams;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
@@ -375,7 +376,7 @@ class SharedStreamService
                 'status' => 'starting',
                 'client_count' => 1, // Set initial client count
                 'last_client_activity' => now(),
-                'stream_info' => json_encode($streamInfo),
+                'stream_info' => $streamInfo, // Store as array, model will cast to JSON
                 'started_at' => now()
             ]
         );
@@ -638,9 +639,14 @@ class SharedStreamService
      */
     private function setStreamProcess(string $streamKey, int $pid): void
     {
+        // Store in Redis for quick access
         $pidKey = "stream_pid:{$streamKey}";
         $this->redis()->set($pidKey, $pid);
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Stored process PID {$pid} in Redis");
+        
+        // Also store in database for persistence
+        SharedStream::where('stream_id', $streamKey)->update(['process_id' => $pid]);
+        
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Stored process PID {$pid} in Redis and database");
     }
 
     /**
@@ -934,14 +940,33 @@ class SharedStreamService
     }
 
     /**
-     * Get stream info from Redis
+     * Get stream info from SharedStream model (database) with Redis fallback
      */
     public function getStreamInfo(string $streamKey): ?array
     {
         try {
+            // First try to get from database (primary source)
+            $sharedStream = SharedStream::where('stream_id', $streamKey)->first();
+            
+            if ($sharedStream && $sharedStream->stream_info) {
+                // Convert database model to array format expected by the service
+                $streamInfo = $sharedStream->stream_info;
+                
+                // Ensure we have the basic required fields
+                $streamInfo['stream_key'] = $streamKey;
+                $streamInfo['status'] = $sharedStream->status;
+                $streamInfo['pid'] = $sharedStream->process_id;
+                $streamInfo['created_at'] = $sharedStream->started_at ? $sharedStream->started_at->timestamp : time();
+                $streamInfo['last_activity'] = $sharedStream->last_client_activity ? $sharedStream->last_client_activity->timestamp : time();
+                $streamInfo['client_count'] = $sharedStream->client_count ?? 0;
+                
+                return $streamInfo;
+            }
+            
+            // Fallback to Redis for backward compatibility during transition
             $data = $this->redis()->get($streamKey);
             if ($data === null || $data === false) {
-                Log::channel('ffmpeg')->debug("Stream {$streamKey}: No stream info found in Redis");
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: No stream info found in Redis or database");
                 return null;
             }
 
@@ -962,8 +987,6 @@ class SharedStreamService
                 return null;
             }
 
-            // This log can be very verbose as getStreamInfo is called frequently.
-            // Log::channel('ffmpeg')->debug("Stream {$streamKey}: Successfully retrieved stream info from Redis (" . strlen($data) . " bytes)");
             return $decoded;
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Stream {$streamKey}: Error retrieving stream info: " . $e->getMessage());
@@ -972,11 +995,40 @@ class SharedStreamService
     }
 
     /**
-     * Set stream info in Redis
+     * Set stream info in SharedStream model (database) with Redis backup
      */
     private function setStreamInfo(string $streamKey, array $streamInfo): void
     {
         try {
+            // Update database record first (primary storage)
+            $sharedStream = SharedStream::where('stream_id', $streamKey)->first();
+            
+            if ($sharedStream) {
+                // Update existing record
+                $updateData = [
+                    'status' => $streamInfo['status'] ?? $sharedStream->status,
+                    'stream_info' => $streamInfo,
+                    'last_client_activity' => isset($streamInfo['last_activity']) ? 
+                        Carbon::createFromTimestamp($streamInfo['last_activity']) : 
+                        $sharedStream->last_client_activity,
+                ];
+                
+                if (isset($streamInfo['pid'])) {
+                    $updateData['process_id'] = $streamInfo['pid'];
+                }
+                
+                if (isset($streamInfo['client_count'])) {
+                    $updateData['client_count'] = $streamInfo['client_count'];
+                }
+                
+                $sharedStream->update($updateData);
+                
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Successfully updated stream info in database");
+            } else {
+                Log::channel('ffmpeg')->warning("Stream {$streamKey}: No database record found to update stream info");
+            }
+            
+            // Also store in Redis for backward compatibility and quick access
             $jsonData = json_encode($streamInfo);
             if ($jsonData === false) {
                 Log::channel('ffmpeg')->error("Stream {$streamKey}: Failed to encode stream info to JSON: " . json_last_error_msg());
@@ -985,10 +1037,7 @@ class SharedStreamService
 
             $result = $this->redis()->set($streamKey, $jsonData);
             if (!$result) {
-                Log::channel('ffmpeg')->error("Stream {$streamKey}: Failed to store stream info in Redis");
-            } else {
-                // This log can be verbose. Success is implicit if no error is thrown.
-                // Log::channel('ffmpeg')->debug("Stream {$streamKey}: Successfully stored stream info in Redis (" . strlen($jsonData) . " bytes)");
+                Log::channel('ffmpeg')->error("Stream {$streamKey}: Failed to store stream info in Redis backup");
             }
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Stream {$streamKey}: Error storing stream info: " . $e->getMessage());
@@ -1186,46 +1235,51 @@ class SharedStreamService
     public function getAllActiveStreams(): array
     {
         try {
-            $redis = $this->redis();
             $streams = [];
 
-            // Get all stream keys from Redis - need to include the Redis database prefix in the pattern
-            $redisPrefix = config('database.redis.options.prefix', '');
-            $pattern = $redisPrefix . self::CACHE_PREFIX . '*';
-            $streamKeys = $redis->keys($pattern);
+            // Primary source: Get from database (more reliable and persistent)
+            $activeStreams = SharedStream::active()->get();
+            
+            foreach ($activeStreams as $sharedStream) {
+                $streamKey = $sharedStream->stream_id;
+                
+                // Get client count from Redis (still stored there for real-time access)
+                $clientSearchKey = self::CLIENT_PREFIX . $streamKey;
+                $clientKeys = $this->redis()->keys($clientSearchKey . ':*');
+                $clientCount = is_array($clientKeys) ? count($clientKeys) : 0;
 
-            // Ensure we have an array before foreach
-            if (is_array($streamKeys)) {
-                foreach ($streamKeys as $fullKey) {
-                    // Extract clean stream key by removing both the Redis database prefix and our cache prefix
-                    $cleanFullKey = str_replace($redisPrefix, '', $fullKey);
-                    $streamKey = str_replace(self::CACHE_PREFIX, '', $cleanFullKey);
-                    $streamInfo = $this->getStreamInfo($cleanFullKey); // Use the key without Redis prefix for getStreamInfo
+                // Calculate uptime
+                $uptime = $sharedStream->started_at ? 
+                    now()->diffInSeconds($sharedStream->started_at) : 0;
 
-                    if ($streamInfo && in_array($streamInfo['status'] ?? '', ['active', 'starting'])) {
-                        // Get client count from Redis client keys - use the full key pattern for client search
-                        $clientSearchKey = $cleanFullKey; // This already has the cache prefix but not the Redis prefix
-                        $clientKeys = $redis->keys($redisPrefix . self::CLIENT_PREFIX . $clientSearchKey . ':*');
-                        $clientCount = is_array($clientKeys) ? count($clientKeys) : 0;
+                // Get stream info from model
+                $streamInfo = $sharedStream->stream_info ?: [];
+                $streamInfo['stream_key'] = $streamKey;
+                $streamInfo['status'] = $sharedStream->status;
+                $streamInfo['pid'] = $sharedStream->process_id;
+                $streamInfo['created_at'] = $sharedStream->started_at ? $sharedStream->started_at->timestamp : null;
+                $streamInfo['last_activity'] = $sharedStream->last_client_activity ? $sharedStream->last_client_activity->timestamp : null;
 
-                        // Calculate uptime
-                        $uptime = (time() - ($streamInfo['created_at'] ?? time()));
-
-                        $streams[$streamKey] = [
-                            'stream_info' => $streamInfo,
-                            'client_count' => $clientCount,
-                            'uptime' => $uptime,
-                            'last_activity' => $streamInfo['last_activity'] ?? time()
-                        ];
-                    }
+                $streams[$streamKey] = [
+                    'stream_info' => $streamInfo,
+                    'client_count' => $clientCount,
+                    'last_activity' => $sharedStream->last_client_activity ? $sharedStream->last_client_activity->timestamp : null,
+                    'uptime' => $uptime
+                ];
+                
+                // Update client count in database if it differs
+                if ($sharedStream->client_count !== $clientCount) {
+                    $sharedStream->update(['client_count' => $clientCount]);
                 }
             }
 
+            Log::channel('ffmpeg')->debug("getAllActiveStreams: Returning " . count($streams) . " active streams from database");
             return $streams;
+            
         } catch (\Exception $e) {
-            Log::channel('ffmpeg')->error("Error getting all active streams: " . $e->getMessage());
-            return [];
+            Log::channel('ffmpeg')->error("Error getting active streams: " . $e->getMessage());
         }
+        return [];
     }
 
     /**
@@ -1679,8 +1733,6 @@ class SharedStreamService
     private function updateStreamActivity(string $streamKey): void
     {
         $streamInfo = $this->getStreamInfo($streamKey);
-        $data = Redis::get($streamKey);
-        $streamInfo = json_decode($data, true) ?? null;
 
         if ($streamInfo) {
             Log::channel('ffmpeg')->debug(">>>>> Updating stream activity for {$streamKey}");
@@ -2407,7 +2459,7 @@ class SharedStreamService
                 'status' => 'starting',
                 'client_count' => 1, // Start with 1 since we have the initial client
                 'last_client_activity' => now(),
-                'stream_info' => json_encode($streamInfo),
+                'stream_info' => $streamInfo, // Store as array, model will cast to JSON
                 'started_at' => now()
             ]);
 

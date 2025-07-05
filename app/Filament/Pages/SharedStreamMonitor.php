@@ -166,7 +166,7 @@ class SharedStreamMonitor extends Page
         return $streams->map(function ($stream) {
             $recentStats = $stream->recentStats(5)->first();
             $clientInfo = $this->sharedStreamService->getClients($stream->stream_id);
-            $streamInfo = json_decode($stream->stream_info, true);
+            $streamInfo = $stream->stream_info;
             $model = $streamInfo['type'] === 'episode'
                 ? Episode::find($streamInfo['model_id'])
                 : Channel::find($streamInfo['model_id']);
