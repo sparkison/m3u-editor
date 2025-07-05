@@ -2733,7 +2733,7 @@ class SharedStreamService
                 // Create new client key for failover stream
                 $newClientKey = self::CLIENT_PREFIX . $failoverStreamKey . ':' . $clientId;
                 $this->redis()->hmset($newClientKey, $clientData);
-                $this->redis()->expire($newClientKey, $this->getClientTimeoutResolved());
+                //$this->redis()->expire($newClientKey, $this->getClientTimeoutResolved());
 
                 // Remove old client key
                 $this->redis()->del($clientKey);
