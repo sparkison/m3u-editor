@@ -1077,16 +1077,21 @@ class SharedStreamService
     }
 
     /**
-     * Increment client count for a stream
+     * Increment client count for a stream using database count
      */
     private function incrementClientCount(string $streamKey): void
     {
         $lock = Cache::lock('lock:stream_info_client_count:' . $streamKey, 10); // Lock for 10 seconds
         if ($lock->get()) {
             try {
+                // Get actual client count from database
+                $activeClientCount = SharedStreamClient::where('stream_id', $streamKey)
+                    ->where('status', 'connected')
+                    ->count();
+
                 $streamInfo = $this->getStreamInfo($streamKey);
                 if ($streamInfo) {
-                    $streamInfo['client_count'] = ($streamInfo['client_count'] ?? 0) + 1;
+                    $streamInfo['client_count'] = $activeClientCount;
                     $streamInfo['last_client_activity'] = now()->timestamp;
                     // If a client is joining, it's definitely not clientless anymore
                     unset($streamInfo['clientless_since']);
@@ -1094,10 +1099,10 @@ class SharedStreamService
 
                     SharedStream::where('stream_id', $streamKey)->update([
                         'status' => 'active', // Ensure status is active on client join
-                        'client_count' => $streamInfo['client_count'],
+                        'client_count' => $activeClientCount,
                     ]);
 
-                    Log::channel('ffmpeg')->debug("Incremented client count for {$streamKey} to {$streamInfo['client_count']}. Unset clientless_since if present.");
+                    Log::channel('ffmpeg')->debug("Updated client count for {$streamKey} to {$activeClientCount} from database. Unset clientless_since if present.");
                 }
             } finally {
                 $lock->release();
@@ -1119,21 +1124,29 @@ class SharedStreamService
         $lock = Cache::lock('lock:stream_info_client_count:' . $streamKey, 10); // Lock for 10 seconds
         if ($lock->get()) {
             try {
-                // Remove client from Redis (individual client key)
-                $clientKey = self::CLIENT_PREFIX . $streamKey . ':' . $clientId;
-                $this->redis()->del($clientKey);
+                // Remove client from database (disconnect client)
+                $clientRemoved = SharedStreamClient::where('stream_id', $streamKey)
+                    ->where('client_id', $clientId)
+                    ->update(['status' => 'disconnected']);
+
+                if (!$clientRemoved) {
+                    Log::channel('ffmpeg')->warning("Client {$clientId} not found in database for stream {$streamKey}");
+                }
+
+                // Get current active client count from database
+                $activeClientCount = SharedStreamClient::where('stream_id', $streamKey)
+                    ->where('status', 'connected')
+                    ->count();
 
                 // Update stream info
                 $streamInfo = $this->getStreamInfo($streamKey);
                 if ($streamInfo) {
-                    $currentCount = $streamInfo['client_count'] ?? 0;
                     $playlistId = $streamInfo['options']['playlist_id'] ?? null;
-                    $newCount = max(0, $currentCount - 1); // Ensure count doesn't go negative
-                    $streamInfo['client_count'] = $newCount;
+                    $streamInfo['client_count'] = $activeClientCount;
                     $streamInfo['last_client_activity'] = now()->timestamp;
 
                     // If no clients left, mark when it became clientless
-                    if ($newCount === 0) {
+                    if ($activeClientCount === 0) {
                         $streamInfo['clientless_since'] = now()->timestamp;
                         Log::channel('ffmpeg')->info("Stream {$streamKey} now has no clients. Starting cleanup process.");
 
@@ -1167,10 +1180,10 @@ class SharedStreamService
 
                         // Update database client count
                         SharedStream::where('stream_id', $streamKey)->update([
-                            'client_count' => $newCount,
+                            'client_count' => $activeClientCount,
                         ]);
 
-                        Log::channel('ffmpeg')->debug("Decremented client count for {$streamKey} to {$newCount}. Client {$clientId} removed.");
+                        Log::channel('ffmpeg')->debug("Decremented client count for {$streamKey} to {$activeClientCount}. Client {$clientId} removed.");
                     }
                 }
             } finally {
@@ -1182,25 +1195,29 @@ class SharedStreamService
     }
 
     /**
-     * Get all clients for a specific stream
+     * Get all clients for a specific stream from database
      */
     public function getClients(string $streamKey): array
     {
         try {
-            $pattern = self::CLIENT_PREFIX . $streamKey . ':*';
-            $clientKeys = $this->redis()->keys($pattern);
-            $clients = [];
-            foreach ($clientKeys as $key) {
-                $clientData = $this->redis()->get($key);
-                if ($clientData) {
-                    $clientInfo = json_decode($clientData, true);
-                    if (is_array($clientInfo)) {
-                        $clients[] = $clientInfo;
-                    } else {
-                        Log::channel('ffmpeg')->error("Invalid client data for {$key}: " . json_last_error_msg());
-                    }
-                }
-            }
+            $clients = SharedStreamClient::where('stream_id', $streamKey)
+                ->where('status', 'connected')
+                ->get()
+                ->map(function ($client) {
+                    return [
+                        'client_id' => $client->client_id,
+                        'connected_at' => $client->connected_at->timestamp,
+                        'last_activity' => $client->last_activity_at->timestamp,
+                        'last_client_activity' => $client->last_activity_at->timestamp,
+                        'ip_address' => $client->ip_address,
+                        'user_agent' => $client->user_agent,
+                        'bytes_received' => $client->bytes_received,
+                        'status' => $client->status
+                    ];
+                })
+                ->toArray();
+
+            Log::channel('ffmpeg')->debug("getClients: Retrieved " . count($clients) . " clients for stream '{$streamKey}' from database");
             return $clients;
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Error retrieving clients for {$streamKey}: " . $e->getMessage());
@@ -1209,18 +1226,35 @@ class SharedStreamService
     }
 
     /**
-     * Register a client for a stream
+     * Register a client for a stream in database
      */
     private function registerClient(string $streamKey, string $clientId, array $options = []): void
     {
-        $clientKey = self::CLIENT_PREFIX . $streamKey . ':' . $clientId;
-        $clientInfo = [
-            'client_id' => $clientId,
-            'connected_at' => now()->timestamp,
-            'last_client_activity' => now()->timestamp,
-            'options' => $options
-        ];
-        $this->redis()->set($clientKey, json_encode($clientInfo));
+        try {
+            // Extract client info from options or request
+            $ipAddress = $options['ip_address'] ?? request()->ip() ?? 'unknown';
+            $userAgent = $options['user_agent'] ?? request()->userAgent() ?? 'unknown';
+
+            // Create or update client record
+            SharedStreamClient::updateOrCreate(
+                [
+                    'stream_id' => $streamKey,
+                    'client_id' => $clientId
+                ],
+                [
+                    'ip_address' => $ipAddress,
+                    'user_agent' => $userAgent,
+                    'connected_at' => now(),
+                    'last_activity_at' => now(),
+                    'bytes_received' => 0,
+                    'status' => 'connected'
+                ]
+            );
+
+            Log::channel('ffmpeg')->debug("Registered client {$clientId} for stream {$streamKey} in database");
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error registering client {$clientId} for stream {$streamKey}: " . $e->getMessage());
+        }
     }
 
     private function getClientTimeoutResolved(): int
@@ -1243,10 +1277,10 @@ class SharedStreamService
             foreach ($activeStreams as $sharedStream) {
                 $streamKey = $sharedStream->stream_id;
                 
-                // Get client count from Redis (still stored there for real-time access)
-                $clientSearchKey = self::CLIENT_PREFIX . $streamKey;
-                $clientKeys = $this->redis()->keys($clientSearchKey . ':*');
-                $clientCount = is_array($clientKeys) ? count($clientKeys) : 0;
+                // Get client count from database (authoritative source)
+                $clientCount = SharedStreamClient::where('stream_id', $streamKey)
+                    ->where('status', 'connected')
+                    ->count();
 
                 // Calculate uptime
                 $uptime = $sharedStream->started_at ? 
@@ -1257,13 +1291,13 @@ class SharedStreamService
                 $streamInfo['stream_key'] = $streamKey;
                 $streamInfo['status'] = $sharedStream->status;
                 $streamInfo['pid'] = $sharedStream->process_id;
-                $streamInfo['created_at'] = $sharedStream->started_at ? $sharedStream->started_at->timestamp : null;
-                $streamInfo['last_activity'] = $sharedStream->last_client_activity ? $sharedStream->last_client_activity->timestamp : null;
+                $streamInfo['created_at'] = $sharedStream->started_at ? $sharedStream->started_at->timestamp : time();
+                $streamInfo['last_activity'] = $sharedStream->last_client_activity ? $sharedStream->last_client_activity->timestamp : time();
 
                 $streams[$streamKey] = [
                     'stream_info' => $streamInfo,
                     'client_count' => $clientCount,
-                    'last_activity' => $sharedStream->last_client_activity ? $sharedStream->last_client_activity->timestamp : null,
+                    'last_activity' => $sharedStream->last_client_activity ? $sharedStream->last_client_activity->timestamp : time(),
                     'uptime' => $uptime
                 ];
                 
@@ -1745,22 +1779,23 @@ class SharedStreamService
     }
 
     /**
-     * Update client activity timestamp
+     * Update client activity timestamp in database
      */
     private function updateClientActivity(string $streamKey, string $clientId): void
     {
-        $clientKey = self::CLIENT_PREFIX . $streamKey;
-        $clientData = Redis::hget($clientKey, $clientId);
+        try {
+            $updated = SharedStreamClient::where('stream_id', $streamKey)
+                ->where('client_id', $clientId)
+                ->where('status', 'connected')
+                ->update(['last_activity_at' => now()]);
 
-        if ($clientData) {
-            Log::channel('ffmpeg')->debug(">>>>> Updating client activity for {$streamKey} - client ID: {$clientId}");
-
-            $clientInfo = json_decode($clientData, true);
-            $clientInfo['last_activity'] = now()->timestamp;
-            $clientInfo['last_client_activity'] = now()->timestamp;
-            Redis::hset($clientKey, $clientId, json_encode($clientInfo));
-        } else {
-            Log::channel('ffmpeg')->warning("Stream {$streamKey}: No client data found for client ID {$clientId} to update activity timestamp");
+            if ($updated) {
+                Log::channel('ffmpeg')->debug(">>>>> Updating client activity for {$streamKey} - client ID: {$clientId}");
+            } else {
+                Log::channel('ffmpeg')->warning("Stream {$streamKey}: No active client found for client ID {$clientId} to update activity timestamp");
+            }
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error updating client activity for {$streamKey} client {$clientId}: " . $e->getMessage());
         }
     }
 
