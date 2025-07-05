@@ -1347,7 +1347,7 @@ class SharedStreamService
     {
         try {
             // Extract client info from options or request
-            $ipAddress = $options['ip_address'] ?? request()->ip() ?? 'unknown';
+            $ipAddress = $options['ip_address'] ?? request()->headers->get('X-Forwarded-For', request()->ip() ?? 'unknown');
             $userAgent = $options['user_agent'] ?? request()->userAgent() ?? 'unknown';
 
             // Create or update client record
