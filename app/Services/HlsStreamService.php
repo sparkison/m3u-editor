@@ -502,12 +502,16 @@ class HlsStreamService
         }
         File::deleteDirectory($storageDir);
 
-        // Decrement active streams count if we have the model and playlist
-        if ($model) {
+        // Decrement active streams count only if a process was actually running
+        // and we have the model and playlist
+        if ($wasRunning && $model) {
             $playlist = $model->getEffectivePlaylist();
             if ($playlist) {
                 $this->decrementActiveStreams($playlist->id);
+                Log::channel('ffmpeg')->debug("Decremented active stream count for playlist {$playlist->id} as stream {$type} ID {$id} was running and is now stopped.");
             }
+        } elseif (!$wasRunning && $model && $model->getEffectivePlaylist()) {
+            Log::channel('ffmpeg')->debug("Did NOT decrement active stream count for playlist {$model->getEffectivePlaylist()->id} as stream {$type} ID {$id} was not running when stop was attempted.");
         }
 
         // Clean up any stream mappings that point to this stopped stream
