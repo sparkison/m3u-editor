@@ -7,6 +7,7 @@ use App\Models\Channel;
 use App\Models\Episode;
 use App\Exceptions\SourceNotResponding;
 use App\Exceptions\FatalStreamContentException; // Added
+use App\Exceptions\AllPlaylistsExhaustedException;
 use App\Traits\TracksActiveStreams;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
@@ -27,10 +28,6 @@ class HlsStreamService
      * @param Channel|Episode $model The Channel model instance
      * @param string $title The title of the channel
      */
-use App\Exceptions\AllPlaylistsExhaustedException;
-
-// ... (other use statements) ...
-
     public function startStream(
         string $type,
         Channel|Episode $model, // This $model is the *original* requested channel/episode
