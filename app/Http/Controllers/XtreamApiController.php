@@ -308,13 +308,21 @@ class XtreamApiController extends Controller
             empty($request->input('action'))
         ) {
             $now = Carbon::now();
+            $xtreamStatus = $playlist->xtream_status ?? null;
+            if ($xtreamStatus) {
+                $expires = $xtreamStatus['user_info']['exp_date']
+                    ? $xtreamStatus['user_info']['exp_date']
+                    : $now->copy()->startOfYear()->addYears(1)->timestamp;
+            } else {
+                $expires = $now->copy()->startOfYear()->addYears(1)->timestamp;
+            }
             $userInfo = [
                 'username' => $username,
                 'password' => $password,
                 'message' => 'Welcome to m3u editor Xtream API',
                 'auth' => 1,
                 'status' => 'Active',
-                'exp_date' => (string)$now->copy()->startOfYear()->addYears(1)->timestamp,
+                'exp_date' => (string)$expires,
                 'is_trial' => '0',
                 'active_cons' => '0',
                 'created_at' => (string)($playlist->user ? $playlist->user->created_at->timestamp : $now->timestamp),
