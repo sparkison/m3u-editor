@@ -8,6 +8,7 @@ use App\Models\Episode;
 use App\Settings\GeneralSettings;
 use App\Services\HlsStreamService;
 use App\Traits\TracksActiveStreams;
+use App\Exceptions\AllPlaylistsExhaustedException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -185,18 +186,19 @@ class HlsStreamController extends Controller
 
                 if ($returnedModel) {
                     $actualStreamingModel = $returnedModel; // This is the model that is actually streaming
-                    
-                    // Cache the mapping between original model and actual streaming model
                     Cache::put($streamMappingKey, $actualStreamingModel->id, now()->addHours(24));
-                    
                     Log::channel('ffmpeg')->debug("HLS Stream: Original request for $type ID {$model->id} ({$logTitle}). Actual streaming $type ID {$actualStreamingModel->id} (" . ($actualStreamingModel->title_custom ?? $actualStreamingModel->title) . ").");
                 } else {
-                    // No stream (primary or failover) could be started
-                    Log::channel('ffmpeg')->error("HLS Stream: No stream could be started for $type ID {$model->id} ({$logTitle}) after trying all sources.");
+                    // This case should ideally be less frequent if AllPlaylistsExhaustedException is thrown for specific limit failures.
+                    // This would now primarily catch other null returns from startStream.
+                    Log::channel('ffmpeg')->error("HLS Stream: No stream could be started for $type ID {$model->id} ({$logTitle}) after trying all sources (and not due to all playlists exhausted).");
                     abort(503, 'Service unavailable. Failed to start the stream or any failovers.');
                 }
+            } catch (AllPlaylistsExhaustedException $e) {
+                Log::channel('ffmpeg')->warning("HLS Stream: Max streams limit reached for all sources for $type ID {$model->id} ({$logTitle}). Message: {$e->getMessage()}");
+                abort(429, 'Maximum stream limits have been reached for this channel. Please try again later.');
             } catch (Exception $e) {
-                Log::channel('ffmpeg')->error("HLS Stream: Exception while trying to start stream for $type ID {$model->id} ({$logTitle}): {$e->getMessage()}");
+                Log::channel('ffmpeg')->error("HLS Stream: Generic exception while trying to start stream for $type ID {$model->id} ({$logTitle}): {$e->getMessage()}");
                 abort(503, 'Service unavailable. Error during stream startup.');
             }
         }

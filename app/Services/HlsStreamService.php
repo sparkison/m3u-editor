@@ -27,12 +27,15 @@ class HlsStreamService
      * @param Channel|Episode $model The Channel model instance
      * @param string $title The title of the channel
      */
+use App\Exceptions\AllPlaylistsExhaustedException;
+
+// ... (other use statements) ...
+
     public function startStream(
         string $type,
         Channel|Episode $model, // This $model is the *original* requested channel/episode
         string $title           // This $title is the title of the *original* model
     ): ?object {
-        // Get stream settings, including the ffprobe timeout
         $streamSettings = ProxyService::getStreamSettings();
         $ffprobeTimeout = $streamSettings['ffmpeg_ffprobe_timeout'] ?? 5; // Default to 5 if not set
 
@@ -73,9 +76,13 @@ class HlsStreamService
 
         // Keep track of playlists that have exhausted their available streams during this request
         $exhaustedPlaylistIds = [];
+        $allAttemptsFailedDueToPlaylistLimits = true; // Assume true initially
+        $atLeastOneAttemptHitLimit = false; // Track if we actually encountered a limit
+        $numberOfAttempts = 0;
 
         // Loop over the failover channels and grab the first one that works.
         foreach ($streams as $stream) { // $stream is the current primary or failover channel being attempted
+            $numberOfAttempts++;
             // URL for the current stream being attempted
             $currentAttemptStreamUrl = $type === 'channel'
                 ? ($stream->url_custom ?? $stream->url) // Use current $stream's URL
@@ -104,6 +111,7 @@ class HlsStreamService
                 } else {
                     Log::channel('ffmpeg')->debug("Skipping Failover {$type} {$stream->name} for source {$model->title} ({$model->id}) as it (stream ID {$stream->id}) was recently marked as bad for playlist {$playlist->id}. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
                 }
+                $allAttemptsFailedDueToPlaylistLimits = false; // Failure not due to playlist limit
                 continue;
             }
 
@@ -119,6 +127,8 @@ class HlsStreamService
                 if (!in_array($playlist->id, $exhaustedPlaylistIds)) {
                     $exhaustedPlaylistIds[] = $playlist->id;
                 }
+                $atLeastOneAttemptHitLimit = true; // Mark that we hit a limit
+                // Do not set $allAttemptsFailedDueToPlaylistLimits to false here, as this IS a playlist limit failure
                 continue;
             }
 
@@ -144,7 +154,7 @@ class HlsStreamService
                 $this->decrementActiveStreams($playlist->id);
                 Log::channel('ffmpeg')->error("Source not responding for channel {$currentStreamTitle} (Original: {$title}): " . $e->getMessage());
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, $e->getMessage());
-
+                $allAttemptsFailedDueToPlaylistLimits = false; // Mark failure as not due to playlist limits
                 // Try the next failover channel
                 continue;
             } catch (FatalStreamContentException $e) {
@@ -152,28 +162,28 @@ class HlsStreamService
                 $this->decrementActiveStreams($playlist->id); // Decrement active streams for the playlist
                 Redis::srem("hls:active_{$type}_ids", $stream->id); // Remove current stream from active set
                 Log::channel('ffmpeg')->error("Fatal stream content error for {$currentStreamTitle} (Original: {$title}, Stream ID: {$stream->id}): " . $e->getMessage() . ". Attempting failover.");
-                // We don't mark the source as bad here with a long TTL,
-                // as the issue is with the content at this specific time.
-                // The failover will continue to the next source.
-                // If desired, a very short BAD_SOURCE_CACHE_SECONDS_CONTENT_ERROR could be used,
-                // or a specific Redis key for content errors.
-                // For now, just log, decrement, and continue to allow failover.
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS_CONTENT_ERROR ?? 10, "Fatal content error: " . $e->getMessage()); // Mark bad for a very short time
+                $allAttemptsFailedDueToPlaylistLimits = false; // Mark failure as not due to playlist limits
                 continue;
             } catch (Exception $e) {
                 // Log the error and potentially mark source as bad before trying next failover
                 $this->decrementActiveStreams($playlist->id); // Ensure decrement if not already handled
                 Redis::srem("hls:active_{$type}_ids", $stream->id); // Remove current stream from active set
                 Log::channel('ffmpeg')->error("General error streaming channel {$currentStreamTitle} (Original: {$title}, Stream ID: {$stream->id}): " . $e->getMessage());
-                // For general exceptions, we might still mark the source as bad,
-                // as it could indicate a persistent issue with that source URL or configuration.
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS_GENERAL_ERROR ?? ProxyService::BAD_SOURCE_CACHE_SECONDS, "General error: " . $e->getMessage());
-
+                $allAttemptsFailedDueToPlaylistLimits = false; // Mark failure as not due to playlist limits
                 // Try the next failover channel
                 continue;
             }
         }
+
         // If loop finishes, no stream was successfully started
+        if ($numberOfAttempts > 0 && $allAttemptsFailedDueToPlaylistLimits && $atLeastOneAttemptHitLimit) {
+            $errorMessage = "All stream attempts for {$type} '{$title}' (Original Model ID: {$model->id}) failed because relevant playlists reached their maximum stream limits.";
+            Log::channel('ffmpeg')->warning($errorMessage);
+            throw new AllPlaylistsExhaustedException($errorMessage);
+        }
+
         Log::channel('ffmpeg')->error("No available (HLS) streams for {$type} {$title} (Original Model ID: {$model->id}) after trying all sources.");
         return null; // Return null if no stream started
     }
