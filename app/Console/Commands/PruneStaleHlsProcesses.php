@@ -40,10 +40,10 @@ class PruneStaleHlsProcesses extends Command
             }
             $lastSeen = Carbon::createFromTimestamp((int) $ts);
             if ($lastSeen->addSeconds($threshold)->isPast()) {
-                $wasRunning = $this->hlsService->stopStream(type: 'channel', id: $channelId);
+                $wasRunning = $this->hlsService->stopStream(type: 'channel', id: $channelId, reason: 'stale_process_pruned_channel');
                 if ($wasRunning) {
                     $stoppedChannels++;
-                    $this->info("🛑 Stopped stale channel {$channelId}");
+                    $this->info("🛑 Stopped stale channel {$channelId} (pruned due to inactivity)");
                 }
             }
         }
@@ -56,10 +56,10 @@ class PruneStaleHlsProcesses extends Command
             }
             $lastSeen = Carbon::createFromTimestamp((int) $ts);
             if ($lastSeen->addSeconds($threshold)->isPast()) {
-                $wasRunning = $this->hlsService->stopStream(type: 'episode', id: $episodeId);
+                $wasRunning = $this->hlsService->stopStream(type: 'episode', id: $episodeId, reason: 'stale_process_pruned_episode');
                 if ($wasRunning) {
                     $stoppedEpisodes++;
-                    $this->info("🛑 Stopped stale episode {$episodeId}");
+                    $this->info("🛑 Stopped stale episode {$episodeId} (pruned due to inactivity)");
                 }
             }
         }

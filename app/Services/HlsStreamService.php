@@ -441,10 +441,14 @@ class HlsStreamService
      *
      * @param string $type
      * @param string $id
+     * @param string|null $reason Optional reason for stopping the stream
      * @return bool
      */
-    public function stopStream($type, $id): bool
+    public function stopStream($type, $id, $reason = null): bool
     {
+        $logReason = $reason ? " (Reason: {$reason})" : "";
+        Log::channel('ffmpeg')->info("Attempting to stop HLS stream for {$type} ID {$id}{$logReason}");
+
         $cacheKey = "hls:pid:{$type}:{$id}";
         $pid = Cache::get($cacheKey);
         $wasRunning = false;

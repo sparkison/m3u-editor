@@ -38,7 +38,7 @@ trait TracksActiveStreams
         // Fire event
         event(new StreamingStarted($playlistId));
 
-        Log::channel('ffmpeg')->debug("Active streams for playlist {$playlistId}: {$activeStreams} (after increment)");
+        Log::channel('ffmpeg')->debug("Playlist {$playlistId} active streams now: {$activeStreams} (after increment; may be for new stream attempt or confirmed start)");
 
         return $activeStreams;
     }
@@ -65,7 +65,7 @@ trait TracksActiveStreams
         // Fire event
         event(new StreamingStopped($playlistId));
 
-        Log::channel('ffmpeg')->debug("Active streams for playlist {$playlistId}: {$activeStreams} (after decrement)");
+        Log::channel('ffmpeg')->debug("Playlist {$playlistId} active streams now: {$activeStreams} (after decrement; may be for failed/skipped attempt or confirmed stop)");
 
         return $activeStreams;
     }
