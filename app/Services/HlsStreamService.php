@@ -6,6 +6,7 @@ use Exception;
 use App\Models\Channel;
 use App\Models\Episode;
 use App\Exceptions\SourceNotResponding;
+use App\Exceptions\FatalStreamContentException; // Added
 use App\Traits\TracksActiveStreams;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
@@ -141,16 +142,32 @@ class HlsStreamService
             } catch (SourceNotResponding $e) {
                 // Log the error and cache the bad source
                 $this->decrementActiveStreams($playlist->id);
-                Log::channel('ffmpeg')->error("Source not responding for channel {$title}: " . $e->getMessage());
+                Log::channel('ffmpeg')->error("Source not responding for channel {$currentStreamTitle} (Original: {$title}): " . $e->getMessage());
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, $e->getMessage());
 
                 // Try the next failover channel
                 continue;
+            } catch (FatalStreamContentException $e) {
+                // This is our new exception for critical FFmpeg content errors
+                $this->decrementActiveStreams($playlist->id); // Decrement active streams for the playlist
+                Redis::srem("hls:active_{$type}_ids", $stream->id); // Remove current stream from active set
+                Log::channel('ffmpeg')->error("Fatal stream content error for {$currentStreamTitle} (Original: {$title}, Stream ID: {$stream->id}): " . $e->getMessage() . ". Attempting failover.");
+                // We don't mark the source as bad here with a long TTL,
+                // as the issue is with the content at this specific time.
+                // The failover will continue to the next source.
+                // If desired, a very short BAD_SOURCE_CACHE_SECONDS_CONTENT_ERROR could be used,
+                // or a specific Redis key for content errors.
+                // For now, just log, decrement, and continue to allow failover.
+                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS_CONTENT_ERROR ?? 10, "Fatal content error: " . $e->getMessage()); // Mark bad for a very short time
+                continue;
             } catch (Exception $e) {
-                // Log the error and abort
-                $this->decrementActiveStreams($playlist->id);
-                Log::channel('ffmpeg')->error("Error streaming channel {$title}: " . $e->getMessage());
-                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, $e->getMessage());
+                // Log the error and potentially mark source as bad before trying next failover
+                $this->decrementActiveStreams($playlist->id); // Ensure decrement if not already handled
+                Redis::srem("hls:active_{$type}_ids", $stream->id); // Remove current stream from active set
+                Log::channel('ffmpeg')->error("General error streaming channel {$currentStreamTitle} (Original: {$title}, Stream ID: {$stream->id}): " . $e->getMessage());
+                // For general exceptions, we might still mark the source as bad,
+                // as it could indicate a persistent issue with that source URL or configuration.
+                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS_GENERAL_ERROR ?? ProxyService::BAD_SOURCE_CACHE_SECONDS, "General error: " . $e->getMessage());
 
                 // Try the next failover channel
                 continue;
@@ -182,62 +199,47 @@ class HlsStreamService
         int $playlistId,
         string|null $userAgent,
     ): int {
+        // Define critical error signatures
+        $criticalErrors = [
+            'non-existing SPS 0 referenced',
+            'non-existing PPS 0 referenced',
+            'decode_slice_header error',
+            'no frame!',
+            'More data is required to decode header' // Common for QSV when headers are missing/corrupt
+        ];
+
         // Setup the stream
         $cmd = $this->buildCmd($type, $model->id, $userAgent, $streamUrl);
 
-        // Use proc_open approach similar to startStream
         $descriptors = [
-            0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
+            0 => ['pipe', 'r'], // stdin
+            1 => ['pipe', 'w'], // stdout
+            2 => ['pipe', 'w'], // stderr
         ];
         $pipes = [];
-        if ($type === 'episode') {
-            $workingDir = Storage::disk('app')->path("hls/e/{$model->id}");
-        } else {
-            $workingDir = Storage::disk('app')->path("hls/{$model->id}");
-        }
+        $workingDir = $type === 'episode'
+            ? Storage::disk('app')->path("hls/e/{$model->id}")
+            : Storage::disk('app')->path("hls/{$model->id}");
+
         $process = proc_open($cmd, $descriptors, $pipes, $workingDir);
 
         if (!is_resource($process)) {
             throw new Exception("Failed to launch FFmpeg for {$title}");
         }
 
-        // Immediately close stdin/stdout
-        fclose($pipes[0]);
-        fclose($pipes[1]);
+        fclose($pipes[0]); // Close stdin
+        fclose($pipes[1]); // Close stdout
 
-        // Make stderr non-blocking
-        stream_set_blocking($pipes[2], false);
+        stream_set_blocking($pipes[2], false); // Make stderr non-blocking
 
-        // Spawn a little "reader" that pulls from stderr and logs
         $logger = Log::channel('ffmpeg');
-        $stderr = $pipes[2];
+        $stderrPipe = $pipes[2];
+        $pidCacheKey = "hls:pid:{$type}:{$model->id}";
 
-        // Get the PID and cache it
-        $cacheKey = "hls:pid:{$type}:{$model->id}";
-
-        // Register shutdown function to ensure the pipe is drained
-        register_shutdown_function(function () use (
-            $stderr,
-            $process,
-            $logger
-        ) {
-            while (!feof($stderr)) {
-                $line = fgets($stderr);
-                if ($line !== false) {
-                    $logger->error(trim($line));
-                }
-            }
-            fclose($stderr);
-            proc_close($process);
-        });
-
-        // Cache the actual FFmpeg PID
+        // Get the PID and cache it immediately
         $status = proc_get_status($process);
         $pid = $status['pid'];
-        // $cacheKey is "hls:pid:{$type}:{$model->id}" which is correct for the PID
-        Cache::forever($cacheKey, $pid);
+        Cache::forever($pidCacheKey, $pid);
 
         // Store the process start time
         $startTimeCacheKey = "hls:streaminfo:starttime:{$type}:{$model->id}";
@@ -249,11 +251,86 @@ class HlsStreamService
         // This key represents when the startStream method was last invoked for this model,
         // which is different from the ffmpeg process actual start time. Keep for now.
         Redis::set("hls:{$type}_last_seen:{$model->id}", now()->timestamp);
+        Redis::sadd("hls:active_{$type}_ids", $model->id); // Ensure this is added early
 
-        // Add to active IDs set
-        Redis::sadd("hls:active_{$type}_ids", $model->id);
+        Log::channel('ffmpeg')->debug("Streaming {$type} {$title} (PID: {$pid}) with command: {$cmd}");
 
-        Log::channel('ffmpeg')->debug("Streaming {$type} {$title} with command: {$cmd}");
+        // Active error monitoring and shutdown function
+        // This combined approach ensures we try to catch errors early and still drain stderr on normal exit.
+        $processStillNeedsMonitoring = true;
+
+        register_shutdown_function(function () use ($stderrPipe, $process, $logger, &$processStillNeedsMonitoring, $pid, $pidCacheKey, $type, $model, $title) {
+            if ($processStillNeedsMonitoring) { // Only run if not already handled by error detection
+                $logger->debug("Shutdown function: Draining stderr for PID {$pid} ({$title})");
+                while (($line = fgets($stderrPipe)) !== false) {
+                    if (!empty(trim($line))) {
+                        $logger->error(trim($line));
+                    }
+                }
+            }
+            // Ensure pipe is closed and process status is updated
+            if (is_resource($stderrPipe)) fclose($stderrPipe);
+            if (is_resource($process)) proc_close($process);
+            $logger->debug("Shutdown function: Closed resources for PID {$pid} ({$title})");
+        });
+
+        // Give FFmpeg a very brief moment to start and potentially output initial errors
+        usleep(500000); // 0.5 seconds
+
+        $errorCheckStartTime = microtime(true);
+        $initialErrorCheckDuration = 10; // Check for critical errors actively for X seconds
+
+        while (microtime(true) - $errorCheckStartTime < $initialErrorCheckDuration) {
+            $status = proc_get_status($process);
+            if (!$status['running']) {
+                $processStillNeedsMonitoring = false; // Process ended on its own
+                $errorOutput = stream_get_contents($stderrPipe);
+                fclose($stderrPipe);
+                proc_close($process);
+                Cache::forget($pidCacheKey);
+                $exitCode = $status['exitcode'];
+                $logger->error("FFmpeg process {$pid} for {$type} {$title} exited prematurely. Exit code: {$exitCode}. Stderr: " . trim($errorOutput));
+                // Do NOT decrement here; startStream's catch block will handle it.
+                throw new Exception("FFmpeg process {$pid} for {$title} exited prematurely. Exit code: {$exitCode}.");
+            }
+
+            $output = fgets($stderrPipe);
+            if ($output !== false && !empty(trim($output))) {
+                $trimmedOutput = trim($output);
+                $logger->error($trimmedOutput); // Log all FFmpeg stderr output
+
+                foreach ($criticalErrors as $errorSignature) {
+                    if (str_contains($trimmedOutput, $errorSignature)) {
+                        $processStillNeedsMonitoring = false;
+                        $logger->error("Critical FFmpeg error detected for {$type} {$title} (PID: {$pid}): '{$trimmedOutput}'. Terminating process.");
+
+                        // Terminate the process
+                        posix_kill($pid, SIGTERM);
+                        $attempts = 0;
+                        while ($attempts < 10 && posix_kill($pid, 0)) { // Check for 1 second
+                            usleep(100000); // 100ms
+                            $attempts++;
+                        }
+                        if (posix_kill($pid, 0)) {
+                            posix_kill($pid, SIGKILL);
+                            $logger->warning("Force killed FFmpeg process {$pid} for {$type} {$title} due to critical error.");
+                        }
+
+                        fclose($stderrPipe);
+                        proc_close($process);
+                        Cache::forget($pidCacheKey);
+                        // Do NOT decrement here; startStream's catch block for FatalStreamContentException will handle logging,
+                        // and the main loop's structure ensures active stream counts are managed.
+                        throw new FatalStreamContentException("Critical FFmpeg error for {$title}: {$trimmedOutput}");
+                    }
+                }
+            }
+            usleep(100000); // 0.1 seconds polling interval
+        }
+
+        $processStillNeedsMonitoring = false; // Active monitoring period is over. Let shutdown function handle remaining stderr.
+        $logger->debug("Initial error monitoring period ended for {$type} {$title} (PID: {$pid}). FFmpeg continues in background.");
+
         return $pid;
     }
 
