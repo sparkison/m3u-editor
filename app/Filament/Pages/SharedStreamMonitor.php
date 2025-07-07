@@ -41,7 +41,7 @@ class SharedStreamMonitor extends Page
     public function boot(): void
     {
         $this->sharedStreamService = app(SharedStreamService::class);
-        $this->monitorService = app(StreamMonitorService::class);
+        // $this->monitorService = app(StreamMonitorService::class);
     }
 
     public function mount(): void
