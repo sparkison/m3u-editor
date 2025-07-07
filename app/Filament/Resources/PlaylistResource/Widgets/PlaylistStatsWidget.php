@@ -32,7 +32,7 @@ class PlaylistStatsWidget extends BaseWidget
             $maxStreamsReached = $activeStreams > 0 && $activeStreams >= $availableStreams;
             $stats[] = Stat::make('proxy_streams', "$activeStreams/$availableStreams")
                 ->label('Proxy Connections')
-                ->description('Active vs. available streams')
+                ->description('Active vs. available')
                 ->descriptionIcon('heroicon-o-chart-bar', 'before')
                 ->color($maxStreamsReached ? 'danger' : 'primary');
         }
@@ -75,9 +75,9 @@ class PlaylistStatsWidget extends BaseWidget
             $expiresIn24HoursOrLess = $expires->isToday() || $expires->isTomorrow();
         }
         return [
-            Stat::make('active_connections', $activeConnections)
+            Stat::make('active_connections', "$activeConnections/$maxConnections")
                 ->label('Provider Connections')
-                ->description("Max connections: $maxConnections")
+                ->description('Active vs. available')
                 ->descriptionIcon('heroicon-o-chart-bar', 'before')
                 ->color($activeConnections >= $maxConnections ? 'danger' : 'primary'),
             Stat::make('expires', $expires->diffForHumans())
