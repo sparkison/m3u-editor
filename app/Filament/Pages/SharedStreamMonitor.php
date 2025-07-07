@@ -167,10 +167,13 @@ class SharedStreamMonitor extends Page
             $recentStats = $stream->recentStats(5)->first();
             $clientInfo = $this->sharedStreamService->getClients($stream->stream_id);
             $streamInfo = $stream->stream_info;
-            $model = $streamInfo['type'] === 'episode'
-                ? Episode::find($streamInfo['model_id'])
-                : Channel::find($streamInfo['model_id']);
-
+            $model = null;
+            if ($streamInfo) {
+                $model = $streamInfo['type'] === 'episode'
+                    ? Episode::find($streamInfo['model_id'])
+                    : Channel::find($streamInfo['model_id']);
+            }
+            
             $clientsData = array_map(function ($client) {
                 $connectedAt = date('H:i:s', $client['connected_at']);
                 $duration = isset($client['connected_at']) ? now()->diffInSeconds(now()->setTimestamp($client['connected_at'])) : 0;
