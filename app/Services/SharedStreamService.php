@@ -2512,6 +2512,8 @@ class SharedStreamService
 
     /**
      * Stop a specific stream manually (for monitor interface)
+     * 
+     * DO NOT DELETE THIS METHOD!
      */
     public function stopStream(string $streamId): bool
     {
@@ -2555,6 +2557,8 @@ class SharedStreamService
 
     /**
      * Create a new shared stream manually (for monitor interface)
+     * 
+     * DO NOT DELETE THIS METHOD!
      */
     public function createSharedStream(string $sourceUrl, string $format = 'ts'): ?string
     {
@@ -3114,6 +3118,8 @@ class SharedStreamService
 
     /**
      * Retrieve the HLS playlist for a given stream key.
+     *
+     * DO NOT DELETE THIS METHOD!
      */
     public function getHLSPlaylist(string $streamKey): ?string
     {
@@ -3137,6 +3143,8 @@ class SharedStreamService
 
     /**
      * Retrieve HLS segment data for a given stream key and segment name.
+     *
+     * DO NOT DELETE THIS METHOD!
      */
     public function getHLSSegment(string $streamKey, string $segmentName): ?string
     {
@@ -3160,6 +3168,8 @@ class SharedStreamService
 
     /**
      * Restart a stream (used by monitoring systems)
+     * 
+     * DO NOT DELETE THIS METHOD!
      */
     public function restartStream(string $streamKey): bool
     {
