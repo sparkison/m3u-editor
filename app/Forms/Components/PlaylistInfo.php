@@ -13,7 +13,7 @@ class PlaylistInfo extends Field
 {
     protected string $view = 'forms.components.playlist-info';
 
-    public function getStats(): array
+    public function getStats($force = false): array
     {
         $playlist = Playlist::find($this->getRecord()?->id);
         if (!$playlist) {
@@ -33,7 +33,7 @@ class PlaylistInfo extends Field
             $stats['active_connections'] = "$activeStreams/$availableStreams";
         }
         if ($playlist->xtream) {
-            $xtreamStats = $this->getXtreamStats($playlist);
+            $xtreamStats = $this->getXtreamStats($playlist, $force);
             if (!empty($xtreamStats)) {
                 $stats = array_merge($stats, $xtreamStats);
             }
@@ -42,11 +42,11 @@ class PlaylistInfo extends Field
         return $stats;
     }
 
-    private function getXtreamStats(Playlist $playlist): array
+    private function getXtreamStats(Playlist $playlist, $force = false): array
     {
         $cacheKey = "xtream_stats:{$playlist->id}";
         $xtreamInfo = Cache::get($cacheKey, null);
-        if (!$xtreamInfo) {
+        if (!$xtreamInfo || $force) {
             // If no cache, initialize XtreamService
             $xtream = XtreamService::make($playlist);
             if (!$xtream) {
@@ -60,7 +60,7 @@ class PlaylistInfo extends Field
                 return [];
             }
         }
-        Cache::put($cacheKey, $xtreamInfo, now()->addMinutes(10)); // Cache for 10 minutes
+        Cache::put($cacheKey, $xtreamInfo, now()->addSeconds(60)); // Cache for 60 seconds
 
         $maxConnections = $xtreamInfo['user_info']['max_connections'] ?? 1;
         $activeConnections = $xtreamInfo['user_info']['active_cons'] ?? 0;
