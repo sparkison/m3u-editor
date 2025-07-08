@@ -6,9 +6,9 @@
                 <!-- Proxy Streams Section -->
                 <div class=" pb-4">
                     <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center">
-                        <svg class="w-4 h-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                        </svg>
+                        <div class="p-1 mr-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                            <x-heroicon-s-signal class="text-blue-500 h-4 w-4" />
+                        </div>
                         Proxy Usage
                     </h3>
                     
@@ -56,10 +56,10 @@
                 <!-- Xtream Info Section -->
                 <div>
                     <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center">
-                        <svg class="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                        </svg>
-                        Xtream Details
+                        <div class="p-1 mr-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                            <x-heroicon-s-bolt class="text-green-500 h-4 w-4" />
+                        </div>
+                        Xtream Provider Details
                     </h3>
                     
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">

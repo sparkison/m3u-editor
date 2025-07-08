@@ -50,7 +50,7 @@ class PlaylistInfo extends Field
             // If no cache, initialize XtreamService
             $xtream = XtreamService::make($playlist);
             if (!$xtream) {
-                // Try and fetch from the playlist data directly
+                // Try and fetch from the playlist data directly if unable to initialize XtreamService
                 $xtreamInfo = $playlist->xtream_info;
             } else {
                 // Prefer live data from XtreamService
@@ -59,8 +59,8 @@ class PlaylistInfo extends Field
             if (!$xtreamInfo) {
                 return [];
             }
+            Cache::put($cacheKey, $xtreamInfo, now()->addSeconds(10)); // Cache for 10 seconds
         }
-        Cache::put($cacheKey, $xtreamInfo, now()->addMinutes(10)); // Cache for 10 minutes
 
         $maxConnections = $xtreamInfo['user_info']['max_connections'] ?? 1;
         $activeConnections = $xtreamInfo['user_info']['active_cons'] ?? 0;
