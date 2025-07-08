@@ -62,30 +62,9 @@ class StreamMonitorUpdate implements ShouldQueue
 
                         // Attempt to restart if it's a critical failure
                         if ($health['critical']) {
-                            Log::channel('ffmpeg')->error("StreamMonitor: Critical failure for stream {$streamKey}, attempting restart");
+                            Log::channel('ffmpeg')->error("StreamMonitor: Critical failure for stream {$streamKey}");
 
-                            $type = $streamData['stream_info']['type'];
-                            $primaryChannel = $type === 'channel'
-                                ? Channel::find($streamData['stream_info']['model_id'])
-                                : Episode::find($streamData['stream_info']['model_id']);
-                            $failoverChannels = collect();
-                            if ($type === 'channel' && $primaryChannel && method_exists($primaryChannel, 'failoverChannels')) {
-                                $failoverChannels = $primaryChannel->failoverChannels;
-                                Log::channel('ffmpeg')->debug("SharedStream: Found " . $failoverChannels->count() . " failover channels for primary channel {$primaryChannel->id}");
-                            }
-                            $sharedStreamService->restartStreamWithFailover(
-                                streamKey: $streamKey,
-                                type: $streamData['stream_info']['type'],
-                                modelId: $streamData['stream_info']['model_id'],
-                                streamUrl: $streamData['stream_info']['stream_url'],
-                                title: $streamData['stream_info']['title'],
-                                format: $streamData['stream_info']['format'],
-                                clientId: null, // No client ID for monitoring
-                                options: $streamData['stream_info']['options'] ?? [],
-                                primaryChannel: $primaryChannel,
-                                failoverChannels: $failoverChannels,
-                                exhaustedPlaylistIds: []
-                            );
+                            // @TODO: Implement failover logic if needed...
                         }
                     }
 

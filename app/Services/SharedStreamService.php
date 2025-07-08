@@ -336,7 +336,7 @@ class SharedStreamService
     /**
      * Restart a stream with failover support
      */
-    public function restartStreamWithFailover(
+    private function restartStreamWithFailover(
         string $streamKey,
         string $type,
         int $modelId,
