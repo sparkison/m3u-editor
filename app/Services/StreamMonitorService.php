@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Channel;
 use App\Models\Episode;
 use App\Models\Playlist;
+use App\Models\SharedStream;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
@@ -17,6 +18,10 @@ use Illuminate\Support\Facades\Redis;
  */
 class StreamMonitorService
 {
+    public function __construct(
+        public SharedStreamService $sharedStreamService
+    ) {}
+
     /**
      * Get comprehensive streaming statistics
      */
@@ -39,11 +44,11 @@ class StreamMonitorService
         // Try both patterns - with and without database prefix
         $pattern1 = 'shared_stream:*';
         $pattern2 = '*shared_stream:*';
-        
+
         $keys1 = Redis::keys($pattern1);
         $keys2 = Redis::keys($pattern2);
         $keys = array_merge($keys1, $keys2);
-        
+
         $streams = [];
         $totalClients = 0;
 
@@ -54,7 +59,7 @@ class StreamMonitorService
                 'shared_stream:'
             ], '', $key);
             $streamData = json_decode(Redis::get($key), true);
-            
+
             if ($streamData) {
                 $clientKey = "stream_clients:{$streamKey}";
                 $clients = Redis::hgetall($clientKey);
@@ -109,7 +114,7 @@ class StreamMonitorService
             $parts = explode('::', $clientDetails);
             if (count($parts) >= 4) {
                 [$ip, $modelId, $type, $streamId] = $parts;
-                
+
                 // Get stream details from cache
                 $detailsKey = "mpts:streaminfo:details:{$streamId}";
                 $details = Redis::get($detailsKey);
@@ -161,7 +166,7 @@ class StreamMonitorService
             $lastSeen = Redis::get("hls:channel_last_seen:{$channelId}");
             $pidKey = "hls:pid:channel:{$channelId}";
             $pid = Cache::get($pidKey);
-            
+
             $channel = Channel::find($channelId);
             if ($channel) {
                 $streams[] = [
@@ -182,7 +187,7 @@ class StreamMonitorService
             $lastSeen = Redis::get("hls:episode_last_seen:{$episodeId}");
             $pidKey = "hls:pid:episode:{$episodeId}";
             $pid = Cache::get($pidKey);
-            
+
             $episode = Episode::find($episodeId);
             if ($episode) {
                 $streams[] = [
@@ -238,24 +243,24 @@ class StreamMonitorService
     {
         // System load
         $loadAvg = sys_getloadavg();
-        
+
         // Memory usage
         $memoryUsage = memory_get_usage(true);
         $memoryPeak = memory_get_peak_usage(true);
-        
+
         // Get system memory info
         $memoryInfo = $this->getSystemMemoryInfo();
-        
+
         // Get disk space info
         $diskInfo = $this->getDiskSpaceInfo();
-        
+
         // Redis info
         $redisInfo = Redis::info('memory');
         $redisMemory = $redisInfo['used_memory_human'] ?? 'N/A';
-        
+
         // Process count
         $totalProcesses = $this->getActiveProcessCount();
-        
+
         // CPU count
         $cpuCount = $this->getCpuCount();
 
@@ -388,7 +393,7 @@ class StreamMonitorService
     public function getBandwidthStats(): array
     {
         $stats = [];
-        
+
         // Get shared stream bandwidth (estimated)
         $sharedStreams = $this->getSharedStreamStats();
         foreach ($sharedStreams['streams'] as $stream) {
@@ -493,7 +498,7 @@ class StreamMonitorService
     {
         // This would be called by a scheduled job
         $stuckStreams = $this->findStuckStreams();
-        
+
         foreach ($stuckStreams as $stream) {
             if ($stream['stale_duration'] > 600) { // 10 minutes
                 $this->forceCleanupStream($stream);
@@ -509,12 +514,12 @@ class StreamMonitorService
     {
         if ($streamInfo['type'] === 'shared') {
             $streamKey = $streamInfo['key'];
-            
+
             // Clean up Redis keys
             Redis::del("shared_stream:{$streamKey}");
             Redis::del("stream_clients:{$streamKey}");
             Redis::del("stream_pid:{$streamKey}");
-            
+
             // Clean up buffer
             $bufferKey = "stream_buffer:{$streamKey}";
             $segments = Redis::lrange("{$bufferKey}:segments", 0, -1);
@@ -536,14 +541,14 @@ class StreamMonitorService
                 'memory_usage' => memory_get_usage(true),
                 'memory_peak' => memory_get_peak_usage(true),
                 'load_average_1min' => $loadAvg[0],
-                'load_average_5min' => $loadAvg[1], 
+                'load_average_5min' => $loadAvg[1],
                 'load_average_15min' => $loadAvg[2],
                 'uptime' => time() - $this->getStartTime(),
                 'updated_at' => time()
             ];
-            
+
             Redis::hMSet($this->getSystemStatsKey(), $stats);
-            
+
             return $stats;
         } catch (\Exception $e) {
             Log::error("Failed to update system stats: " . $e->getMessage());
@@ -559,20 +564,20 @@ class StreamMonitorService
         try {
             $streamKeys = Redis::keys('stream:*');
             $stats = [];
-            
+
             foreach ($streamKeys as $key) {
                 if (strpos($key, ':stats') === false) {
                     continue; // Only process stats keys
                 }
-                
+
                 $streamKey = str_replace(['stream:', ':stats'], '', $key);
                 $streamStats = Redis::hGetAll($key);
-                
+
                 if (!empty($streamStats)) {
                     $stats[$streamKey] = $streamStats;
                 }
             }
-            
+
             return $stats;
         } catch (\Exception $e) {
             Log::error("Failed to get stream stats: " . $e->getMessage());
@@ -586,9 +591,7 @@ class StreamMonitorService
     public function checkStreamHealth(string $streamKey): array
     {
         try {
-            $streamInfo = Redis::hGetAll("stream:$streamKey");
-            $stats = Redis::hGetAll("stream:$streamKey:stats");
-            
+            $stream = SharedStream::where('stream_id', $streamKey)->first();
             $health = [
                 'status' => 'unknown',
                 'process_running' => false,
@@ -597,43 +600,37 @@ class StreamMonitorService
                 'uptime' => 0,
                 'buffer_health' => 'unknown'
             ];
-            
-            if (!empty($streamInfo)) {
-                $health['last_activity'] = (int)($streamInfo['last_activity'] ?? 0);
-                $health['uptime'] = time() - (int)($streamInfo['started_at'] ?? 0);
-                
+
+            if (!empty($stream)) {
+                $health['last_activity'] = (int)($stream->last_client_activity ?? 0);
+                $health['uptime'] = time() - (int)($stream->started_at ?? 0);
+
                 // Check if process is running
-                if (isset($streamInfo['pid']) && $streamInfo['pid']) {
-                    $health['process_running'] = $this->isProcessRunning((int)$streamInfo['pid']);
-                }
-                
+                $health['process_running'] = $stream->isProcessRunning();
+
                 // Get client count
-                $clients = Redis::sMembers("stream:$streamKey:clients");
+                $clients = $this->sharedStreamService->getClients($streamKey);
                 $health['client_count'] = count($clients);
-                
+
                 // Determine overall status
                 $now = time();
                 $timeout = config('proxy.shared_streaming.monitoring.stream_timeout', 300);
-                
+
                 if ($health['process_running'] && ($now - $health['last_activity']) < $timeout) {
                     $health['status'] = 'healthy';
                 } else {
                     $health['status'] = 'unhealthy';
                 }
-                
+
                 // Check buffer health
-                $bufferDir = storage_path("app/stream_buffers/$streamKey");
-                if (is_dir($bufferDir)) {
-                    $segmentCount = count(glob($bufferDir . '/*.ts'));
-                    $health['buffer_health'] = $segmentCount > 0 ? 'good' : 'empty';
-                } else {
-                    $health['buffer_health'] = 'missing';
-                }
+                $health['buffer_health'] = $this->sharedStreamService->getStreamBufferDiskUsage($streamKey) === 0
+                    ? 'empty'
+                    : 'healthy';
             }
-            
+
             // Add healthy boolean for backward compatibility
             $health['healthy'] = $health['status'] === 'healthy';
-            
+
             // Determine if this is a critical failure worthy of automatic restart
             $health['critical'] = false;
             if (!$health['healthy']) {
@@ -641,7 +638,7 @@ class StreamMonitorService
                 $inactiveTime = time() - $health['last_activity'];
                 $health['critical'] = !$health['process_running'] && $inactiveTime > 300;
             }
-            
+
             // Add reason for unhealthy streams
             if (!$health['healthy']) {
                 $reasons = [];
@@ -658,12 +655,12 @@ class StreamMonitorService
                 }
                 $health['reason'] = implode(', ', $reasons);
             }
-            
+
             return $health;
         } catch (\Exception $e) {
             Log::error("Failed to check stream health: " . $e->getMessage());
             return [
-                'status' => 'error', 
+                'status' => 'error',
                 'healthy' => false,
                 'critical' => false,
                 'error' => $e->getMessage(),
@@ -680,7 +677,7 @@ class StreamMonitorService
         try {
             $globalKey = 'shared_streaming:global_stats';
             $current = Redis::hGetAll($globalKey) ?: [];
-            
+
             // Ensure all values are strings or scalar for Redis hMSet
             $processedStats = [];
             foreach ($stats as $key => $value) {
@@ -695,13 +692,12 @@ class StreamMonitorService
                     $processedStats[$key] = (string) $value;
                 }
             }
-            
+
             // Merge with current stats
             $merged = array_merge($current, $processedStats);
             $merged['last_updated'] = (string) time();
-            
+
             Redis::hMSet($globalKey, $merged);
-            
         } catch (\Exception $e) {
             Log::error("Failed to update global stats: " . $e->getMessage());
         }
@@ -734,12 +730,12 @@ class StreamMonitorService
     {
         $key = 'shared_streaming:start_time';
         $startTime = Redis::get($key);
-        
+
         if (!$startTime) {
             $startTime = time();
             Redis::set($key, $startTime);
         }
-        
+
         return (int)$startTime;
     }
 
@@ -755,11 +751,11 @@ class StreamMonitorService
 
         preg_match('/MemTotal:\s+(\d+)/', $meminfo, $total);
         preg_match('/MemAvailable:\s+(\d+)/', $meminfo, $available);
-        
+
         $totalMem = isset($total[1]) ? (int)$total[1] * 1024 : 0;
         $availableMem = isset($available[1]) ? (int)$available[1] * 1024 : 0;
         $usedMem = $totalMem - $availableMem;
-        
+
         return [
             'total' => $this->formatBytes($totalMem),
             'free' => $this->formatBytes($availableMem),
@@ -776,13 +772,13 @@ class StreamMonitorService
         $path = config('proxy.shared_streaming.buffer_path', '/tmp');
         $total = disk_total_space($path);
         $free = disk_free_space($path);
-        
+
         if ($total === false || $free === false) {
             return ['total' => 'N/A', 'free' => 'N/A', 'used' => 'N/A', 'percentage' => 0];
         }
-        
+
         $used = $total - $free;
-        
+
         return [
             'total' => $this->formatBytes($total),
             'free' => $this->formatBytes($free),
@@ -811,13 +807,13 @@ class StreamMonitorService
     {
         try {
             // Try different approaches to get CPU count
-            
+
             // Method 1: Use nproc if available (Linux/Unix)
             $output = shell_exec('nproc 2>/dev/null');
             if ($output !== null && is_numeric(trim($output))) {
                 return (int) trim($output);
             }
-            
+
             // Method 2: Parse /proc/cpuinfo (Linux)
             if (is_readable('/proc/cpuinfo')) {
                 $cpuinfo = file_get_contents('/proc/cpuinfo');
@@ -828,13 +824,13 @@ class StreamMonitorService
                     }
                 }
             }
-            
+
             // Method 3: Use sysctl (macOS/BSD)
             $output = shell_exec('sysctl -n hw.ncpu 2>/dev/null');
             if ($output !== null && is_numeric(trim($output))) {
                 return (int) trim($output);
             }
-            
+
             // Method 4: Use wmic (Windows - unlikely in this context but comprehensive)
             $output = shell_exec('wmic cpu get NumberOfCores /value 2>/dev/null | find "NumberOfCores"');
             if ($output !== null) {
@@ -843,12 +839,11 @@ class StreamMonitorService
                     return (int) $matches[1];
                 }
             }
-            
+
             // Fallback: return 1 if we can't determine
             return 1;
         } catch (\Exception $e) {
             return 1;
         }
     }
-
 }

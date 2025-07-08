@@ -336,14 +336,14 @@ class SharedStreamService
     /**
      * Restart a stream with failover support
      */
-    private function restartStreamWithFailover(
+    public function restartStreamWithFailover(
         string $streamKey,
         string $type,
         int $modelId,
         string $streamUrl,
         string $title,
         string $format,
-        string $clientId,
+        string|null $clientId,
         array $options,
         $primaryChannel,
         $failoverChannels,
@@ -391,9 +391,13 @@ class SharedStreamService
                             'error_message' => null,
                             'last_client_activity' => now()
                         ]);
-                        Log::channel('ffmpeg')->debug("SharedStream: Successfully restarted original stream {$streamKey} for client {$clientId}");
-                        $this->registerClient($streamKey, $clientId, $options);
-                        if ($streamInfo) $streamInfo['is_new_stream'] = false; // It's a restart of an existing stream key
+                        if ($clientId) {
+                            Log::channel('ffmpeg')->debug("SharedStream: Successfully restarted original stream {$streamKey} for client {$clientId}");
+                            $this->registerClient($streamKey, $clientId, $options);
+                        }
+                        if ($streamInfo) {
+                            $streamInfo['is_new_stream'] = false; // It's a restart of an existing stream key
+                        }
                         $restartedOriginal = true;
                         return $streamInfo ?: $this->getStreamInfo($streamKey); // Return updated streamInfo
                     } catch (\Exception $e) {
@@ -414,12 +418,19 @@ class SharedStreamService
                         $this->setStreamInfo($streamKey, $streamInfo);
                     }
                     Log::channel('ffmpeg')->debug("SharedStream: Stream {$streamKey} (no playlist): Marked as 'starting' before restart.");
-                    if ($streamInfo && $streamInfo['format'] === 'hls') $this->startHLSStream($streamKey, $streamInfo);
-                    elseif ($streamInfo) $this->startDirectStream($streamKey, $streamInfo);
+                    if ($streamInfo && $streamInfo['format'] === 'hls') {
+                        $this->startHLSStream($streamKey, $streamInfo);
+                    } elseif ($streamInfo) {
+                        $this->startDirectStream($streamKey, $streamInfo);
+                    }
                     SharedStream::where('stream_id', $streamKey)->update(['status' => 'starting', 'process_id' => $this->getProcessPid($streamKey), 'client_count' => 1, 'started_at' => now(), 'error_message' => null, 'last_client_activity' => now()]);
                     Log::channel('ffmpeg')->debug("SharedStream: Successfully restarted original stream {$streamKey} (no playlist) for client {$clientId}");
-                    $this->registerClient($streamKey, $clientId, $options);
-                    if ($streamInfo) $streamInfo['is_new_stream'] = false;
+                    if ($clientId) {
+                        $this->registerClient($streamKey, $clientId, $options);
+                    }
+                    if ($streamInfo) {
+                        $streamInfo['is_new_stream'] = false;
+                    }
                     $restartedOriginal = true;
                     return $streamInfo ?: $this->getStreamInfo($streamKey);
                 } catch (\Exception $e) {
@@ -484,10 +495,12 @@ class SharedStreamService
                     $newStreamInfo['active_channel_id'] = $failoverChannel->id;
                     $newStreamInfo['failover_attempts'] = $index + 1; // This is the first attempt for this new stream
                     $newStreamInfo['is_failover'] = true;
-                    $this->registerClient($failoverStreamKey, $clientId, $options);
                     $newStreamInfo['is_new_stream'] = true;
                     $newStreamInfo['stream_key'] = $failoverStreamKey;
 
+                    if ($clientId) {
+                        $this->registerClient($failoverStreamKey, $clientId, $options);
+                    }
                     Log::channel('ffmpeg')->debug("SharedStream: Successfully failed over (restarted) to channel {$failoverChannel->id}. New stream key: {$failoverStreamKey}");
                     return $newStreamInfo;
                 } catch (\Exception $failoverError) {
@@ -536,11 +549,7 @@ class SharedStreamService
             'last_client_activity' => now()->timestamp,
             'options' => $options
         ];
-
-        // Store stream info
-        $this->setStreamInfo($streamKey, $streamInfo);
-
-        // Also create database record for persistent tracking
+        // 1. Create or update database record for persistent tracking
         SharedStream::updateOrCreate(
             ['stream_id' => $streamKey],
             [
@@ -555,6 +564,9 @@ class SharedStreamService
                 'health_status' => 'unknown',
             ]
         );
+
+        // 2. Store stream info
+        $this->setStreamInfo($streamKey, $streamInfo);
 
         // Start the streaming process directly (temporary fix for queue issues)
         try {
@@ -3144,90 +3156,6 @@ class SharedStreamService
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Stream {$streamKey}: Error retrieving HLS segment {$segmentName}: " . $e->getMessage());
             return null;
-        }
-    }
-
-    /**
-     * Restart a stream (used by monitoring systems)
-     * 
-     * DO NOT DELETE THIS METHOD!
-     */
-    public function restartStream(string $streamKey): bool
-    {
-        try {
-            $streamInfo = $this->getStreamInfo($streamKey);
-            if (!$streamInfo) {
-                Log::channel('ffmpeg')->error("Cannot restart stream {$streamKey}: stream info not found");
-                return false;
-            }
-
-            // Get the model information from stream info
-            $type = $streamInfo['type'] ?? null;
-            $modelId = $streamInfo['model_id'] ?? null;
-
-            if (!$type || !$modelId) {
-                Log::channel('ffmpeg')->error("Cannot restart stream {$streamKey}: missing type or model_id");
-                return false;
-            }
-
-            Log::channel('ffmpeg')->debug("Attempting to restart stream {$streamKey} (type: {$type}, model_id: {$modelId})");
-
-            // Stop the current stream process if it's running
-            $this->cleanupStream($streamKey, false);
-
-            // Get the model to restart with
-            if ($type === 'channel') {
-                $model = Channel::find($modelId);
-            } elseif ($type === 'episode') {
-                $model = Episode::find($modelId);
-            } else {
-                Log::channel('ffmpeg')->error("Cannot restart stream {$streamKey}: unknown type {$type}");
-                return false;
-            }
-
-            if (!$model) {
-                Log::channel('ffmpeg')->error("Cannot restart stream {$streamKey}: {$type} {$modelId} not found");
-                return false;
-            }
-
-            // Get stream URL
-            $streamUrl = $model->url_custom ?? $model->url;
-            $title = $model->title_custom ?? $model->title;
-            $format = $streamInfo['format'] ?? 'ts';
-
-            if (!$streamUrl) {
-                Log::channel('ffmpeg')->error("Cannot restart stream {$streamKey}: no URL available");
-                return false;
-            }
-
-            // Create a temporary client ID for restart
-            $restartClientId = 'monitor_restart_' . time();
-
-            // Use the existing getOrCreateSharedStreamWithFailover method to restart the stream
-            $result = $this->getOrCreateSharedStreamWithFailover(
-                $type,
-                $modelId,
-                $streamUrl,
-                $title,
-                $format,
-                $restartClientId,
-                [],
-                $model
-            );
-
-            if ($result && isset($result['status']) && $result['status'] !== 'error') {
-                // Remove the temporary client after restart
-                $this->removeClient($streamKey, $restartClientId);
-
-                Log::channel('ffmpeg')->debug("Successfully restarted stream {$streamKey}");
-                return true;
-            } else {
-                Log::channel('ffmpeg')->error("Failed to restart stream {$streamKey}: " . ($result['error_message'] ?? 'unknown error'));
-                return false;
-            }
-        } catch (\Exception $e) {
-            Log::channel('ffmpeg')->error("Exception while restarting stream {$streamKey}: " . $e->getMessage());
-            return false;
         }
     }
 }

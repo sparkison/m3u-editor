@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Models\Channel;
+use App\Models\Episode;
 use App\Services\SharedStreamService;
 use App\Services\StreamMonitorService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -39,42 +41,63 @@ class StreamMonitorUpdate implements ShouldQueue
         try {
             // Update monitoring statistics
             $stats = $monitorService->updateSystemStats();
-            
+
             // Get current stream status
             $streamStats = $monitorService->getStreamStats();
             $systemStats = $monitorService->getSystemStats();
-            
+
             // Update stream health for all active streams
             $activeStreams = $sharedStreamService->getAllActiveStreams();
             $unhealthyStreams = 0;
             $totalBandwidth = 0;
-            
+
             foreach ($activeStreams as $streamKey => $streamData) {
                 try {
                     // Check stream health
                     $health = $monitorService->checkStreamHealth($streamKey);
-                    
+
                     if (!$health['healthy']) {
                         $unhealthyStreams++;
                         Log::channel('ffmpeg')->warning("StreamMonitor: Unhealthy stream detected: {$streamKey} - {$health['reason']}");
-                        
+
                         // Attempt to restart if it's a critical failure
                         if ($health['critical']) {
                             Log::channel('ffmpeg')->error("StreamMonitor: Critical failure for stream {$streamKey}, attempting restart");
-                            $sharedStreamService->restartStream($streamKey);
+
+                            $type = $streamData['stream_info']['type'];
+                            $primaryChannel = $type === 'channel'
+                                ? Channel::find($streamData['stream_info']['model_id'])
+                                : Episode::find($streamData['stream_info']['model_id']);
+                            $failoverChannels = collect();
+                            if ($type === 'channel' && $primaryChannel && method_exists($primaryChannel, 'failoverChannels')) {
+                                $failoverChannels = $primaryChannel->failoverChannels;
+                                Log::channel('ffmpeg')->debug("SharedStream: Found " . $failoverChannels->count() . " failover channels for primary channel {$primaryChannel->id}");
+                            }
+                            $sharedStreamService->restartStreamWithFailover(
+                                streamKey: $streamKey,
+                                type: $streamData['stream_info']['type'],
+                                modelId: $streamData['stream_info']['model_id'],
+                                streamUrl: $streamData['stream_info']['stream_url'],
+                                title: $streamData['stream_info']['title'],
+                                format: $streamData['stream_info']['format'],
+                                clientId: null, // No client ID for monitoring
+                                options: $streamData['stream_info']['options'] ?? [],
+                                primaryChannel: $primaryChannel,
+                                failoverChannels: $failoverChannels,
+                                exhaustedPlaylistIds: []
+                            );
                         }
                     }
-                    
+
                     // Update bandwidth tracking
                     if (isset($health['bandwidth'])) {
                         $totalBandwidth += $health['bandwidth'];
                     }
-                    
                 } catch (\Exception $e) {
                     Log::channel('ffmpeg')->error("StreamMonitor: Error checking health for stream {$streamKey}: " . $e->getMessage());
                 }
             }
-            
+
             // Update system-wide statistics
             $monitorService->updateGlobalStats([
                 'total_streams' => count($activeStreams),
@@ -85,15 +108,14 @@ class StreamMonitorUpdate implements ShouldQueue
                 'redis_connected' => $systemStats['redis_connected'] ?? false,
                 'timestamp' => time()
             ]);
-            
+
             // Clean up stale monitoring data
             $monitorService->cleanupStaleData();
-            
+
             Log::channel('ffmpeg')->debug(
-                "StreamMonitor: Updated stats - " . count($activeStreams) . " streams, " . 
-                "{$unhealthyStreams} unhealthy, " . round($totalBandwidth / 1024 / 1024, 2) . "MB/s bandwidth"
+                "StreamMonitor: Updated stats - " . count($activeStreams) . " streams, " .
+                    "{$unhealthyStreams} unhealthy, " . round($totalBandwidth / 1024 / 1024, 2) . "MB/s bandwidth"
             );
-            
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error('StreamMonitor: Error during monitoring update: ' . $e->getMessage());
             throw $e;
