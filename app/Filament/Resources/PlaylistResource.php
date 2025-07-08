@@ -918,16 +918,18 @@ class PlaylistResource extends Resource
                 ->columns(5)
                 ->schema([
                     Forms\Components\Section::make('Playlist Stats')
-                        ->icon('heroicon-m-chart-bar')
+                        ->compact()
+                        ->icon('heroicon-o-chart-bar-square')
                         ->collapsible()
-                        ->columnSpan(2)
+                        ->persistCollapsed()
+                        ->columnSpanFull()
                         ->collapsed(true)
                         ->schema([
                             PlaylistInfo::make('play_list_info')
                                 ->label('') // disable the label
-                                ->columnSpan(2)
+                                ->columnSpanFull()
                                 ->dehydrated(false), // don't save the value in the database
-                        ])->columnSpanFull(),
+                        ]),
                     Forms\Components\Tabs::make()
                         ->tabs($tabs)
                         ->columnSpan(3)
