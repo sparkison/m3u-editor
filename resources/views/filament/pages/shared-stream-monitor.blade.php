@@ -170,10 +170,6 @@
                                 </div>
                                 
                                 <div class="flex items-center space-x-2">
-                                    {{-- <button wire:click="restartStream('{{ $stream['stream_id'] }}')" 
-                                            class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-yellow-500">
-                                        Restart
-                                    </button> --}}
                                     <button wire:click="stopStream('{{ $stream['stream_id'] }}')" 
                                             class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-red-500">
                                         Stop

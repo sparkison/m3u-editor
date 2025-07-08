@@ -57,13 +57,6 @@ class ManageSharedStreams extends Command
             case 'stop-all':
                 return $this->stopAllStreams($force);
 
-            case 'restart':
-                if (!$streamKey) {
-                    $this->error('--stream-key is required for restart action');
-                    return 1;
-                }
-                return $this->restartStream($streamKey);
-
             case 'cleanup':
                 return $this->cleanupStreams($force);
 
@@ -186,31 +179,6 @@ class ManageSharedStreams extends Command
 
         $this->info("Stopped {$stopped} streams.");
         return 0;
-    }
-
-    private function restartStream(string $streamKey): int
-    {
-        $streams = $this->sharedStreamService->getAllActiveStreams();
-        if (!isset($streams[$streamKey])) {
-            $this->error("Stream not found: {$streamKey}");
-            return 1;
-        }
-
-        $this->info("Restarting stream: {$streamKey}");
-
-        try {
-            $success = $this->sharedStreamService->restartStream($streamKey);
-            if ($success) {
-                $this->info("Stream restarted successfully.");
-                return 0;
-            } else {
-                $this->error("Failed to restart stream.");
-                return 1;
-            }
-        } catch (\Exception $e) {
-            $this->error("Error restarting stream: " . $e->getMessage());
-            return 1;
-        }
     }
 
     private function cleanupStreams(bool $force): int

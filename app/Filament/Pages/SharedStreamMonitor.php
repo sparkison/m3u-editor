@@ -122,45 +122,6 @@ class SharedStreamMonitor extends Page
         $this->refreshData();
     }
 
-    public function restartStream(string $streamId): void
-    {
-        $stream = SharedStream::where('stream_id', $streamId)->first();
-
-        if (!$stream) {
-            Notification::make()
-                ->title("Stream not found.")
-                ->danger()
-                ->send();
-            return;
-        }
-
-        // Stop the current stream
-        $this->sharedStreamService->stopStream($streamId);
-
-        // Wait a moment for cleanup
-        sleep(1);
-
-        // Start a new stream with the same source
-        $newStreamId = $this->sharedStreamService->createSharedStream(
-            $stream->source_url,
-            $stream->format
-        );
-
-        if ($newStreamId) {
-            Notification::make()
-                ->title("Stream restarted with new ID: {$newStreamId}")
-                ->success()
-                ->send();
-        } else {
-            Notification::make()
-                ->title("Failed to restart stream.")
-                ->danger()
-                ->send();
-        }
-
-        $this->refreshData();
-    }
-
     protected function getActiveStreams(): array
     {
         // Get streams from database instead of just Redis

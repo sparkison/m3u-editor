@@ -35,36 +35,6 @@ class QuickActionsWidget extends Widget
         }
     }
 
-    public function restartUnhealthyStreams()
-    {
-        try {
-            $unhealthyStreams = SharedStream::where('health_status', '!=', 'healthy')
-                                          ->where('status', 'active')
-                                          ->get();
-            
-            $restartCount = 0;
-            foreach ($unhealthyStreams as $stream) {
-                $sharedStreamService = app(SharedStreamService::class);
-                if ($sharedStreamService->restartStream($stream->stream_id)) {
-                    $restartCount++;
-                }
-            }
-            
-            Notification::make()
-                ->title('Streams Restarted')
-                ->body("Successfully restarted {$restartCount} unhealthy streams")
-                ->success()
-                ->send();
-                
-        } catch (\Exception $e) {
-            Notification::make()
-                ->title('Restart Failed')
-                ->body($e->getMessage())
-                ->danger()
-                ->send();
-        }
-    }
-
     public function optimizeBuffers()
     {
         try {

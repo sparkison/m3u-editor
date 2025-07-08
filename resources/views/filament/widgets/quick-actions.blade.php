@@ -66,23 +66,6 @@
                     <span class="text-xs text-gray-500 dark:text-gray-400 text-center mt-1">Remove inactive streams and clients</span>
                 </button>
 
-                <!-- Restart Unhealthy -->
-                <button 
-                    wire:click="restartUnhealthyStreams"
-                    class="flex flex-col items-center p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group"
-                    @if($stats['unhealthy_streams'] === 0) disabled @endif
-                >
-                    <div class="p-2 {{ $stats['unhealthy_streams'] > 0 ? 'bg-yellow-100 dark:bg-yellow-900/50' : 'bg-gray-100 dark:bg-gray-700' }} rounded-lg mb-3 group-hover:{{ $stats['unhealthy_streams'] > 0 ? 'bg-yellow-200 dark:group-hover:bg-yellow-900/70' : 'bg-gray-200 dark:bg-gray-600' }} transition-colors">
-                        <svg class="w-6 h-6 {{ $stats['unhealthy_streams'] > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                        </svg>
-                    </div>
-                    <span class="text-sm font-medium {{ $stats['unhealthy_streams'] > 0 ? 'text-gray-900 dark:text-white' : 'text-gray-400' }}">Restart Unhealthy</span>
-                    <span class="text-xs {{ $stats['unhealthy_streams'] > 0 ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400' }} text-center mt-1">
-                        {{ $stats['unhealthy_streams'] > 0 ? "Restart {$stats['unhealthy_streams']} streams" : 'No unhealthy streams' }}
-                    </span>
-                </button>
-
                 <!-- Optimize Buffers -->
                 <button 
                     wire:click="optimizeBuffers"
