@@ -291,7 +291,6 @@ class ProcessM3uImport implements ShouldQueue
                 'year' => null, // new field for year
                 'rating' => null, // new field for rating
                 'rating_5based' => null, // new field for 5-based rating
-                'source_id' => null, // source ID for the channel
             ];
 
             // Update progress
@@ -347,7 +346,6 @@ class ProcessM3uImport implements ShouldQueue
                             'channel' => $item['num'] ?? null,
                             'catchup' => $item['tv_archive'] ?? null,
                             'shift' => $item['tv_archive_duration'] ?? 0,
-                            'source_id' => $item['stream_id'] ?? null, // source ID for the channel
                             // 'tvg_shift' => $item['tvg_shift'] ?? null, // @TODO: check if this is on Xtream API, not seeing it as a deffinition in the API docs
                         ];
                         if ($autoSort) {
@@ -386,7 +384,6 @@ class ProcessM3uImport implements ShouldQueue
                             'year' => $item['year'] ?? null, // new field for year
                             'rating' => $item['rating'] ?? null, // new field for rating
                             'rating_5based' => $item['rating_5based'] ?? null, // new field for 5-based rating
-                            'source_id' => $item['stream_id'] ?? null, // source ID for the channel
                         ];
                         if ($autoSort) {
                             $channel['sort'] = $channelNo;
@@ -512,8 +509,7 @@ class ProcessM3uImport implements ShouldQueue
                     'catchup' => null,
                     'catchup_source' => null,
                     'shift' => 0,
-                    'tvg_shift' => null,
-                    'source_id' => null, // source ID for the channel
+                    'tvg_shift' => null
                 ];
                 if ($autoSort) {
                     $channelFields['sort'] = 0;
@@ -569,17 +565,9 @@ class ProcessM3uImport implements ShouldQueue
                                 continue 2;
                             }
                         }
-                        // Get the source ID from the URL
-                        $sourceId = null;
-                        if (str_contains($url, '/')) {
-                            $urlParts = explode('/', $url);
-                            $streamIdWithExtension = end($urlParts);
-                            $sourceId = pathinfo($streamIdWithExtension, PATHINFO_FILENAME); // Get the stream ID without extension
-                        }
                         $channel = [
                             ...$channelFields,
                             'url' => $url,
-                            'source_id' => $sourceId, // source ID for the channel
                         ];
                         $extvlcopt = [];
                         $kodidrop = [];

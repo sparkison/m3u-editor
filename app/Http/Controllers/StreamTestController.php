@@ -1,0 +1,524 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\Process\Process;
+
+class StreamTestController extends Controller
+{
+    /**
+     * Generate a test stream with a timer overlay.
+     * 
+     * @param Request $request
+     * @param int $timeout - 0 for no limit, or seconds to count down
+     * @return StreamedResponse
+     */
+    public function testStream(Request $request, int $timeout = 0): StreamedResponse
+    {
+        // Prevent timeouts, etc.
+        // These are typically set at the beginning of a script that does direct output.
+        @ini_set('max_execution_time', 0);
+        @ini_set('output_buffering', 'off');
+        @ini_set('implicit_flush', 1);
+        
+        // Validate timeout
+        if ($timeout < 0) {
+            abort(400, 'Timeout must be 0 or positive integer');
+        }
+
+        // Set appropriate headers for TS streaming
+        $headers = [
+            'Content-Type' => 'video/mp2t',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+            'Connection' => 'keep-alive',
+            'Access-Control-Allow-Origin' => '*',
+        ];
+
+        return new StreamedResponse(function () use ($timeout) {
+            $this->generateTestStream($timeout);
+        }, 200, $headers);
+    }
+
+    /**
+     * Generate the actual test stream content
+     * 
+     * @param int $timeout
+     * @return void
+     */
+    private function generateTestStream(int $timeout): void
+    {
+        $startTime = time();
+        
+        Log::channel('ffmpeg')->info("Starting test stream", [
+            'timeout' => $timeout,
+            'start_time' => $startTime
+        ]);
+
+        // Check if FFmpeg is available for proper video generation
+        if ($this->isFFmpegAvailable()) {
+            $this->generateFFmpegStream($timeout, $startTime);
+        } else {
+            $this->generateBasicStream($timeout, $startTime);
+        }
+    }
+
+    /**
+     * Check if FFmpeg is available on the system
+     * 
+     * @return bool
+     */
+    private function isFFmpegAvailable(): bool
+    {
+        try {
+            $process = new Process(['ffmpeg', '-version']);
+            $process->run();
+            return $process->isSuccessful();
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Generate a proper video stream using FFmpeg
+     * 
+     * @param int $timeout
+     * @param int $startTime
+     * @return void
+     */
+    private function generateFFmpegStream(int $timeout, int $startTime): void
+    {
+        try {
+            // For infinite streams, we need a different approach
+            if ($timeout === 0) {
+                $this->generateInfiniteFFmpegStream($startTime);
+                return;
+            }
+            
+            // Calculate initial display text
+            $timeText = sprintf("Countdown: %02d:%02d", floor($timeout / 60), $timeout % 60);
+            
+            // Prepare filter text (escape special characters for FFmpeg)
+            $filterText = str_replace(['"', "'", ':', '\n'], ['\"', "\'", '\\:', '\\n'], $timeText . "\\nFinite Stream");
+            
+            // Create FFmpeg command for finite stream
+            $cmd = [
+                'ffmpeg',
+                '-re', // Force real-time output
+                '-f', 'lavfi',
+                '-i', 'testsrc2=size=1280x720:rate=25', // 720p test pattern at 25fps
+                '-f', 'lavfi',
+                '-i', 'sine=frequency=1000:sample_rate=48000', // 1kHz tone  
+                '-filter_complex', "[0:v]drawtext=text='{$filterText}':fontsize=48:fontcolor=white:x=(w-tw)/2:y=(h-th)/2:box=1:boxcolor=black@0.5[v]",
+                '-map', '[v]',
+                '-map', '1:a',
+                '-t', (string)$timeout, // Set duration for finite streams
+                '-c:v', 'libx264',
+                '-preset', 'ultrafast',
+                '-tune', 'zerolatency',
+                '-profile:v', 'baseline',
+                '-level', '3.0',
+                '-pix_fmt', 'yuv420p',
+                '-c:a', 'aac',
+                '-b:a', '128k',
+                '-f', 'mpegts',
+                'pipe:1'
+            ];
+
+            Log::channel('ffmpeg')->info("Starting continuous FFmpeg stream", ['timeout' => $timeout, 'cmd' => implode(' ', $cmd)]);
+
+            $process = new Process($cmd);
+            $process->setTimeout($timeout > 0 ? $timeout + 5 : null);
+            
+            Log::channel('ffmpeg')->info("Starting FFmpeg process", [
+                'timeout' => $timeout,
+                'process_timeout' => $timeout > 0 ? $timeout + 5 : null
+            ]);
+            
+            $process->start();
+            
+            if (!$process->isStarted()) {
+                Log::channel('ffmpeg')->error("Failed to start FFmpeg process");
+                throw new \Exception("Failed to start FFmpeg process");
+            }
+            
+            $lastOutput = time();
+            $totalBytes = 0;
+            
+            // Stream output as it becomes available
+            while ($process->isRunning()) {
+                // Read available output
+                $output = $process->getIncrementalOutput();
+                
+                if (!empty($output)) {
+                    echo $output;
+                    $totalBytes += strlen($output);
+                    if (ob_get_level()) {
+                        ob_flush();
+                    }
+                    flush();
+                    $lastOutput = time();
+                }
+                
+                // Check if connection is still alive
+                if (connection_aborted()) {
+                    $process->stop();
+                    Log::channel('ffmpeg')->info("Test stream connection aborted (FFmpeg)", ['elapsed' => time() - $startTime]);
+                    break;
+                }
+                
+                // Safety timeout check (should not be needed if FFmpeg -t works)
+                if ($timeout > 0 && (time() - $startTime) >= ($timeout + 3)) {
+                    Log::channel('ffmpeg')->warning("FFmpeg process exceeded expected timeout, force stopping", [
+                        'elapsed' => time() - $startTime,
+                        'expected_timeout' => $timeout,
+                        'bytes_sent' => $totalBytes
+                    ]);
+                    $process->stop();
+                    break;
+                }
+                
+                // Check if process is stalled (but give more time for finite streams)
+                $stallTimeout = $timeout > 0 ? min(15, $timeout + 5) : 15;
+                if ((time() - $lastOutput) > $stallTimeout) {
+                    Log::channel('ffmpeg')->warning("FFmpeg process seems stalled, stopping", [
+                        'last_output' => $lastOutput,
+                        'current_time' => time(),
+                        'stall_timeout' => $stallTimeout,
+                        'bytes_sent' => $totalBytes
+                    ]);
+                    $process->stop();
+                    break;
+                }
+                
+                // Small sleep to prevent busy waiting
+                usleep(10000); // 10ms
+            }
+            
+            // Check if process exited due to error
+            if ($process->getExitCode() > 0) {
+                Log::channel('ffmpeg')->error("FFmpeg process exited with error", [
+                    'exit_code' => $process->getExitCode(),
+                    'error_output' => $process->getErrorOutput(),
+                    'bytes_sent' => $totalBytes
+                ]);
+            }
+            
+            Log::channel('ffmpeg')->info("FFmpeg process finished", [
+                'exit_code' => $process->getExitCode(),
+                'bytes_sent' => $totalBytes,
+                'elapsed' => time() - $startTime
+            ]);
+            
+            // Get any remaining output
+            $remainingOutput = $process->getIncrementalOutput();
+            if (!empty($remainingOutput)) {
+                echo $remainingOutput;
+                if (ob_get_level()) {
+                    ob_flush();
+                }
+                flush();
+            }
+            
+            $exitCode = $process->getExitCode();
+            $finalElapsed = time() - $startTime;
+            
+            if ($exitCode !== 0 && $exitCode !== null) {
+                Log::channel('ffmpeg')->error("FFmpeg continuous stream failed", [
+                    'exit_code' => $exitCode,
+                    'error' => $process->getErrorOutput(),
+                    'elapsed' => $finalElapsed,
+                    'timeout' => $timeout
+                ]);
+            } else {
+                Log::channel('ffmpeg')->info("FFmpeg continuous stream completed", [
+                    'duration' => $finalElapsed,
+                    'timeout' => $timeout,
+                    'exit_code' => $exitCode
+                ]);
+            }
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("FFmpeg stream error", [
+                'error' => $e->getMessage(),
+                'elapsed' => time() - $startTime
+            ]);
+            
+            // Fallback to basic stream
+            $this->generateBasicStream($timeout, $startTime);
+        }
+    }
+
+    /**
+     * Generate an infinite video stream using FFmpeg
+     * This method creates a truly continuous stream that loops indefinitely
+     * 
+     * @param int $startTime
+     * @return void
+     */
+    private function generateInfiniteFFmpegStream(int $startTime): void
+    {
+        try {
+            Log::channel('ffmpeg')->info("Starting infinite FFmpeg stream", ['start_time' => $startTime]);
+            
+            // Create FFmpeg command for infinite stream with dynamic timer
+            // We use the -stream_loop -1 flag to loop indefinitely and use lavfi inputs that don't have inherent length limits
+            $cmd = [
+                'ffmpeg',
+                '-re', // Force real-time output
+                '-f', 'lavfi',
+                '-i', 'testsrc2=size=1280x720:rate=25', // 720p test pattern at 25fps - this generates indefinitely
+                '-f', 'lavfi', 
+                '-i', 'sine=frequency=1000:sample_rate=48000', // 1kHz tone - this also generates indefinitely
+                '-filter_complex', '[0:v]drawtext=text=\'Runtime\\: %{eif\\:trunc(t/60)\\:d}\\:%{eif\\:mod(t,60)\\:02d}\\nInfinite Stream\':fontsize=48:fontcolor=white:x=(w-tw)/2:y=(h-th)/2:box=1:boxcolor=black@0.5[v]',
+                '-map', '[v]',
+                '-map', '1:a',
+                '-c:v', 'libx264',
+                '-preset', 'ultrafast',
+                '-tune', 'zerolatency',
+                '-profile:v', 'baseline',
+                '-level', '3.0',
+                '-pix_fmt', 'yuv420p',
+                '-c:a', 'aac',
+                '-b:a', '128k',
+                '-f', 'mpegts',
+                'pipe:1'
+            ];
+
+            Log::channel('ffmpeg')->info("Starting infinite FFmpeg stream", ['cmd' => implode(' ', $cmd)]);
+
+            $process = new Process($cmd);
+            $process->setTimeout(null); // No timeout for infinite streams
+            
+            $process->start();
+            
+            if (!$process->isStarted()) {
+                Log::channel('ffmpeg')->error("Failed to start infinite FFmpeg process");
+                throw new \Exception("Failed to start infinite FFmpeg process");
+            }
+            
+            $lastOutput = time();
+            $totalBytes = 0;
+            $lastLogTime = time();
+            
+            // Stream output as it becomes available
+            while ($process->isRunning()) {
+                // Read available output
+                $output = $process->getIncrementalOutput();
+                
+                if (!empty($output)) {
+                    echo $output;
+                    $totalBytes += strlen($output);
+                    if (ob_get_level()) {
+                        ob_flush();
+                    }
+                    flush();
+                    $lastOutput = time();
+                }
+                
+                // Check if connection is still alive
+                if (connection_aborted()) {
+                    $process->stop();
+                    Log::channel('ffmpeg')->info("Infinite test stream connection aborted", ['elapsed' => time() - $startTime, 'bytes_sent' => $totalBytes]);
+                    break;
+                }
+                
+                // Log progress every 60 seconds for infinite streams
+                if ((time() - $lastLogTime) >= 60) {
+                    Log::channel('ffmpeg')->info("Infinite stream progress", [
+                        'elapsed' => time() - $startTime,
+                        'bytes_sent' => $totalBytes,
+                        'mb_sent' => round($totalBytes / 1024 / 1024, 2)
+                    ]);
+                    $lastLogTime = time();
+                }
+                
+                // Check if process is stalled (longer timeout for infinite streams)
+                if ((time() - $lastOutput) > 30) {
+                    Log::channel('ffmpeg')->warning("Infinite FFmpeg process seems stalled, stopping", [
+                        'last_output' => $lastOutput,
+                        'current_time' => time(),
+                        'bytes_sent' => $totalBytes
+                    ]);
+                    $process->stop();
+                    break;
+                }
+                
+                // Small sleep to prevent busy waiting
+                usleep(10000); // 10ms
+            }
+            
+            // Check if process exited due to error
+            $exitCode = $process->getExitCode();
+            if ($exitCode > 0) {
+                Log::channel('ffmpeg')->error("Infinite FFmpeg process exited with error", [
+                    'exit_code' => $exitCode,
+                    'error_output' => $process->getErrorOutput(),
+                    'bytes_sent' => $totalBytes,
+                    'elapsed' => time() - $startTime
+                ]);
+            }
+            
+            // Get any remaining output
+            $remainingOutput = $process->getIncrementalOutput();
+            if (!empty($remainingOutput)) {
+                echo $remainingOutput;
+                if (ob_get_level()) {
+                    ob_flush();
+                }
+                flush();
+            }
+            
+            Log::channel('ffmpeg')->info("Infinite FFmpeg stream ended", [
+                'duration' => time() - $startTime,
+                'bytes_sent' => $totalBytes,
+                'exit_code' => $exitCode
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Infinite FFmpeg stream error", [
+                'error' => $e->getMessage(),
+                'elapsed' => time() - $startTime
+            ]);
+            
+            // Fallback to basic infinite stream
+            $this->generateBasicStream(0, $startTime);
+        }
+    }
+
+    /**
+     * Generate a basic fallback stream
+     * 
+     * @param int $timeout
+     * @param int $startTime
+     * @return void
+     */
+    private function generateBasicStream(int $timeout, int $startTime): void
+    {
+        $counter = 0;
+        $segmentDuration = 2; // 2 seconds per segment
+        
+        try {
+            while (true) {
+                $currentTime = time();
+                $elapsed = $currentTime - $startTime;
+                
+                // Check if we should stop (timeout reached)
+                if ($timeout > 0 && $elapsed >= $timeout) {
+                    Log::channel('ffmpeg')->info("Test stream timeout reached", ['elapsed' => $elapsed, 'timeout' => $timeout]);
+                    break;
+                }
+                
+                // Calculate display time
+                if ($timeout > 0) {
+                    $displayTime = max(0, $timeout - $elapsed);
+                    $timeText = sprintf("Countdown: %02d:%02d", floor($displayTime / 60), $displayTime % 60);
+                } else {
+                    $timeText = sprintf("Runtime: %02d:%02d", floor($elapsed / 60), $elapsed % 60);
+                }
+                
+                // Generate a simple TS segment
+                $tsSegment = $this->generateTsSegment($timeText, $counter, $segmentDuration);
+                
+                // Output the segment
+                echo $tsSegment;
+                
+                // Flush the output buffer
+                if (ob_get_level()) {
+                    ob_flush();
+                }
+                flush();
+                
+                // Check if connection is still alive
+                if (connection_aborted()) {
+                    Log::channel('ffmpeg')->info("Test stream connection aborted", ['elapsed' => $elapsed]);
+                    break;
+                }
+                
+                $counter++;
+                
+                // Sleep for segment duration
+                sleep($segmentDuration);
+            }
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Test stream error", [
+                'error' => $e->getMessage(),
+                'elapsed' => time() - $startTime
+            ]);
+        }
+        
+        Log::channel('ffmpeg')->info("Test stream ended", [
+            'duration' => time() - $startTime,
+            'segments_sent' => $counter
+        ]);
+    }
+
+    /**
+     * Generate a minimal TS segment with embedded timer
+     * 
+     * @param string $timeText
+     * @param int $counter
+     * @param int $duration
+     * @return string
+     */
+    private function generateTsSegment(string $timeText, int $counter, int $duration): string
+    {
+        // This is a simplified TS packet structure
+        // In a real implementation, you would use FFmpeg or similar
+        // For testing purposes, we'll create a minimal valid TS structure
+        
+        $segmentData = $this->createMinimalTsPacket($timeText, $counter, $duration);
+        
+        return $segmentData;
+    }
+
+    /**
+     * Create a minimal TS packet structure
+     * This is a very basic implementation for testing purposes
+     * 
+     * @param string $timeText
+     * @param int $counter
+     * @param int $duration
+     * @return string
+     */
+    private function createMinimalTsPacket(string $timeText, int $counter, int $duration): string
+    {
+        // TS packet is 188 bytes
+        $packetSize = 188;
+        $packetsPerSegment = 500; // More packets for better streaming
+        
+        $segment = '';
+        
+        for ($i = 0; $i < $packetsPerSegment; $i++) {
+            // Create a basic TS packet header
+            $packet = '';
+            
+            // Sync byte (0x47)
+            $packet .= chr(0x47);
+            
+            // Transport Error Indicator, Payload Unit Start Indicator, Transport Priority, PID (13 bits)
+            $pid = ($i % 3 == 0) ? 0x0100 : (($i % 3 == 1) ? 0x0101 : 0x0102);
+            $packet .= pack('n', $pid);
+            
+            // Scrambling control, Adaptation field control, Continuity counter
+            $continuityCounter = ($counter + $i) % 16;
+            $packet .= chr(0x10 | $continuityCounter);
+            
+            // Fill the rest with payload data (including our timer info)
+            $payload = sprintf("Test Stream - %s - Segment #%d - Packet #%d - Time: %s", 
+                $timeText, $counter, $i, date('Y-m-d H:i:s'));
+            
+            // Pad payload to fill packet
+            $payload = str_pad($payload, $packetSize - 4, "\xFF");
+            $packet .= substr($payload, 0, $packetSize - 4);
+            
+            $segment .= $packet;
+        }
+        
+        return $segment;
+    }
+}

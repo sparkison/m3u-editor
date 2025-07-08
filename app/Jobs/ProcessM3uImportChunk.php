@@ -97,7 +97,6 @@ class ProcessM3uImportChunk implements ShouldQueue
                 'year', // new field for year
                 'rating', // new field for rating
                 'rating_5based', // new field for 5-based rating
-                'source_id', // new field for source ID
             ]);
         }
     }

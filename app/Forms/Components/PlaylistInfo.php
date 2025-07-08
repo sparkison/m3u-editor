@@ -13,7 +13,7 @@ class PlaylistInfo extends Field
 {
     protected string $view = 'forms.components.playlist-info';
 
-    public function getStats(): array
+    public function getStats($force = false): array
     {
         $playlist = Playlist::find($this->getRecord()?->id);
         if (!$playlist) {
@@ -33,7 +33,7 @@ class PlaylistInfo extends Field
             $stats['active_connections'] = "$activeStreams/$availableStreams";
         }
         if ($playlist->xtream) {
-            $xtreamStats = $this->getXtreamStats($playlist);
+            $xtreamStats = $this->getXtreamStats($playlist, $force);
             if (!empty($xtreamStats)) {
                 $stats = array_merge($stats, $xtreamStats);
             }

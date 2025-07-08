@@ -8,7 +8,8 @@ use Exception;
 class ProxyService
 {
     // Cache configuration for bad sources
-    public const BAD_SOURCE_CACHE_SECONDS = 10;
+    public const BAD_SOURCE_CACHE_SECONDS = 10; // Default for ffprobe/general errors
+    public const BAD_SOURCE_CACHE_SECONDS_CONTENT_ERROR = 10; // For fatal stream content errors
     public const BAD_SOURCE_CACHE_PREFIX = 'failover:bad_source:';
 
     /**
@@ -22,16 +23,29 @@ class ProxyService
     {
         $proxyUrlOverride = config('proxy.url_override');
         $proxyFormat = $format ?? config('proxy.proxy_format', 'ts');
+        $sharedStreamingEnabled = config('proxy.shared_streaming.enabled', false);
         $id = rtrim(base64_encode($id), '=');
         if ($proxyUrlOverride && !$preview) {
             $proxyUrlOverride = rtrim($proxyUrlOverride, '/');
             if ($proxyFormat === 'hls') {
+                if ($sharedStreamingEnabled) {
+                    return "$proxyUrlOverride/shared/stream/$id/hls";
+                }
                 return "$proxyUrlOverride/api/stream/$id/playlist.m3u8";
             } else {
+                if ($sharedStreamingEnabled) {
+                    return "$proxyUrlOverride/shared/stream/$id";
+                }
                 return "$proxyUrlOverride/stream/$id.ts";
             }
         }
 
+        if ($sharedStreamingEnabled) {
+            return route('shared.stream.channel', [
+                'encodedId' => $id,
+                'format' => $proxyFormat
+            ]);
+        }
         return $proxyFormat === 'hls'
             ? route('stream.hls.playlist', [
                 'encodedId' => $id
@@ -53,16 +67,29 @@ class ProxyService
     {
         $proxyUrlOverride = config('proxy.url_override');
         $proxyFormat = $format ?? config('proxy.proxy_format', 'ts');
+        $sharedStreamingEnabled = config('proxy.shared_streaming.enabled', false);
         $id = rtrim(base64_encode($id), '=');
         if ($proxyUrlOverride && !$preview) {
             $proxyUrlOverride = rtrim($proxyUrlOverride, '/');
             if ($proxyFormat === 'hls') {
+                if ($sharedStreamingEnabled) {
+                    return "$proxyUrlOverride/shared/stream/e/$id.hls";
+                }
                 return "$proxyUrlOverride/api/stream/e/$id/playlist.m3u8";
             } else {
+                if ($sharedStreamingEnabled) {
+                    return "$proxyUrlOverride/shared/stream/e/$id.ts";
+                }
                 return "$proxyUrlOverride/stream/e/$id.ts";
             }
         }
 
+        if ($sharedStreamingEnabled) {
+            return route('shared.stream.episode', [
+                'encodedId' => $id,
+                'format' => $proxyFormat
+            ]);
+        }
         return $proxyFormat === 'hls'
             ? route('stream.hls.episode', [
                 'encodedId' => $id

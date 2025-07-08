@@ -25,10 +25,10 @@ trait TracksActiveStreams
     protected function incrementActiveStreams(int $playlistId): int
     {
         $activeStreamsKey = "active_streams:{$playlistId}";
-        
+
         // Increment the counter
         $activeStreams = Redis::incr($activeStreamsKey);
-        
+
         // Make sure we haven't gone negative for any reason
         if ($activeStreams <= 0) {
             Redis::set($activeStreamsKey, 1);
@@ -37,12 +37,12 @@ trait TracksActiveStreams
 
         // Fire event
         event(new StreamingStarted($playlistId));
-        
-        Log::channel('ffmpeg')->debug("Active streams for playlist {$playlistId}: {$activeStreams} (after increment)");
-        
+
+        Log::channel('ffmpeg')->debug("Playlist {$playlistId} active streams now: {$activeStreams} (after increment; may be for new stream attempt or confirmed start)");
+
         return $activeStreams;
     }
-    
+
     /**
      * Decrement the active streams count for a playlist
      * 
@@ -52,10 +52,10 @@ trait TracksActiveStreams
     protected function decrementActiveStreams(int $playlistId): int
     {
         $activeStreamsKey = "active_streams:{$playlistId}";
-        
+
         // Decrement the counter
         $activeStreams = Redis::decr($activeStreamsKey);
-        
+
         // Make sure we don't go below 0
         if ($activeStreams < 0) {
             Redis::set($activeStreamsKey, 0);
@@ -64,12 +64,12 @@ trait TracksActiveStreams
 
         // Fire event
         event(new StreamingStopped($playlistId));
-        
-        Log::channel('ffmpeg')->debug("Active streams for playlist {$playlistId}: {$activeStreams} (after decrement)");
-        
+
+        Log::channel('ffmpeg')->debug("Playlist {$playlistId} active streams now: {$activeStreams} (after decrement; may be for failed/skipped attempt or confirmed stop)");
+
         return $activeStreams;
     }
-    
+
     /**
      * Get the current active streams count for a playlist
      * 
@@ -80,16 +80,16 @@ trait TracksActiveStreams
     {
         $activeStreamsKey = "active_streams:{$playlistId}";
         $count = (int) Redis::get($activeStreamsKey) ?? 0;
-        
+
         // Ensure the count is never negative
         if ($count < 0) {
             Redis::set($activeStreamsKey, 0);
             $count = 0;
         }
-        
+
         return $count;
     }
-    
+
     /**
      * Check if adding a new stream would exceed the playlist's limit
      * 
@@ -103,10 +103,10 @@ trait TracksActiveStreams
         if ($availableStreams <= 0) {
             return false; // Unlimited streams
         }
-        
-        return $currentActiveStreams >= $availableStreams;
+
+        return $currentActiveStreams > $availableStreams;
     }
-    
+
     /**
      * Reset the active streams count for a playlist to zero
      * 
@@ -117,8 +117,7 @@ trait TracksActiveStreams
     {
         $activeStreamsKey = "active_streams:{$playlistId}";
         Redis::set($activeStreamsKey, 0);
-        
+
         Log::channel('ffmpeg')->debug("Reset active streams count for playlist {$playlistId} to 0");
     }
-
 }

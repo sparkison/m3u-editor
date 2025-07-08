@@ -212,7 +212,7 @@ class PlaylistResource extends Resource
                         ->modalDescription('Process playlist now?')
                         ->modalSubmitActionLabel('Yes, process now'),
                     Tables\Actions\Action::make('process_series')
-                        ->label('Process Series')
+                        ->label('Process Series Only')
                         ->icon('heroicon-o-arrow-path')
                         ->action(function ($record) {
                             $record->update([

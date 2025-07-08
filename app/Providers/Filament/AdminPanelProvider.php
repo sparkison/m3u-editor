@@ -12,10 +12,12 @@ use App\Filament\Widgets\DiscordWidget;
 use App\Filament\Widgets\DocumentsWidget;
 use App\Filament\Widgets\DonateCrypto;
 use App\Filament\Widgets\KoFiWidget;
-
+use App\Filament\Widgets\SharedStreamStatsWidget;
 //use App\Filament\Widgets\PayPalDonateWidget;
 use App\Filament\Widgets\StatsOverview;
+use App\Filament\Widgets\SystemHealthWidget;
 use App\Livewire\ProfileComponent;
+use App\Models\SharedStream;
 use App\Settings\GeneralSettings;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -70,7 +72,7 @@ class AdminPanelProvider extends PanelProvider
         $adminPanel = $panel
             ->default()
             ->id('admin')
-            ->path('/')
+            ->path('')
             ->login(Login::class)
             // ->profile(EditProfile::class, isSimple: false)
             ->brandName('m3u editor')
@@ -98,6 +100,8 @@ class AdminPanelProvider extends PanelProvider
                 KoFiWidget::class,
                 // DonateCrypto::class,
                 StatsOverview::class,
+                // SharedStreamStatsWidget::class,
+                // SystemHealthWidget::class,
             ])
             ->plugins([
                 FilamentSpatieLaravelBackupPlugin::make()

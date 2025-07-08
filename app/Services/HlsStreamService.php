@@ -6,6 +6,8 @@ use Exception;
 use App\Models\Channel;
 use App\Models\Episode;
 use App\Exceptions\SourceNotResponding;
+use App\Exceptions\FatalStreamContentException; // Added
+use App\Exceptions\AllPlaylistsExhaustedException;
 use App\Traits\TracksActiveStreams;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
@@ -31,7 +33,6 @@ class HlsStreamService
         Channel|Episode $model, // This $model is the *original* requested channel/episode
         string $title           // This $title is the title of the *original* model
     ): ?object {
-        // Get stream settings, including the ffprobe timeout
         $streamSettings = ProxyService::getStreamSettings();
         $ffprobeTimeout = $streamSettings['ffmpeg_ffprobe_timeout'] ?? 5; // Default to 5 if not set
 
@@ -70,8 +71,15 @@ class HlsStreamService
         // Add to active IDs set for the original model
         Redis::sadd("hls:active_{$type}_ids", $model->id);
 
+        // Keep track of playlists that have exhausted their available streams during this request
+        $exhaustedPlaylistIds = [];
+        $allAttemptsFailedDueToPlaylistLimits = true; // Assume true initially
+        $atLeastOneAttemptHitLimit = false; // Track if we actually encountered a limit
+        $numberOfAttempts = 0;
+
         // Loop over the failover channels and grab the first one that works.
         foreach ($streams as $stream) { // $stream is the current primary or failover channel being attempted
+            $numberOfAttempts++;
             // URL for the current stream being attempted
             $currentAttemptStreamUrl = $type === 'channel'
                 ? ($stream->url_custom ?? $stream->url) // Use current $stream's URL
@@ -86,6 +94,12 @@ class HlsStreamService
             // Check if playlist is specified for the current stream
             $playlist = $stream->getEffectivePlaylist();
 
+            // If this stream's playlist is already marked as exhausted for this request, skip it.
+            if (in_array($playlist->id, $exhaustedPlaylistIds)) {
+                Log::channel('ffmpeg')->debug("HLS Stream: Playlist {$playlist->name} ({$playlist->id}) previously marked as exhausted. Skipping channel {$currentStreamTitle} ({$stream->id}).");
+                continue;
+            }
+
             // Make sure we have a valid source channel (using current stream's ID and its playlist ID)
             $badSourceCacheKey = ProxyService::BAD_SOURCE_CACHE_PREFIX . $stream->id . ':' . $playlist->id;
             if (Redis::exists($badSourceCacheKey)) {
@@ -94,6 +108,7 @@ class HlsStreamService
                 } else {
                     Log::channel('ffmpeg')->debug("Skipping Failover {$type} {$stream->name} for source {$model->title} ({$model->id}) as it (stream ID {$stream->id}) was recently marked as bad for playlist {$playlist->id}. Reason: " . (Redis::get($badSourceCacheKey) ?: 'N/A'));
                 }
+                $allAttemptsFailedDueToPlaylistLimits = false; // Failure not due to playlist limit
                 continue;
             }
 
@@ -104,7 +119,13 @@ class HlsStreamService
             if ($this->wouldExceedStreamLimit($playlist->id, $playlist->available_streams, $activeStreams)) {
                 // We're over limit, so decrement and skip
                 $this->decrementActiveStreams($playlist->id);
-                Log::channel('ffmpeg')->debug("Max streams reached for playlist {$playlist->name} ({$playlist->id}). Skipping channel {$currentStreamTitle}.");
+                Log::channel('ffmpeg')->debug("HLS Stream: Max streams reached for playlist {$playlist->name} ({$playlist->id}). Skipping channel {$currentStreamTitle}. Adding playlist to exhausted list for this request.");
+                // Add this playlist to the exhausted list for the current request scope
+                if (!in_array($playlist->id, $exhaustedPlaylistIds)) {
+                    $exhaustedPlaylistIds[] = $playlist->id;
+                }
+                $atLeastOneAttemptHitLimit = true; // Mark that we hit a limit
+                // Do not set $allAttemptsFailedDueToPlaylistLimits to false here, as this IS a playlist limit failure
                 continue;
             }
 
@@ -128,22 +149,53 @@ class HlsStreamService
             } catch (SourceNotResponding $e) {
                 // Log the error and cache the bad source
                 $this->decrementActiveStreams($playlist->id);
-                Log::channel('ffmpeg')->error("Source not responding for channel {$title}: " . $e->getMessage());
+                Log::channel('ffmpeg')->error("Source not responding for channel {$currentStreamTitle} (Original: {$title}): " . $e->getMessage());
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, $e->getMessage());
-
+                $allAttemptsFailedDueToPlaylistLimits = false; // Mark failure as not due to playlist limits
                 // Try the next failover channel
                 continue;
-            } catch (Exception $e) {
-                // Log the error and abort
-                $this->decrementActiveStreams($playlist->id);
-                Log::channel('ffmpeg')->error("Error streaming channel {$title}: " . $e->getMessage());
-                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, $e->getMessage());
+            } catch (FatalStreamContentException $e) {
+                // This is our new exception for critical FFmpeg content errors
+                $this->decrementActiveStreams($playlist->id); // Decrement active streams for the playlist
+                Redis::srem("hls:active_{$type}_ids", $stream->id); // Remove current stream from active set
+                Log::channel('ffmpeg')->error("Fatal stream content error for {$currentStreamTitle} (Original: {$title}, Stream ID: {$stream->id}): " . $e->getMessage() . ". Attempting failover.");
+                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS_CONTENT_ERROR ?? 10, "Fatal content error: " . $e->getMessage()); // Mark bad for a very short time
+                $allAttemptsFailedDueToPlaylistLimits = false; // Mark failure as not due to playlist limits
 
+                // If a fatal content error occurs on a stream, and we are about to try a failover,
+                // touch the 'last_seen' timestamp of the *original* model. This gives the client
+                // time to be redirected and start requesting segments from the failover stream
+                // before the PruneStaleHlsProcesses job might consider the original model ID stale.
+                if ($model->id != $stream->id) { // Check if this was an attempt on a failover stream already
+                    // This logic primarily applies if the *first* attempt (original model) fails this way.
+                    // If a failover stream itself has a fatal content error, the original model's last_seen
+                    // would have already been updated when the first failover was initiated.
+                } else {
+                    // This means the original stream attempt had a fatal content error.
+                    // Update its last_seen to prevent immediate pruning.
+                    Redis::set("hls:{$type}_last_seen:{$model->id}", now()->timestamp);
+                    Log::channel('ffmpeg')->debug("HLS Stream: Touched last_seen for original $type ID {$model->id} due to fatal content error, before attempting further failovers.");
+                }
+                continue;
+            } catch (Exception $e) {
+                // Log the error and potentially mark source as bad before trying next failover
+                $this->decrementActiveStreams($playlist->id); // Ensure decrement if not already handled
+                Redis::srem("hls:active_{$type}_ids", $stream->id); // Remove current stream from active set
+                Log::channel('ffmpeg')->error("General error streaming channel {$currentStreamTitle} (Original: {$title}, Stream ID: {$stream->id}): " . $e->getMessage());
+                Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS_GENERAL_ERROR ?? ProxyService::BAD_SOURCE_CACHE_SECONDS, "General error: " . $e->getMessage());
+                $allAttemptsFailedDueToPlaylistLimits = false; // Mark failure as not due to playlist limits
                 // Try the next failover channel
                 continue;
             }
         }
+
         // If loop finishes, no stream was successfully started
+        if ($numberOfAttempts > 0 && $allAttemptsFailedDueToPlaylistLimits && $atLeastOneAttemptHitLimit) {
+            $errorMessage = "All stream attempts for {$type} '{$title}' (Original Model ID: {$model->id}) failed because relevant playlists reached their maximum stream limits.";
+            Log::channel('ffmpeg')->warning($errorMessage);
+            throw new AllPlaylistsExhaustedException($errorMessage);
+        }
+
         Log::channel('ffmpeg')->error("No available (HLS) streams for {$type} {$title} (Original Model ID: {$model->id}) after trying all sources.");
         return null; // Return null if no stream started
     }
@@ -169,62 +221,47 @@ class HlsStreamService
         int $playlistId,
         string|null $userAgent,
     ): int {
+        // Define critical error signatures
+        $criticalErrors = [
+            'non-existing SPS 0 referenced',
+            'non-existing PPS 0 referenced',
+            'decode_slice_header error',
+            'no frame!',
+            'More data is required to decode header' // Common for QSV when headers are missing/corrupt
+        ];
+
         // Setup the stream
         $cmd = $this->buildCmd($type, $model->id, $userAgent, $streamUrl);
 
-        // Use proc_open approach similar to startStream
         $descriptors = [
-            0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
+            0 => ['pipe', 'r'], // stdin
+            1 => ['pipe', 'w'], // stdout
+            2 => ['pipe', 'w'], // stderr
         ];
         $pipes = [];
-        if ($type === 'episode') {
-            $workingDir = Storage::disk('app')->path("hls/e/{$model->id}");
-        } else {
-            $workingDir = Storage::disk('app')->path("hls/{$model->id}");
-        }
+        $workingDir = $type === 'episode'
+            ? Storage::disk('app')->path("hls/e/{$model->id}")
+            : Storage::disk('app')->path("hls/{$model->id}");
+
         $process = proc_open($cmd, $descriptors, $pipes, $workingDir);
 
         if (!is_resource($process)) {
             throw new Exception("Failed to launch FFmpeg for {$title}");
         }
 
-        // Immediately close stdin/stdout
-        fclose($pipes[0]);
-        fclose($pipes[1]);
+        fclose($pipes[0]); // Close stdin
+        fclose($pipes[1]); // Close stdout
 
-        // Make stderr non-blocking
-        stream_set_blocking($pipes[2], false);
+        stream_set_blocking($pipes[2], false); // Make stderr non-blocking
 
-        // Spawn a little "reader" that pulls from stderr and logs
         $logger = Log::channel('ffmpeg');
-        $stderr = $pipes[2];
+        $stderrPipe = $pipes[2];
+        $pidCacheKey = "hls:pid:{$type}:{$model->id}";
 
-        // Get the PID and cache it
-        $cacheKey = "hls:pid:{$type}:{$model->id}";
-
-        // Register shutdown function to ensure the pipe is drained
-        register_shutdown_function(function () use (
-            $stderr,
-            $process,
-            $logger
-        ) {
-            while (!feof($stderr)) {
-                $line = fgets($stderr);
-                if ($line !== false) {
-                    $logger->error(trim($line));
-                }
-            }
-            fclose($stderr);
-            proc_close($process);
-        });
-
-        // Cache the actual FFmpeg PID
+        // Get the PID and cache it immediately
         $status = proc_get_status($process);
         $pid = $status['pid'];
-        // $cacheKey is "hls:pid:{$type}:{$model->id}" which is correct for the PID
-        Cache::forever($cacheKey, $pid);
+        Cache::forever($pidCacheKey, $pid);
 
         // Store the process start time
         $startTimeCacheKey = "hls:streaminfo:starttime:{$type}:{$model->id}";
@@ -236,11 +273,86 @@ class HlsStreamService
         // This key represents when the startStream method was last invoked for this model,
         // which is different from the ffmpeg process actual start time. Keep for now.
         Redis::set("hls:{$type}_last_seen:{$model->id}", now()->timestamp);
+        Redis::sadd("hls:active_{$type}_ids", $model->id); // Ensure this is added early
 
-        // Add to active IDs set
-        Redis::sadd("hls:active_{$type}_ids", $model->id);
+        Log::channel('ffmpeg')->debug("Streaming {$type} {$title} (PID: {$pid}) with command: {$cmd}");
 
-        Log::channel('ffmpeg')->debug("Streaming {$type} {$title} with command: {$cmd}");
+        // Active error monitoring and shutdown function
+        // This combined approach ensures we try to catch errors early and still drain stderr on normal exit.
+        $processStillNeedsMonitoring = true;
+
+        register_shutdown_function(function () use ($stderrPipe, $process, $logger, &$processStillNeedsMonitoring, $pid, $pidCacheKey, $type, $model, $title) {
+            if ($processStillNeedsMonitoring) { // Only run if not already handled by error detection
+                $logger->debug("Shutdown function: Draining stderr for PID {$pid} ({$title})");
+                while (($line = fgets($stderrPipe)) !== false) {
+                    if (!empty(trim($line))) {
+                        $logger->error(trim($line));
+                    }
+                }
+            }
+            // Ensure pipe is closed and process status is updated
+            if (is_resource($stderrPipe)) fclose($stderrPipe);
+            if (is_resource($process)) proc_close($process);
+            $logger->debug("Shutdown function: Closed resources for PID {$pid} ({$title})");
+        });
+
+        // Give FFmpeg a very brief moment to start and potentially output initial errors
+        usleep(500000); // 0.5 seconds
+
+        $errorCheckStartTime = microtime(true);
+        $initialErrorCheckDuration = 10; // Check for critical errors actively for X seconds
+
+        while (microtime(true) - $errorCheckStartTime < $initialErrorCheckDuration) {
+            $status = proc_get_status($process);
+            if (!$status['running']) {
+                $processStillNeedsMonitoring = false; // Process ended on its own
+                $errorOutput = stream_get_contents($stderrPipe);
+                fclose($stderrPipe);
+                proc_close($process);
+                Cache::forget($pidCacheKey);
+                $exitCode = $status['exitcode'];
+                $logger->error("FFmpeg process {$pid} for {$type} {$title} exited prematurely. Exit code: {$exitCode}. Stderr: " . trim($errorOutput));
+                // Do NOT decrement here; startStream's catch block will handle it.
+                throw new Exception("FFmpeg process {$pid} for {$title} exited prematurely. Exit code: {$exitCode}.");
+            }
+
+            $output = fgets($stderrPipe);
+            if ($output !== false && !empty(trim($output))) {
+                $trimmedOutput = trim($output);
+                $logger->error($trimmedOutput); // Log all FFmpeg stderr output
+
+                foreach ($criticalErrors as $errorSignature) {
+                    if (str_contains($trimmedOutput, $errorSignature)) {
+                        $processStillNeedsMonitoring = false;
+                        $logger->error("Critical FFmpeg error detected for {$type} {$title} (PID: {$pid}): '{$trimmedOutput}'. Terminating process.");
+
+                        // Terminate the process
+                        posix_kill($pid, SIGTERM);
+                        $attempts = 0;
+                        while ($attempts < 10 && posix_kill($pid, 0)) { // Check for 1 second
+                            usleep(100000); // 100ms
+                            $attempts++;
+                        }
+                        if (posix_kill($pid, 0)) {
+                            posix_kill($pid, SIGKILL);
+                            $logger->warning("Force killed FFmpeg process {$pid} for {$type} {$title} due to critical error.");
+                        }
+
+                        fclose($stderrPipe);
+                        proc_close($process);
+                        Cache::forget($pidCacheKey);
+                        // Do NOT decrement here; startStream's catch block for FatalStreamContentException will handle logging,
+                        // and the main loop's structure ensures active stream counts are managed.
+                        throw new FatalStreamContentException("Critical FFmpeg error for {$title}: {$trimmedOutput}");
+                    }
+                }
+            }
+            usleep(100000); // 0.1 seconds polling interval
+        }
+
+        $processStillNeedsMonitoring = false; // Active monitoring period is over. Let shutdown function handle remaining stderr.
+        $logger->debug("Initial error monitoring period ended for {$type} {$title} (PID: {$pid}). FFmpeg continues in background.");
+
         return $pid;
     }
 
@@ -351,10 +463,14 @@ class HlsStreamService
      *
      * @param string $type
      * @param string $id
+     * @param string|null $reason Optional reason for stopping the stream
      * @return bool
      */
-    public function stopStream($type, $id): bool
+    public function stopStream($type, $id, $reason = null): bool
     {
+        $logReason = $reason ? " (Reason: {$reason})" : "";
+        Log::channel('ffmpeg')->info("Attempting to stop HLS stream for {$type} ID {$id}{$logReason}");
+
         $cacheKey = "hls:pid:{$type}:{$id}";
         $pid = Cache::get($cacheKey);
         $wasRunning = false;
@@ -401,12 +517,16 @@ class HlsStreamService
         }
         File::deleteDirectory($storageDir);
 
-        // Decrement active streams count if we have the model and playlist
-        if ($model) {
+        // Decrement active streams count only if a process was actually running
+        // and we have the model and playlist
+        if ($wasRunning && $model) {
             $playlist = $model->getEffectivePlaylist();
             if ($playlist) {
                 $this->decrementActiveStreams($playlist->id);
+                Log::channel('ffmpeg')->debug("Decremented active stream count for playlist {$playlist->id} as stream {$type} ID {$id} was running and is now stopped.");
             }
+        } elseif (!$wasRunning && $model && $model->getEffectivePlaylist()) {
+            Log::channel('ffmpeg')->debug("Did NOT decrement active stream count for playlist {$model->getEffectivePlaylist()->id} as stream {$type} ID {$id} was not running when stop was attempted.");
         }
 
         // Clean up any stream mappings that point to this stopped stream
@@ -595,8 +715,12 @@ class HlsStreamService
                 if (!empty($qsvEncoderOptions)) { // $qsvEncoderOptions = $settings['ffmpeg_qsv_encoder_options']
                     $codecSpecificArgs = trim($qsvEncoderOptions) . " ";
                 } else {
-                    // Default QSV encoder options for HLS if not set by user
-                    $codecSpecificArgs = "-preset medium -global_quality 23 "; // Ensure trailing space
+                    // Default QSV encoder options
+                    $codecSpecificArgs = "-preset medium ";
+                    // Only add -global_quality if NOT using libopus
+                    if ($audioCodec !== 'libopus') { // $audioCodec here is the one determined at the top of buildCmd
+                        $codecSpecificArgs .= "-global_quality 23 ";
+                    }
                 }
                 if (!empty($qsvAdditionalArgs)) {
                     $userArgs = trim($qsvAdditionalArgs) . ($userArgs ? " " . $userArgs : "");
@@ -606,8 +730,27 @@ class HlsStreamService
             // and $hwaccelInitArgs, $hwaccelInputArgs, $videoFilterArgs remain empty from hw accel logic.
 
             // Get ffmpeg output codec formats
-            $audioCodec = config('proxy.ffmpeg_codec_audio') ?: $settings['ffmpeg_codec_audio'];
+            $audioCodec = config('proxy.ffmpeg_codec_audio') ?: $settings['ffmpeg_codec_audio']; // This is the target codec
             $subtitleCodec = config('proxy.ffmpeg_codec_subtitles') ?: $settings['ffmpeg_codec_subtitles'];
+            $audioParams = '';
+
+            if ($audioCodec === 'opus') {
+                $audioCodec = 'libopus'; // Ensure we use libopus
+                Log::channel('ffmpeg')->debug("HLS: Switched audio codec from 'opus' to 'libopus'.");
+            }
+
+            if ($audioCodec === 'libopus' && $audioCodec !== 'copy') {
+                $audioParams = " -vbr 1";
+                // Check if user already specified a bitrate in global args, if not, add default
+                if (strpos($userArgs, '-b:a') === false) {
+                     $audioParams .= " -b:a 128k";
+                }
+                Log::channel('ffmpeg')->debug("HLS: Setting VBR and bitrate for libopus. Params: {$audioParams}");
+            } elseif (($audioCodec === 'vorbis' || $audioCodec === 'libvorbis') && $audioCodec !== 'copy') {
+                $audioParams = ' -strict -2';
+                Log::channel('ffmpeg')->debug("HLS: Setting -strict -2 for vorbis.");
+            }
+
 
             // Start building ffmpeg output codec formats
             $outputFormat = "-c:v {$outputVideoCodec} " .
@@ -615,7 +758,7 @@ class HlsStreamService
 
             // Conditionally add audio codec
             if (!empty($audioCodec)) {
-                $outputFormat .= "-c:a {$audioCodec} ";
+                $outputFormat .= "-c:a {$audioCodec}{$audioParams} ";
             }
 
             // Conditionally add subtitle codec
@@ -697,13 +840,34 @@ class HlsStreamService
             $videoCodecForTemplate = $settings['ffmpeg_codec_video'] ?: 'copy';
             $audioCodecForTemplate = $settings['ffmpeg_codec_audio'] ?: 'copy';
             $subtitleCodecForTemplate = $settings['ffmpeg_codec_subtitles'] ?: 'copy';
+            $audioParamsForTemplate = '';
+
+            if ($audioCodecForTemplate === 'opus') {
+                $audioCodecForTemplate = 'libopus';
+                Log::channel('ffmpeg')->debug("HLS: Switched audio codec (template) from 'opus' to 'libopus'.");
+            }
+
+            if ($audioCodecForTemplate === 'libopus' && $audioCodecForTemplate !== 'copy') {
+                $audioParamsForTemplate = ' -vbr 1 -b:a 128k'; // Ensure -vbr 1 comes before -b:a
+                Log::channel('ffmpeg')->debug("HLS: Setting default VBR and bitrate (template) for libopus: 1, 128k.");
+                // If QSV is enabled and we're using libopus, ensure QSV_ENCODER_OPTIONS doesn't add -global_quality
+                if ($settings['ffmpeg_qsv_enabled'] ?? false) {
+                    if (empty($settings['ffmpeg_qsv_encoder_options'])) { // Only override if user hasn't set their own
+                        $qsvEncoderOptionsValue = '-preset medium'; // Remove global_quality
+                    }
+                }
+            } elseif (($audioCodecForTemplate === 'vorbis' || $audioCodecForTemplate === 'libvorbis') && $audioCodecForTemplate !== 'copy') {
+                $audioParamsForTemplate = ' -strict -2';
+                Log::channel('ffmpeg')->debug("HLS: Setting -strict -2 (template) for vorbis.");
+            }
+
 
             $outputCommandSegment = "-c:v {$outputVideoCodec} " .
                 ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "") .
-                "-c:a {$audioCodecForTemplate} -c:s {$subtitleCodecForTemplate}";
+                "-c:a {$audioCodecForTemplate}{$audioParamsForTemplate} -c:s {$subtitleCodecForTemplate}";
 
             $videoCodecArgs = "-c:v {$videoCodecForTemplate}" . ($codecSpecificArgs ? " " . trim($codecSpecificArgs) : "");
-            $audioCodecArgs = "-c:a {$audioCodecForTemplate}";
+            $audioCodecArgs = "-c:a {$audioCodecForTemplate}{$audioParamsForTemplate}";
             $subtitleCodecArgs = "-c:s {$subtitleCodecForTemplate}";
 
             // Perform replacements
