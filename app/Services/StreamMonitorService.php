@@ -37,68 +37,50 @@ class StreamMonitorService
     }
 
     /**
-     * Get shared stream statistics (xTeVe-like streams)
+     * Get shared stream statistics (xTeVe-like streams) from the database
      */
     private function getSharedStreamStats(): array
     {
-        // Try both patterns - with and without database prefix
-        $pattern1 = 'shared_stream:*';
-        $pattern2 = '*shared_stream:*';
-
-        $keys1 = Redis::keys($pattern1);
-        $keys2 = Redis::keys($pattern2);
-        $keys = array_merge($keys1, $keys2);
-
-        $streams = [];
+        // Fetch all shared streams from the database
+        $streams = \App\Models\SharedStream::with('clients')->get();
+        $result = [];
         $totalClients = 0;
 
-        foreach ($keys as $key) {
-            // Extract stream key from Redis key (handle prefixed keys)
-            $streamKey = str_replace([
-                config('database.redis.options.prefix', ''),
-                'shared_stream:'
-            ], '', $key);
-            $streamData = json_decode(Redis::get($key), true);
+        foreach ($streams as $stream) {
+            $clients = $stream->clients;
+            $clientCount = $clients->count();
+            $totalClients += $clientCount;
 
-            if ($streamData) {
-                $clientKey = "stream_clients:{$streamKey}";
-                $clients = Redis::hgetall($clientKey);
-                $clientCount = count($clients);
-                $totalClients += $clientCount;
-
-                $clientDetails = [];
-                foreach ($clients as $clientId => $clientDataJson) {
-                    $clientData = json_decode($clientDataJson, true);
-                    $clientDetails[] = [
-                        'id' => $clientId,
-                        'ip' => $clientData['options']['ip'] ?? 'unknown',
-                        'connected_at' => $clientData['connected_at'],
-                        'last_activity' => $clientData['last_activity'],
-                        'duration' => now()->timestamp - $clientData['connected_at']
+            $result[] = [
+                'id' => $stream->id,
+                'stream_key' => $stream->stream_key ?? $stream->id,
+                'channel_id' => $stream->channel_id ?? null,
+                'episode_id' => $stream->episode_id ?? null,
+                'status' => $stream->status ?? 'unknown',
+                'health_status' => $stream->health_status ?? 'unknown',
+                'client_count' => $clientCount,
+                'clients' => $clients->map(function ($client) {
+                    return [
+                        'id' => $client->id,
+                        'ip_address' => $client->ip_address ?? null,
+                        'user_agent' => $client->user_agent ?? null,
+                        'connected_at' => $client->created_at ?? null,
+                        'last_activity' => $client->updated_at ?? null,
+                        'bytes_received' => $client->bytes_received ?? null,
+                        'is_active' => method_exists($client, 'isActive') ? $client->isActive() : null,
+                        'duration' => $client->duration ?? null,
                     ];
-                }
-
-                $streams[] = [
-                    'stream_key' => $streamKey,
-                    'type' => $streamData['type'],
-                    'model_id' => $streamData['model_id'],
-                    'title' => $streamData['title'],
-                    'format' => $streamData['format'],
-                    'status' => $streamData['status'],
-                    'client_count' => $clientCount,
-                    'created_at' => $streamData['created_at'],
-                    'uptime' => now()->timestamp - $streamData['created_at'],
-                    'last_activity' => $streamData['last_activity'],
-                    'clients' => $clientDetails,
-                    'stream_url' => $streamData['stream_url'] ?? null
-                ];
-            }
+                }),
+                'bandwidth' => $stream->bandwidth ?? null,
+                'created_at' => $stream->created_at,
+                'updated_at' => $stream->updated_at,
+            ];
         }
 
         return [
-            'total_streams' => count($streams),
+            'streams' => $result,
+            'total_streams' => $streams->count(),
             'total_clients' => $totalClients,
-            'streams' => $streams
         ];
     }
 
