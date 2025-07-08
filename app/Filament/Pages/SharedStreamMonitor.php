@@ -23,8 +23,8 @@ use Illuminate\Support\Facades\Redis;
 class SharedStreamMonitor extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-signal';
-    protected static ?string $navigationLabel = 'Shared Streams';
-    protected static ?string $title = 'Shared Stream Monitor';
+    protected static ?string $navigationLabel = 'Buffered Streams';
+    protected static ?string $title = 'Buffered Stream Monitor';
     protected static ?string $navigationGroup = 'Tools';
     protected static ?int $navigationSort = 15;
 

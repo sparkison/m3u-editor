@@ -28,6 +28,12 @@ class StreamingChannelStats extends Page
         $this->statsData = $this->getStatsData();
     }
 
+    static function shouldRegisterNavigation(): bool
+    {
+        // Only register if the shared streaming feature is disabled
+        return !config('proxy.shared_streaming.enabled', false);
+    }
+
     public function getSubheading(): ?string
     {
         return empty($this->statsData)
