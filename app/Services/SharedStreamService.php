@@ -1433,7 +1433,7 @@ class SharedStreamService
                 }
             }
 
-            Log::channel('ffmpeg')->debug("getAllActiveStreams: Returning " . count($streams) . " active streams from database");
+            // Log::channel('ffmpeg')->debug("getAllActiveStreams: Returning " . count($streams) . " active streams from database");
             return $streams;
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Error getting active streams: " . $e->getMessage());
