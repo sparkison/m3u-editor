@@ -95,8 +95,8 @@
                     <x-filament::card>
                         <div class="p-6" x-data="{ showClients: false, showDetails: false }">
                             <!-- Stream Header -->
-                            <div class="flex items-center justify-between mb-4">
-                                <div class="flex items-center space-x-4">
+                            <div class="md:flex items-center justify-between mb-4">
+                                <div class="md:flex items-center space-x-0 md:space-x-4 space-y-2 md:space-y-0">
                                     <div class="flex-shrink-0">
                                         <div class="h-10 w-10 rounded-full flex items-center justify-center {{ 
                                             $stream['status'] === 'active' ? 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300' : 
@@ -113,10 +113,18 @@
                                             @endif
                                         </div>
                                     </div>
+                                    @if($stream['model']['logo'] ?? false)
+                                        <div class="flex-1 min-w-0">
+                                            <div>
+                                                <img src="{{ $stream['model']['logo'] }}" alt="Stream Thumbnail" class="h-10 w-auto rounded-md object-cover">
+                                            </div>
+                                        </div>
+                                    @endif
                                     <div>
                                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
                                             Stream {{ substr($stream['stream_id'], -8) }}
                                         </h3>
+                                        <p class="text-sm text-gray-500 dark:text-gray-400 font-mono">{{ $stream['model']['title'] ?? 'N/A' }}</p>
                                         <p class="text-sm text-gray-500 dark:text-gray-400 font-mono">{{ $stream['source_url'] }}</p>
                                     </div>
                                 </div>
