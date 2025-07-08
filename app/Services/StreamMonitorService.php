@@ -751,21 +751,13 @@ class StreamMonitorService
      */
     private function getDiskSpaceInfo(): array
     {
-        $path = config('proxy.shared_streaming.buffer_path', '/tmp');
-        $total = disk_total_space($path);
-        $free = disk_free_space($path);
-
-        if ($total === false || $free === false) {
-            return ['total' => 'N/A', 'free' => 'N/A', 'used' => 'N/A', 'percentage' => 0];
-        }
-
-        $used = $total - $free;
-
+        // Only return disk info for general storage, not for shared stream buffer
+        $root = base_path();
         return [
-            'total' => $this->formatBytes($total),
-            'free' => $this->formatBytes($free),
-            'used' => $this->formatBytes($used),
-            'percentage' => $total > 0 ? round(($used / $total) * 100, 1) : 0,
+            'total' => $this->formatBytes(disk_total_space($root)),
+            'free' => $this->formatBytes(disk_free_space($root)),
+            'used' => $this->formatBytes(disk_total_space($root) - disk_free_space($root)),
+            'mount' => $root
         ];
     }
 
