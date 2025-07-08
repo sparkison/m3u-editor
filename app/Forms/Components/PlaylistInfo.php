@@ -7,6 +7,7 @@ use App\Services\XtreamService;
 use Carbon\Carbon;
 use Filament\Forms\Components\Field;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 
 class PlaylistInfo extends Field
@@ -47,19 +48,25 @@ class PlaylistInfo extends Field
         $cacheKey = "xtream_stats:{$playlist->id}";
         $xtreamInfo = Cache::get($cacheKey, null);
         if (!$xtreamInfo) {
-            // If no cache, initialize XtreamService
-            $xtream = XtreamService::make($playlist);
-            if (!$xtream) {
-                // Try and fetch from the playlist data directly if unable to initialize XtreamService
-                $xtreamInfo = $playlist->xtream_info;
-            } else {
-                // Prefer live data from XtreamService
-                $xtreamInfo = $xtream->userInfo();
-            }
-            if (!$xtreamInfo) {
+            try {
+                // If no cache, initialize XtreamService
+                $xtream = XtreamService::make($playlist);
+                if (!$xtream) {
+                    // Try and fetch from the playlist data directly if unable to initialize XtreamService
+                    $xtreamInfo = $playlist->xtream_info;
+                } else {
+                    // Prefer live data from XtreamService
+                    $xtreamInfo = $xtream->userInfo();
+                }
+                if (!$xtreamInfo) {
+                    return [];
+                }
+                Cache::put($cacheKey, $xtreamInfo, now()->addSeconds(10)); // Cache for 10 seconds
+            } catch (\Exception $e) {
+                // Log the error and return empty array
+                Log::error("Failed to fetch Xtream stats for playlist {$playlist->id}: " . $e->getMessage());
                 return [];
             }
-            Cache::put($cacheKey, $xtreamInfo, now()->addSeconds(10)); // Cache for 10 seconds
         }
 
         $maxConnections = $xtreamInfo['user_info']['max_connections'] ?? 1;
