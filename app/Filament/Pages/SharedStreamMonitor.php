@@ -44,6 +44,12 @@ class SharedStreamMonitor extends Page
         // $this->monitorService = app(StreamMonitorService::class);
     }
 
+    static function shouldRegisterNavigation(): bool
+    {
+        // Only register if the shared streaming feature is enabled
+        return config('proxy.shared_streaming.enabled', false);
+    }
+
     public function mount(): void
     {
         $this->refreshData();
