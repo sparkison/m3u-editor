@@ -2118,15 +2118,12 @@ class SharedStreamService
             foreach ($streamInfoKeys as $redisKey) {
                 $streamKey = str_replace([
                     config('database.redis.options.prefix', ''),
-                    'shared_stream:'
                 ], '', $redisKey);
-
-                $streamKey = 'shared_stream:' . $streamKey;
 
                 // Check if corresponding database record exists
                 $dbRecord = SharedStream::where('stream_id', $streamKey)->first();
 
-                if (!$dbRecord) {
+                if (!$dbRecord && Redis::exists($redisKey)) {
                     // Orphaned Redis key - clean it up
                     Redis::del($redisKey);
                     $cleanedKeys++;
