@@ -41,7 +41,7 @@ class StreamBufferManager implements ShouldQueue
      */
     public function handle(): void
     {
-        Log::channel('ffmpeg')->info("StreamBufferManager: Starting buffer management for stream {$this->streamKey}");
+        Log::channel('ffmpeg')->debug("StreamBufferManager: Starting buffer management for stream {$this->streamKey}");
 
         try {
             $this->runBufferLoop();
@@ -115,7 +115,7 @@ class StreamBufferManager implements ShouldQueue
             }
         }
 
-        Log::channel('ffmpeg')->info("StreamBufferManager: Buffer loop ended for {$this->streamKey} after {$segmentNumber} segments");
+        Log::channel('ffmpeg')->debug("StreamBufferManager: Buffer loop ended for {$this->streamKey} after {$segmentNumber} segments");
     }
 
     /**
