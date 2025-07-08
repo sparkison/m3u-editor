@@ -148,7 +148,7 @@ class SharedStreamService
                             $streamInfo['failover_attempts'] = 0;
                             $this->registerClient($streamKey, $clientId, $options);
                             $streamInfo['is_new_stream'] = true;
-                            Log::channel('ffmpeg')->info("SharedStream: Successfully created primary stream for channel {$modelId}");
+                            Log::channel('ffmpeg')->debug("SharedStream: Successfully created primary stream for channel {$modelId}");
                             $primarySucceeded = true;
                             return $streamInfo;
                         } catch (\Exception $e) {
@@ -176,7 +176,7 @@ class SharedStreamService
                         $streamInfo['failover_attempts'] = 0;
                         $this->registerClient($streamKey, $clientId, $options);
                         $streamInfo['is_new_stream'] = true;
-                        Log::channel('ffmpeg')->info("SharedStream: Successfully created primary stream for channel {$modelId} (no playlist for limit check).");
+                        Log::channel('ffmpeg')->debug("SharedStream: Successfully created primary stream for channel {$modelId} (no playlist for limit check).");
                         $primarySucceeded = true;
                         return $streamInfo;
                     } catch (\Exception $e) {
@@ -201,7 +201,7 @@ class SharedStreamService
                     $streamInfo['failover_attempts'] = 0;
                     $this->registerClient($streamKey, $clientId, $options);
                     $streamInfo['is_new_stream'] = true;
-                    Log::channel('ffmpeg')->info("SharedStream: Successfully created primary stream for channel {$modelId} (no primary channel model for limit check).");
+                    Log::channel('ffmpeg')->debug("SharedStream: Successfully created primary stream for channel {$modelId} (no primary channel model for limit check).");
                     $primarySucceeded = true;
                     return $streamInfo;
                 } catch (\Exception $e) {
@@ -215,7 +215,7 @@ class SharedStreamService
 
             if (!$processRunning && $streamInfo['status'] !== 'starting') {
                 // Stream exists but process is dead, attempt failover restart
-                Log::channel('ffmpeg')->info("SharedStream: Client {$clientId} found dead stream {$streamKey}, attempting restart with failover");
+                Log::channel('ffmpeg')->debug("SharedStream: Client {$clientId} found dead stream {$streamKey}, attempting restart with failover");
                 // This will internally handle playlist limits for the restart attempt.
                 return $this->restartStreamWithFailover(
                     $streamKey,
@@ -276,7 +276,7 @@ class SharedStreamService
                         continue;
                     }
 
-                    Log::channel('ffmpeg')->info("SharedStream: Attempting failover to channel {$failoverChannel->id} ({$failoverTitle}) on playlist " . ($failoverPlaylist ? $failoverPlaylist->name : 'N/A'));
+                    Log::channel('ffmpeg')->debug("SharedStream: Attempting failover to channel {$failoverChannel->id} ({$failoverTitle}) on playlist " . ($failoverPlaylist ? $failoverPlaylist->name : 'N/A'));
                     $failoverStreamKey = $this->getStreamKey($type, $failoverChannel->id, $failoverUrl);
 
                     $streamInfo = $this->createSharedStreamInternal(
@@ -296,7 +296,7 @@ class SharedStreamService
                     $this->registerClient($failoverStreamKey, $clientId, $options);
                     $streamInfo['is_new_stream'] = true;
                     $streamInfo['stream_key'] = $failoverStreamKey;
-                    Log::channel('ffmpeg')->info("SharedStream: Successfully failed over to channel {$failoverChannel->id} after " . ($index + 1) . " attempts.");
+                    Log::channel('ffmpeg')->debug("SharedStream: Successfully failed over to channel {$failoverChannel->id} after " . ($index + 1) . " attempts.");
                     return $streamInfo;
                 } catch (\Exception $failoverError) {
                     if ($failoverPlaylist) $this->decrementActiveStreams($failoverPlaylist->id); // Decrement if create failed
@@ -375,7 +375,7 @@ class SharedStreamService
                             unset($streamInfo['ffmpeg_stderr']);
                             $this->setStreamInfo($streamKey, $streamInfo);
                         }
-                        Log::channel('ffmpeg')->info("SharedStream: Stream {$streamKey}: Marked as 'starting' in Redis before attempting restart.");
+                        Log::channel('ffmpeg')->debug("SharedStream: Stream {$streamKey}: Marked as 'starting' before attempting restart.");
 
                         if ($streamInfo && $streamInfo['format'] === 'hls') {
                             $this->startHLSStream($streamKey, $streamInfo);
@@ -391,7 +391,7 @@ class SharedStreamService
                             'error_message' => null,
                             'last_client_activity' => now()
                         ]);
-                        Log::channel('ffmpeg')->info("SharedStream: Successfully restarted original stream {$streamKey} for client {$clientId}");
+                        Log::channel('ffmpeg')->debug("SharedStream: Successfully restarted original stream {$streamKey} for client {$clientId}");
                         $this->registerClient($streamKey, $clientId, $options);
                         if ($streamInfo) $streamInfo['is_new_stream'] = false; // It's a restart of an existing stream key
                         $restartedOriginal = true;
@@ -413,11 +413,11 @@ class SharedStreamService
                         unset($streamInfo['ffmpeg_stderr']);
                         $this->setStreamInfo($streamKey, $streamInfo);
                     }
-                    Log::channel('ffmpeg')->info("SharedStream: Stream {$streamKey} (no playlist): Marked as 'starting' before restart.");
+                    Log::channel('ffmpeg')->debug("SharedStream: Stream {$streamKey} (no playlist): Marked as 'starting' before restart.");
                     if ($streamInfo && $streamInfo['format'] === 'hls') $this->startHLSStream($streamKey, $streamInfo);
                     elseif ($streamInfo) $this->startDirectStream($streamKey, $streamInfo);
                     SharedStream::where('stream_id', $streamKey)->update(['status' => 'starting', 'process_id' => $this->getProcessPid($streamKey), 'client_count' => 1, 'started_at' => now(), 'error_message' => null, 'last_client_activity' => now()]);
-                    Log::channel('ffmpeg')->info("SharedStream: Successfully restarted original stream {$streamKey} (no playlist) for client {$clientId}");
+                    Log::channel('ffmpeg')->debug("SharedStream: Successfully restarted original stream {$streamKey} (no playlist) for client {$clientId}");
                     $this->registerClient($streamKey, $clientId, $options);
                     if ($streamInfo) $streamInfo['is_new_stream'] = false;
                     $restartedOriginal = true;
@@ -463,11 +463,10 @@ class SharedStreamService
                         continue;
                     }
 
-                    Log::channel('ffmpeg')->info("SharedStream: Attempting failover restart to channel {$failoverChannel->id} ({$failoverTitle}) on playlist " . ($failoverPlaylist ? $failoverPlaylist->name : 'N/A'));
+                    Log::channel('ffmpeg')->debug("SharedStream: Attempting failover restart to channel {$failoverChannel->id} ({$failoverTitle}) on playlist " . ($failoverPlaylist ? $failoverPlaylist->name : 'N/A'));
 
                     // Important: Clean up the old (dead) stream before creating a new one with failover
                     $this->cleanupStream($streamKey, true); // True to remove files as well
-                    SharedStream::where('stream_id', $streamKey)->delete();
                     Log::channel('ffmpeg')->debug("SharedStream: Cleaned up dead stream {$streamKey} before failover restart.");
 
                     $failoverStreamKey = $this->getStreamKey($type, $failoverChannel->id, $failoverUrl);
@@ -489,7 +488,7 @@ class SharedStreamService
                     $newStreamInfo['is_new_stream'] = true;
                     $newStreamInfo['stream_key'] = $failoverStreamKey;
 
-                    Log::channel('ffmpeg')->info("SharedStream: Successfully failed over (restarted) to channel {$failoverChannel->id}. New stream key: {$failoverStreamKey}");
+                    Log::channel('ffmpeg')->debug("SharedStream: Successfully failed over (restarted) to channel {$failoverChannel->id}. New stream key: {$failoverStreamKey}");
                     return $newStreamInfo;
                 } catch (\Exception $failoverError) {
                     if ($failoverPlaylist) $this->decrementActiveStreams($failoverPlaylist->id);
@@ -538,7 +537,7 @@ class SharedStreamService
             'options' => $options
         ];
 
-        // Store stream info in Redis
+        // Store stream info
         $this->setStreamInfo($streamKey, $streamInfo);
 
         // Also create database record for persistent tracking
@@ -551,7 +550,9 @@ class SharedStreamService
                 'client_count' => 1, // Set initial client count
                 'last_client_activity' => now(),
                 'stream_info' => $streamInfo, // Store as array, model will cast to JSON
-                'started_at' => now()
+                'started_at' => now(),
+                'health_check_at' => null,
+                'health_status' => 'unknown',
             ]
         );
 
@@ -564,7 +565,7 @@ class SharedStreamService
             throw $e;
         }
 
-        Log::channel('ffmpeg')->info("Created new shared stream {$streamKey} for {$type} {$title}"); // Changed from debug to info
+        Log::channel('ffmpeg')->debug("Created new shared stream {$streamKey} for {$type} {$title}"); // Changed from debug to info
 
         return $streamInfo;
     }
@@ -653,7 +654,7 @@ class SharedStreamService
         // Set up error logging from stderr
         $this->setupErrorLogging($streamKey, $pipes[2], $process);
 
-        Log::channel('ffmpeg')->info("Started HLS shared stream {$streamKey} with PID {$pid}");
+        Log::channel('ffmpeg')->debug("Started HLS shared stream {$streamKey} with PID {$pid}");
         Log::channel('ffmpeg')->debug("HLS Command: {$cmd}");
     }
 
@@ -708,10 +709,6 @@ class SharedStreamService
             'pid' => $pid
         ];
 
-        // Store process info in stream data
-        $streamInfo['pid'] = $pid;
-        $this->setStreamInfo($streamKey, $streamInfo);
-
         // Requirement 4.b.a: Brief, non-blocking read from stderr for immediate errors
         stream_set_blocking($pipes[2], false); // Ensure stderr is non-blocking
         $initialError = fread($pipes[2], 4096); // Read up to 4KB
@@ -724,7 +721,12 @@ class SharedStreamService
         // Start continuous buffer management for direct streaming
         $this->startContinuousBuffering($streamKey, $pipes[1], $pipes[2], $process);
 
-        Log::channel('ffmpeg')->info("Started direct shared stream {$streamKey} with PID {$pid}");
+        // Store process info in stream data
+        $streamInfo['pid'] = $pid;
+        $streamInfo['status'] = 'active'; // Set status to active
+        $this->setStreamInfo($streamKey, $streamInfo);
+
+        Log::channel('ffmpeg')->debug("Started direct shared stream {$streamKey} with PID {$pid}");
         Log::channel('ffmpeg')->debug("Direct Command: {$cmd}");
     }
 
@@ -854,7 +856,7 @@ class SharedStreamService
         $maxWait = 10; // Reduced from 15 to 10 seconds for faster startup
         $waitTime = 0;
 
-        Log::channel('ffmpeg')->info("Stream {$streamKey}: Starting initial buffering. Waiting up to {$maxWait}s for FFmpeg data.");
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Starting initial buffering. Waiting up to {$maxWait}s for FFmpeg data.");
 
         // Wait for FFmpeg to start producing data and build initial buffer
         $accumulatedData = '';
@@ -876,7 +878,7 @@ class SharedStreamService
                 $chunk = fread($stdout, $readChunkSize);
                 if ($chunk !== false && strlen($chunk) > 0) {
                     if (!$hasFirstData) {
-                        Log::channel('ffmpeg')->info("Stream {$streamKey}: First data chunk received from FFmpeg (" . strlen($chunk) . " bytes).");
+                        Log::channel('ffmpeg')->debug("Stream {$streamKey}: First data chunk received from FFmpeg (" . strlen($chunk) . " bytes).");
                         $hasFirstData = true;
                     }
 
@@ -913,7 +915,7 @@ class SharedStreamService
                                     'status' => 'active'
                                 ]);
 
-                                Log::channel('ffmpeg')->info("Stream {$streamKey}: Initial segment " . ($segmentNumber + 1) . " buffered. Marking stream as ACTIVE. DB update result: {$updateResult}");
+                                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Initial segment " . ($segmentNumber + 1) . " buffered. Marking stream as ACTIVE. DB update result: {$updateResult}");
                             } else {
                                 Log::channel('ffmpeg')->warning("Stream {$streamKey}: Could not get stream info to update status to active");
                             }
@@ -953,7 +955,7 @@ class SharedStreamService
         }
 
         if ($segmentNumber > 0) {
-            Log::channel('ffmpeg')->info("Stream {$streamKey}: Initial buffering completed successfully with {$segmentNumber} segments");
+            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Initial buffering completed successfully with {$segmentNumber} segments");
 
             // Ensure status is active if segments were buffered (it might have been set already by the first segment logic)
             $streamInfo = $this->getStreamInfo($streamKey);
@@ -966,7 +968,7 @@ class SharedStreamService
                 $this->setStreamInfo($streamKey, $streamInfo);
 
                 SharedStream::where('stream_id', $streamKey)->update(['status' => 'active']);
-                Log::channel('ffmpeg')->info("Stream {$streamKey}: Confirmed status as 'active' after initial buffering.");
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Confirmed status as 'active' after initial buffering.");
             }
         } else {
             // Requirement 1.c: No data was buffered ($segmentNumber is still 0)
@@ -982,7 +984,7 @@ class SharedStreamService
                 $error_output = trim($stderr_content);
                 Log::channel('ffmpeg')->error("Stream {$streamKey}: FFmpeg stderr output: {$error_output}");
             } else {
-                Log::channel('ffmpeg')->info("Stream {$streamKey}: No FFmpeg stderr output detected.");
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: No FFmpeg stderr output detected.");
             }
 
             $streamInfo = $this->getStreamInfo($streamKey);
@@ -998,7 +1000,7 @@ class SharedStreamService
                     'error_message' => $errorMessage,
                     'stream_info->ffmpeg_stderr' => $error_output // Store in DB as well
                 ]);
-                Log::channel('ffmpeg')->info("Stream {$streamKey}: Status updated to 'error' due to no initial data. FFmpeg stderr logged.");
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Status updated to 'error' due to no initial data. FFmpeg stderr logged.");
             }
         }
     }
@@ -1066,7 +1068,7 @@ class SharedStreamService
             Log::channel('ffmpeg')->debug("Stream {$streamKey}: Flushed remaining data as segment {$segmentNumber}");
         }
 
-        Log::channel('ffmpeg')->info("Stream {$streamKey}: Short initial buffering completed with {$segmentNumber} total segments");
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Short initial buffering completed with {$segmentNumber} total segments");
 
         // Initial buffering is complete. The process handles are stored for on-demand reading.
         // Clients will read additional data via getNextStreamSegments() which can read directly from FFmpeg.
@@ -1128,18 +1130,7 @@ class SharedStreamService
                 return null;
             }
 
-            // Convert database model to array format expected by the service
-            $streamInfo = $sharedStream->stream_info;
-
-            // Ensure we have the basic required fields
-            $streamInfo['stream_key'] = $streamKey;
-            $streamInfo['status'] = $sharedStream->status;
-            $streamInfo['pid'] = $sharedStream->process_id;
-            $streamInfo['created_at'] = $sharedStream->started_at ? $sharedStream->started_at->timestamp : time();
-            $streamInfo['last_activity'] = $sharedStream->last_client_activity ? $sharedStream->last_client_activity->timestamp : time();
-            $streamInfo['client_count'] = $sharedStream->client_count ?? 0;
-
-            return $streamInfo;
+            return $sharedStream->stream_info;
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Stream {$streamKey}: Error retrieving stream info: " . $e->getMessage());
             return null;
@@ -1158,10 +1149,9 @@ class SharedStreamService
             if ($sharedStream) {
                 // Update existing record
                 $updateData = [
-                    'status' => $streamInfo['status'] ?? $sharedStream->status,
                     'stream_info' => $streamInfo,
-                    'last_client_activity' => isset($streamInfo['last_activity']) ?
-                        Carbon::createFromTimestamp($streamInfo['last_activity']) :
+                    'last_client_activity' => isset($streamInfo['last_client_activity']) ?
+                        Carbon::createFromTimestamp($streamInfo['last_client_activity']) :
                         $sharedStream->last_client_activity,
                 ];
 
@@ -1175,7 +1165,7 @@ class SharedStreamService
 
                 $sharedStream->update($updateData);
 
-                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Successfully updated stream info in database");
+                // Log::channel('ffmpeg')->debug("Stream {$streamKey}: Successfully updated stream info in database");
             } else {
                 Log::channel('ffmpeg')->warning("Stream {$streamKey}: No database record found to update stream info");
             }
@@ -1288,7 +1278,7 @@ class SharedStreamService
                     // If no clients left, mark when it became clientless
                     if ($activeClientCount === 0) {
                         $streamInfo['clientless_since'] = now()->timestamp;
-                        Log::channel('ffmpeg')->info("Stream {$streamKey} now has no clients. Starting cleanup process.");
+                        Log::channel('ffmpeg')->debug("Stream {$streamKey} now has no clients. Starting cleanup process.");
 
                         // Clean up the stream completely
                         $this->cleanupStream($streamKey, true);
@@ -1297,23 +1287,7 @@ class SharedStreamService
                         if ($playlistId) {
                             $this->decrementActiveStreams($playlistId);
                         }
-
-                        //
-                        // NOTE: Not using currently, instead deleting the stream directly in cleanupStream
-                        //       TODO: Consider if we need to keep this logic for any reason
-                        //
-                        // Update database to stopped status and reset all metrics
-                        // SharedStream::where('stream_id', $streamKey)->update([
-                        //     'status' => 'stopped',
-                        //     'started_at' => null,
-                        //     'stopped_at' => now(),
-                        //     'process_id' => null,
-                        //     'client_count' => 0,
-                        //     'bandwidth_kbps' => 0,
-                        //     'bytes_transferred' => 0
-                        // ]);
-
-                        Log::channel('ffmpeg')->info("Stream {$streamKey} completely cleaned up due to no clients.");
+                        Log::channel('ffmpeg')->debug("Stream {$streamKey} completely cleaned up due to no clients.");
                         return; // Exit early since stream is cleaned up
                     } else {
                         $this->setStreamInfo($streamKey, $streamInfo);
@@ -1357,7 +1331,7 @@ class SharedStreamService
                 })
                 ->toArray();
 
-            Log::channel('ffmpeg')->debug("getClients: Retrieved " . count($clients) . " clients for stream '{$streamKey}' from database");
+            // Log::channel('ffmpeg')->debug("getClients: Retrieved " . count($clients) . " clients for stream '{$streamKey}' from database");
             return $clients;
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Error retrieving clients for {$streamKey}: " . $e->getMessage());
@@ -1946,7 +1920,7 @@ class SharedStreamService
         // First, kill the FFmpeg process if it exists
         $pid = $this->getProcessPid($streamKey);
         if ($pid && $this->isProcessRunning($pid)) {
-            Log::channel('ffmpeg')->info("Terminating FFmpeg process (PID: {$pid}) for stream {$streamKey}");
+            Log::channel('ffmpeg')->debug("Terminating FFmpeg process (PID: {$pid}) for stream {$streamKey}");
 
             // Try graceful termination first (SIGTERM)
             exec("kill -TERM {$pid} 2>/dev/null");
@@ -1963,7 +1937,7 @@ class SharedStreamService
 
             // Verify it's actually dead
             if (!$this->isProcessRunning($pid)) {
-                Log::channel('ffmpeg')->info("FFmpeg process {$pid} successfully terminated for stream {$streamKey}");
+                Log::channel('ffmpeg')->debug("FFmpeg process {$pid} successfully terminated for stream {$streamKey}");
             } else {
                 Log::channel('ffmpeg')->error("Failed to terminate FFmpeg process {$pid} for stream {$streamKey}");
             }
@@ -2002,12 +1976,12 @@ class SharedStreamService
         $deletedCount = (int) trim($output);
 
         if ($deletedCount > 0) {
-            Log::channel('ffmpeg')->info("Stream {$streamKey}: Cleaned up {$deletedCount} Redis keys including all buffer segments via shell command");
+            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Cleaned up {$deletedCount} Redis keys including all buffer segments via shell command");
         } else {
             Log::channel('ffmpeg')->debug("Stream {$streamKey}: No Redis keys found to clean up (pattern: *{$streamIdentifier}*)");
         }
 
-        Log::channel('ffmpeg')->info("Stream {$streamKey}: All Redis buffer data and keys cleaned up");
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: All Redis buffer data and keys cleaned up");
 
         // Clean up files if requested
         if ($removeFiles) {
@@ -2017,9 +1991,23 @@ class SharedStreamService
             }
         }
 
-        // Remove the stream from the database
+        // Finally, update the database to mark the stream as stopped
         SharedStream::where('stream_id', $streamKey)
-            ->delete();
+            ->update([
+                'status' => 'stopped',
+                'started_at' => null,
+                'stopped_at' => now(),
+                'process_id' => null,
+                'buffer_size' => 0, // Reset buffer size
+                'error_message' => null, // Reset error message
+                // 'stream_info' => null, // Reset stream info (should we do this? might need details in other methods...)
+                'client_count' => 0,
+                'bandwidth_kbps' => 0,
+                'bytes_transferred' => 0,
+                'last_client_activity' => null,
+                'health_check_at' => null, // Reset health check timestamp
+                'health_status' => 'unknown' // Reset health status
+            ]);
     }
 
     /**
@@ -2191,7 +2179,7 @@ class SharedStreamService
                 // Increment redirect count with configurable TTL
                 $this->redis()->setex($redirectTrackingKey, $this->redirectTtl, $redirectCount + 1);
 
-                Log::channel('ffmpeg')->info("Stream {$streamKey}: Redirecting client {$clientId} to failover stream {$redirectedStreamKey} (attempt " . ($redirectCount + 1) . " for channel {$channelId})");
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Redirecting client {$clientId} to failover stream {$redirectedStreamKey} (attempt " . ($redirectCount + 1) . " for channel {$channelId})");
 
                 // Update the streamKey by reference
                 $streamKey = $redirectedStreamKey;
@@ -2263,12 +2251,12 @@ class SharedStreamService
         $primaryChannel = Channel::find($primaryChannelId);
 
         if (!$primaryChannel || !$primaryChannel->failoverChannels) {
-            Log::channel('ffmpeg')->info("Stream {$streamKey}: No failover channels configured for primary channel {$primaryChannelId}");
+            Log::channel('ffmpeg')->debug("Stream {$streamKey}: No failover channels configured for primary channel {$primaryChannelId}");
             return null;
         }
 
         $failoverChannels = $primaryChannel->failoverChannels;
-        Log::channel('ffmpeg')->info("Stream {$streamKey}: Primary channel {$primaryChannelId} failed, attempting failover to " . $failoverChannels->count() . " backup channels");
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Primary channel {$primaryChannelId} failed, attempting failover to " . $failoverChannels->count() . " backup channels");
 
         foreach ($failoverChannels as $index => $failoverChannel) {
             try {
@@ -2280,7 +2268,7 @@ class SharedStreamService
                     continue;
                 }
 
-                Log::channel('ffmpeg')->info("Stream {$streamKey}: Attempting failover #" . ($index + 1) . " to channel {$failoverChannel->id} ({$failoverTitle})");
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Attempting failover #" . ($index + 1) . " to channel {$failoverChannel->id} ({$failoverTitle})");
 
                 // Use getOrCreateSharedStream to handle creating the new stream
                 $failoverStreamInfo = $this->getOrCreateSharedStream(
@@ -2305,7 +2293,7 @@ class SharedStreamService
                     // Migrate clients to the new stream
                     $this->migrateClients($streamKey, $newStreamKey);
 
-                    Log::channel('ffmpeg')->info("Stream {$streamKey}: Successfully failed over to channel {$failoverChannel->id} (attempt #" . ($index + 1) . "). New stream key: {$newStreamKey}");
+                    Log::channel('ffmpeg')->debug("Stream {$streamKey}: Successfully failed over to channel {$failoverChannel->id} (attempt #" . ($index + 1) . "). New stream key: {$newStreamKey}");
                     return $newStreamKey;
                 }
             } catch (\Exception $e) {
@@ -2333,7 +2321,7 @@ class SharedStreamService
         }
 
         $migratedCount = 0;
-        Log::channel('ffmpeg')->info("Migrating " . $clients->count() . " clients from {$oldStreamKey} to {$newStreamKey}");
+        Log::channel('ffmpeg')->debug("Migrating " . $clients->count() . " clients from {$oldStreamKey} to {$newStreamKey}");
 
         foreach ($clients as $client) {
             // Register client with the new stream
@@ -2364,7 +2352,7 @@ class SharedStreamService
                 'client_count' => $newStreamClientCount
             ]);
 
-            Log::channel('ffmpeg')->info("Updated client count for failover stream {$newStreamKey} to {$newStreamClientCount}");
+            Log::channel('ffmpeg')->debug("Updated client count for failover stream {$newStreamKey} to {$newStreamClientCount}");
         }
     }
 
@@ -2393,12 +2381,12 @@ class SharedStreamService
             $streamInfo = $this->getStreamInfo($streamKey);
 
             if ($streamInfo && ($streamInfo['type'] ?? '') === 'channel') {
-                Log::channel('ffmpeg')->info("Stream {$streamKey}: Attempting failover for channel {$streamInfo['model_id']}");
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Attempting failover for channel {$streamInfo['model_id']}");
                 $failoverStreamKey = $this->attemptStreamFailover($streamKey, $streamInfo);
 
                 if ($failoverStreamKey && $failoverStreamKey !== $streamKey) {
                     // Failover succeeded, try to get initial data from the new stream
-                    Log::channel('ffmpeg')->info("Stream {$streamKey}: Failover completed, getting data from new stream {$failoverStreamKey}");
+                    Log::channel('ffmpeg')->debug("Stream {$streamKey}: Failover completed, getting data from new stream {$failoverStreamKey}");
 
                     // Wait a moment for the new stream to be ready
                     sleep(1);
@@ -2481,7 +2469,7 @@ class SharedStreamService
 
             // Only log every 10th segment to reduce noise, unless it's the first few segments
             if ($newSegmentNumber <= 5 || $newSegmentNumber % 10 === 0) {
-                Log::channel('ffmpeg')->info("Stream {$streamKey}: Stored " . round($accumulatedSize / 1024, 1) . "KB as segment {$newSegmentNumber}");
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Stored " . round($accumulatedSize / 1024, 1) . "KB as segment {$newSegmentNumber}");
             }
 
             return $accumulatedData;
@@ -2518,36 +2506,24 @@ class SharedStreamService
     public function stopStream(string $streamId): bool
     {
         try {
-            Log::channel('ffmpeg')->info("Manual stop requested for stream: {$streamId}");
+            Log::channel('ffmpeg')->debug("Manual stop requested for stream: {$streamId}");
 
             // Get stream info first
             $streamInfo = $this->getStreamInfo($streamId);
             if (!$streamInfo) {
-                Log::channel('ffmpeg')->warning("Stream {$streamId} not found in Redis for manual stop");
-
-                // Still try to delete database record if it exists
-                $dbStream = SharedStream::where('stream_id', $streamId)->first();
-                if ($dbStream) {
-                    $dbStream->delete();
-                    Log::channel('ffmpeg')->info("Deleted database record for {$streamId}");
-                    return true;
-                }
+                Log::channel('ffmpeg')->warning("Stream {$streamId} not found for manual stop");
                 return false;
             }
 
             // Stop the FFmpeg process if it exists (will be handled by cleanupStream)
             $pid = $this->getProcessPid($streamId);
             if ($pid) {
-                Log::channel('ffmpeg')->info("Stopping FFmpeg process (PID: {$pid}) for stream {$streamId}");
+                Log::channel('ffmpeg')->debug("Stopping FFmpeg process (PID: {$pid}) for stream {$streamId}");
             }
 
             // Clean up the stream data (this will also stop the process)
             $this->cleanupStream($streamId, true);
-
-            // Delete database record completely
-            SharedStream::where('stream_id', $streamId)->delete();
-
-            Log::channel('ffmpeg')->info("Successfully stopped stream {$streamId} manually");
+            Log::channel('ffmpeg')->debug("Successfully stopped stream {$streamId} manually");
             return true;
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Error stopping stream {$streamId}: " . $e->getMessage());
@@ -2566,7 +2542,7 @@ class SharedStreamService
             // Generate a stream key for the new stream
             $streamKey = 'shared_stream:manual:' . time() . ':' . md5($sourceUrl);
 
-            Log::channel('ffmpeg')->info("Creating manual shared stream: {$streamKey}");
+            Log::channel('ffmpeg')->debug("Creating manual shared stream: {$streamKey}");
 
             $streamInfo = [
                 'stream_key' => $streamKey,
@@ -2582,7 +2558,7 @@ class SharedStreamService
                 'options' => []
             ];
 
-            // Store stream info in Redis
+            // Store stream info
             $this->setStreamInfo($streamKey, $streamInfo);
 
             // Create database record
@@ -2600,7 +2576,7 @@ class SharedStreamService
             // Start the streaming process
             $this->startStreamingProcess($streamKey, $streamInfo);
 
-            Log::channel('ffmpeg')->info("Created manual shared stream: {$streamKey}");
+            Log::channel('ffmpeg')->debug("Created manual shared stream: {$streamKey}");
             return $streamKey;
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Error creating manual stream: " . $e->getMessage());
@@ -2732,6 +2708,9 @@ class SharedStreamService
     {
         $modelId = $streamInfo['model_id'] ?? null;
         $type = $streamInfo['type'] ?? null;
+        $originalStreamInfo = [
+            ...$streamInfo, // create a copy of the original stream info
+        ];
 
         if (!$modelId || $type !== 'channel') {
             Log::channel('ffmpeg')->debug("Stream {$originalStreamKey}: No model ID or not a channel, cannot attempt failover");
@@ -2746,7 +2725,7 @@ class SharedStreamService
                 return null;
             }
 
-            Log::channel('ffmpeg')->info("Stream {$originalStreamKey}: Primary channel {$modelId} failed, attempting failover to " . $primaryChannel->failoverChannels->count() . " backup channels");
+            Log::channel('ffmpeg')->debug("Stream {$originalStreamKey}: Primary channel {$modelId} failed, attempting failover to " . $primaryChannel->failoverChannels->count() . " backup channels");
 
             // Get current failover attempt count
             $currentAttempts = $streamInfo['failover_attempts'] ?? 0;
@@ -2769,8 +2748,7 @@ class SharedStreamService
                     continue;
                 }
 
-                Log::channel('ffmpeg')->info("Stream {$originalStreamKey}: Attempting failover #{$attemptNumber} to channel {$failoverChannel->id} ({$failoverTitle})");
-
+                Log::channel('ffmpeg')->debug("Stream {$originalStreamKey}: Attempting failover #{$attemptNumber} to channel {$failoverChannel->id} ({$failoverTitle})");
                 try {
                     // Generate new stream key for failover
                     $failoverStreamKey = $this->getStreamKey('channel', $failoverChannel->id, $failoverUrl);
@@ -2783,36 +2761,50 @@ class SharedStreamService
                     $streamInfo['stream_url'] = $failoverUrl;
                     $streamInfo['title'] = $failoverTitle;
                     $streamInfo['model_id'] = $failoverChannel->id;
-                    $streamInfo['status'] = 'starting';
+                    $streamInfo['status'] = 'starting'; // Will be active after starting
                     $streamInfo['restart_attempt'] = time();
                     unset($streamInfo['error_message']);
 
+                    $failoverStream = SharedStream::updateOrCreate(
+                        ['stream_id' => $failoverStreamKey],
+                        [
+                            'source_url' => $failoverUrl,
+                            'status' => 'starting',
+                            'process_id' => $this->getProcessPid($failoverStreamKey),
+                            'error_message' => null,
+                            'started_at' => now(),
+                            'stream_info' => $streamInfo,
+                            'health_status' => 'unknown',
+                            'health_check_at' => null,
+                        ]
+                    );
+
                     // Start the failover stream
+                    // NOTE: Stream will be marked as ACTIVE after starting
                     if ($streamInfo['format'] === 'hls') {
                         $this->startHLSStream($failoverStreamKey, $streamInfo);
                     } else {
                         $this->startDirectStream($failoverStreamKey, $streamInfo);
                     }
-
-                    // Update stream info with new details - UPDATE AFTER STARTING
-                    $streamInfo['status'] = 'active'; // Mark as active after successful start
-                    $this->setStreamInfo($failoverStreamKey, $streamInfo);
-
-                    // Update database with failover information - use INSERT OR UPDATE to handle duplicates
                     try {
-                        SharedStream::updateOrCreate(
-                            ['stream_id' => $failoverStreamKey],
-                            [
-                                'source_url' => $failoverUrl,
-                                'status' => 'active',
-                                'process_id' => $this->getProcessPid($failoverStreamKey),
-                                'error_message' => null,
-                                'started_at' => now()
+                        // Mark old stream as failed
+                        SharedStream::where('stream_id', $originalStreamKey)->update([
+                            'status' => 'error',
+                            'stopped_at' => now(),
+                            'error_message' => "Failed over to channel {$failoverChannel->id} after {$attemptNumber} attempts",
+                            // 'client_count' => 0, // Clients should be migrated, not deleted, so we don't reset this
+                            // 'bandwidth_kbps' => 0,
+                            // 'bytes_transferred' => 0,
+                            'last_client_activity' => null, // Reset last activity since this stream is no longer active
+                            'health_check_at' => now(),
+                            'health_status' => 'unhealthy',
+                            'stream_info' => [
+                                ...$originalStreamInfo,
+                                'status' => 'failed_over',
+                                'failover_stream_key' => $failoverStreamKey,
+                                'failed_over_at' => now()->timestamp,
                             ]
-                        );
-
-                        // Remove the old stream record
-                        SharedStream::where('stream_id', $originalStreamKey)->delete();
+                        ]);
                     } catch (\Exception $dbError) {
                         Log::channel('ffmpeg')->warning("Stream {$originalStreamKey}: Database update failed during failover: " . $dbError->getMessage());
                         // Continue with failover even if DB update fails
@@ -2823,17 +2815,10 @@ class SharedStreamService
                     $failoverRedirectKey = "stream_failover_redirect:{$originalStreamKey}";
                     $this->redis()->setex($failoverRedirectKey, 600, $failoverStreamKey); // Cache for 10 minutes
 
-                    // Update original stream info to indicate failover
-                    $originalStreamInfo = $this->getStreamInfo($originalStreamKey) ?: [];
-                    $originalStreamInfo['status'] = 'failed_over';
-                    $originalStreamInfo['failover_stream_key'] = $failoverStreamKey;
-                    $originalStreamInfo['failed_over_at'] = time();
-                    $this->setStreamInfo($originalStreamKey, $originalStreamInfo);
-
                     // Move clients to new stream key
                     $this->migrateClientsToFailoverStream($originalStreamKey, $failoverStreamKey);
 
-                    Log::channel('ffmpeg')->info("Stream {$originalStreamKey}: Successfully failed over to channel {$failoverChannel->id} (attempt #{$attemptNumber}). New stream key: {$failoverStreamKey}");
+                    Log::channel('ffmpeg')->debug("Stream {$originalStreamKey}: Successfully failed over to channel {$failoverChannel->id} (attempt #{$attemptNumber}). New stream key: {$failoverStreamKey}");
 
                     // Return the failover stream key so the client can be redirected
                     return $failoverStreamKey;
@@ -2859,17 +2844,16 @@ class SharedStreamService
      */
     private function markStreamFailed(string $streamKey, string $reason): void
     {
-        $streamInfo = $this->getStreamInfo($streamKey);
-        if ($streamInfo) {
-            $streamInfo['status'] = 'error';
-            $streamInfo['error_message'] = $reason;
-            $this->setStreamInfo($streamKey, $streamInfo);
-        }
-
+        $streamInfo = $this->getStreamInfo($streamKey) ?: [];
         SharedStream::where('stream_id', $streamKey)->update([
             'status' => 'error',
             'error_message' => $reason,
-            'stopped_at' => now()
+            'stopped_at' => now(),
+            'stream_info' => [
+                ...$streamInfo,
+                'status' => 'error',
+                'error_message' => $reason,
+            ],
         ]);
 
         Log::channel('ffmpeg')->error("Stream {$streamKey}: Marked as failed - {$reason}");
@@ -2908,7 +2892,7 @@ class SharedStreamService
             return;
         }
 
-        Log::channel('ffmpeg')->info("Migrating " . $clients->count() . " clients from {$originalStreamKey} to {$failoverStreamKey}");
+        Log::channel('ffmpeg')->debug("Migrating " . $clients->count() . " clients from {$originalStreamKey} to {$failoverStreamKey}");
 
         foreach ($clients as $client) {
             // Register client with the failover stream
@@ -2933,7 +2917,7 @@ class SharedStreamService
 
         SharedStream::where('stream_id', $originalStreamKey)->update(['client_count' => $originalClientCount]);
 
-        Log::channel('ffmpeg')->info("Updated client count for failover stream {$failoverStreamKey} to {$failoverClientCount}");
+        Log::channel('ffmpeg')->debug("Updated client count for failover stream {$failoverStreamKey} to {$failoverClientCount}");
     }
 
     /**
@@ -3098,7 +3082,7 @@ class SharedStreamService
                     ) {
 
                         // Found an active failover stream for this channel
-                        Log::channel('ffmpeg')->info("Stream {$originalStreamKey}: Found failover stream {$key} for model {$modelId}, setting up redirect");
+                        Log::channel('ffmpeg')->debug("Stream {$originalStreamKey}: Found failover stream {$key} for model {$modelId}, setting up redirect");
 
                         // Store the redirect for future lookups
                         $this->redis()->setex($failoverKey, 300, $key); // Cache for 5 minutes
@@ -3189,7 +3173,7 @@ class SharedStreamService
                 return false;
             }
 
-            Log::channel('ffmpeg')->info("Attempting to restart stream {$streamKey} (type: {$type}, model_id: {$modelId})");
+            Log::channel('ffmpeg')->debug("Attempting to restart stream {$streamKey} (type: {$type}, model_id: {$modelId})");
 
             // Stop the current stream process if it's running
             $this->cleanupStream($streamKey, false);
@@ -3238,7 +3222,7 @@ class SharedStreamService
                 // Remove the temporary client after restart
                 $this->removeClient($streamKey, $restartClientId);
 
-                Log::channel('ffmpeg')->info("Successfully restarted stream {$streamKey}");
+                Log::channel('ffmpeg')->debug("Successfully restarted stream {$streamKey}");
                 return true;
             } else {
                 Log::channel('ffmpeg')->error("Failed to restart stream {$streamKey}: " . ($result['error_message'] ?? 'unknown error'));

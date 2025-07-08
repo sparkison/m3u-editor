@@ -72,7 +72,7 @@ class SharedStream extends Model
         do {
             $streamId = 'shared_' . Str::random(16);
         } while (self::where('stream_id', $streamId)->exists());
-        
+
         return $streamId;
     }
 
@@ -98,7 +98,7 @@ class SharedStream extends Model
     public function stats(): HasMany
     {
         return $this->hasMany(SharedStreamStat::class, 'stream_id', 'stream_id')
-                   ->orderBy('recorded_at', 'desc');
+            ->orderBy('recorded_at', 'desc');
     }
 
     /**
@@ -107,7 +107,7 @@ class SharedStream extends Model
     public function recentStats(int $minutes = 60): HasMany
     {
         return $this->stats()
-                   ->where('recorded_at', '>=', now()->subMinutes($minutes));
+            ->where('recorded_at', '>=', now()->subMinutes($minutes));
     }
 
     /**
@@ -128,8 +128,15 @@ class SharedStream extends Model
         }
 
         // Check if process is still running
-        $result = shell_exec("ps -p {$this->process_id} -o pid=");
-        return !empty(trim($result));
+        // Use ps to check process status (works on both Linux and macOS)
+        $output = shell_exec("ps -p {$this->process_id} -o stat= 2>/dev/null");
+
+        if (empty(trim($output))) {
+            // Process doesn't exist
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -139,7 +146,7 @@ class SharedStream extends Model
     {
         $count = $this->activeClients()->count();
         $this->update(['client_count' => $count]);
-        
+
         // Also update Redis cache
         Redis::hset("shared:stream:{$this->stream_id}", 'client_count', $count);
     }
@@ -150,7 +157,7 @@ class SharedStream extends Model
     public function addBytesTransferred(int $bytes): void
     {
         $this->increment('bytes_transferred', $bytes);
-        
+
         // Update Redis cache
         Redis::hincrby("shared:stream:{$this->stream_id}", 'bytes_transferred', $bytes);
     }
@@ -161,7 +168,7 @@ class SharedStream extends Model
     public function updateBandwidth(int $kbps): void
     {
         $this->update(['bandwidth_kbps' => $kbps]);
-        
+
         // Update Redis cache
         Redis::hset("shared:stream:{$this->stream_id}", 'bandwidth_kbps', $kbps);
     }
@@ -175,7 +182,7 @@ class SharedStream extends Model
             'health_status' => $status,
             'health_check_at' => now()
         ]);
-        
+
         // Update Redis cache
         Redis::hmset("shared:stream:{$this->stream_id}", [
             'health_status' => $status,
@@ -226,7 +233,7 @@ class SharedStream extends Model
     public static function cleanupOldStreams(int $hoursOld = 24): int
     {
         return self::where('status', 'stopped')
-                  ->where('stopped_at', '<', now()->subHours($hoursOld))
-                  ->delete();
+            ->where('stopped_at', '<', now()->subHours($hoursOld))
+            ->delete();
     }
 }

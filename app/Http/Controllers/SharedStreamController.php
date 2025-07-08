@@ -5,12 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Channel;
 use App\Models\Episode;
 use App\Services\SharedStreamService;
-use App\Services\ProxyService;
-use App\Traits\TracksActiveStreams;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Redis;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -22,8 +19,6 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class SharedStreamController extends Controller
 {
-    use TracksActiveStreams;
-
     private SharedStreamService $sharedStreamService;
 
     public function __construct(SharedStreamService $sharedStreamService)
@@ -131,18 +126,6 @@ class SharedStreamController extends Controller
                 $model // Pass the full model for failover support
             );
 
-            // Only check and increment stream limits for NEW streams
-            if ($streamInfo['is_new_stream'] ?? false) {
-                // Check stream limits
-                $activeStreams = $this->incrementActiveStreams($playlist->id);
-                if ($this->wouldExceedStreamLimit($playlist->id, $playlist->available_streams, $activeStreams)) {
-                    $this->decrementActiveStreams($playlist->id);
-                    // Clean up the just-created stream
-                    $this->sharedStreamService->removeClient($streamInfo['stream_key'], $clientId);
-                    abort(503, 'Maximum concurrent streams reached for this playlist.');
-                }
-            }
-
             Log::channel('ffmpeg')->info("Client {$clientId} connected to shared stream for {$type} {$title} ({$format})");
 
             // Return appropriate response based on format
@@ -152,10 +135,6 @@ class SharedStreamController extends Controller
                 return $this->streamDirect($streamInfo, $clientId, $request);
             }
         } catch (\Exception $e) {
-            // Only decrement if we incremented (for new streams)
-            if (isset($streamInfo) && ($streamInfo['is_new_stream'] ?? false)) {
-                $this->decrementActiveStreams($playlist->id);
-            }
             Log::channel('ffmpeg')->error("Error starting shared stream for {$type} {$title}: " . $e->getMessage());
             abort(500, 'Failed to start stream: ' . $e->getMessage());
         }
@@ -494,6 +473,7 @@ class SharedStreamController extends Controller
         $clientId = $this->generateClientId($request);
 
         try {
+            // @TODO: fix this, or remove it...
             $data = $this->sharedStreamService->getStreamData($streamKey, $clientId);
 
             if (!$data) {
