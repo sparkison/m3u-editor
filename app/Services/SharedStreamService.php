@@ -622,7 +622,7 @@ class SharedStreamService
 
         $settings = ProxyService::getStreamSettings();
         $ffmpegPath = $settings['ffmpeg_path'] ?? 'jellyfin-ffmpeg';
-        $userAgent = $settings['ffmpeg_user_agent'] ?? 'VLC/3.0.21';
+        $userAgent = $streamInfo['options']['user_agent'] ?? $settings['ffmpeg_user_agent'] ?? 'VLC/3.0.21';
 
         // Build FFmpeg command for HLS output
         $cmd = $this->buildHLSCommand($ffmpegPath, $streamInfo, $storageDir, $userAgent);
@@ -672,7 +672,7 @@ class SharedStreamService
     {
         $settings = ProxyService::getStreamSettings();
         $ffmpegPath = $settings['ffmpeg_path'] ?? 'jellyfin-ffmpeg';
-        $userAgent = $settings['ffmpeg_user_agent'] ?? 'VLC/3.0.21';
+        $userAgent = $streamInfo['options']['user_agent'] ?? $settings['ffmpeg_user_agent'] ?? 'VLC/3.0.21';
 
         // Build FFmpeg command for direct output
         $cmd = $this->buildDirectCommand($ffmpegPath, $streamInfo, $userAgent);
