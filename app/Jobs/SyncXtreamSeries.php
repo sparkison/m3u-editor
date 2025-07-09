@@ -88,7 +88,7 @@ class SyncXtreamSeries implements ShouldQueue
                     'cover' => $seriesInfo['cover'] ?? null,
                     'plot' => $seriesInfo['plot'] ?? null,
                     'genre' => $seriesInfo['genre'] ?? null,
-                    'release_date' => $seriesInfo['releaseDate'] ?? null,
+                    'release_date' => $seriesInfo['releaseDate'] ?? $item['release_date'] ?? null,
                     'cast' => $seriesInfo['cast'] ?? null,
                     'director' => $seriesInfo['director'],
                     'rating' => $seriesInfo['rating'] ?? null,
