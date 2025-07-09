@@ -1,6 +1,9 @@
 <x-dynamic-component :component="$getFieldWrapperView()" :field="$field">
     @php($stats = $getStats())
     @if(!empty($stats))
+        {{-- <div class="w-full flex items-end justify-end -mb-8">
+            {{ $getAction('refreshData') }}
+        </div> --}}
         <div class="">
             @if(isset($stats['proxy_enabled']) && $stats['proxy_enabled'])
                 <!-- Proxy Streams Section -->
