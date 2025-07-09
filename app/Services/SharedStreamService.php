@@ -116,7 +116,6 @@ class SharedStreamService
         $streamKey = $this->getStreamKey($type, $modelId, $streamUrl);
         $streamInfo = $this->getStreamInfo($streamKey);
         $primaryAttempted = false;
-        $primarySucceeded = false;
 
         if (!$streamInfo || !$this->isStreamActive($streamKey)) {
             $primaryAttempted = true;
@@ -170,11 +169,11 @@ class SharedStreamService
                             $format,
                             $options
                         );
+                        $this->registerClient($streamKey, $clientId, $options);
+
                         $streamInfo['primary_channel_id'] = $modelId;
                         $streamInfo['active_channel_id'] = $modelId;
                         $streamInfo['failover_attempts'] = 0;
-                        $this->registerClient($streamKey, $clientId, $options);
-                        $streamInfo['is_new_stream'] = true;
                         Log::channel('ffmpeg')->debug("SharedStream: Successfully created primary stream for channel {$modelId} (no playlist for limit check).");
                         return $streamInfo;
                     } catch (\Exception $e) {
@@ -194,11 +193,11 @@ class SharedStreamService
                         $format,
                         $options
                     );
+                    $this->registerClient($streamKey, $clientId, $options);
+
                     $streamInfo['primary_channel_id'] = $modelId;
                     $streamInfo['active_channel_id'] = $modelId;
                     $streamInfo['failover_attempts'] = 0;
-                    $this->registerClient($streamKey, $clientId, $options);
-                    $streamInfo['is_new_stream'] = true;
                     Log::channel('ffmpeg')->debug("SharedStream: Successfully created primary stream for channel {$modelId} (no primary channel model for limit check).");
                     return $streamInfo;
                 } catch (\Exception $e) {
