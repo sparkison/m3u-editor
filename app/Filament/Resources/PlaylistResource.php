@@ -250,7 +250,7 @@ class PlaylistResource extends Resource
                             Notification::make()
                                 ->success()
                                 ->title('Playlist is fetching metadata for VOD channels')
-                                ->body('Playlist VOD channels are being processed in the background. Depending on the number of VOD entries, this may take a while. You will be notified on completion.')
+                                ->body('Playlist VOD channels are being processed in the background. Depending on the number of enabled VOD channels, this may take a while. You will be notified on completion.')
                                 ->duration(10000)
                                 ->send();
                         })
@@ -259,7 +259,7 @@ class PlaylistResource extends Resource
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
-                        ->modalDescription('Fetch VOD metadata for this playlist now? Only enabled channels will be included.')
+                        ->modalDescription('Fetch VOD metadata for this playlist now? Only enabled VOD channels will be included.')
                         ->modalSubmitActionLabel('Yes, process now'),
                     Tables\Actions\Action::make('Download M3U')
                         ->label('Download M3U')
