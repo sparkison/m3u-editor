@@ -4,6 +4,7 @@ namespace App\Filament\Resources\PlaylistResource\Pages;
 
 use App\Enums\Status;
 use App\Filament\Resources\PlaylistResource;
+use App\Filament\Resources\PlaylistResource\Widgets\ImportProgress;
 use App\Models\Playlist;
 use Filament\Actions;
 use Filament\Forms;
@@ -20,6 +21,13 @@ class EditPlaylist extends EditRecord
     public function hasSkippableSteps(): bool
     {
         return true;
+    }
+
+    public function getVisibleHeaderWidgets(): array
+    {
+        return [
+            ImportProgress::class
+        ];
     }
 
     protected function getHeaderActions(): array
