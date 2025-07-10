@@ -122,8 +122,8 @@ class ProcessVodChannels implements ShouldQueue
                     $progress = min(99, ($index / $total) * 100);
                     $playlist->update(['progress' => $progress]);
                 }
-                sleep(1); // Throttle processing to avoid overwhelming the Xtream API
             }
+            usleep(100000); // Throttle processing to avoid overwhelming the Xtream API
         }
 
         // Update the playlist status after processing

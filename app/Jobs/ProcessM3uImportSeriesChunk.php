@@ -2,9 +2,11 @@
 
 namespace App\Jobs;
 
+use App\Enums\Status;
 use App\Models\Category;
 use App\Models\Playlist;
 use App\Models\Series;
+use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Http;
@@ -28,6 +30,7 @@ class ProcessM3uImportSeriesChunk implements ShouldQueue
         public array $payload,
         public int $batchCount,
         public string $batchNo,
+        public int $index
     ) {
         //
     }
@@ -52,6 +55,24 @@ class ProcessM3uImportSeriesChunk implements ShouldQueue
         $playlist = Playlist::find($playlistId);
         if (!$playlist) {
             return; // skip if no playlist found
+        }
+
+        // If this is the first chunk, reset the series progress and notify the user
+        // This is to ensure that the series progress is reset for each import
+        if ($this->index === 0) {
+            // Notify the user that series import is starting
+            Notification::make()
+                ->info()
+                ->title('Syncing Series')
+                ->body('Syncing series now. This may take a while depending on the number of series your provider offers.')
+                ->broadcast($playlist->user)
+                ->sendToDatabase($playlist->user);
+            $playlist->update([
+                'processing' => true,
+                'status' => Status::Processing,
+                'errors' => null,
+                'series_progress' => 0,
+            ]);
         }
 
         // Setup the user agent and SSL verification
@@ -138,6 +159,11 @@ class ProcessM3uImportSeriesChunk implements ShouldQueue
                 'youtube_trailer' => $item->youtube_trailer ?? null,
             ];
         }
+
+        // Update progress
+        $playlist->update([
+            'series_progress' => min(99, $playlist->series_progress + ($this->batchCount / 100) * 5),
+        ]);
 
         // Bulk insert the series in chunks
         collect($bulk)->chunk(100)->each(fn($chunk) => Series::insert($chunk->toArray()));

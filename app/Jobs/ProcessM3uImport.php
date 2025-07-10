@@ -102,7 +102,6 @@ class ProcessM3uImport implements ShouldQueue
             'status' => Status::Processing,
             'errors' => null,
             'progress' => 0,
-            'series_progress' => 0,
         ]);
 
         // Determine if using Xtream API or M3U+
@@ -873,7 +872,8 @@ class ProcessM3uImport implements ShouldQueue
         $groups = array_values(array_unique($this->groups));
 
         // Create the source groups
-        // Need to call AFTER the channel loop has been executed
+        // Need to call **AFTER** the channel loop has been executed
+        // NOTE: If called before, the loop will not have run yet, and no groups will be created
         foreach (array_chunk($groups, 50) as $chunk) {
             SourceGroup::upsert(
                 collect($chunk)->map(function ($groupName) use ($playlistId) {
@@ -929,38 +929,6 @@ class ProcessM3uImport implements ShouldQueue
             $jobs[] = new ProcessM3uImportChunk($chunk->pluck('id')->toArray(), $batchCount);
         });
 
-        // Add series processing to the chain, if passed in
-        if ($seriesCategories) {
-            $seriesCategories->each(function ($category) use ($playlistId, $batchNo, $userId) {
-                // Create a job for each series category
-                Job::create([
-                    'title' => "Processing series import for category: {$category['category_name']}",
-                    'batch_no' => $batchNo,
-                    'payload' => [
-                        'categoryId' => $category['category_id'],
-                        'categoryName' => $category['category_name'],
-                        'playlistId' => $playlistId,
-                    ],
-                    'variables' => null
-                ]);
-            });
-
-            // Add series processing to the chain
-            $seriesJobsWhere = [
-                ['batch_no', '=', $batchNo],
-                ['variables', '=', null],
-            ];
-            $batchCount = Job::where($seriesJobsWhere)->count();
-            $jobsBatch = Job::where($seriesJobsWhere)->select('id', 'payload')->cursor();
-            $jobsBatch->each(function ($job) use (&$jobs, $batchCount, $batchNo) {
-                $jobs[] = new ProcessM3uImportSeriesChunk(
-                    $job->payload,
-                    $batchCount,
-                    $batchNo
-                );
-            });
-        }
-
         // Last job in the batch
         $jobs[] = new ProcessM3uImportComplete(
             userId: $userId,
@@ -970,6 +938,33 @@ class ProcessM3uImport implements ShouldQueue
             maxHit: $this->maxItemsHit,
             isNew: $this->isNew,
         );
+
+        // Add series processing to the chain, if passed in
+        if ($seriesCategories) {
+            $categoryCount = $seriesCategories->count();
+            $seriesCategories->each(function ($category, $index) use (&$jobs, $playlistId, $batchNo, $categoryCount) {
+                // Create a job for each series category
+                $jobs[] = new ProcessM3uImportSeriesChunk(
+                    [
+                        'categoryId' => $category['category_id'],
+                        'categoryName' => $category['category_name'],
+                        'playlistId' => $playlistId,
+                    ],
+                    $categoryCount,
+                    $batchNo,
+                    $index,
+                );
+            });
+
+            // Add series processing to the chain
+            $jobs[] = new ProcessM3uImportSeriesComplete(
+                playlist: $playlist,
+                batchNo: $batchNo,
+                fetchedMeta: false // flag as not fetching metadata (default is true)
+            );
+        }
+
+        // Start the chain!
         Bus::chain($jobs)
             ->onConnection('redis') // force to use redis connection
             ->onQueue('import')

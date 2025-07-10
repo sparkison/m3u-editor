@@ -258,7 +258,7 @@ class ProcessM3uImportComplete implements ShouldQueue
                 ->delete();
         }
 
-        // Determine if importing series as well
+        // Determine if syncing series metadata as well
         if ($playlist->series()->where('enabled', true)->exists()) {
             // Process series import
             dispatch(new ProcessM3uImportSeries(
@@ -269,8 +269,8 @@ class ProcessM3uImportComplete implements ShouldQueue
             ));
             Notification::make()
                 ->info()
-                ->title('Syncing Series')
-                ->body('Syncing playlist series now. This may take a while depending on how many series you have. Please check back later.')
+                ->title('Fetching Series Metadata')
+                ->body('Fetching series metadata now. This may take a while depending on how many series you have enabled. Please check back later.')
                 ->broadcast($playlist->user)
                 ->sendToDatabase($playlist->user);
             return; // Exit early if series import is enabled, sync complete event will be fired after series import completes

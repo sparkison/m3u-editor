@@ -130,7 +130,12 @@ class PlaylistResource extends Resource
                     ->toggleable()
                     ->color(fn(Status $state) => $state->getColor()),
                 ProgressColumn::make('progress')
-                    ->label('Sync Progress')
+                    ->label('Channel Sync')
+                    ->sortable()
+                    ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
+                    ->toggleable(),
+                ProgressColumn::make('series_progress')
+                    ->label('Series Sync')
                     ->sortable()
                     ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
                     ->toggleable(),
@@ -242,7 +247,7 @@ class PlaylistResource extends Resource
                         ->action(function ($record) {
                             $record->update([
                                 'status' => Status::Processing,
-                                'series_progress' => 0,
+                                'progress' => 0,
                             ]);
                             app('Illuminate\Contracts\Bus\Dispatcher')
                                 ->dispatch(new \App\Jobs\ProcessVodChannels(playlist: $record));
