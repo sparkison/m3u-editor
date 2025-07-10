@@ -217,9 +217,20 @@ class ProcessM3uImport implements ShouldQueue
                 }
                 $liveCategories = collect($categoriesResponse->json());
 
+                // Get the live streams and save to a file
+                $liveFp = Storage::disk('local')->path("{$playlist->folder_path}/live_streams.json");
+
+                // Make sure the folder exists
+                Storage::disk('local')->makeDirectory($playlist->folder_path, 0755, true);
+
+                // Delete the file if it already exists so we can start fresh
+                if (Storage::disk('local')->exists($liveFp)) {
+                    Storage::disk('local')->delete($liveFp);
+                }
                 $liveResponse = Http::withUserAgent($userAgent)
+                    ->sink($liveFp) // Save the response to a file for later processing
                     ->withOptions(['verify' => $verify])
-                    ->timeout(60 * 5) // set timeout to five minute
+                    ->timeout(60 * 5)
                     ->throw()->get($liveStreamsUrl);
                 if (!$liveResponse->ok()) {
                     $error = $liveResponse->body();
@@ -235,7 +246,7 @@ class ProcessM3uImport implements ShouldQueue
             if ($vodStreamsEnabled) {
                 $vodCategoriesResponse = Http::withUserAgent($userAgent)
                     ->withOptions(['verify' => $verify])
-                    ->timeout(60 * 5)
+                    ->timeout(60) // set timeout to one minute
                     ->throw()->get($vodCategories);
                 if (!$vodCategoriesResponse->ok()) {
                     $error = $vodCategoriesResponse->body();
@@ -245,10 +256,20 @@ class ProcessM3uImport implements ShouldQueue
                 }
                 $vodCategories = collect($vodCategoriesResponse->json());
 
-                // Get the VOD streams
+                // Get the VOD streams and save to a file
+                $vodFp = Storage::disk('local')->path("{$playlist->folder_path}/vod_streams.json");
+
+                // Make sure the folder exists
+                Storage::disk('local')->makeDirectory($playlist->folder_path, 0755, true);
+
+                // Delete the file if it already exists so we can start fresh
+                if (Storage::disk('local')->exists($vodFp)) {
+                    Storage::disk('local')->delete($vodFp);
+                }
                 $vodResponse = Http::withUserAgent($userAgent)
+                    ->sink($vodFp) // Save the response to a file for later processing
                     ->withOptions(['verify' => $verify])
-                    ->timeout(60 * 10) // set timeout to ten minute
+                    ->timeout(60 * 5)
                     ->throw()->get($vodStreamsUrl);
                 if (!$vodResponse->ok()) {
                     $error = $vodResponse->body();
@@ -312,8 +333,8 @@ class ProcessM3uImport implements ShouldQueue
             }
 
             // Get the live streams
-            $liveStreams = $liveStreamsEnabled && $liveResponse ? Items::fromString($liveResponse->body()) : null;
-            $vodStreams = $vodStreamsEnabled && $vodResponse ? Items::fromString($vodResponse->body()) : null;
+            $liveStreams = $liveStreamsEnabled && $liveFp ? Items::fromFile($liveFp) : null;
+            $vodStreams = $vodStreamsEnabled && $vodFp ? Items::fromFile($vodFp) : null;
 
             // Process the live streams
             $streamBaseUrl = "$baseUrl/live/$user/$password";
