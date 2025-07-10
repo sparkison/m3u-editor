@@ -20,12 +20,15 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\LazyCollection;
-use Cerbero\JsonParser\JsonParser;
 use Illuminate\Support\Facades\Log;
+use JsonMachine\Items;
 
 class ProcessM3uImport implements ShouldQueue
 {
     use Queueable;
+
+    // Don't retry the job on failure
+    public $tries = 1;
 
     // To prevent errors when processing large files, limit imported channels to 50,000
     // NOTE: this only applies to M3U+ files
@@ -173,9 +176,13 @@ class ProcessM3uImport implements ShouldQueue
             // Setup the category and stream URLs
             $userInfo = "$baseUrl/player_api.php?username=$user&password=$password";
             $liveCategories = "$baseUrl/player_api.php?username=$user&password=$password&action=get_live_categories";
-            $liveStreams = "$baseUrl/player_api.php?username=$user&password=$password&action=get_live_streams";
+            $liveStreamsUrl = "$baseUrl/player_api.php?username=$user&password=$password&action=get_live_streams";
             $vodCategories = "$baseUrl/player_api.php?username=$user&password=$password&action=get_vod_categories";
-            $vodStreams = "$baseUrl/player_api.php?username=$user&password=$password&action=get_vod_streams";
+            $vodStreamsUrl = "$baseUrl/player_api.php?username=$user&password=$password&action=get_vod_streams";
+
+            // Determine which imports are enabled
+            $liveStreamsEnabled = in_array('live', $categoriesToImport);
+            $vodStreamsEnabled = in_array('vod', $categoriesToImport);
 
             // Setup the user agent and SSL verification
             $verify = !$playlist->disable_ssl_verification;
@@ -195,7 +202,8 @@ class ProcessM3uImport implements ShouldQueue
             // Set the initial progress
             $initialProgress = 3; // start at 3%
 
-            if (in_array('live', $categoriesToImport)) {
+            // If including Live streams, get the categories and streams
+            if ($liveStreamsEnabled) {
                 // Get the live categories
                 $categoriesResponse = Http::withUserAgent($userAgent)
                     ->withOptions(['verify' => $verify])
@@ -207,24 +215,24 @@ class ProcessM3uImport implements ShouldQueue
                     $this->sendError($message, $error);
                     return;
                 }
+                $liveCategories = collect($categoriesResponse->json());
 
-                $liveStreamsResponse = Http::withUserAgent($userAgent)
+                $liveResponse = Http::withUserAgent($userAgent)
                     ->withOptions(['verify' => $verify])
                     ->timeout(60 * 5) // set timeout to five minute
-                    ->throw()->get($liveStreams);
-                if (!$liveStreamsResponse->ok()) {
-                    $error = $liveStreamsResponse->body();
+                    ->throw()->get($liveStreamsUrl);
+                if (!$liveResponse->ok()) {
+                    $error = $liveResponse->body();
                     $message = "Error processing Live streams: $error";
                     $this->sendError($message, $error);
                     return;
                 }
                 $initialProgress += 3;
                 $playlist->update(['progress' => $initialProgress]);
-                $liveCategories = collect($categoriesResponse->json());
             }
 
-            // If including VOD, get the categories
-            if (in_array('vod', $categoriesToImport)) {
+            // If including VOD, get the categories and streams
+            if ($vodStreamsEnabled) {
                 $vodCategoriesResponse = Http::withUserAgent($userAgent)
                     ->withOptions(['verify' => $verify])
                     ->timeout(60 * 5)
@@ -235,21 +243,21 @@ class ProcessM3uImport implements ShouldQueue
                     $this->sendError($message, $error);
                     return;
                 }
+                $vodCategories = collect($vodCategoriesResponse->json());
 
                 // Get the VOD streams
-                $vodStreamsResponse = Http::withUserAgent($userAgent)
+                $vodResponse = Http::withUserAgent($userAgent)
                     ->withOptions(['verify' => $verify])
                     ->timeout(60 * 10) // set timeout to ten minute
-                    ->throw()->get($vodStreams);
-                if (!$vodStreamsResponse->ok()) {
-                    $error = $vodStreamsResponse->body();
+                    ->throw()->get($vodStreamsUrl);
+                if (!$vodResponse->ok()) {
+                    $error = $vodResponse->body();
                     $message = "Error processing VOD streams: $error";
                     $this->sendError($message, $error);
                     return;
                 }
                 $initialProgress += 3;
                 $playlist->update(['progress' => $initialProgress]);
-                $vodCategories = collect($vodCategoriesResponse->json());
             }
 
             // Update progress
@@ -304,8 +312,8 @@ class ProcessM3uImport implements ShouldQueue
             }
 
             // Get the live streams
-            $liveStreams = isset($liveStreamsResponse) ? JsonParser::parse($liveStreamsResponse->body()) : null;
-            $vodStreams = isset($vodStreamsResponse) ? JsonParser::parse($vodStreamsResponse->body()) : null;
+            $liveStreams = $liveStreamsEnabled && $liveResponse ? Items::fromString($liveResponse->body()) : null;
+            $vodStreams = $vodStreamsEnabled && $vodResponse ? Items::fromString($vodResponse->body()) : null;
 
             // Process the live streams
             $streamBaseUrl = "$baseUrl/live/$user/$password";
@@ -329,7 +337,7 @@ class ProcessM3uImport implements ShouldQueue
                         ++$channelNo;
 
                         // Get the category
-                        $category = $liveCategories->firstWhere('category_id', $item['category_id']);
+                        $category = $liveCategories->firstWhere('category_id', $item->category_id);
 
                         // Determine if the channel should be included
                         if ($this->preprocess && !$this->shouldIncludeChannel($category['category_name'] ?? '')) {
@@ -337,18 +345,17 @@ class ProcessM3uImport implements ShouldQueue
                         }
                         $channel = [
                             ...$channelFields,
-                            'title' => $item['name'],
-                            'name' => $item['name'],
-                            'url' => "$streamBaseUrl/{$item['stream_id']}.$output",
-                            'logo' => $item['stream_icon'],
+                            'title' => $item->name,
+                            'name' => $item->name,
+                            'url' => "$streamBaseUrl/{$item->stream_id}.$output",
+                            'logo' => $item->stream_icon,
                             'group' => $category['category_name'] ?? '',
                             'group_internal' => $category['category_name'] ?? '',
-                            'stream_id' => $item['epg_channel_id'] ?? $item['stream_id'], // prefer EPG id for mapping, if set
-                            'channel' => $item['num'] ?? null,
-                            'catchup' => $item['tv_archive'] ?? null,
-                            'shift' => $item['tv_archive_duration'] ?? 0,
-                            'source_id' => $item['stream_id'] ?? null, // source ID for the channel
-                            // 'tvg_shift' => $item['tvg_shift'] ?? null, // @TODO: check if this is on Xtream API, not seeing it as a deffinition in the API docs
+                            'stream_id' => $item->epg_channel_id ?? $item->stream_id, // prefer EPG id for mapping, if set
+                            'channel' => $item->num ?? null,
+                            'catchup' => $item->tv_archive ?? null,
+                            'shift' => $item->tv_archive_duration ?? 0,
+                            // 'tvg_shift' => $item->tvg_shift ?? null, // @TODO: check if this is on Xtream API, not seeing it as a deffinition in the API docs
                         ];
                         if ($autoSort) {
                             $channel['sort'] = $channelNo;
@@ -364,29 +371,28 @@ class ProcessM3uImport implements ShouldQueue
                         ++$channelNo;
 
                         // Get the category
-                        $category = $vodCategories->firstWhere('category_id', $item['category_id']);
+                        $category = $vodCategories->firstWhere('category_id', $item->category_id);
 
                         // Determine if the channel should be included
                         if ($this->preprocess && !$this->shouldIncludeChannel($category['category_name'] ?? '')) {
                             continue;
                         }
-                        $extension = $item['container_extension'] ?? "mp4";
+                        $extension = $item->container_extension ?? "mp4";
                         $channel = [
                             ...$channelFields,
-                            'title' => $item['name'],
-                            'name' => $item['name'],
-                            'url' => "$vodBaseUrl/{$item['stream_id']}." . $extension,
-                            'logo' => $item['stream_icon'],
+                            'title' => $item->name,
+                            'name' => $item->name,
+                            'url' => "$vodBaseUrl/{$item->stream_id}." . $extension,
+                            'logo' => $item->stream_icon,
                             'group' => $category['category_name'] ?? '',
                             'group_internal' => $category['category_name'] ?? '',
-                            'stream_id' => $item['stream_id'],
-                            'channel' => $item['num'] ?? null,
+                            'stream_id' => $item->stream_id,
+                            'channel' => $item->num ?? null,
                             'is_vod' => true, // mark as VOD
                             'container_extension' => $extension, // store the container extension
-                            'year' => $item['year'] ?? null, // new field for year
-                            'rating' => $item['rating'] ?? null, // new field for rating
-                            'rating_5based' => $item['rating_5based'] ?? null, // new field for 5-based rating
-                            'source_id' => $item['stream_id'] ?? null, // source ID for the channel
+                            'year' => $item->year ?? null, // new field for year
+                            'rating' => $item->rating ?? null, // new field for rating
+                            'rating_5based' => $item->rating_5based ?? null, // new field for 5-based rating
                         ];
                         if ($autoSort) {
                             $channel['sort'] = $channelNo;
