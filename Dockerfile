@@ -124,6 +124,7 @@ RUN composer install --no-dev --no-interaction --no-progress -o
 
 # Symlink jellyfin-ffmpeg to usr/bin
 RUN ln -s /usr/lib/jellyfin-ffmpeg/ffmpeg /usr/bin/jellyfin-ffmpeg
+RUN ln -s /usr/lib/jellyfin-ffmpeg/ffprobe /usr/bin/jellyfin-ffprobe
 
 # Setup user, group and permissions
 RUN addgroup $WWWGROUP \

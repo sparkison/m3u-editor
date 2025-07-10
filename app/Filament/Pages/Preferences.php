@@ -78,6 +78,21 @@ class Preferences extends SettingsPage
                                             ->hint(fn() => !empty($ffmpegPath) ? 'Already set by environment variable!' : null)
                                             ->dehydrated(fn() => empty($ffmpegPath))
                                             ->placeholder(fn() => empty($ffmpegPath) ? 'jellyfin-ffmpeg' : $ffmpegPath),
+                                        Forms\Components\Select::make('ffprobe_path')
+                                            ->label('FFprobe')
+                                            ->columnSpan(2)
+                                            ->helperText('Which ffprobe variant would you like to use.')
+                                            ->options([
+                                                'jellyfin-ffprobe' => 'jellyfin-ffprobe (default)',
+                                                'ffprobe' => 'ffprobe',
+                                            ])
+                                            ->searchable()
+                                            // Assuming similar logic for ffprobe path being set by env var
+                                            ->suffixIcon(fn() => !empty(config('proxy.ffprobe_path')) ? 'heroicon-m-lock-closed' : null)
+                                            ->disabled(fn() => !empty(config('proxy.ffprobe_path')))
+                                            ->hint(fn() => !empty(config('proxy.ffprobe_path')) ? 'Already set by environment variable!' : null)
+                                            ->dehydrated(fn() => empty(config('proxy.ffprobe_path')))
+                                            ->placeholder(fn() => empty(config('proxy.ffprobe_path')) ? 'jellyfin-ffprobe' : config('proxy.ffprobe_path')),
                                         Forms\Components\TextInput::make('ffmpeg_max_tries')
                                             ->label('Max tries')
                                             ->columnSpan(1)
@@ -457,7 +472,8 @@ class Preferences extends SettingsPage
             // mediaflow fields were removed, but if others exist that are text & nullable, add here
             // 'mediaflow_proxy_url', 'mediaflow_proxy_port', 'mediaflow_proxy_password',
             // 'mediaflow_proxy_user_agent', 
-            'ffmpeg_path'
+            'ffmpeg_path',
+            'ffprobe_path'
         ];
 
         foreach ($nullableTextfields as $field) {

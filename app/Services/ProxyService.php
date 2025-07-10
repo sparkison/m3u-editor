@@ -132,6 +132,7 @@ class ProxyService
             'ffmpeg_codec_audio' => 'copy',
             'ffmpeg_codec_subtitles' => 'copy',
             'ffmpeg_path' => 'jellyfin-ffmpeg',
+            'ffprobe_path' => 'jellyfin-ffprobe', // Default ffprobe path
 
             // HW acceleration settings
             'hardware_acceleration_method' => 'none',
@@ -154,6 +155,7 @@ class ProxyService
                 'ffmpeg_codec_audio' => $userPreferences->ffmpeg_codec_audio ?? $settings['ffmpeg_codec_audio'],
                 'ffmpeg_codec_subtitles' => $userPreferences->ffmpeg_codec_subtitles ?? $settings['ffmpeg_codec_subtitles'],
                 'ffmpeg_path' => $userPreferences->ffmpeg_path ?? $settings['ffmpeg_path'],
+                'ffprobe_path' => $userPreferences->ffprobe_path ?? $settings['ffprobe_path'],
                 'ffmpeg_hls_time' => $userPreferences->ffmpeg_hls_time ?? 4,
                 'ffmpeg_ffprobe_timeout' => $userPreferences->ffmpeg_ffprobe_timeout ?? 5,
 
@@ -183,5 +185,48 @@ class ProxyService
         $settings['ffmpeg_qsv_enabled'] = $settings['hardware_acceleration_method'] === 'qsv';
 
         return $settings;
+    }
+
+    /**
+     * Determine the effective ffprobe executable path.
+     *
+     * @param array $settings The stream settings array from getStreamSettings().
+     * @return string The ffprobe executable path/command.
+     */
+    public static function getEffectiveFfprobePath(array $settings): string
+    {
+        $envFfprobePath = config('proxy.ffprobe_path');
+        if (!empty($envFfprobePath)) {
+            // Handle keywords or direct path from env var
+            if ($envFfprobePath === 'jellyfin-ffprobe' || $envFfprobePath === 'ffprobe') {
+                return $envFfprobePath;
+            }
+            return $envFfprobePath; // Assume full path
+        }
+
+        // Use the ffprobe_path from GeneralSettings (actual user setting from DB)
+        // This ensures we respect a user's explicit choice of null/empty if they want derivation.
+        $userFfprobePath = app(GeneralSettings::class)->ffprobe_path;
+        if (!empty($userFfprobePath)) {
+            // Handle keywords or direct path from user setting
+            if ($userFfprobePath === 'jellyfin-ffprobe' || $userFfprobePath === 'ffprobe') {
+                return $userFfprobePath;
+            }
+            return $userFfprobePath; // Assume full path
+        }
+
+        // If both env and user settings for ffprobe are empty, then derive or use default.
+        // $settings['ffmpeg_path'] from getStreamSettings() already reflects env -> user_db -> service_default for ffmpeg.
+        $ffmpegPath = $settings['ffmpeg_path'] ?? 'jellyfin-ffmpeg'; // Default to 'jellyfin-ffmpeg' if not in settings for some reason
+
+        if ($ffmpegPath === 'jellyfin-ffmpeg') {
+            return 'jellyfin-ffprobe';
+        } elseif (str_contains($ffmpegPath, '/')) {
+            // If ffmpeg_path is a full path like /usr/bin/ffmpeg, derive ffprobe path e.g. /usr/bin/ffprobe
+            return dirname($ffmpegPath) . '/ffprobe';
+        } else {
+            // Default to 'ffprobe' for other simple ffmpeg names like 'ffmpeg' or if $ffmpegPath was empty and defaulted above.
+            return 'ffprobe';
+        }
     }
 }

@@ -370,10 +370,13 @@ class HlsStreamService
      */
     private function runPreCheck(string $modelType, $modelId, $streamUrl, $userAgent, $title, int $ffprobeTimeout)
     {
-        $ffprobePath = config('proxy.ffprobe_path', 'ffprobe');
+        $settings = ProxyService::getStreamSettings(); // Get general settings
+
+        // Determine ffprobe path using the consolidated service method
+        $ffprobePath = ProxyService::getEffectiveFfprobePath($settings);
 
         // Updated command to include -show_format and remove -select_streams to get all streams for detailed info
-        $cmd = "$ffprobePath -v quiet -print_format json -show_streams -show_format -user_agent " . escapeshellarg($userAgent) . " " . escapeshellarg($streamUrl);
+        $cmd = escapeshellcmd($ffprobePath) . " -v quiet -print_format json -show_streams -show_format -user_agent " . escapeshellarg($userAgent) . " " . escapeshellarg($streamUrl);
 
         Log::channel('ffmpeg')->debug("[PRE-CHECK] Executing ffprobe command for [{$title}] with timeout {$ffprobeTimeout}s: {$cmd}");
         $precheckProcess = SymfonyProcess::fromShellCommandline($cmd);
