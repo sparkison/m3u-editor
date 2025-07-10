@@ -19,6 +19,9 @@ class ProcessM3uImportComplete implements ShouldQueue
 {
     use Queueable;
 
+    // Don't retry the job on failure
+    public $tries = 1;
+
     // Make sure the process logs are cleaned up
     public int $maxLogs = 25;
 

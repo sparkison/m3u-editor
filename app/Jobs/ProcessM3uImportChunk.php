@@ -12,6 +12,9 @@ class ProcessM3uImportChunk implements ShouldQueue
 {
     use Queueable;
 
+    // Don't retry the job on failure
+    public $tries = 1;
+
     public $deleteWhenMissingModels = true;
 
     /**
