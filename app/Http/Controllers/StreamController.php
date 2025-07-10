@@ -355,10 +355,12 @@ class StreamController extends Controller
             if (empty($ffmpegExecutable)) {
                 $ffmpegExecutable = 'jellyfin-ffmpeg'; // Default ffmpeg command
             }
-            $ffprobePath = str_contains($ffmpegExecutable, '/') ? dirname($ffmpegExecutable) . '/ffprobe' : 'ffprobe';
+
+            // Determine ffprobe path using the consolidated service method
+            $ffprobePath = ProxyService::getEffectiveFfprobePath($settings);
             $ffprobeTimeout = $settings['ffmpeg_ffprobe_timeout'] ?? 5;
 
-            $precheckCmd = "$ffprobePath -v quiet -print_format json -show_streams -show_format -user_agent " . $escapedUserAgent . " " . escapeshellarg($streamUrl);
+            $precheckCmd = escapeshellcmd($ffprobePath) . " -v quiet -print_format json -show_streams -show_format -user_agent " . $escapedUserAgent . " " . escapeshellarg($streamUrl);
             Log::channel('ffmpeg')->debug("[PRE-CHECK] Executing ffprobe command for [{$title}] with timeout {$ffprobeTimeout}s: {$precheckCmd}");
             $precheckProcess = SymfonyProcess::fromShellCommandline($precheckCmd);
             $precheckProcess->setTimeout($ffprobeTimeout);
