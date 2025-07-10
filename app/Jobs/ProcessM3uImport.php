@@ -299,6 +299,7 @@ class ProcessM3uImport implements ShouldQueue
                 'year' => null, // new field for year
                 'rating' => null, // new field for rating
                 'rating_5based' => null, // new field for 5-based rating
+                'source_id' => null, // source ID for the channel
             ];
 
             // Update progress
@@ -517,7 +518,8 @@ class ProcessM3uImport implements ShouldQueue
                     'catchup' => null,
                     'catchup_source' => null,
                     'shift' => 0,
-                    'tvg_shift' => null
+                    'tvg_shift' => null,
+                    'source_id' => null, // source ID for the channel
                 ];
                 if ($autoSort) {
                     $channelFields['sort'] = 0;
@@ -573,9 +575,17 @@ class ProcessM3uImport implements ShouldQueue
                                 continue 2;
                             }
                         }
+                        // Get the source ID from the URL
+                        $sourceId = null;
+                        if (str_contains($url, '/')) {
+                            $urlParts = explode('/', $url);
+                            $streamIdWithExtension = end($urlParts);
+                            $sourceId = pathinfo($streamIdWithExtension, PATHINFO_FILENAME); // Get the stream ID without extension
+                        }
                         $channel = [
                             ...$channelFields,
                             'url' => $url,
+                            'source_id' => $sourceId, // source ID for the channel
                         ];
                         $extvlcopt = [];
                         $kodidrop = [];
