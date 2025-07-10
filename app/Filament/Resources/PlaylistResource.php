@@ -611,7 +611,8 @@ class PlaylistResource extends Resource
                                         ->options([
                                             'live' => 'Live',
                                             'vod' => 'VOD',
-                                        ])->helperText('NOTE: Playlist series can be imported in the Series section.'),
+                                            'series' => 'Series',
+                                        ])->helperText('NOTE: Playlist series can be managed in the Series section. You will need to enabled the VOD channels and Series you wish to import metadata for as it will only be imported for enabled channels and series.'),
                                     Forms\Components\Toggle::make('xtream_config.import_epg')
                                         ->label('Import EPG')
                                         ->helperText('If your provider supports EPG, you can import it automatically.')

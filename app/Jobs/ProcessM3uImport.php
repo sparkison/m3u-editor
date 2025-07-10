@@ -15,6 +15,7 @@ use M3uParser\M3uParser;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
@@ -179,10 +180,12 @@ class ProcessM3uImport implements ShouldQueue
             $liveStreamsUrl = "$baseUrl/player_api.php?username=$user&password=$password&action=get_live_streams";
             $vodCategories = "$baseUrl/player_api.php?username=$user&password=$password&action=get_vod_categories";
             $vodStreamsUrl = "$baseUrl/player_api.php?username=$user&password=$password&action=get_vod_streams";
+            $seriesCategories = "$baseUrl/player_api.php?username=$user&password=$password&action=get_series_categories";
 
             // Determine which imports are enabled
             $liveStreamsEnabled = in_array('live', $categoriesToImport);
             $vodStreamsEnabled = in_array('vod', $categoriesToImport);
+            $seriesStreamsEnabled = in_array('series', $categoriesToImport);
 
             // Setup the user agent and SSL verification
             $verify = !$playlist->disable_ssl_verification;
@@ -204,7 +207,6 @@ class ProcessM3uImport implements ShouldQueue
 
             // If including Live streams, get the categories and streams
             if ($liveStreamsEnabled) {
-                // Get the live categories
                 $categoriesResponse = Http::withUserAgent($userAgent)
                     ->withOptions(['verify' => $verify])
                     ->timeout(60) // set timeout to one minute
@@ -279,6 +281,25 @@ class ProcessM3uImport implements ShouldQueue
                 }
                 $initialProgress += 3;
                 $playlist->update(['progress' => $initialProgress]);
+            }
+
+            // If including Series streams, get the categories and streams
+            if ($seriesStreamsEnabled) {
+                $seriesCategoriesResponse = Http::withUserAgent($userAgent)
+                    ->withOptions(['verify' => $verify])
+                    ->timeout(60) // set timeout to one minute
+                    ->throw()->get($seriesCategories);
+                if (!$seriesCategoriesResponse->ok()) {
+                    $error = $seriesCategoriesResponse->body();
+                    $message = "Error processing Series categories: $error";
+                    $this->sendError($message, $error);
+                    return;
+                }
+                $seriesCategories = collect($seriesCategoriesResponse->json());
+                $initialProgress += 3;
+                $playlist->update(['progress' => $initialProgress]);
+            } else {
+                $seriesCategories = null;
             }
 
             // Update progress
@@ -422,7 +443,7 @@ class ProcessM3uImport implements ShouldQueue
                     }
                 }
             });
-            $this->processChannelCollection($collection, $playlist, $batchNo, $userId, $start);
+            $this->processChannelCollection($collection, $playlist, $batchNo, $userId, $start, $seriesCategories);
         } catch (Exception $e) {
             // Log the exception
             logger()->error("Error processing \"{$this->playlist->name}\": {$e->getMessage()}");
@@ -778,7 +799,8 @@ class ProcessM3uImport implements ShouldQueue
         Playlist       $playlist,
         string         $batchNo,
         int            $userId,
-        Carbon         $start
+        Carbon         $start,
+        ?Collection    $seriesCategories
     ) {
         // Get the playlist ID
         $playlistId = $playlist->id;
@@ -897,11 +919,47 @@ class ProcessM3uImport implements ShouldQueue
 
         // Get the jobs for the batch
         $jobs = [];
-        $batchCount = Job::where('batch_no', $batchNo)->count();
-        $jobsBatch = Job::where('batch_no', $batchNo)->select('id')->cursor();
+        $jobsWhere = [
+            ['batch_no', '=', $batchNo],
+            ['variables', '!=', null],
+        ];
+        $batchCount = Job::where($jobsWhere)->count();
+        $jobsBatch = Job::where($jobsWhere)->select('id')->cursor();
         $jobsBatch->chunk(100)->each(function ($chunk) use (&$jobs, $batchCount) {
             $jobs[] = new ProcessM3uImportChunk($chunk->pluck('id')->toArray(), $batchCount);
         });
+
+        // Add series processing to the chain, if passed in
+        if ($seriesCategories) {
+            $seriesCategories->each(function ($category) use ($playlistId, $batchNo, $userId) {
+                // Create a job for each series category
+                Job::create([
+                    'title' => "Processing series import for category: {$category['category_name']}",
+                    'batch_no' => $batchNo,
+                    'payload' => [
+                        'categoryId' => $category['category_id'],
+                        'categoryName' => $category['category_name'],
+                        'playlistId' => $playlistId,
+                    ],
+                    'variables' => null
+                ]);
+            });
+
+            // Add series processing to the chain
+            $seriesJobsWhere = [
+                ['batch_no', '=', $batchNo],
+                ['variables', '=', null],
+            ];
+            $batchCount = Job::where($seriesJobsWhere)->count();
+            $jobsBatch = Job::where($seriesJobsWhere)->select('id', 'payload')->cursor();
+            $jobsBatch->each(function ($job) use (&$jobs, $batchCount, $batchNo) {
+                $jobs[] = new ProcessM3uImportSeriesChunk(
+                    $job->payload,
+                    $batchCount,
+                    $batchNo
+                );
+            });
+        }
 
         // Last job in the batch
         $jobs[] = new ProcessM3uImportComplete(

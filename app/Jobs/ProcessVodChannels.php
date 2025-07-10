@@ -14,6 +14,9 @@ class ProcessVodChannels implements ShouldQueue
 {
     use Queueable;
 
+    // Don't retry the job on failure
+    public $tries = 1;
+
     // Giving a timeout of 15 minutes to the Job to process the file
     public $timeout = 60 * 15;
 
