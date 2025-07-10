@@ -474,7 +474,7 @@ class SeriesResource extends Resource
                         ->onColor('warning')
                         ->hint('Use with caution')
                         ->live()
-                        ->helperText('If enabled, all series in the selected category will be imported. Use with caution as this will make a lot of requests to your provider. It is recomended to import only the series you want to watch.')
+                        ->helperText('If enabled, all series in the selected category will be imported. Use with caution as this will make a lot of requests to your provider to fetch metadata and episodes. It is recomended to import only the series you want to watch. You can also enable the series option on your playlist under the "Groups and Streams to Import" to import all the base data for all available series.')
                         ->default(false)
                         ->columnSpanFull()
                         ->afterStateUpdated(function (Get $get, $set) {

@@ -130,7 +130,12 @@ class PlaylistResource extends Resource
                     ->toggleable()
                     ->color(fn(Status $state) => $state->getColor()),
                 ProgressColumn::make('progress')
-                    ->label('Sync Progress')
+                    ->label('Channel Sync')
+                    ->sortable()
+                    ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
+                    ->toggleable(),
+                ProgressColumn::make('series_progress')
+                    ->label('Series Sync')
                     ->sortable()
                     ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
                     ->toggleable(),
@@ -242,7 +247,7 @@ class PlaylistResource extends Resource
                         ->action(function ($record) {
                             $record->update([
                                 'status' => Status::Processing,
-                                'series_progress' => 0,
+                                'progress' => 0,
                             ]);
                             app('Illuminate\Contracts\Bus\Dispatcher')
                                 ->dispatch(new \App\Jobs\ProcessVodChannels(playlist: $record));
@@ -611,7 +616,8 @@ class PlaylistResource extends Resource
                                         ->options([
                                             'live' => 'Live',
                                             'vod' => 'VOD',
-                                        ])->helperText('NOTE: Playlist series can be imported in the Series section.'),
+                                            'series' => 'Series',
+                                        ])->helperText('NOTE: Playlist series can be managed in the Series section. You will need to enabled the VOD channels and Series you wish to import metadata for as it will only be imported for enabled channels and series.'),
                                     Forms\Components\Toggle::make('xtream_config.import_epg')
                                         ->label('Import EPG')
                                         ->helperText('If your provider supports EPG, you can import it automatically.')

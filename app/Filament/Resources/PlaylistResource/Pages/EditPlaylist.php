@@ -101,7 +101,7 @@ class EditPlaylist extends EditRecord
                     ->action(function ($record) {
                         $record->update([
                             'status' => Status::Processing,
-                            'series_progress' => 0,
+                            'progress' => 0,
                         ]);
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new \App\Jobs\ProcessVodChannels(playlist: $record));

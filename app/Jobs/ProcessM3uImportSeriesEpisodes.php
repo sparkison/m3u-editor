@@ -15,6 +15,9 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
 {
     use Queueable;
 
+    // Don't retry the job on failure
+    public $tries = 1;
+
     /**
      * Create a new job instance.
      */
