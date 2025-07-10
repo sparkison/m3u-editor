@@ -8,6 +8,7 @@ use App\Models\SharedStream;
 use App\Models\SharedStreamStat;
 use App\Services\SharedStreamService;
 use App\Services\StreamMonitorService;
+use Carbon\Carbon;
 use Filament\Actions;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -140,14 +141,18 @@ class SharedStreamMonitor extends Page
                     ? Episode::find($streamInfo['model_id'])
                     : Channel::find($streamInfo['model_id']);
             }
-            
+
             $clientsData = array_map(function ($client) {
-                $connectedAt = date('H:i:s', $client['connected_at']);
-                $duration = isset($client['connected_at']) ? now()->diffInSeconds(now()->setTimestamp($client['connected_at'])) : 0;
+                $connectedAt = $client['connected_at']
+                    ? Carbon::createFromTimestamp($client['connected_at'])
+                    : null;
+                $duration = $connectedAt ? now()->diff($connectedAt)->forHumans() : 0;
                 return [
                     'ip' => $client['ip_address'],
                     'client_id' => $client['client_id'],
-                    'connected_at' => $connectedAt,
+                    'connected_at' => $connectedAt
+                        ? $connectedAt->timezone(config('app.timezone'))->toDayDateTimeString()
+                        : null,
                     'user_agent' => $client['user_agent'] ?? 'Unknown',
                     'duration' => $duration,
                     'is_active' => $client['status'] === 'connected',

@@ -207,7 +207,7 @@
                                                     <tr>
                                                         <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ $client['ip'] }}</td>
                                                         <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $client['connected_at'] }}</td>
-                                                        <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ gmdate('H:i:s', $client['duration']) }}</td>
+                                                        <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $client['duration'] }}</td>
                                                         {{-- <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $client['bytes_received'] }}</td> --}}
                                                         {{-- <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $client['bandwidth'] }}</td> --}}
                                                         <td class="px-3 py-2 whitespace-nowrap">
