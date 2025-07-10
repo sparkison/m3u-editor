@@ -2059,7 +2059,7 @@ class SharedStreamService
                 } else {
                     // Clean up disconnected clients for active streams
                     $inactiveClients = SharedStreamClient::where('stream_id', $streamKey)
-                        ->where('last_activity', '<', $inactiveThreshold)
+                        ->where('last_activity_at', '<', $inactiveThreshold)
                         ->get();
 
                     foreach ($inactiveClients as $client) {

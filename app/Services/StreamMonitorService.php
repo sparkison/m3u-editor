@@ -584,8 +584,8 @@ class StreamMonitorService
             ];
 
             if (!empty($stream)) {
-                $health['last_activity'] = (int)($stream->last_client_activity ?? 0);
-                $health['uptime'] = time() - (int)($stream->started_at ?? 0);
+                $health['last_activity'] = $stream->last_client_activity ? $stream->last_client_activity->getTimestamp() : 0;
+                $health['uptime'] = $stream->started_at ? time() - $stream->started_at->getTimestamp() : 0;
 
                 // Check if process is running
                 $health['process_running'] = $stream->isProcessRunning();
