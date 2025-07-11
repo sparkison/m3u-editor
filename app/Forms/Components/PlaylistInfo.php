@@ -14,6 +14,8 @@ class PlaylistInfo extends Field
 {
     protected string $view = 'forms.components.playlist-info';
 
+    public string|int $interval = '5s';
+
     public function getStats(): array
     {
         $playlist = Playlist::find($this->getRecord()?->id);
@@ -53,7 +55,7 @@ class PlaylistInfo extends Field
                 $xtream = XtreamService::make($playlist);
                 if (!$xtream) {
                     // Try and fetch from the playlist data directly if unable to initialize XtreamService
-                    $xtreamInfo = $playlist->xtream_info;
+                    $xtreamInfo = $playlist->xtream_status;
                 } else {
                     // Prefer live data from XtreamService
                     $xtreamInfo = $xtream->userInfo();
@@ -67,6 +69,13 @@ class PlaylistInfo extends Field
                 Log::error("Failed to fetch Xtream stats for playlist {$playlist->id}: " . $e->getMessage());
                 return [];
             }
+        }
+
+        // If xtream_status is not set in the playlist, update it
+        if (!$playlist->xtream_status) {
+            $playlist->update([
+                'xtream_status' => $xtreamInfo,
+            ]);
         }
 
         $maxConnections = $xtreamInfo['user_info']['max_connections'] ?? 1;
