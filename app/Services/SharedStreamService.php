@@ -3060,10 +3060,10 @@ class SharedStreamService
     }
 
     /**
-     * Retrieve HLS segment data for a given stream key and segment name.
+     * Retrieve HLS segment path for a given stream key and segment name.
      */
-    public function getHLSSegment(string $streamKey): ?string
+    public function getHLSSegmentPath(string $streamKey, string $segment): ?string
     {
-        return $this->getStreamStoragePath($streamKey);
+        return $this->getStreamStoragePath($streamKey) . "/{$segment}";
     }
 }

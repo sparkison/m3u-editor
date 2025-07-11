@@ -338,14 +338,14 @@ class SharedStreamController extends Controller
         }
 
         // Get segment data from shared stream
-        $segmentPath = $this->sharedStreamService->getHLSSegment($streamKey);
-        $fullPath = Storage::disk('app')->path($segmentPath . '/' . $segment);
+        $segmentPath = $this->sharedStreamService->getHLSSegmentPath($streamKey, $segment);
+        $fullPath = Storage::disk('app')->path($segmentPath);
         if (!($segmentPath && file_exists($fullPath))) {
             abort(404, 'Segment not found');
         }
         return response('', 200, [
             'Content-Type'     => 'video/MP2T',
-            'X-Accel-Redirect' => "/internal/{$segmentPath}/{$segment}",
+            'X-Accel-Redirect' => "/internal/{$segmentPath}",
             'Cache-Control'    => 'no-cache, no-transform',
             'Connection'       => 'keep-alive',
         ]);
