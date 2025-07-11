@@ -152,7 +152,6 @@ class SharedStreamController extends Controller
         @ini_set('implicit_flush', 1);
 
         $streamKey = $streamInfo['stream_key'];
-
         $playlist = $this->sharedStreamService->getHLSPlaylist($streamKey, $clientId);
         $maxAttempts = $playlist['max_attempts'];
         $sleepSeconds = $playlist['sleep_seconds'];
@@ -327,9 +326,6 @@ class SharedStreamController extends Controller
             $encodedId .= '==';
         }
         $modelId = base64_decode($encodedId);
-
-        // Generate client ID and stream key
-        $clientId = $this->generateClientId($request);
 
         // Try to find the stream (we need to determine if it's channel or episode)
         $streamKey = $this->sharedStreamService->getStreamKey($type, $modelId, $segment);
