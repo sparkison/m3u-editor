@@ -35,7 +35,7 @@ Route::group(['prefix' => 'stream'], function () {
 // Shared streaming API routes (xTeVe-like proxy functionality)
 Route::group(['prefix' => 'shared'], function () {
     // HLS segments for shared streams
-    Route::get('hls/{encodedId}/{segment}', [\App\Http\Controllers\SharedStreamController::class, 'serveHLSSegment'])
+    Route::get('hls/{type}/{encodedId}/{segment}', [\App\Http\Controllers\SharedStreamController::class, 'serveHLSSegment'])
         ->where('segment', '.*\.ts')
         ->name('shared.stream.hls.segment');
     

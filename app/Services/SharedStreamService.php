@@ -34,6 +34,7 @@ class SharedStreamService
     private int $maxRedirects;
     private int $redirectTtl;
     private int $logDataThreshold;
+    private ?array $settings;
 
     public function __construct()
     {
@@ -42,6 +43,7 @@ class SharedStreamService
         $this->maxRedirects = config('app.shared_streaming.max_redirects', 3);
         $this->redirectTtl = config('app.shared_streaming.redirect_ttl', 30);
         $this->logDataThreshold = config('app.shared_streaming.log_data_threshold', 51200);
+        $this->settings = ProxyService::getStreamSettings();
     }
 
     /**
@@ -1073,8 +1075,28 @@ class SharedStreamService
      */
     private function buildHLSCommand(string $ffmpegPath, array $streamInfo, string $storageDir, string $userAgent): string
     {
-        $settings = ProxyService::getStreamSettings();
+        // Get the stream URL
         $streamUrl = $streamInfo['stream_url'];
+        $id = rtrim(base64_encode($streamInfo['model_id']), '=');
+        $type = $streamInfo['type'];
+
+        // Setup the stream URL
+        $m3uPlaylist = "{$storageDir}/playlist.m3u8";
+        $segment = "{$storageDir}/segment_%03d.ts";
+
+        // Construct segmentBaseUrl based on proxy_url_override
+        $proxyOverrideUrl = config('proxy.url_override');
+        if (!empty($proxyOverrideUrl)) {
+            $parsedUrl = parse_url($proxyOverrideUrl);
+            $scheme = $parsedUrl['scheme'] ?? 'http';
+            $host = $parsedUrl['host'];
+            $port = isset($parsedUrl['port']) ? ':' . $parsedUrl['port'] : '';
+            $base = "{$scheme}://{$host}{$port}";
+            $path = "/api/shared/hls/{$type}/{$id}/";
+            $segmentBaseUrl = $base . $path;
+        } else {
+            $segmentBaseUrl = url("/api/shared/hls/{$type}/{$id}") . '/';
+        }
 
         $cmd = escapeshellcmd($ffmpegPath) . ' ';
         $cmd .= '-hide_banner -loglevel error ';
@@ -1092,7 +1114,9 @@ class SharedStreamService
         $cmd .= '-c copy -f hls ';
         $cmd .= '-hls_time 4 -hls_list_size 10 ';
         $cmd .= '-hls_flags delete_segments ';
-        $cmd .= escapeshellarg($storageDir . '/playlist.m3u8');
+        $cmd .= '-hls_segment_filename ' . escapeshellarg($segment) . ' ';
+        $cmd .= '-hls_base_url ' . escapeshellarg($segmentBaseUrl) . ' ';
+        $cmd .= escapeshellarg($m3uPlaylist) . ' ';
 
         return $cmd;
     }
@@ -1100,7 +1124,7 @@ class SharedStreamService
     /**
      * Generate stream key from type, model ID, and URL
      */
-    private function getStreamKey(string $type, int $modelId, string $streamUrl): string
+    public function getStreamKey(string $type, int $modelId, string $streamUrl): string
     {
         return self::CACHE_PREFIX . $type . ':' . $modelId . ':' . md5($streamUrl);
     }
@@ -1796,7 +1820,7 @@ class SharedStreamService
     private function getStreamStoragePath(string $streamKey): string
     {
         $bufferPath = config('proxy.shared_streaming.storage.buffer_path', 'shared_streams');
-        $storagePath = $bufferPath . '/' . str_replace(':', '_', $streamKey);
+        $storagePath = 'hls/' . $bufferPath . '/' . str_replace(':', '_', $streamKey);
         return $storagePath;
     }
 
@@ -2976,51 +3000,24 @@ class SharedStreamService
 
     /**
      * Retrieve the HLS playlist for a given stream key.
-     *
-     * DO NOT DELETE THIS METHOD!
      */
-    public function getHLSPlaylist(string $streamKey): ?string
+    public function getHLSPlaylist(string $streamKey, string $clientId): ?array
     {
-        $bufferKey = self::BUFFER_PREFIX . $streamKey;
-        $playlistKey = "{$bufferKey}:playlist";
-
-        try {
-            $playlistData = $this->redis()->get($playlistKey);
-            if ($playlistData) {
-                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Retrieved HLS playlist ({" . strlen($playlistData) . " bytes)");
-                return $playlistData;
-            } else {
-                Log::channel('ffmpeg')->warning("Stream {$streamKey}: HLS playlist not found in buffer");
-                return null;
-            }
-        } catch (\Exception $e) {
-            Log::channel('ffmpeg')->error("Stream {$streamKey}: Error retrieving HLS playlist: " . $e->getMessage());
-            return null;
-        }
+        $maxAttempts = $this->settings->hls_playlist_max_attempts ?? 10;
+        $sleepSeconds = $this->settings->hls_playlist_sleep_seconds ?? 1.0;
+        $m3u8Path = $this->getStreamStoragePath($streamKey) . '/playlist.m3u8';
+        return [
+            'max_attempts' => $maxAttempts,
+            'sleep_seconds' => $sleepSeconds,
+            'm3u8_path' => $m3u8Path
+        ];
     }
 
     /**
      * Retrieve HLS segment data for a given stream key and segment name.
-     *
-     * DO NOT DELETE THIS METHOD!
      */
-    public function getHLSSegment(string $streamKey, string $segmentName): ?string
+    public function getHLSSegment(string $streamKey): ?string 
     {
-        $bufferKey = self::BUFFER_PREFIX . $streamKey;
-        $segmentKey = "{$bufferKey}:segment_{$segmentName}";
-
-        try {
-            $segmentData = $this->redis()->get($segmentKey);
-            if ($segmentData) {
-                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Retrieved HLS segment {$segmentName} ({" . strlen($segmentData) . " bytes)");
-                return $segmentData;
-            } else {
-                Log::channel('ffmpeg')->warning("Stream {$streamKey}: HLS segment {$segmentName} not found in buffer");
-                return null;
-            }
-        } catch (\Exception $e) {
-            Log::channel('ffmpeg')->error("Stream {$streamKey}: Error retrieving HLS segment {$segmentName}: " . $e->getMessage());
-            return null;
-        }
+        return $this->getStreamStoragePath($streamKey);
     }
 }

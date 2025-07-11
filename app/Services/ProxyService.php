@@ -146,33 +146,8 @@ class ProxyService
         ];
 
         try {
-            $settings = [
-                // General settings
-                'ffmpeg_debug' => $userPreferences->ffmpeg_debug ?? $settings['ffmpeg_debug'],
-                'ffmpeg_max_tries' => $userPreferences->ffmpeg_max_tries ?? $settings['ffmpeg_max_tries'],
-                'ffmpeg_user_agent' => $userPreferences->ffmpeg_user_agent ?? $settings['ffmpeg_user_agent'],
-                'ffmpeg_codec_video' => $userPreferences->ffmpeg_codec_video ?? $settings['ffmpeg_codec_video'],
-                'ffmpeg_codec_audio' => $userPreferences->ffmpeg_codec_audio ?? $settings['ffmpeg_codec_audio'],
-                'ffmpeg_codec_subtitles' => $userPreferences->ffmpeg_codec_subtitles ?? $settings['ffmpeg_codec_subtitles'],
-                'ffmpeg_path' => $userPreferences->ffmpeg_path ?? $settings['ffmpeg_path'],
-                'ffprobe_path' => $userPreferences->ffprobe_path ?? $settings['ffprobe_path'],
-                'ffmpeg_hls_time' => $userPreferences->ffmpeg_hls_time ?? 4,
-                'ffmpeg_ffprobe_timeout' => $userPreferences->ffmpeg_ffprobe_timeout ?? 5,
-
-                // HW acceleration settings
-                'hardware_acceleration_method' => $userPreferences->hardware_acceleration_method ?? $settings['hardware_acceleration_method'],
-                'ffmpeg_custom_command_template' => $userPreferences->ffmpeg_custom_command_template ?? $settings['ffmpeg_custom_command_template'],
-
-                // Add VA-API settings
-                'ffmpeg_vaapi_device' => $userPreferences->ffmpeg_vaapi_device ?? $settings['ffmpeg_vaapi_device'],
-                'ffmpeg_vaapi_video_filter' => $userPreferences->ffmpeg_vaapi_video_filter ?? $settings['ffmpeg_vaapi_video_filter'],
-
-                // Add QSV settings
-                'ffmpeg_qsv_device' => $userPreferences->ffmpeg_qsv_device ?? $settings['ffmpeg_qsv_device'],
-                'ffmpeg_qsv_video_filter' => $userPreferences->ffmpeg_qsv_video_filter ?? $settings['ffmpeg_qsv_video_filter'],
-                'ffmpeg_qsv_encoder_options' => $userPreferences->ffmpeg_qsv_encoder_options ?? $settings['ffmpeg_qsv_encoder_options'],
-                'ffmpeg_qsv_additional_args' => $userPreferences->ffmpeg_qsv_additional_args ?? $settings['ffmpeg_qsv_additional_args'],
-            ];
+            // Apply any user overrides from the GeneralSettings
+            $settings = array_merge($settings, $userPreferences->toArray());
 
             // Add any additional args from config
             $settings['ffmpeg_additional_args'] = config('proxy.ffmpeg_additional_args', '');

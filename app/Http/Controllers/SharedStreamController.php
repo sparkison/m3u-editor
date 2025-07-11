@@ -8,6 +8,7 @@ use App\Services\SharedStreamService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -152,22 +153,22 @@ class SharedStreamController extends Controller
 
         $streamKey = $streamInfo['stream_key'];
 
-        // Wait for stream to be ready
-        $maxWait = 30; // 30 seconds
-        $waited = 0;
-        while ($waited < $maxWait) {
-            $playlist = $this->sharedStreamService->getHLSPlaylist($streamKey, $clientId);
-            if ($playlist) {
-                return response($playlist, 200, [
-                    'Content-Type' => 'application/vnd.apple.mpegurl',
-                    'Cache-Control' => 'no-cache, no-store, must-revalidate',
-                    'Connection' => 'keep-alive'
+        $playlist = $this->sharedStreamService->getHLSPlaylist($streamKey, $clientId);
+        $maxAttempts = $playlist['max_attempts'];
+        $sleepSeconds = $playlist['sleep_seconds'];
+        $m3u8Path = $playlist['m3u8_path'];
+        $fullPath = Storage::disk('app')->path($m3u8Path);
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            if (file_exists($fullPath)) {
+                return response('', 200, [
+                    'Content-Type'      => 'application/vnd.apple.mpegurl',
+                    'X-Accel-Redirect'  => "/internal/$m3u8Path",
+                    'Cache-Control'     => 'no-cache, no-transform',
+                    'Connection'        => 'keep-alive',
                 ]);
             }
-            sleep(1);
-            $waited++;
+            usleep((int)($sleepSeconds * 1000000));
         }
-
         abort(503, 'Stream not ready within timeout period');
     }
 
@@ -319,7 +320,7 @@ class SharedStreamController extends Controller
     /**
      * Serve HLS segment for shared stream
      */
-    public function serveHLSSegment(Request $request, string $encodedId, string $segment)
+    public function serveHLSSegment(Request $request, string $type, string $encodedId, string $segment)
     {
         // Decode channel/episode ID
         if (strpos($encodedId, '==') === false) {
@@ -331,34 +332,23 @@ class SharedStreamController extends Controller
         $clientId = $this->generateClientId($request);
 
         // Try to find the stream (we need to determine if it's channel or episode)
-        $streamKey = null;
-        $model = Channel::find($modelId);
-        if ($model) {
-            $streamUrl = $model->url_custom ?? $model->url;
-            $streamKey = md5("channel:{$modelId}:{$streamUrl}");
-        } else {
-            $model = Episode::find($modelId);
-            if ($model) {
-                $streamUrl = $model->url;
-                $streamKey = md5("episode:{$modelId}:{$streamUrl}");
-            }
-        }
-
+        $streamKey = $this->sharedStreamService->getStreamKey($type, $modelId, $segment);
+        $model = $type === 'channel' ? Channel::find($modelId) : Episode::find($modelId);
         if (!$streamKey || !$model) {
             abort(404, 'Stream not found');
         }
 
         // Get segment data from shared stream
-        $segmentData = $this->sharedStreamService->getHLSSegment($streamKey, $clientId, $segment);
-
-        if (!$segmentData) {
+        $segmentPath = $this->sharedStreamService->getHLSSegment($streamKey);
+        $fullPath = Storage::disk('app')->path($segmentPath . '/' . $segment);
+        if (!($segmentPath && file_exists($fullPath))) {
             abort(404, 'Segment not found');
         }
-
-        return response($segmentData, 200, [
-            'Content-Type' => 'video/MP2T',
-            'Cache-Control' => 'no-cache',
-            'Connection' => 'keep-alive'
+        return response('', 200, [
+            'Content-Type'     => 'video/MP2T',
+            'X-Accel-Redirect' => "/internal/$segmentPath/{$segment}",
+            'Cache-Control'    => 'no-cache, no-transform',
+            'Connection'       => 'keep-alive',
         ]);
     }
 
@@ -463,56 +453,5 @@ class SharedStreamController extends Controller
     {
         $ip = $request->headers->get('X-Forwarded-For', $request->ip());
         return md5($ip . $request->userAgent() . microtime(true));
-    }
-
-    /**
-     * Serve shared stream directly (for testing)
-     */
-    public function serveSharedStream(Request $request, string $streamKey)
-    {
-        $clientId = $this->generateClientId($request);
-
-        try {
-            // @TODO: fix this, or remove it...
-            $data = $this->sharedStreamService->getStreamData($streamKey, $clientId);
-
-            if (!$data) {
-                abort(404, 'Stream not found or no data available');
-            }
-
-            return response($data, 200, [
-                'Content-Type' => 'video/MP2T',
-                'Cache-Control' => 'no-cache, no-store, must-revalidate',
-                'Connection' => 'keep-alive'
-            ]);
-        } catch (\Exception $e) {
-            Log::channel('ffmpeg')->error("Error serving shared stream {$streamKey}: " . $e->getMessage());
-            abort(500, 'Stream error');
-        }
-    }
-
-    /**
-     * Serve HLS playlist for shared stream (for testing)
-     */
-    public function serveHLS(Request $request, string $streamKey)
-    {
-        $clientId = $this->generateClientId($request);
-
-        try {
-            $playlist = $this->sharedStreamService->getHLSPlaylist($streamKey, $clientId);
-
-            if (!$playlist) {
-                abort(404, 'Stream not found or playlist not ready');
-            }
-
-            return response($playlist, 200, [
-                'Content-Type' => 'application/vnd.apple.mpegurl',
-                'Cache-Control' => 'no-cache, no-store, must-revalidate',
-                'Connection' => 'keep-alive'
-            ]);
-        } catch (\Exception $e) {
-            Log::channel('ffmpeg')->error("Error serving HLS playlist for {$streamKey}: " . $e->getMessage());
-            abort(500, 'Stream error');
-        }
     }
 }
