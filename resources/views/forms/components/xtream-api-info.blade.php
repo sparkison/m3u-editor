@@ -11,7 +11,10 @@
             </p>
         </div>
         <div class="flex gap-2 items-center justify-start mb-4">
-            <x-filament::input.wrapper prefix-icon="heroicon-m-globe-alt">
+            <x-filament::input.wrapper suffix-icon="heroicon-m-globe-alt">
+                <x-slot name="prefix">
+                    <x-copy-to-clipboard :text="$url" />
+                 </x-slot> 
                 <x-filament::input
                     type="text"
                     :value="$url"
@@ -21,7 +24,10 @@
             <x-qr-modal :title="$record->name" body="Xtream API URL" :text="$url" />
         </div>
         <div class="flex gap-2 items-center justify-start mb-4">
-            <x-filament::input.wrapper prefix-icon="heroicon-m-user">
+            <x-filament::input.wrapper suffix-icon="heroicon-m-user">
+                <x-slot name="prefix">
+                    <x-copy-to-clipboard :text="$username" />
+                 </x-slot> 
                 <x-filament::input
                     type="text"
                     :value="$username"
@@ -31,7 +37,10 @@
             <x-qr-modal :title="$record->name" body="Xtream API Username" :text="$username" />
         </div>
         <div class="flex gap-2 items-center justify-start">
-            <x-filament::input.wrapper prefix-icon="heroicon-m-lock-closed">
+            <x-filament::input.wrapper suffix-icon="heroicon-m-lock-closed">
+                <x-slot name="prefix">
+                    <x-copy-to-clipboard :text="$password" />
+                 </x-slot> 
                 <x-filament::input
                     type="text"
                     :value="$password === 'YOUR_M3U_EDITOR_PASSWORD' ? '' : $password"
