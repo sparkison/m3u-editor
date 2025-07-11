@@ -146,11 +146,6 @@ class SharedStreamController extends Controller
      */
     private function streamHLS(array $streamInfo, string $clientId, Request $request): Response
     {
-        // Disable execution time limit for streaming
-        @ini_set('max_execution_time', 0);
-        @ini_set('output_buffering', 'off');
-        @ini_set('implicit_flush', 1);
-
         $streamKey = $streamInfo['stream_key'];
         $playlist = $this->sharedStreamService->getHLSPlaylist($streamKey, $clientId);
         $maxAttempts = $playlist['max_attempts'];
@@ -159,12 +154,16 @@ class SharedStreamController extends Controller
         $fullPath = Storage::disk('app')->path($m3u8Path);
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
             if (file_exists($fullPath)) {
-                return response('', 200, [
+                $response = response('', 200, [
                     'Content-Type'      => 'application/vnd.apple.mpegurl',
                     'X-Accel-Redirect'  => "/internal/$m3u8Path",
                     'Cache-Control'     => 'no-cache, no-transform',
                     'Connection'        => 'keep-alive',
                 ]);
+                if (!$request->cookie('client_id')) {
+                    $response->withCookie(cookie('client_id', $clientId, 60)); // 60 minutes
+                }
+                return $response;
             }
             usleep((int)($sleepSeconds * 1000000));
         }
@@ -327,10 +326,14 @@ class SharedStreamController extends Controller
         }
         $modelId = base64_decode($encodedId);
 
-        // Try to find the stream (we need to determine if it's channel or episode)
-        $streamKey = $this->sharedStreamService->getStreamKey($type, $modelId, $segment);
+        // Try to find the model and stream key
         $model = $type === 'channel' ? Channel::find($modelId) : Episode::find($modelId);
-        if (!$streamKey || !$model) {
+        if (!$model) {
+            abort(404, 'Model not found');
+        }
+        $streamUrl = $type === 'channel' ? ($model->url_custom ?? $model->url) : $model->url;
+        $streamKey = $this->sharedStreamService->getStreamKey($type, $modelId, $streamUrl);
+        if (!$streamKey) {
             abort(404, 'Stream not found');
         }
 
@@ -342,7 +345,7 @@ class SharedStreamController extends Controller
         }
         return response('', 200, [
             'Content-Type'     => 'video/MP2T',
-            'X-Accel-Redirect' => "/internal/$segmentPath/{$segment}",
+            'X-Accel-Redirect' => "/internal/{$segmentPath}/{$segment}",
             'Cache-Control'    => 'no-cache, no-transform',
             'Connection'       => 'keep-alive',
         ]);
@@ -447,6 +450,12 @@ class SharedStreamController extends Controller
      */
     private function generateClientId(Request $request): string
     {
+        // Check for client_id in cookie or query param
+        $clientId = $request->cookie('client_id') ?? $request->query('client_id');
+        if ($clientId && preg_match('/^[a-f0-9]{32}$/', $clientId)) {
+            return $clientId;
+        }
+
         $ip = $request->headers->get('X-Forwarded-For', $request->ip());
         return md5($ip . $request->userAgent() . microtime(true));
     }
