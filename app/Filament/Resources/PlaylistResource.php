@@ -934,13 +934,6 @@ class PlaylistResource extends Resource
                             PlaylistInfo::make('play_list_info')
                                 ->label('') // disable the label
                                 ->columnSpanFull()
-                                ->registerActions([
-                                    Forms\Components\Actions\Action::make('refreshData')
-                                        ->icon('heroicon-m-arrow-path')
-                                        ->size('xs')
-                                        ->color('gray')
-                                        ->action(fn($record) => Cache::forget("xtream_stats:{$record->id}")),
-                                ])
                                 ->dehydrated(false), // don't save the value in the database
                         ]),
                     Forms\Components\Tabs::make()
