@@ -290,7 +290,7 @@ class SharedStreamService
                     $streamInfo['failover_attempts'] = $index + 1;
                     $streamInfo['is_failover'] = true;
                     $streamInfo['stream_key'] = $failoverStreamKey;
-                    
+
                     Log::channel('ffmpeg')->debug("SharedStream: Successfully failed over to channel {$failoverChannel->id} after " . ($index + 1) . " attempts.");
                     return $streamInfo;
                 } catch (\Exception $failoverError) {
@@ -604,15 +604,16 @@ class SharedStreamService
      */
     private function startHLSStream(string $streamKey, array $streamInfo): void
     {
-        $storageDir = $this->getStreamStorageDir($streamKey);
-        Storage::makeDirectory($storageDir);
+        $storagePath = $this->getStreamStoragePath($streamKey);
+        $absoluteStorageDir = Storage::disk('app')->path($storagePath);
+        Storage::disk('app')->makeDirectory($storagePath);
 
         $settings = ProxyService::getStreamSettings();
         $ffmpegPath = $settings['ffmpeg_path'] ?? 'jellyfin-ffmpeg';
         $userAgent = $streamInfo['options']['user_agent'] ?? $settings['ffmpeg_user_agent'] ?? 'VLC/3.0.21';
 
         // Build FFmpeg command for HLS output
-        $cmd = $this->buildHLSCommand($ffmpegPath, $streamInfo, $storageDir, $userAgent);
+        $cmd = $this->buildHLSCommand($ffmpegPath, $streamInfo, $absoluteStorageDir, $userAgent);
 
         // Use proc_open approach like HlsStreamService for consistency
         $descriptors = [
@@ -622,7 +623,6 @@ class SharedStreamService
         ];
 
         $pipes = [];
-        $absoluteStorageDir = Storage::path($storageDir);
         $process = proc_open($cmd, $descriptors, $pipes, $absoluteStorageDir);
 
         if (!is_resource($process)) {
@@ -1791,12 +1791,21 @@ class SharedStreamService
     }
 
     /**
+     * Get the storage path for a stream
+     */
+    private function getStreamStoragePath(string $streamKey): string
+    {
+        $bufferPath = config('proxy.shared_streaming.storage.buffer_path', 'shared_streams');
+        $storagePath = $bufferPath . '/' . str_replace(':', '_', $streamKey);
+        return $storagePath;
+    }
+
+    /**
      * Get the storage directory for a stream
      */
     private function getStreamStorageDir(string $streamKey): string
     {
-        $bufferPath = config('proxy.shared_streaming.storage.buffer_path', 'shared_streams');
-        $fullPath = storage_path('app/' . $bufferPath . '/' . $streamKey);
+        $fullPath = Storage::disk('app')->path($this->getStreamStoragePath($streamKey));
         return $fullPath;
     }
 
