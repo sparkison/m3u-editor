@@ -29,7 +29,7 @@ class ProxyService
             $proxyUrlOverride = rtrim($proxyUrlOverride, '/');
             if ($proxyFormat === 'hls') {
                 if ($sharedStreamingEnabled) {
-                    return "$proxyUrlOverride/shared/stream/$id/hls";
+                    return "$proxyUrlOverride/shared/stream/$id.m3u8";
                 }
                 return "$proxyUrlOverride/api/stream/$id/playlist.m3u8";
             } else {
@@ -43,7 +43,7 @@ class ProxyService
         if ($sharedStreamingEnabled) {
             return route('shared.stream.channel', [
                 'encodedId' => $id,
-                'format' => $proxyFormat
+                'format' => $proxyFormat === 'hls' ? 'm3u8' : $format
             ]);
         }
         return $proxyFormat === 'hls'
@@ -73,7 +73,7 @@ class ProxyService
             $proxyUrlOverride = rtrim($proxyUrlOverride, '/');
             if ($proxyFormat === 'hls') {
                 if ($sharedStreamingEnabled) {
-                    return "$proxyUrlOverride/shared/stream/e/$id.hls";
+                    return "$proxyUrlOverride/shared/stream/e/$id.m3u8";
                 }
                 return "$proxyUrlOverride/api/stream/e/$id/playlist.m3u8";
             } else {
@@ -87,7 +87,7 @@ class ProxyService
         if ($sharedStreamingEnabled) {
             return route('shared.stream.episode', [
                 'encodedId' => $id,
-                'format' => $proxyFormat
+                'format' => $proxyFormat === 'hls' ? 'm3u8' : $format
             ]);
         }
         return $proxyFormat === 'hls'

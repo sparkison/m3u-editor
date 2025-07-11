@@ -39,9 +39,9 @@ class SharedStreamController extends Controller
         Log::channel('ffmpeg')->info("SharedStreamController: streamChannel called with encodedId: {$encodedId}, format: {$format}");
 
         // Validate format
-        if (!in_array($format, ['ts', 'hls'])) {
+        if (!in_array($format, ['ts', 'm3u8'])) {
             Log::channel('ffmpeg')->error("SharedStreamController: Invalid format specified: {$format}");
-            abort(400, 'Invalid format specified. Use ts or hls.');
+            abort(400, 'Invalid format specified. Use ts or m3u8.');
         }
 
         // Decode channel ID
@@ -69,8 +69,8 @@ class SharedStreamController extends Controller
     public function streamEpisode(Request $request, string $encodedId, string $format = 'ts')
     {
         // Validate format
-        if (!in_array($format, ['ts', 'hls'])) {
-            abort(400, 'Invalid format specified. Use ts or hls.');
+        if (!in_array($format, ['ts', 'm3u8'])) {
+            abort(400, 'Invalid format specified. Use ts or m3u8.');
         }
 
         // Decode episode ID
@@ -117,7 +117,7 @@ class SharedStreamController extends Controller
                 $model->id,
                 $streamUrl,
                 $title,
-                $format,
+                $format === 'm3u8' ? 'hls' : $format,
                 $clientId,
                 [
                     'user_agent' => $userAgent,
@@ -129,7 +129,7 @@ class SharedStreamController extends Controller
             Log::channel('ffmpeg')->info("Client {$clientId} connected to shared stream for {$type} {$title} ({$format})");
 
             // Return appropriate response based on format
-            if ($format === 'hls') {
+            if ($format === 'm3u8') {
                 return $this->streamHLS($streamInfo, $clientId, $request);
             } else {
                 return $this->streamDirect($streamInfo, $clientId, $request);
