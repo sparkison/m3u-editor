@@ -1366,23 +1366,35 @@ class SharedStreamService
             // Extract client info from options or request
             $ipAddress = $options['ip_address'] ?? request()->headers->get('X-Forwarded-For', request()->ip() ?? 'unknown');
             $userAgent = $options['user_agent'] ?? request()->userAgent() ?? 'unknown';
-
-            // Create or update client record
-            SharedStreamClient::updateOrCreate(
-                [
+            $client = SharedStreamClient::where('stream_id', $streamKey)
+                ->where('client_id', $clientId)
+                ->first();
+            if ($client) {
+                // Update existing client info
+                $update = [
+                    'ip_address' => $ipAddress,
+                    'user_agent' => $userAgent,
+                    'last_activity_at' => now(),
+                ];
+                if ($client->status !== 'connected') {
+                    // Only update connected_at if the status is changing to connected
+                    $update['connected_at'] = now();
+                    $update['bytes_received'] = 0; // Reset bytes received on reconnect
+                    $update['status'] = 'connected'; // Ensure status is set to connected
+                }
+                $client->update($update);
+            } else {
+                SharedStreamClient::create([
                     'stream_id' => $streamKey,
-                    'client_id' => $clientId
-                ],
-                [
+                    'client_id' => $clientId,
                     'ip_address' => $ipAddress,
                     'user_agent' => $userAgent,
                     'connected_at' => now(),
                     'last_activity_at' => now(),
                     'bytes_received' => 0,
                     'status' => 'connected'
-                ]
-            );
-
+                ]);
+            }
             Log::channel('ffmpeg')->debug("Registered client {$clientId} for stream {$streamKey} in database");
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Error registering client {$clientId} for stream {$streamKey}: " . $e->getMessage());
@@ -3016,7 +3028,7 @@ class SharedStreamService
     /**
      * Retrieve HLS segment data for a given stream key and segment name.
      */
-    public function getHLSSegment(string $streamKey): ?string 
+    public function getHLSSegment(string $streamKey): ?string
     {
         return $this->getStreamStoragePath($streamKey);
     }
