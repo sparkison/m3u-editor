@@ -40,17 +40,28 @@ class StreamMonitorUpdate implements ShouldQueue
     ): void {
         try {
             // Update monitoring statistics
-            $stats = $monitorService->updateSystemStats();
+            $monitorService->updateSystemStats();
 
             // Get current stream status
-            $streamStats = $monitorService->getStreamStats();
+            // $streamStats = $monitorService->getStreamStats(); // this is inaccurate and uses an earlier Redis version...
             $systemStats = $monitorService->getSystemStats();
+
+            // Need to remove any stale clients
+            // We can be pretty agressive with this, as the timestamp will be updated frequently for active connections
+            $activeClients = $sharedStreamService->getAllActiveClients();
+            $removedClients = 0;
+            foreach ($activeClients as $client) {
+                if (isset($client['last_activity_at']) && time() - $client['last_activity_at'] > 60) { // 1 minute
+                    Log::channel('ffmpeg')->info("StreamMonitor: Removing stale client {$client['client_id']} from stream {$client['stream_id']}");
+                    $sharedStreamService->removeClient($client['stream_id'], $client['client_id']);
+                    $removedClients++;
+                }
+            }
 
             // Update stream health for all active streams
             $activeStreams = $sharedStreamService->getAllActiveStreams();
             $unhealthyStreams = 0;
             $totalBandwidth = 0;
-
             foreach ($activeStreams as $streamKey => $streamData) {
                 try {
                     // Check stream health
@@ -93,6 +104,7 @@ class StreamMonitorUpdate implements ShouldQueue
 
             Log::channel('ffmpeg')->debug(
                 "StreamMonitor: Updated stats - " . count($activeStreams) . " streams, " .
+                    "{$removedClients} stale clients removed, " .
                     "{$unhealthyStreams} unhealthy, " . round($totalBandwidth / 1024 / 1024, 2) . "MB/s bandwidth"
             );
         } catch (\Exception $e) {

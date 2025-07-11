@@ -2,7 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Models\SharedStream;
 use App\Services\ProxyService;
+use App\Services\SharedStreamService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Redis;
 
@@ -25,11 +27,16 @@ class FlushFfmpegProcessCache extends Command
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(SharedStreamService $sharedStreamService): void
     {
         $this->info('🧹 Cleaning up FFmpeg process cache...');
 
         // Flush the Redis store (FFmpeg processes mgmt., cache, etc.)
         Redis::flushdb();
+
+        // Clean shared streams
+        collect(
+            $sharedStreamService->getAllActiveStreams()
+        )->each(fn(array $stream) => $sharedStreamService->cleanupStream($stream['stream_key'], true));
     }
 }

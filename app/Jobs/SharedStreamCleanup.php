@@ -36,7 +36,7 @@ class SharedStreamCleanup implements ShouldQueue
         Log::channel('ffmpeg')->debug('SharedStreamCleanup: Starting cleanup process');
 
         try {
-            // Get all active streams from Redis
+            // Get all active streams from database
             $activeStreams = $sharedStreamService->getAllActiveStreams();
             $cleanedUp = 0;
             $staleStreams = 0;

@@ -1460,6 +1460,36 @@ class SharedStreamService
     }
 
     /**
+     * Get all active clients across all streams
+     * Called by BufferManagement job and other services
+     */
+    public function getAllActiveClients(): array
+    {
+        try {
+            $clients = SharedStreamClient::where('status', 'connected')
+                ->get()
+                ->map(function ($client) {
+                    return [
+                        'stream_id' => $client->stream_id,
+                        'client_id' => $client->client_id,
+                        'ip_address' => $client->ip_address,
+                        'user_agent' => $client->user_agent,
+                        'connected_at' => $client->connected_at->timestamp,
+                        'last_activity_at' => $client->last_activity_at->timestamp,
+                        'bytes_received' => $client->bytes_received,
+                    ];
+                })
+                ->toArray();
+
+            // Log::channel('ffmpeg')->debug("getAllActiveClients: Retrieved " . count($clients) . " active clients from database");
+            return $clients;
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error getting active clients: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
      * Clean up old buffer segments for a stream
      */
     public function cleanupOldBufferSegments(string $streamKey): int
@@ -2029,6 +2059,10 @@ class SharedStreamService
                 $this->removeDirectory($storageDir);
             }
         }
+
+        // Clean up connected clients
+        SharedStreamClient::where('stream_id', $streamKey)
+            ->update(['status' => 'disconnected', 'last_activity_at' => now()]);
 
         // Finally, update the database to mark the stream as stopped
         SharedStream::where('stream_id', $streamKey)
