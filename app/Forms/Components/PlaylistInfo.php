@@ -36,7 +36,7 @@ class PlaylistInfo extends Field
             $stats['active_connections'] = "$activeStreams/$availableStreams";
         }
         if ($playlist->xtream) {
-            $xtreamStats = $this->getXtreamStats($playlist, $force);
+            $xtreamStats = $this->getXtreamStats($playlist);
             if (!empty($xtreamStats)) {
                 $stats = array_merge($stats, $xtreamStats);
             }
