@@ -393,6 +393,7 @@ class ProcessM3uImport implements ShouldQueue
                             'group' => $category['category_name'] ?? '',
                             'group_internal' => $category['category_name'] ?? '',
                             'stream_id' => $item->epg_channel_id ?? $item->stream_id, // prefer EPG id for mapping, if set
+                            'source_id' => $item->stream_id, // source ID for the channel
                             'channel' => $item->num ?? null,
                             'catchup' => $item->tv_archive ?? null,
                             'shift' => $item->tv_archive_duration ?? 0,
@@ -428,6 +429,7 @@ class ProcessM3uImport implements ShouldQueue
                             'group' => $category['category_name'] ?? '',
                             'group_internal' => $category['category_name'] ?? '',
                             'stream_id' => $item->stream_id,
+                            'source_id' => $item->stream_id, // source ID for the channel
                             'channel' => $item->num ?? null,
                             'is_vod' => true, // mark as VOD
                             'container_extension' => $extension, // store the container extension
