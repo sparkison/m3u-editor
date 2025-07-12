@@ -57,6 +57,10 @@ class GroupResource extends Resource
     {
         return $table->persistFiltersInSession()
             ->persistSortInSession()
+            ->modifyQueryUsing(function (Builder $query) {
+                $query->withCount('enabled_live_channels')
+                    ->withCount('enabled_vod_channels');
+            })
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
@@ -82,14 +86,16 @@ class GroupResource extends Resource
                     ->label('Default name')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('channels_count')
-                    ->label('Available Channels')
-                    ->counts('channels')
+                Tables\Columns\TextColumn::make('live_channels_count')
+                    ->label('Live Channels')
+                    ->counts('live_channels')
+                    ->description(fn(Group $record): string => "Enabled: {$record->enabled_live_channels_count}")
                     ->toggleable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('enabled_channels_count')
-                    ->label('Enabled Channels')
-                    ->counts('enabled_channels')
+                Tables\Columns\TextColumn::make('vod_channels_count')
+                    ->label('VOD Channels')
+                    ->counts('vod_channels')
+                    ->description(fn(Group $record): string => "Enabled: {$record->enabled_vod_channels_count}")
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('playlist.name')
