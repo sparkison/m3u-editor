@@ -65,7 +65,32 @@ class Playlist extends Model
 
     public function enabled_channels(): HasMany
     {
-        return $this->channels()->where('enabled', true);
+        return $this->channels()
+            ->where('enabled', true);
+    }
+
+    public function live_channels(): HasMany
+    {
+        return $this->channels()
+            ->where('is_vod', false);
+    }
+
+    public function enabled_live_channels(): HasMany
+    {
+        return $this->live_channels()
+            ->where('enabled', true);
+    }
+
+    public function vod_channels(): HasMany
+    {
+        return $this->channels()
+            ->where('is_vod', true);
+    }
+
+    public function enabled_vod_channels(): HasMany
+    {
+        return $this->vod_channels()
+            ->where('enabled', true);
     }
 
     public function groups(): HasMany

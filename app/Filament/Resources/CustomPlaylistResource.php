@@ -58,7 +58,8 @@ class CustomPlaylistResource extends Resource
     {
         return $table
             ->modifyQueryUsing(function (Builder $query) {
-                $query->withCount('enabled_channels');
+                $query->withCount('enabled_live_channels')
+                    ->withCount('enabled_vod_channels');
             })
             ->columns([
                 Tables\Columns\TextColumn::make('id')
@@ -75,9 +76,21 @@ class CustomPlaylistResource extends Resource
                     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
                     ->description(fn(CustomPlaylist $record): string => "Active: " . (int) Redis::get("active_streams:{$record->id}") ?? 0)
                     ->sortable(),
-                Tables\Columns\TextColumn::make('channels_count')
-                    ->label('Channels')
-                    ->counts('channels')
+                // Tables\Columns\TextColumn::make('channels_count')
+                //     ->label('Channels')
+                //     ->counts('channels')
+                //     ->toggleable()
+                //     ->sortable(),
+                Tables\Columns\TextColumn::make('live_channels_count')
+                    ->label('Live')
+                    ->counts('live_channels')
+                    ->description(fn(CustomPlaylist $record): string => "Enabled: {$record->enabled_live_channels_count}")
+                    ->toggleable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('vod_channels_count')
+                    ->label('VOD')
+                    ->counts('vod_channels')
+                    ->description(fn(CustomPlaylist $record): string => "Enabled: {$record->enabled_vod_channels_count}")
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('channels_count')

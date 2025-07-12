@@ -113,6 +113,30 @@ class MergedPlaylist extends Model
         );
     }
 
+    public function live_channels(): hasManyThrough
+    {
+        return $this->channels()
+            ->where('is_vod', false);
+    }
+
+    public function enabled_live_channels(): hasManyThrough
+    {
+        return $this->live_channels()
+            ->where('enabled', true);
+    }
+
+    public function vod_channels(): hasManyThrough
+    {
+        return $this->channels()
+            ->where('is_vod', true);
+    }
+
+    public function enabled_vod_channels(): hasManyThrough
+    {
+        return $this->vod_channels()
+            ->where('enabled', true);
+    }
+
     public function playlistAuths(): MorphToMany
     {
         return $this->morphToMany(PlaylistAuth::class, 'authenticatable');
