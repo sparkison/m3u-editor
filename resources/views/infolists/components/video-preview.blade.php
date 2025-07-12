@@ -1,7 +1,8 @@
 <x-dynamic-component :component="$getEntryWrapperView()" :entry="$entry">
     @php($record = $getRecord())
+    @php($isNewStreamingMethod = (bool) config('proxy.shared_streaming.enabled') ?? false)
     @php($url = $record->url_custom ?? $record->url)
-    @php($proxyUrl = App\Facades\ProxyFacade::getProxyUrlForChannel(id: $record->id, format: 'hls', preview: true))
+    @php($proxyUrl = App\Facades\ProxyFacade::getProxyUrlForChannel(id: $record->id, format: $isNewStreamingMethod ? 'hls' : 'mp4', preview: true))
     @php($playerId = "channel_{$record->id}_preview")
     <div x-data="{ state: {}, player: null }">
         <div x-data x-init="
