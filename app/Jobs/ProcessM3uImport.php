@@ -801,7 +801,7 @@ class ProcessM3uImport implements ShouldQueue
         string         $batchNo,
         int            $userId,
         Carbon         $start,
-        ?Collection    $seriesCategories
+        ?Collection    $seriesCategories = null
     ) {
         // Get the playlist ID
         $playlistId = $playlist->id;
