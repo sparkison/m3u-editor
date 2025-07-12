@@ -91,7 +91,8 @@ class PlaylistResource extends Resource
         return $table->persistFiltersInSession()
             ->persistSortInSession()
             ->modifyQueryUsing(function (Builder $query) {
-                $query->withCount('enabled_channels')
+                $query->withCount('enabled_live_channels')
+                    ->withCount('enabled_vod_channels')
                     ->withCount('enabled_series');
             })
             ->columns([
@@ -119,10 +120,22 @@ class PlaylistResource extends Resource
                     ->counts('groups')
                     ->toggleable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('channels_count')
-                    ->label('Channels')
-                    ->counts('channels')
-                    ->description(fn(Playlist $record): string => "Enabled: {$record->enabled_channels_count}")
+                // Tables\Columns\TextColumn::make('channels_count')
+                //     ->label('Channels')
+                //     ->counts('channels')
+                //     ->description(fn(Playlist $record): string => "Enabled: {$record->enabled_channels_count}")
+                //     ->toggleable()
+                //     ->sortable(),
+                Tables\Columns\TextColumn::make('live_channels_count')
+                    ->label('Live')
+                    ->counts('live_channels')
+                    ->description(fn(Playlist $record): string => "Enabled: {$record->enabled_live_channels_count}")
+                    ->toggleable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('vod_channels_count')
+                    ->label('VOD')
+                    ->counts('vod_channels')
+                    ->description(fn(Playlist $record): string => "Enabled: {$record->enabled_vod_channels_count}")
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('series_count')

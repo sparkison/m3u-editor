@@ -43,14 +43,39 @@ class CustomPlaylist extends Model
         return $this->belongsToMany(Channel::class, 'channel_custom_playlist');
     }
 
+    public function enabled_channels(): BelongsToMany
+    {
+        return $this->channels()
+            ->where('enabled', true);
+    }
+
+    public function live_channels(): BelongsToMany
+    {
+        return $this->channels()
+            ->where('is_vod', false);
+    }
+
+    public function enabled_live_channels(): BelongsToMany
+    {
+        return $this->live_channels()
+            ->where('enabled', true);
+    }
+
+    public function vod_channels(): BelongsToMany
+    {
+        return $this->channels()
+            ->where('is_vod', true);
+    }
+
+    public function enabled_vod_channels(): BelongsToMany
+    {
+        return $this->vod_channels()
+            ->where('enabled', true);
+    }
+
     public function customChannels(): HasMany
     {
         return $this->hasMany(Channel::class);
-    }
-
-    public function enabled_channels(): BelongsToMany
-    {
-        return $this->channels()->where('enabled', true);
     }
 
     // public function playlists(): HasManyThrough
