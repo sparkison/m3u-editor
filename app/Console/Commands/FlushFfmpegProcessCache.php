@@ -37,6 +37,6 @@ class FlushFfmpegProcessCache extends Command
         // Clean shared streams
         collect(
             $sharedStreamService->getAllActiveStreams()
-        )->each(fn(array $stream) => $sharedStreamService->cleanupStream($stream['stream_key'], true));
+        )->each(fn(array $stream, $streamKey) => $sharedStreamService->cleanupStream($streamKey, true));
     }
 }
