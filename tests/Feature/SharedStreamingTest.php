@@ -440,4 +440,53 @@ class SharedStreamingTest extends TestCase
         // Test that the failover concept works for valid scenarios
         $this->assertTrue(method_exists($this->service, 'attemptStreamFailover'), 'Failover method should exist');
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_serves_segments_to_multiple_clients_independently()
+    {
+        $this->mockLock();
+
+        $channel = $this->createTestChannel('https://example.com/test_multi_client.m3u8');
+        $streamKey = $this->getStreamKey('channel', $channel->id, $channel->url);
+        $clientId1 = 'test_client_1';
+        $clientId2 = 'test_client_2';
+
+        // Create stream and register clients
+        SharedStream::create([
+            'stream_id' => $streamKey,
+            'source_url' => $channel->url,
+            'format' => 'ts',
+            'status' => 'active',
+            'client_count' => 2,
+            'process_id' => 12345
+        ]);
+        $this->service->registerClient($streamKey, $clientId1);
+        $this->service->registerClient($streamKey, $clientId2);
+
+        // Add buffer segments to Redis
+        $bufferKey = 'stream_buffer:' . $streamKey;
+        $redis = app('redis');
+        $redis->lpush("{$bufferKey}:segments", 0);
+        $redis->set("{$bufferKey}:segment_0", 'segment_0_data');
+        $redis->lpush("{$bufferKey}:segments", 1);
+        $redis->set("{$bufferKey}:segment_1", 'segment_1_data');
+        $redis->lpush("{$bufferKey}:segments", 2);
+        $redis->set("{$bufferKey}:segment_2", 'segment_2_data');
+
+        // Simulate client 1 requesting segments
+        $lastSegment1 = -1;
+        $data1 = $this->service->getNextStreamSegments($streamKey, $clientId1, $lastSegment1);
+
+        // Assert client 1 gets all segments
+        $this->assertEquals('segment_0_datasegment_1_datasegment_2_data', $data1);
+        $this->assertEquals(2, $lastSegment1);
+
+        // Simulate client 2 requesting segments
+        $lastSegment2 = -1;
+        $data2 = $this->service->getNextStreamSegments($streamKey, $clientId2, $lastSegment2);
+
+        // Assert client 2 also gets all segments
+        $this->assertEquals('segment_0_datasegment_1_datasegment_2_data', $data2);
+        $this->assertEquals(2, $lastSegment2);
+    }
 }

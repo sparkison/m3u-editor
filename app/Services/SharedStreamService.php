@@ -55,6 +55,14 @@ class SharedStreamService
     }
 
     /**
+     * Get the Redis key for a client's cursor on a stream
+     */
+    private function getClientCursorKey(string $streamKey, string $clientId): string
+    {
+        return self::CACHE_PREFIX . $streamKey . ':client_cursor:' . $clientId;
+    }
+
+    /**
      * Get or create a shared stream for the given channel/episode
      * 
      * @param string $type 'channel' or 'episode'
@@ -1281,6 +1289,10 @@ class SharedStreamService
                     Log::channel('ffmpeg')->warning("Client {$clientId} not found in database for stream {$streamKey}");
                 }
 
+                // Remove the client's cursor from Redis
+                $cursorKey = $this->getClientCursorKey($streamKey, $clientId);
+                $this->redis()->del($cursorKey);
+
                 // Get current active client count from database
                 $activeClientCount = SharedStreamClient::where('stream_id', $streamKey)
                     ->where('status', 'connected')
@@ -1358,6 +1370,20 @@ class SharedStreamService
     }
 
     /**
+     * Get all client cursors for a stream
+     */
+    public function getClientCursors(string $streamKey): array
+    {
+        $clients = $this->getClients($streamKey);
+        $cursors = [];
+        foreach ($clients as $client) {
+            $cursorKey = $this->getClientCursorKey($streamKey, $client['client_id']);
+            $cursors[$client['client_id']] = (int)$this->redis()->get($cursorKey);
+        }
+        return $cursors;
+    }
+
+    /**
      * Register a client for a stream in database
      */
     private function registerClient(string $streamKey, string $clientId, array $options = []): void
@@ -1366,6 +1392,12 @@ class SharedStreamService
             // Extract client info from options or request
             $ipAddress = $options['ip_address'] ?? request()->headers->get('X-Forwarded-For', request()->ip() ?? 'unknown');
             $userAgent = $options['user_agent'] ?? request()->userAgent() ?? 'unknown';
+
+            // Set initial cursor for the client
+            $cursorKey = $this->getClientCursorKey($streamKey, $clientId);
+            $this->redis()->set($cursorKey, -1);
+
+
             $client = SharedStreamClient::where('stream_id', $streamKey)
                 ->where('client_id', $clientId)
                 ->first();
@@ -1497,22 +1529,34 @@ class SharedStreamService
         try {
             $bufferKey = self::BUFFER_PREFIX . $streamKey;
             $segmentNumbers = $this->redis()->lrange("{$bufferKey}:segments", 0, -1);
+            $cursors = $this->getClientCursors($streamKey);
 
+            if (empty($cursors)) {
+                // No clients, so we can clean up all but the last few segments
+                $keepCount = 10; // Keep 10 segments for new clients
+                if (count($segmentNumbers) > $keepCount) {
+                    $toRemove = array_slice($segmentNumbers, $keepCount);
+                    foreach ($toRemove as $segmentNumber) {
+                        $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                        $this->redis()->del($segmentKey);
+                    }
+                    $this->redis()->ltrim("{$bufferKey}:segments", 0, $keepCount - 1);
+                    return count($toRemove);
+                }
+                return 0;
+            }
+
+            $minCursor = min($cursors);
             $cleaned = 0;
-            $keepCount = 50; // Keep only the most recent 50 segments
 
-            // Ensure we have an array before processing
-            if (is_array($segmentNumbers) && count($segmentNumbers) > $keepCount) {
-                $toRemove = array_slice($segmentNumbers, $keepCount);
-                foreach ($toRemove as $segmentNumber) {
+            foreach ($segmentNumbers as $segmentNumber) {
+                if ($segmentNumber < $minCursor) {
                     $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
                     if ($this->redis()->del($segmentKey)) {
+                        $this->redis()->lrem("{$bufferKey}:segments", 1, $segmentNumber);
                         $cleaned++;
                     }
                 }
-
-                // Trim the segments list
-                $this->redis()->ltrim("{$bufferKey}:segments", 0, $keepCount - 1);
             }
 
             return $cleaned;
@@ -2273,6 +2317,11 @@ class SharedStreamService
         $segmentsRetrieved = 0;
         $maxSegmentsPerCall = 5; // Limit segments per call to prevent overwhelming clients
 
+        // Get the client's cursor
+        $cursorKey = $this->getClientCursorKey($streamKey, $clientId);
+        $lastSegment = (int)$this->redis()->get($cursorKey);
+
+
         // First, try to get data from existing buffered segments
         if (!empty($segmentNumbers)) {
             // Convert segment numbers to integers and sort them
@@ -2303,6 +2352,7 @@ class SharedStreamService
             $this->trackBandwidth($streamKey, strlen($data));
             $this->updateStreamActivity($streamKey);
             $this->updateClientActivity($streamKey, $clientId);
+            $this->redis()->set($cursorKey, $lastSegment);
         }
 
         return $data;
