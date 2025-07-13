@@ -489,4 +489,17 @@ class SharedStreamingTest extends TestCase
         $this->assertEquals('segment_0_datasegment_1_datasegment_2_data', $data2);
         $this->assertEquals(2, $lastSegment2);
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_correctly_checks_if_a_process_is_running()
+    {
+        // Get the PID of the current test process
+        $pid = getmypid();
+
+        // Check if the current process is running (it should be)
+        $this->assertTrue($this->service->isProcessRunning($pid));
+
+        // Check for a non-existent process
+        $this->assertFalse($this->service->isProcessRunning(999999));
+    }
 }
