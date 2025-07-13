@@ -20,11 +20,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class SharedStreamController extends Controller
 {
-    private SharedStreamService $sharedStreamService;
-
-    public function __construct(SharedStreamService $sharedStreamService)
+    public function __construct()
     {
-        $this->sharedStreamService = $sharedStreamService;
     }
 
     /**
@@ -113,7 +110,7 @@ class SharedStreamController extends Controller
         $userAgent = $playlist->user_agent ?? 'VLC/3.0.21';
         try {
             // Get or create shared stream
-            $streamInfo = $this->sharedStreamService->getOrCreateSharedStream(
+        $streamInfo = app(SharedStreamService::class)->getOrCreateSharedStream(
                 $type,
                 $model->id,
                 $streamUrl,
@@ -147,7 +144,7 @@ class SharedStreamController extends Controller
     private function streamHLS(array $streamInfo, string $clientId, Request $request): Response
     {
         $streamKey = $streamInfo['stream_key'];
-        $playlist = $this->sharedStreamService->getHLSPlaylist($streamKey, $clientId);
+        $playlist = app(SharedStreamService::class)->getHLSPlaylist($streamKey, $clientId);
         $maxAttempts = $playlist['max_attempts'];
         $sleepSeconds = $playlist['sleep_seconds'];
         $m3u8Path = $playlist['m3u8_path'];
@@ -185,7 +182,7 @@ class SharedStreamController extends Controller
         Log::channel('ffmpeg')->debug("Stream {$streamKey}: Client {$clientId} waiting up to {$streamReadyTimeout}s for stream to become active.");
 
         while (time() - $startTime < $streamReadyTimeout) {
-            $stats = $this->sharedStreamService->getStreamStats($streamKey);
+            $stats = app(SharedStreamService::class)->getStreamStats($streamKey);
 
             if (!$stats) {
                 Log::channel('ffmpeg')->debug("Stream {$streamKey}: Client {$clientId} - Stream stats are null, possibly during a restart. Waiting.");
@@ -221,7 +218,7 @@ class SharedStreamController extends Controller
 
             try {
                 // Stream should already be active or starting from the service
-                $stats = $this->sharedStreamService->getStreamStats($streamKey);
+                $stats = app(SharedStreamService::class)->getStreamStats($streamKey);
                 if (!$stats || !in_array($stats['status'], ['active', 'starting'])) {
                     Log::channel('ffmpeg')->warning("Stream {$streamKey} is not active, aborting for client {$clientId}. Status: " . ($stats['status'] ?? 'unknown'));
                     return;
@@ -235,7 +232,7 @@ class SharedStreamController extends Controller
                 $initialTimeout = 30; // 30 seconds to get the first chunk of data
 
                 while (!connection_aborted()) {
-                    $data = $this->sharedStreamService->getNextStreamSegments($streamKey, $clientId, $lastSegment);
+                    $data = app(SharedStreamService::class)->getNextStreamSegments($streamKey, $clientId, $lastSegment);
 
                     if ($data) {
                         // Only log significant data transfers based on config
@@ -273,7 +270,7 @@ class SharedStreamController extends Controller
                         $failoverExtendedTimeout = 60; // Extended timeout during failover
 
                         // Check if we're in the middle of a failover
-                        $isFailoverHappening = $this->sharedStreamService->isFailoverInProgress($streamKey);
+                        $isFailoverHappening = app(SharedStreamService::class)->isFailoverInProgress($streamKey);
 
                         if ($isFailoverHappening) {
                             $timeoutSeconds = $failoverExtendedTimeout;
@@ -300,7 +297,7 @@ class SharedStreamController extends Controller
                 }
             } finally {
                 Log::channel('ffmpeg')->info("Stream {$streamKey}: Client {$clientId} disconnecting. Attempting to remove client from stream service.");
-                $this->sharedStreamService->removeClient($streamKey, $clientId);
+                app(SharedStreamService::class)->removeClient($streamKey, $clientId);
                 Log::channel('ffmpeg')->info("Stream {$streamKey}: Client {$clientId} successfully removed by stream service.");
             }
         }, 200, [
@@ -332,13 +329,13 @@ class SharedStreamController extends Controller
             abort(404, 'Model not found');
         }
         $streamUrl = $type === 'channel' ? ($model->url_custom ?? $model->url) : $model->url;
-        $streamKey = $this->sharedStreamService->getStreamKey($type, $modelId, $streamUrl);
+        $streamKey = app(SharedStreamService::class)->getStreamKey($type, $modelId, $streamUrl);
         if (!$streamKey) {
             abort(404, 'Stream not found');
         }
 
         // Get segment data from shared stream
-        $segmentPath = $this->sharedStreamService->getHLSSegmentPath($streamKey, $segment);
+        $segmentPath = app(SharedStreamService::class)->getHLSSegmentPath($streamKey, $segment);
         $fullPath = Storage::disk('app')->path($segmentPath);
         if (!($segmentPath && file_exists($fullPath))) {
             abort(404, 'Segment not found');
@@ -356,7 +353,7 @@ class SharedStreamController extends Controller
      */
     public function getStreamStats(Request $request): \Illuminate\Http\JsonResponse
     {
-        $streams = $this->sharedStreamService->getAllActiveStreams();
+        $streams = app(SharedStreamService::class)->getAllActiveStreams();
 
         $stats = [
             'total_streams' => count($streams),
@@ -386,14 +383,14 @@ class SharedStreamController extends Controller
      */
     public function stopStream(Request $request, string $streamKey): \Illuminate\Http\JsonResponse
     {
-        $stats = $this->sharedStreamService->getStreamStats($streamKey);
+        $stats = app(SharedStreamService::class)->getStreamStats($streamKey);
         if (!$stats) {
             abort(404, 'Stream not found');
         }
 
         // Remove all clients to trigger cleanup
         foreach ($stats['clients'] as $client) {
-            $this->sharedStreamService->removeClient($streamKey, $client['id']);
+            app(SharedStreamService::class)->removeClient($streamKey, $client['id']);
         }
 
         Log::channel('ffmpeg')->info("Manually stopped shared stream {$streamKey}");
@@ -417,7 +414,7 @@ class SharedStreamController extends Controller
 
         try {
             // Create a test stream
-            $streamInfo = $this->sharedStreamService->getOrCreateSharedStream(
+            $streamInfo = app(SharedStreamService::class)->getOrCreateSharedStream(
                 'test',
                 0,
                 $streamUrl,

@@ -1318,17 +1318,15 @@ class SharedStreamService
                             $this->decrementActiveStreams($playlistId);
                         }
                         Log::channel('ffmpeg')->debug("Stream {$streamKey} completely cleaned up due to no clients.");
-                        return; // Exit early since stream is cleaned up
-                    } else {
-                        $this->setStreamInfo($streamKey, $streamInfo);
-
-                        // Update database client count
-                        SharedStream::where('stream_id', $streamKey)->update([
-                            'client_count' => $activeClientCount,
-                        ]);
-
-                        Log::channel('ffmpeg')->debug("Decremented client count for {$streamKey} to {$activeClientCount}. Client {$clientId} removed.");
                     }
+                    $this->setStreamInfo($streamKey, $streamInfo);
+
+                    // Update database client count
+                    SharedStream::where('stream_id', $streamKey)->update([
+                        'client_count' => $activeClientCount,
+                    ]);
+
+                    Log::channel('ffmpeg')->debug("Decremented client count for {$streamKey} to {$activeClientCount}. Client {$clientId} removed.");
                 }
             } finally {
                 $lock->release();
