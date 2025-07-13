@@ -75,7 +75,7 @@ return [
                 'secret' => env('REVERB_APP_SECRET'),
                 'app_id' => env('REVERB_APP_ID'),
                 'options' => [
-                    'host' => env('REVERB_HOST'),
+                    'host' => env('REVERB_HOST', 'localhost'),
                     'port' => env('APP_ENV', 'production') === 'production' && env('REVERB_SCHEME', 'https') === 'https'
                         ? 443 // force to 443 for https
                         : env('REVERB_PORT', 443), // if not https, use the port specified
