@@ -1471,6 +1471,7 @@ class SharedStreamService
                 $streamInfo['last_activity'] = $sharedStream->last_client_activity ? $sharedStream->last_client_activity->timestamp : time();
 
                 $streams[$streamKey] = [
+                    'stream_key' => $streamKey,
                     'stream_info' => $streamInfo,
                     'client_count' => $clientCount,
                     'last_activity' => $sharedStream->last_client_activity ? $sharedStream->last_client_activity->timestamp : time(),
