@@ -1293,34 +1293,22 @@ class SharedStreamService
                 // Update stream info
                 $streamInfo = $this->getStreamInfo($streamKey);
                 if ($streamInfo) {
-                    $playlistId = $streamInfo['options']['playlist_id'] ?? null;
                     $streamInfo['client_count'] = $activeClientCount;
                     $streamInfo['last_client_activity'] = now()->timestamp;
 
-                    // If no clients left, mark when it became clientless
                     if ($activeClientCount === 0) {
                         $streamInfo['clientless_since'] = now()->timestamp;
-                        Log::channel('ffmpeg')->debug("Stream {$streamKey} now has no clients. Starting cleanup process.");
-
-                        // Clean up the stream completely
-                        $this->cleanupStream($streamKey, true);
-
-                        // Decrement active stream count for playlist
-                        if ($playlistId) {
-                            $this->decrementActiveStreams($playlistId);
-                        }
-                        Log::channel('ffmpeg')->debug("Stream {$streamKey} completely cleaned up due to no clients.");
-                        return; // Exit early since stream is cleaned up
-                    } else {
-                        $this->setStreamInfo($streamKey, $streamInfo);
-
-                        // Update database client count
-                        SharedStream::where('stream_id', $streamKey)->update([
-                            'client_count' => $activeClientCount,
-                        ]);
-
-                        Log::channel('ffmpeg')->debug("Decremented client count for {$streamKey} to {$activeClientCount}. Client {$clientId} removed.");
+                        Log::channel('ffmpeg')->debug("Stream {$streamKey} now has no clients. The cleanup job will handle it.");
                     }
+
+                    $this->setStreamInfo($streamKey, $streamInfo);
+
+                    // Update database client count
+                    SharedStream::where('stream_id', $streamKey)->update([
+                        'client_count' => $activeClientCount,
+                    ]);
+
+                    Log::channel('ffmpeg')->debug("Decremented client count for {$streamKey} to {$activeClientCount}. Client {$clientId} removed.");
                 }
             } finally {
                 $lock->release();
@@ -2051,21 +2039,18 @@ class SharedStreamService
             Log::channel('ffmpeg')->debug("Stream {$streamKey}: Cleaned up active process handles");
         }
 
-        // Remove all Redis data related to this stream
+        // Remove all Redis data related to this stream, except client_cursors
+        $cursorKey = "client_cursors:{$streamKey}";
+        $keysToDelete = [];
+        $redisKeys = Redis::keys("*{$streamKey}*");
+        foreach ($redisKeys as $key) {
+            if ($key !== $cursorKey) {
+                $keysToDelete[] = $key;
+            }
+        }
 
-        // Use the unique part of the stream identifier (1223568:hash)
-        preg_match('/channel:(\d+:[a-f0-9]+)/', $streamKey, $matches);
-        $streamIdentifier = $matches[1] ?? str_replace('shared_stream:', '', $streamKey);
-
-        // Use shell command since Laravel Redis isn't finding the keys correctly
-        $deleteCommand = "redis-cli --scan --pattern '*{$streamIdentifier}*' | xargs redis-cli del 2>/dev/null";
-        $output = shell_exec($deleteCommand);
-        $deletedCount = (int) trim($output);
-
-        if ($deletedCount > 0) {
-            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Cleaned up {$deletedCount} Redis keys including all buffer segments via shell command");
-        } else {
-            Log::channel('ffmpeg')->debug("Stream {$streamKey}: No Redis keys found to clean up (pattern: *{$streamIdentifier}*)");
+        if (!empty($keysToDelete)) {
+            Redis::del($keysToDelete);
         }
 
         Log::channel('ffmpeg')->debug("Stream {$streamKey}: All Redis buffer data and keys cleaned up");
