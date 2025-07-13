@@ -1280,53 +1280,60 @@ class SharedStreamService
         $lock = Cache::lock('lock:stream_info_client_count:' . $streamKey, 10); // Lock for 10 seconds
         if ($lock->get()) {
             try {
-                // Remove client from database (disconnect client)
-                $clientRemoved = SharedStreamClient::where('stream_id', $streamKey)
+                // Mark client as disconnected in the database
+                $client = SharedStreamClient::where('stream_id', $streamKey)
                     ->where('client_id', $clientId)
-                    ->update(['status' => 'disconnected']);
+                    ->first();
 
-                if (!$clientRemoved) {
-                    Log::channel('ffmpeg')->warning("Client {$clientId} not found in database for stream {$streamKey}");
+                if ($client) {
+                    $client->update(['status' => 'disconnected']);
+                } else {
+                    Log::channel('ffmpeg')->warning("Client {$clientId} not found in database for stream {$streamKey} during removal.");
                 }
 
                 // Remove the client's cursor from Redis
                 $cursorKey = $this->getClientCursorKey($streamKey, $clientId);
                 $this->redis()->del($cursorKey);
 
-                // Get current active client count from database
+                // Recalculate the number of *truly* active clients
                 $activeClientCount = SharedStreamClient::where('stream_id', $streamKey)
                     ->where('status', 'connected')
                     ->count();
 
-                // Update stream info
-                $streamInfo = $this->getStreamInfo($streamKey);
-                if ($streamInfo) {
-                    $playlistId = $streamInfo['options']['playlist_id'] ?? null;
+                // Update stream info in the database
+                $sharedStream = SharedStream::where('stream_id', $streamKey)->first();
+                if ($sharedStream) {
+                    $streamInfo = $sharedStream->stream_info;
                     $streamInfo['client_count'] = $activeClientCount;
                     $streamInfo['last_client_activity'] = now()->timestamp;
 
-                    // If no clients left, mark when it became clientless
                     if ($activeClientCount === 0) {
                         $streamInfo['clientless_since'] = now()->timestamp;
                         Log::channel('ffmpeg')->debug("Stream {$streamKey} now has no clients. Starting cleanup process.");
+
+                        $sharedStream->update([
+                            'client_count' => 0,
+                            'stream_info' => $streamInfo
+                        ]);
 
                         // Clean up the stream completely
                         $this->cleanupStream($streamKey, true);
 
                         // Decrement active stream count for playlist
+                        $playlistId = $streamInfo['options']['playlist_id'] ?? null;
                         if ($playlistId) {
                             $this->decrementActiveStreams($playlistId);
                         }
+
                         Log::channel('ffmpeg')->debug("Stream {$streamKey} completely cleaned up due to no clients.");
+                    } else {
+                        // If there are still clients, just update the count
+                        $sharedStream->update([
+                            'client_count' => $activeClientCount,
+                            'stream_info' => $streamInfo
+                        ]);
+                        Log::channel('ffmpeg')->debug("Decremented client count for {$streamKey} to {$activeClientCount}. Client {$clientId} removed.");
                     }
-                    $this->setStreamInfo($streamKey, $streamInfo);
-
-                    // Update database client count
-                    SharedStream::where('stream_id', $streamKey)->update([
-                        'client_count' => $activeClientCount,
-                    ]);
-
-                    Log::channel('ffmpeg')->debug("Decremented client count for {$streamKey} to {$activeClientCount}. Client {$clientId} removed.");
                 }
             } finally {
                 $lock->release();
