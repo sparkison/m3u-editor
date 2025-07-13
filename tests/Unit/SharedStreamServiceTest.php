@@ -518,6 +518,21 @@ class SharedStreamServiceTest extends TestCase
     }
 
     /** @test */
+    public function it_checks_if_process_is_running_correctly()
+    {
+        if (!function_exists('posix_getpgid')) {
+            $this->markTestSkipped('POSIX functions not available.');
+        }
+
+        // Test with a valid process ID (the current process)
+        $pid = getmypid();
+        $this->assertTrue($this->sharedStreamService->isProcessRunning($pid));
+
+        // Test with an invalid process ID
+        $this->assertFalse($this->sharedStreamService->isProcessRunning(99999));
+    }
+
+    /** @test */
     public function it_maintains_consistent_cache_prefix_usage()
     {
         // Test that cache prefixes are used consistently
@@ -1263,5 +1278,57 @@ class SharedStreamServiceTest extends TestCase
         // Should handle gracefully when no channel is found
         $result = $method->invoke($this->sharedStreamService, $streamKey, $streamInfo);
         $this->assertNull($result, 'Should return null when channel not found');
+    }
+
+    /** @test */
+    public function it_handles_client_specific_cursors_and_segment_cleanup()
+    {
+        $streamKey = 'test_stream_cursors';
+        $clientId1 = 'client1';
+        $clientId2 = 'client2';
+
+        // 1. Simulate some segments in the buffer
+        $bufferKey = SharedStreamService::BUFFER_PREFIX . $streamKey;
+        for ($i = 0; $i < 10; $i++) {
+            Redis::rpush("{$bufferKey}:segments", $i);
+            Redis::set("{$bufferKey}:segment_{$i}", "segment_data_{$i}");
+        }
+
+        // 2. Client 1 requests segments
+        $lastSegment1 = -1;
+        $data1 = $this->sharedStreamService->getNextStreamSegments($streamKey, $clientId1, $lastSegment1);
+        $this->assertStringContainsString('segment_data_0', $data1);
+        $this->assertStringContainsString('segment_data_4', $data1);
+        $this->assertEquals(4, $lastSegment1);
+
+        // 3. Client 2 requests segments
+        $lastSegment2 = -1;
+        $data2 = $this->sharedStreamService->getNextStreamSegments($streamKey, $clientId2, $lastSegment2);
+        $this->assertStringContainsString('segment_data_0', $data2);
+        $this->assertStringContainsString('segment_data_4', $data2);
+        $this->assertEquals(4, $lastSegment2);
+
+        // 4. Client 1 requests more segments
+        $data1 = $this->sharedStreamService->getNextStreamSegments($streamKey, $clientId1, $lastSegment1);
+        $this->assertStringContainsString('segment_data_5', $data1);
+        $this->assertStringContainsString('segment_data_9', $data1);
+        $this->assertEquals(9, $lastSegment1);
+
+        // 5. Check cursors in Redis
+        $cursorKey = "client_cursors:{$streamKey}";
+        $cursors = Redis::hgetall($cursorKey);
+        $this->assertEquals(9, $cursors[$clientId1]);
+        $this->assertEquals(4, $cursors[$clientId2]);
+
+        // 6. Clean up old segments
+        $this->sharedStreamService->cleanupOldBufferSegments($streamKey);
+
+        // 7. Verify that segments consumed by both clients are deleted
+        $this->assertFalse(Redis::exists("{$bufferKey}:segment_0"));
+        $this->assertFalse(Redis::exists("{$bufferKey}:segment_1"));
+        $this->assertFalse(Redis::exists("{$bufferKey}:segment_2"));
+        $this->assertFalse(Redis::exists("{$bufferKey}:segment_3"));
+        $this->assertTrue(Redis::exists("{$bufferKey}:segment_4"));
+        $this->assertTrue(Redis::exists("{$bufferKey}:segment_5"));
     }
 }

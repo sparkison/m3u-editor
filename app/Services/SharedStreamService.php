@@ -1281,6 +1281,10 @@ class SharedStreamService
                     Log::channel('ffmpeg')->warning("Client {$clientId} not found in database for stream {$streamKey}");
                 }
 
+                // Remove client cursor
+                $cursorKey = "client_cursors:{$streamKey}";
+                $this->redis()->hdel($cursorKey, $clientId);
+
                 // Get current active client count from database
                 $activeClientCount = SharedStreamClient::where('stream_id', $streamKey)
                     ->where('status', 'connected')
@@ -1430,8 +1434,11 @@ class SharedStreamService
                 $uptime = $sharedStream->started_at ?
                     now()->diffInSeconds($sharedStream->started_at) : 0;
 
-                // Get stream info from model
+                // Get stream info from model, ensuring it's an array
                 $streamInfo = $sharedStream->stream_info ?: [];
+                if (!is_array($streamInfo)) {
+                    $streamInfo = [];
+                }
                 $streamInfo['stream_key'] = $streamKey;
                 $streamInfo['status'] = $sharedStream->status;
                 $streamInfo['pid'] = $sharedStream->process_id;
@@ -1495,24 +1502,30 @@ class SharedStreamService
     public function cleanupOldBufferSegments(string $streamKey): int
     {
         try {
+            $cursorKey = "client_cursors:{$streamKey}";
+            $cursors = $this->redis()->hgetall($cursorKey);
+
+            if (empty($cursors)) {
+                return 0;
+            }
+
+            $minSegment = min(array_values($cursors));
+
             $bufferKey = self::BUFFER_PREFIX . $streamKey;
             $segmentNumbers = $this->redis()->lrange("{$bufferKey}:segments", 0, -1);
 
             $cleaned = 0;
-            $keepCount = 50; // Keep only the most recent 50 segments
 
-            // Ensure we have an array before processing
-            if (is_array($segmentNumbers) && count($segmentNumbers) > $keepCount) {
-                $toRemove = array_slice($segmentNumbers, $keepCount);
-                foreach ($toRemove as $segmentNumber) {
-                    $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
-                    if ($this->redis()->del($segmentKey)) {
-                        $cleaned++;
+            if (is_array($segmentNumbers)) {
+                foreach ($segmentNumbers as $segmentNumber) {
+                    if ($segmentNumber < $minSegment) {
+                        $segmentKey = "{$bufferKey}:segment_{$segmentNumber}";
+                        if ($this->redis()->del($segmentKey)) {
+                            $this->redis()->lrem("{$bufferKey}:segments", 0, $segmentNumber);
+                            $cleaned++;
+                        }
                     }
                 }
-
-                // Trim the segments list
-                $this->redis()->ltrim("{$bufferKey}:segments", 0, $keepCount - 1);
             }
 
             return $cleaned;
@@ -1830,30 +1843,35 @@ class SharedStreamService
         if (!$pid) {
             return false;
         }
+        if (!function_exists('posix_getpgid')) {
+            // Fallback for non-POSIX systems (e.g., Windows)
+            try {
+                // Use ps to check process status (works on both Linux and macOS)
+                $output = shell_exec("ps -p {$pid} -o stat= 2>/dev/null");
 
-        try {
-            // Use ps to check process status (works on both Linux and macOS)
-            $output = shell_exec("ps -p {$pid} -o stat= 2>/dev/null");
+                if (empty(trim($output))) {
+                    // Process doesn't exist
+                    return false;
+                }
 
-            if (empty(trim($output))) {
-                // Process doesn't exist
+                $stat = trim($output);
+                // Check for zombie or dead processes
+                // Z = zombie, X = dead on most systems
+                if (preg_match('/^[ZX]/', $stat)) {
+                    Log::channel('ffmpeg')->debug("Process {$pid} exists but is in state '{$stat}' (zombie/dead)");
+                    return false;
+                }
+
+                // Process exists and is not zombie/dead
+                return true;
+            } catch (\Exception $e) {
+                Log::channel('ffmpeg')->error("Error checking if process {$pid} is running: " . $e->getMessage());
                 return false;
             }
-
-            $stat = trim($output);
-            // Check for zombie or dead processes
-            // Z = zombie, X = dead on most systems
-            if (preg_match('/^[ZX]/', $stat)) {
-                Log::channel('ffmpeg')->debug("Process {$pid} exists but is in state '{$stat}' (zombie/dead)");
-                return false;
-            }
-
-            // Process exists and is not zombie/dead
-            return true;
-        } catch (\Exception $e) {
-            Log::channel('ffmpeg')->error("Error checking if process {$pid} is running: " . $e->getMessage());
-            return false;
         }
+        // Check if the process is running using posix_getpgid
+        // this is a more reliable way to check if a process is running
+        return posix_getpgid($pid) !== false;
     }
 
     /**
@@ -2266,6 +2284,9 @@ class SharedStreamService
             }
         }
 
+        $cursorKey = "client_cursors:{$streamKey}";
+        $lastSegment = (int)$this->redis()->hget($cursorKey, $clientId) ?: -1;
+
         $bufferKey = self::BUFFER_PREFIX . $streamKey;
         $segmentNumbers = $this->redis()->lrange("{$bufferKey}:segments", 0, -1);
 
@@ -2300,6 +2321,7 @@ class SharedStreamService
 
         // If data is not empty, track bandwidth and update activity
         if (!empty($data)) {
+            $this->redis()->hset($cursorKey, $clientId, $lastSegment);
             $this->trackBandwidth($streamKey, strlen($data));
             $this->updateStreamActivity($streamKey);
             $this->updateClientActivity($streamKey, $clientId);
