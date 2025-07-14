@@ -11,7 +11,7 @@ class ListCategories extends ListRecords
 {
     protected static string $resource = CategoryResource::class;
 
-    protected ?string $subheading = 'Manage series categories.';
+    protected ?string $subheading = 'Manage series categories. Only enabled series will be automatically updated on Playlist sync, this includes fetching episodes and metadata. You can also manually sync series to update episodes and metadata.';
 
     protected function getHeaderActions(): array
     {

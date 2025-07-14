@@ -105,99 +105,180 @@ class CategoryResource extends Resource
             ->actions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\ViewAction::make(),
+                    Tables\Actions\Action::make('process')
+                        ->label('Process Selected Series')
+                        ->icon('heroicon-o-arrow-path')
+                        ->action(function ($record) {
+                            foreach ($record->enabled_series as $series) {
+                                app('Illuminate\Contracts\Bus\Dispatcher')
+                                    ->dispatch(new \App\Jobs\ProcessM3uImportSeriesEpisodes(
+                                        playlistSeries: $series,
+                                    ));
+                            }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Series are being processed')
+                                ->body('You will be notified once complete.')
+                                ->duration(10000)
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-arrow-path')
+                        ->modalIcon('heroicon-o-arrow-path')
+                        ->modalDescription('Process series for selected category now? Only enabled series will be processed. This will fetch all episodes and seasons for the category series. This may take a while depending on the number of series in the category.')
+                        ->modalSubmitActionLabel('Yes, process now'),
+                    Tables\Actions\Action::make('sync')
+                        ->label('Sync Series .strm files')
+                        ->action(function ($record) {
+                            foreach ($record->enabled_series as $series) {
+                                app('Illuminate\Contracts\Bus\Dispatcher')
+                                    ->dispatch(new \App\Jobs\SyncSeriesStrmFiles(
+                                        series: $series,
+                                    ));
+                            }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('.strm files are being synced for selected category series. Only enabled series will be synced.')
+                                ->body('You will be notified once complete.')
+                                ->duration(10000)
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->modalIcon('heroicon-o-document-arrow-down')
+                        ->modalDescription('Sync selected category series .strm files now? This will generate .strm files for the selected series at the path set for the series.')
+                        ->modalSubmitActionLabel('Yes, sync now'),
+                    Tables\Actions\Action::make('enable')
+                        ->label('Enable selected')
+                        ->action(function ($record): void {
+                            $record->series()->update(['enabled' => true]);
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Selected category series enabled')
+                                ->body('The selected category series have been enabled.')
+                                ->send();
+                        })
+                        ->color('success')
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-check-circle')
+                        ->modalIcon('heroicon-o-check-circle')
+                        ->modalDescription('Enable the selected category series now?')
+                        ->modalSubmitActionLabel('Yes, enable now'),
+                    Tables\Actions\Action::make('disable')
+                        ->label('Disable selected')
+                        ->action(function ($record): void {
+                            $record->series()->update(['enabled' => false]);
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Selected category series disabled')
+                                ->body('The selected category series have been disabled.')
+                                ->send();
+                        })
+                        ->color('warning')
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-x-circle')
+                        ->modalIcon('heroicon-o-x-circle')
+                        ->modalDescription('Disable the selected category series now?')
+                        ->modalSubmitActionLabel('Yes, disable now'),
                 ])->color('primary')->button()->hiddenLabel()->size('sm'),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    // Tables\Actions\BulkAction::make('process')
-                    //     ->label('Process Selected Series')
-                    //     ->icon('heroicon-o-arrow-path')
-                    //     ->action(function ($records) {
-                    //         foreach ($records as $record) {
-                    //             app('Illuminate\Contracts\Bus\Dispatcher')
-                    //                 ->dispatch(new \App\Jobs\ProcessM3uImportSeriesEpisodes(
-                    //                     playlistSeries: $record,
-                    //                 ));
-                    //         }
-                    //     })->after(function () {
-                    //         Notification::make()
-                    //             ->success()
-                    //             ->title('Series are being processed')
-                    //             ->body('You will be notified once complete.')
-                    //             ->duration(10000)
-                    //             ->send();
-                    //     })
-                    //     ->requiresConfirmation()
-                    //     ->icon('heroicon-o-arrow-path')
-                    //     ->modalIcon('heroicon-o-arrow-path')
-                    //     ->modalDescription('Process selected series now? This will fetch all episodes and seasons for this series. This may take a while depending on the number of series selected.')
-                    //     ->modalSubmitActionLabel('Yes, process now'),
-                    // Tables\Actions\BulkAction::make('sync')
-                    //     ->label('Sync Series .strm files')
-                    //     ->action(function ($records) {
-                    //         foreach ($records as $record) {
-                    //             app('Illuminate\Contracts\Bus\Dispatcher')
-                    //                 ->dispatch(new \App\Jobs\SyncSeriesStrmFiles(
-                    //                     series: $record,
-                    //                 ));
-                    //         }
-                    //     })->after(function () {
-                    //         Notification::make()
-                    //             ->success()
-                    //             ->title('.strm files are being synced for selected series')
-                    //             ->body('You will be notified once complete.')
-                    //             ->duration(10000)
-                    //             ->send();
-                    //     })
-                    //     ->requiresConfirmation()
-                    //     ->icon('heroicon-o-document-arrow-down')
-                    //     ->modalIcon('heroicon-o-document-arrow-down')
-                    //     ->modalDescription('Sync selected series .strm files now? This will generate .strm files for the selected series at the path set for the series.')
-                    //     ->modalSubmitActionLabel('Yes, sync now'),
-                    // Tables\Actions\BulkAction::make('enable')
-                    //     ->label('Enable selected')
-                    //     ->action(function (Collection $records): void {
-                    //         foreach ($records as $record) {
-                    //             $record->update([
-                    //                 'enabled' => true,
-                    //             ]);
-                    //         }
-                    //     })->after(function () {
-                    //         Notification::make()
-                    //             ->success()
-                    //             ->title('Selected series enabled')
-                    //             ->body('The selected series have been enabled.')
-                    //             ->send();
-                    //     })
-                    //     ->color('success')
-                    //     ->deselectRecordsAfterCompletion()
-                    //     ->requiresConfirmation()
-                    //     ->icon('heroicon-o-check-circle')
-                    //     ->modalIcon('heroicon-o-check-circle')
-                    //     ->modalDescription('Enable the selected channel(s) now?')
-                    //     ->modalSubmitActionLabel('Yes, enable now'),
-                    // Tables\Actions\BulkAction::make('disable')
-                    //     ->label('Disable selected')
-                    //     ->action(function (Collection $records): void {
-                    //         foreach ($records as $record) {
-                    //             $record->update([
-                    //                 'enabled' => false,
-                    //             ]);
-                    //         }
-                    //     })->after(function () {
-                    //         Notification::make()
-                    //             ->success()
-                    //             ->title('Selected series disabled')
-                    //             ->body('The selected series have been disabled.')
-                    //             ->send();
-                    //     })
-                    //     ->color('warning')
-                    //     ->deselectRecordsAfterCompletion()
-                    //     ->requiresConfirmation()
-                    //     ->icon('heroicon-o-x-circle')
-                    //     ->modalIcon('heroicon-o-x-circle')
-                    //     ->modalDescription('Disable the selected channel(s) now?')
-                    //     ->modalSubmitActionLabel('Yes, disable now'),
+                    Tables\Actions\BulkAction::make('process')
+                        ->label('Process Selected Series')
+                        ->icon('heroicon-o-arrow-path')
+                        ->action(function (Collection $records) {
+                            foreach ($records as $record) {
+                                foreach ($record->enabled_series as $series) {
+                                    app('Illuminate\Contracts\Bus\Dispatcher')
+                                        ->dispatch(new \App\Jobs\SyncSeriesStrmFiles(
+                                            series: $series,
+                                        ));
+                                }
+                            }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Series are being processed')
+                                ->body('You will be notified once complete.')
+                                ->duration(10000)
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-arrow-path')
+                        ->modalIcon('heroicon-o-arrow-path')
+                        ->modalDescription('Process series for selected category now? Only enabled series will be processed. This will fetch all episodes and seasons for the category series. This may take a while depending on the number of series in the category.')
+                        ->modalSubmitActionLabel('Yes, process now'),
+                    Tables\Actions\BulkAction::make('sync')
+                        ->label('Sync Series .strm files')
+                        ->action(function (Collection $records) {
+                            foreach ($records as $record) {
+                                foreach ($record->enabled_series as $series) {
+                                    app('Illuminate\Contracts\Bus\Dispatcher')
+                                        ->dispatch(new \App\Jobs\SyncSeriesStrmFiles(
+                                            series: $series,
+                                        ));
+                                }
+                            }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('.strm files are being synced for selected category series. Only enabled series will be synced.')
+                                ->body('You will be notified once complete.')
+                                ->duration(10000)
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->modalIcon('heroicon-o-document-arrow-down')
+                        ->modalDescription('Sync selected category series .strm files now? This will generate .strm files for the selected series at the path set for the series.')
+                        ->modalSubmitActionLabel('Yes, sync now'),
+                    Tables\Actions\BulkAction::make('enable')
+                        ->label('Enable selected')
+                        ->action(function (Collection $records): void {
+                            foreach ($records as $record) {
+                                $record->series()->update(['enabled' => true]);
+                            }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Selected category series enabled')
+                                ->body('The selected category series have been enabled.')
+                                ->send();
+                        })
+                        ->color('success')
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-check-circle')
+                        ->modalIcon('heroicon-o-check-circle')
+                        ->modalDescription('Enable the selected category series now?')
+                        ->modalSubmitActionLabel('Yes, enable now'),
+                    Tables\Actions\BulkAction::make('disable')
+                        ->label('Disable selected')
+                        ->action(function (Collection $records): void {
+                            foreach ($records as $record) {
+                                $record->series()->update(['enabled' => false]);
+                            }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Selected category series disabled')
+                                ->body('The selected category series have been disabled.')
+                                ->send();
+                        })
+                        ->color('warning')
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-x-circle')
+                        ->modalIcon('heroicon-o-x-circle')
+                        ->modalDescription('Disable the selected category series now?')
+                        ->modalSubmitActionLabel('Yes, disable now'),
                     // Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
