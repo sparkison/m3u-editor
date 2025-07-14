@@ -11,6 +11,8 @@ use App\Services\XtreamService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -54,6 +56,11 @@ class SeriesResource extends Resource
     }
 
     public static function table(Table $table): Table
+    {
+        return self::setupTable($table);
+    }
+
+    public static function setupTable(Table $table, $relationId = null): Table
     {
         return $table->persistFiltersInSession()
             ->persistSortInSession()
@@ -125,7 +132,8 @@ class SeriesResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('playlist.name')
                     ->numeric()
-                    ->sortable(),
+                    ->sortable()
+                    ->hidden(fn() => $relationId !== null),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -140,7 +148,8 @@ class SeriesResource extends Resource
                     ->relationship('playlist', 'name')
                     ->multiple()
                     ->preload()
-                    ->searchable(),
+                    ->searchable()
+                    ->hidden(fn() => $relationId !== null),
                 Tables\Filters\Filter::make('enabled')
                     ->label('Series is enabled')
                     ->toggle()
@@ -308,6 +317,23 @@ class SeriesResource extends Resource
             'create' => Pages\CreateSeries::route('/create'),
             'edit' => Pages\EditSeries::route('/{record}/edit'),
         ];
+    }
+
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist
+            ->schema([
+                Infolists\Components\Section::make('Group Details')
+                    ->columns(2)
+                    ->schema([
+                        Infolists\Components\TextEntry::make('name')
+                            ->badge(),
+                        Infolists\Components\TextEntry::make('playlist.name')
+                            ->label('Playlist')
+                            //->badge(),
+                            ->url(fn($record) => PlaylistResource::getUrl('edit', ['record' => $record->playlist_id])),
+                    ])
+            ]);
     }
 
     public static function getForm(): array
