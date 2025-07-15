@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\SeriesResource\Pages;
 use App\Filament\Resources\SeriesResource\RelationManagers;
+use App\Models\Category;
 use App\Models\Playlist;
 use App\Models\Series;
 use App\Rules\CheckIfUrlOrLocalPath;
@@ -160,6 +161,34 @@ class SeriesResource extends Resource
             ->actions([
                 Tables\Actions\ActionGroup::make([
                     Tables\Actions\EditAction::make(),
+                    Tables\Actions\Action::make('move')
+                        ->label('Move series to category')
+                        ->form([
+                            Forms\Components\Select::make('category')
+                                ->required()
+                                ->live()
+                                ->label('Category')
+                                ->helperText('Select the category you would like to move the series to.')
+                                ->options(fn(Get $get, $record) => Category::where(['user_id' => auth()->id(), 'playlist_id' => $record->playlist_id])->get(['name', 'id'])->pluck('name', 'id'))
+                                ->searchable(),
+                        ])
+                        ->action(function ($record, array $data): void {
+                            $category = Category::findOrFail($data['category']);
+                            $record->update([
+                                'category_id' => $category->id,
+                            ]);
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Series moved to category')
+                                ->body('The series has been moved to the chosen category.')
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-arrows-right-left')
+                        ->modalIcon('heroicon-o-arrows-right-left')
+                        ->modalDescription('Move the series to another category.')
+                        ->modalSubmitActionLabel('Move now'),
                     Tables\Actions\Action::make('process')
                         ->label('Process Series')
                         ->action(function ($record) {
@@ -209,6 +238,56 @@ class SeriesResource extends Resource
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\BulkAction::make('move')
+                        ->label('Move series to category')
+                        ->form([
+                            Forms\Components\Select::make('category')
+                                ->required()
+                                ->live()
+                                ->label('Category')
+                                ->helperText('Select the category you would like to move the series to.')
+                                ->options(
+                                    fn() => Category::query()
+                                        ->with(['playlist'])
+                                        ->where(['user_id' => auth()->id()])
+                                        ->get(['name', 'id', 'playlist_id'])
+                                        ->transform(fn($category) => [
+                                            'id' => $category->id,
+                                            'name' => $category->name . ' (' . $category->playlist->name . ')',
+                                        ])->pluck('name', 'id')
+                                )->searchable(),
+                        ])
+                        ->action(function (Collection $records, array $data): void {
+                            $category = Category::findOrFail($data['category']);
+                            foreach ($records as $record) {
+                                // Update the series to the new category
+                                // This will change the category_id for the series in the database
+                                // to reflect the new category
+                                if ($category->playlist_id !== $record->playlist_id) {
+                                    Notification::make()
+                                        ->warning()
+                                        ->title('Warning')
+                                        ->body("Cannot move \"{$category->name}\" to \"{$record->name}\" as they belong to different playlists.")
+                                        ->persistent()
+                                        ->send();
+                                    continue;
+                                }
+                                $record->update([
+                                    'category_id' => $category->id,
+                                ]);
+                            }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Series moved to category')
+                                ->body('The category series have been moved to the chosen category.')
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-arrows-right-left')
+                        ->modalIcon('heroicon-o-arrows-right-left')
+                        ->modalDescription('Move the category series to another category.')
+                        ->modalSubmitActionLabel('Move now'),
                     Tables\Actions\BulkAction::make('process')
                         ->label('Process Selected Series')
                         ->icon('heroicon-o-arrow-path')
