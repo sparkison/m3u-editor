@@ -148,7 +148,7 @@ class CategoryResource extends Resource
                         ->requiresConfirmation()
                         ->icon('heroicon-o-document-arrow-down')
                         ->modalIcon('heroicon-o-document-arrow-down')
-                        ->modalDescription('Sync selected category series .strm files now? This will generate .strm files for the selected series at the path set for the series.')
+                        ->modalDescription('Sync selected category series .strm files now? This will generate .strm files for the enabled series at the path set for the series.')
                         ->modalSubmitActionLabel('Yes, sync now'),
                     Tables\Actions\Action::make('enable')
                         ->label('Enable selected')
