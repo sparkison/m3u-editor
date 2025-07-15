@@ -19,6 +19,34 @@ class ViewCategory extends ViewRecord
     {
         return [
             Actions\ActionGroup::make([
+                Actions\Action::make('move')
+                    ->label('Move series to category')
+                    ->form([
+                        Forms\Components\Select::make('category')
+                            ->required()
+                            ->live()
+                            ->label('Category')
+                            ->helperText('Select the category you would like to move the series to.')
+                            ->options(fn(Get $get, $record) => Category::where(['user_id' => auth()->id(), 'playlist_id' => $record->playlist_id])->get(['name', 'id'])->pluck('name', 'id'))
+                            ->searchable(),
+                    ])
+                    ->action(function ($record, array $data): void {
+                        $category = Category::findOrFail($data['category']);
+                        $record->series()->update([
+                            'category_id' => $category->id,
+                        ]);
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Series moved to category')
+                            ->body('The series have been moved to the chosen category.')
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrows-right-left')
+                    ->modalIcon('heroicon-o-arrows-right-left')
+                    ->modalDescription('Move the series to another category.')
+                    ->modalSubmitActionLabel('Move now'),
                 Actions\Action::make('process')
                     ->label('Process Category Series')
                     ->icon('heroicon-o-arrow-path')
