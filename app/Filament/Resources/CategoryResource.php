@@ -58,7 +58,8 @@ class CategoryResource extends Resource
         return $table->persistFiltersInSession()
             ->persistSortInSession()
             ->modifyQueryUsing(function (Builder $query) {
-                $query->withCount('enabled_series');
+                $query->withCount('series')
+                    ->withCount('enabled_series');
             })
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
@@ -78,7 +79,6 @@ class CategoryResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('series_count')
                     ->label('Series')
-                    ->counts('series')
                     ->description(fn(Category $record): string => "Enabled: {$record->enabled_series_count}")
                     ->toggleable()
                     ->sortable(),
