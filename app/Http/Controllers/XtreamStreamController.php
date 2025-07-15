@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Facades\ProxyFacade;
 use App\Models\Playlist;
 use App\Models\MergedPlaylist;
 use App\Models\CustomPlaylist;
@@ -45,7 +46,7 @@ class XtreamStreamController extends Controller
             // Try to find playlist by UUID (password parameter)
             try {
                 $playlist = Playlist::with(['user'])->where('uuid', $password)->firstOrFail();
-                
+
                 // Verify username matches playlist owner's name
                 if ($playlist->user->name !== $username) {
                     $playlist = null;
@@ -53,7 +54,7 @@ class XtreamStreamController extends Controller
             } catch (ModelNotFoundException $e) {
                 try {
                     $playlist = MergedPlaylist::with(['user'])->where('uuid', $password)->firstOrFail();
-                    
+
                     // Verify username matches playlist owner's name
                     if ($playlist->user->name !== $username) {
                         $playlist = null;
@@ -61,7 +62,7 @@ class XtreamStreamController extends Controller
                 } catch (ModelNotFoundException $e) {
                     try {
                         $playlist = CustomPlaylist::with(['user'])->where('uuid', $password)->firstOrFail();
-                        
+
                         // Verify username matches playlist owner's name
                         if ($playlist->user->name !== $username) {
                             $playlist = null;
@@ -153,9 +154,7 @@ class XtreamStreamController extends Controller
 
         if ($channel instanceof Channel) {
             if ($playlist->enable_proxy) {
-                $url = rtrim(route('stream', [
-                    'encodedId' => rtrim(base64_encode($streamId), '=')
-                ]), '.');
+                $url = ProxyFacade::getProxyUrlForChannel($streamId);
             } else {
                 $url = $channel->url_custom ?? $channel->url;
             }
@@ -174,9 +173,7 @@ class XtreamStreamController extends Controller
 
         if ($channel instanceof Channel) {
             if ($playlist->enable_proxy) {
-                $url = rtrim(route('stream', [
-                    'encodedId' => rtrim(base64_encode($streamId), '=')
-                ]), '.');
+                $url = ProxyFacade::getProxyUrlForChannel($streamId);
             } else {
                 $url = $channel->url_custom ?? $channel->url;
             }
@@ -195,9 +192,7 @@ class XtreamStreamController extends Controller
 
         if ($episode instanceof Episode) {
             if ($playlist->enable_proxy) {
-                $url = rtrim(route('stream.episode', [
-                    'encodedId' => rtrim(base64_encode($streamId), '=')
-                ]), '.');
+                $url = ProxyFacade::getProxyUrlForEpisode($streamId);
             } else {
                 $url = $episode->url;
             }
