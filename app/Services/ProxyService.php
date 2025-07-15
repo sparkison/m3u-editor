@@ -194,7 +194,6 @@ class ProxyService
         // If both env and user settings for ffprobe are empty, then derive or use default.
         // $settings['ffmpeg_path'] from getStreamSettings() already reflects env -> user_db -> service_default for ffmpeg.
         $ffmpegPath = $settings['ffmpeg_path'] ?? 'jellyfin-ffmpeg'; // Default to 'jellyfin-ffmpeg' if not in settings for some reason
-
         if ($ffmpegPath === 'jellyfin-ffmpeg') {
             return 'jellyfin-ffprobe';
         } elseif (str_contains($ffmpegPath, '/')) {
@@ -207,7 +206,7 @@ class ProxyService
     }
 
     /**
-     * Build the HLS command for streaming.
+     * Build the FFmpeg command for HLS streaming.
      *
      * @param string $m3uPlaylist
      * @param string $segment
@@ -234,7 +233,7 @@ class ProxyService
         }
 
         // Determine the effective video codec based on config and settings
-        $finalVideoCodec = ProxyService::determineVideoCodec(
+        $finalVideoCodec = self::determineVideoCodec(
             config('proxy.ffmpeg_codec_video', null),
             $settings['ffmpeg_codec_video'] ?? 'copy' // Default to 'copy' if not set
         );
@@ -485,6 +484,286 @@ class ProxyService
             escapeshellarg($m3uPlaylist) . ' ';
 
         $cmd .= ($settings['ffmpeg_debug'] ? ' -loglevel verbose' : ' -hide_banner -nostats -loglevel error');
+
+        return $cmd;
+    }
+
+    /**
+     * Build the FFmpeg command for TS streaming.
+     *
+     * @param string $format
+     * @param string $streamUrl
+     * @param string $userAgent
+     * @return string
+     */
+    public static function buildTsCommand(
+        $format,
+        $streamUrl,
+        $userAgent
+    ): string {
+        // Get default stream settings
+        $settings = self::getStreamSettings();
+        $customCommandTemplate = $settings['ffmpeg_custom_command_template'] ?? null;
+
+        // Get user defined options
+        $userArgs = config('proxy.ffmpeg_additional_args', '');
+        if (!empty($userArgs)) {
+            $userArgs .= ' ';
+        }
+
+        // Get ffmpeg path
+        $ffmpegPath = config('proxy.ffmpeg_path') ?: $settings['ffmpeg_path'];
+        if (empty($ffmpegPath)) {
+            $ffmpegPath = 'jellyfin-ffmpeg';
+        }
+
+        // Determine the effective video codec based on config and settings
+        $videoCodec = self::determineVideoCodec(
+            config('proxy.ffmpeg_codec_video', null),
+            $settings['ffmpeg_codec_video'] ?? 'copy' // Default to 'copy' if not set
+        );
+
+        // Command construction logic
+        if (empty($customCommandTemplate)) {
+            // Initialize FFmpeg command argument variables
+            $hwaccelInitArgs = '';
+            $hwaccelArgs = '';
+            $videoFilterArgs = '';
+            $codecSpecificArgs = ''; // For QSV or other codec-specific args not part of -vf
+
+            // Get base ffmpeg output codec formats (these are defaults or from non-QSV/VA-API settings)
+            // Get base ffmpeg output codec formats (these are defaults or from non-QSV/VA-API settings)
+            $audioCodec = (config('proxy.ffmpeg_codec_audio') ?: ($settings['ffmpeg_codec_audio'] ?? null)) ?: 'copy';
+            $audioBitrateArgs = '';
+            if ($audioCodec === 'opus') {
+                $audioCodec = 'libopus';
+                Log::channel('ffmpeg')->debug("Switched audio codec from 'opus' to 'libopus'.");
+            }
+            if ($audioCodec === 'libopus') {
+                // libopus requires a bitrate or it will fail if not in a specific VBR quality mode.
+                // Default to 128k if no other audio bitrate is implicitly set via global options.
+                $audioBitrateArgs = '-b:a 128k -vbr on '; // Added -vbr on
+                Log::channel('ffmpeg')->debug("Setting default bitrate and VBR for libopus: 128k, on.");
+            }
+            $subtitleCodec = (config('proxy.ffmpeg_codec_subtitles') ?: ($settings['ffmpeg_codec_subtitles'] ?? null)) ?: 'copy';
+
+            // Hardware Acceleration Logic
+            if ($settings['ffmpeg_vaapi_enabled'] ?? false) {
+                $videoCodec = 'h264_vaapi'; // Default VA-API H.264 encoder
+                if (!empty($settings['ffmpeg_vaapi_device'])) {
+                    $escapedDevice = escapeshellarg($settings['ffmpeg_vaapi_device']);
+                    $hwaccelInitArgs = "-init_hw_device vaapi=va_device:{$escapedDevice} ";
+                    $hwaccelArgs = "-hwaccel vaapi -hwaccel_device va_device -hwaccel_output_format vaapi -filter_hw_device va_device ";
+                }
+                if (!empty($settings['ffmpeg_vaapi_video_filter'])) {
+                    $videoFilterArgs = "-vf " . escapeshellarg(trim($settings['ffmpeg_vaapi_video_filter'], "'\",")) . " ";
+                } else {
+                    $videoFilterArgs = "-vf 'scale_vaapi=format=nv12' ";
+                }
+            } else if ($settings['ffmpeg_qsv_enabled'] ?? false) {
+                $videoCodec = 'h264_qsv'; // Default QSV H.264 encoder
+
+                // Simplify QSV initialization - don't specify device path directly
+                $hwaccelInitArgs = "-init_hw_device qsv=qsv_device ";
+                $hwaccelArgs = "-hwaccel qsv -hwaccel_device qsv_device -hwaccel_output_format qsv -filter_hw_device qsv_device ";
+
+                if (!empty($settings['ffmpeg_qsv_video_filter'])) {
+                    $videoFilterArgs = "-vf " . escapeshellarg(trim($settings['ffmpeg_qsv_video_filter'], "'\",")) . " ";
+                } else {
+                    // Default QSV video filter, matches user's working example
+                    $videoFilterArgs = "-vf 'hwupload=extra_hw_frames=64,scale_qsv=format=nv12' ";
+                }
+
+                // Additional QSV specific options
+                if ($settings['ffmpeg_qsv_encoder_options']) {
+                    $codecSpecificArgs = escapeshellarg($settings['ffmpeg_qsv_encoder_options']);
+                } else {
+                    // Default QSV encoder options
+                    $codecSpecificArgs = '-preset medium';
+                    // Only add -global_quality if NOT using libopus, as it might interfere
+                    if ($audioCodec !== 'libopus') {
+                        $codecSpecificArgs .= ' -global_quality 23';
+                    }
+                }
+                if (!empty($settings['ffmpeg_qsv_additional_args'])) {
+                    $userArgs = trim($settings['ffmpeg_qsv_additional_args']) . ($userArgs ? " " . $userArgs : "");
+                }
+            }
+
+            // Explicitly determine audio arguments
+            $audioOutputArgs = "-c:a {$audioCodec}";
+            if ($audioCodec === 'libopus') {
+                $opusArgs = " -vbr 1";
+                // Add default bitrate for libopus if no other audio bitrate is implicitly set by other args
+                // Check against $userArgs only, as $codecSpecificArgs is for video.
+                if (strpos($userArgs, '-b:a') === false) {
+                    $opusArgs .= " -b:a 128k";
+                }
+                $audioOutputArgs .= $opusArgs;
+                Log::channel('ffmpeg')->debug("StreamController: Updated libopus audio arguments. Audio Args: {$audioOutputArgs}");
+            } elseif ($audioCodec === 'vorbis' || $audioCodec === 'libvorbis') {
+                // Add -strict -2 for vorbis encoder
+                $audioOutputArgs .= " -strict -2";
+                Log::channel('ffmpeg')->debug("StreamController: Added -strict -2 for vorbis. Audio Args: {$audioOutputArgs}");
+            }
+
+            // Set the output format and codecs
+            if ($format === 'ts') {
+                $output = "-c:v {$videoCodec} " . ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "") . " {$audioOutputArgs} -c:s {$subtitleCodec} -f mpegts pipe:1";
+            } else {
+                // For mp4 format
+                $bsfArgs = '';
+                if ($audioCodec === 'copy') {
+                    // Check if the source audio is AAC, as the filter is specific to AAC ADTS
+                    // This is a heuristic. A more robust check would involve ffprobe output if available here.
+                    // For now, we apply it if copying audio to mp4, as it's a common scenario for this issue.
+                    $bsfArgs = '-bsf:a aac_adtstoasc ';
+                    Log::channel('ffmpeg')->debug("Adding aac_adtstoasc bitstream filter for mp4 output with audio copy.");
+                }
+                $output = "-c:v {$videoCodec} -ac 2 {$audioOutputArgs} {$bsfArgs}-f mp4 -movflags frag_keyframe+empty_moov+default_base_moof pipe:1";
+            }
+
+            // Note: The previous complex ternary for mp4 audio was simplified as $qsvAudioArguments now correctly forms the full audio part.
+            // If $audioCodec was 'copy', $qsvAudioArguments is just '-c:a copy' and no bitrate is added.
+
+            // Determine if it's an MKV file by extension
+            $isMkv = stripos($streamUrl, '.mkv') !== false;
+
+            // Build the FFmpeg command
+            $cmd = escapeshellcmd($ffmpegPath) . ' ';
+            $cmd .= $hwaccelInitArgs;
+            $cmd .= $hwaccelArgs;
+
+            // Better error handling
+            $cmd .= '-err_detect ignore_err -ignore_unknown ';
+
+            // Pre-input HTTP options:
+            $cmd .= "-user_agent " . escapeshellarg($userAgent) . " -referer " . escapeshellarg("MyComputer") . " " .
+                '-multiple_requests 1 -reconnect_on_network_error 1 ' .
+                '-reconnect_on_http_error 5xx,4xx -reconnect_streamed 1 ' .
+                '-reconnect_delay_max 5 ';
+
+            // Add rw_timeout for all http/https inputs to make ffmpeg fail faster on stall
+            if (preg_match('/^https?:\/\//', $streamUrl)) {
+                $cmd .= '-rw_timeout 20000000 '; // 20 seconds in microseconds
+            }
+
+            if ($isMkv) {
+                $cmd .= ' -analyzeduration 10M -probesize 10M ';
+            }
+            $cmd .= ' -noautorotate ';
+
+            // User defined general options:
+            $cmd .= $userArgs;
+
+            // Input:
+            $cmd .= '-i ' . escapeshellarg($streamUrl) . ' ';
+
+            // Video Filter arguments:
+            $cmd .= $videoFilterArgs;
+
+            // Output options from $output variable:
+            $cmd .= $output;
+        } else {
+            // Custom command template is provided
+            $cmd = $customCommandTemplate;
+
+            // Prepare placeholder values
+            $hwaccelInitArgsValue = '';
+            $hwaccelArgsValue = '';
+            $videoFilterArgsValue = '';
+
+            // QSV options
+            $qsvEncoderOptionsValue = $settings['ffmpeg_qsv_encoder_options'] ? escapeshellarg($settings['ffmpeg_qsv_encoder_options']) : '';
+            $qsvAdditionalArgsValue = $settings['ffmpeg_qsv_additional_args'] ? escapeshellarg($settings['ffmpeg_qsv_additional_args']) : '';
+
+            // Determine codec type
+            $isVaapiCodec = str_contains($videoCodec, '_vaapi');
+            $isQsvCodec = str_contains($videoCodec, '_qsv');
+
+            if ($settings['ffmpeg_vaapi_enabled'] ?? false) {
+                $videoCodec = $isVaapiCodec ? $videoCodec : 'h264_vaapi'; // Default to h264_vaapi if not already set
+                if (!empty($settings['ffmpeg_vaapi_device'])) {
+                    $hwaccelInitArgsValue = "-init_hw_device vaapi=va_device:" . escapeshellarg($settings['ffmpeg_vaapi_device']) . " -filter_hw_device va_device ";
+                    $hwaccelArgsValue = "-hwaccel vaapi -hwaccel_device va_device -hwaccel_output_format vaapi ";
+                }
+                if (!empty($settings['ffmpeg_vaapi_video_filter'])) {
+                    $videoFilterArgsValue = "-vf " . escapeshellarg(trim($settings['ffmpeg_vaapi_video_filter'], "'\",")) . " ";
+                }
+            } else if ($settings['ffmpeg_qsv_enabled'] ?? false) {
+                $videoCodec = $isQsvCodec ? $videoCodec : 'h264_qsv'; // Default to h264_qsv if not already set
+                if (!empty($settings['ffmpeg_qsv_device'])) {
+                    $hwaccelInitArgsValue = "-init_hw_device qsv=qsv_hw:" . escapeshellarg($settings['ffmpeg_qsv_device']) . " ";
+                    $hwaccelArgsValue = '-hwaccel qsv -hwaccel_device qsv_hw -hwaccel_output_format qsv ';
+                }
+                if (!empty($settings['ffmpeg_qsv_video_filter'])) {
+                    $videoFilterArgsValue = "-vf " . escapeshellarg(trim($settings['ffmpeg_qsv_video_filter'], "'\",")) . " ";
+                }
+
+                // Additional QSV specific options
+                $codecSpecificArgs = $settings['ffmpeg_qsv_encoder_options'] ? escapeshellarg($settings['ffmpeg_qsv_encoder_options']) : '';
+                if (!empty($settings['ffmpeg_qsv_additional_args'])) {
+                    $userArgs = trim($settings['ffmpeg_qsv_additional_args']) . ($userArgs ? " " . $userArgs : "");
+                }
+            }
+
+            $videoCodecForTemplate = $settings['ffmpeg_codec_video'] ?: 'copy';
+            $audioCodecForTemplate = (config('proxy.ffmpeg_codec_audio') ?: ($settings['ffmpeg_codec_audio'] ?? null)) ?: 'copy';
+            $audioParamsForTemplate = '';
+            if ($audioCodecForTemplate === 'opus') {
+                $audioCodecForTemplate = 'libopus';
+                Log::channel('ffmpeg')->debug("Switched audio codec (template) from 'opus' to 'libopus'.");
+            }
+
+            if ($audioCodecForTemplate === 'libopus' && $audioCodecForTemplate !== 'copy') {
+                // Add default VBR and bitrate for libopus if not copying, ensuring -vbr 1 comes first
+                $audioParamsForTemplate = ' -vbr 1 -b:a 128k';
+                Log::channel('ffmpeg')->debug("Setting default VBR and bitrate (template) for libopus: 1, 128k.");
+                // If QSV is enabled and we're using libopus, ensure QSV_ENCODER_OPTIONS doesn't add -global_quality
+                if ($settings['ffmpeg_qsv_enabled'] ?? false) {
+                    if (empty($settings['ffmpeg_qsv_encoder_options'])) { // Only override if user hasn't set their own
+                        $qsvEncoderOptionsValue = '-preset medium'; // Remove global_quality
+                    }
+                }
+            } elseif (($audioCodecForTemplate === 'vorbis' || $audioCodecForTemplate === 'libvorbis') && $audioCodecForTemplate !== 'copy') {
+                // Add -strict -2 for vorbis encoder
+                $audioParamsForTemplate = ' -strict -2';
+                Log::channel('ffmpeg')->debug("Setting -strict -2 (template) for vorbis.");
+            }
+            $subtitleCodecForTemplate = (config('proxy.ffmpeg_codec_subtitles') ?: ($settings['ffmpeg_codec_subtitles'] ?? null)) ?: 'copy';
+
+            // Construct audio codec arguments including bitrate if applicable
+            $audioCodecArgs = "-c:a {$audioCodecForTemplate}{$audioParamsForTemplate}";
+
+            $outputCommandSegment = $format === 'ts'
+                ? "-c:v {$videoCodecForTemplate} {$audioCodecArgs} -c:s {$subtitleCodecForTemplate} -f mpegts pipe:1"
+                : "-c:v {$videoCodecForTemplate} -ac 2 {$audioCodecArgs} -f mp4 -movflags frag_keyframe+empty_moov+default_base_moof pipe:1";
+
+            // For the template, we assume {OUTPUT_OPTIONS} or specific codec args will handle this.
+            // The individual {AUDIO_CODEC_ARGS} should now include the bitrate.
+            $videoCodecArgs = "-c:v {$videoCodecForTemplate}";
+            // $audioCodecArgs is already constructed above
+            $subtitleCodecArgs = "-c:s {$subtitleCodecForTemplate}";
+
+            // Perform replacements
+            $cmd = str_replace('{FFMPEG_PATH}', escapeshellcmd($ffmpegPath), $cmd);
+            $cmd = str_replace('{INPUT_URL}', escapeshellarg($streamUrl), $cmd);
+            $cmd = str_replace('{OUTPUT_OPTIONS}', $outputCommandSegment, $cmd);
+            $cmd = str_replace('{USER_AGENT}', $userAgent, $cmd); // $userAgent is already escaped
+            $cmd = str_replace('{REFERER}', escapeshellarg("MyComputer"), $cmd);
+            $cmd = str_replace('{HWACCEL_INIT_ARGS}', $hwaccelInitArgsValue, $cmd);
+            $cmd = str_replace('{HWACCEL_ARGS}', $hwaccelArgsValue, $cmd);
+            $cmd = str_replace('{VIDEO_FILTER_ARGS}', $videoFilterArgsValue, $cmd);
+            $cmd = str_replace('{VIDEO_CODEC_ARGS}', $videoCodecArgs, $cmd);
+            $cmd = str_replace('{AUDIO_CODEC_ARGS}', $audioCodecArgs, $cmd);
+            $cmd = str_replace('{SUBTITLE_CODEC_ARGS}', $subtitleCodecArgs, $cmd);
+            $cmd = str_replace('{QSV_ENCODER_OPTIONS}', $qsvEncoderOptionsValue, $cmd);
+            $cmd = str_replace('{QSV_ADDITIONAL_ARGS}', $qsvAdditionalArgsValue, $cmd);
+            $cmd = str_replace('{ADDITIONAL_ARGS}', $userArgs, $cmd); // If user wants to include general additional args
+        }
+
+        // ... rest of the options and command suffix ...
+        $cmd .= ($settings['ffmpeg_debug'] ? ' -loglevel verbose' : ' -hide_banner -loglevel error');
 
         return $cmd;
     }

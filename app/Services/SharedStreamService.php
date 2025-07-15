@@ -660,11 +660,10 @@ class SharedStreamService
     private function startDirectStream(string $streamKey, array $streamInfo): void
     {
         $settings = ProxyService::getStreamSettings();
-        $ffmpegPath = $settings['ffmpeg_path'] ?? 'jellyfin-ffmpeg';
         $userAgent = $streamInfo['options']['user_agent'] ?? $settings['ffmpeg_user_agent'] ?? 'VLC/3.0.21';
 
         // Build FFmpeg command for direct output
-        $cmd = $this->buildDirectCommand($ffmpegPath, $streamInfo, $userAgent);
+        $cmd = $this->buildDirectCommand($streamInfo, $userAgent);
 
         Log::channel('ffmpeg')->debug("Starting shared stream process for {$streamKey}: {$cmd}");
 
@@ -730,58 +729,62 @@ class SharedStreamService
      * Build FFmpeg command for direct streaming (simplified for compatibility)
      * Uses proven working approach from StreamController
      */
-    private function buildDirectCommand(string $ffmpegPath, array $streamInfo, string $userAgent): string
+    private function buildDirectCommand(array $streamInfo, string $userAgent): string
     {
-        $settings = ProxyService::getStreamSettings();
         $streamUrl = $streamInfo['stream_url'];
+        return ProxyService::buildTsCommand(
+            'ts', // or 'mp4' if needed
+            $streamUrl,
+            $userAgent
+        );
 
-        // Build command using proven working approach from StreamController
-        $cmd = escapeshellcmd($ffmpegPath) . ' ';
-        $cmd .= '-hide_banner -loglevel error '; // Added -hide_banner and -loglevel error globally
+        // // Build command using proven working approach from StreamController
+        // $cmd = escapeshellcmd($ffmpegPath) . ' ';
+        // $cmd .= '-hide_banner -loglevel error '; // Added -hide_banner and -loglevel error globally
 
-        // Better error handling and more robust connection options
-        $cmd .= '-err_detect ignore_err -ignore_unknown ';
-        $cmd .= '-fflags +nobuffer+igndts -flags low_delay ';
-        $cmd .= '-analyzeduration 1M -probesize 1M -max_delay 500000 ';
+        // // Better error handling and more robust connection options
+        // $cmd .= '-err_detect ignore_err -ignore_unknown ';
+        // $cmd .= '-fflags +nobuffer+igndts -flags low_delay ';
+        // $cmd .= '-analyzeduration 1M -probesize 1M -max_delay 500000 ';
 
-        // HTTP options (simplified to match working approach)
-        $cmd .= "-user_agent " . escapeshellarg($userAgent) . " -referer " . escapeshellarg("MyComputer") . " ";
-        $cmd .= '-multiple_requests 1 -reconnect_on_network_error 1 ';
-        $cmd .= '-reconnect_on_http_error 5xx,4xx -reconnect_streamed 1 ';
-        $cmd .= '-reconnect_delay_max 5 ';
-        $cmd .= '-noautorotate ';
+        // // HTTP options (simplified to match working approach)
+        // $cmd .= "-user_agent " . escapeshellarg($userAgent) . " -referer " . escapeshellarg("MyComputer") . " ";
+        // $cmd .= '-multiple_requests 1 -reconnect_on_network_error 1 ';
+        // $cmd .= '-reconnect_on_http_error 5xx,4xx -reconnect_streamed 1 ';
+        // $cmd .= '-reconnect_delay_max 5 ';
+        // $cmd .= '-noautorotate ';
 
-        // Input
-        $cmd .= '-i ' . escapeshellarg($streamUrl) . ' ';
+        // // Input
+        // $cmd .= '-i ' . escapeshellarg($streamUrl) . ' ';
 
-        // Output options - use copy by default for better compatibility and performance
-        $videoCodec = $settings['ffmpeg_codec_video'] ?? 'copy';
-        $audioCodec = $settings['ffmpeg_codec_audio'] ?? 'copy';
+        // // Output options - use copy by default for better compatibility and performance
+        // $videoCodec = $settings['ffmpeg_codec_video'] ?? 'copy';
+        // $audioCodec = $settings['ffmpeg_codec_audio'] ?? 'copy';
 
-        // Ensure codecs are strings, not arrays
-        if (is_array($videoCodec)) {
-            $videoCodec = 'copy';
-        }
-        if (is_array($audioCodec)) {
-            $audioCodec = 'copy';
-        }
+        // // Ensure codecs are strings, not arrays
+        // if (is_array($videoCodec)) {
+        //     $videoCodec = 'copy';
+        // }
+        // if (is_array($audioCodec)) {
+        //     $audioCodec = 'copy';
+        // }
 
-        // Use copy by default for shared streaming to reduce CPU load
-        if ($videoCodec === 'copy' || empty($videoCodec)) {
-            $videoCodec = 'copy';
-        }
-        if ($audioCodec === 'copy' || empty($audioCodec)) {
-            $audioCodec = 'copy';
-        }
+        // // Use copy by default for shared streaming to reduce CPU load
+        // if ($videoCodec === 'copy' || empty($videoCodec)) {
+        //     $videoCodec = 'copy';
+        // }
+        // if ($audioCodec === 'copy' || empty($audioCodec)) {
+        //     $audioCodec = 'copy';
+        // }
 
-        // Output format with better streaming options
-        $cmd .= "-c:v {$videoCodec} -c:a {$audioCodec} ";
-        $cmd .= "-avoid_negative_ts disabled -copyts -start_at_zero ";
-        $cmd .= "-f mpegts pipe:1";
+        // // Output format with better streaming options
+        // $cmd .= "-c:v {$videoCodec} -c:a {$audioCodec} ";
+        // $cmd .= "-avoid_negative_ts disabled -copyts -start_at_zero ";
+        // $cmd .= "-f mpegts pipe:1";
 
-        Log::channel('ffmpeg')->debug("SharedStream: Built optimized direct command for reliable streaming");
+        // Log::channel('ffmpeg')->debug("SharedStream: Built optimized direct command for reliable streaming");
 
-        return $cmd;
+        // return $cmd;
     }
 
     /**
