@@ -63,7 +63,7 @@ class ProcessM3uImport implements ShouldQueue
     public array $groups = [];
 
     // M3U Parser instance
-    public M3uParser $m3uParser;
+    public $m3uParser = null;
 
     /**
      * Create a new job instance.
