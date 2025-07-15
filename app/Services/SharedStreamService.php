@@ -1098,27 +1098,15 @@ class SharedStreamService
             $segmentBaseUrl = url("/api/shared/hls/{$type}/{$id}") . '/';
         }
 
-        $cmd = escapeshellcmd($ffmpegPath) . ' ';
-        $cmd .= '-hide_banner -loglevel error ';
-        $cmd .= '-user_agent ' . escapeshellarg($userAgent) . ' ';
-
-        // Add robust input options similar to buildDirectCommand
-        $cmd .= '-err_detect ignore_err -ignore_unknown ';
-        $cmd .= '-fflags +nobuffer+igndts -flags low_delay '; // Consider if +nobuffer is always needed for HLS
-        $cmd .= '-multiple_requests 1 -reconnect_on_network_error 1 ';
-        $cmd .= '-reconnect_on_http_error 5xx,4xx -reconnect_streamed 1 ';
-        $cmd .= '-reconnect_delay_max 5 ';
-        $cmd .= '-noautorotate ';
-
-        $cmd .= '-i ' . escapeshellarg($streamUrl) . ' ';
-        $cmd .= '-c copy -f hls ';
-        $cmd .= '-hls_time 4 -hls_list_size 10 ';
-        $cmd .= '-hls_flags delete_segments ';
-        $cmd .= '-hls_segment_filename ' . escapeshellarg($segment) . ' ';
-        $cmd .= '-hls_base_url ' . escapeshellarg($segmentBaseUrl) . ' ';
-        $cmd .= escapeshellarg($m3uPlaylist) . ' ';
-
-        return $cmd;
+        // Build the FFmpeg command for HLS output
+        return ProxyService::buildHLSCommand(
+            $m3uPlaylist,
+            $segment,
+            $segmentBaseUrl,
+            $storageDir,
+            $userAgent,
+            $streamUrl,
+        );
     }
 
     /**
