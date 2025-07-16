@@ -45,7 +45,7 @@ class XtreamStreamController extends Controller
             // Try to find playlist by UUID (password parameter)
             try {
                 $playlist = Playlist::with(['user'])->where('uuid', $password)->firstOrFail();
-                
+
                 // Verify username matches playlist owner's name
                 if ($playlist->user->name !== $username) {
                     $playlist = null;
@@ -53,7 +53,7 @@ class XtreamStreamController extends Controller
             } catch (ModelNotFoundException $e) {
                 try {
                     $playlist = MergedPlaylist::with(['user'])->where('uuid', $password)->firstOrFail();
-                    
+
                     // Verify username matches playlist owner's name
                     if ($playlist->user->name !== $username) {
                         $playlist = null;
@@ -61,7 +61,7 @@ class XtreamStreamController extends Controller
                 } catch (ModelNotFoundException $e) {
                     try {
                         $playlist = CustomPlaylist::with(['user'])->where('uuid', $password)->firstOrFail();
-                        
+
                         // Verify username matches playlist owner's name
                         if ($playlist->user->name !== $username) {
                             $playlist = null;
@@ -150,16 +150,31 @@ class XtreamStreamController extends Controller
     public function handleLive(Request $request, string $username, string $password, int $streamId, string $format = 'ts')
     {
         list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'live');
-
         if ($channel instanceof Channel) {
             if ($playlist->enable_proxy) {
-                $url = rtrim(route('stream', [
-                    'encodedId' => rtrim(base64_encode($streamId), '=')
-                ]), '.');
+                // If proxy enabled, call the controller method directly to avoid redirect loop
+                $bufferedStreamsEnabled = false; // prep for upcoming feature: config('proxy.shared_streams.enabled', false)
+                if ($playlist->proxy_options['output'] === 'hls') {
+                    if ($bufferedStreamsEnabled) {
+                        // @TODO...
+                    } else {
+                        return app()->call('App\\Http\\Controllers\\HlsStreamController@serveChannelPlaylist', [
+                            'encodedId' => rtrim(base64_encode($streamId), '='),
+                        ]);
+                    }
+                } else {
+                    if ($bufferedStreamsEnabled) {
+                        // @TODO...
+                    } else {
+                        return app()->call('App\\Http\\Controllers\\StreamController@__invoke', [
+                            'encodedId' => rtrim(base64_encode($streamId), '='),
+                            'format' => 'ts',
+                        ]);
+                    }
+                }
             } else {
-                $url = $channel->url_custom ?? $channel->url;
+                return Redirect::to($channel->url_custom ?? $channel->url);
             }
-            return Redirect::to($url);
         }
 
         return response()->json(['error' => 'Unauthorized or stream not found'], 403);
@@ -171,16 +186,31 @@ class XtreamStreamController extends Controller
     public function handleVod(Request $request, string $username, string $password, string $streamId, string $format = 'ts')
     {
         list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'vod');
-
         if ($channel instanceof Channel) {
             if ($playlist->enable_proxy) {
-                $url = rtrim(route('stream', [
-                    'encodedId' => rtrim(base64_encode($streamId), '=')
-                ]), '.');
+                // If proxy enabled, call the controller method directly to avoid redirect loop
+                $bufferedStreamsEnabled = false; // prep for upcoming feature: config('proxy.shared_streams.enabled', false)
+                if ($playlist->proxy_options['output'] === 'hls') {
+                    if ($bufferedStreamsEnabled) {
+                        // @TODO...
+                    } else {
+                        return app()->call('App\\Http\\Controllers\\HlsStreamController@serveChannelPlaylist', [
+                            'encodedId' => rtrim(base64_encode($streamId), '='),
+                        ]);
+                    }
+                } else {
+                    if ($bufferedStreamsEnabled) {
+                        // @TODO...
+                    } else {
+                        return app()->call('App\\Http\\Controllers\\StreamController@__invoke', [
+                            'encodedId' => rtrim(base64_encode($streamId), '='),
+                            'format' => 'ts',
+                        ]);
+                    }
+                }
             } else {
-                $url = $channel->url_custom ?? $channel->url;
+                return Redirect::to($channel->url_custom ?? $channel->url);
             }
-            return Redirect::to($url);
         }
 
         return response()->json(['error' => 'Unauthorized or stream not found'], 403);
@@ -192,16 +222,31 @@ class XtreamStreamController extends Controller
     public function handleSeries(Request $request, string $username, string $password, int $streamId, string $format = 'mp4')
     {
         list($playlist, $episode) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'episode');
-
         if ($episode instanceof Episode) {
             if ($playlist->enable_proxy) {
-                $url = rtrim(route('stream.episode', [
-                    'encodedId' => rtrim(base64_encode($streamId), '=')
-                ]), '.');
+                // If proxy enabled, call the controller method directly to avoid redirect loop
+                $bufferedStreamsEnabled = false; // prep for upcoming feature: config('proxy.shared_streams.enabled', false)
+                if ($playlist->proxy_options['output'] === 'hls') {
+                    if ($bufferedStreamsEnabled) {
+                        // @TODO...
+                    } else {
+                        return app()->call('App\\Http\\Controllers\\HlsStreamController@serveEpisodePlaylist', [
+                            'encodedId' => rtrim(base64_encode($streamId), '='),
+                        ]);
+                    }
+                } else {
+                    if ($bufferedStreamsEnabled) {
+                        // @TODO...
+                    } else {
+                        return app()->call('App\\Http\\Controllers\\StreamController@episode', [
+                            'encodedId' => rtrim(base64_encode($streamId), '='),
+                            'format' => 'ts',
+                        ]);
+                    }
+                }
             } else {
-                $url = $episode->url;
+                return Redirect::to($episode->url);
             }
-            return Redirect::to($url);
         }
 
         return response()->json(['error' => 'Unauthorized or stream not found'], 403);
