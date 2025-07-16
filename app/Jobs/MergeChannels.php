@@ -92,7 +92,9 @@ class MergeChannels implements ShouldQueue
 
         // Phase 4: Finalization - A Single Bulk Update
         if (!empty($failoversToUpsert)) {
-            ChannelFailover::upsert($failoversToUpsert, ['channel_id', 'channel_failover_id'], ['user_id', 'updated_at']);
+            foreach (array_chunk($failoversToUpsert, 500) as $chunk) {
+                ChannelFailover::upsert($chunk, ['channel_id', 'channel_failover_id'], ['user_id', 'updated_at']);
+            }
             $processed = count($failoversToUpsert);
         }
 
