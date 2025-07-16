@@ -34,14 +34,16 @@ class MergeChannels implements ShouldQueue
     public function handle(): void
     {
         $processed = 0;
-        $allChannels = Channel::whereIn('id', $this->channels->pluck('id'))->cursor();
-        $groupedChannels = $allChannels->groupBy(function ($channel) {
-            $streamId = $channel->stream_id_custom ?: $channel->stream_id;
-            return $streamId;
-        });
+        $groups = [];
 
-        foreach ($groupedChannels as $group) {
-            if ($group->count() > 1) {
+        foreach (Channel::whereIn('id', $this->channels->pluck('id'))->cursor() as $channel) {
+            $streamId = $channel->stream_id_custom ?: $channel->stream_id;
+            $groups[$streamId][] = $channel;
+        }
+
+        foreach ($groups as $group) {
+            if (count($group) > 1) {
+                $group = collect($group); // Convert to collection for easier manipulation
                 $master = null;
                 if ($this->playlistId) {
                     $preferredChannels = $group->where('playlist_id', $this->playlistId);
