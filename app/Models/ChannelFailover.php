@@ -10,18 +10,6 @@ class ChannelFailover extends Model
 {
     use HasFactory;
 
-    /**
-     * The attributes that should be cast to native types.
-     *
-     * @var array
-     */
-    protected $fillable = [
-        'user_id',
-        'channel_id',
-        'channel_failover_id',
-        'metadata',
-    ];
-
     protected $casts = [
         'id' => 'integer',
         'user_id' => 'integer',
