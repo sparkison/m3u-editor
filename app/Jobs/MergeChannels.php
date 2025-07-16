@@ -38,6 +38,7 @@ class MergeChannels implements ShouldQueue
             return $channel->stream_id_custom ?: $channel->stream_id;
         });
 
+        $processed = 0;
         foreach ($groupedChannels as $group) {
             if ($group->count() > 1) {
                 // Designate the first channel as the master
@@ -71,14 +72,16 @@ class MergeChannels implements ShouldQueue
                 }
             }
         }
-        $this->sendCompletionNotification();
+        $this->sendCompletionNotification($processed);
     }
 
-    protected function sendCompletionNotification()
+    protected function sendCompletionNotification($processed)
     {
+        $body = $processed > 0 ? "Merged {$processed} channels successfully." : 'No channels were merged.';
+
         Notification::make()
             ->title('Merge complete')
-            ->body('All channels have been merged successfully.')
+            ->body($body)
             ->success()
             ->sendToDatabase($this->user);
     }
