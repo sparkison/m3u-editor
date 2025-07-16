@@ -35,10 +35,6 @@ class UnmergeChannels implements ShouldQueue
             ->orWhereIn('channel_failover_id', $channelIds)
             ->delete();
 
-        foreach ($this->channels as $channel) {
-            $processed++;
-        }
-
         $this->sendCompletionNotification();
     }
 
