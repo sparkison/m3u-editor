@@ -15,12 +15,14 @@ class UnmergeChannels implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public $user;
+
     /**
      * Create a new job instance.
      */
-    public function __construct(public Collection $channels)
+    public function __construct(public Collection $channels, $user)
     {
-        //
+        $this->user = $user;
     }
 
     /**
