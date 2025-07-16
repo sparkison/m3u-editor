@@ -34,7 +34,8 @@ class MergeChannels implements ShouldQueue
     public function handle(): void
     {
         $processed = 0;
-        $groupedChannels = $this->channels->groupBy(function ($channel) {
+        $allChannels = Channel::whereIn('id', $this->channels->pluck('id'))->cursor();
+        $groupedChannels = $allChannels->groupBy(function ($channel) {
             $streamId = $channel->stream_id_custom ?: $channel->stream_id;
             return strtolower($streamId);
         });
@@ -65,6 +66,7 @@ class MergeChannels implements ShouldQueue
                 }
             }
         }
+
         $this->sendCompletionNotification($processed);
     }
 
