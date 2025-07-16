@@ -33,9 +33,6 @@ class MergeChannels implements ShouldQueue
      */
     public function handle(): void
     {
-        $total = $this->channels->count();
-        $processed = 0;
-
         // Group channels by their effective stream ID
         $groupedChannels = $this->channels->groupBy(function ($channel) {
             return $channel->stream_id_custom ?: $channel->stream_id;
@@ -71,22 +68,10 @@ class MergeChannels implements ShouldQueue
                         ]
                     );
                     $processed++;
-                    $this->updateProgress($processed, $total);
                 }
             }
         }
         $this->sendCompletionNotification();
-    }
-
-    protected function updateProgress($processed, $total)
-    {
-        $progress = round(($processed / $total) * 100);
-        Notification::make()
-            ->title('Merging channels...')
-            ->body("Processed {$processed} of {$total} channels.")
-            ->success()
-            ->progress($progress)
-            ->sendToDatabase($this->user);
     }
 
     protected function sendCompletionNotification()

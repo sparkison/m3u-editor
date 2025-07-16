@@ -28,9 +28,6 @@ class UnmergeChannels implements ShouldQueue
      */
     public function handle(): void
     {
-        $total = $this->channels->count();
-        $processed = 0;
-
         $channelIds = $this->channels->pluck('id');
 
         // Delete all failover records where the selected channels are either the master or the failover
@@ -40,21 +37,9 @@ class UnmergeChannels implements ShouldQueue
 
         foreach ($this->channels as $channel) {
             $processed++;
-            $this->updateProgress($processed, $total);
         }
 
         $this->sendCompletionNotification();
-    }
-
-    protected function updateProgress($processed, $total)
-    {
-        $progress = round(($processed / $total) * 100);
-        Notification::make()
-            ->title('Unmerging channels...')
-            ->body("Processed {$processed} of {$total} channels.")
-            ->success()
-            ->progress($progress)
-            ->sendToDatabase($this->user);
     }
 
     protected function sendCompletionNotification()
