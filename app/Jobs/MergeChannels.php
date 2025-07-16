@@ -35,34 +35,34 @@ class MergeChannels implements ShouldQueue
     {
         $processed = 0;
         if ($this->channels->count() > 1) {
-            $preferredChannels = $this->channels;
+            $master = null;
             if ($this->playlistId) {
                 $preferredChannels = $this->channels->where('playlist_id', $this->playlistId);
+                if ($preferredChannels->isNotEmpty()) {
+                    $master = $preferredChannels->reduce(function ($highest, $channel) {
+                        if (!$highest) return $channel;
+                        $highestResolution = $this->getResolution($highest);
+                        $currentResolution = $this->getResolution($channel);
+                        return ($currentResolution > $highestResolution) ? $channel : $highest;
+                    });
+                }
             }
 
-            // Find the channel with the highest resolution in the preferred playlist
-            $master = $preferredChannels->reduce(function ($highest, $channel) {
-                if (!$highest) {
-                    return $channel;
-                }
-
-                $highestResolution = $this->getResolution($highest);
-                $currentResolution = $this->getResolution($channel);
-
-                return ($currentResolution > $highestResolution) ? $channel : $highest;
-            });
+            if (!$master) {
+                $master = $this->channels->reduce(function ($highest, $channel) {
+                    if (!$highest) return $channel;
+                    $highestResolution = $this->getResolution($highest);
+                    $currentResolution = $this->getResolution($channel);
+                    return ($currentResolution > $highestResolution) ? $channel : $highest;
+                });
+            }
 
             // The rest are failovers
             foreach ($this->channels as $failover) {
                 if ($failover->id !== $master->id) {
                     ChannelFailover::updateOrCreate(
-                        [
-                            'channel_id' => $master->id,
-                            'channel_failover_id' => $failover->id,
-                        ],
-                        [
-                            'user_id' => $master->user_id,
-                        ]
+                        ['channel_id' => $master->id, 'channel_failover_id' => $failover->id],
+                        ['user_id' => $master->user_id]
                     );
                     $processed++;
                 }
