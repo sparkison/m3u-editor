@@ -51,7 +51,7 @@ class MergeChannels implements ShouldQueue
                 }
 
                 if (!$master) {
-                    $master = $group->first();
+                    $master = $group->sortBy('id')->first();
                 }
 
                 // The rest are failovers
