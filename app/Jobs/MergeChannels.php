@@ -39,7 +39,7 @@ class MergeChannels implements ShouldQueue
         foreach (Channel::whereIn('id', $this->channels->pluck('id'))->cursor() as $channel) {
             $streamId = $channel->stream_id_custom ?: $channel->stream_id;
             if (!empty($streamId)) {
-                $groups[$streamId][] = $channel;
+                $groups[strtolower($streamId)][] = $channel;
             }
         }
 
