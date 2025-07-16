@@ -32,10 +32,8 @@ class UnmergeChannels implements ShouldQueue
     {
         $channelIds = $this->channels->pluck('id');
 
-        // Delete all failover records where the selected channels are either the master or the failover
-        ChannelFailover::whereIn('channel_id', $channelIds)
-            ->orWhereIn('channel_failover_id', $channelIds)
-            ->delete();
+        // Delete all failover records where the selected channels are the master
+        ChannelFailover::whereIn('channel_id', $channelIds)->delete();
 
         $this->sendCompletionNotification();
     }
