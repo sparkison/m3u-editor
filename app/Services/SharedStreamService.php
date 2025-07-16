@@ -1200,15 +1200,8 @@ class SharedStreamService
         // Check if the process is actually running (phantom stream detection)
         $pid = $streamInfo['pid'] ?? null;
         if ($pid && !$this->isProcessRunning($pid)) {
-            Log::channel('ffmpeg')->warning("Phantom stream detected for {$streamKey} with PID {$pid} - process not running");
-
-            // Mark the stream as errored instead of deleting it immediately
-            $streamInfo['status'] = 'error';
-            $streamInfo['error_message'] = 'Phantom process detected';
-            $this->setStreamInfo($streamKey, $streamInfo);
-
-            // The cleanup job will handle the final removal
-            return false;
+            // Just log it for now, don't delete immediately
+            Log::channel('ffmpeg')->warning("👻 Possible phantom stream detected for {$streamKey} with PID {$pid} - process not running");
         }
 
         return true;
