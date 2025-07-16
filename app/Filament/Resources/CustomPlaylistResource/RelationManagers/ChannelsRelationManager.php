@@ -191,6 +191,38 @@ class ChannelsRelationManager extends RelationManager
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\DetachBulkAction::make()->color('danger'),
+                Tables\Actions\BulkAction::make('add_to_group')
+                    ->label('Add to custom group')
+                    ->form([
+                        Forms\Components\Select::make('group')
+                            ->label('Select group')
+                            ->options(
+                                Tag::query()
+                                    ->where('type', $ownerRecord->uuid)
+                                    ->get()
+                                    ->map(fn($name) => [
+                                        'id' => $name->getAttributeValue('name'),
+                                        'name' => $name->getAttributeValue('name')
+                                    ])->pluck('id', 'name')
+                            )->required(),
+                    ])
+                    ->action(function (Collection $records, $data) use ($ownerRecord): void {
+                        foreach ($records as $record) {
+                            $record->syncTagsWithType([$data['group']], $ownerRecord->uuid);
+                        }
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Added to group')
+                            ->body('The selected channels have been added to the custom group.')
+                            ->send();
+                    })
+                    ->deselectRecordsAfterCompletion()
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-squares-plus')
+                    ->modalIcon('heroicon-o-squares-plus')
+                    ->modalDescription('Add to group')
+                    ->modalSubmitActionLabel('Yes, add to group'),
                 ...ChannelResource::getTableBulkActions(addToCustom: false),
             ]);
     }
