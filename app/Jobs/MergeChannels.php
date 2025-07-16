@@ -34,23 +34,41 @@ class MergeChannels implements ShouldQueue
     public function handle(): void
     {
         $processed = 0;
-        $groups = [];
+        $failoversToUpsert = [];
 
-        foreach (Channel::whereIn('id', $this->channels->pluck('id'))->cursor() as $channel) {
-            $streamId = $channel->stream_id_custom ?: $channel->stream_id;
-            if (!empty($streamId)) {
-                $groups[strtolower($streamId)][] = $channel;
-            }
-        }
+        // Phase 1: Reconnaissance - Find all stream_ids with more than one channel
+        $mergeableStreamIds = Channel::query()
+            ->selectRaw('LOWER(COALESCE(stream_id_custom, stream_id)) as effective_stream_id')
+            ->whereIn('id', $this->channels->pluck('id'))
+            ->where(function ($query) {
+                $query->whereNotNull('stream_id')
+                      ->orWhereNotNull('stream_id_custom');
+            })
+            ->groupBy('effective_stream_id')
+            ->havingRaw('COUNT(*) > 1')
+            ->pluck('effective_stream_id');
 
-        foreach ($groups as $group) {
-            if (count($group) > 1) {
-                $group = collect($group); // Convert to collection for easier manipulation
+        // Phase 2 & 3: Batch Processing and Fetch & Merge
+        $mergeableStreamIds->chunk(200)->each(function ($streamIdChunk) use (&$failoversToUpsert) {
+            $channelsToProcess = Channel::query()
+                ->whereIn(\DB::raw('LOWER(COALESCE(stream_id_custom, stream_id))'), $streamIdChunk)
+                ->whereIn('id', $this->channels->pluck('id')) // Ensure we only process channels from the original selection
+                ->get();
+
+            $groupedByStreamId = $channelsToProcess->groupBy(function ($channel) {
+                return strtolower($channel->stream_id_custom ?: $channel->stream_id);
+            });
+
+            foreach ($groupedByStreamId as $group) {
+                if ($group->count() <= 1) {
+                    continue;
+                }
+
                 $master = null;
                 if ($this->playlistId) {
                     $preferredChannels = $group->where('playlist_id', $this->playlistId);
                     if ($preferredChannels->isNotEmpty()) {
-                        $master = $preferredChannels->first();
+                        $master = $preferredChannels->sortBy('id')->first();
                     }
                 }
 
@@ -58,17 +76,24 @@ class MergeChannels implements ShouldQueue
                     $master = $group->sortBy('id')->first();
                 }
 
-                // The rest are failovers
                 foreach ($group as $failover) {
                     if ($failover->id !== $master->id) {
-                        ChannelFailover::updateOrCreate(
-                            ['channel_id' => $master->id, 'channel_failover_id' => $failover->id],
-                            ['user_id' => $master->user_id]
-                        );
-                        $processed++;
+                        $failoversToUpsert[] = [
+                            'channel_id' => $master->id,
+                            'channel_failover_id' => $failover->id,
+                            'user_id' => $master->user_id,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ];
                     }
                 }
             }
+        });
+
+        // Phase 4: Finalization - A Single Bulk Update
+        if (!empty($failoversToUpsert)) {
+            ChannelFailover::upsert($failoversToUpsert, ['channel_id', 'channel_failover_id'], ['user_id', 'updated_at']);
+            $processed = count($failoversToUpsert);
         }
 
         $this->sendCompletionNotification($processed);
