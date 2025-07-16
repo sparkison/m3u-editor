@@ -489,30 +489,6 @@ class ChannelResource extends Resource
                         ->modalIcon('heroicon-o-photo')
                         ->modalDescription('Update the preferred icon for the selected channel(s).')
                         ->modalSubmitActionLabel('Update now'),
-                    Tables\Actions\BulkAction::make('merge')
-                        ->label('Merge Same ID')
-                        ->form([
-                            Forms\Components\Select::make('playlist_id')
-                                ->label('Preferred Playlist')
-                                ->options(Playlist::where('user_id', auth()->id())->pluck('name', 'id'))
-                                ->helperText('Select a playlist to prioritize as the master during the merge process.')
-                        ])
-                        ->action(function (Collection $records, array $data): void {
-                            app('Illuminate\Contracts\Bus\Dispatcher')
-                                ->dispatch(new \App\Jobs\MergeChannels($records, auth()->user(), $data['playlist_id'] ?? null));
-                        })->after(function () {
-                            Notification::make()
-                                ->success()
-                                ->title('Channel merge started')
-                                ->body('Merging channels in the background. You will be notified once the process is complete.')
-                                ->send();
-                        })
-                        ->requiresConfirmation()
-                        ->icon('heroicon-o-arrows-pointing-in')
-                        ->color('primary')
-                        ->modalIcon('heroicon-o-arrows-pointing-in')
-                        ->modalDescription('Merge all selected channels with the same ID into a single channel with failover.')
-                        ->modalSubmitActionLabel('Merge now'),
                     Tables\Actions\BulkAction::make('failover')
                         ->label('Add as failover')
                         ->form(function (Collection $records) {
@@ -608,6 +584,29 @@ class ChannelResource extends Resource
                         ->modalIcon('heroicon-o-arrow-path-rounded-square')
                         ->modalDescription('Add the selected channel(s) to the chosen channel as failover sources.')
                         ->modalSubmitActionLabel('Add failovers now'),
+                    Tables\Actions\BulkAction::make('merge')
+                        ->label('Merge Same ID')
+                        ->form([
+                            Forms\Components\Select::make('playlist_id')
+                                ->label('Preferred Playlist')
+                                ->options(Playlist::where('user_id', auth()->id())->pluck('name', 'id'))
+                                ->helperText('Select a playlist to prioritize as the master during the merge process.')
+                        ])
+                        ->action(function (Collection $records, array $data): void {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new \App\Jobs\MergeChannels($records, auth()->user(), $data['playlist_id'] ?? null));
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Channel merge started')
+                                ->body('Merging channels in the background. You will be notified once the process is complete.')
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-arrows-pointing-in')
+                        ->modalIcon('heroicon-o-arrows-pointing-in')
+                        ->modalDescription('Merge all selected channels with the same ID into a single channel with failover.')
+                        ->modalSubmitActionLabel('Merge now'),
                     Tables\Actions\BulkAction::make('unmerge')
                         ->label('Unmerge Same ID')
                         ->action(function (Collection $records): void {
