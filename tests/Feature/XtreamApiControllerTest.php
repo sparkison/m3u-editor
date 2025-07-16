@@ -416,4 +416,33 @@ class XtreamApiControllerTest extends TestCase
         $response->assertStatus(400) // Expecting 400 Bad Request
             ->assertJson(['error' => 'Missing vod_id parameter']);
     }
+
+    /**
+     * Test that the merge and unmerge channel jobs work correctly.
+     *
+     * @return void
+     */
+    public function test_merge_and_unmerge_channels_jobs()
+    {
+        // Create channels with the same stream_id
+        $channel1 = Channel::factory()->create(['playlist_id' => $this->playlist->id, 'stream_id' => '100', 'user_id' => $this->user->id]);
+        $channel2 = Channel::factory()->create(['playlist_id' => $this->playlist->id, 'stream_id' => '100', 'user_id' => $this->user->id]);
+        $channel3 = Channel::factory()->create(['playlist_id' => $this->playlist->id, 'stream_id' => '100', 'user_id' => $this->user->id]);
+
+        $channels = collect([$channel1, $channel2, $channel3]);
+
+        // Run the merge job
+        (new \App\Jobs\MergeChannels($channels))->handle();
+
+        // Assert that failover records were created
+        $this->assertDatabaseCount('channel_failovers', 2);
+        $this->assertDatabaseHas('channel_failovers', ['channel_id' => $channel1->id, 'channel_failover_id' => $channel2->id]);
+        $this->assertDatabaseHas('channel_failovers', ['channel_id' => $channel1->id, 'channel_failover_id' => $channel3->id]);
+
+        // Run the unmerge job
+        (new \App\Jobs\UnmergeChannels($channels))->handle();
+
+        // Assert that failover records were deleted
+        $this->assertDatabaseCount('channel_failovers', 0);
+    }
 }
