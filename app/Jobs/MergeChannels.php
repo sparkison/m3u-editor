@@ -34,37 +34,43 @@ class MergeChannels implements ShouldQueue
     public function handle(): void
     {
         $processed = 0;
-        if ($this->channels->count() > 1) {
-            $master = null;
-            if ($this->playlistId) {
-                $preferredChannels = $this->channels->where('playlist_id', $this->playlistId);
-                if ($preferredChannels->isNotEmpty()) {
-                    $master = $preferredChannels->reduce(function ($highest, $channel) {
+        $groupedChannels = $this->channels->groupBy(function ($channel) {
+            return $channel->stream_id_custom ?: $channel->stream_id;
+        });
+
+        foreach ($groupedChannels as $group) {
+            if ($group->count() > 1) {
+                $master = null;
+                if ($this->playlistId) {
+                    $preferredChannels = $group->where('playlist_id', $this->playlistId);
+                    if ($preferredChannels->isNotEmpty()) {
+                        $master = $preferredChannels->reduce(function ($highest, $channel) {
+                            if (!$highest) return $channel;
+                            $highestResolution = $this->getResolution($highest);
+                            $currentResolution = $this->getResolution($channel);
+                            return ($currentResolution > $highestResolution) ? $channel : $highest;
+                        });
+                    }
+                }
+
+                if (!$master) {
+                    $master = $group->reduce(function ($highest, $channel) {
                         if (!$highest) return $channel;
                         $highestResolution = $this->getResolution($highest);
                         $currentResolution = $this->getResolution($channel);
                         return ($currentResolution > $highestResolution) ? $channel : $highest;
                     });
                 }
-            }
 
-            if (!$master) {
-                $master = $this->channels->reduce(function ($highest, $channel) {
-                    if (!$highest) return $channel;
-                    $highestResolution = $this->getResolution($highest);
-                    $currentResolution = $this->getResolution($channel);
-                    return ($currentResolution > $highestResolution) ? $channel : $highest;
-                });
-            }
-
-            // The rest are failovers
-            foreach ($this->channels as $failover) {
-                if ($failover->id !== $master->id) {
-                    ChannelFailover::updateOrCreate(
-                        ['channel_id' => $master->id, 'channel_failover_id' => $failover->id],
-                        ['user_id' => $master->user_id]
-                    );
-                    $processed++;
+                // The rest are failovers
+                foreach ($group as $failover) {
+                    if ($failover->id !== $master->id) {
+                        ChannelFailover::updateOrCreate(
+                            ['channel_id' => $master->id, 'channel_failover_id' => $failover->id],
+                            ['user_id' => $master->user_id]
+                        );
+                        $processed++;
+                    }
                 }
             }
         }
