@@ -15,12 +15,16 @@ class MergeChannels implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public $user;
+    public $playlistId;
+
     /**
      * Create a new job instance.
      */
-    public function __construct(public Collection $channels)
+    public function __construct(public Collection $channels, $user, $playlistId = null)
     {
-        //
+        $this->user = $user;
+        $this->playlistId = $playlistId;
     }
 
     /**
@@ -28,6 +32,9 @@ class MergeChannels implements ShouldQueue
      */
     public function handle(): void
     {
+        $total = $this->channels->count();
+        $processed = 0;
+
         // Group channels by their effective stream ID
         $groupedChannels = $this->channels->groupBy(function ($channel) {
             return $channel->stream_id_custom ?: $channel->stream_id;
@@ -36,7 +43,20 @@ class MergeChannels implements ShouldQueue
         foreach ($groupedChannels as $group) {
             if ($group->count() > 1) {
                 // Designate the first channel as the master
-                $master = $group->shift();
+                if ($this->playlistId) {
+                    $master = $group->first(function ($channel) {
+                        return $channel->playlist_id == $this->playlistId;
+                    });
+                    if (!$master) {
+                        $master = $group->shift();
+                    } else {
+                        $group = $group->filter(function ($channel) use ($master) {
+                            return $channel->id !== $master->id;
+                        });
+                    }
+                } else {
+                    $master = $group->shift();
+                }
 
                 // The rest are failovers
                 foreach ($group as $failover) {
@@ -49,8 +69,31 @@ class MergeChannels implements ShouldQueue
                             'user_id' => $master->user_id,
                         ]
                     );
+                    $processed++;
+                    $this->updateProgress($processed, $total);
                 }
             }
         }
+        $this->sendCompletionNotification();
+    }
+
+    protected function updateProgress($processed, $total)
+    {
+        $progress = round(($processed / $total) * 100);
+        Notification::make()
+            ->title('Merging channels...')
+            ->body("Processed {$processed} of {$total} channels.")
+            ->success()
+            ->progress($progress)
+            ->sendToDatabase($this->user);
+    }
+
+    protected function sendCompletionNotification()
+    {
+        Notification::make()
+            ->title('Merge complete')
+            ->body('All channels have been merged successfully.')
+            ->success()
+            ->sendToDatabase($this->user);
     }
 }

@@ -491,9 +491,15 @@ class ChannelResource extends Resource
                         ->modalSubmitActionLabel('Update now'),
                     Tables\Actions\BulkAction::make('merge')
                         ->label('Merge Same ID')
-                        ->action(function (Collection $records): void {
+                        ->form([
+                            Forms\Components\Select::make('playlist_id')
+                                ->label('Preferred Playlist')
+                                ->options(Playlist::where('user_id', auth()->id())->pluck('name', 'id'))
+                                ->helperText('Select a playlist to prioritize as the master during the merge process.')
+                        ])
+                        ->action(function (Collection $records, array $data): void {
                             app('Illuminate\Contracts\Bus\Dispatcher')
-                                ->dispatch(new \App\Jobs\MergeChannels($records));
+                                ->dispatch(new \App\Jobs\MergeChannels($records, auth()->user(), $data['playlist_id'] ?? null));
                         })->after(function () {
                             Notification::make()
                                 ->success()
@@ -606,7 +612,7 @@ class ChannelResource extends Resource
                         ->label('Unmerge Same ID')
                         ->action(function (Collection $records): void {
                             app('Illuminate\Contracts\Bus\Dispatcher')
-                                ->dispatch(new \App\Jobs\UnmergeChannels($records));
+                                ->dispatch(new \App\Jobs\UnmergeChannels($records, auth()->user()));
                         })->after(function () {
                             Notification::make()
                                 ->success()
