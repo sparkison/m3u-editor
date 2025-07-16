@@ -206,6 +206,10 @@
                     </x-filament::card>
                 @endforeach
             </div>
+        @else
+            <div class="flex items-center justify-center h-48">
+                <p class="text-gray-500 dark:text-gray-400">No streaming stats available.</p>
+            </div>
         @endif
     </div>
 </x-filament-panels::page>
