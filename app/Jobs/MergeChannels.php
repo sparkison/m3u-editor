@@ -37,7 +37,7 @@ class MergeChannels implements ShouldQueue
         $allChannels = Channel::whereIn('id', $this->channels->pluck('id'))->cursor();
         $groupedChannels = $allChannels->groupBy(function ($channel) {
             $streamId = $channel->stream_id_custom ?: $channel->stream_id;
-            return strtolower($streamId);
+            return $streamId;
         });
 
         foreach ($groupedChannels as $group) {
