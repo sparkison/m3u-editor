@@ -40,10 +40,15 @@ class MergeChannels implements ShouldQueue
 
                 // The rest are failovers
                 foreach ($group as $failover) {
-                    ChannelFailover::updateOrCreate([
-                        'channel_id' => $master->id,
-                        'channel_failover_id' => $failover->id,
-                    ]);
+                    ChannelFailover::updateOrCreate(
+                        [
+                            'channel_id' => $master->id,
+                            'channel_failover_id' => $failover->id,
+                        ],
+                        [
+                            'user_id' => $master->user_id,
+                        ]
+                    );
                 }
             }
         }

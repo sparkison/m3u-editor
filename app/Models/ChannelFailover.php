@@ -15,6 +15,13 @@ class ChannelFailover extends Model
      *
      * @var array
      */
+    protected $fillable = [
+        'user_id',
+        'channel_id',
+        'channel_failover_id',
+        'metadata',
+    ];
+
     protected $casts = [
         'id' => 'integer',
         'user_id' => 'integer',
