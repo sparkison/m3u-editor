@@ -27,6 +27,7 @@ class SharedStreamService
     const BUFFER_PREFIX = 'stream_buffer:';
     const STREAM_PREFIX = 'shared_stream:'; // For compatibility with existing code
     const SEGMENT_EXPIRY = 300; // 5 minutes
+    const STAT_UPDATE_INTERVAL = 2; // Seconds between stat updates, lower value increases update frequency and database activity
 
     private int $clientTimeout;
     private array $activeProcesses = []; // Store active FFmpeg processes
@@ -1967,8 +1968,14 @@ class SharedStreamService
      */
     private function updateStreamActivity(string $streamKey): void
     {
+        // Debounce rapid updates
+        $debounceKey = "stream_activity_debounce:{$streamKey}";
+        if (Redis::get($debounceKey)) {
+            return; // Skip update if within debounce period
+        }
+        // Set debounce key with expiration (value is arbitrary)
+        Redis::setex($debounceKey, self::STAT_UPDATE_INTERVAL, '1');
         $streamInfo = $this->getStreamInfo($streamKey);
-
         if ($streamInfo) {
             Log::channel('ffmpeg')->debug(">>>>> Updating stream activity for {$streamKey}");
 
@@ -1984,6 +1991,13 @@ class SharedStreamService
      */
     private function updateClientActivity(string $streamKey, string $clientId): void
     {
+        // Debounce rapid updates
+        $debounceKey = "client_activity_debounce:{$streamKey}:{$clientId}";
+        if (Redis::get($debounceKey)) {
+            return; // Skip update if within debounce period
+        }
+        // Set debounce key with expiration (value is arbitrary)
+        Redis::setex($debounceKey, self::STAT_UPDATE_INTERVAL, '1');
         try {
             $updated = SharedStreamClient::where('stream_id', $streamKey)
                 ->where('client_id', $clientId)
