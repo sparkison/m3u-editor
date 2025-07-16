@@ -106,6 +106,9 @@ class ChannelsRelationManager extends RelationManager
             });
         $defaultColumns = ChannelResource::getTableColumns(showGroup: true, showPlaylist: true);
 
+        // Inject the custom group column after the group column
+        array_splice($defaultColumns, 13, 0, [$groupColumn]);
+
         return $table->persistFiltersInSession()
             ->persistFiltersInSession()
             ->persistSortInSession()
