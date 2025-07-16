@@ -154,21 +154,21 @@ class XtreamStreamController extends Controller
         if ($channel instanceof Channel) {
             if ($playlist->enable_proxy) {
                 // If proxy enabled, call the controller method directly to avoid redirect loop
-                $bufferedStreamsEnabled = false; // prep for upcoming feature: config('proxy.shared_streams.enabled', false)
-                if ($playlist->proxy_options['output'] === 'hls') {
-                    if ($bufferedStreamsEnabled) {
-                        // @TODO...
-                    } else {
-                        return app()->call('App\\Http\\Controllers\\HlsStreamController@serveChannelPlaylist', [
-                            'encodedId' => rtrim(base64_encode($streamId), '='),
-                        ]);
-                    }
+                $bufferedStreamsEnabled = config('proxy.shared_streaming.enabled', false);
+                $encoded = rtrim(base64_encode($streamId), '=');
+                if ($bufferedStreamsEnabled) {
+                    return app()->call('App\\Http\\Controllers\\SharedStreamController@streamChannel', [
+                        'encodedId' => $encoded,
+                        'format' => $format
+                    ]);
                 } else {
-                    if ($bufferedStreamsEnabled) {
-                        // @TODO...
+                    if ($format === 'm3u8') {
+                        return app()->call('App\\Http\\Controllers\\HlsStreamController@serveChannelPlaylist', [
+                            'encodedId' => $encoded,
+                        ]);
                     } else {
                         return app()->call('App\\Http\\Controllers\\StreamController@__invoke', [
-                            'encodedId' => rtrim(base64_encode($streamId), '='),
+                            'encodedId' => $encoded,
                             'format' => 'ts',
                         ]);
                     }
@@ -190,21 +190,21 @@ class XtreamStreamController extends Controller
         if ($channel instanceof Channel) {
             if ($playlist->enable_proxy) {
                 // If proxy enabled, call the controller method directly to avoid redirect loop
-                $bufferedStreamsEnabled = false; // prep for upcoming feature: config('proxy.shared_streams.enabled', false)
-                if ($playlist->proxy_options['output'] === 'hls') {
-                    if ($bufferedStreamsEnabled) {
-                        // @TODO...
-                    } else {
-                        return app()->call('App\\Http\\Controllers\\HlsStreamController@serveChannelPlaylist', [
-                            'encodedId' => rtrim(base64_encode($streamId), '='),
-                        ]);
-                    }
+                $bufferedStreamsEnabled = config('proxy.shared_streaming.enabled', false);
+                $encoded = rtrim(base64_encode($streamId), '=');
+                if ($bufferedStreamsEnabled) {
+                    return app()->call('App\\Http\\Controllers\\SharedStreamController@streamChannel', [
+                        'encodedId' => $encoded,
+                        'format' => $format
+                    ]);
                 } else {
-                    if ($bufferedStreamsEnabled) {
-                        // @TODO...
+                    if ($format === 'm3u8') {
+                        return app()->call('App\\Http\\Controllers\\HlsStreamController@serveChannelPlaylist', [
+                            'encodedId' => $encoded,
+                        ]);
                     } else {
                         return app()->call('App\\Http\\Controllers\\StreamController@__invoke', [
-                            'encodedId' => rtrim(base64_encode($streamId), '='),
+                            'encodedId' => $encoded,
                             'format' => 'ts',
                         ]);
                     }
@@ -226,21 +226,21 @@ class XtreamStreamController extends Controller
         if ($episode instanceof Episode) {
             if ($playlist->enable_proxy) {
                 // If proxy enabled, call the controller method directly to avoid redirect loop
-                $bufferedStreamsEnabled = false; // prep for upcoming feature: config('proxy.shared_streams.enabled', false)
-                if ($playlist->proxy_options['output'] === 'hls') {
-                    if ($bufferedStreamsEnabled) {
-                        // @TODO...
-                    } else {
+                $bufferedStreamsEnabled = config('proxy.shared_streaming.enabled', false);
+                $encoded = rtrim(base64_encode($streamId), '=');
+                if ($bufferedStreamsEnabled) {
+                    return app()->call('App\\Http\\Controllers\\SharedStreamController@streamEpisode', [
+                        'encodedId' => $encoded,
+                        'format' => $format
+                    ]);
+                } else {
+                    if ($format === 'm3u8') {
                         return app()->call('App\\Http\\Controllers\\HlsStreamController@serveEpisodePlaylist', [
                             'encodedId' => rtrim(base64_encode($streamId), '='),
                         ]);
-                    }
-                } else {
-                    if ($bufferedStreamsEnabled) {
-                        // @TODO...
                     } else {
                         return app()->call('App\\Http\\Controllers\\StreamController@episode', [
-                            'encodedId' => rtrim(base64_encode($streamId), '='),
+                            'encodedId' => $encoded,
                             'format' => 'ts',
                         ]);
                     }
