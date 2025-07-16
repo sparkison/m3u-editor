@@ -155,20 +155,20 @@ class XtreamStreamController extends Controller
             if ($playlist->enable_proxy) {
                 // If proxy enabled, call the controller method directly to avoid redirect loop
                 $bufferedStreamsEnabled = config('proxy.shared_streaming.enabled', false);
-                $encoded = rtrim(base64_encode($streamId), '=');
+                $encodedId = rtrim(base64_encode($streamId), '=');
                 if ($bufferedStreamsEnabled) {
                     return app()->call('App\\Http\\Controllers\\SharedStreamController@streamChannel', [
-                        'encodedId' => $encoded,
+                        'encodedId' => $encodedId,
                         'format' => $format
                     ]);
                 } else {
                     if ($format === 'm3u8') {
                         return app()->call('App\\Http\\Controllers\\HlsStreamController@serveChannelPlaylist', [
-                            'encodedId' => $encoded,
+                            'encodedId' => $encodedId,
                         ]);
                     } else {
                         return app()->call('App\\Http\\Controllers\\StreamController@__invoke', [
-                            'encodedId' => $encoded,
+                            'encodedId' => $encodedId,
                             'format' => 'ts',
                         ]);
                     }
@@ -191,21 +191,21 @@ class XtreamStreamController extends Controller
             if ($playlist->enable_proxy) {
                 // If proxy enabled, call the controller method directly to avoid redirect loop
                 $bufferedStreamsEnabled = config('proxy.shared_streaming.enabled', false);
-                $encoded = rtrim(base64_encode($streamId), '=');
+                $encodedId = rtrim(base64_encode($streamId), '=');
                 if ($bufferedStreamsEnabled) {
                     return app()->call('App\\Http\\Controllers\\SharedStreamController@streamChannel', [
-                        'encodedId' => $encoded,
+                        'encodedId' => $encodedId,
                         'format' => $format
                     ]);
                 } else {
                     if ($format === 'm3u8') {
                         return app()->call('App\\Http\\Controllers\\HlsStreamController@serveChannelPlaylist', [
-                            'encodedId' => $encoded,
+                            'encodedId' => $encodedId,
                         ]);
                     } else {
                         return app()->call('App\\Http\\Controllers\\StreamController@__invoke', [
-                            'encodedId' => $encoded,
-                            'format' => 'ts',
+                            'encodedId' => $encodedId,
+                            'format' => $format,
                         ]);
                     }
                 }
@@ -227,21 +227,21 @@ class XtreamStreamController extends Controller
             if ($playlist->enable_proxy) {
                 // If proxy enabled, call the controller method directly to avoid redirect loop
                 $bufferedStreamsEnabled = config('proxy.shared_streaming.enabled', false);
-                $encoded = rtrim(base64_encode($streamId), '=');
+                $encodedId = rtrim(base64_encode($streamId), '=');
                 if ($bufferedStreamsEnabled) {
                     return app()->call('App\\Http\\Controllers\\SharedStreamController@streamEpisode', [
-                        'encodedId' => $encoded,
+                        'encodedId' => $encodedId,
                         'format' => $format
                     ]);
                 } else {
                     if ($format === 'm3u8') {
                         return app()->call('App\\Http\\Controllers\\HlsStreamController@serveEpisodePlaylist', [
-                            'encodedId' => rtrim(base64_encode($streamId), '='),
+                            'encodedId' => $encodedId,
                         ]);
                     } else {
                         return app()->call('App\\Http\\Controllers\\StreamController@episode', [
-                            'encodedId' => $encoded,
-                            'format' => 'ts',
+                            'encodedId' => $encodedId,
+                            'format' => $format,
                         ]);
                     }
                 }
