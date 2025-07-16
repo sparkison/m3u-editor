@@ -105,7 +105,7 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
             // Fetch the playlist (if set)
             $channels = [];
             if ($this->channels) {
-                $channels = collect($this->channels);
+                $channels = Channel::whereIn('id', $this->channels);
                 $totalChannelCount = $channels->where('is_vod', false)->count();
                 $mappedCount = $channels
                     ->filter(fn($channel) => $channel->epg_channel_id !== null)
