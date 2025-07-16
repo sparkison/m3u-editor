@@ -33,32 +33,23 @@ class MergeChannels implements ShouldQueue
      */
     public function handle(): void
     {
-        // Group channels by their effective stream ID
-        $groupedChannels = $this->channels->groupBy(function ($channel) {
-            return $channel->stream_id_custom ?: $channel->stream_id;
-        });
-
         $processed = 0;
-        foreach ($groupedChannels as $group) {
-            if ($group->count() > 1) {
-                // Designate the first channel as the master
-                if ($this->playlistId) {
-                    $master = $group->first(function ($channel) {
-                        return $channel->playlist_id == $this->playlistId;
-                    });
-                    if (!$master) {
-                        $master = $group->shift();
-                    } else {
-                        $group = $group->filter(function ($channel) use ($master) {
-                            return $channel->id !== $master->id;
-                        });
-                    }
-                } else {
-                    $master = $group->shift();
+        if ($this->channels->count() > 1) {
+            // Find the channel with the highest resolution
+            $master = $this->channels->reduce(function ($highest, $channel) {
+                if (!$highest) {
+                    return $channel;
                 }
 
-                // The rest are failovers
-                foreach ($group as $failover) {
+                $highestResolution = $this->getResolution($highest);
+                $currentResolution = $this->getResolution($channel);
+
+                return ($currentResolution > $highestResolution) ? $channel : $highest;
+            });
+
+            // The rest are failovers
+            foreach ($this->channels as $failover) {
+                if ($failover->id !== $master->id) {
                     ChannelFailover::updateOrCreate(
                         [
                             'channel_id' => $master->id,
@@ -73,6 +64,17 @@ class MergeChannels implements ShouldQueue
             }
         }
         $this->sendCompletionNotification($processed);
+    }
+
+    private function getResolution($channel)
+    {
+        $streamStats = $channel->stream_stats;
+        foreach ($streamStats as $stream) {
+            if (isset($stream['stream']['codec_type']) && $stream['stream']['codec_type'] === 'video') {
+                return ($stream['stream']['width'] ?? 0) * ($stream['stream']['height'] ?? 0);
+            }
+        }
+        return 0;
     }
 
     protected function sendCompletionNotification($processed)
