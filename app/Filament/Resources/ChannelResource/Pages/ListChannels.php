@@ -48,6 +48,49 @@ class ListChannels extends ListRecords
                 ))
                 ->slideOver(),
             Actions\ActionGroup::make([
+                Actions\Action::make('merge')
+                    ->label('Merge Same ID')
+                    ->form([
+                        Forms\Components\Select::make('playlist_id')
+                            ->label('Preferred Playlist')
+                            ->options(Playlist::where('user_id', auth()->id())->pluck('name', 'id'))
+                            ->helperText('Select a playlist to prioritize as the master during the merge process.')
+                    ])
+                    ->action(function (array $data): void {
+                        $channels = Channel::where('user_id', auth()->id())->get();
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new \App\Jobs\MergeChannels($channels, auth()->user(), $data['playlist_id'] ?? null));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Channel merge started')
+                            ->body('Merging channels in the background. You will be notified once the process is complete.')
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrows-pointing-in')
+                    ->modalIcon('heroicon-o-arrows-pointing-in')
+                    ->modalDescription('Merge all channels with the same ID into a single channel with failover.')
+                    ->modalSubmitActionLabel('Merge now'),
+                Actions\Action::make('unmerge')
+                    ->label('Unmerge Same ID')
+                    ->action(function (): void {
+                        $channels = Channel::where('user_id', auth()->id())->get();
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new \App\Jobs\UnmergeChannels($channels, auth()->user()));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Channel unmerge started')
+                            ->body('Unmerging channels in the background. You will be notified once the process is complete.')
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrows-pointing-out')
+                    ->color('warning')
+                    ->modalIcon('heroicon-o-arrows-pointing-out')
+                    ->modalDescription('Unmerge all channels with the same ID, removing all failover relationships.')
+                    ->modalSubmitActionLabel('Unmerge now'),
                 Actions\Action::make('map')
                     ->label('Map EPG to Playlist')
                     ->form(EpgMapResource::getForm())
