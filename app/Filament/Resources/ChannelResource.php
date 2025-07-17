@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class ChannelResource extends Resource
 {
@@ -94,14 +95,32 @@ class ChannelResource extends Resource
             Tables\Columns\ImageColumn::make('logo')
                 ->label('Logo')
                 ->checkFileExistence(false)
-                ->height(30)
-                ->width('auto')
+                ->size('inherit', 'inherit')
+                ->extraImgAttributes(fn($record): array => [
+                    // 'class' => $record->is_vod ? 'w-80 h-120' : 'h-8 w-auto rounded-sm',
+                    'style' => $record->is_vod ? 'width:80px; height:120px;' : 'height:2.5rem; width:auto; border-radius:4px;',
+                ])
                 ->getStateUsing(function ($record) {
                     if ($record->logo_type === ChannelLogoType::Channel) {
                         return $record->logo;
                     }
                     return $record->epgChannel?->icon ?? $record->logo;
                 })
+                ->toggleable(),
+            Tables\Columns\TextColumn::make('info')
+                ->label('Info')
+                ->wrap()
+                ->getStateUsing(function ($record) {
+                    $info = $record->info;
+                    $title = $record->title_custom ?: $record->title;
+                    $html = "<span class='fi-ta-text-item-label whitespace-normal text-sm leading-6 text-gray-950 dark:text-white'>{$title}</span>";
+                    if (is_array($info)) {
+                        $description = Str::limit($info['description'] ?? $info['plot'] ?? '', 200);
+                        $html .= "<p class='text-sm text-gray-500 dark:text-gray-400 whitespace-normal mt-2'>{$description}</p>";
+                    }
+                    return new HtmlString($html);
+                })
+                ->extraAttributes(['style' => 'min-width: 350px;'])
                 ->toggleable(),
             Tables\Columns\TextInputColumn::make('sort')
                 ->label('Sort Order')
@@ -313,6 +332,22 @@ class ChannelResource extends Resource
                 ->query(function ($query) {
                     return $query->where('epg_channel_id', '=', null);
                 }),
+            Tables\Filters\Filter::make('is_live')
+                ->label('Is Live')
+                ->toggle()
+                ->query(function ($query) {
+                    return $query->where([
+                        ['is_vod', '=', false],
+                    ]);
+                }),
+            Tables\Filters\Filter::make('is_vod')
+                ->label('Is VOD')
+                ->toggle()
+                ->query(function ($query) {
+                    return $query->where([
+                        ['is_vod', '=', true],
+                    ]);
+                }),
             Tables\Filters\Filter::make('has_metadata')
                 ->label('VOD Has metadata')
                 ->toggle()
@@ -463,6 +498,32 @@ class ChannelResource extends Resource
                     ->modalIcon('heroicon-o-arrows-right-left')
                     ->modalDescription('Move the selected channel(s) to the chosen group.')
                     ->modalSubmitActionLabel('Move now'),
+                Tables\Actions\BulkAction::make('process_vod')
+                    ->label('Process VOD')
+                    ->icon('heroicon-o-arrow-path')
+                    ->action(function ($records) {
+                        $count = 0;
+                        foreach ($records as $record) {
+                            if ($record->is_vod) {
+                                $count++;
+                                app('Illuminate\Contracts\Bus\Dispatcher')
+                                    ->dispatch(new \App\Jobs\ProcessVodChannels(channel: $record));
+                            }
+                        }
+
+                        Notification::make()
+                            ->success()
+                            ->title("Fetching VOD metadata for {$count} channel(s)")
+                            ->body('The VOD metadata fetching and processing has been started. You will be notified when it is complete.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->deselectRecordsAfterCompletion()
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrow-path')
+                    ->modalIcon('heroicon-o-arrow-path')
+                    ->modalDescription('Fetch and process VOD metadata for the selected channels? Only VOD channels will be processed.')
+                    ->modalSubmitActionLabel('Yes, process now'),
                 Tables\Actions\BulkAction::make('map')
                     ->label('Map EPG to selected')
                     ->form(EpgMapResource::getForm(showPlaylist: false, showEpg: true))

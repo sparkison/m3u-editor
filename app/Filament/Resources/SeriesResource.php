@@ -87,7 +87,7 @@ class SeriesResource extends Resource
             Tables\Columns\TextColumn::make('name')
                 ->description((fn($record) => Str::limit($record->plot, 200)))
                 ->wrap()
-                ->extraAttributes(['style' => 'min-width: 400px;'])
+                ->extraAttributes(['style' => 'min-width: 350px;'])
                 ->searchable()
                 ->searchable(query: function (Builder $query, string $search): Builder {
                     return $query->orWhereRaw('LOWER(series.name) LIKE ?', ['%' . strtolower($search) . '%']);
