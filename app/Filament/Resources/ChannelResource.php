@@ -155,7 +155,9 @@ class ChannelResource extends Resource
                 ->rules(['min:0', 'max:255'])
                 ->tooltip(fn($record) => $record->name)
                 ->placeholder(fn($record) => $record->name)
-                ->searchable()
+                ->searchable(query: function (Builder $query, string $search): Builder {
+                    return $query->orWhereRaw('LOWER(channels.name_custom) LIKE ?', ['%' . strtolower($search) . '%']);
+                })
                 ->toggleable(),
             Tables\Columns\ToggleColumn::make('enabled')
                 ->toggleable()
@@ -207,7 +209,11 @@ class ChannelResource extends Resource
             Tables\Columns\TextColumn::make('epgChannel.name')
                 ->label('EPG Channel')
                 ->toggleable()
-                ->searchable()
+                ->searchable(query: function (Builder $query, string $search): Builder {
+                    return $query->orWhereHas('epgChannel', function (Builder $query) use ($search) {
+                        $query->whereRaw('LOWER(epg_channels.name) LIKE ?', ['%' . strtolower($search) . '%']);
+                    });
+                })
                 ->limit(40)
                 ->sortable(),
             Tables\Columns\TextInputColumn::make('tvg_shift')
@@ -253,7 +259,9 @@ class ChannelResource extends Resource
             Tables\Columns\TextColumn::make('name')
                 ->label('Default Name')
                 ->sortable()
-                ->searchable()
+                ->searchable(query: function (Builder $query, string $search): Builder {
+                    return $query->orWhereRaw('LOWER(channels.name) LIKE ?', ['%' . strtolower($search) . '%']);
+                })
                 ->toggleable(isToggledHiddenByDefault: true),
             Tables\Columns\TextColumn::make('url')
                 ->label('Default URL')
