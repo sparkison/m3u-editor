@@ -119,26 +119,7 @@ class SeriesResource extends Resource
                 ->openUrlInNewTab()
                 ->icon('heroicon-s-play'),
             Tables\Columns\TextColumn::make('release_date')
-                ->searchable()
-                ->formatStateUsing(function ($state, $record) {
-                    try {
-                        // Try to parse the release_date from the raw attributes to avoid casting issues
-                        $rawDate = $record->getAttributes()['release_date'] ?? null;
-                        if (!$rawDate) {
-                            return null;
-                        }
-
-                        // Extract just the date part (remove any text after the date)
-                        if (preg_match('/(\d{4}-\d{2}-\d{2})/', $rawDate, $matches)) {
-                            return \Carbon\Carbon::parse($matches[1])->format('Y-m-d');
-                        }
-
-                        return $rawDate; // Return as-is if no date pattern found
-                    } catch (\Exception $e) {
-                        // If parsing fails, return the raw value
-                        return $record->getAttributes()['release_date'] ?? null;
-                    }
-                }),
+                ->searchable(),
             Tables\Columns\TextColumn::make('rating')
                 ->searchable(),
             Tables\Columns\TextColumn::make('rating_5based')
