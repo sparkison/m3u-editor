@@ -73,7 +73,7 @@ class ViewCategory extends ViewRecord
                     ->modalDescription('Move the series to another category.')
                     ->modalSubmitActionLabel('Move now'),
                 Actions\Action::make('process')
-                    ->label('Process Category Series')
+                    ->label('Process category series')
                     ->icon('heroicon-o-arrow-path')
                     ->action(function ($record) {
                         foreach ($record->enabled_series as $series) {

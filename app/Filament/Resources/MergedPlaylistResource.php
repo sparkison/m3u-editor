@@ -38,11 +38,11 @@ class MergedPlaylistResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-forward';
 
-    protected static ?string $navigationGroup = 'Custom';
+    protected static ?string $navigationGroup = 'Playlist';
 
     public static function getNavigationSort(): ?int
     {
-        return 1;
+        return 3;
     }
 
     public static function form(Form $form): Form

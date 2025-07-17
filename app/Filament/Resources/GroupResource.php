@@ -40,7 +40,7 @@ class GroupResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-queue-list';
 
-    protected static ?string $navigationGroup = 'Playlist';
+    protected static ?string $navigationGroup = 'Channels & VOD';
 
     public static function getNavigationSort(): ?int
     {

@@ -40,7 +40,7 @@ class CustomPlaylistResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-list-bullet';
 
-    protected static ?string $navigationGroup = 'Custom';
+    protected static ?string $navigationGroup = 'Playlist';
 
     public static function getNavigationSort(): ?int
     {
