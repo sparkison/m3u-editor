@@ -34,7 +34,12 @@ class MergeChannels implements ShouldQueue
     public function handle(): void
     {
         $processed = 0;
-        $groupedChannels = $this->channels->groupBy(function ($channel) {
+        // Filter out channels where the stream ID is empty
+        $filteredChannels = $this->channels->filter(function ($channel) {
+            return !empty($channel->stream_id_custom) || !empty($channel->stream_id);
+        });
+
+        $groupedChannels = $filteredChannels->groupBy(function ($channel) {
             $streamId = $channel->stream_id_custom ?: $channel->stream_id;
             return strtolower($streamId);
         });
