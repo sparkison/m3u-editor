@@ -483,7 +483,6 @@ class SeriesResource extends Resource
                             Forms\Components\Grid::make(2)
                                 ->schema([
                                     Forms\Components\TextInput::make('name')
-                                        ->disabled()
                                         ->maxLength(255),
                                     Forms\Components\Toggle::make('enabled')
                                         ->inline(false)
