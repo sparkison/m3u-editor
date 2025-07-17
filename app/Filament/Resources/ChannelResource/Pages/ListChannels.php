@@ -107,7 +107,6 @@ class ListChannels extends ListRecords
                 Actions\Action::make('unmerge')
                     ->form([
                         Forms\Components\Select::make('playlist_id')
-                            ->required()
                             ->label('Unmerge Playlist')
                             ->options(Playlist::where('user_id', auth()->id())->pluck('name', 'id'))
                             ->live()
@@ -119,7 +118,7 @@ class ListChannels extends ListRecords
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new \App\Jobs\UnmergeChannels(
                                 user: auth()->user(),
-                                playlistId: $data['playlist_id']
+                                playlistId: $data['playlist_id'] ?? null
                             ));
                     })->after(function () {
                         Notification::make()
