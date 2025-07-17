@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\CategoryResource\Pages;
 use App\Filament\Resources\CategoryResource\RelationManagers;
 use App\Models\Category;
+use App\Models\CustomPlaylist;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -106,6 +107,31 @@ class CategoryResource extends Resource
             ->actions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\ViewAction::make(),
+                    Tables\Actions\Action::make('add')
+                        ->label('Add to custom playlist')
+                        ->form([
+                            Forms\Components\Select::make('playlist')
+                                ->required()
+                                ->label('Custom Playlist')
+                                ->helperText('Select the custom playlist you would like to add the selected series to.')
+                                ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                                ->searchable(),
+                        ])
+                        ->action(function ($record, array $data): void {
+                            $playlist = CustomPlaylist::findOrFail($data['playlist']);
+                            $playlist->series()->syncWithoutDetaching($record->series()->pluck('id'));
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Series added to custom playlist')
+                                ->body('The selected series have been added to the chosen custom playlist.')
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-play')
+                        ->modalIcon('heroicon-o-play')
+                        ->modalDescription('Add the selected series to the chosen custom playlist.')
+                        ->modalSubmitActionLabel('Add now'),
                     Tables\Actions\Action::make('move')
                         ->label('Move series to category')
                         ->form([
@@ -219,6 +245,36 @@ class CategoryResource extends Resource
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\BulkAction::make('add')
+                        ->label('Add to custom playlist')
+                        ->form([
+                            Forms\Components\Select::make('playlist')
+                                ->required()
+                                ->label('Custom Playlist')
+                                ->helperText('Select the custom playlist you would like to add the selected category series to.')
+                                ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                                ->searchable(),
+                        ])
+                        ->action(function (Collection $records, array $data): void {
+                            $playlist = CustomPlaylist::findOrFail($data['playlist']);
+                            foreach ($records as $record) {
+                                // Sync the series to the custom playlist
+                                // This will add the series to the playlist without detaching existing ones
+                                // Prevents duplicates in the playlist
+                                $playlist->series()->syncWithoutDetaching($record->series()->pluck('id'));
+                            }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Category series added to custom playlist')
+                                ->body('The selected category series have been added to the chosen custom playlist.')
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-play')
+                        ->modalIcon('heroicon-o-play')
+                        ->modalDescription('Add the selected category series to the chosen custom playlist.')
+                        ->modalSubmitActionLabel('Add now'),
                     Tables\Actions\BulkAction::make('move')
                         ->label('Move series to category')
                         ->form([

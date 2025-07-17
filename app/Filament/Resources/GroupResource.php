@@ -238,7 +238,7 @@ class GroupResource extends Resource
                             Forms\Components\Select::make('playlist')
                                 ->required()
                                 ->label('Custom Playlist')
-                                ->helperText('Select the custom playlist you would like to add the selected channel(s) to.')
+                                ->helperText('Select the custom playlist you would like to add the selected group channel(s) to.')
                                 ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
                                 ->searchable(),
                         ])
