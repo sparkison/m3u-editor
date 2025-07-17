@@ -103,7 +103,7 @@ class SeriesRelationManager extends RelationManager
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\DetachBulkAction::make()->color('danger'),
-                ...SeriesResource::getTableBulkActions(),
+                ...SeriesResource::getTableBulkActions(addToCustom: false),
             ]);
     }
 }

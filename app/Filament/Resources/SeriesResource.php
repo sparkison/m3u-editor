@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\SeriesResource\Pages;
 use App\Filament\Resources\SeriesResource\RelationManagers;
 use App\Models\Category;
+use App\Models\CustomPlaylist;
 use App\Models\Playlist;
 use App\Models\Series;
 use App\Rules\CheckIfUrlOrLocalPath;
@@ -70,13 +71,13 @@ class SeriesResource extends Resource
             })
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
-            ->columns(self::getTableColumns(showPlaylist: !$relationId))
+            ->columns(self::getTableColumns(showCategory: !$relationId, showPlaylist: !$relationId))
             ->filters(self::getTableFilters(showPlaylist: !$relationId))
             ->actions(self::getTableActions(), position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions(self::getTableBulkActions());
     }
 
-    public static function getTableColumns($showPlaylist = true): array
+    public static function getTableColumns($showCategory = true, $showPlaylist = true): array
     {
         return [
             Tables\Columns\ImageColumn::make('cover')
@@ -103,6 +104,7 @@ class SeriesResource extends Resource
                 ->toggleable()
                 ->sortable(),
             Tables\Columns\TextColumn::make('category.name')
+                ->hidden(fn() => !$showCategory)
                 ->numeric()
                 ->sortable(),
             Tables\Columns\TextColumn::make('genre')
@@ -254,10 +256,37 @@ class SeriesResource extends Resource
         ];
     }
 
-    public static function getTableBulkActions(): array
+    public static function getTableBulkActions($addToCustom = true): array
     {
         return [
             Tables\Actions\BulkActionGroup::make([
+                Tables\Actions\BulkAction::make('add')
+                    ->label('Add to custom playlist')
+                    ->form([
+                        Forms\Components\Select::make('playlist')
+                            ->required()
+                            ->label('Custom Playlist')
+                            ->helperText('Select the custom playlist you would like to add the selected series to.')
+                            ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                            ->searchable(),
+                    ])
+                    ->action(function (Collection $records, array $data): void {
+                        $playlist = CustomPlaylist::findOrFail($data['playlist']);
+                        $playlist->series()->syncWithoutDetaching($records->pluck('id'));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Series added to custom playlist')
+                            ->body('The selected series have been added to the chosen custom playlist.')
+                            ->send();
+                    })
+                    ->hidden(fn() => !$addToCustom)
+                    ->deselectRecordsAfterCompletion()
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-play')
+                    ->modalIcon('heroicon-o-play')
+                    ->modalDescription('Add the selected series to the chosen custom playlist.')
+                    ->modalSubmitActionLabel('Add now'),
                 Tables\Actions\BulkAction::make('move')
                     ->label('Move series to category')
                     ->form([

@@ -19,6 +19,31 @@ class ViewCategory extends ViewRecord
     {
         return [
             Actions\ActionGroup::make([
+                Actions\Action::make('add')
+                    ->label('Add to custom playlist')
+                    ->form([
+                        Forms\Components\Select::make('playlist')
+                            ->required()
+                            ->label('Custom Playlist')
+                            ->helperText('Select the custom playlist you would like to add the selected series to.')
+                            ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                            ->searchable(),
+                    ])
+                    ->action(function ($record, array $data): void {
+                        $playlist = CustomPlaylist::findOrFail($data['playlist']);
+                        $playlist->series()->syncWithoutDetaching($record->series()->pluck('id'));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Series added to custom playlist')
+                            ->body('The selected series have been added to the chosen custom playlist.')
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-play')
+                    ->modalIcon('heroicon-o-play')
+                    ->modalDescription('Add the selected series to the chosen custom playlist.')
+                    ->modalSubmitActionLabel('Add now'),
                 Actions\Action::make('move')
                     ->label('Move series to category')
                     ->form([
