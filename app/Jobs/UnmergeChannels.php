@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\Channel;
 use App\Models\ChannelFailover;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -15,27 +16,43 @@ class UnmergeChannels implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $user;
-
     /**
      * Create a new job instance.
      */
-    public function __construct(public Collection $channels, $user)
-    {
-        $this->user = $user;
-    }
+    public function __construct(
+        public $user,
+        public $playlistId = null,
+    ) {}
 
     /**
      * Execute the job.
      */
     public function handle(): void
     {
-        $channelIds = $this->channels->pluck('id');
+        if ($this->playlistId) {
+            // Get the playlist channels IDs
+            $channelIds = Channel::where('playlist_id', $this->playlistId);
 
-        // Delete all failover records where the selected channels are either the master or the failover
-        ChannelFailover::whereIn('channel_id', $channelIds)
-            ->orWhereIn('channel_failover_id', $channelIds)
-            ->delete();
+            // Need to efficiently work through potentially 100s of thousands of channels
+            // so we use cursor() to avoid loading everything into memory at once
+            $idsToDelete = [];
+            foreach ($channelIds->cursor() as $channel) {
+                // Bulk delete in chunks of 100
+                $idsToDelete[] = $channel->id;
+                if (count($idsToDelete) >= 100) {
+                    ChannelFailover::whereIn('channel_id', $idsToDelete)->delete();
+                    $idsToDelete = [];
+                }
+            }
+
+            // Clean up any remaining IDs
+            if (count($idsToDelete) > 0) {
+                ChannelFailover::whereIn('channel_id', $idsToDelete)->delete();
+            }
+        } else {
+            // Delete all user failovers if no playlist is specified
+            ChannelFailover::where('user_id', $this->user->id)->delete();
+        }
 
         $this->sendCompletionNotification();
     }
@@ -46,6 +63,7 @@ class UnmergeChannels implements ShouldQueue
             ->title('Unmerge complete')
             ->body('All channels have been unmerged successfully.')
             ->success()
+            ->broadcast($this->user)
             ->sendToDatabase($this->user);
     }
 }

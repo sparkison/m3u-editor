@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Hydrat\TableLayoutToggle\Concerns\HasToggleableTable;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 
 class ListChannels extends ListRecords
@@ -42,7 +43,7 @@ class ListChannels extends ListRecords
                 ->label('Create Custom Channel')
                 ->modalHeading('New Custom Channel')
                 ->modalDescription('NOTE: Custom channels need to be associated with a Playlist or Custom Playlist.')
-                ->using(fn (array $data, string $model): Model => ChannelResource::createCustomChannel(
+                ->using(fn(array $data, string $model): Model => ChannelResource::createCustomChannel(
                     data: $data,
                     model: $model,
                 ))
@@ -52,14 +53,45 @@ class ListChannels extends ListRecords
                     ->label('Merge Same ID')
                     ->form([
                         Forms\Components\Select::make('playlist_id')
+                            ->required()
                             ->label('Preferred Playlist')
                             ->options(Playlist::where('user_id', auth()->id())->pluck('name', 'id'))
-                            ->helperText('Select a playlist to prioritize as the master during the merge process.')
+                            ->live()
+                            ->searchable()
+                            ->helperText('Select a playlist to prioritize as the master during the merge process.'),
+                        Forms\Components\Repeater::make('failover_playlists')
+                            ->label('')
+                            ->helperText('Select one or more playlists use as failover source(s).')
+                            ->reorderable()
+                            ->reorderableWithButtons()
+                            ->orderColumn('sort')
+                            ->simple(
+                                Forms\Components\Select::make('playlist_failover_id')
+                                    ->label('Failover Playlists')
+                                    ->options(Playlist::where('user_id', auth()->id())->pluck('name', 'id'))
+                                    ->searchable()
+                                    ->required()
+                            )
+                            ->distinct()
+                            ->columns(1)
+                            ->addActionLabel('Add failover playlist')
+                            ->columnSpanFull()
+                            ->minItems(1)
+                            ->defaultItems(1),
+                        Forms\Components\Toggle::make('by_resolution')
+                            ->label('Order by Resolution')
+                            ->live()
+                            ->helperText('When enabled, the highest resolution failover will be prioritized first. This will take longer to process as each matched stream will need to be assessed to determine resolution.')
+                            ->default(false),
                     ])
                     ->action(function (array $data): void {
-                        $channels = Channel::where('user_id', auth()->id())->get();
                         app('Illuminate\Contracts\Bus\Dispatcher')
-                            ->dispatch(new \App\Jobs\MergeChannels($channels, auth()->user(), $data['playlist_id'] ?? null));
+                            ->dispatch(new \App\Jobs\MergeChannels(
+                                user: auth()->user(),
+                                playlists: collect($data['failover_playlists']),
+                                playlistId: $data['playlist_id'],
+                                checkResolution: $data['by_resolution'] ?? false, // Sort failovers by resolution, or by playlist (default behavior)
+                            ));
                     })->after(function () {
                         Notification::make()
                             ->success()
@@ -73,11 +105,22 @@ class ListChannels extends ListRecords
                     ->modalDescription('Merge all channels with the same ID into a single channel with failover.')
                     ->modalSubmitActionLabel('Merge now'),
                 Actions\Action::make('unmerge')
+                    ->form([
+                        Forms\Components\Select::make('playlist_id')
+                            ->required()
+                            ->label('Unmerge Playlist')
+                            ->options(Playlist::where('user_id', auth()->id())->pluck('name', 'id'))
+                            ->live()
+                            ->searchable()
+                            ->helperText('Playlist to unmerge channels from (or leave empty to unmerge all).'),
+                    ])
                     ->label('Unmerge Same ID')
-                    ->action(function (): void {
-                        $channels = Channel::where('user_id', auth()->id())->get();
+                    ->action(function ($data): void {
                         app('Illuminate\Contracts\Bus\Dispatcher')
-                            ->dispatch(new \App\Jobs\UnmergeChannels($channels, auth()->user()));
+                            ->dispatch(new \App\Jobs\UnmergeChannels(
+                                user: auth()->user(),
+                                playlistId: $data['playlist_id']
+                            ));
                     })->after(function () {
                         Notification::make()
                             ->success()
