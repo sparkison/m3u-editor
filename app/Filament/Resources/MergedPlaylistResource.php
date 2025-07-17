@@ -452,7 +452,8 @@ class MergedPlaylistResource extends Resource
                                 ->compact()
                                 ->icon('heroicon-m-link')
                                 ->collapsible()
-                                ->collapsed(false)
+                                ->persistCollapsed()
+                                ->collapsed(true)
                                 ->schema([
                                     Forms\Components\Toggle::make('short_urls_enabled')
                                         ->label('Use Short URLs')
