@@ -49,7 +49,7 @@ class ChannelResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-film';
 
-    protected static ?string $navigationGroup = 'Playlist';
+    protected static ?string $navigationGroup = 'Channels & VOD';
 
     public static function getNavigationSort(): ?int
     {

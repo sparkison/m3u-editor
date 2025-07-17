@@ -44,7 +44,7 @@ class SeriesResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-film';
 
-    protected static ?string $navigationGroup = 'Playlist';
+    protected static ?string $navigationGroup = 'Series';
 
     public static function getNavigationSort(): ?int
     {
@@ -341,7 +341,7 @@ class SeriesResource extends Resource
                     ->modalDescription('Move the category series to another category.')
                     ->modalSubmitActionLabel('Move now'),
                 Tables\Actions\BulkAction::make('process')
-                    ->label('Process Selected Series')
+                    ->label('Process selected series')
                     ->icon('heroicon-o-arrow-path')
                     ->action(function ($records) {
                         foreach ($records as $record) {
