@@ -3,6 +3,7 @@
 use App\Models\Channel;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -26,20 +27,18 @@ return new class extends Migration
         // and will only update channels that have is_vod set to true and container_extension is null.
         $channels = Channel::where('is_vod', true)
             ->whereNull('container_extension');
-        foreach ($channels->cursor()->chunk(500) as $chunk) {
-            $bulk = [];
+        foreach ($channels->cursor()->chunk(100) as $chunk) {
             foreach ($chunk as $channel) {
                 $containerExtension = null;
                 // Extract the file extension from the URL
                 if (preg_match('/\.(\w+)$/', $channel->url, $matches)) {
                     $containerExtension = strtolower($matches[1]);
                 }
-                $bulk[] = [
-                    'id' => $channel->id,
-                    'container_extension' => $containerExtension,
-                ];
+                // Use DB::table for direct update to avoid model events and potential issues
+                DB::table('channels')
+                    ->where('id', $channel->id)
+                    ->update(['container_extension' => $containerExtension]);
             }
-            Channel::upsert($bulk, ['id'], ['container_extension']);
         }
     }
 
