@@ -337,7 +337,24 @@ class MergedPlaylistResource extends Resource
                 ->hiddenOn(['edit']) // hide this field on the edit form
                 ->schema([
                     ...$schema,
-                    ...$outputScheme
+                    ...$outputScheme,
+                    Forms\Components\CheckboxList::make('failover_playlist_ids')
+                        ->label('Failover Playlists')
+                        ->relationship('playlists', 'name')
+                        ->helperText('Select playlists to use for failover.')
+                        ->afterStateUpdated(function ($state, $record) {
+                            if (!$record) return;
+
+                            $record->playlists()->updateExistingPivot($record->playlists, ['is_failover' => false]);
+                            $record->playlists()->updateExistingPivot($state, ['is_failover' => true]);
+                        })
+                        ->dehydrated(false)
+                        ->default(function ($record) {
+                            if ($record) {
+                                return $record->playlists()->where('is_failover', true)->pluck('playlists.id')->toArray();
+                            }
+                            return [];
+                        })
                 ])
                 ->columns(2),
             Forms\Components\Grid::make()

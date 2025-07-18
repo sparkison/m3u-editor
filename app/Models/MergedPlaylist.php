@@ -43,6 +43,12 @@ class MergedPlaylist extends Model
         return $this->belongsToMany(Playlist::class, 'merged_playlist_playlist');
     }
 
+    public function failoverPlaylists(): BelongsToMany
+    {
+        return $this->belongsToMany(Playlist::class, 'merged_playlist_playlist')
+            ->wherePivot('is_failover', true);
+    }
+
     public function channels(): HasManyThrough
     {
         return $this->hasManyThrough(

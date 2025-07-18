@@ -22,7 +22,7 @@ class MergeChannels implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct(public Collection $channels, $user, $playlistId = null)
+    public function __construct($user, public Collection $playlists, $playlistId, public bool $checkResolution = false)
     {
         $this->user = $user;
         $this->playlistId = $playlistId;
@@ -34,8 +34,23 @@ class MergeChannels implements ShouldQueue
     public function handle(): void
     {
         $processed = 0;
+        $playlistIds = $this->playlists->map(function ($item) {
+            if (is_array($item)) {
+                return $item['playlist_failover_id'];
+            }
+            return $item;
+        })->toArray();
+
+        if ($this->playlistId) {
+            $playlistIds[] = $this->playlistId;
+        }
+
+        $channels = Channel::where('user_id', $this->user->id)
+            ->whereIn('playlist_id', array_unique($playlistIds))
+            ->get();
+
         // Filter out channels where the stream ID is empty
-        $filteredChannels = $this->channels->filter(function ($channel) {
+        $filteredChannels = $channels->filter(function ($channel) {
             return !empty($channel->stream_id_custom) || !empty($channel->stream_id);
         });
 
@@ -43,6 +58,17 @@ class MergeChannels implements ShouldQueue
             $streamId = $channel->stream_id_custom ?: $channel->stream_id;
             return strtolower($streamId);
         });
+
+        $failoverPlaylistIds = $this->playlists->map(function ($item) {
+            if (is_array($item)) {
+                return $item['playlist_failover_id'];
+            }
+            return $item;
+        })->toArray();
+
+        if ($this->playlistId && !in_array($this->playlistId, $failoverPlaylistIds)) {
+            $failoverPlaylistIds[] = $this->playlistId;
+        }
 
         foreach ($groupedChannels as $group) {
             if ($group->count() > 1) {
@@ -69,14 +95,25 @@ class MergeChannels implements ShouldQueue
                 }
 
                 // The rest are failovers
-                foreach ($group as $failover) {
-                    if ($failover->id !== $master->id) {
-                        ChannelFailover::updateOrCreate(
-                            ['channel_id' => $master->id, 'channel_failover_id' => $failover->id],
-                            ['user_id' => $master->user_id]
-                        );
-                        $processed++;
+                if (!empty($failoverPlaylistIds)) {
+                    $failoverChannels = $group->where('id', '!=', $master->id)
+                                              ->whereIn('playlist_id', $failoverPlaylistIds);
+
+                    if ($this->checkResolution) {
+                        $failoverChannels = $failoverChannels->sortByDesc(function ($channel) {
+                            return $this->getResolution($channel);
+                        });
                     }
+                } else {
+                    $failoverChannels = collect(); // Empty collection
+                }
+
+                foreach ($failoverChannels as $failover) {
+                    ChannelFailover::updateOrCreate(
+                        ['channel_id' => $master->id, 'channel_failover_id' => $failover->id],
+                        ['user_id' => $this->user->id]
+                    );
+                    $processed++;
                 }
             }
         }
