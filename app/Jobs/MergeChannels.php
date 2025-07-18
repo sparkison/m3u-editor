@@ -45,7 +45,9 @@ class MergeChannels implements ShouldQueue
             return strtolower($streamId);
         });
 
-        $failoverPlaylistIds = $this->playlists->pluck('playlist_failover_id')->toArray();
+        $failoverPlaylistIds = $this->playlists->map(function ($item) {
+            return $item['playlist_failover_id'];
+        })->toArray();
 
         foreach ($groupedChannels as $group) {
             if ($group->count() > 1) {
