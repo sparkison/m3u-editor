@@ -22,7 +22,7 @@ class MergeChannels implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct(public Collection $channels, $user, $playlistId = null)
+    public function __construct(public Collection $channels, $user, $playlistId = null, public ?array $failoverPlaylistIds = [])
     {
         $this->user = $user;
         $this->playlistId = $playlistId;
@@ -69,14 +69,18 @@ class MergeChannels implements ShouldQueue
                 }
 
                 // The rest are failovers
-                foreach ($group as $failover) {
-                    if ($failover->id !== $master->id) {
-                        ChannelFailover::updateOrCreate(
-                            ['channel_id' => $master->id, 'channel_failover_id' => $failover->id],
-                            ['user_id' => $master->user_id]
-                        );
-                        $processed++;
-                    }
+                $failoverChannels = $group->where('id', '!=', $master->id);
+
+                if (!empty($this->failoverPlaylistIds)) {
+                    $failoverChannels = $failoverChannels->whereIn('playlist_id', $this->failoverPlaylistIds);
+                }
+
+                foreach ($failoverChannels as $failover) {
+                    ChannelFailover::updateOrCreate(
+                        ['channel_id' => $master->id, 'channel_failover_id' => $failover->id],
+                        ['user_id' => $master->user_id]
+                    );
+                    $processed++;
                 }
             }
         }
