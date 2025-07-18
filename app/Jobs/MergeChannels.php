@@ -52,6 +52,10 @@ class MergeChannels implements ShouldQueue
             return $item;
         })->toArray();
 
+        if ($this->playlistId && !in_array($this->playlistId, $failoverPlaylistIds)) {
+            $failoverPlaylistIds[] = $this->playlistId;
+        }
+
         foreach ($groupedChannels as $group) {
             if ($group->count() > 1) {
                 $master = null;
