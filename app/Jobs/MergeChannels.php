@@ -69,10 +69,11 @@ class MergeChannels implements ShouldQueue
                 }
 
                 // The rest are failovers
-                $failoverChannels = $group->where('id', '!=', $master->id);
-
                 if (!empty($this->failoverPlaylistIds)) {
-                    $failoverChannels = $failoverChannels->whereIn('playlist_id', $this->failoverPlaylistIds);
+                    $failoverChannels = $group->where('id', '!=', $master->id)
+                                              ->whereIn('playlist_id', $this->failoverPlaylistIds);
+                } else {
+                    $failoverChannels = collect(); // Empty collection
                 }
 
                 foreach ($failoverChannels as $failover) {

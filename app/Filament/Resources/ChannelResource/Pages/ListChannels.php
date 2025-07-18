@@ -54,12 +54,16 @@ class ListChannels extends ListRecords
                         Forms\Components\Select::make('playlist_id')
                             ->label('Preferred Playlist')
                             ->options(Playlist::where('user_id', auth()->id())->pluck('name', 'id'))
-                            ->helperText('Select a playlist to prioritize as the master during the merge process.')
+                            ->helperText('Select a playlist to prioritize as the master during the merge process.'),
+                        Forms\Components\CheckboxList::make('failover_playlist_ids')
+                            ->label('Failover Playlists')
+                            ->options(Playlist::where('user_id', auth()->id())->pluck('name', 'id'))
+                            ->helperText('Select playlists to use for failover.')
                     ])
                     ->action(function (array $data): void {
                         $channels = Channel::where('user_id', auth()->id())->get();
                         app('Illuminate\Contracts\Bus\Dispatcher')
-                            ->dispatch(new \App\Jobs\MergeChannels($channels, auth()->user(), $data['playlist_id'] ?? null));
+                            ->dispatch(new \App\Jobs\MergeChannels($channels, auth()->user(), $data['playlist_id'] ?? null, $data['failover_playlist_ids'] ?? []));
                     })->after(function () {
                         Notification::make()
                             ->success()
