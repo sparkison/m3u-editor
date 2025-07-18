@@ -27,7 +27,7 @@ class MergeChannels implements ShouldQueue
         $this->user = $user;
         $this->playlistId = $playlistId;
 
-        if (isset($failoverPlaylists[0]['playlist_failover_id'])) {
+        if (!empty($failoverPlaylists) && isset($failoverPlaylists[0]['playlist_failover_id'])) {
             $this->failoverPlaylistIds = array_map(function ($item) {
                 return $item['playlist_failover_id'];
             }, $failoverPlaylists);
