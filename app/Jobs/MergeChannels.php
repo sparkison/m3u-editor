@@ -22,7 +22,7 @@ class MergeChannels implements ShouldQueue
     public function __construct(
         public $user,
         public Collection $playlists,
-        public $playlistId,
+        public int $playlistId,
         public bool $checkResolution = false,
     ) {}
 
@@ -33,114 +33,104 @@ class MergeChannels implements ShouldQueue
     {
         $processed = 0;
 
-        // Build playlist IDs array similar to MergeChannelsKaka
+        // Build unified playlist IDs array and create priority lookup
         $playlistIds = $this->playlists->map(function ($item) {
-            if (is_array($item)) {
-                return $item['playlist_failover_id'];
-            }
-            return $item;
-        })->toArray();
+            return is_array($item) ? $item['playlist_failover_id'] : $item;
+        })->values();
 
         if ($this->playlistId) {
-            $playlistIds[] = $this->playlistId;
+            $playlistIds->prepend($this->playlistId); // Add preferred playlist at the beginning
         }
 
-        // Get all channels from the specified playlists with user filter
+        $playlistIds = $playlistIds->unique()->toArray();
+
+        // Create playlist priority lookup for efficient sorting
+        $playlistPriority = $playlistIds ? array_flip($playlistIds) : [];
+
+        // Get all channels with stream IDs in a single efficient query
         $allChannels = Channel::where('user_id', $this->user->id)
-            ->whereIn('playlist_id', array_unique($playlistIds))
+            ->whereIn('playlist_id', $playlistIds)
             ->where(function ($query) {
-                // Only include channels that have a stream ID or custom stream ID
-                $query->whereNotNull('stream_id_custom')->orWhereNotNull('stream_id');
-            })->cursor(); // Use cursor for memory efficiency
+                $query->where('stream_id_custom', '!=', '')
+                    ->orWhere('stream_id', '!=', '');
+            })->cursor();
 
-        // Group channels by stream ID using LazyCollection to maintain memory efficiency
-        $groupedChannels = $allChannels
-            ->filter(function ($channel) {
-                return !empty($channel->stream_id_custom) || !empty($channel->stream_id);
-            })
-            ->groupBy(function ($channel) {
-                $streamId = $channel->stream_id_custom ?: $channel->stream_id;
-                return strtolower($streamId);
-            });
-
-        $failoverPlaylistIds = $this->playlists->map(function ($item) {
-            if (is_array($item)) {
-                return $item['playlist_failover_id'];
-            }
-            return $item;
-        })->toArray();
-
-        if ($this->playlistId && !in_array($this->playlistId, $failoverPlaylistIds)) {
-            $failoverPlaylistIds[] = $this->playlistId;
-        }
+        // Group channels by stream ID using LazyCollection
+        $groupedChannels = $allChannels->groupBy(function ($channel) {
+            $streamId = $channel->stream_id_custom ?: $channel->stream_id;
+            return strtolower(trim($streamId));
+        });
 
         // Process each group of channels with the same stream ID
-        foreach ($groupedChannels as $group) {
-            if ($group->count() > 1) {
-                $master = null;
+        foreach ($groupedChannels as $streamId => $group) {
+            if ($group->count() <= 1) {
+                continue; // Skip single channels
+            }
 
-                // Try to find master channel from preferred playlist first
-                $preferredChannels = $group->where('playlist_id', $this->playlistId);
-                if ($preferredChannels->isNotEmpty()) {
-                    if ($this->checkResolution) {
-                        // Select highest resolution from preferred playlist
-                        $master = $preferredChannels->reduce(function ($highest, $channel) {
-                            if (!$highest) return $channel;
-                            $highestResolution = $this->getResolution($highest);
-                            $currentResolution = $this->getResolution($channel);
-                            return ($currentResolution > $highestResolution) ? $channel : $highest;
-                        });
-                    } else {
-                        // Use playlist order priority - find channel from earliest playlist in order
-                        $master = $preferredChannels->sortBy(function ($channel) {
-                            return $this->playlists->search($channel->playlist_id);
-                        })->first();
-                    }
-                }
+            // Select master channel based on criteria
+            $master = $this->selectMasterChannel($group, $playlistPriority);
+            if (!$master) {
+                continue; // Skip if no valid master found
+            }
 
-                // If no master found from preferred playlist, select from all channels
-                if (!$master) {
-                    if ($this->checkResolution) {
-                        // Select highest resolution overall
-                        $master = $group->reduce(function ($highest, $channel) {
-                            if (!$highest) return $channel;
-                            $highestResolution = $this->getResolution($highest);
-                            $currentResolution = $this->getResolution($channel);
-                            return ($currentResolution > $highestResolution) ? $channel : $highest;
-                        });
-                    } else {
-                        // Use playlist order priority
-                        $master = $group->sortBy(function ($channel) {
-                            return $this->playlists->search($channel->playlist_id);
-                        })->first();
-                    }
-                }
+            // Create failover relationships for remaining channels
+            $failoverChannels = $group->where('id', '!=', $master->id);
+            if ($this->checkResolution) {
+                $failoverChannels = $failoverChannels->sortByDesc(fn($channel) => $this->getResolution($channel));
+            } else {
+                $failoverChannels = $failoverChannels->sortBy(fn($channel) => $playlistPriority[$channel->playlist_id] ?? 999);
+            }
 
-                // Create failover relationships for remaining channels
-                $failoverChannels = $group->where('id', '!=', $master->id)
-                    ->whereIn('playlist_id', $failoverPlaylistIds);
-
-                if ($this->checkResolution) {
-                    $failoverChannels = $failoverChannels->sortByDesc(function ($channel) {
-                        return $this->getResolution($channel);
-                    });
-                } else {
-                    // Sort failovers by playlist order priority
-                    $failoverChannels = $failoverChannels->sortBy(function ($channel) {
-                        return $this->playlists->search($channel->playlist_id);
-                    });
-                }
-
-                foreach ($failoverChannels as $failover) {
-                    ChannelFailover::updateOrCreate(
-                        ['channel_id' => $master->id, 'channel_failover_id' => $failover->id],
-                        ['user_id' => $this->user->id]
-                    );
-                    $processed++;
-                }
+            // Create failover relationships using updateOrCreate for compatibility
+            foreach ($failoverChannels as $failover) {
+                ChannelFailover::updateOrCreate(
+                    [
+                        'channel_id' => $master->id,
+                        'channel_failover_id' => $failover->id
+                    ],
+                    ['user_id' => $this->user->id]
+                );
+                $processed++;
             }
         }
+
         $this->sendCompletionNotification($processed);
+    }
+
+    /**
+     * Select the master channel from a group based on priority rules
+     */
+    private function selectMasterChannel($group, array $playlistPriority)
+    {
+        if ($this->checkResolution) {
+            // Priority 1: Preferred playlist with highest resolution
+            if ($this->playlistId) {
+                $preferredChannels = $group->where('playlist_id', $this->playlistId);
+                if ($preferredChannels->isNotEmpty()) {
+                    return $preferredChannels->reduce(function ($highest, $channel) {
+                        if (!$highest) return $channel;
+                        return $this->getResolution($channel) > $this->getResolution($highest) ? $channel : $highest;
+                    });
+                }
+            }
+
+            // Priority 2: Highest resolution overall
+            return $group->reduce(function ($highest, $channel) {
+                if (!$highest) return $channel;
+                return $this->getResolution($channel) > $this->getResolution($highest) ? $channel : $highest;
+            });
+        } else {
+            // Priority 1: Preferred playlist with earliest order
+            if ($this->playlistId) {
+                $preferredChannels = $group->where('playlist_id', $this->playlistId);
+                if ($preferredChannels->isNotEmpty()) {
+                    return $preferredChannels->sortBy(fn($channel) => $playlistPriority[$channel->playlist_id] ?? 999)->first();
+                }
+            }
+
+            // Priority 2: Earliest playlist order overall
+            return $group->sortBy(fn($channel) => $playlistPriority[$channel->playlist_id] ?? 999)->first();
+        }
     }
 
     private function getResolution($channel)
