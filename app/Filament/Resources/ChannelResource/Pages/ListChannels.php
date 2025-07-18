@@ -55,10 +55,12 @@ class ListChannels extends ListRecords
                             ->label('Preferred Playlist')
                             ->options(Playlist::where('user_id', auth()->id())->pluck('name', 'id'))
                             ->helperText('Select a playlist to prioritize as the master during the merge process.'),
-                        Forms\Components\CheckboxList::make('failover_playlist_ids')
+                        Forms\Components\Select::make('failover_playlist_ids')
                             ->label('Failover Playlists')
                             ->options(Playlist::where('user_id', auth()->id())->pluck('name', 'id'))
                             ->helperText('Select playlists to use for failover.')
+                            ->multiple()
+                            ->searchable()
                     ])
                     ->action(function (array $data): void {
                         $channels = Channel::where('user_id', auth()->id())->get();

@@ -26,6 +26,9 @@ class MergeChannels implements ShouldQueue
     {
         $this->user = $user;
         $this->playlistId = $playlistId;
+        if ($this->playlistId && !in_array($this->playlistId, $this->failoverPlaylistIds)) {
+            $this->failoverPlaylistIds[] = $this->playlistId;
+        }
     }
 
     /**
