@@ -357,7 +357,7 @@ class ProxyService
             $cmd .= $hwaccelInputArgs; // e.g., -hwaccel vaapi (these must go BEFORE the -i input)
 
             // Low-latency flags for better HLS performance
-            $cmd .= '-fflags nobuffer+igndts -flags low_delay -avoid_negative_ts disabled ';
+            $cmd .= '-fflags nobuffer+igndts -flags low_delay -avoid_negative_ts disabled -copyts -start_at_zero ';
 
             // Input analysis optimization for faster stream start
             $cmd .= '-analyzeduration 1M -probesize 1M -max_delay 500000 -fpsprobesize 0 ';
