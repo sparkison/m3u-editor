@@ -22,9 +22,10 @@ class MergeChannels implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct($user, public Collection $playlists, public $playlistId, public bool $checkResolution = false)
+    public function __construct($user, public Collection $playlists, $playlistId, public bool $checkResolution = false)
     {
         $this->user = $user;
+        $this->playlistId = $playlistId;
     }
 
     /**
