@@ -35,42 +35,45 @@ class MergeChannels implements ShouldQueue
         $processed = 0;
 
         // Get the channels from the specified playlists
+        // These are the primary channels that will be merged with failover channels
         $primaryChannels = Channel::where('playlist_id', $this->playlistId)
             ->where(function ($query) {
+                // Only include channels that have a stream ID or custom stream ID
                 $query->whereNotNull('stream_id_custom')->orWhereNotNull('stream_id');
-            })->cursor();
+            })->cursor(); // Use cursor for memory efficiency
 
         // Get the failover channels from the specified playlists
         $failoverChannels = Channel::whereIn('playlist_id', $this->playlists)
             ->where('playlist_id', '!=', $this->playlistId) // Exclude primary playlist channels
             ->where(function ($query) {
+                // Only include channels that have a stream ID or custom stream ID
                 $query->whereNotNull('stream_id_custom')->orWhereNotNull('stream_id');
             });
 
         // Loop through primary channels and assign any matching failover channels
         foreach ($primaryChannels as $channel) {
-            // Skip if channel has no stream ID to match against
-            if (!$channel->stream_id_custom && !$channel->stream_id) {
-                continue;
-            }
-
-            // Check if any of the failovers have the same stream ID
-            $matchingFailovers = $failoverChannels->clone() // make a copy of the query
+            // Fetch any channels that have the same stream ID as failovers
+            $matchingFailovers = $failoverChannels->clone() // make a copy of the query (we'll need to reuse it)
                 ->where(function ($query) use ($channel) {
+                    // Priority: match custom stream ID first, then stream ID
                     if ($channel->stream_id_custom) {
                         $query->where('stream_id_custom', $channel->stream_id_custom);
                     }
+                    // If no custom stream ID, match regular stream ID
                     if ($channel->stream_id) {
                         if ($channel->stream_id_custom) {
+                            // If we have a custom stream ID, we can use orWhere to match either
                             $query->orWhere('stream_id', $channel->stream_id);
                         } else {
+                            // If we only have a regular stream ID, just match that
                             $query->where('stream_id', $channel->stream_id);
                         }
                     }
                 })->get();
 
+            // No matching failovers, skip to the next channel
             if ($matchingFailovers->isEmpty()) {
-                continue; // No matching failovers, skip to the next channel
+                continue;
             }
 
             // If checkResolution is true, we need to order by resolution instead of playlist order
