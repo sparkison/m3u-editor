@@ -52,41 +52,20 @@ class ListChannels extends ListRecords
                     ->label('Merge Same ID')
                     ->form([
                         Forms\Components\Select::make('playlist_id')
-                            ->required()
                             ->label('Preferred Playlist')
                             ->options(Playlist::where('user_id', auth()->id())->pluck('name', 'id'))
-                            ->live()
-                            ->searchable()
                             ->helperText('Select a playlist to prioritize as the master during the merge process.'),
-                        Forms\Components\Repeater::make('failover_playlists')
-                            ->label('')
-                            ->helperText('Select one or more playlists use as failover source(s).')
-                            ->reorderable()
-                            ->reorderableWithButtons()
-                            ->orderColumn('sort')
-                            ->simple(
-                                Forms\Components\Select::make('playlist_failover_id')
-                                    ->label('Failover Playlists')
-                                    ->options(Playlist::where('user_id', auth()->id())->pluck('name', 'id'))
-                                    ->searchable()
-                                    ->required()
-                            )
-                            ->distinct()
-                            ->columns(1)
-                            ->addActionLabel('Add failover playlist')
-                            ->columnSpanFull()
-                            ->minItems(1)
-                            ->defaultItems(1),
-                        Forms\Components\Toggle::make('by_resolution')
-                            ->label('Order by Resolution')
-                            ->live()
-                            ->helperText('When enabled, the highest resolution failover will be prioritized first. This will take longer to process as each matched stream will need to be assessed to determine resolution.')
-                            ->default(false)
+                        Forms\Components\Select::make('failover_playlist_ids')
+                            ->label('Failover Playlists')
+                            ->options(Playlist::where('user_id', auth()->id())->pluck('name', 'id'))
+                            ->helperText('Select playlists to use for failover.')
+                            ->multiple()
+                            ->searchable()
                     ])
                     ->action(function (array $data): void {
                         $channels = Channel::where('user_id', auth()->id())->get();
                         app('Illuminate\Contracts\Bus\Dispatcher')
-                            ->dispatch(new \App\Jobs\MergeChannels($channels, auth()->user(), $data['playlist_id'] ?? null, $data['failover_playlists'] ?? [], $data['by_resolution'] ?? false));
+                            ->dispatch(new \App\Jobs\MergeChannels($channels, auth()->user(), $data['playlist_id'] ?? null, $data['failover_playlist_ids'] ?? []));
                     })->after(function () {
                         Notification::make()
                             ->success()

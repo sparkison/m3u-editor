@@ -22,19 +22,10 @@ class MergeChannels implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct(public Collection $channels, $user, $playlistId = null, public ?array $failoverPlaylists = [], public bool $byResolution = false)
+    public function __construct(public Collection $channels, $user, $playlistId = null, public ?array $failoverPlaylistIds = [])
     {
         $this->user = $user;
         $this->playlistId = $playlistId;
-
-        if (!empty($failoverPlaylists) && isset($failoverPlaylists[0]['playlist_failover_id'])) {
-            $this->failoverPlaylistIds = array_map(function ($item) {
-                return $item['playlist_failover_id'];
-            }, $failoverPlaylists);
-        } else {
-            $this->failoverPlaylistIds = $failoverPlaylists;
-        }
-
         if ($this->playlistId && !in_array($this->playlistId, $this->failoverPlaylistIds)) {
             $this->failoverPlaylistIds[] = $this->playlistId;
         }
@@ -84,12 +75,6 @@ class MergeChannels implements ShouldQueue
                 if (!empty($this->failoverPlaylistIds)) {
                     $failoverChannels = $group->where('id', '!=', $master->id)
                                               ->whereIn('playlist_id', $this->failoverPlaylistIds);
-
-                    if ($this->byResolution) {
-                        $failoverChannels = $failoverChannels->sortByDesc(function ($channel) {
-                            return $this->getResolution($channel);
-                        });
-                    }
                 } else {
                     $failoverChannels = collect(); // Empty collection
                 }
