@@ -22,13 +22,9 @@ class MergeChannels implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct(public Collection $channels, $user, $playlistId = null, public ?array $failoverPlaylistIds = [])
+    public function __construct($user, public Collection $playlists, public $playlistId, public bool $checkResolution = false)
     {
         $this->user = $user;
-        $this->playlistId = $playlistId;
-        if ($this->playlistId && !in_array($this->playlistId, $this->failoverPlaylistIds)) {
-            $this->failoverPlaylistIds[] = $this->playlistId;
-        }
     }
 
     /**
@@ -37,8 +33,9 @@ class MergeChannels implements ShouldQueue
     public function handle(): void
     {
         $processed = 0;
+        $channels = Channel::where('user_id', $this->user->id)->get();
         // Filter out channels where the stream ID is empty
-        $filteredChannels = $this->channels->filter(function ($channel) {
+        $filteredChannels = $channels->filter(function ($channel) {
             return !empty($channel->stream_id_custom) || !empty($channel->stream_id);
         });
 
@@ -46,6 +43,8 @@ class MergeChannels implements ShouldQueue
             $streamId = $channel->stream_id_custom ?: $channel->stream_id;
             return strtolower($streamId);
         });
+
+        $failoverPlaylistIds = $this->playlists->pluck('playlist_failover_id')->toArray();
 
         foreach ($groupedChannels as $group) {
             if ($group->count() > 1) {
@@ -72,9 +71,15 @@ class MergeChannels implements ShouldQueue
                 }
 
                 // The rest are failovers
-                if (!empty($this->failoverPlaylistIds)) {
+                if (!empty($failoverPlaylistIds)) {
                     $failoverChannels = $group->where('id', '!=', $master->id)
-                                              ->whereIn('playlist_id', $this->failoverPlaylistIds);
+                                              ->whereIn('playlist_id', $failoverPlaylistIds);
+
+                    if ($this->checkResolution) {
+                        $failoverChannels = $failoverChannels->sortByDesc(function ($channel) {
+                            return $this->getResolution($channel);
+                        });
+                    }
                 } else {
                     $failoverChannels = collect(); // Empty collection
                 }
@@ -82,7 +87,7 @@ class MergeChannels implements ShouldQueue
                 foreach ($failoverChannels as $failover) {
                     ChannelFailover::updateOrCreate(
                         ['channel_id' => $master->id, 'channel_failover_id' => $failover->id],
-                        ['user_id' => $master->user_id]
+                        ['user_id' => $this->user->id]
                     );
                     $processed++;
                 }
