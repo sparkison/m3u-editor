@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process as SymfonyProcess;
 use Spatie\Tags\HasTags;
@@ -127,6 +128,10 @@ class Channel extends Model
      */
     public function getStreamStatsAttribute(): array
     {
+        $stats = Cache::get("channel_stream_stats_{$this->id}");
+        if ($stats !== null) {
+            return $stats;
+        }
         try {
             $url = $this->url_custom ?? $this->url;
             $process = SymfonyProcess::fromShellCommandline(
@@ -172,6 +177,9 @@ class Channel extends Model
                         ];
                     }
                 }
+
+                // Cache the result for 5 minutes
+                Cache::put("channel_stream_stats_{$this->id}", $streamStats, now()->addMinutes(5));
                 return $streamStats;
             }
         } catch (\Exception $e) {
