@@ -162,7 +162,8 @@ class SeriesResource extends Resource
     {
         return [
             Tables\Actions\ActionGroup::make([
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->slideOver(),
                 Tables\Actions\Action::make('move')
                     ->label('Move series to category')
                     ->form([
