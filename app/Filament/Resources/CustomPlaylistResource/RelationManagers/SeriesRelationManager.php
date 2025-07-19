@@ -170,6 +170,7 @@ class SeriesRelationManager extends RelationManager
                 ...SeriesResource::getTableActions(),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
+                ...SeriesResource::getTableBulkActions(addToCustom: false),
                 Tables\Actions\DetachBulkAction::make()->color('danger'),
                 Tables\Actions\BulkAction::make('add_to_category')
                     ->label('Add to custom category')
@@ -203,7 +204,6 @@ class SeriesRelationManager extends RelationManager
                     ->modalIcon('heroicon-o-squares-plus')
                     ->modalDescription('Add to category')
                     ->modalSubmitActionLabel('Yes, add to category'),
-                ...SeriesResource::getTableBulkActions(addToCustom: false),
             ]);
     }
 }

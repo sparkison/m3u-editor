@@ -190,6 +190,7 @@ class ChannelsRelationManager extends RelationManager
                 ...ChannelResource::getTableActions(),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
+                ...ChannelResource::getTableBulkActions(addToCustom: false),
                 Tables\Actions\DetachBulkAction::make()->color('danger'),
                 Tables\Actions\BulkAction::make('add_to_group')
                     ->label('Add to custom group')
@@ -223,7 +224,6 @@ class ChannelsRelationManager extends RelationManager
                     ->modalIcon('heroicon-o-squares-plus')
                     ->modalDescription('Add to group')
                     ->modalSubmitActionLabel('Yes, add to group'),
-                ...ChannelResource::getTableBulkActions(addToCustom: false),
             ]);
     }
 }
