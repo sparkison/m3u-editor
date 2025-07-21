@@ -725,6 +725,12 @@ class PlaylistResource extends Resource
                                     '2 weeks' => '2 weeks',
                                     '1 month' => '1 month',
                                 ])->hidden(fn(Get $get): bool => !$get('auto_sync')),
+                            Forms\Components\Toggle::make('backup_before_sync')
+                                ->label('Backup Before Sync')
+                                ->helperText('When enabled, a backup will be created before syncing.')
+                                ->columnSpanFull()
+                                ->inline(false)
+                                ->default(false),
                         ]),
 
                     Forms\Components\DateTimePicker::make('synced')

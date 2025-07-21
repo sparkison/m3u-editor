@@ -939,8 +939,15 @@ class ProcessM3uImport implements ShouldQueue
             return;
         }
 
-        // Get the jobs for the batch
+        // Create the jobs array
         $jobs = [];
+
+        // Check if we need to create a backup first
+        if ($playlist->backup_before_sync) {
+            $jobs[] = new CreateBackup(includeFiles: false);
+        }
+
+        // Get the jobs for the batch
         $jobsWhere = [
             ['batch_no', '=', $batchNo],
             ['variables', '!=', null],
