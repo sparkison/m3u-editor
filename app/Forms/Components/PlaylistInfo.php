@@ -102,8 +102,8 @@ class PlaylistInfo extends Field
             'xtream_info' => [
                 'active_connections' => "$activeConnections/$maxConnections",
                 'max_streams_reached' => $activeConnections >= $maxConnections,
-                'expires' => $expires->diffForHumans(),
-                'expires_description' => $expires->toDateTimeString(),
+                'expires' => $expires ? $expires->diffForHumans() : 'N/A',
+                'expires_description' => $expires ? $expires->toDateTimeString() : 'N/A',
                 'expires_in_24_hours_or_less' => $expiresIn24HoursOrLess,
             ]
         ];
