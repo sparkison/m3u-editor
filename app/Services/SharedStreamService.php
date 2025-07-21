@@ -736,54 +736,6 @@ class SharedStreamService
             $streamUrl,
             $userAgent
         );
-
-        // // Build command using proven working approach from StreamController
-        // $cmd = escapeshellcmd($ffmpegPath) . ' ';
-        // $cmd .= '-hide_banner -loglevel error '; // Added -hide_banner and -loglevel error globally
-
-        // // Better error handling and more robust connection options
-        // $cmd .= '-err_detect ignore_err -ignore_unknown ';
-        // $cmd .= '-fflags +nobuffer+igndts -flags low_delay ';
-        // $cmd .= '-analyzeduration 1M -probesize 1M -max_delay 500000 ';
-
-        // // HTTP options (simplified to match working approach)
-        // $cmd .= "-user_agent " . escapeshellarg($userAgent) . " -referer " . escapeshellarg("MyComputer") . " ";
-        // $cmd .= '-multiple_requests 1 -reconnect_on_network_error 1 ';
-        // $cmd .= '-reconnect_on_http_error 5xx,4xx -reconnect_streamed 1 ';
-        // $cmd .= '-reconnect_delay_max 5 ';
-        // $cmd .= '-noautorotate ';
-
-        // // Input
-        // $cmd .= '-i ' . escapeshellarg($streamUrl) . ' ';
-
-        // // Output options - use copy by default for better compatibility and performance
-        // $videoCodec = $settings['ffmpeg_codec_video'] ?? 'copy';
-        // $audioCodec = $settings['ffmpeg_codec_audio'] ?? 'copy';
-
-        // // Ensure codecs are strings, not arrays
-        // if (is_array($videoCodec)) {
-        //     $videoCodec = 'copy';
-        // }
-        // if (is_array($audioCodec)) {
-        //     $audioCodec = 'copy';
-        // }
-
-        // // Use copy by default for shared streaming to reduce CPU load
-        // if ($videoCodec === 'copy' || empty($videoCodec)) {
-        //     $videoCodec = 'copy';
-        // }
-        // if ($audioCodec === 'copy' || empty($audioCodec)) {
-        //     $audioCodec = 'copy';
-        // }
-
-        // // Output format with better streaming options
-        // $cmd .= "-c:v {$videoCodec} -c:a {$audioCodec} ";
-        // $cmd .= "-avoid_negative_ts disabled -copyts -start_at_zero ";
-        // $cmd .= "-f mpegts pipe:1";
-
-        // Log::channel('ffmpeg')->debug("SharedStream: Built optimized direct command for reliable streaming");
-
-        // return $cmd;
     }
 
     /**
@@ -1169,6 +1121,11 @@ class SharedStreamService
 
                 if (isset($streamInfo['client_count'])) {
                     $updateData['client_count'] = $streamInfo['client_count'];
+                }
+
+                if (isset($streamInfo['buffer_size'])) {
+                    $updateData['buffer_size'] = $streamInfo['buffer_size'];
+                    unset($updateData['stream_info']['buffer_size']); // Don't store buffer_size in stream_info
                 }
 
                 $sharedStream->update($updateData);
@@ -1973,6 +1930,7 @@ class SharedStreamService
             Log::channel('ffmpeg')->debug(">>>>> Updating stream activity for {$streamKey}");
 
             $streamInfo['last_activity'] = now()->timestamp;
+            $streamInfo['buffer_size'] = $this->getStreamBufferDiskUsage($streamKey);
             $this->setStreamInfo($streamKey, $streamInfo);
         } else {
             Log::channel('ffmpeg')->warning("Stream {$streamKey}: No stream info found to update activity timestamp");
@@ -3106,14 +3064,20 @@ class SharedStreamService
             // Track bandwidth using the same method as direct streaming
             $this->trackBandwidth($streamKey, $bytesTransferred);
 
-            // Update client and stream activity
-            // This is already happening since the client is regularly fetching the playlist
-            // and segments, so we don't need to explicitly update here.
-            // If you want to update activity, uncomment the following lines:
-            //$this->updateStreamActivity($streamKey);
-            //$this->updateClientActivity($streamKey, $clientId);
+            // Get current time
+            $now = time();
 
-            Log::channel('ffmpeg')->debug("HLS bandwidth tracked for {$streamKey}: {$bytesTransferred} bytes from client {$clientId} for segment {$segment}");
+            // Update database periodically (every 10 seconds to avoid too many writes)
+            // Don't need to update too often as this is a pretty rough calculation, and won't change much once the stream is stable
+            if ($now % 10 === 0) {
+                // Update the calculated buffer size (determined by the segment count)
+                $hlsListSize = 15; // Kept as a variable for future configurability
+
+                // Use the transferred bytes (current segment size) multiplied by the list size as the buffer size
+                $estimatedBufferSize = $bytesTransferred * $hlsListSize;
+                SharedStream::where('stream_id', $streamKey)
+                    ->update(['buffer_size' => $estimatedBufferSize]);
+            }
         } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Error tracking HLS bandwidth for {$streamKey}: " . $e->getMessage());
         }
