@@ -17,6 +17,8 @@ return [
         'regex' => env('TVGID_REGEX', '/[^a-zA-Z0-9_\-\.]/'),
     ],
     'max_channels' => env('MAX_CHANNELS', 50000), // Maximum number of channels allowed for m3u import
+    'invalidate_import' => env('INVALIDATE_IMPORT', false), // Invalidate import if number of "new" channels is less than the current count (minus `INVALIDATE_IMPORT_THRESHOLD`)
+    'invalidate_import_threshold' => env('INVALIDATE_IMPORT_THRESHOLD', 100), // Threshold for invalidating import
     'crypto_addresses' => [
         [
             'name' => 'Bitcoin',

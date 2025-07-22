@@ -28,7 +28,12 @@ class ProcessM3uImportComplete implements ShouldQueue
     // Make sure the process logs are cleaned up
     public int $maxLogs = 25;
 
+    // Delete the job when the model is missing
     public $deleteWhenMissingModels = true;
+
+    // Whether to invalidate the import if the number of new channels is less than the current count
+    public $invalidateImport = false;
+    public $invalidateImportThreshold = 100; // Default threshold for invalidating import
 
     /**
      * Create a new job instance.
@@ -41,7 +46,8 @@ class ProcessM3uImportComplete implements ShouldQueue
         public bool $maxHit = false,
         public bool $isNew = false,
     ) {
-        //
+        $this->invalidateImport = config('dev.invalidate_import', false);
+        $this->invalidateImportThreshold = config('dev.invalidate_import_threshold', 100);
     }
 
     /**
@@ -84,10 +90,52 @@ class ProcessM3uImportComplete implements ShouldQueue
 
         // If not a new playlist, create a new playlst sync status!
         if (!$this->isNew) {
+            // Get counts for removed and new groups/channels
             $removedGroupCount = $removedGroups->count();
             $newGroupCount = $newGroups->count();
             $removedChannelCount = $removedChannels->count();
             $newChannelCount = $newChannels->count();
+
+            // Check if we need to invalidate the import before proceeding
+            if ($this->invalidateImport) {
+                // Only invalidate if there are new channels
+                if ($removedChannelCount > 0) {
+                    $currentCount = $playlist->channels()->where(
+                        ['is_custom', false]
+                    )->count();
+
+                    // See how many new channels were added
+                    $newCount = $currentCount + $newChannelCount - $removedChannelCount;
+
+                    // If the new count is less than the current count minus the threshold, invalidate the import
+                    if ($newCount < ($currentCount - $this->invalidateImportThreshold)) {
+                        $message = "Playlist Sync Invalidated: The channel count would have been {$newCount} after import, which is less than the current count of {$currentCount} minus the threshold of {$this->invalidateImportThreshold}.";
+
+                        // Invalidate the import
+                        $playlist->update([
+                            'status' => Status::Failed,
+                            'errors' => $message,
+                            'processing' => false,
+                        ]);
+
+                        // Cleanup the any new groups/channels
+                        $newGroups->delete();
+                        $newChannels->delete();
+
+                        // Clear out the jobs
+                        Job::where(['batch_no', $this->batchNo])->delete();
+
+                        // Notify the user
+                        Notification::make()
+                            ->danger()
+                            ->title('Playlist Sync Invalidated')
+                            ->body($message)
+                            ->broadcast($user)
+                            ->sendToDatabase($user);
+                        return;
+                    }
+                }
+            }
 
             $sync = PlaylistSyncStatus::create([
                 'name' => $playlist->name,
