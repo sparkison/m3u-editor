@@ -83,8 +83,8 @@ class EditPlaylist extends EditRecord
                     })->after(function () {
                         Notification::make()
                             ->success()
-                            ->title('Playlist is processing series')
-                            ->body('Playlist series are being processed in the background. Depending on the number of series and seasons being imported, this may take a while. You will be notified on completion.')
+                            ->title('Playlist is fetching metadata for Series')
+                            ->body('Playlist Series are being processed in the background. Depending on the number of enabled Series, this may take a while. You will be notified on completion.')
                             ->duration(10000)
                             ->send();
                     })
@@ -93,7 +93,7 @@ class EditPlaylist extends EditRecord
                     ->requiresConfirmation()
                     ->icon('heroicon-o-arrow-path')
                     ->modalIcon('heroicon-o-arrow-path')
-                    ->modalDescription('Process playlist series now?')
+                    ->modalDescription('Fetch Series metadata for this playlist now? Only enabled Series will be included.')
                     ->modalSubmitActionLabel('Yes, process now'),
                 Actions\Action::make('process_vod')
                     ->label('Process VOD')
