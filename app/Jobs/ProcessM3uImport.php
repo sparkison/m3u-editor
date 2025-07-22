@@ -942,8 +942,8 @@ class ProcessM3uImport implements ShouldQueue
         // Create the jobs array
         $jobs = [];
 
-        // Check if we need to create a backup first
-        if ($playlist->backup_before_sync) {
+        // Check if we need to create a backup first (don't include first time syncs)
+        if (!$this->isNew && $playlist->backup_before_sync) {
             $jobs[] = new CreateBackup(includeFiles: false);
         }
 
