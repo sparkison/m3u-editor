@@ -23,6 +23,11 @@ class PruneStaleHlsProcesses extends Command
 
     public function handle()
     {
+        // Only run if the newer Shared Streaming is disabled
+        if (config('proxy.shared_streaming.enabled')) {
+            return;
+        }
+
         // Get the threshold from the command line option (default is 10 seconds)
         $threshold = (int)$this->option('threshold');
 

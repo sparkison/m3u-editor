@@ -33,8 +33,12 @@ class SharedStreamCleanup implements ShouldQueue
      */
     public function handle(SharedStreamService $sharedStreamService): void
     {
-        Log::channel('ffmpeg')->debug('SharedStreamCleanup: Starting cleanup process');
+        // Only run if the newer Shared Streaming is enabled
+        if (!config('proxy.shared_streaming.enabled')) {
+            return;
+        }
 
+        Log::channel('ffmpeg')->debug('SharedStreamCleanup: Starting cleanup process');
         try {
             // Get all active streams from database
             $activeStreams = $sharedStreamService->getAllActiveStreams();
