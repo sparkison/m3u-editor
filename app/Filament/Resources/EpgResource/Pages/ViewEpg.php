@@ -27,8 +27,7 @@ class ViewEpg extends ViewRecord
                         'status' => \App\Enums\Status::Processing,
                         'progress' => 0,
                     ]);
-                    app('Illuminate\Contracts\Bus\Dispatcher')
-                        ->dispatch(new \App\Jobs\ProcessEpgImport($record, force: true));
+                    \App\Jobs\ProcessEpgImport::dispatch($record, force: true);
                 })->after(function () {
                     Notification::make()
                         ->success()
@@ -67,7 +66,7 @@ class ViewEpg extends ViewRecord
                             ->placeholder('Never'),
                         TextEntry::make('channels_count')
                             ->label('Total Channels')
-                            ->counts('channels'),
+                            ->formatStateUsing(fn($record) => $record->channels()->count()),
                     ])
                     ->columns(2),
 
