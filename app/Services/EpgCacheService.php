@@ -76,21 +76,33 @@ class EpgCacheService
         try {
             Log::info("Starting EPG cache generation for {$epg->name}");
             
-            // Parse channels and programmes
+            // Set memory limit and execution time for large files
+            ini_set('memory_limit', '2G');
+            set_time_limit(600); // 10 minutes
+            
+            // Parse channels and programmes separately for better memory management
+            Log::info("Parsing channels for {$epg->name}");
             $channels = $this->parseChannels($epgFilePath);
+            Log::info("Parsed " . count($channels) . " channels");
+            
+            Log::info("Parsing programmes for {$epg->name}");
             $programmes = $this->parseProgrammes($epgFilePath);
+            $totalProgrammes = array_sum(array_map('count', $programmes));
+            Log::info("Parsed {$totalProgrammes} programmes");
             
             // Ensure cache directory exists
             $cacheDir = $this->getCacheDir($epg);
             Storage::disk('local')->makeDirectory($cacheDir);
             
             // Save channels
+            Log::info("Saving channels cache for {$epg->name}");
             Storage::disk('local')->put(
                 $this->getCacheFilePath($epg, self::CHANNELS_FILE),
                 json_encode($channels, JSON_UNESCAPED_UNICODE)
             );
             
             // Save programmes (chunked by date for better performance)
+            Log::info("Saving programmes cache for {$epg->name}");
             $this->saveProgrammesByDate($epg, $programmes);
             
             // Save metadata
@@ -100,7 +112,7 @@ class EpgCacheService
                 'cache_created' => time(),
                 'cache_version' => self::CACHE_VERSION,
                 'total_channels' => count($channels),
-                'total_programmes' => array_sum(array_map('count', $programmes)),
+                'total_programmes' => $totalProgrammes,
                 'programme_date_range' => $this->getProgrammeDateRange($programmes),
             ];
             
@@ -129,7 +141,7 @@ class EpgCacheService
 
         while (@$channelReader->read()) {
             if ($channelReader->nodeType == XMLReader::ELEMENT && $channelReader->name === 'channel') {
-                $channelId = trim($channelReader->getAttribute('id'));
+                $channelId = trim($channelReader->getAttribute('id') ?: '');
                 $innerXML = $channelReader->readOuterXml();
                 $innerReader = new XMLReader();
                 $innerReader->xml($innerXML);
@@ -146,12 +158,12 @@ class EpgCacheService
                         switch ($innerReader->name) {
                             case 'display-name':
                                 if (!$channel['display_name']) {
-                                    $channel['display_name'] = trim($innerReader->readString());
-                                    $channel['lang'] = trim($innerReader->getAttribute('lang')) ?: 'en';
+                                    $channel['display_name'] = trim($innerReader->readString() ?: '');
+                                    $channel['lang'] = trim($innerReader->getAttribute('lang') ?: '') ?: 'en';
                                 }
                                 break;
                             case 'icon':
-                                $channel['icon'] = trim($innerReader->getAttribute('src'));
+                                $channel['icon'] = trim($innerReader->getAttribute('src') ?: '');
                                 break;
                         }
                     }
@@ -182,15 +194,15 @@ class EpgCacheService
             if ($programReader->nodeType == XMLReader::ELEMENT && $programReader->name === 'programme') {
                 $processedCount++;
                 
-                // Safety limit
-                if ($processedCount > 500000) {
+                // Safety limit (reduced for memory efficiency)
+                if ($processedCount > 200000) {
                     Log::warning("Programme processing limit reached at {$processedCount}");
                     break;
                 }
 
-                $channelId = trim($programReader->getAttribute('channel'));
-                $start = trim($programReader->getAttribute('start'));
-                $stop = trim($programReader->getAttribute('stop'));
+                $channelId = trim($programReader->getAttribute('channel') ?: '');
+                $start = trim($programReader->getAttribute('start') ?: '');
+                $stop = trim($programReader->getAttribute('stop') ?: '');
 
                 if (!$channelId || !$start) {
                     continue;
@@ -221,18 +233,18 @@ class EpgCacheService
                     if ($innerReader->nodeType == XMLReader::ELEMENT) {
                         switch ($innerReader->name) {
                             case 'title':
-                                $programme['title'] = trim($innerReader->readString());
+                                $programme['title'] = trim($innerReader->readString() ?: '');
                                 break;
                             case 'desc':
-                                $programme['desc'] = trim($innerReader->readString());
+                                $programme['desc'] = trim($innerReader->readString() ?: '');
                                 break;
                             case 'category':
                                 if (!$programme['category']) {
-                                    $programme['category'] = trim($innerReader->readString());
+                                    $programme['category'] = trim($innerReader->readString() ?: '');
                                 }
                                 break;
                             case 'icon':
-                                $programme['icon'] = trim($innerReader->getAttribute('src'));
+                                $programme['icon'] = trim($innerReader->getAttribute('src') ?: '');
                                 break;
                         }
                     }
