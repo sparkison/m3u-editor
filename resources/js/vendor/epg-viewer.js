@@ -70,6 +70,11 @@ function epgViewer(config) {
                 }
                 
                 this.updateCurrentTime();
+                
+                // Auto-scroll to current time if viewing today
+                if (this.isToday()) {
+                    setTimeout(() => this.scrollToCurrentTime(), 100);
+                }
             } catch (error) {
                 console.error('Error loading EPG data:', error);
                 this.error = 'Failed to load EPG data. Please try again.';
@@ -99,6 +104,24 @@ function epgViewer(config) {
         goToToday() {
             this.currentDate = new Date().toISOString().split('T')[0];
             this.loadEpgData();
+        },
+
+        scrollToCurrentTime() {
+            if (this.isToday() && this.currentTimePosition >= 0) {
+                // Scroll to current time position minus some padding to center it
+                const scrollLeft = Math.max(0, this.currentTimePosition - 300); // 300px padding
+                const timelineElement = document.querySelector('.timeline-scroll');
+                const timeHeaderElement = document.querySelector('.time-header-scroll');
+                
+                if (timelineElement) {
+                    timelineElement.scrollLeft = scrollLeft;
+                }
+                if (timeHeaderElement) {
+                    timeHeaderElement.scrollLeft = scrollLeft;
+                }
+                
+                console.log('Scrolled to current time position:', scrollLeft);
+            }
         },
 
         formatDate(dateStr) {

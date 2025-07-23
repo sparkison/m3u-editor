@@ -71,6 +71,14 @@
                     >
                         Today
                     </button>
+                    <button 
+                        @click="scrollToCurrentTime()"
+                        x-show="isToday()"
+                        class="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-100 border border-blue-300 rounded-md hover:bg-blue-200 transition-colors"
+                        title="Scroll to current time"
+                    >
+                        📍 Now
+                    </button>
                     <input 
                         type="date" 
                         x-model="currentDate"
@@ -90,23 +98,34 @@
                             <span class="text-sm font-medium text-gray-900">Channels</span>
                             <span class="text-xs text-gray-500 ml-2" x-text="`(${Object.keys(epgData?.channels || {}).length})`"></span>
                         </div>
-                        <!-- Time Slots Header -->
-                        <div class="flex-1 relative">
-                            <div class="flex" style="width: 2400px;"> <!-- 24 hours * 100px per hour -->
-                                <template x-for="hour in timeSlots" :key="hour">
-                                    <div class="w-25 px-2 py-3 border-r border-gray-200 text-center bg-gray-100" style="width: 100px;">
-                                        <span class="text-xs font-medium text-gray-700" x-text="formatTime(hour)"></span>
-                                    </div>
-                                </template>
-                            </div>
-                            <!-- Current time indicator -->
+                        <!-- Time Slots Header (Scrollable) -->
+                        <div class="flex-1 relative overflow-hidden">
                             <div 
-                                x-show="isToday() && currentTimePosition >= 0"
-                                class="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10"
-                                :style="`left: ${currentTimePosition}px;`"
+                                class="overflow-x-auto time-header-scroll" 
+                                @scroll="document.querySelector('.timeline-scroll').scrollLeft = $el.scrollLeft"
+                                style="scrollbar-width: none; -ms-overflow-style: none;"
                             >
-                                <div class="absolute -top-1 -left-1 w-2 h-2 bg-red-500 rounded-full"></div>
+                                <div class="flex" style="width: 2400px;"> <!-- 24 hours * 100px per hour -->
+                                    <template x-for="hour in timeSlots" :key="hour">
+                                        <div class="w-25 px-2 py-3 border-r border-gray-200 text-center bg-gray-100" style="width: 100px;">
+                                            <span class="text-xs font-medium text-gray-700" x-text="formatTime(hour)"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                                <!-- Current time indicator -->
+                                <div 
+                                    x-show="isToday() && currentTimePosition >= 0"
+                                    class="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10"
+                                    :style="`left: ${currentTimePosition}px;`"
+                                >
+                                    <div class="absolute -top-1 -left-1 w-2 h-2 bg-red-500 rounded-full"></div>
+                                </div>
                             </div>
+                            <style>
+                                .time-header-scroll::-webkit-scrollbar {
+                                    display: none;
+                                }
+                            </style>
                         </div>
                     </div>
                 </div>
@@ -142,7 +161,10 @@
                     <!-- Programme Timeline (Scrollable) -->
                     <div 
                         class="flex-1 overflow-auto relative timeline-scroll"
-                        @scroll="$refs.channelScroll.scrollTop = $el.scrollTop"
+                        @scroll="
+                            $refs.channelScroll.scrollTop = $el.scrollTop;
+                            document.querySelector('.time-header-scroll').scrollLeft = $el.scrollLeft;
+                        "
                     >
                         <div style="width: 2400px;"> <!-- 24 hours * 100px per hour -->
                             <template x-for="(channel, channelId) in epgData?.channels || {}" :key="channelId">
