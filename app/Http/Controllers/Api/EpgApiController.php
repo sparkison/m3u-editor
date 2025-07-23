@@ -7,6 +7,7 @@ use App\Models\Epg;
 use App\Models\EpgChannel;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use XMLReader;
 
@@ -21,24 +22,27 @@ class EpgApiController extends Controller
      */
     public function getData(string $uuid, Request $request)
     {
+        // Increase execution time for large EPG files
+        set_time_limit(120);
+        
         $epg = Epg::where('uuid', $uuid)->firstOrFail();
 
         // Get the date range for EPG data (default to current day)
         $startDate = $request->get('start_date', Carbon::now()->format('Y-m-d'));
         $endDate = $request->get('end_date', Carbon::parse($startDate)->addDay()->format('Y-m-d'));
         
-        // Get the EPG file path
-        $filePath = null;
-        if ($epg->url && str_starts_with($epg->url, 'http')) {
-            $filePath = Storage::disk('local')->path($epg->file_path);
-        } else if ($epg->uploads && Storage::disk('local')->exists($epg->uploads)) {
-            $filePath = Storage::disk('local')->path($epg->uploads);
-        } else if ($epg->url) {
-            $filePath = $epg->url;
-        }
+        Log::info('EPG API Request', [
+            'uuid' => $uuid,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'file_path' => $epg->file_path
+        ]);
+        
+        // Get the EPG file path using Storage disk
+        $filePath = Storage::disk('local')->path($epg->file_path);
 
-        if (!($filePath && file_exists($filePath))) {
-            return response()->json(['error' => 'EPG file not found'], 404);
+        if (!file_exists($filePath)) {
+            return response()->json(['error' => 'EPG file not found at: ' . $filePath], 404);
         }
 
         // Parse the XML and extract program data
@@ -89,14 +93,33 @@ class EpgApiController extends Controller
             $channelReader->close();
 
             // Second pass: get programmes for the date range
+            $programmes = [];
+            $programmeCount = 0;
+            $filteredCount = 0;
+            
             $programReader = new XMLReader();
             $programReader->open('compress.zlib://' . $filePath);
 
             $startTimestamp = Carbon::parse($startDate)->startOfDay();
             $endTimestamp = Carbon::parse($endDate)->endOfDay();
+            
+            Log::info('Starting programme parsing', [
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+                'start_timestamp' => $startTimestamp->toISOString(),
+                'end_timestamp' => $endTimestamp->toISOString()
+            ]);
 
             while (@$programReader->read()) {
                 if ($programReader->nodeType == XMLReader::ELEMENT && $programReader->name === 'programme') {
+                    $programmeCount++;
+                    
+                    // Add safety limit to prevent excessive processing
+                    if ($programmeCount > 50000) {
+                        Log::info('Programme processing limit reached', ['count' => $programmeCount]);
+                        break;
+                    }
+                    
                     $channelId = trim($programReader->getAttribute('channel'));
                     $start = trim($programReader->getAttribute('start'));
                     $stop = trim($programReader->getAttribute('stop'));
@@ -109,10 +132,23 @@ class EpgApiController extends Controller
                     $startDateTime = $this->parseXmltvDateTime($start);
                     $stopDateTime = $stop ? $this->parseXmltvDateTime($stop) : null;
 
+                    // Log first few programmes for debugging
+                    if ($programmeCount <= 5) {
+                        Log::info('Programme sample', [
+                            'count' => $programmeCount,
+                            'channel_id' => $channelId,
+                            'start_raw' => $start,
+                            'start_parsed' => $startDateTime ? $startDateTime->toISOString() : null,
+                            'in_range' => $startDateTime && $startDateTime >= $startTimestamp && $startDateTime <= $endTimestamp
+                        ]);
+                    }
+
                     // Filter by date range
                     if ($startDateTime && ($startDateTime < $startTimestamp || $startDateTime > $endTimestamp)) {
                         continue;
                     }
+                    
+                    $filteredCount++;
 
                     $innerXML = $programReader->readOuterXml();
                     $innerReader = new XMLReader();
@@ -159,6 +195,13 @@ class EpgApiController extends Controller
                 }
             }
             $programReader->close();
+            
+            Log::info('Programme parsing complete', [
+                'total_programmes' => $programmeCount,
+                'filtered_programmes' => $filteredCount,
+                'programmes_with_titles' => array_sum(array_map('count', $programmes)),
+                'channels_with_programmes' => count($programmes)
+            ]);
 
         } catch (\Exception $e) {
             return response()->json(['error' => 'Failed to parse EPG data: ' . $e->getMessage()], 500);
