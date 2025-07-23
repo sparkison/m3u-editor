@@ -32,6 +32,9 @@ function epgViewer(config) {
                     container.addEventListener('scroll', this.handleScroll.bind(this));
                 }
             });
+
+            // Scroll to current time on load
+            this.scrollToCurrentTime();
         },
 
         generateTimeSlots() {
