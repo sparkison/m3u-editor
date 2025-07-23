@@ -11,6 +11,7 @@ use App\Models\CustomPlaylist;
 use App\Models\Epg;
 use App\Models\MergedPlaylist;
 use App\Models\Playlist;
+use App\Services\EpgCacheService;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Illuminate\Http\Request;
@@ -218,6 +219,9 @@ class EpgGenerateController extends Controller
         $epgs = Epg::whereIn('id', array_keys($epgChannels))
             ->get();
 
+        // Initialize cache service
+        $cacheService = new EpgCacheService();
+
         // Loop through the EPGs and output the <programme> tags
         foreach ($epgs as $epg) {
             // Channel data
@@ -228,69 +232,69 @@ class EpgGenerateController extends Controller
                 continue;
             }
 
-            // Get the content
-            $filePath = null;
-            if ($epg->url && str_starts_with($epg->url, 'http')) {
-                $filePath = Storage::disk('local')->path($epg->file_path);
-            } else if ($epg->uploads && Storage::disk('local')->exists($epg->uploads)) {
-                $filePath = Storage::disk('local')->path($epg->uploads);
-            } else if ($epg->url) {
-                $filePath = $epg->url;
-            }
-            if (!$filePath) {
-                // Send notification
-                $error = "Invalid EPG file. Unable to read or download an associated EPG file. Please check the URL or uploaded file and try again.";
-                Notification::make()
-                    ->danger()
-                    ->title("Error generating epg data for playlist \"{$playlist->name}\" using EPG \"{$epg->name}\"")
-                    ->body($error)
-                    ->broadcast($epg->user);
-                Notification::make()
-                    ->danger()
-                    ->title("Error generating epg data for playlist \"{$playlist->name}\" using EPG \"{$epg->name}\"")
-                    ->body($error)
-                    ->sendToDatabase($epg->user);
-                continue;
-            }
-
-            // Set up the reader
-            $programReader = new XMLReader();
-            $programReader->open('compress.zlib://' . $filePath);
-
-            // Loop through the XML data
-            while (@$programReader->read()) {
-                // Only consider XML elements and programme nodes
-                if ($programReader->nodeType == XMLReader::ELEMENT && $programReader->name === 'programme') {
-                    // Get the channel id
-                    $channelId = trim($programReader->getAttribute('channel'));
-                    if (!$channelId) {
-                        continue;
+            try {
+                // Try to use cached data first
+                if ($cacheService->isCacheValid($epg)) {
+                    // Get all programmes from cache (last 5 days to next 5 days for EPG generation)
+                    $startDate = Carbon::now()->subDays(5)->format('Y-m-d');
+                    $endDate = Carbon::now()->addDays(5)->format('Y-m-d');
+                    
+                    // Get all channel IDs that this EPG should map to
+                    $epgChannelIds = [];
+                    foreach ($channels as $channelMapping) {
+                        $epgChannelIds = array_merge($epgChannelIds, array_keys($channelMapping));
                     }
-
-                    // EPG could be applied to multiple channels, find all matching channels
-                    $filtered = array_filter($channels, fn($ch) => array_key_exists($channelId, $ch));
-                    if (!count($filtered)) {
-                        continue;
+                    
+                    // Get programmes from cache for date range
+                    $cachedProgrammes = $cacheService->getCachedProgrammesRange($epg, $startDate, $endDate, $epgChannelIds);
+                    
+                    // Output programmes from cache
+                    foreach ($cachedProgrammes as $channelId => $programmes) {
+                        foreach ($programmes as $programme) {
+                            // Find matching channels for this EPG channel ID
+                            $filtered = array_filter($channels, fn($ch) => array_key_exists($channelId, $ch));
+                            if (!count($filtered)) {
+                                continue;
+                            }
+                            
+                            foreach ($filtered as $ch) {
+                                $mappedChannelId = $ch[$channelId];
+                                
+                                // Format times for XMLTV
+                                $start = $this->formatXmltvDateTime($programme['start']);
+                                $stop = $this->formatXmltvDateTime($programme['stop']);
+                                
+                                // Output programme tag
+                                echo '  <programme channel="' . htmlspecialchars($mappedChannelId) . '"';
+                                if ($start) echo ' start="' . $start . '"';
+                                if ($stop) echo ' stop="' . $stop . '"';
+                                echo '>' . PHP_EOL;
+                                
+                                if ($programme['title']) {
+                                    echo '    <title>' . htmlspecialchars($programme['title']) . '</title>' . PHP_EOL;
+                                }
+                                if ($programme['desc']) {
+                                    echo '    <desc>' . htmlspecialchars($programme['desc']) . '</desc>' . PHP_EOL;
+                                }
+                                if ($programme['category']) {
+                                    echo '    <category>' . htmlspecialchars($programme['category']) . '</category>' . PHP_EOL;
+                                }
+                                if ($programme['icon']) {
+                                    echo '    <icon src="' . htmlspecialchars($programme['icon']) . '"/>' . PHP_EOL;
+                                }
+                                
+                                echo '  </programme>' . PHP_EOL;
+                            }
+                        }
                     }
-                    // Channel program found, output the <programme> tag
-                    // First, we need to make sure the channel is correct
-                    // Replace `channel="<channel_id>"` with `channel="<stream_id>"`
-                    $itemDom = new DOMDocument();
-                    $itemDom->loadXML($programReader->readOuterXML());
-
-                    // Get the item element
-                    $item = $itemDom->documentElement;
-                    foreach ($filtered as $ch) {
-                        // Modify the channel attribute
-                        $item->setAttribute('channel', $ch[$channelId]);
-
-                        // Output modified line
-                        echo "  " . $itemDom->saveXML($item) . PHP_EOL;
-                    }
+                } else {
+                    // Fallback to original XML reading if cache is not available
+                    $this->processEpgWithXmlReader($epg, $channels, $playlist);
                 }
+            } catch (\Exception $e) {
+                // If cache fails, fallback to original XML reading
+                $this->processEpgWithXmlReader($epg, $channels, $playlist);
             }
-            // Close the XMLReader for this epg
-            $programReader->close();
         }
 
         // If dummy EPG channels, generate dummy programmes
@@ -362,5 +366,101 @@ class EpgGenerateController extends Controller
         }
 
         return $result > 0;
+    }
+
+    /**
+     * Format datetime for XMLTV format
+     *
+     * @param string $datetime ISO 8601 datetime string
+     * @return string|null XMLTV formatted datetime
+     */
+    private function formatXmltvDateTime($datetime)
+    {
+        if (!$datetime) {
+            return null;
+        }
+        
+        try {
+            $carbon = Carbon::parse($datetime);
+            // Format as YYYYMMDDHHMMSS +ZZZZ
+            return $carbon->format('YmdHis O');
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Process EPG using XMLReader (fallback method)
+     *
+     * @param Epg $epg
+     * @param array $channels
+     * @param mixed $playlist
+     */
+    private function processEpgWithXmlReader($epg, $channels, $playlist)
+    {
+        // Get the content
+        $filePath = null;
+        if ($epg->url && str_starts_with($epg->url, 'http')) {
+            $filePath = Storage::disk('local')->path($epg->file_path);
+        } else if ($epg->uploads && Storage::disk('local')->exists($epg->uploads)) {
+            $filePath = Storage::disk('local')->path($epg->uploads);
+        } else if ($epg->url) {
+            $filePath = $epg->url;
+        }
+        
+        if (!$filePath) {
+            // Send notification
+            $error = "Invalid EPG file. Unable to read or download an associated EPG file. Please check the URL or uploaded file and try again.";
+            Notification::make()
+                ->danger()
+                ->title("Error generating epg data for playlist \"{$playlist->name}\" using EPG \"{$epg->name}\"")
+                ->body($error)
+                ->broadcast($epg->user);
+            Notification::make()
+                ->danger()
+                ->title("Error generating epg data for playlist \"{$playlist->name}\" using EPG \"{$epg->name}\"")
+                ->body($error)
+                ->sendToDatabase($epg->user);
+            return;
+        }
+
+        // Set up the reader
+        $programReader = new XMLReader();
+        $programReader->open('compress.zlib://' . $filePath);
+
+        // Loop through the XML data
+        while (@$programReader->read()) {
+            // Only consider XML elements and programme nodes
+            if ($programReader->nodeType == XMLReader::ELEMENT && $programReader->name === 'programme') {
+                // Get the channel id
+                $channelId = trim($programReader->getAttribute('channel'));
+                if (!$channelId) {
+                    continue;
+                }
+
+                // EPG could be applied to multiple channels, find all matching channels
+                $filtered = array_filter($channels, fn($ch) => array_key_exists($channelId, $ch));
+                if (!count($filtered)) {
+                    continue;
+                }
+                // Channel program found, output the <programme> tag
+                // First, we need to make sure the channel is correct
+                // Replace `channel="<channel_id>"` with `channel="<stream_id>"`
+                $itemDom = new DOMDocument();
+                $itemDom->loadXML($programReader->readOuterXML());
+
+                // Get the item element
+                $item = $itemDom->documentElement;
+                foreach ($filtered as $ch) {
+                    // Modify the channel attribute
+                    $item->setAttribute('channel', $ch[$channelId]);
+
+                    // Output modified line
+                    echo "  " . $itemDom->saveXML($item) . PHP_EOL;
+                }
+            }
+        }
+        // Close the XMLReader for this epg
+        $programReader->close();
     }
 }

@@ -9,6 +9,7 @@ use App\Enums\Status;
 use App\Events\SyncCompleted;
 use App\Models\Epg;
 use App\Models\Job;
+use App\Services\EpgCacheService;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;

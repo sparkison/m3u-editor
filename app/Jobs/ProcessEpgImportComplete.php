@@ -7,10 +7,12 @@ use App\Events\SyncCompleted;
 use App\Models\EpgChannel;
 use App\Models\Job;
 use App\Models\User;
+use App\Services\EpgCacheService;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Log;
 
 class ProcessEpgImportComplete implements ShouldQueue
 {
@@ -72,6 +74,17 @@ class ProcessEpgImportComplete implements ShouldQueue
             'progress' => 100,
             'processing' => false,
         ]);
+
+        // Generate cache for optimized EPG viewing and generation
+        Log::info("Starting cache generation for EPG: {$epg->name}");
+        $cacheService = new EpgCacheService();
+        $cacheGenerated = $cacheService->cacheEpgData($epg);
+        
+        if ($cacheGenerated) {
+            Log::info("Cache generated successfully for EPG: {$epg->name}");
+        } else {
+            Log::warning("Failed to generate cache for EPG: {$epg->name}");
+        }
 
         // Check if there are any sync jobs that should be re-run
         $epg->epgMaps()->where([
