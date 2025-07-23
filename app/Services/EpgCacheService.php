@@ -12,7 +12,6 @@ class EpgCacheService
 {
     private const CACHE_VERSION = 'v1';
     private const CHANNELS_FILE = 'channels.json';
-    private const PROGRAMMES_FILE = 'programmes.json';
     private const METADATA_FILE = 'metadata.json';
 
     /**
