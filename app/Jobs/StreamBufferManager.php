@@ -41,8 +41,12 @@ class StreamBufferManager implements ShouldQueue
      */
     public function handle(): void
     {
-        Log::channel('ffmpeg')->debug("StreamBufferManager: Starting buffer management for stream {$this->streamKey}");
+        // Only run if the newer Shared Streaming is enabled
+        if (!config('proxy.shared_streaming.enabled')) {
+            return;
+        }
 
+        Log::channel('ffmpeg')->debug("StreamBufferManager: Starting buffer management for stream {$this->streamKey}");
         try {
             $this->runBufferLoop();
         } catch (\Exception $e) {
