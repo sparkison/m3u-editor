@@ -1,7 +1,6 @@
 @php
     $record = $getRecord();
-    $state = $getState();
-    $epgUuid = $state['epg_uuid'] ?? $record?->uuid;
+    $epgUuid = $record?->uuid;
 @endphp
 
 <div 
@@ -79,12 +78,12 @@
                     >
                         📍 Now
                     </button>
-                    <input 
+                    {{-- <input 
                         type="date" 
                         x-model="currentDate"
                         @change="loadEpgData()"
                         class="px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
+                    > --}}
                 </div>
             </div>
 

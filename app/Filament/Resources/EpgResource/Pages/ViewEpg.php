@@ -65,8 +65,7 @@ class ViewEpg extends ViewRecord
                             ->since()
                             ->placeholder('Never'),
                         TextEntry::make('channels_count')
-                            ->label('Total Channels')
-                            ->formatStateUsing(fn($record) => $record->channels()->count()),
+                            ->label('Total Channels'),
                     ])
                     ->columns(2),
 
