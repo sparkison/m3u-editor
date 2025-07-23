@@ -26,10 +26,15 @@ function epgViewer(config) {
         },
 
         updateCurrentTime() {
+            const now = new Date();
+            console.log('Current time:', now);
+            console.log('Current date:', this.currentDate);
+            console.log('Is today?', this.isToday());
+            
             if (this.isToday()) {
-                const now = new Date();
                 const hours = now.getHours() + now.getMinutes() / 60;
                 this.currentTimePosition = hours * 100; // 100px per hour
+                console.log('Current time position:', this.currentTimePosition, 'px (', hours, 'hours )');
             } else {
                 this.currentTimePosition = -1;
             }
@@ -46,6 +51,7 @@ function epgViewer(config) {
             this.selectedProgramme = null;
 
             try {
+                console.log('Loading EPG data from:', this.apiUrl + `?start_date=${this.currentDate}&end_date=${this.currentDate}`);
                 const response = await fetch(this.apiUrl + `?start_date=${this.currentDate}&end_date=${this.currentDate}`);
                 
                 if (!response.ok) {
@@ -53,6 +59,16 @@ function epgViewer(config) {
                 }
 
                 this.epgData = await response.json();
+                console.log('EPG data loaded:', this.epgData);
+                console.log('Channels found:', Object.keys(this.epgData?.channels || {}).length);
+                console.log('Programmes found:', Object.keys(this.epgData?.programmes || {}).length);
+                
+                // Debug first few programmes
+                const firstChannelId = Object.keys(this.epgData?.channels || {})[0];
+                if (firstChannelId) {
+                    console.log('First channel programmes:', this.epgData?.programmes?.[firstChannelId]?.slice(0, 3));
+                }
+                
                 this.updateCurrentTime();
             } catch (error) {
                 console.error('Error loading EPG data:', error);
@@ -96,11 +112,11 @@ function epgViewer(config) {
         },
 
         formatTime(hour) {
-            return new Date(2000, 0, 1, hour).toLocaleTimeString('en-US', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                hour12: false 
-            });
+            console.log('Formatting time for hour:', hour);
+            // Format as HH:00 
+            const formatted = hour.toString().padStart(2, '0') + ':00';
+            console.log('Formatted time:', formatted);
+            return formatted;
         },
 
         formatProgrammeTime(programme) {
@@ -126,7 +142,11 @@ function epgViewer(config) {
         },
 
         getChannelProgrammes(channelId) {
-            return this.epgData?.programmes?.[channelId] || [];
+            const programmes = this.epgData?.programmes?.[channelId] || [];
+            if (programmes.length === 0) {
+                console.log('No programmes found for channel:', channelId);
+            }
+            return programmes;
         },
 
         getProgrammeStyle(programme) {

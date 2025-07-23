@@ -112,29 +112,38 @@
                 </div>
 
                 <!-- Scrollable Content Area -->
-                <div class="flex h-full overflow-hidden">
-                    <!-- Channel List (Fixed) -->
-                    <div class="w-48 overflow-y-auto border-r border-gray-200 bg-gray-50">
-                        <template x-for="(channel, channelId) in epgData?.channels || {}" :key="channelId">
-                            <div class="px-4 py-3 border-b border-gray-100 flex items-center space-x-3 hover:bg-gray-100 transition-colors" style="height: 60px;">
-                                <div class="flex-shrink-0">
-                                    <img 
-                                        :src="channel.icon || '/placeholder.png'" 
-                                        :alt="channel.display_name"
-                                        class="w-8 h-8 rounded object-cover"
-                                        onerror="this.src='/placeholder.png'"
-                                    >
+                <div class="flex h-full overflow-hidden" x-data="{ scrollContainer: null }" x-init="scrollContainer = $el.querySelector('.timeline-scroll')">
+                    <!-- Channel List (Fixed vertically, scrolls with timeline) -->
+                    <div class="w-48 border-r border-gray-200 bg-gray-50 overflow-hidden">
+                        <div 
+                            class="overflow-y-auto h-full"
+                            @scroll="if (scrollContainer) scrollContainer.scrollTop = $el.scrollTop"
+                            x-ref="channelScroll"
+                        >
+                            <template x-for="(channel, channelId) in epgData?.channels || {}" :key="channelId">
+                                <div class="px-4 py-3 border-b border-gray-100 flex items-center space-x-3 hover:bg-gray-100 transition-colors" style="height: 60px;">
+                                    <div class="flex-shrink-0">
+                                        <img 
+                                            :src="channel.icon || '/placeholder.png'" 
+                                            :alt="channel.display_name"
+                                            class="w-8 h-8 rounded object-cover"
+                                            onerror="this.src='/placeholder.png'"
+                                        >
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-sm font-medium text-gray-900 truncate" x-text="channel.display_name"></p>
+                                        <p class="text-xs text-gray-500 truncate" x-text="channelId"></p>
+                                    </div>
                                 </div>
-                                <div class="min-w-0 flex-1">
-                                    <p class="text-sm font-medium text-gray-900 truncate" x-text="channel.display_name"></p>
-                                    <p class="text-xs text-gray-500 truncate" x-text="channelId"></p>
-                                </div>
-                            </div>
-                        </template>
+                            </template>
+                        </div>
                     </div>
 
                     <!-- Programme Timeline (Scrollable) -->
-                    <div class="flex-1 overflow-auto relative">
+                    <div 
+                        class="flex-1 overflow-auto relative timeline-scroll"
+                        @scroll="$refs.channelScroll.scrollTop = $el.scrollTop"
+                    >
                         <div style="width: 2400px;"> <!-- 24 hours * 100px per hour -->
                             <template x-for="(channel, channelId) in epgData?.channels || {}" :key="channelId">
                                 <div class="relative border-b border-gray-100" style="height: 60px;">
