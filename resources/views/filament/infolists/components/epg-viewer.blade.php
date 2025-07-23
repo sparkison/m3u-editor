@@ -105,20 +105,20 @@
                                 @scroll="document.querySelector('.timeline-scroll').scrollLeft = $el.scrollLeft"
                                 style="scrollbar-width: none; -ms-overflow-style: none;"
                             >
-                                <div class="flex" style="width: 2400px;"> <!-- 24 hours * 100px per hour -->
+                                <div class="flex relative" style="width: 2400px;"> <!-- 24 hours * 100px per hour -->
                                     <template x-for="hour in timeSlots" :key="hour">
                                         <div class="w-25 px-2 py-3 border-r border-gray-200 text-center bg-gray-100" style="width: 100px;">
                                             <span class="text-xs font-medium text-gray-700" x-text="formatTime(hour)"></span>
                                         </div>
                                     </template>
-                                </div>
-                                <!-- Current time indicator -->
-                                <div 
-                                    x-show="isToday() && currentTimePosition >= 0"
-                                    class="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10"
-                                    :style="`left: ${currentTimePosition}px;`"
-                                >
-                                    <div class="absolute -top-1 -left-1 w-2 h-2 bg-red-500 rounded-full"></div>
+                                    <!-- Current time indicator (moves with content) -->
+                                    <div 
+                                        x-show="isToday() && currentTimePosition >= 0"
+                                        class="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10"
+                                        :style="`left: ${currentTimePosition}px;`"
+                                    >
+                                        <div class="absolute -top-1 -left-1 w-2 h-2 bg-red-500 rounded-full"></div>
+                                    </div>
                                 </div>
                             </div>
                             <style>
@@ -166,7 +166,14 @@
                             document.querySelector('.time-header-scroll').scrollLeft = $el.scrollLeft;
                         "
                     >
-                        <div style="width: 2400px;"> <!-- 24 hours * 100px per hour -->
+                        <div class="relative" style="width: 2400px;"> <!-- 24 hours * 100px per hour -->
+                            <!-- Current time indicator for programme area -->
+                            <div 
+                                x-show="isToday() && currentTimePosition >= 0"
+                                class="absolute top-0 bottom-0 w-0.5 bg-red-500 z-30 pointer-events-none"
+                                :style="`left: ${currentTimePosition}px;`"
+                            ></div>
+                            
                             <template x-for="(channel, channelId) in epgData?.channels || {}" :key="channelId">
                                 <div class="relative border-b border-gray-100" style="height: 60px;">
                                     <!-- Time grid background -->
