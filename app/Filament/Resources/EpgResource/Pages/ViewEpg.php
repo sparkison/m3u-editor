@@ -27,7 +27,8 @@ class ViewEpg extends ViewRecord
                         'status' => \App\Enums\Status::Processing,
                         'progress' => 0,
                     ]);
-                    \App\Jobs\ProcessEpgImport::dispatch($record, force: true);
+                    app('Illuminate\Contracts\Bus\Dispatcher')
+                        ->dispatch(new \App\Jobs\ProcessEpgImport($record, force: true));
                 })->after(function () {
                     Notification::make()
                         ->success()
@@ -40,6 +41,26 @@ class ViewEpg extends ViewRecord
                 ->requiresConfirmation()
                 ->modalDescription('Process EPG now? This will reload the EPG data from the source.')
                 ->modalSubmitActionLabel('Yes, refresh now'),
+
+            Actions\Action::make('cache')
+                ->label('Generate EPG Cache')
+                ->icon('heroicon-o-arrows-pointing-in')
+                ->action(function () {
+                    $record = $this->getRecord();
+                    app('Illuminate\Contracts\Bus\Dispatcher')
+                        ->dispatch(new \App\Jobs\GenerateEpgCache($record->uuid, notify: true));
+                })->after(function () {
+                    Notification::make()
+                        ->success()
+                        ->title('EPG Cache is being generated')
+                        ->body('EPG Cache is being generated in the background. You will be notified when complete.')
+                        ->duration(5000)
+                        ->send();
+                })
+                ->disabled(fn() => $this->getRecord()->status === \App\Enums\Status::Processing)
+                ->requiresConfirmation()
+                ->modalDescription('Generate EPG Cache now? This will create a cache for the EPG data.')
+                ->modalSubmitActionLabel('Yes, generate cache now'),
 
             Actions\Action::make('download')
                 ->label('Download EPG')

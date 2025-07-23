@@ -75,17 +75,6 @@ class ProcessEpgImportComplete implements ShouldQueue
             'processing' => false,
         ]);
 
-        // Generate cache for optimized EPG viewing and generation
-        Log::info("Starting cache generation for EPG: {$epg->name}");
-        $cacheService = new EpgCacheService();
-        $cacheGenerated = $cacheService->cacheEpgData($epg);
-        
-        if ($cacheGenerated) {
-            Log::info("Cache generated successfully for EPG: {$epg->name}");
-        } else {
-            Log::warning("Failed to generate cache for EPG: {$epg->name}");
-        }
-
         // Check if there are any sync jobs that should be re-run
         $epg->epgMaps()->where([
             ['recurring', '=', true],
