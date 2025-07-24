@@ -26,9 +26,28 @@ function epgViewer(config) {
             
             // Setup scroll listener for pagination
             this.$nextTick(() => {
-                const container = this.$refs.epgContainer;
-                if (container) {
-                    container.addEventListener('scroll', this.handleScroll.bind(this));
+                // The main scrollable container is the timeline-scroll element
+                const timelineContainer = document.querySelector('.timeline-scroll');
+                console.log('Setting up scroll listener, timeline container:', timelineContainer);
+                
+                if (timelineContainer) {
+                    timelineContainer.addEventListener('scroll', this.handleScroll.bind(this));
+                    // console.log('Scroll listener attached to timeline container');
+                } else {
+                    // console.warn('Timeline container not found, trying alternative selectors...');
+                    // Try alternative selectors as fallback
+                    const channelScroll = document.querySelector('[x-ref="channelScroll"]');
+                    const epgGrid = document.querySelector('.epg-grid');
+                    
+                    // console.log('Channel scroll:', channelScroll);
+                    // console.log('EPG grid:', epgGrid);
+                    
+                    // Attach to the first available container
+                    const fallbackContainer = channelScroll || epgGrid;
+                    if (fallbackContainer) {
+                        fallbackContainer.addEventListener('scroll', this.handleScroll.bind(this));
+                        // console.log('Scroll listener attached to fallback container:', fallbackContainer);
+                    }
                 }
             });
 
@@ -149,9 +168,10 @@ function epgViewer(config) {
             const scrollHeight = container.scrollHeight;
             const clientHeight = container.clientHeight;
             
+            // For pagination, we only care about vertical scrolling
             // Check if we're near the bottom (within 200px)
             const nearBottom = scrollTop + clientHeight >= scrollHeight - 200;
-            
+
             if (nearBottom && this.hasMore && !this.loadingMore) {
                 console.log('Near bottom, loading more data...');
                 this.loadMoreData();
