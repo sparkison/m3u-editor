@@ -45,6 +45,13 @@ class EditPlaylist extends EditRecord
                         ]
                     )
                 ),
+            Actions\ViewAction::make()
+                ->label('View Playlist')
+                ->icon('heroicon-m-eye')
+                ->color('primary')
+                ->action(function () {
+                    $this->redirect($this->getRecord()->getUrl('view'));
+                }),
             Actions\ActionGroup::make([
                 Actions\Action::make('process')
                     ->label(fn($record): string => $record->xtream ? 'Process All' : 'Process')

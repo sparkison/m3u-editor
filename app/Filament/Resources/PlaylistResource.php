@@ -23,17 +23,20 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
 use App\Facades\PlaylistUrlFacade;
+use App\Filament\Infolists\Components\EpgViewer;
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\CreatePlaylistSyncStatus;
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\EditPlaylistSyncStatus;
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ListPlaylistSyncStatuses;
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ViewPlaylistSyncStatus;
 use App\Forms\Components\MediaFlowProxyUrl;
-use App\Forms\Components\PlaylistInfo;
 use App\Forms\Components\XtreamApiInfo;
+use App\Livewire\PlaylistInfo;
 use App\Models\PlaylistSyncStatus;
 use App\Models\SourceGroup;
 use App\Services\XtreamService;
 use Filament\Facades\Filament;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
 use Filament\Tables\Actions\Action;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
@@ -397,8 +400,8 @@ class PlaylistResource extends Resource
                     Tables\Actions\DeleteAction::make(),
                 ])->button()->hiddenLabel()->size('sm'),
                 Tables\Actions\EditAction::make()->button()->hiddenLabel()->size('sm'),
-                // Tables\Actions\ViewAction::make()
-                //     ->button()->hiddenLabel()->size('sm'),
+                Tables\Actions\ViewAction::make()
+                    ->button()->hiddenLabel()->size('sm'),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -506,6 +509,29 @@ class PlaylistResource extends Resource
             'playlist-sync-statuses.view' => ViewPlaylistSyncStatus::route('/{parent}/syncs/{record}'),
             //'playlist-sync-statuses.edit' => EditPlaylistSyncStatus::route('/{parent}/syncs/{record}/edit'),
         ];
+    }
+
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist
+            ->schema([
+                Infolists\Components\Section::make('Playlist Info')
+                    ->compact()
+                    ->icon('heroicon-o-chart-bar-square')
+                    ->collapsible()
+                    ->persistCollapsed()
+                    ->columnSpanFull()
+                    ->collapsed(false)
+                    ->schema([
+                        Infolists\Components\Livewire::make(PlaylistInfo::class),
+                    ]),
+
+                Infolists\Components\Section::make('Guide')
+                    ->schema([
+                        EpgViewer::make(),
+                    ])
+                    ->collapsible(false),
+            ]);
     }
 
     public static function getFormSections($creating = false): array
@@ -953,19 +979,6 @@ class PlaylistResource extends Resource
             Forms\Components\Grid::make()
                 ->columns(5)
                 ->schema([
-                    Forms\Components\Section::make('Playlist Stats')
-                        ->compact()
-                        ->icon('heroicon-o-chart-bar-square')
-                        ->collapsible()
-                        ->persistCollapsed()
-                        ->columnSpanFull()
-                        ->collapsed(true)
-                        ->schema([
-                            PlaylistInfo::make('play_list_info')
-                                ->label('') // disable the label
-                                ->columnSpanFull()
-                                ->dehydrated(false), // don't save the value in the database
-                        ]),
                     Forms\Components\Tabs::make()
                         ->tabs($tabs)
                         ->columnSpan(3)
