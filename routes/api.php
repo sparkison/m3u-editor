@@ -97,4 +97,6 @@ Route::group(['prefix' => 'monitor'], function () {
 Route::group(['prefix' => 'epg'], function () {
     Route::get('{uuid}/data', [\App\Http\Controllers\Api\EpgApiController::class, 'getData'])
         ->name('api.epg.data');
+    Route::get('playlist/{uuid}/data', [\App\Http\Controllers\Api\EpgApiController::class, 'getDataForPlaylist'])
+        ->name('api.epg.playlist.data');
 });
