@@ -13,6 +13,7 @@ class EpgCacheService
     private const CACHE_VERSION = 'v1';
     private const CHANNELS_FILE = 'channels.json';
     private const METADATA_FILE = 'metadata.json';
+    private const MAX_PROGRAMMES = 200000; // Safety limit to prevent memory issues
 
     /**
      * Get the cache directory path for an EPG
@@ -36,14 +37,14 @@ class EpgCacheService
     public function isCacheValid(Epg $epg): bool
     {
         $metadataPath = $this->getCacheFilePath($epg, self::METADATA_FILE);
-        
+
         if (!Storage::disk('local')->exists($metadataPath)) {
             return false;
         }
 
         try {
             $metadata = json_decode(Storage::disk('local')->get($metadataPath), true);
-            
+
             // Check if EPG file has been modified since cache was created
             $epgFilePath = Storage::disk('local')->path($epg->file_path);
             if (!file_exists($epgFilePath)) {
@@ -52,7 +53,7 @@ class EpgCacheService
 
             $epgFileModified = filemtime($epgFilePath);
             $cacheCreated = $metadata['cache_created'] ?? 0;
-            
+
             return $epgFileModified <= $cacheCreated;
         } catch (\Exception $e) {
             Log::warning("Invalid cache metadata for EPG {$epg->uuid}: {$e->getMessage()}");
@@ -66,44 +67,45 @@ class EpgCacheService
     public function cacheEpgData(Epg $epg): bool
     {
         $epgFilePath = Storage::disk('local')->path($epg->file_path);
-        
+
         if (!file_exists($epgFilePath)) {
             Log::error("EPG file not found: {$epgFilePath}");
             return false;
         }
 
         try {
-            Log::info("Starting EPG cache generation for {$epg->name}");
-            
+            Log::debug("Starting EPG cache generation for {$epg->name}");
+
             // Set memory limit and execution time for large files
             ini_set('memory_limit', '2G');
             set_time_limit(600); // 10 minutes
-            
+
             // Parse channels and programmes separately for better memory management
-            Log::info("Parsing channels for {$epg->name}");
+            Log::debug("Parsing channels for {$epg->name}");
             $channels = $this->parseChannels($epgFilePath);
-            Log::info("Parsed " . count($channels) . " channels");
-            
-            Log::info("Parsing programmes for {$epg->name}");
+            Log::debug("Parsed " . count($channels) . " channels");
+
+            Log::debug("Parsing programmes for {$epg->name}");
             $programmes = $this->parseProgrammes($epgFilePath);
             $totalProgrammes = array_sum(array_map('count', $programmes));
-            Log::info("Parsed {$totalProgrammes} programmes");
-            
-            // Ensure cache directory exists
+            Log::debug("Parsed {$totalProgrammes} programmes");
+
+            // Start by clearing existing cache
+            $this->clearCache($epg);
             $cacheDir = $this->getCacheDir($epg);
             Storage::disk('local')->makeDirectory($cacheDir);
-            
+
             // Save channels
-            Log::info("Saving channels cache for {$epg->name}");
+            Log::debug("Saving channels cache for {$epg->name}");
             Storage::disk('local')->put(
                 $this->getCacheFilePath($epg, self::CHANNELS_FILE),
                 json_encode($channels, JSON_UNESCAPED_UNICODE)
             );
-            
+
             // Save programmes (chunked by date for better performance)
-            Log::info("Saving programmes cache for {$epg->name}");
+            Log::debug("Saving programmes cache for {$epg->name}");
             $this->saveProgrammesByDate($epg, $programmes);
-            
+
             // Save metadata
             $metadata = [
                 'epg_uuid' => $epg->uuid,
@@ -114,15 +116,14 @@ class EpgCacheService
                 'total_programmes' => $totalProgrammes,
                 'programme_date_range' => $this->getProgrammeDateRange($programmes),
             ];
-            
+
             Storage::disk('local')->put(
                 $this->getCacheFilePath($epg, self::METADATA_FILE),
                 json_encode($metadata, JSON_PRETTY_PRINT)
             );
-            
-            Log::info("EPG cache generated successfully", $metadata);
+
+            Log::debug("EPG cache generated successfully", $metadata);
             return true;
-            
         } catch (\Exception $e) {
             Log::error("Failed to cache EPG data for {$epg->name}: {$e->getMessage()}");
             return false;
@@ -192,9 +193,9 @@ class EpgCacheService
         while (@$programReader->read()) {
             if ($programReader->nodeType == XMLReader::ELEMENT && $programReader->name === 'programme') {
                 $processedCount++;
-                
+
                 // Safety limit (reduced for memory efficiency)
-                if ($processedCount > 200000) {
+                if ($processedCount > self::MAX_PROGRAMMES) {
                     Log::warning("Programme processing limit reached at {$processedCount}");
                     break;
                 }
@@ -269,22 +270,22 @@ class EpgCacheService
     private function saveProgrammesByDate(Epg $epg, array $programmes): void
     {
         $programmesByDate = [];
-        
+
         foreach ($programmes as $channelId => $channelProgrammes) {
             foreach ($channelProgrammes as $programme) {
                 $date = Carbon::parse($programme['start'])->format('Y-m-d');
-                
+
                 if (!isset($programmesByDate[$date])) {
                     $programmesByDate[$date] = [];
                 }
                 if (!isset($programmesByDate[$date][$channelId])) {
                     $programmesByDate[$date][$channelId] = [];
                 }
-                
+
                 $programmesByDate[$date][$channelId][] = $programme;
             }
         }
-        
+
         // Save each date's programmes to a separate file
         foreach ($programmesByDate as $date => $dateProgrammes) {
             $filename = "programmes-{$date}.json";
@@ -301,7 +302,7 @@ class EpgCacheService
     public function getCachedChannels(Epg $epg, int $page = 1, int $perPage = 50): array
     {
         $channelsPath = $this->getCacheFilePath($epg, self::CHANNELS_FILE);
-        
+
         if (!Storage::disk('local')->exists($channelsPath)) {
             return [
                 'channels' => [],
@@ -318,11 +319,11 @@ class EpgCacheService
 
         $allChannels = json_decode(Storage::disk('local')->get($channelsPath), true);
         $channelsList = array_values($allChannels);
-        
+
         $totalChannels = count($channelsList);
         $skip = ($page - 1) * $perPage;
         $paginatedChannels = array_slice($channelsList, $skip, $perPage);
-        
+
         // Convert back to associative array
         $channels = [];
         foreach ($paginatedChannels as $channel) {
@@ -348,13 +349,13 @@ class EpgCacheService
     public function getCachedProgrammes(Epg $epg, string $date, array $channelIds = []): array
     {
         $programmesPath = $this->getCacheFilePath($epg, "programmes-{$date}.json");
-        
+
         if (!Storage::disk('local')->exists($programmesPath)) {
             return [];
         }
 
         $programmes = json_decode(Storage::disk('local')->get($programmesPath), true);
-        
+
         // Filter by channel IDs if provided
         if (!empty($channelIds)) {
             $filtered = [];
@@ -381,7 +382,7 @@ class EpgCacheService
         while ($currentDate <= $endDateCarbon) {
             $dateStr = $currentDate->format('Y-m-d');
             $dayProgrammes = $this->getCachedProgrammes($epg, $dateStr, $channelIds);
-            
+
             // Merge programmes from this date
             foreach ($dayProgrammes as $channelId => $programmes) {
                 if (!isset($allProgrammes[$channelId])) {
@@ -389,7 +390,7 @@ class EpgCacheService
                 }
                 $allProgrammes[$channelId] = array_merge($allProgrammes[$channelId], $programmes);
             }
-            
+
             $currentDate->addDay();
         }
 
@@ -409,7 +410,7 @@ class EpgCacheService
     public function getCacheMetadata(Epg $epg): ?array
     {
         $metadataPath = $this->getCacheFilePath($epg, self::METADATA_FILE);
-        
+
         if (!Storage::disk('local')->exists($metadataPath)) {
             return null;
         }
@@ -423,10 +424,10 @@ class EpgCacheService
     public function clearCache(Epg $epg): bool
     {
         $cacheDir = $this->getCacheDir($epg);
-        
+
         try {
             Storage::disk('local')->deleteDirectory($cacheDir);
-            Log::info("Cleared cache for EPG {$epg->name}");
+            Log::debug("Cleared cache for EPG {$epg->name}");
             return true;
         } catch (\Exception $e) {
             Log::error("Failed to clear cache for EPG {$epg->name}: {$e->getMessage()}");
@@ -441,11 +442,11 @@ class EpgCacheService
     {
         $minDate = null;
         $maxDate = null;
-        
+
         foreach ($programmes as $channelProgrammes) {
             foreach ($channelProgrammes as $programme) {
                 $date = Carbon::parse($programme['start']);
-                
+
                 if ($minDate === null || $date->lt($minDate)) {
                     $minDate = $date;
                 }
@@ -454,7 +455,7 @@ class EpgCacheService
                 }
             }
         }
-        
+
         return [
             'min_date' => $minDate ? $minDate->format('Y-m-d') : null,
             'max_date' => $maxDate ? $maxDate->format('Y-m-d') : null,
@@ -477,7 +478,7 @@ class EpgCacheService
                 $timezone = $matches[7] ?? '+0000';
 
                 $dateString = "{$year}-{$month}-{$day} {$hour}:{$minute}:{$second}";
-                
+
                 if (preg_match('/([+-])(\d{2})(\d{2})/', $timezone, $tzMatches)) {
                     $tzString = $tzMatches[1] . $tzMatches[2] . ':' . $tzMatches[3];
                     $dateString .= ' ' . $tzString;

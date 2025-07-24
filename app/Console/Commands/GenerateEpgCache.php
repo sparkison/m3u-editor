@@ -13,7 +13,7 @@ class GenerateEpgCache extends Command
      *
      * @var string
      */
-    protected $signature = 'epg:cache-generate {uuid : The EPG UUID to cache}';
+    protected $signature = 'app:epg-cache-generate {id : The EPG ID to cache}';
 
     /**
      * The console command description.
@@ -27,26 +27,26 @@ class GenerateEpgCache extends Command
      */
     public function handle()
     {
-        $uuid = $this->argument('uuid');
-        
-        $epg = Epg::where('uuid', $uuid)->first();
+        $id = $this->argument('id');
+
+        $epg = Epg::find($id);
         if (!$epg) {
-            $this->error("EPG with UUID {$uuid} not found");
+            $this->error("EPG with ID {$id} not found");
             return 1;
         }
 
         $this->info("Generating cache for EPG: {$epg->name}");
-        
+
         $cacheService = new EpgCacheService();
-        
+
         // Set high memory and time limits for command line execution
         ini_set('memory_limit', '4G');
         set_time_limit(0); // No time limit for CLI
-        
+
         $start = microtime(true);
         $result = $cacheService->cacheEpgData($epg);
         $duration = microtime(true) - $start;
-        
+
         if ($result) {
             $this->info("Cache generated successfully in " . round($duration, 2) . " seconds");
             return 0;
