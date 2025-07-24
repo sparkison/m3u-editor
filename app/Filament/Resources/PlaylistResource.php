@@ -5,8 +5,6 @@ namespace App\Filament\Resources;
 use App\Enums\Status;
 use App\Filament\Resources\PlaylistResource\Pages;
 use App\Filament\Resources\PlaylistResource\RelationManagers;
-use App\Forms\Components\PlaylistEpgUrl;
-use App\Forms\Components\PlaylistM3uUrl;
 use App\Models\Playlist;
 use App\Rules\CheckIfUrlOrLocalPath;
 use Carbon\Carbon;
@@ -29,8 +27,10 @@ use App\Filament\Resources\PlaylistSyncStatusResource\Pages\EditPlaylistSyncStat
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ListPlaylistSyncStatuses;
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ViewPlaylistSyncStatus;
 use App\Forms\Components\MediaFlowProxyUrl;
-use App\Forms\Components\XtreamApiInfo;
+use App\Livewire\PlaylistEpgUrl;
 use App\Livewire\PlaylistInfo;
+use App\Livewire\PlaylistM3uUrl;
+use App\Livewire\XtreamApiInfo;
 use App\Models\PlaylistSyncStatus;
 use App\Models\SourceGroup;
 use App\Services\XtreamService;
@@ -45,6 +45,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Route;
 use Illuminate\View\View;
+use Filament\Actions as FilamentActions;
 use PDO;
 
 class PlaylistResource extends Resource
@@ -511,21 +512,213 @@ class PlaylistResource extends Resource
         ];
     }
 
+    public static function getHeaderActions(): array
+    {
+        return [
+            FilamentActions\Action::make('Sync Logs')
+                ->label('Sync Logs')
+                ->color('gray')
+                ->icon('heroicon-m-arrows-right-left')
+                ->url(
+                    fn(Playlist $record): string => PlaylistResource::getUrl(
+                        name: 'playlist-sync-statuses.index',
+                        parameters: [
+                            'parent' => $record->id,
+                        ]
+                    )
+                ),
+            FilamentActions\ActionGroup::make([
+                FilamentActions\Action::make('process')
+                    ->label(fn($record): string => $record->xtream ? 'Process All' : 'Process')
+                    ->icon('heroicon-o-arrow-path')
+                    ->action(function ($record) {
+                        $record->update([
+                            'status' => Status::Processing,
+                            'progress' => 0,
+                        ]);
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new \App\Jobs\ProcessM3uImport($record, force: true));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Playlist is processing')
+                            ->body('Playlist is being processed in the background. Depending on the size of your playlist, this may take a while. You will be notified on completion.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->disabled(fn($record): bool => $record->status === Status::Processing)
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrow-path')
+                    ->modalIcon('heroicon-o-arrow-path')
+                    ->modalDescription('Process playlist now?')
+                    ->modalSubmitActionLabel('Yes, process now'),
+                FilamentActions\Action::make('process_series')
+                    ->label('Process Series')
+                    ->icon('heroicon-o-arrow-path')
+                    ->action(function ($record) {
+                        $record->update([
+                            'status' => Status::Processing,
+                            'series_progress' => 0,
+                        ]);
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new \App\Jobs\ProcessM3uImportSeries($record, force: true));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Playlist is fetching metadata for Series')
+                            ->body('Playlist Series are being processed in the background. Depending on the number of enabled Series, this may take a while. You will be notified on completion.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->disabled(fn($record): bool => $record->status === Status::Processing)
+                    ->hidden(fn($record): bool => !$record->xtream)
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrow-path')
+                    ->modalIcon('heroicon-o-arrow-path')
+                    ->modalDescription('Fetch Series metadata for this playlist now? Only enabled Series will be included.')
+                    ->modalSubmitActionLabel('Yes, process now'),
+                FilamentActions\Action::make('process_vod')
+                    ->label('Process VOD')
+                    ->icon('heroicon-o-arrow-path')
+                    ->action(function ($record) {
+                        $record->update([
+                            'status' => Status::Processing,
+                            'progress' => 0,
+                        ]);
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new \App\Jobs\ProcessVodChannels(playlist: $record));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Playlist is fetching metadata for VOD channels')
+                            ->body('Playlist VOD channels are being processed in the background. Depending on the number of enabled VOD channels, this may take a while. You will be notified on completion.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->disabled(fn($record): bool => $record->status === Status::Processing)
+                    ->hidden(fn($record): bool => !$record->xtream)
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrow-path')
+                    ->modalIcon('heroicon-o-arrow-path')
+                    ->modalDescription('Fetch VOD metadata for this playlist now? Only enabled VOD channels will be included.')
+                    ->modalSubmitActionLabel('Yes, process now'),
+                FilamentActions\Action::make('Download M3U')
+                    ->label('Download M3U')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->url(fn($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['m3u'])
+                    ->openUrlInNewTab(),
+                FilamentActions\Action::make('Download EPG')
+                    ->label('Download EPG')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->url(fn($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['epg'])
+                    ->openUrlInNewTab(),
+                FilamentActions\Action::make('HDHomeRun URL')
+                    ->label('HDHomeRun URL')
+                    ->icon('heroicon-o-arrow-top-right-on-square')
+                    ->url(fn($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['hdhr'])
+                    ->openUrlInNewTab(),
+                FilamentActions\Action::make('Duplicate')
+                    ->label('Duplicate')
+                    ->form([
+                        Forms\Components\TextInput::make('name')
+                            ->label('Playlist name')
+                            ->required()
+                            ->helperText('This will be the name of the duplicated playlist.'),
+                    ])
+                    ->action(function ($record, $data) {
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new \App\Jobs\DuplicatePlaylist($record, $data['name']));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Playlist is being duplicated')
+                            ->body('Playlist is being duplicated in the background. You will be notified on completion.')
+                            ->duration(3000)
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-document-duplicate')
+                    ->modalIcon('heroicon-o-document-duplicate')
+                    ->modalDescription('Duplicate playlist now?')
+                    ->modalSubmitActionLabel('Yes, duplicate now'),
+                FilamentActions\Action::make('reset')
+                    ->label('Reset status')
+                    ->icon('heroicon-o-arrow-uturn-left')
+                    ->color('warning')
+                    ->action(function ($record) {
+                        $record->update([
+                            'status' => Status::Pending,
+                            'processing' => false,
+                            'progress' => 0,
+                            'series_progress' => 0,
+                            'channels' => 0,
+                            'synced' => null,
+                            'errors' => null,
+                        ]);
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Playlist status reset')
+                            ->body('Playlist status has been reset.')
+                            ->duration(3000)
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrow-uturn-left')
+                    ->modalIcon('heroicon-o-arrow-uturn-left')
+                    ->modalDescription('Reset playlist status so it can be processed again. Only perform this action if you are having problems with the playlist syncing.')
+                    ->modalSubmitActionLabel('Yes, reset now'),
+                FilamentActions\Action::make('reset_active_count')
+                    ->label('Reset active count')
+                    ->icon('heroicon-o-numbered-list')
+                    ->color('warning')
+                    ->action(fn($record) => Redis::set("active_streams:{$record->id}", 0))->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Active stream count reset')
+                            ->body('Playlist active stream count has been reset.')
+                            ->duration(3000)
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrow-uturn-left')
+                    ->modalIcon('heroicon-o-numbered-list')
+                    ->modalDescription('Reset playlist active streams count. Proceed with caution as this could lead to an incorrect count if there are streams currently running.')
+                    ->modalSubmitActionLabel('Yes, reset now'),
+                FilamentActions\DeleteAction::make(),
+            ])->button(),
+        ];
+    }
+
     public static function infolist(Infolist $infolist): Infolist
     {
         return $infolist
             ->schema([
-                Infolists\Components\Section::make('Playlist Info')
-                    ->compact()
-                    ->icon('heroicon-o-chart-bar-square')
-                    ->collapsible()
-                    ->persistCollapsed()
+                Infolists\Components\Tabs::make()
+                    ->persistTabInQueryString()
                     ->columnSpanFull()
-                    ->collapsed(false)
-                    ->schema([
-                        Infolists\Components\Livewire::make(PlaylistInfo::class),
+                    ->tabs([
+                        Infolists\Components\Tabs\Tab::make('Details')
+                            ->icon('heroicon-o-play')
+                            ->schema([
+                                Infolists\Components\Livewire::make(PlaylistInfo::class),
+                            ]),
+                        Infolists\Components\Tabs\Tab::make('Links')
+                            ->icon('heroicon-m-link')
+                            ->schema([
+                                Infolists\Components\Grid::make()
+                                    ->columns(2)
+                                    ->schema([
+                                        Infolists\Components\Livewire::make(PlaylistM3uUrl::class),
+                                        Infolists\Components\Livewire::make(PlaylistEpgUrl::class)
+                                    ])
+                            ]),
+                        Infolists\Components\Tabs\Tab::make('Xtream API')
+                            ->icon('heroicon-m-bolt')
+                            ->schema([
+                                Infolists\Components\Livewire::make(XtreamApiInfo::class)
+                            ]),
                     ]),
-
                 Infolists\Components\Section::make('Guide')
                     ->schema([
                         EpgViewer::make(),
@@ -545,6 +738,12 @@ class PlaylistResource extends Resource
                 ->columnSpanFull()
                 ->columns(3)
                 ->schema([
+                    Forms\Components\Toggle::make('short_urls_enabled')
+                        ->label('Use Short URLs')
+                        ->helperText('When enabled, short URLs will be used for the playlist links. Save changes to generate the short URLs (or remove them).')
+                        ->columnSpan(2)
+                        ->inline(false)
+                        ->default(false),
                     Forms\Components\Toggle::make('edit_uuid')
                         ->label('View/Update Unique Identifier')
                         ->columnSpanFull()
@@ -992,7 +1191,7 @@ class PlaylistResource extends Resource
                                 ->description('Add and manage authentication.')
                                 ->icon('heroicon-m-key')
                                 ->collapsible()
-                                ->collapsed(true)
+                                ->collapsed(false)
                                 ->columnSpan(2)
                                 ->schema([
                                     Forms\Components\Select::make('assigned_auth_ids')
@@ -1065,41 +1264,6 @@ class PlaylistResource extends Resource
                                             }
                                         })
                                         ->dehydrated(false), // Don't save this field directly
-                                ]),
-                            Forms\Components\Section::make('Xtream API')
-                                ->compact()
-                                ->description('Xtream API connection details.')
-                                ->icon('heroicon-m-bolt')
-                                ->collapsible()
-                                ->columnSpan(2)
-                                ->collapsed(true)
-                                ->schema([
-                                    XtreamApiInfo::make('xtream_api_info')
-                                        ->label('Xtream API Info')
-                                        ->columnSpan(2)
-                                        ->dehydrated(false), // don't save the value in the database
-                                ]),
-                            Forms\Components\Section::make('Links')
-                                ->compact()
-                                ->icon('heroicon-m-link')
-                                ->collapsible()
-                                ->columnSpan(2)
-                                ->collapsed(false)
-                                ->schema([
-                                    Forms\Components\Toggle::make('short_urls_enabled')
-                                        ->label('Use Short URLs')
-                                        ->helperText('When enabled, short URLs will be used for the playlist links. Save changes to generate the short URLs (or remove them).')
-                                        ->columnSpan(2)
-                                        ->inline(false)
-                                        ->default(false),
-                                    PlaylistM3uUrl::make('m3u_url')
-                                        ->label('M3U URLs')
-                                        ->columnSpan(2)
-                                        ->dehydrated(false), // don't save the value in the database
-                                    PlaylistEpgUrl::make('epg_url')
-                                        ->label('EPG URLs')
-                                        ->columnSpan(2)
-                                        ->dehydrated(false) // don't save the value in the database
                                 ]),
                         ])
                 ])->columnSpanFull(),

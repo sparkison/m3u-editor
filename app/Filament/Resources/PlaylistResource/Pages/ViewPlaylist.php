@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PlaylistResource\Pages;
 
 use App\Filament\Resources\PlaylistResource;
+use App\Filament\Resources\PlaylistResource\Widgets\ImportProgress;
 use Filament\Actions;
 use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
@@ -12,16 +13,24 @@ class ViewPlaylist extends ViewRecord
 {
     protected static string $resource = PlaylistResource::class;
 
+    public function getVisibleHeaderWidgets(): array
+    {
+        return [
+            ImportProgress::class
+        ];
+    }
+
     protected function getHeaderActions(): array
     {
         return [
             Actions\EditAction::make()
                 ->label('Edit Playlist')
                 ->icon('heroicon-m-pencil')
-                ->color('primary')
+                ->color('gray')
                 ->action(function () {
                     $this->redirect($this->getRecord()->getUrl('edit'));
                 }),
+            ...PlaylistResource::getHeaderActions()
         ];
     }
 
