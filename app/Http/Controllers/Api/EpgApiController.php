@@ -34,7 +34,7 @@ class EpgApiController extends Controller
         $startDate = $request->get('start_date', Carbon::now()->format('Y-m-d'));
         $endDate = $request->get('end_date', Carbon::parse($startDate)->format('Y-m-d'));
         
-        Log::info('EPG API Request', [
+        Log::debug('EPG API Request', [
             'uuid' => $uuid,
             'page' => $page,
             'per_page' => $perPage,
@@ -46,7 +46,7 @@ class EpgApiController extends Controller
             // Check if cache exists and is valid
             if (!$cacheService->isCacheValid($epg)) {
                 // If cache is invalid, try to regenerate it
-                Log::info("Cache invalid for EPG {$epg->name}, attempting regeneration");
+                Log::debug("Cache invalid for EPG {$epg->name}, attempting regeneration");
                 $cacheGenerated = $cacheService->cacheEpgData($epg);
                 
                 if (!$cacheGenerated) {
@@ -130,7 +130,7 @@ class EpgApiController extends Controller
         $startDate = $request->get('start_date', Carbon::now()->format('Y-m-d'));
         $endDate = $request->get('end_date', Carbon::parse($startDate)->format('Y-m-d'));
         
-        Log::info('EPG API Request for Playlist', [
+        Log::debug('EPG API Request for Playlist', [
             'playlist_uuid' => $uuid,
             'playlist_name' => $playlist->name,
             'page' => $page,
@@ -210,7 +210,7 @@ class EpgApiController extends Controller
 
                 // Check if cache exists and is valid
                 if (!$cacheService->isCacheValid($epg)) {
-                    Log::info("Cache invalid for EPG {$epg->name}, attempting regeneration");
+                    Log::debug("Cache invalid for EPG {$epg->name}, attempting regeneration");
                     $cacheGenerated = $cacheService->cacheEpgData($epg);
                     
                     if (!$cacheGenerated) {
