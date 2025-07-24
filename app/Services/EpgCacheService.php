@@ -354,20 +354,29 @@ class EpgCacheService
             return [];
         }
 
-        $programmes = json_decode(Storage::disk('local')->get($programmesPath), true);
+        // Temporarily increase memory limit for large EPG files
+        $originalMemoryLimit = ini_get('memory_limit');
+        ini_set('memory_limit', '512M');
+        
+        try {
+            $programmes = json_decode(Storage::disk('local')->get($programmesPath), true);
 
-        // Filter by channel IDs if provided
-        if (!empty($channelIds)) {
-            $filtered = [];
-            foreach ($channelIds as $channelId) {
-                if (isset($programmes[$channelId])) {
-                    $filtered[$channelId] = $programmes[$channelId];
+            // Filter by channel IDs if provided
+            if (!empty($channelIds)) {
+                $filtered = [];
+                foreach ($channelIds as $channelId) {
+                    if (isset($programmes[$channelId])) {
+                        $filtered[$channelId] = $programmes[$channelId];
+                    }
                 }
+                return $filtered;
             }
-            return $filtered;
-        }
 
-        return $programmes;
+            return $programmes;
+        } finally {
+            // Restore original memory limit
+            ini_set('memory_limit', $originalMemoryLimit);
+        }
     }
 
     /**

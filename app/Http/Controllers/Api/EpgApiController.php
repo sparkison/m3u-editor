@@ -166,7 +166,12 @@ class EpgApiController extends Controller
                     }
                     
                     // Map EPG channel ID to playlist channel info
-                    $epgChannelMap[$epgId][$epgData->channel_id] = [
+                    // Store array of playlist channels for each EPG channel (one-to-many mapping)
+                    if (!isset($epgChannelMap[$epgId][$epgData->channel_id])) {
+                        $epgChannelMap[$epgId][$epgData->channel_id] = [];
+                    }
+                    
+                    $epgChannelMap[$epgId][$epgData->channel_id][] = [
                         'playlist_channel_id' => $channel->id,
                         'title' => $channel->title_custom ?? $channel->title,
                         'display_name' => $channel->name_custom ?? $channel->name,
@@ -204,38 +209,68 @@ class EpgApiController extends Controller
             $programmes = [];
             $epgIds = array_unique($epgIds);
             
+            Log::info("Processing EPG data for " . count($epgIds) . " unique EPGs");
+            
             foreach ($epgIds as $epgId) {
-                $epg = Epg::find($epgId);
-                if (!$epg) continue;
-
-                // Check if cache exists and is valid
-                if (!$cacheService->isCacheValid($epg)) {
-                    Log::debug("Cache invalid for EPG {$epg->name}, attempting regeneration");
-                    $cacheGenerated = $cacheService->cacheEpgData($epg);
-                    
-                    if (!$cacheGenerated) {
-                        Log::warning("Failed to generate cache for EPG {$epg->name}");
+                try {
+                    $epg = Epg::find($epgId);
+                    if (!$epg) {
+                        Log::warning("EPG with ID {$epgId} not found");
                         continue;
                     }
-                }
 
-                // Get the EPG channel IDs we need for this EPG
-                $neededEpgChannelIds = array_keys($epgChannelMap[$epgId] ?? []);
-                
-                // Get programmes from cache
-                $epgProgrammes = $cacheService->getCachedProgrammes($epg, $startDate, $neededEpgChannelIds);
-                
-                // Map programmes to playlist channels
-                foreach ($epgProgrammes as $epgChannelId => $channelProgrammes) {
-                    if (isset($epgChannelMap[$epgId][$epgChannelId])) {
-                        $playlistChannelInfo = $epgChannelMap[$epgId][$epgChannelId];
-                        $playlistChannelId = $playlistChannelInfo['playlist_channel_id'];
-                        
-                        // Only include programmes for channels in current page
-                        if (isset($channels[$playlistChannelId])) {
-                            $programmes[$playlistChannelId] = $channelProgrammes;
+                    // Check if cache exists and is valid - don't auto-regenerate for playlist requests to avoid timeouts
+                    if (!$cacheService->isCacheValid($epg)) {
+                        Log::info("Cache invalid for EPG {$epg->name}, skipping (no auto-regeneration for playlist requests)");
+                        continue;
+                    }
+
+                    // Get the EPG channel IDs we need for this EPG (only for paginated channels)
+                    $neededEpgChannelIds = [];
+                    if (isset($epgChannelMap[$epgId])) {
+                        foreach ($epgChannelMap[$epgId] as $epgChannelId => $playlistChannelInfoArray) {
+                            // Check if any of the playlist channels for this EPG channel are on current page
+                            $hasChannelOnPage = false;
+                            foreach ($playlistChannelInfoArray as $playlistChannelInfo) {
+                                $playlistChannelId = $playlistChannelInfo['playlist_channel_id'];
+                                if (isset($channels[$playlistChannelId])) {
+                                    $hasChannelOnPage = true;
+                                    break;
+                                }
+                            }
+                            
+                            if ($hasChannelOnPage) {
+                                $neededEpgChannelIds[] = $epgChannelId;
+                            }
                         }
                     }
+
+                    if (empty($neededEpgChannelIds)) {
+                        continue;
+                    }
+                    
+                    // Get programmes from cache
+                    $epgProgrammes = $cacheService->getCachedProgrammes($epg, $startDate, $neededEpgChannelIds);
+                    
+                    // Map programmes to playlist channels
+                    foreach ($epgProgrammes as $epgChannelId => $channelProgrammes) {
+                        if (isset($epgChannelMap[$epgId][$epgChannelId])) {
+                            $playlistChannelInfoArray = $epgChannelMap[$epgId][$epgChannelId];
+                            
+                            // Map programmes to all playlist channels that use this EPG channel
+                            foreach ($playlistChannelInfoArray as $playlistChannelInfo) {
+                                $playlistChannelId = $playlistChannelInfo['playlist_channel_id'];
+                                
+                                // Only include programmes for channels in current page
+                                if (isset($channels[$playlistChannelId])) {
+                                    $programmes[$playlistChannelId] = $channelProgrammes;
+                                }
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::error("Error processing EPG {$epgId}: {$e->getMessage()}");
+                    // Continue with other EPGs
                 }
             }
 

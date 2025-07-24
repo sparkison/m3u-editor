@@ -111,7 +111,8 @@ function epgViewer(config) {
                 
                 // Set epgData for template compatibility
                 this.epgData = {
-                    epg: data.epg,
+                    epg: data.epg || null,
+                    playlist: data.playlist || null,
                     date_range: data.date_range,
                     channels: this.allChannels,
                     programmes: this.allProgrammes,
