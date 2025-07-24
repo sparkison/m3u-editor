@@ -24,6 +24,8 @@ class ViewPlaylist extends ViewRecord
 
     public function infolist(Infolist $infolist): Infolist
     {
+        $record = $this->getRecord();
+        $record->loadCount('enabled_channels');
         return $infolist
             ->schema([
                 Section::make('Playlist Information')
@@ -37,12 +39,13 @@ class ViewPlaylist extends ViewRecord
                             ->label('Last Synced')
                             ->since()
                             ->placeholder('Never'),
-                        TextEntry::make('channels_count')
-                            ->label('Total Channels'),
+                        TextEntry::make('enabled_channels_count')
+                            ->label('Enabled Channels')
+                            ->default($record->enabled_channels_count),
                     ])
                     ->columns(2),
 
-                Section::make('EPG Guide')
+                Section::make('Guide')
                     ->schema([
                         EpgViewer::make(),
                     ])

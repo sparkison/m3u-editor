@@ -48,11 +48,6 @@ class Epg extends Model
         return $this->hasMany(EpgChannel::class);
     }
 
-    public function getChannelsCountAttribute(): int
-    {
-        return $this->channels()->count();
-    }
-
     public function epgMaps(): HasMany
     {
         return $this->hasMany(EpgMap::class);

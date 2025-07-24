@@ -72,6 +72,8 @@ class ViewEpg extends ViewRecord
 
     public function infolist(Infolist $infolist): Infolist
     {
+        $record = $this->getRecord();
+        $record->loadCount('channels');
         return $infolist
             ->schema([
                 Section::make('EPG Information')
@@ -86,11 +88,12 @@ class ViewEpg extends ViewRecord
                             ->since()
                             ->placeholder('Never'),
                         TextEntry::make('channels_count')
-                            ->label('Total Channels'),
+                            ->label('Total Channels')
+                            ->default($record->channels_count),
                     ])
                     ->columns(2),
 
-                Section::make('EPG Guide')
+                Section::make('Guide')
                     ->schema([
                         EpgViewer::make(),
                     ])
