@@ -50,7 +50,7 @@
                     </button>
                     
                     <div class="flex flex-col">
-                        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100" x-text="epgData?.epg?.name || 'EPG Viewer'"></h3>
+                        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100" x-text="epgData?.epg?.name || epgData?.playlist?.name || 'EPG Viewer'"></h3>
                         <p class="text-sm text-gray-500 dark:text-gray-400" x-text="formatDate(currentDate)"></p>
                     </div>
                     
