@@ -90,7 +90,7 @@
             </div>
 
             <!-- EPG Grid Container -->
-            <div class="bg-white border border-gray-200 rounded-lg overflow-hidden" style="height: 600px;">
+            <div class="bg-white relative border border-gray-200 rounded-lg overflow-hidden" style="height: 600px;">
                  <!-- Loading More Overlay -->
                 <div 
                     x-show="loadingMore" 
