@@ -39,47 +39,47 @@
             <!-- Date Navigation -->
             <div class="flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                 <div class="flex items-center space-x-4">
-                    <button 
+                    <x-filament::button 
+                        icon="heroicon-m-chevron-left"
+                        icon-position="before"
+                        color="gray"
                         @click="previousDay()"
-                        class="flex items-center px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                     >
-                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-                        </svg>
                         Previous
-                    </button>
+                    </x-filament::button>
                     
                     <div class="flex flex-col">
                         <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100" x-text="epgData?.epg?.name || epgData?.playlist?.name || 'EPG Viewer'"></h3>
                         <p class="text-sm text-gray-500 dark:text-gray-400" x-text="formatDate(currentDate)"></p>
                     </div>
                     
-                    <button 
+                    <x-filament::button 
+                        icon="heroicon-m-chevron-right"
+                        icon-position="after"
+                        color="gray"
                         @click="nextDay()"
-                        class="flex items-center px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                     >
                         Next
-                        <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                        </svg>
-                    </button>
+                    </x-filament::button>
                 </div>
 
                 <div class="flex items-center space-x-2">
-                    <button 
+                    <x-filament::button
+                        icon="heroicon-m-calendar"
+                        icon-position="before"
+                        color="gray"
                         @click="goToToday()"
-                        class="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                     >
                         Today
-                    </button>
-                    <button 
+                    </x-filament::button>
+                    <x-filament::button
+                        icon="heroicon-m-clock"
+                        icon-position="before"
+                        color="gray"
                         @click="scrollToCurrentTime()"
-                        x-show="isToday()"
-                        class="px-3 py-2 text-sm font-medium text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-md hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
-                        title="Scroll to current time"
                     >
-                        📍 Now
-                    </button>
+                        Now
+                    </x-filament::button>
                     {{-- <input 
                         type="date" 
                         x-model="currentDate"

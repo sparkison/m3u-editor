@@ -38,6 +38,6 @@ class ViewPlaylist extends ViewRecord
     {
         $record = $this->getRecord();
         $record->loadCount('enabled_channels');
-        return PlaylistResource::infolist($infolist, $record);
+        return PlaylistResource::infolist($infolist);
     }
 }
