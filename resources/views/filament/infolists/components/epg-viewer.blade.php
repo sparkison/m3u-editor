@@ -205,7 +205,7 @@
                             handleScroll($event);
                         "
                     >
-                        <div class="relative" style="width: 2400px;"> <!-- 24 hours * 100px per hour -->
+                        <div class="relative overflow-hidden" style="width: 2400px;"> <!-- 24 hours * 100px per hour -->
                             <!-- Current time indicator for programme area -->
                             <div 
                                 x-show="isToday() && currentTimePosition >= 0"
