@@ -43,7 +43,6 @@ class EpgApiController extends Controller
             'start_date' => $startDate,
             'end_date' => $endDate,
         ]);
-
         try {
             // Check if cache exists and is valid
             if (!$epg->is_cached) {
@@ -143,6 +142,8 @@ class EpgApiController extends Controller
                 ->orderBy('channels.sort') // Secondary sort
                 ->orderBy('channels.channel')
                 ->orderBy('channels.title')
+                ->limit($perPage)
+                ->offset(($page - 1) * $perPage)
                 ->select('channels.*')
                 ->get();
 
@@ -161,9 +162,33 @@ class EpgApiController extends Controller
             foreach ($playlistChannels as $channel) {
                 $epgData = $channel->epgChannel ?? null;
                 $channelNo = $channel->channel;
-                if (!$channelNo && $playlist->auto_channel_increment) {
+                if (!$channelNo) {
                     $channelNo = ++$channelNumber;
                 }
+                if ($epgData) {
+                    $epgId = $epgData->epg_id;
+                    $epgIds[] = $epgId;
+                    if (!isset($epgChannelMap[$epgId])) {
+                        $epgChannelMap[$epgId] = [];
+                    }
+
+                    // Map EPG channel ID to playlist channel info
+                    // Store array of playlist channels for each EPG channel (one-to-many mapping)
+                    if (!isset($epgChannelMap[$epgId][$epgData->channel_id])) {
+                        $epgChannelMap[$epgId][$epgData->channel_id] = [];
+                    }
+
+                    // Add the playlist channel info to the EPG channel map
+                    $epgChannelMap[$epgId][$epgData->channel_id][] = [
+                        'playlist_channel_id' => $channelNo,
+                        'title' => $channel->title_custom ?? $channel->title,
+                        'display_name' => $channel->name_custom ?? $channel->name,
+                        'channel_number' => $channel->channel,
+                        'group' => $channel->group ?? $channel->group_internal,
+                        'logo' => $channel->logo ?? ''
+                    ];
+                }
+
                 // Get the TVG ID
                 switch ($idChannelBy) {
                     case PlaylistChannelId::ChannelId:
@@ -180,30 +205,6 @@ class EpgApiController extends Controller
                         break;
                 }
 
-                if ($epgData) {
-                    $epgId = $epgData->epg_id;
-                    $epgIds[] = $epgId;
-                    if (!isset($epgChannelMap[$epgId])) {
-                        $epgChannelMap[$epgId] = [];
-                    }
-
-                    // Map EPG channel ID to playlist channel info
-                    // Store array of playlist channels for each EPG channel (one-to-many mapping)
-                    if (!isset($epgChannelMap[$epgId][$epgData->channel_id])) {
-                        $epgChannelMap[$epgId][$epgData->channel_id] = [];
-                    }
-
-                    // Add the playlist channel info to the EPG channel map
-                    $epgChannelMap[$epgId][$epgData->channel_id][] = [
-                        'playlist_channel_id' => $tvgId,
-                        'title' => $channel->title_custom ?? $channel->title,
-                        'display_name' => $channel->name_custom ?? $channel->name,
-                        'channel_number' => $channel->channel,
-                        'group' => $channel->group ?? $channel->group_internal,
-                        'logo' => $channel->logo ?? ''
-                    ];
-                }
-
                 // Store channel data for pagination
                 $url = $channel->url_custom ?? $channel->url;
                 if ($proxyEnabled) {
@@ -212,9 +213,11 @@ class EpgApiController extends Controller
                         format: $format
                     );
                 }
-                $playlistChannelData[] = [
-                    'id' => $tvgId,
+                $playlistChannelData[$channelNo] = [
+                    'id' => $channelNo,
                     'url' => $url,
+                    'format' => $format,
+                    'tvg_id' => $tvgId,
                     'title' => $channel->title_custom ?? $channel->title,
                     'display_name' => $channel->name_custom ?? $channel->name,
                     'channel_number' => $channel->channel,
@@ -226,15 +229,9 @@ class EpgApiController extends Controller
             }
 
             // Apply pagination to playlist channels
-            $totalChannels = count($playlistChannelData);
+            $totalChannels = $playlist->channels()->where('enabled', true)->count();
             $skip = ($page - 1) * $perPage;
-            $paginatedChannels = array_slice($playlistChannelData, $skip, $perPage);
-
-            // Convert to associative array format for consistency with getData
-            $channels = [];
-            foreach ($paginatedChannels as $channel) {
-                $channels[$channel['id']] = $channel;
-            }
+            $channels = $playlistChannelData;
 
             // Get EPG data from cache for the paginated channels
             $programmes = [];
@@ -309,7 +306,7 @@ class EpgApiController extends Controller
                 'current_page' => $page,
                 'per_page' => $perPage,
                 'total_channels' => $totalChannels,
-                'returned_channels' => count($paginatedChannels),
+                'returned_channels' => count($channels),
                 'has_more' => ($skip + $perPage) < $totalChannels,
                 'next_page' => ($skip + $perPage) < $totalChannels ? $page + 1 : null,
             ];
