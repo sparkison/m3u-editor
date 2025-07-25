@@ -43,7 +43,7 @@ class EpgApiController extends Controller
 
         try {
             // Check if cache exists and is valid
-            if (!$epg->isCached()) {
+            if (!$epg->is_cached) {
                 return response()->json([
                     'error' => 'Failed to retrieve EPG cache. Please try generating the EPG cache.',
                     'suggestion' => 'Try using the "Generate Cache" button to regenerate the data.'
@@ -213,7 +213,7 @@ class EpgApiController extends Controller
                     }
 
                     // Check if cache exists and is valid
-                    if (!$epg->isCached()) {
+                    if (!$epg->is_cached) {
                         Log::info("Cache invalid for EPG {$epg->name}, skipping (no auto-regeneration for playlist requests)");
                         continue;
                     }

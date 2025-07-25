@@ -53,3 +53,8 @@ Schedule::command('app:shared-streams cleanup')
 Schedule::command('app:shared-streams sync')
     ->everyTenMinutes()
     ->withoutOverlapping();
+
+// EPG cache health
+Schedule::command('app:epg-cache-health-check')
+    ->hourly()
+    ->withoutOverlapping();

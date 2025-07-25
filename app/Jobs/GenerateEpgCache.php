@@ -7,6 +7,7 @@ use App\Services\EpgCacheService;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Log;
 
 class GenerateEpgCache implements ShouldQueue
 {
@@ -31,6 +32,8 @@ class GenerateEpgCache implements ShouldQueue
     {
         $epg = Epg::where('uuid', $this->uuid)->first();
         if (!$epg) {
+            Log::error("EPG with UUID {$this->uuid} not found for cache generation.");
+            return;
         }
 
         $start = microtime(true);

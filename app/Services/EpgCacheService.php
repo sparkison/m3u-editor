@@ -14,7 +14,6 @@ class EpgCacheService
     private const CACHE_VERSION = 'v1';
     private const CHANNELS_FILE = 'channels.json';
     private const METADATA_FILE = 'metadata.json';
-    private const CACHE_CHECK_KEY = 'epg_cache_valid_'; // Cache key prefix for EPG validity checks
     private const MAX_PROGRAMMES = 200000; // Safety limit to prevent memory issues
 
     /**
@@ -123,6 +122,9 @@ class EpgCacheService
                 $this->getCacheFilePath($epg, self::METADATA_FILE),
                 json_encode($metadata, JSON_PRETTY_PRINT)
             );
+
+            // Flag EPG as cached
+            $epg->update(['is_cached' => true]);
 
             Log::debug("EPG cache generated successfully", $metadata);
             return true;
@@ -437,8 +439,8 @@ class EpgCacheService
         // Get the cache directory
         $cacheDir = $this->getCacheDir($epg);
         try {
-            // Clear cache check key
-            Cache::forget(self::CACHE_CHECK_KEY . $epg->uuid);
+            // Flag EPG as not cached
+            $epg->update(['is_cached' => false]);
 
             // Delete cache directory
             Storage::disk('local')->deleteDirectory($cacheDir);
