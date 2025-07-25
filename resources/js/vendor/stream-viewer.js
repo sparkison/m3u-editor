@@ -4,43 +4,43 @@ function streamPlayer() {
         player: null,
         hls: null,
         mpegts: null,
-
+        
         initPlayer(url, format, playerId) {
             console.log('initPlayer called with:', { url, format, playerId });
-
+            
             const video = document.getElementById(playerId);
             const loadingEl = document.getElementById(playerId + '-loading');
             const errorEl = document.getElementById(playerId + '-error');
             const statusEl = document.getElementById(playerId + '-status');
-
-            console.log('DOM elements found:', {
-                video: !!video,
-                loadingEl: !!loadingEl,
-                errorEl: !!errorEl,
-                statusEl: !!statusEl
+            
+            console.log('DOM elements found:', { 
+                video: !!video, 
+                loadingEl: !!loadingEl, 
+                errorEl: !!errorEl, 
+                statusEl: !!statusEl 
             });
-
+            
             if (!video) {
                 console.error('Video element not found:', playerId);
                 return;
             }
-
+            
             if (!url) {
                 console.error('No stream URL provided');
                 this.showError(playerId, 'No stream URL provided');
                 return;
             }
-
+            
             console.log('Starting player initialization...');
-
+            
             // Clean up any existing players
             this.cleanup();
-
+            
             // Update status
             statusEl.textContent = 'Connecting...';
             loadingEl.style.display = 'flex';
             errorEl.style.display = 'none';
-
+            
             try {
                 if (format === 'hls' || url.includes('.m3u8')) {
                     console.log('Initializing HLS player');
@@ -57,7 +57,7 @@ function streamPlayer() {
                 this.showError(playerId, error.message);
             }
         },
-
+        
         initHlsPlayer(video, url, playerId) {
             if (typeof Hls !== 'undefined' && Hls.isSupported()) {
                 this.hls = new Hls({
@@ -65,20 +65,20 @@ function streamPlayer() {
                     lowLatencyMode: true,
                     backBufferLength: 90
                 });
-
+                
                 this.hls.loadSource(url);
                 this.hls.attachMedia(video);
-
+                
                 this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
                     this.hideLoading(playerId);
                     this.updateStatus(playerId, 'Connected');
                 });
-
+                
                 this.hls.on(Hls.Events.ERROR, (event, data) => {
                     console.error('HLS Error:', data);
                     this.showError(playerId, `HLS Error: ${data.details || 'Unknown error'}`);
                 });
-
+                
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 // Safari native HLS support
                 video.src = url;
@@ -87,81 +87,104 @@ function streamPlayer() {
                 throw new Error('HLS is not supported in this browser');
             }
         },
-
+        
         initMpegTsPlayer(video, url, playerId) {
+            console.log('MPEG-TS libraries available:', typeof mpegts !== 'undefined', mpegts?.getFeatureList().mseLivePlayback);
+            
             if (typeof mpegts !== 'undefined' && mpegts.getFeatureList().mseLivePlayback) {
+                console.log('Creating MPEG-TS player...');
                 this.mpegts = mpegts.createPlayer({
                     type: 'mpegts',
                     url: url,
                     isLive: true
                 });
-
+                
                 this.mpegts.attachMediaElement(video);
                 this.mpegts.load();
-
+                
                 this.mpegts.on(mpegts.Events.METADATA_ARRIVED, () => {
+                    console.log('MPEG-TS metadata arrived');
                     this.hideLoading(playerId);
                     this.updateStatus(playerId, 'Connected');
                 });
-
+                
                 this.mpegts.on(mpegts.Events.ERROR, (type, details, info) => {
                     console.error('MPEGTS Error:', type, details, info);
                     this.showError(playerId, `MPEGTS Error: ${details || 'Unknown error'}`);
                 });
-
+                
+                // Also set up native video events as backup
+                this.setupNativeEvents(video, playerId);
+                
             } else {
+                console.log('MPEG-TS not supported, falling back to native');
                 // Fallback to native
                 this.initNativePlayer(video, url, playerId);
             }
         },
-
+        
         initNativePlayer(video, url, playerId) {
             video.src = url;
             this.setupNativeEvents(video, playerId);
         },
-
+        
         setupNativeEvents(video, playerId) {
             video.addEventListener('loadstart', () => {
+                console.log('Video loadstart event');
                 this.updateStatus(playerId, 'Loading...');
             });
-
+            
+            video.addEventListener('loadedmetadata', () => {
+                console.log('Video loadedmetadata event');
+                this.hideLoading(playerId);
+                this.updateStatus(playerId, 'Metadata loaded');
+            });
+            
             video.addEventListener('canplay', () => {
+                console.log('Video canplay event');
                 this.hideLoading(playerId);
                 this.updateStatus(playerId, 'Ready');
             });
-
+            
             video.addEventListener('playing', () => {
+                console.log('Video playing event');
+                this.hideLoading(playerId);
                 this.updateStatus(playerId, 'Playing');
             });
-
+            
             video.addEventListener('error', (e) => {
                 console.error('Video Error:', e);
                 this.showError(playerId, 'Failed to load video stream');
             });
         },
-
+        
         hideLoading(playerId) {
+            console.log('hideLoading called for:', playerId);
             const loadingEl = document.getElementById(playerId + '-loading');
-            if (loadingEl) loadingEl.style.display = 'none';
+            console.log('Loading element found:', !!loadingEl);
+            if (loadingEl) {
+                loadingEl.style.display = 'none';
+                console.log('Loading overlay hidden');
+            }
         },
-
+        
         showError(playerId, message) {
             const loadingEl = document.getElementById(playerId + '-loading');
             const errorEl = document.getElementById(playerId + '-error');
             const errorMessageEl = document.getElementById(playerId + '-error-message');
-
+            
             if (loadingEl) loadingEl.style.display = 'none';
             if (errorEl) errorEl.style.display = 'flex';
             if (errorMessageEl) errorMessageEl.textContent = message;
-
+            
             this.updateStatus(playerId, 'Error');
         },
-
+        
         updateStatus(playerId, status) {
             const statusEl = document.getElementById(playerId + '-status');
             if (statusEl) statusEl.textContent = status;
         },
-
+        
         cleanup() {
             if (this.hls) {
                 this.hls.destroy();
