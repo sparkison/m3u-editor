@@ -146,6 +146,24 @@ class EpgResource extends Resource
                         ->modalIcon('heroicon-o-arrow-path')
                         ->modalDescription('Process EPG now?')
                         ->modalSubmitActionLabel('Yes, process now'),
+                    Tables\Actions\Action::make('cache')
+                        ->label('Generate Cache')
+                        ->icon('heroicon-o-arrows-pointing-in')
+                        ->action(function ($record) {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new \App\Jobs\GenerateEpgCache($record->uuid, notify: true));
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('EPG Cache is being generated')
+                                ->body('EPG Cache is being generated in the background. You will be notified when complete.')
+                                ->duration(5000)
+                                ->send();
+                        })
+                        ->disabled(fn($record) => $record->status === \App\Enums\Status::Processing)
+                        ->requiresConfirmation()
+                        ->modalDescription('Generate EPG Cache now? This will create a cache for the EPG data.')
+                        ->modalSubmitActionLabel('Yes, generate cache now'),
                     Tables\Actions\Action::make('Download EPG')
                         ->label('Download EPG')
                         ->icon('heroicon-o-arrow-down-tray')
@@ -209,6 +227,26 @@ class EpgResource extends Resource
                         ->modalIcon('heroicon-o-arrow-path')
                         ->modalDescription('Process the selected epg(s) now?')
                         ->modalSubmitActionLabel('Yes, process now'),
+
+                    Tables\Actions\BulkAction::make('cache')
+                        ->label('Generate Cache')
+                        ->icon('heroicon-o-arrows-pointing-in')
+                        ->action(function ($records) {
+                            foreach ($records as $record) {
+                                app('Illuminate\Contracts\Bus\Dispatcher')
+                                    ->dispatch(new \App\Jobs\GenerateEpgCache($record->uuid, notify: true));
+                            }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('EPG Cache is being generated for selected EPGs')
+                                ->body('EPG Cache is being generated in the background for the selected EPGs. You will be notified when complete.')
+                                ->duration(5000)
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->modalDescription('Generate EPG Cache now? This will create a cache for the EPG data.')
+                        ->modalSubmitActionLabel('Yes, generate cache now'),
 
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),

@@ -46,7 +46,7 @@ class EpgApiController extends Controller
             if (!$epg->isCached()) {
                 return response()->json([
                     'error' => 'Failed to retrieve EPG cache. Please try generating the EPG cache.',
-                    'suggestion' => 'Try using the "Generate EPG Cache" button to regenerate the data.'
+                    'suggestion' => 'Try using the "Generate Cache" button to regenerate the data.'
                 ], 500);
             }
 

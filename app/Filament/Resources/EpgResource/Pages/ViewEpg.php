@@ -19,7 +19,7 @@ class ViewEpg extends ViewRecord
     {
         return [
             Actions\Action::make('refresh')
-                ->label('Refresh EPG')
+                ->label('Process')
                 ->icon('heroicon-o-arrow-path')
                 ->action(function () {
                     $record = $this->getRecord();
@@ -43,7 +43,7 @@ class ViewEpg extends ViewRecord
                 ->modalSubmitActionLabel('Yes, refresh now'),
 
             Actions\Action::make('cache')
-                ->label('Generate EPG Cache')
+                ->label('Generate Cache')
                 ->icon('heroicon-o-arrows-pointing-in')
                 ->action(function () {
                     $record = $this->getRecord();
