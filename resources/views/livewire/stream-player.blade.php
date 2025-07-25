@@ -13,7 +13,31 @@
                 $wire.openPlayer(event.detail);
             });
         "
+        x-watch="show"
+        x-effect="
+            if (!show) {
+                console.log('Modal closing, triggering cleanup...');
+                // Find the video element and trigger cleanup
+                const video = document.querySelector('#{{ $playerId }}');
+                if (video) {
+                    const alpineData = Alpine.$data(video);
+                    if (alpineData && typeof alpineData.cleanup === 'function') {
+                        alpineData.cleanup();
+                    }
+                }
+            }
+        "
         @openstreamplayer.window="console.log('openStreamPlayer event received:', $event.detail)"
+        @cleanup-player.window="
+            console.log('Cleanup player event received:', $event.detail);
+            const video = document.getElementById($event.detail.playerId);
+            if (video) {
+                const alpineData = Alpine.$data(video);
+                if (alpineData && typeof alpineData.cleanup === 'function') {
+                    alpineData.cleanup();
+                }
+            }
+        "
     >
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
             <!-- Backdrop -->
@@ -72,7 +96,13 @@
                             x-init="initPlayer('{{ $streamUrl }}', '{{ $streamFormat }}', '{{ $playerId }}')"
                             data-url="{{ $streamUrl }}"
                             data-format="{{ $streamFormat }}"
-                            @cleanup-player.window="if ($event.detail.playerId === '{{ $playerId }}') cleanup()"
+                            @cleanup-player.window="
+                                console.log('Video cleanup event:', $event.detail);
+                                if ($event.detail.playerId === '{{ $playerId }}') {
+                                    console.log('Cleaning up this video player');
+                                    cleanup();
+                                }
+                            "
                         >
                             <p class="text-white p-4">Your browser does not support video playback.</p>
                         </video>

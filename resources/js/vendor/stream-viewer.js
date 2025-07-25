@@ -33,6 +33,9 @@ function streamPlayer() {
             
             console.log('Starting player initialization...');
             
+            // Store reference to video element for cleanup
+            this.player = video;
+            
             // Clean up any existing players
             this.cleanup();
             
@@ -186,13 +189,26 @@ function streamPlayer() {
         },
         
         cleanup() {
+            console.log('Cleaning up stream player...');
+            
             if (this.hls) {
+                console.log('Destroying HLS player');
                 this.hls.destroy();
                 this.hls = null;
             }
+            
             if (this.mpegts) {
+                console.log('Destroying MPEG-TS player');
                 this.mpegts.destroy();
                 this.mpegts = null;
+            }
+            
+            // Also pause and clear any video element that might be playing
+            if (this.player && this.player.tagName === 'VIDEO') {
+                console.log('Stopping video playback');
+                this.player.pause();
+                this.player.src = '';
+                this.player.load(); // This will stop any ongoing loading/streaming
             }
         }
     };

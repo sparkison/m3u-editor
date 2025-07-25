@@ -43,6 +43,8 @@ class StreamPlayer extends Component
 
     public function closePlayer()
     {
+        Log::info('StreamPlayer closePlayer called');
+        
         $this->showModal = false;
         $this->streamUrl = '';
         $this->streamFormat = 'ts';
