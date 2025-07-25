@@ -2,15 +2,18 @@
     @php($record = $getRecord())
     @php($playlist = App\Models\Playlist::find($record->playlist_id) ?? null)
     @php($format = $playlist->proxy_options['output'] ?? 'ts')
+    @php($proxyEnabled = $playlist->enable_proxy)
     @php($url = $record->url)
-    @php($proxyUrl = App\Facades\ProxyFacade::getProxyUrlForEpisode(id: $record->id, format:  $format, preview: true))
+    @if($proxyEnabled)
+        @php($url = App\Facades\ProxyFacade::getProxyUrlForEpisode(id: $record->id, format:  $format, preview: true))
+    @endif
     @php($playerId = "episode_{$record->id}_preview")
 
     <div 
         x-data="{ 
             player: null,
             playerId: '{{ $playerId }}',
-            streamUrl: '{{ $proxyUrl }}',
+            streamUrl: '{{ $url }}',
             streamFormat: '{{ $format }}',
             channelTitle: '{{ $record->title ?? $record->name }}'
         }"
