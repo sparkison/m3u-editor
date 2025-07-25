@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Epg;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use XMLReader;
@@ -13,6 +14,7 @@ class EpgCacheService
     private const CACHE_VERSION = 'v1';
     private const CHANNELS_FILE = 'channels.json';
     private const METADATA_FILE = 'metadata.json';
+    private const CACHE_CHECK_KEY = 'epg_cache_valid_'; // Cache key prefix for EPG validity checks
     private const MAX_PROGRAMMES = 200000; // Safety limit to prevent memory issues
 
     /**
@@ -357,7 +359,7 @@ class EpgCacheService
         // Temporarily increase memory limit for large EPG files
         $originalMemoryLimit = ini_get('memory_limit');
         ini_set('memory_limit', '512M');
-        
+
         try {
             $programmes = json_decode(Storage::disk('local')->get($programmesPath), true);
 
@@ -432,10 +434,16 @@ class EpgCacheService
      */
     public function clearCache(Epg $epg): bool
     {
+        // Get the cache directory
         $cacheDir = $this->getCacheDir($epg);
-
         try {
+            // Clear cache check key
+            Cache::forget(self::CACHE_CHECK_KEY . $epg->uuid);
+
+            // Delete cache directory
             Storage::disk('local')->deleteDirectory($cacheDir);
+
+            // Log cache clearing
             Log::debug("Cleared cache for EPG {$epg->name}");
             return true;
         } catch (\Exception $e) {

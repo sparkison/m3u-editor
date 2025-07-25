@@ -24,8 +24,7 @@ class EpgApiController extends Controller
     public function getData(string $uuid, Request $request)
     {
         $epg = Epg::where('uuid', $uuid)->firstOrFail();
-        $cacheService = new EpgCacheService();
-        
+
         // Pagination parameters
         $page = (int) $request->get('page', 1);
         $perPage = (int) $request->get('per_page', 50);
@@ -33,7 +32,7 @@ class EpgApiController extends Controller
         // Date parameters
         $startDate = $request->get('start_date', Carbon::now()->format('Y-m-d'));
         $endDate = $request->get('end_date', Carbon::parse($startDate)->format('Y-m-d'));
-        
+
         Log::debug('EPG API Request', [
             'uuid' => $uuid,
             'page' => $page,
@@ -44,20 +43,15 @@ class EpgApiController extends Controller
 
         try {
             // Check if cache exists and is valid
-            if (!$cacheService->isCacheValid($epg)) {
-                // If cache is invalid, try to regenerate it
-                Log::debug("Cache invalid for EPG {$epg->name}, attempting regeneration");
-                $cacheGenerated = $cacheService->cacheEpgData($epg);
-                
-                if (!$cacheGenerated) {
-                    return response()->json([
-                        'error' => 'Failed to generate EPG cache. Please try refreshing the EPG.',
-                        'suggestion' => 'Try using the "Refresh EPG" button to regenerate the data.'
-                    ], 500);
-                }
+            if (!$epg->isCached()) {
+                return response()->json([
+                    'error' => 'Failed to retrieve EPG cache. Please try generating the EPG cache.',
+                    'suggestion' => 'Try using the "Generate EPG Cache" button to regenerate the data.'
+                ], 500);
             }
 
             // Get cached channels with pagination
+            $cacheService = new EpgCacheService();
             $channelData = $cacheService->getCachedChannels($epg, $page, $perPage);
             $channels = $channelData['channels'];
             $pagination = $channelData['pagination'];
@@ -89,7 +83,6 @@ class EpgApiController extends Controller
                     'programme_date_range' => $metadata['programme_date_range'] ?? null,
                 ]
             ]);
-
         } catch (\Exception $e) {
             Log::error("Error retrieving EPG data for {$epg->name}: {$e->getMessage()}");
             return response()->json([
@@ -115,13 +108,13 @@ class EpgApiController extends Controller
         if (!$playlist) {
             $playlist = CustomPlaylist::where('uuid', $uuid)->first();
         }
-        
+
         if (!$playlist) {
             return response()->json(['error' => 'Playlist not found'], 404);
         }
 
         $cacheService = new EpgCacheService();
-        
+
         // Pagination parameters
         $page = (int) $request->get('page', 1);
         $perPage = (int) $request->get('per_page', 50);
@@ -129,7 +122,7 @@ class EpgApiController extends Controller
         // Date parameters
         $startDate = $request->get('start_date', Carbon::now()->format('Y-m-d'));
         $endDate = $request->get('end_date', Carbon::parse($startDate)->format('Y-m-d'));
-        
+
         Log::debug('EPG API Request for Playlist', [
             'playlist_uuid' => $uuid,
             'playlist_name' => $playlist->name,
@@ -156,21 +149,21 @@ class EpgApiController extends Controller
 
             foreach ($playlistChannels as $channel) {
                 $epgData = $channel->epgChannel ?? null;
-                
+
                 if ($epgData) {
                     $epgId = $epgData->epg_id;
                     $epgIds[] = $epgId;
-                    
+
                     if (!isset($epgChannelMap[$epgId])) {
                         $epgChannelMap[$epgId] = [];
                     }
-                    
+
                     // Map EPG channel ID to playlist channel info
                     // Store array of playlist channels for each EPG channel (one-to-many mapping)
                     if (!isset($epgChannelMap[$epgId][$epgData->channel_id])) {
                         $epgChannelMap[$epgId][$epgData->channel_id] = [];
                     }
-                    
+
                     $epgChannelMap[$epgId][$epgData->channel_id][] = [
                         'playlist_channel_id' => $channel->id,
                         'title' => $channel->title_custom ?? $channel->title,
@@ -180,7 +173,7 @@ class EpgApiController extends Controller
                         'logo' => $channel->logo ?? ''
                     ];
                 }
-                
+
                 // Store channel data for pagination
                 $playlistChannelData[] = [
                     'id' => $channel->id,
@@ -198,7 +191,7 @@ class EpgApiController extends Controller
             $totalChannels = count($playlistChannelData);
             $skip = ($page - 1) * $perPage;
             $paginatedChannels = array_slice($playlistChannelData, $skip, $perPage);
-            
+
             // Convert to associative array format for consistency with getData
             $channels = [];
             foreach ($paginatedChannels as $channel) {
@@ -208,9 +201,9 @@ class EpgApiController extends Controller
             // Get EPG data from cache for the paginated channels
             $programmes = [];
             $epgIds = array_unique($epgIds);
-            
+
             Log::info("Processing EPG data for " . count($epgIds) . " unique EPGs");
-            
+
             foreach ($epgIds as $epgId) {
                 try {
                     $epg = Epg::find($epgId);
@@ -219,8 +212,8 @@ class EpgApiController extends Controller
                         continue;
                     }
 
-                    // Check if cache exists and is valid - don't auto-regenerate for playlist requests to avoid timeouts
-                    if (!$cacheService->isCacheValid($epg)) {
+                    // Check if cache exists and is valid
+                    if (!$epg->isCached()) {
                         Log::info("Cache invalid for EPG {$epg->name}, skipping (no auto-regeneration for playlist requests)");
                         continue;
                     }
@@ -238,7 +231,7 @@ class EpgApiController extends Controller
                                     break;
                                 }
                             }
-                            
+
                             if ($hasChannelOnPage) {
                                 $neededEpgChannelIds[] = $epgChannelId;
                             }
@@ -248,19 +241,19 @@ class EpgApiController extends Controller
                     if (empty($neededEpgChannelIds)) {
                         continue;
                     }
-                    
+
                     // Get programmes from cache
                     $epgProgrammes = $cacheService->getCachedProgrammes($epg, $startDate, $neededEpgChannelIds);
-                    
+
                     // Map programmes to playlist channels
                     foreach ($epgProgrammes as $epgChannelId => $channelProgrammes) {
                         if (isset($epgChannelMap[$epgId][$epgChannelId])) {
                             $playlistChannelInfoArray = $epgChannelMap[$epgId][$epgChannelId];
-                            
+
                             // Map programmes to all playlist channels that use this EPG channel
                             foreach ($playlistChannelInfoArray as $playlistChannelInfo) {
                                 $playlistChannelId = $playlistChannelInfo['playlist_channel_id'];
-                                
+
                                 // Only include programmes for channels in current page
                                 if (isset($channels[$playlistChannelId])) {
                                     $programmes[$playlistChannelId] = $channelProgrammes;
@@ -304,7 +297,6 @@ class EpgApiController extends Controller
                     'channels_with_epg' => count(array_filter($playlistChannelData, fn($ch) => $ch['has_epg'])),
                 ]
             ]);
-
         } catch (\Exception $e) {
             Log::error("Error retrieving EPG data for playlist {$playlist->name}: {$e->getMessage()}");
             return response()->json([
@@ -333,7 +325,7 @@ class EpgApiController extends Controller
                 $timezone = $matches[7] ?? '+0000';
 
                 $dateString = "{$year}-{$month}-{$day} {$hour}:{$minute}:{$second}";
-                
+
                 // Convert timezone offset to proper format
                 if (preg_match('/([+-])(\d{2})(\d{2})/', $timezone, $tzMatches)) {
                     $tzString = $tzMatches[1] . $tzMatches[2] . ':' . $tzMatches[3];
