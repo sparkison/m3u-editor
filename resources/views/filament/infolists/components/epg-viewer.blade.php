@@ -76,6 +76,7 @@
                         icon="heroicon-m-clock"
                         icon-position="before"
                         color="gray"
+                        x-show="isToday()"
                         @click="scrollToCurrentTime()"
                     >
                         Now

@@ -31,22 +31,13 @@ use App\Livewire\PlaylistEpgUrl;
 use App\Livewire\PlaylistInfo;
 use App\Livewire\PlaylistM3uUrl;
 use App\Livewire\XtreamApiInfo;
-use App\Models\PlaylistSyncStatus;
 use App\Models\SourceGroup;
-use App\Services\XtreamService;
-use Filament\Facades\Filament;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
-use Filament\Tables\Actions\Action;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Redis;
-use Illuminate\Support\Facades\Route;
-use Illuminate\View\View;
-use Filament\Actions as FilamentActions;
-use PDO;
+use Filament\Actions;
 
 class PlaylistResource extends Resource
 {
@@ -515,7 +506,7 @@ class PlaylistResource extends Resource
     public static function getHeaderActions(): array
     {
         return [
-            FilamentActions\Action::make('Sync Logs')
+            Actions\Action::make('Sync Logs')
                 ->label('Sync Logs')
                 ->color('gray')
                 ->icon('heroicon-m-arrows-right-left')
@@ -527,8 +518,8 @@ class PlaylistResource extends Resource
                         ]
                     )
                 ),
-            FilamentActions\ActionGroup::make([
-                FilamentActions\Action::make('process')
+            Actions\ActionGroup::make([
+                Actions\Action::make('process')
                     ->label(fn($record): string => $record->xtream ? 'Process All' : 'Process')
                     ->icon('heroicon-o-arrow-path')
                     ->action(function ($record) {
@@ -552,7 +543,7 @@ class PlaylistResource extends Resource
                     ->modalIcon('heroicon-o-arrow-path')
                     ->modalDescription('Process playlist now?')
                     ->modalSubmitActionLabel('Yes, process now'),
-                FilamentActions\Action::make('process_series')
+                Actions\Action::make('process_series')
                     ->label('Process Series')
                     ->icon('heroicon-o-arrow-path')
                     ->action(function ($record) {
@@ -577,7 +568,7 @@ class PlaylistResource extends Resource
                     ->modalIcon('heroicon-o-arrow-path')
                     ->modalDescription('Fetch Series metadata for this playlist now? Only enabled Series will be included.')
                     ->modalSubmitActionLabel('Yes, process now'),
-                FilamentActions\Action::make('process_vod')
+                Actions\Action::make('process_vod')
                     ->label('Process VOD')
                     ->icon('heroicon-o-arrow-path')
                     ->action(function ($record) {
@@ -602,22 +593,22 @@ class PlaylistResource extends Resource
                     ->modalIcon('heroicon-o-arrow-path')
                     ->modalDescription('Fetch VOD metadata for this playlist now? Only enabled VOD channels will be included.')
                     ->modalSubmitActionLabel('Yes, process now'),
-                FilamentActions\Action::make('Download M3U')
+                Actions\Action::make('Download M3U')
                     ->label('Download M3U')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->url(fn($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['m3u'])
                     ->openUrlInNewTab(),
-                FilamentActions\Action::make('Download EPG')
+                Actions\Action::make('Download EPG')
                     ->label('Download EPG')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->url(fn($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['epg'])
                     ->openUrlInNewTab(),
-                FilamentActions\Action::make('HDHomeRun URL')
+                Actions\Action::make('HDHomeRun URL')
                     ->label('HDHomeRun URL')
                     ->icon('heroicon-o-arrow-top-right-on-square')
                     ->url(fn($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['hdhr'])
                     ->openUrlInNewTab(),
-                FilamentActions\Action::make('Duplicate')
+                Actions\Action::make('Duplicate')
                     ->label('Duplicate')
                     ->form([
                         Forms\Components\TextInput::make('name')
@@ -641,7 +632,7 @@ class PlaylistResource extends Resource
                     ->modalIcon('heroicon-o-document-duplicate')
                     ->modalDescription('Duplicate playlist now?')
                     ->modalSubmitActionLabel('Yes, duplicate now'),
-                FilamentActions\Action::make('reset')
+                Actions\Action::make('reset')
                     ->label('Reset status')
                     ->icon('heroicon-o-arrow-uturn-left')
                     ->color('warning')
@@ -668,7 +659,7 @@ class PlaylistResource extends Resource
                     ->modalIcon('heroicon-o-arrow-uturn-left')
                     ->modalDescription('Reset playlist status so it can be processed again. Only perform this action if you are having problems with the playlist syncing.')
                     ->modalSubmitActionLabel('Yes, reset now'),
-                FilamentActions\Action::make('reset_active_count')
+                Actions\Action::make('reset_active_count')
                     ->label('Reset active count')
                     ->icon('heroicon-o-numbered-list')
                     ->color('warning')
@@ -685,7 +676,7 @@ class PlaylistResource extends Resource
                     ->modalIcon('heroicon-o-numbered-list')
                     ->modalDescription('Reset playlist active streams count. Proceed with caution as this could lead to an incorrect count if there are streams currently running.')
                     ->modalSubmitActionLabel('Yes, reset now'),
-                FilamentActions\DeleteAction::make(),
+                Actions\DeleteAction::make(),
             ])->button(),
         ];
     }
@@ -963,7 +954,7 @@ class PlaylistResource extends Resource
 
                     Forms\Components\DateTimePicker::make('synced')
                         ->columnSpan(2)
-                        ->suffix('UTC')
+                        ->suffix(config('app.timezone'))
                         ->native(false)
                         ->label('Last Synced')
                         ->hidden(fn(Get $get, string $operation): bool => !$get('auto_sync') || $operation === 'create')
