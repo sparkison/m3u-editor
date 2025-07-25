@@ -174,6 +174,18 @@
                                         <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate" x-text="channel.display_name"></p>
                                         <p class="text-xs text-gray-500 dark:text-gray-400 truncate" x-text="channelId"></p>
                                     </div>
+                                    <!-- Play Button (only show if channel has URL) -->
+                                    <div x-show="channel.url" class="flex-shrink-0">
+                                        <button 
+                                            @click="$dispatch('openStreamPlayer', channel)"
+                                            class="p-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors"
+                                            title="Play Stream"
+                                        >
+                                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                <path d="M8 5v10l8-5-8-5z"/>
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </div>
                             </template>
 
@@ -291,4 +303,7 @@
                 </div>
             </div>
         </div>
+
+        <!-- Stream Player Component -->
+        @livewire('stream-player')
 </div>
