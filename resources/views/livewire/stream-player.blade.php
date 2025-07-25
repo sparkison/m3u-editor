@@ -6,6 +6,14 @@
         x-transition.opacity.duration.300ms
         class="fixed inset-0 z-50 overflow-y-auto"
         style="display: none;"
+        x-init="
+            console.log('StreamPlayer modal initialized');
+            window.addEventListener('openStreamPlayer', function(event) {
+                console.log('Window event received:', event.detail);
+                $wire.openPlayer(event.detail);
+            });
+        "
+        @openstreamplayer.window="console.log('openStreamPlayer event received:', $event.detail)"
     >
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
             <!-- Backdrop -->
@@ -62,8 +70,8 @@
                             muted
                             x-data="streamPlayer()"
                             x-init="initPlayer('{{ $streamUrl }}', '{{ $streamFormat }}', '{{ $playerId }}')"
-                            x-data-url="{{ $streamUrl }}"
-                            x-data-format="{{ $streamFormat }}"
+                            data-url="{{ $streamUrl }}"
+                            data-format="{{ $streamFormat }}"
                             @cleanup-player.window="if ($event.detail.playerId === '{{ $playerId }}') cleanup()"
                         >
                             <p class="text-white p-4">Your browser does not support video playback.</p>
@@ -132,12 +140,32 @@ function streamPlayer() {
         mpegts: null,
         
         initPlayer(url, format, playerId) {
+            console.log('initPlayer called with:', { url, format, playerId });
+            
             const video = document.getElementById(playerId);
             const loadingEl = document.getElementById(playerId + '-loading');
             const errorEl = document.getElementById(playerId + '-error');
             const statusEl = document.getElementById(playerId + '-status');
             
-            if (!video || !url) return;
+            console.log('DOM elements found:', { 
+                video: !!video, 
+                loadingEl: !!loadingEl, 
+                errorEl: !!errorEl, 
+                statusEl: !!statusEl 
+            });
+            
+            if (!video) {
+                console.error('Video element not found:', playerId);
+                return;
+            }
+            
+            if (!url) {
+                console.error('No stream URL provided');
+                this.showError(playerId, 'No stream URL provided');
+                return;
+            }
+            
+            console.log('Starting player initialization...');
             
             // Clean up any existing players
             this.cleanup();
@@ -149,11 +177,13 @@ function streamPlayer() {
             
             try {
                 if (format === 'hls' || url.includes('.m3u8')) {
+                    console.log('Initializing HLS player');
                     this.initHlsPlayer(video, url, playerId);
                 } else if (format === 'ts' || format === 'mpegts') {
+                    console.log('Initializing MPEG-TS player');
                     this.initMpegTsPlayer(video, url, playerId);
                 } else {
-                    // Fallback to native video
+                    console.log('Initializing native player');
                     this.initNativePlayer(video, url, playerId);
                 }
             } catch (error) {

@@ -177,7 +177,10 @@
                                     <!-- Play Button (only show if channel has URL) -->
                                     <div x-show="channel.url" class="flex-shrink-0">
                                         <button 
-                                            @click="$dispatch('openStreamPlayer', channel)"
+                                            @click="
+                                                console.log('Play button clicked for channel:', channel); 
+                                                window.dispatchEvent(new CustomEvent('openStreamPlayer', { detail: channel }))
+                                            "
                                             class="p-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors"
                                             title="Play Stream"
                                         >

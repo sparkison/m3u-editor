@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use Livewire\Component;
+use Illuminate\Support\Facades\Log;
 
 class StreamPlayer extends Component
 {
@@ -13,7 +14,7 @@ class StreamPlayer extends Component
     public $showModal = false;
     public $playerId;
 
-    protected $listeners = ['openStreamPlayer' => 'openPlayer', 'closeStreamPlayer' => 'closePlayer'];
+    protected $listeners = ['openStreamPlayer' => 'openPlayer'];
 
     public function mount()
     {
@@ -22,11 +23,22 @@ class StreamPlayer extends Component
 
     public function openPlayer($channelData = [])
     {
+        // Debug the incoming channel data
+        Log::info('StreamPlayer openPlayer called with data:', $channelData);
+        
         $this->streamUrl = $channelData['url'] ?? '';
         $this->streamFormat = $channelData['format'] ?? 'ts';
         $this->channelTitle = $channelData['title'] ?? $channelData['display_name'] ?? 'Unknown Channel';
         $this->channelLogo = $channelData['logo'] ?? $channelData['icon'] ?? '';
         $this->showModal = true;
+        
+        // Debug the final component state
+        Log::info('StreamPlayer state after openPlayer:', [
+            'streamUrl' => $this->streamUrl,
+            'streamFormat' => $this->streamFormat,
+            'channelTitle' => $this->channelTitle,
+            'showModal' => $this->showModal
+        ]);
     }
 
     public function closePlayer()
