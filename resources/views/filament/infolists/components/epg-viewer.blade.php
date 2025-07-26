@@ -68,6 +68,7 @@
                         icon="heroicon-m-calendar"
                         icon-position="before"
                         color="gray"
+                        x-show="!isToday()"
                         @click="goToToday()"
                     >
                         Today
