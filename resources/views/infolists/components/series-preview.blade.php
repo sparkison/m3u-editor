@@ -94,13 +94,70 @@
         </div>
     </div>
 
-    <x-filament::section>
+    <x-filament::section collapsible="true" :collapsed="true">
         <x-slot name="heading">
-            Stream details
+            <div class="flex items-center space-x-2">
+                <span>Stream Details</span>
+            </div>
         </x-slot>
 
-        <p class="mb-2 text-sm text-gray-500 dark:text-gray-400">
-            Using proxy: {{ $proxyEnabled ? 'Yes' : 'No' }} | Format: {{ $format }} | URL: {{ $url }}
-        </p>
+        <div class="space-y-3">
+            <!-- Proxy Status -->
+            <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div class="flex items-center space-x-2">
+                    <x-heroicon-s-globe-alt class="w-4 h-4 text-gray-400" />
+                    <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Source</span>
+                </div>
+                <span class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ $proxyEnabled ? 'Via M3U Editor Proxy' : 'Direct from source' }}
+                </span>
+            </div>
+
+            <!-- Format Information -->
+            <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div class="flex items-center space-x-2">
+                    <x-heroicon-s-film class="w-4 h-4 text-gray-400" />
+                    <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Format</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                        {{ $format === 'hls' || $format === 'm3u8' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' : 
+                           ($format === 'ts' || $format === 'mpegts' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 
+                           'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200') }}">
+                        {{ strtoupper($format) }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- URL Information -->
+            <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div class="flex items-center space-x-2 mb-2">
+                    <x-heroicon-s-link class="w-4 h-4 text-gray-400" />
+                    <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Stream URL</span>
+                </div>
+                <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded p-2 overflow-hidden">
+                    <code class="text-xs text-gray-600 dark:text-gray-300 break-all font-mono">{{ $url }}</code>
+                </div>
+                <div class="flex items-center justify-between mt-2">
+                    <span class="text-xs text-gray-500 dark:text-gray-400">
+                        @php($parsedUrl = parse_url($url))
+                        {{ $parsedUrl['scheme'] ?? 'unknown' }}://{{ $parsedUrl['host'] ?? 'unknown' }}
+                    </span>
+                </div>
+            </div>
+
+            @if($proxyEnabled && $playlist)
+                <!-- Proxy Settings -->
+                <div class="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <x-heroicon-s-bolt class="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        <span class="text-sm font-medium text-blue-900 dark:text-blue-100">Proxy Configuration</span>
+                    </div>
+                    <div class="space-y-1 text-xs text-blue-700 dark:text-blue-300">
+                        <div>Output Format: <span class="font-medium">{{ strtoupper($format) }}</span></div>
+                    </div>
+                </div>
+            @endif
+        </div>
     </x-filament::section>
 </x-dynamic-component>
