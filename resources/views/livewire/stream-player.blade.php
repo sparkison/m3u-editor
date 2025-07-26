@@ -70,7 +70,7 @@
                         @endif
                         <div>
                             <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ $channelTitle }}</h3>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">{{ ucfirst($streamFormat) }} Stream</p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">{{ strtoupper($streamFormat) }} Stream</p>
                         </div>
                     </div>
                     <button 

@@ -37,7 +37,7 @@
                 player.cleanup();
             }
         "
-        class="relative bg-black rounded-lg overflow-hidden"
+        class="relative bg-black rounded-lg overflow-hidden mb-4"
         style="aspect-ratio: 16/9;"
     >
         <!-- Video Element -->
@@ -93,4 +93,14 @@
             </div>
         </div>
     </div>
+
+    <x-filament::section collapsible="true" :collapsed="true">
+        <x-slot name="heading">
+            URL & Format
+        </x-slot>
+
+        <p class="mb-2 text-sm text-gray-500 dark:text-gray-400">
+            Using proxy: {{ $proxyEnabled ? 'Yes' : 'No' }} | Format: {{ $format }} | URL: {{ $url }}
+        </p>
+    </x-filament::section>
 </x-dynamic-component>

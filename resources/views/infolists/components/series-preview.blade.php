@@ -93,4 +93,14 @@
             </div>
         </div>
     </div>
+
+    <x-filament::section>
+        <x-slot name="heading">
+            Stream details
+        </x-slot>
+
+        <p class="mb-2 text-sm text-gray-500 dark:text-gray-400">
+            Using proxy: {{ $proxyEnabled ? 'Yes' : 'No' }} | Format: {{ $format }} | URL: {{ $url }}
+        </p>
+    </x-filament::section>
 </x-dynamic-component>

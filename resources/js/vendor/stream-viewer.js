@@ -36,6 +36,9 @@ function streamPlayer() {
             // Store reference to video element for cleanup
             this.player = video;
             
+            // Reset error counters
+            this.fragmentErrorCount = 0;
+            
             // Clean up any existing players
             this.cleanup();
             
@@ -63,27 +66,110 @@ function streamPlayer() {
         
         initHlsPlayer(video, url, playerId) {
             if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+                console.log('Creating HLS player with configuration...');
                 this.hls = new Hls({
                     enableWorker: true,
                     lowLatencyMode: true,
-                    backBufferLength: 90
+                    backBufferLength: 90,
+                    maxBufferLength: 30,
+                    maxMaxBufferLength: 600,
+                    maxBufferSize: 60 * 1000 * 1000,
+                    maxBufferHole: 0.5,
+                    // Add debug logging
+                    debug: false,
+                    // Add retry and timeout configurations
+                    manifestLoadingTimeOut: 10000,
+                    manifestLoadingMaxRetry: 3,
+                    manifestLoadingRetryDelay: 1000,
+                    levelLoadingTimeOut: 10000,
+                    levelLoadingMaxRetry: 4,
+                    levelLoadingRetryDelay: 1000,
+                    fragLoadingTimeOut: 20000,
+                    fragLoadingMaxRetry: 6,
+                    fragLoadingRetryDelay: 1000,
+                    // Add CORS configuration
+                    xhrSetup: function(xhr, url) {
+                        console.log('HLS XHR setup for:', url);
+                        // Add any necessary headers here
+                        xhr.withCredentials = false;
+                    }
                 });
                 
                 this.hls.loadSource(url);
                 this.hls.attachMedia(video);
                 
                 this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    console.log('HLS manifest parsed successfully');
                     this.hideLoading(playerId);
                     this.updateStatus(playerId, 'Connected');
                 });
                 
                 this.hls.on(Hls.Events.ERROR, (event, data) => {
                     console.error('HLS Error:', data);
-                    this.showError(playerId, `HLS Error: ${data.details || 'Unknown error'}`);
+                    
+                    // Check for authentication/authorization errors (403, 401)
+                    const isAuthError = data.response && (data.response.code === 403 || data.response.code === 401);
+                    const isFragLoadError = data.details && data.details.includes('FRAG_LOAD_ERROR');
+                    
+                    // If we get auth errors on fragment loading, immediately fall back to native
+                    if (isAuthError && isFragLoadError) {
+                        console.log('HLS Authentication error on fragments, falling back to native player immediately');
+                        this.cleanup();
+                        this.initNativePlayer(video, url, playerId);
+                        return;
+                    }
+                    
+                    // Handle different types of errors
+                    if (data.fatal) {
+                        console.log('Fatal HLS error, attempting recovery or fallback');
+                        switch(data.type) {
+                            case Hls.ErrorTypes.NETWORK_ERROR:
+                                console.log('HLS Network error, trying to recover...');
+                                this.hls.startLoad();
+                                break;
+                            case Hls.ErrorTypes.MEDIA_ERROR:
+                                console.log('HLS Media error, trying to recover...');
+                                this.hls.recoverMediaError();
+                                break;
+                            default:
+                                console.log('HLS Unrecoverable error, falling back to native player');
+                                this.cleanup();
+                                this.initNativePlayer(video, url, playerId);
+                                break;
+                        }
+                    } else {
+                        console.warn('Non-fatal HLS error:', data.details);
+                        // For segment loading errors, let's show the specific error
+                        if (data.details && data.details.includes('FRAG_LOAD_ERROR')) {
+                            // If we've had multiple fragment errors, fall back
+                            if (!this.fragmentErrorCount) this.fragmentErrorCount = 0;
+                            this.fragmentErrorCount++;
+                            
+                            if (this.fragmentErrorCount >= 3) {
+                                console.log('Multiple fragment errors, falling back to native player');
+                                this.cleanup();
+                                this.initNativePlayer(video, url, playerId);
+                                return;
+                            }
+                            
+                            this.showError(playerId, `Segment loading failed: ${data.response?.code || 'Network error'}`);
+                        }
+                    }
+                });
+                
+                // Add more event listeners for debugging
+                this.hls.on(Hls.Events.FRAG_LOAD_ERROR, (event, data) => {
+                    console.error('HLS Fragment load error:', data);
+                    console.error('Failed URL:', data.frag?.url);
+                    console.error('Response:', data.response);
+                });
+                
+                this.hls.on(Hls.Events.LEVEL_LOADED, (event, data) => {
+                    console.log('HLS Level loaded:', data.level, 'URL:', data.details?.url);
                 });
                 
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                // Safari native HLS support
+                console.log('Using Safari native HLS support');
                 video.src = url;
                 this.setupNativeEvents(video, playerId);
             } else {
@@ -193,22 +279,34 @@ function streamPlayer() {
             
             if (this.hls) {
                 console.log('Destroying HLS player');
-                this.hls.destroy();
+                try {
+                    this.hls.destroy();
+                } catch (error) {
+                    console.warn('Error destroying HLS player:', error);
+                }
                 this.hls = null;
             }
             
             if (this.mpegts) {
                 console.log('Destroying MPEG-TS player');
-                this.mpegts.destroy();
+                try {
+                    this.mpegts.destroy();
+                } catch (error) {
+                    console.warn('Error destroying MPEG-TS player:', error);
+                }
                 this.mpegts = null;
             }
             
             // Also pause and clear any video element that might be playing
             if (this.player && this.player.tagName === 'VIDEO') {
                 console.log('Stopping video playback');
-                this.player.pause();
-                this.player.src = '';
-                this.player.load(); // This will stop any ongoing loading/streaming
+                try {
+                    this.player.pause();
+                    this.player.src = '';
+                    this.player.load(); // This will stop any ongoing loading/streaming
+                } catch (error) {
+                    console.warn('Error cleaning up video element:', error);
+                }
             }
         }
     };
