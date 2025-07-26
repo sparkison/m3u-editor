@@ -14,6 +14,7 @@ use App\Services\ProxyService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class EpgApiController extends Controller
 {
@@ -149,7 +150,7 @@ class EpgApiController extends Controller
 
             // Check the proxy format
             $proxyEnabled = $playlist->enable_proxy;
-            $format = $playlist->proxy_options['output'] ?? 'ts';
+            $proxyFormat = $playlist->proxy_options['output'] ?? 'ts';
 
             // If auto channel increment is enabled, set the starting channel number
             $channelNumber = $playlist->auto_channel_increment ? $playlist->channel_start - 1 : 0;
@@ -207,16 +208,19 @@ class EpgApiController extends Controller
 
                 // Store channel data for pagination
                 $url = $channel->url_custom ?? $channel->url;
+                $channelFormat = $proxyFormat;
                 if ($proxyEnabled) {
                     $url = ProxyFacade::getProxyUrlForChannel(
                         id: $channel->id,
-                        format: $format
+                        format: $proxyFormat
                     );
+                } else {
+                    $channelFormat = Str::endsWith($url, '.m3u8') ? 'hls' : 'ts';
                 }
                 $playlistChannelData[$channelNo] = [
                     'id' => $channelNo,
                     'url' => $url,
-                    'format' => $format,
+                    'format' => $channelFormat,
                     'tvg_id' => $tvgId,
                     'title' => $channel->title_custom ?? $channel->title,
                     'display_name' => $channel->name_custom ?? $channel->name,

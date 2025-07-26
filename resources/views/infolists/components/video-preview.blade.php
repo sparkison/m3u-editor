@@ -1,11 +1,13 @@
 <x-dynamic-component :component="$getEntryWrapperView()" :entry="$entry">
     @php($record = $getRecord())
     @php($playlist = App\Models\Playlist::find($record->playlist_id) ?? null)
-    @php($format = $playlist->proxy_options['output'] ?? 'ts')
     @php($proxyEnabled = $playlist->enable_proxy)
     @php($url = $record->url_custom ?? $record->url)
     @if($proxyEnabled)
+        @php($format =  $playlist->proxy_options['output'] ?? 'ts')
         @php($url = App\Facades\ProxyFacade::getProxyUrlForChannel(id: $record->id, format: $format, preview: true))
+    @else
+        @php($format = pathinfo($record->url, PATHINFO_EXTENSION))
     @endif
     @php($playerId = "channel_{$record->id}_preview")
 
