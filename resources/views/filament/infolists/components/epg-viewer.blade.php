@@ -113,7 +113,7 @@
                     </div>
                 </div>
                 <!-- Time Header -->
-                <div class="sticky top-0 z-20 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                <div class="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
                     <div class="flex">
                         <!-- Channel Column Header -->
                         <div class="w-60 px-4 py-3 border-r border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-800">
