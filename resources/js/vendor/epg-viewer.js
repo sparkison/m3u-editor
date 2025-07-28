@@ -18,23 +18,47 @@ function epgViewer(config) {
         allChannels: {},
         allProgrammes: {},
 
+        // Cleanup resources
+        timeUpdateInterval: null,
+        scrollEventListener: null,
+
         init() {
             this.generateTimeSlots();
             this.updateCurrentTime();
             // Update current time every minute
-            setInterval(() => this.updateCurrentTime(), 60000);
+            this.timeUpdateInterval = setInterval(() => this.updateCurrentTime(), 60000);
 
             // Setup scroll listener for pagination
             this.$nextTick(() => {
                 // The main scrollable container is the timeline-scroll element
                 const timelineContainer = document.querySelector('.timeline-scroll');
                 if (timelineContainer) {
-                    timelineContainer.addEventListener('scroll', this.handleScroll.bind(this));
+                    this.scrollEventListener = this.handleScroll.bind(this);
+                    timelineContainer.addEventListener('scroll', this.scrollEventListener);
                 }
             });
 
             // Scroll to current time on load
             this.scrollToCurrentTime();
+        },
+
+        destroy() {
+            // Clear the time update interval
+            if (this.timeUpdateInterval) {
+                clearInterval(this.timeUpdateInterval);
+                this.timeUpdateInterval = null;
+            }
+
+            // Remove scroll event listener
+            if (this.scrollEventListener) {
+                const timelineContainer = document.querySelector('.timeline-scroll');
+                if (timelineContainer) {
+                    timelineContainer.removeEventListener('scroll', this.scrollEventListener);
+                }
+                this.scrollEventListener = null;
+            }
+
+            console.log('EPG Viewer component destroyed and cleaned up');
         },
 
         generateTimeSlots() {

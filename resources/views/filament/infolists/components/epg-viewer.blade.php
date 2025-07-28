@@ -11,6 +11,10 @@
         apiUrl: '{{ $route }}' 
     })"
     x-init="init(); loadEpgData()"
+    x-on:beforeunload.window="destroy()"
+    x-on:alpine:destroyed="destroy()"
+    x-on:close-modal.window="destroy()"
+    x-on:livewire:navigating.window="destroy()"
     class="w-full"
 >
         <!-- Loading State -->
