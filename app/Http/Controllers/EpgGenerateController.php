@@ -235,8 +235,8 @@ class EpgGenerateController extends Controller
             try {
                 // Try to use cached data first
                 if ($cacheService->isCacheValid($epg)) {
-                    // Get all programmes from cache (last 5 days to next 5 days for EPG generation)
-                    $startDate = Carbon::now()->subDays(5)->format('Y-m-d');
+                    // Get all programmes from cache (last 1 day to next 5 days for EPG generation)
+                    $startDate = Carbon::now()->subDays(1)->format('Y-m-d');
                     $endDate = Carbon::now()->addDays(5)->format('Y-m-d');
                     
                     // Get all channel IDs that this EPG should map to
