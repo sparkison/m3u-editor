@@ -30,7 +30,7 @@ class ViewPlaylist extends ViewRecord
                 ->action(function () {
                     $this->redirect($this->getRecord()->getUrl('edit'));
                 }),
-            ...PlaylistResource::getHeaderActions()
+            //...PlaylistResource::getHeaderActions()
         ];
     }
 
