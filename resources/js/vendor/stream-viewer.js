@@ -4,6 +4,9 @@ function streamPlayer() {
         player: null,
         hls: null,
         mpegts: null,
+        currentTranscodeUrl: null,
+        selectedServerAudioTrack: 0,
+        availableServerAudioTracks: [],
         streamMetadata: {
             codec: null,
             resolution: null,
@@ -19,6 +22,9 @@ function streamPlayer() {
         
         initPlayer(url, format, playerId) {
             console.log('initPlayer called with:', { url, format, playerId });
+            
+            // Set this instance as the global instance for audio track switching
+            window.streamPlayerInstance = this;
             
             const video = document.getElementById(playerId);
             const loadingEl = document.getElementById(playerId + '-loading');
@@ -342,9 +348,13 @@ function streamPlayer() {
                 // First, probe the stream to get metadata
                 await this.probeStream(url, playerId);
                 
-                // Build the transcode URL
-                const transcodeUrl = this.buildTranscodeUrl(url);
+                // Build the transcode URL with selected audio track
+                const transcodeUrl = this.buildTranscodeUrl(url, this.selectedServerAudioTrack);
                 console.log('Transcode URL:', transcodeUrl);
+                
+                // Store the base URL and current transcode URL for later use
+                this.baseUrl = url;
+                this.currentTranscodeUrl = transcodeUrl;
                 
                 this.updateStatus(playerId, 'Starting transcode...');
                 
@@ -353,6 +363,12 @@ function streamPlayer() {
                 
                 // Add transcoding indicator to stream details
                 this.addTranscodingIndicator(playerId);
+                
+                // Override the availableAudioTracks with server tracks if available
+                if (this.availableServerAudioTracks.length > 0) {
+                    this.availableAudioTracks = this.availableServerAudioTracks;
+                    this.selectedAudioTrack = this.selectedServerAudioTrack;
+                }
                 
             } catch (error) {
                 console.error('Transcoding initialization failed:', error);
@@ -371,6 +387,24 @@ function streamPlayer() {
                     const metadata = await response.json();
                     console.log('Stream metadata:', metadata);
                     
+                    // Store server-side audio tracks for transcoding
+                    if (metadata.audio_tracks && metadata.audio_tracks.length > 0) {
+                        this.availableServerAudioTracks = metadata.audio_tracks.map((track, index) => ({
+                            index: track.index,
+                            id: `server-${track.index}`,
+                            label: track.title || `Track ${track.index + 1}`,
+                            language: track.language || 'unknown',
+                            codec: track.codec,
+                            channels: track.channels,
+                            enabled: index === 0,
+                            estimated: false,
+                            serverTrack: true
+                        }));
+                        
+                        this.selectedServerAudioTrack = 0;
+                        console.log('Found server audio tracks:', this.availableServerAudioTracks);
+                    }
+                    
                     // Update stream metadata with probed information
                     if (metadata.streams) {
                         for (const stream of metadata.streams) {
@@ -385,13 +419,19 @@ function streamPlayer() {
                                 if (stream.bitrate) {
                                     this.streamMetadata.bitrate = stream.bitrate;
                                 }
-                            } else if (stream.type === 'audio') {
+                            } else if (stream.type === 'audio' && stream.index === 0) {
+                                // Use the first audio track for general metadata
                                 this.streamMetadata.audioCodec = stream.codec;
                                 if (stream.channels) {
                                     this.streamMetadata.audioChannels = stream.channels === 2 ? '2.0' : stream.channels.toString();
                                 }
                             }
                         }
+                    }
+                    
+                    // Store duration for seeking support
+                    if (metadata.duration) {
+                        this.streamMetadata.duration = parseFloat(metadata.duration);
                     }
                     
                     this.updateStreamDetails(playerId);
@@ -404,11 +444,16 @@ function streamPlayer() {
             }
         },
         
-        buildTranscodeUrl(url) {
+        buildTranscodeUrl(url, audioTrack = 0, seekTo = null) {
             const params = new URLSearchParams({
                 url: url,
-                format: 'auto'
+                format: 'auto',
+                audio_track: audioTrack
             });
+            
+            if (seekTo !== null && seekTo > 0) {
+                params.set('seek', seekTo);
+            }
             
             return `/transcode?${params.toString()}`;
         },
@@ -428,7 +473,74 @@ function streamPlayer() {
                 
                 const existingContent = detailsEl.innerHTML;
                 detailsEl.innerHTML = transcodeHtml + existingContent;
+                
+                // Add audio track selector if we have server audio tracks
+                this.addAudioTrackSelector(playerId);
             }
+        },
+        
+        addAudioTrackSelector(playerId) {
+            if (this.availableServerAudioTracks.length <= 1) {
+                return; // No need for selector if only one track
+            }
+            
+            const detailsEl = document.getElementById(playerId + '-details');
+            if (!detailsEl) return;
+            
+            // Check if selector already exists to prevent duplicates
+            const existingSelector = document.getElementById(`${playerId}-audio-selector`);
+            if (existingSelector) {
+                console.log('Audio track selector already exists, updating options instead');
+                this.updateAudioTrackSelectorOptions(playerId);
+                return;
+            }
+            
+            // Create audio track selector HTML
+            const trackOptions = this.availableServerAudioTracks.map((track, index) => {
+                const langLabel = track.language === 'unknown' ? `Track ${index + 1}` : track.language.toUpperCase();
+                const codecInfo = track.codec ? ` (${track.codec})` : '';
+                const channelInfo = track.channels ? ` ${track.channels}ch` : '';
+                return `<option value="${index}" ${index === this.selectedServerAudioTrack ? 'selected' : ''}>
+                    ${langLabel}${codecInfo}${channelInfo}
+                </option>`;
+            }).join('');
+            
+            const selectorHtml = `
+                <div id="${playerId}-audio-selector" class="mb-2 p-2 bg-gray-800 bg-opacity-40 rounded border border-gray-600">
+                    <div class="flex items-center gap-3">
+                        <label class="text-sm font-medium text-gray-300">Audio Track:</label>
+                        <select 
+                            id="${playerId}-audio-select" 
+                            class="bg-gray-700 text-white text-sm rounded px-2 py-1 border border-gray-600 focus:border-blue-500"
+                            onchange="window.streamPlayerInstance?.switchServerAudioTrack?.('${playerId}', parseInt(this.value))"
+                        >
+                            ${trackOptions}
+                        </select>
+                    </div>
+                </div>
+            `;
+            
+            // Insert the selector before the existing content
+            const existingContent = detailsEl.innerHTML;
+            detailsEl.innerHTML = selectorHtml + existingContent;
+        },
+        
+        updateAudioTrackSelectorOptions(playerId) {
+            const audioSelect = document.getElementById(`${playerId}-audio-select`);
+            if (!audioSelect) return;
+            
+            // Update the options with current track data
+            audioSelect.innerHTML = this.availableServerAudioTracks.map((track, index) => {
+                const langLabel = track.language === 'unknown' ? `Track ${index + 1}` : track.language.toUpperCase();
+                const codecInfo = track.codec ? ` (${track.codec})` : '';
+                const channelInfo = track.channels ? ` ${track.channels}ch` : '';
+                return `<option value="${index}" ${index === this.selectedServerAudioTrack ? 'selected' : ''}>
+                    ${langLabel}${codecInfo}${channelInfo}
+                </option>`;
+            }).join('');
+            
+            // Ensure the correct track is selected
+            audioSelect.value = this.selectedServerAudioTrack;
         },
         
         showTranscodingWarning(playerId, message) {
@@ -446,6 +558,96 @@ function streamPlayer() {
                 
                 const existingContent = detailsEl.innerHTML;
                 detailsEl.innerHTML = warningHtml + existingContent;
+            }
+        },
+        
+        updateAudioTrackSelector(playerId, selectedTrackIndex) {
+            const audioSelect = document.getElementById(`${playerId}-audio-select`);
+            if (audioSelect) {
+                // Use setTimeout to ensure DOM is ready and dropdown is properly updated
+                setTimeout(() => {
+                    audioSelect.value = selectedTrackIndex.toString();
+                    
+                    // Force a re-render if the value didn't stick
+                    if (audioSelect.value !== selectedTrackIndex.toString()) {
+                        this.updateAudioTrackSelectorOptions(playerId);
+                    }
+                }, 100);
+            } else {
+                console.warn(`Audio selector element not found: ${playerId}-audio-select`);
+            }
+        },
+        
+        async switchServerAudioTrack(playerId, trackIndex) {
+            if (!this.baseUrl || !this.availableServerAudioTracks[trackIndex]) {
+                console.warn('Cannot switch server audio track - no base URL or invalid track');
+                return false;
+            }
+            
+            console.log('Switching to server audio track:', trackIndex);
+            
+            const video = document.getElementById(playerId);
+            if (!video) return false;
+            
+            // Store current playback position
+            const currentTime = video.currentTime || 0;
+            const wasPlaying = !video.paused;
+            
+            this.updateStatus(playerId, 'Switching audio track...');
+            
+            try {
+                // Update selected track
+                this.selectedServerAudioTrack = trackIndex;
+                this.selectedAudioTrack = trackIndex;
+                
+                // Update the dropdown immediately (with delay to ensure DOM is ready)
+                setTimeout(() => {
+                    this.updateAudioTrackSelector(playerId, trackIndex);
+                }, 10);
+                
+                // Update track enabled status
+                this.availableServerAudioTracks.forEach((track, index) => {
+                    track.enabled = index === trackIndex;
+                });
+                this.availableAudioTracks = this.availableServerAudioTracks;
+                
+                // Build new transcode URL with selected audio track and seek position
+                const newTranscodeUrl = this.buildTranscodeUrl(this.baseUrl, trackIndex, currentTime);
+                console.log('New transcode URL with audio track:', newTranscodeUrl);
+                
+                // Update video source
+                video.src = newTranscodeUrl;
+                this.currentTranscodeUrl = newTranscodeUrl;
+                
+                // Wait for the video to load and seek to the previous position
+                const onLoadedData = () => {
+                    video.removeEventListener('loadeddata', onLoadedData);
+                    
+                    if (currentTime > 0) {
+                        video.currentTime = currentTime;
+                    }
+                    
+                    if (wasPlaying) {
+                        video.play().catch(e => console.warn('Autoplay failed:', e));
+                    }
+                    
+                    this.updateStatus(playerId, wasPlaying ? 'Playing' : 'Ready');
+                    
+                    // Update the dropdown to reflect the selected track
+                    this.updateAudioTrackSelector(playerId, trackIndex);
+                };
+                
+                video.addEventListener('loadeddata', onLoadedData);
+                video.load();
+                
+                this.updateStreamDetails(playerId);
+                
+                return true;
+                
+            } catch (error) {
+                console.error('Failed to switch server audio track:', error);
+                this.updateStatus(playerId, 'Error switching audio');
+                return false;
             }
         },
         
@@ -555,6 +757,10 @@ function streamPlayer() {
             const detailsEl = document.getElementById(playerId + '-details');
             if (!detailsEl) return;
 
+            // Check if we have server transcoding UI that we need to preserve
+            const existingTranscodeIndicator = detailsEl.querySelector('.bg-blue-900');
+            const existingAudioSelector = detailsEl.querySelector(`#${playerId}-audio-selector`);
+            
             let detailsHtml = '';
             
             if (this.streamMetadata.resolution) {
@@ -573,8 +779,8 @@ function streamPlayer() {
                 detailsHtml += `<div class="flex justify-between gap-1"><span>Audio Channels:</span><span class="font-mono">${this.streamMetadata.audioChannels}</span></div>`;
             }
             
-            // Add audio track selector if multiple tracks are available
-            if (this.availableAudioTracks && this.availableAudioTracks.length > 1) {
+            // For client-side audio tracks (non-server transcoding) - only show if no server audio selector exists
+            if (this.availableAudioTracks && this.availableAudioTracks.length > 1 && !existingAudioSelector && !this.availableServerAudioTracks.length) {
                 detailsHtml += `<div class="border-t pt-2 mt-2">`;
                 detailsHtml += `<div class="flex justify-between items-center gap-1 mb-1">`;
                 detailsHtml += `<span class="text-sm">Audio Track:</span>`;
@@ -583,17 +789,16 @@ function streamPlayer() {
                 this.availableAudioTracks.forEach((track, index) => {
                     const selected = index === this.selectedAudioTrack ? 'selected' : '';
                     const estimatedTag = track.estimated ? ' (estimated)' : '';
-                    const label = track.language !== 'unknown' ? `${track.label} (${track.language})` : track.label;
+                    const codecInfo = track.codec ? ` - ${track.codec}` : '';
+                    const label = track.language !== 'unknown' ? `${track.label} (${track.language})${codecInfo}` : `${track.label}${codecInfo}`;
                     detailsHtml += `<option value="${index}" ${selected}>${label}${estimatedTag}</option>`;
                 });
                 
                 detailsHtml += `</select></div>`;
                 
-                // Add note for estimated tracks
                 if (this.availableAudioTracks.some(track => track.estimated)) {
                     detailsHtml += `<div class="text-xs text-yellow-400">Note: Audio track switching may not work due to browser limitations</div>`;
                 }
-                
                 detailsHtml += `</div>`;
             }
             
@@ -609,13 +814,42 @@ function streamPlayer() {
             if (this.streamMetadata.profile) {
                 detailsHtml += `<div class="flex justify-between gap-1"><span>Profile:</span><span class="font-mono">${this.streamMetadata.profile}</span></div>`;
             }
-            
-            if (detailsHtml) {
-                detailsEl.innerHTML = detailsHtml;
+
+            // If we have server transcoding UI, preserve it and maintain proper order
+            if (existingTranscodeIndicator || existingAudioSelector) {
+                let preservedHtml = '';
+                
+                // Always put transcode indicator first
+                if (existingTranscodeIndicator) {
+                    preservedHtml += existingTranscodeIndicator.outerHTML;
+                }
+                
+                // Then audio selector
+                if (existingAudioSelector) {
+                    preservedHtml += existingAudioSelector.outerHTML;
+                }
+                
+                if (detailsHtml) {
+                    detailsEl.innerHTML = preservedHtml + detailsHtml;
+                } else {
+                    detailsEl.innerHTML = preservedHtml + '<div class="text-gray-500 dark:text-gray-400 text-sm">Stream details not available</div>';
+                }
                 detailsEl.style.display = 'block';
+                
+                // After preserving, make sure the audio selector shows the correct value
+                if (existingAudioSelector && this.selectedServerAudioTrack !== undefined) {
+                    setTimeout(() => {
+                        this.updateAudioTrackSelector(playerId, this.selectedServerAudioTrack);
+                    }, 50);
+                }
             } else {
-                detailsEl.innerHTML = '<div class="text-gray-500 dark:text-gray-400 text-sm">Stream details not available</div>';
-                detailsEl.style.display = 'block';
+                if (detailsHtml) {
+                    detailsEl.innerHTML = detailsHtml;
+                    detailsEl.style.display = 'block';
+                } else {
+                    detailsEl.innerHTML = '<div class="text-gray-500 dark:text-gray-400 text-sm">Stream details not available</div>';
+                    detailsEl.style.display = 'block';
+                }
             }
         },
 
@@ -867,10 +1101,17 @@ function streamPlayer() {
             if (!video) return;
             
             const videoSrc = video.src || video.currentSrc;
-            const isMKV = videoSrc && videoSrc.toLowerCase().includes('.mkv');
+            const trackIndexNum = parseInt(trackIndex);
+            
+            // Check if this is a server-transcoded stream
+            if (this.currentTranscodeUrl && this.availableServerAudioTracks.length > 0) {
+                console.log('Switching server-side transcoded audio track');
+                this.switchServerAudioTrack(playerId, trackIndexNum);
+                return;
+            }
             
             // If we have real audio tracks, use them
-            if (video.audioTracks && video.audioTracks.length > trackIndex) {
+            if (video.audioTracks && video.audioTracks.length > trackIndexNum) {
                 console.log('Switching real audio track');
                 
                 // Disable all tracks first
@@ -879,32 +1120,33 @@ function streamPlayer() {
                 }
                 
                 // Enable selected track
-                video.audioTracks[trackIndex].enabled = true;
-                this.selectedAudioTrack = trackIndex;
+                video.audioTracks[trackIndexNum].enabled = true;
+                this.selectedAudioTrack = trackIndexNum;
                 
                 // Update our tracking
                 this.availableAudioTracks.forEach((track, index) => {
-                    track.enabled = index === trackIndex;
+                    track.enabled = index === trackIndexNum;
                 });
                 
-                console.log(`Enabled native audio track ${trackIndex}`);
+                console.log(`Enabled native audio track ${trackIndexNum}`);
             } else {
                 console.log('Switching estimated audio track (limited functionality)');
                 
                 // For estimated tracks, we can't actually change the audio
                 // but we can update the UI to show the selection
-                this.selectedAudioTrack = trackIndex;
+                this.selectedAudioTrack = trackIndexNum;
                 
                 // Update the available tracks to reflect the selection
                 if (this.availableAudioTracks) {
                     this.availableAudioTracks.forEach((track, index) => {
-                        track.enabled = index === trackIndex;
+                        track.enabled = index === trackIndexNum;
                     });
                 }
                 
-                // For MKV files, provide user feedback about limitations
+                // Provide user feedback about limitations
+                const isMKV = videoSrc && videoSrc.toLowerCase().includes('.mkv');
                 if (isMKV) {
-                    console.warn(`Selected estimated MKV audio track ${trackIndex} - browser API limitations prevent actual audio switching`);
+                    console.warn(`Selected estimated MKV audio track ${trackIndexNum} - browser API limitations prevent actual audio switching`);
                     
                     // Optional: Show user notification about limitations
                     const detailsEl = document.getElementById(playerId + '-details');
@@ -923,7 +1165,7 @@ function streamPlayer() {
                         }, 3000);
                     }
                 } else {
-                    console.log(`Selected estimated audio track ${trackIndex} (no actual audio change)`);
+                    console.log(`Selected estimated audio track ${trackIndexNum} (no actual audio change)`);
                 }
             }
             
@@ -948,6 +1190,10 @@ function streamPlayer() {
             // Reset audio track data
             this.availableAudioTracks = [];
             this.selectedAudioTrack = null;
+            this.availableServerAudioTracks = [];
+            this.selectedServerAudioTrack = 0;
+            this.currentTranscodeUrl = null;
+            this.baseUrl = null;
             
             if (this.hls) {
                 console.log('Destroying HLS player');
@@ -1023,6 +1269,9 @@ function selectAudioTrack(playerId, trackIndex) {
 
 // Make streamPlayer function globally accessible
 window.streamPlayer = streamPlayer;
+
+// Create a global instance for audio track switching
+window.streamPlayerInstance = null;
 
 // Make retryStream function globally accessible
 window.retryStream = retryStream;
