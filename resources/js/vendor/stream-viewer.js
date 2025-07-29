@@ -575,8 +575,19 @@ function retryStream(playerId) {
     }
 }
 
+// Toggle stream details overlay
+function toggleStreamDetails(playerId) {
+    const overlay = document.getElementById(playerId + '-details-overlay');
+    if (overlay) {
+        overlay.classList.toggle('hidden');
+    }
+}
+
 // Make streamPlayer function globally accessible
 window.streamPlayer = streamPlayer;
 
 // Make retryStream function globally accessible
 window.retryStream = retryStream;
+
+// Make toggleStreamDetails function globally accessible
+window.toggleStreamDetails = toggleStreamDetails;

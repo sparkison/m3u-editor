@@ -162,6 +162,7 @@
                             <div class="flex justify-between items-center mb-2">
                                 <span class="font-medium">Stream Details</span>
                                 <button 
+                                    type="button"
                                     onclick="toggleStreamDetails('{{ $playerId }}')"
                                     class="text-gray-300 hover:text-white"
                                 >
@@ -191,13 +192,4 @@
             </div>
         </div>
     </div>
-
-    <script>
-        function toggleStreamDetails(playerId) {
-            const overlay = document.getElementById(playerId + '-details-overlay');
-            if (overlay) {
-                overlay.classList.toggle('hidden');
-            }
-        }
-    </script>
 </div>
