@@ -69,6 +69,9 @@ function streamPlayer() {
                 } else if (format === 'ts' || format === 'mpegts') {
                     console.log('Initializing MPEG-TS player');
                     this.initMpegTsPlayer(video, url, playerId);
+                } else if (this.needsServerTranscoding(url, format)) {
+                    console.log('Initializing transcoded player for format:', format);
+                    this.initTranscodedPlayer(video, url, playerId);
                 } else {
                     console.log('Initializing native player');
                     this.initNativePlayer(video, url, playerId);
@@ -307,6 +310,142 @@ function streamPlayer() {
                 console.log('MPEG-TS not supported, falling back to native');
                 // Fallback to native
                 this.initNativePlayer(video, url, playerId);
+            }
+        },
+        
+        needsServerTranscoding(url, format) {
+            // Check if the format requires server-side transcoding
+            const path = new URL(url, window.location.origin).pathname;
+            const extension = path.split('.').pop().toLowerCase().split('?')[0];
+            
+            // Skip transcoding for already compatible formats
+            if (format === 'hls' || format === 'ts' || format === 'mpegts') {
+                return false;
+            }
+            
+            if (url.includes('.m3u8') || url.includes('.ts')) {
+                return false;
+            }
+            
+            // File types that need transcoding for web compatibility
+            const needsTranscodingExtensions = ['mkv', 'avi', 'mov', 'flv', 'wmv', 'asf', 'rm', 'rmvb'];
+            
+            return needsTranscodingExtensions.includes(extension);
+        },
+        
+        async initTranscodedPlayer(video, url, playerId) {
+            console.log('Initializing transcoded player for:', url);
+            
+            this.updateStatus(playerId, 'Preparing transcode...');
+            
+            try {
+                // First, probe the stream to get metadata
+                await this.probeStream(url, playerId);
+                
+                // Build the transcode URL
+                const transcodeUrl = this.buildTranscodeUrl(url);
+                console.log('Transcode URL:', transcodeUrl);
+                
+                this.updateStatus(playerId, 'Starting transcode...');
+                
+                // Use the transcoded stream URL with native player
+                this.initNativePlayer(video, transcodeUrl, playerId);
+                
+                // Add transcoding indicator to stream details
+                this.addTranscodingIndicator(playerId);
+                
+            } catch (error) {
+                console.error('Transcoding initialization failed:', error);
+                console.log('Falling back to native player...');
+                this.showTranscodingWarning(playerId, 'Transcoding failed, using direct stream');
+                this.initNativePlayer(video, url, playerId);
+            }
+        },
+        
+        async probeStream(url, playerId) {
+            try {
+                const probeUrl = `/probe?url=${encodeURIComponent(url)}`;
+                const response = await fetch(probeUrl);
+                
+                if (response.ok) {
+                    const metadata = await response.json();
+                    console.log('Stream metadata:', metadata);
+                    
+                    // Update stream metadata with probed information
+                    if (metadata.streams) {
+                        for (const stream of metadata.streams) {
+                            if (stream.type === 'video') {
+                                this.streamMetadata.codec = stream.codec;
+                                if (stream.width && stream.height) {
+                                    this.streamMetadata.resolution = `${stream.width}x${stream.height}`;
+                                }
+                                if (stream.fps) {
+                                    this.streamMetadata.framerate = stream.fps;
+                                }
+                                if (stream.bitrate) {
+                                    this.streamMetadata.bitrate = stream.bitrate;
+                                }
+                            } else if (stream.type === 'audio') {
+                                this.streamMetadata.audioCodec = stream.codec;
+                                if (stream.channels) {
+                                    this.streamMetadata.audioChannels = stream.channels === 2 ? '2.0' : stream.channels.toString();
+                                }
+                            }
+                        }
+                    }
+                    
+                    this.updateStreamDetails(playerId);
+                } else {
+                    console.warn('Failed to probe stream:', response.status);
+                }
+            } catch (error) {
+                console.warn('Stream probing failed:', error);
+                // Non-fatal - continue with transcoding
+            }
+        },
+        
+        buildTranscodeUrl(url) {
+            const params = new URLSearchParams({
+                url: url,
+                format: 'auto'
+            });
+            
+            return `/transcode?${params.toString()}`;
+        },
+        
+        addTranscodingIndicator(playerId) {
+            const detailsEl = document.getElementById(playerId + '-details');
+            if (detailsEl) {
+                const transcodeHtml = `
+                    <div class="flex items-center gap-2 mb-2 p-2 bg-blue-900 bg-opacity-20 rounded border border-blue-600">
+                        <div class="text-blue-400">⚡</div>
+                        <div class="text-sm">
+                            <div class="font-semibold text-blue-400">Server Transcode Active</div>
+                            <div class="text-xs text-blue-300 mt-1">Stream being transcoded on server for compatibility</div>
+                        </div>
+                    </div>
+                `;
+                
+                const existingContent = detailsEl.innerHTML;
+                detailsEl.innerHTML = transcodeHtml + existingContent;
+            }
+        },
+        
+        showTranscodingWarning(playerId, message) {
+            const detailsEl = document.getElementById(playerId + '-details');
+            if (detailsEl) {
+                const warningHtml = `
+                    <div class="flex items-center gap-2 mb-2 p-2 bg-yellow-900 bg-opacity-20 rounded border border-yellow-600">
+                        <div class="text-yellow-400">⚠️</div>
+                        <div class="text-sm">
+                            <div class="font-semibold text-yellow-400">Transcoding Issue</div>
+                            <div class="text-xs text-yellow-300 mt-1">${message}</div>
+                        </div>
+                    </div>
+                `;
+                
+                const existingContent = detailsEl.innerHTML;
+                detailsEl.innerHTML = warningHtml + existingContent;
             }
         },
         

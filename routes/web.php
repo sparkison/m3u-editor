@@ -121,6 +121,14 @@ Route::group(['prefix' => 'epg'], function () {
 });
 
 /*
+ * Stream transcoding endpoints
+ */
+Route::get('/transcode', [App\Http\Controllers\StreamTranscodeController::class, 'transcode'])
+    ->name('stream.transcode');
+Route::get('/probe', [App\Http\Controllers\StreamTranscodeController::class, 'probe'])
+    ->name('stream.probe');
+
+/*
  * Xtream API endpoints at root
  */
 // Main Xtream API endpoint at /player_api.php
