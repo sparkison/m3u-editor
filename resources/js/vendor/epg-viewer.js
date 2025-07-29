@@ -299,7 +299,7 @@ function epgViewer(config) {
             const stop = programme.stop ? new Date(programme.stop) : new Date(start.getTime() + 30 * 60 * 1000);
 
             if (this.isToday() && start <= now && stop >= now) {
-                return 'bg-green-200 dark:bg-green-800 border border-green-400 dark:border-green-600 hover:bg-green-300 dark:hover:bg-green-700'; // Currently playing
+                return 'bg-indigo-200 dark:bg-indigo-800 border border-indigo-400 dark:border-indigo-600 hover:bg-indigo-300 dark:hover:bg-indigo-700'; // Currently playing
             } else if (start > now || !this.isToday()) {
                 return 'bg-blue-100 dark:bg-blue-900 border border-blue-300 dark:border-blue-700 hover:bg-blue-200 dark:hover:bg-blue-800'; // Future programme
             } else {
