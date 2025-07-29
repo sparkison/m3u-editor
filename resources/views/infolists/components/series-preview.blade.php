@@ -46,7 +46,7 @@
             class="w-full h-full"
             controls
             autoplay
-            muted
+            preload="metadata"
         >
             <p class="text-white p-4">Your browser does not support video playback.</p>
         </video>

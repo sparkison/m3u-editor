@@ -91,7 +91,7 @@
                             class="w-full h-full"
                             controls
                             autoplay
-                            muted
+                            preload="metadata"
                             x-data="streamPlayer()"
                             x-init="initPlayer('{{ $streamUrl }}', '{{ $streamFormat }}', '{{ $playerId }}')"
                             data-url="{{ $streamUrl }}"
