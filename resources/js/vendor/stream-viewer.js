@@ -520,9 +520,9 @@ function streamPlayer() {
                 </div>
             `;
             
-            // Insert the selector before the existing content
+            // Insert the selector after the existing content
             const existingContent = detailsEl.innerHTML;
-            detailsEl.innerHTML = selectorHtml + existingContent;
+            detailsEl.innerHTML = existingContent + selectorHtml;
         },
         
         updateAudioTrackSelectorOptions(playerId) {
