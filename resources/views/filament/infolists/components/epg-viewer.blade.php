@@ -236,33 +236,23 @@
                                                 :class="getProgrammeColorClass(programme)"
                                                 :style="getProgrammeStyle(programme)"
                                                 @click="selectProgramme(programme)"
-                                                x-data="{ showTooltip: false }"
-                                                @mouseenter="showTooltip = true"
-                                                @mouseleave="showTooltip = false"
+                                                x-data="{ 
+                                                    get tooltipContent() {
+                                                        let content = '<p><strong>' + programme.title + '</strong></p>';
+                                                        if (programme.desc && programme.desc.trim()) {
+                                                            content += '\n\n<p>' + programme.desc + '</p>';
+                                                        }
+                                                        if (programme.category && programme.category.trim()) {
+                                                            content += '\n\n<small>Category: ' + programme.category + '</small>';
+                                                        }
+                                                        return content;
+                                                    }
+                                                }"
+                                                x-tooltip.html="tooltipContent"
                                             >
                                                 <div class="p-2 h-full overflow-hidden flex flex-col justify-center">
                                                     <div class="text-xs font-medium text-gray-900 dark:text-gray-100 truncate leading-tight" x-text="programme.title"></div>
                                                     <div class="text-xs text-gray-600 dark:text-gray-300 truncate" x-text="formatProgrammeTime(programme)"></div>
-                                                </div>
-                                                
-                                                <!-- Enhanced Tooltip -->
-                                                <div 
-                                                    x-show="showTooltip"
-                                                    x-transition:enter="transition ease-out duration-200"
-                                                    x-transition:enter-start="opacity-0 transform scale-95"
-                                                    x-transition:enter-end="opacity-100 transform scale-100"
-                                                    x-transition:leave="transition ease-in duration-150"
-                                                    x-transition:leave-start="opacity-100 transform scale-100"
-                                                    x-transition:leave-end="opacity-0 transform scale-95"
-                                                    class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded-lg z-30 pointer-events-none max-w-xs shadow-lg"
-                                                    style="min-width: 200px;"
-                                                >
-                                                    <div class="font-medium" x-text="programme.title"></div>
-                                                    <div class="text-gray-300 dark:text-gray-600 mt-1" x-text="formatProgrammeTime(programme)"></div>
-                                                    <div x-show="programme.desc" class="mt-1 text-gray-200 dark:text-gray-700" x-text="programme.desc"></div>
-                                                    <div x-show="programme.category" class="mt-1 text-indigo-300 dark:text-indigo-600 text-xs" x-text="'Category: ' + programme.category"></div>
-                                                    <!-- Arrow -->
-                                                    <div class="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
                                                 </div>
                                             </div>
                                         </template>
