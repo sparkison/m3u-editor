@@ -226,6 +226,12 @@ function streamPlayer() {
         initMpegTsPlayer(video, url, playerId) {
             console.log('MPEG-TS libraries available:', typeof mpegts !== 'undefined', mpegts?.getFeatureList().mseLivePlayback);
             
+            // Set some defaults for MPEG-TS streams
+            this.streamMetadata.codec = 'H.264';
+            this.streamMetadata.audioCodec = 'AAC';
+            this.streamMetadata.audioChannels = '2.0';
+            this.updateStreamDetails(playerId);
+            
             if (typeof mpegts !== 'undefined' && mpegts.getFeatureList().mseLivePlayback) {
                 console.log('Creating MPEG-TS player...');
                 this.mpegts = mpegts.createPlayer({
@@ -240,7 +246,7 @@ function streamPlayer() {
                 this.mpegts.on(mpegts.Events.METADATA_ARRIVED, (metadata) => {
                     console.log('MPEG-TS metadata arrived:', metadata);
                     
-                    // Collect MPEG-TS metadata
+                    // Collect MPEG-TS metadata - override defaults with actual values
                     if (metadata.videoCodec) {
                         this.streamMetadata.codec = metadata.videoCodec;
                     }
@@ -264,6 +270,29 @@ function streamPlayer() {
                     this.updateStatus(playerId, 'Connected');
                     this.updateStreamDetails(playerId);
                 });
+
+                this.mpegts.on(mpegts.Events.MEDIA_INFO, (mediaInfo) => {
+                    console.log('MPEG-TS media info:', mediaInfo);
+                    
+                    // Additional metadata from media info
+                    if (mediaInfo.width && mediaInfo.height) {
+                        this.streamMetadata.resolution = `${mediaInfo.width}x${mediaInfo.height}`;
+                    }
+                    if (mediaInfo.videoCodec) {
+                        this.streamMetadata.codec = mediaInfo.videoCodec;
+                    }
+                    if (mediaInfo.audioCodec) {
+                        this.streamMetadata.audioCodec = mediaInfo.audioCodec;
+                    }
+                    if (mediaInfo.audioChannelCount) {
+                        this.streamMetadata.audioChannels = mediaInfo.audioChannelCount === 2 ? '2.0' : mediaInfo.audioChannelCount.toString();
+                    }
+                    if (mediaInfo.fps) {
+                        this.streamMetadata.framerate = mediaInfo.fps;
+                    }
+                    
+                    this.updateStreamDetails(playerId);
+                });
                 
                 this.mpegts.on(mpegts.Events.ERROR, (type, details, info) => {
                     console.error('MPEGTS Error:', type, details, info);
@@ -281,8 +310,38 @@ function streamPlayer() {
         },
         
         initNativePlayer(video, url, playerId) {
+            console.log('Initializing native player for URL:', url);
+            
+            // Try to infer some basic details from the URL/format before loading
+            this.inferStreamDetailsFromUrl(url, playerId);
+            
             video.src = url;
             this.setupNativeEvents(video, playerId);
+        },
+
+        inferStreamDetailsFromUrl(url, playerId) {
+            console.log('Inferring stream details from URL:', url);
+            
+            // Common defaults for different stream types
+            if (url.includes('.ts') || url.includes('mpegts') || url.includes('transport')) {
+                this.streamMetadata.codec = 'H.264';
+                this.streamMetadata.audioCodec = 'AAC';
+                this.streamMetadata.audioChannels = '2.0';
+                console.log('Detected MPEG-TS stream, setting default codecs');
+            } else if (url.includes('.m3u8') || url.includes('hls')) {
+                this.streamMetadata.codec = 'H.264';
+                this.streamMetadata.audioCodec = 'AAC';
+                this.streamMetadata.audioChannels = '2.0';
+                console.log('Detected HLS stream, setting default codecs');
+            } else if (url.includes('.mp4')) {
+                this.streamMetadata.codec = 'H.264';
+                this.streamMetadata.audioCodec = 'AAC';
+                this.streamMetadata.audioChannels = '2.0';
+                console.log('Detected MP4 stream, setting default codecs');
+            }
+            
+            // Update details with initial inference
+            this.updateStreamDetails(playerId);
         },
         
         setupNativeEvents(video, playerId) {
@@ -305,9 +364,17 @@ function streamPlayer() {
                 this.updateStreamDetails(playerId);
             });
             
+            video.addEventListener('loadeddata', () => {
+                console.log('Native video data loaded - trying to collect more metadata');
+                this.collectVideoMetadata(video, playerId);
+            });
+            
             video.addEventListener('canplay', () => {
                 console.log('Native video can play');
                 this.updateStatus(playerId, 'Ready');
+                
+                // Try to collect metadata again once we can play
+                this.collectVideoMetadata(video, playerId);
             });
             
             video.addEventListener('playing', () => {
@@ -315,7 +382,16 @@ function streamPlayer() {
                 this.updateStatus(playerId, 'Playing');
                 
                 // Try to collect additional metadata once playing
-                this.collectVideoMetadata(video, playerId);
+                setTimeout(() => {
+                    this.collectVideoMetadata(video, playerId);
+                }, 1000); // Give it a second to establish the stream
+            });
+
+            video.addEventListener('progress', () => {
+                // Try to collect metadata as data loads
+                if (video.buffered.length > 0 && !this.streamMetadata.codec) {
+                    this.collectVideoMetadata(video, playerId);
+                }
             });
             
             video.addEventListener('error', (e) => {
@@ -372,6 +448,8 @@ function streamPlayer() {
             const detailsEl = document.getElementById(playerId + '-details');
             if (!detailsEl) return;
 
+            console.log('Updating stream details for:', playerId, 'Metadata:', this.streamMetadata);
+
             let detailsHtml = '';
             
             if (this.streamMetadata.resolution) {
@@ -413,16 +491,44 @@ function streamPlayer() {
         },
 
         collectVideoMetadata(video, playerId) {
-            if (!video.videoTracks && !video.videoWidth) return;
+            console.log('Collecting video metadata for:', playerId);
+            console.log('Video element properties:', {
+                videoWidth: video.videoWidth,
+                videoHeight: video.videoHeight,
+                videoTracks: video.videoTracks?.length,
+                audioTracks: video.audioTracks?.length,
+                textTracks: video.textTracks?.length,
+                duration: video.duration,
+                buffered: video.buffered?.length,
+                networkState: video.networkState,
+                readyState: video.readyState
+            });
 
             // Get basic video properties
             if (video.videoWidth && video.videoHeight) {
                 this.streamMetadata.resolution = `${video.videoWidth}x${video.videoHeight}`;
             }
 
+            // Try to estimate framerate from video properties
+            if (video.getVideoPlaybackQuality) {
+                try {
+                    const quality = video.getVideoPlaybackQuality();
+                    console.log('Video playback quality:', quality);
+                    if (quality.totalVideoFrames && quality.creationTime) {
+                        const fps = Math.round(quality.totalVideoFrames / (quality.creationTime / 1000));
+                        if (fps > 0 && fps < 120) { // Reasonable FPS range
+                            this.streamMetadata.framerate = fps;
+                        }
+                    }
+                } catch (e) {
+                    console.log('getVideoPlaybackQuality not available');
+                }
+            }
+
             // Try to get video tracks info
             if (video.videoTracks && video.videoTracks.length > 0) {
                 const track = video.videoTracks[0];
+                console.log('Video track:', track);
                 if (track.label) {
                     // Parse codec info from track label if available
                     const codecMatch = track.label.match(/(\w+)/);
@@ -435,9 +541,53 @@ function streamPlayer() {
             // Try to get audio tracks info
             if (video.audioTracks && video.audioTracks.length > 0) {
                 const audioTrack = video.audioTracks[0];
+                console.log('Audio track:', audioTrack);
                 if (audioTrack.language) {
                     this.streamMetadata.audioCodec = audioTrack.language;
                 }
+                if (audioTrack.label) {
+                    // Try to parse codec from label
+                    const audioCodecMatch = audioTrack.label.match(/(aac|mp3|ac3|dts|pcm)/i);
+                    if (audioCodecMatch) {
+                        this.streamMetadata.audioCodec = audioCodecMatch[1].toUpperCase();
+                    }
+                }
+            }
+
+            // Try to get more detailed info from the video element's capabilities
+            if (video.mozPaintedFrames !== undefined) {
+                // Firefox specific
+                console.log('Firefox video stats:', {
+                    paintedFrames: video.mozPaintedFrames,
+                    presentedFrames: video.mozPresentedFrames,
+                    parsedFrames: video.mozParsedFrames,
+                    decodedFrames: video.mozDecodedFrames
+                });
+            }
+
+            if (video.webkitDroppedFrameCount !== undefined) {
+                // Webkit specific
+                console.log('Webkit video stats:', {
+                    droppedFrames: video.webkitDroppedFrameCount,
+                    decodedFrames: video.webkitDecodedFrameCount
+                });
+            }
+
+            // For TS streams, try to infer codec from URL or file extension
+            const videoSrc = video.src || video.currentSrc;
+            if (videoSrc && !this.streamMetadata.codec) {
+                if (videoSrc.includes('.ts') || videoSrc.includes('mpegts')) {
+                    this.streamMetadata.codec = 'H.264'; // Most TS streams use H.264
+                    if (!this.streamMetadata.audioCodec) {
+                        this.streamMetadata.audioCodec = 'AAC'; // Most TS streams use AAC audio
+                    }
+                }
+            }
+
+            // Try to detect audio channels from the audio context if available
+            if (!this.streamMetadata.audioChannels && video.audioTracks && video.audioTracks.length > 0) {
+                // Default to stereo for most streams
+                this.streamMetadata.audioChannels = '2.0';
             }
 
             this.updateStreamDetails(playerId);
