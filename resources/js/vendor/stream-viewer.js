@@ -4,6 +4,16 @@ function streamPlayer() {
         player: null,
         hls: null,
         mpegts: null,
+        streamMetadata: {
+            codec: null,
+            resolution: null,
+            audioCodec: null,
+            audioChannels: null,
+            bitrate: null,
+            framerate: null,
+            profile: null,
+            level: null
+        },
         
         initPlayer(url, format, playerId) {
             console.log('initPlayer called with:', { url, format, playerId });
@@ -100,8 +110,31 @@ function streamPlayer() {
                 
                 this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
                     console.log('HLS manifest parsed successfully');
+                    
+                    // Collect HLS metadata
+                    if (this.hls.levels && this.hls.levels.length > 0) {
+                        const level = this.hls.levels[this.hls.currentLevel] || this.hls.levels[0];
+                        if (level) {
+                            this.streamMetadata.resolution = `${level.width}x${level.height}`;
+                            this.streamMetadata.bitrate = level.bitrate;
+                            this.streamMetadata.framerate = level.frameRate;
+                            
+                            // Parse codec info
+                            if (level.codecName) {
+                                this.streamMetadata.codec = level.codecName;
+                            } else if (level.videoCodec) {
+                                this.streamMetadata.codec = level.videoCodec.split('.')[0];
+                            }
+                            
+                            if (level.audioCodec) {
+                                this.streamMetadata.audioCodec = level.audioCodec.split('.')[0];
+                            }
+                        }
+                    }
+                    
                     this.hideLoading(playerId);
                     this.updateStatus(playerId, 'Connected');
+                    this.updateStreamDetails(playerId);
                 });
                 
                 this.hls.on(Hls.Events.ERROR, (event, data) => {
@@ -167,6 +200,19 @@ function streamPlayer() {
                 this.hls.on(Hls.Events.LEVEL_LOADED, (event, data) => {
                     console.log('HLS Level loaded:', data.level, 'URL:', data.details?.url);
                 });
+
+                this.hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+                    console.log('HLS Level switched to:', data.level);
+                    
+                    // Update metadata when level changes
+                    if (this.hls.levels && this.hls.levels[data.level]) {
+                        const level = this.hls.levels[data.level];
+                        this.streamMetadata.resolution = `${level.width}x${level.height}`;
+                        this.streamMetadata.bitrate = level.bitrate;
+                        this.streamMetadata.framerate = level.frameRate;
+                        this.updateStreamDetails(playerId);
+                    }
+                });
                 
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 console.log('Using Safari native HLS support');
@@ -191,10 +237,32 @@ function streamPlayer() {
                 this.mpegts.attachMediaElement(video);
                 this.mpegts.load();
                 
-                this.mpegts.on(mpegts.Events.METADATA_ARRIVED, () => {
-                    console.log('MPEG-TS metadata arrived');
+                this.mpegts.on(mpegts.Events.METADATA_ARRIVED, (metadata) => {
+                    console.log('MPEG-TS metadata arrived:', metadata);
+                    
+                    // Collect MPEG-TS metadata
+                    if (metadata.videoCodec) {
+                        this.streamMetadata.codec = metadata.videoCodec;
+                    }
+                    if (metadata.audioCodec) {
+                        this.streamMetadata.audioCodec = metadata.audioCodec;
+                    }
+                    if (metadata.width && metadata.height) {
+                        this.streamMetadata.resolution = `${metadata.width}x${metadata.height}`;
+                    }
+                    if (metadata.videoBitrate) {
+                        this.streamMetadata.bitrate = metadata.videoBitrate;
+                    }
+                    if (metadata.frameRate) {
+                        this.streamMetadata.framerate = metadata.frameRate;
+                    }
+                    if (metadata.audioChannels) {
+                        this.streamMetadata.audioChannels = metadata.audioChannels;
+                    }
+                    
                     this.hideLoading(playerId);
                     this.updateStatus(playerId, 'Connected');
+                    this.updateStreamDetails(playerId);
                 });
                 
                 this.mpegts.on(mpegts.Events.ERROR, (type, details, info) => {
@@ -219,31 +287,57 @@ function streamPlayer() {
         
         setupNativeEvents(video, playerId) {
             video.addEventListener('loadstart', () => {
-                console.log('Video loadstart event');
+                console.log('Native video loadstart');
                 this.updateStatus(playerId, 'Loading...');
             });
             
             video.addEventListener('loadedmetadata', () => {
-                console.log('Video loadedmetadata event');
+                console.log('Native video metadata loaded');
+                
+                // Collect basic metadata
+                if (video.videoWidth && video.videoHeight) {
+                    this.streamMetadata.resolution = `${video.videoWidth}x${video.videoHeight}`;
+                }
+                
+                this.collectVideoMetadata(video, playerId);
                 this.hideLoading(playerId);
-                this.updateStatus(playerId, 'Metadata loaded');
+                this.updateStatus(playerId, 'Ready');
+                this.updateStreamDetails(playerId);
             });
             
             video.addEventListener('canplay', () => {
-                console.log('Video canplay event');
-                this.hideLoading(playerId);
+                console.log('Native video can play');
                 this.updateStatus(playerId, 'Ready');
             });
             
             video.addEventListener('playing', () => {
-                console.log('Video playing event');
-                this.hideLoading(playerId);
+                console.log('Native video playing');
                 this.updateStatus(playerId, 'Playing');
+                
+                // Try to collect additional metadata once playing
+                this.collectVideoMetadata(video, playerId);
             });
             
             video.addEventListener('error', (e) => {
-                console.error('Video Error:', e);
-                this.showError(playerId, 'Failed to load video stream');
+                console.error('Native video error:', e, video.error);
+                let errorMessage = 'Playback failed';
+                if (video.error) {
+                    switch(video.error.code) {
+                        case video.error.MEDIA_ERR_ABORTED:
+                            errorMessage = 'Playback aborted';
+                            break;
+                        case video.error.MEDIA_ERR_NETWORK:
+                            errorMessage = 'Network error';
+                            break;
+                        case video.error.MEDIA_ERR_DECODE:
+                            errorMessage = 'Decode error';
+                            break;
+                        case video.error.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                            errorMessage = 'Format not supported';
+                            break;
+                    }
+                }
+                this.showError(playerId, errorMessage);
             });
         },
         
@@ -273,9 +367,96 @@ function streamPlayer() {
             const statusEl = document.getElementById(playerId + '-status');
             if (statusEl) statusEl.textContent = status;
         },
+
+        updateStreamDetails(playerId) {
+            const detailsEl = document.getElementById(playerId + '-details');
+            if (!detailsEl) return;
+
+            let detailsHtml = '';
+            
+            if (this.streamMetadata.resolution) {
+                detailsHtml += `<div class="flex justify-between"><span>Resolution:</span><span class="font-mono">${this.streamMetadata.resolution}</span></div>`;
+            }
+            
+            if (this.streamMetadata.codec) {
+                detailsHtml += `<div class="flex justify-between"><span>Video Codec:</span><span class="font-mono">${this.streamMetadata.codec}</span></div>`;
+            }
+            
+            if (this.streamMetadata.audioCodec) {
+                detailsHtml += `<div class="flex justify-between"><span>Audio Codec:</span><span class="font-mono">${this.streamMetadata.audioCodec}</span></div>`;
+            }
+            
+            if (this.streamMetadata.audioChannels) {
+                detailsHtml += `<div class="flex justify-between"><span>Audio Channels:</span><span class="font-mono">${this.streamMetadata.audioChannels}</span></div>`;
+            }
+            
+            if (this.streamMetadata.bitrate) {
+                const bitrateKbps = Math.round(this.streamMetadata.bitrate / 1000);
+                detailsHtml += `<div class="flex justify-between"><span>Bitrate:</span><span class="font-mono">${bitrateKbps} kbps</span></div>`;
+            }
+            
+            if (this.streamMetadata.framerate) {
+                detailsHtml += `<div class="flex justify-between"><span>Frame Rate:</span><span class="font-mono">${this.streamMetadata.framerate} fps</span></div>`;
+            }
+            
+            if (this.streamMetadata.profile) {
+                detailsHtml += `<div class="flex justify-between"><span>Profile:</span><span class="font-mono">${this.streamMetadata.profile}</span></div>`;
+            }
+            
+            if (detailsHtml) {
+                detailsEl.innerHTML = detailsHtml;
+                detailsEl.style.display = 'block';
+            } else {
+                detailsEl.innerHTML = '<div class="text-gray-500 dark:text-gray-400 text-sm">Stream details not available</div>';
+                detailsEl.style.display = 'block';
+            }
+        },
+
+        collectVideoMetadata(video, playerId) {
+            if (!video.videoTracks && !video.videoWidth) return;
+
+            // Get basic video properties
+            if (video.videoWidth && video.videoHeight) {
+                this.streamMetadata.resolution = `${video.videoWidth}x${video.videoHeight}`;
+            }
+
+            // Try to get video tracks info
+            if (video.videoTracks && video.videoTracks.length > 0) {
+                const track = video.videoTracks[0];
+                if (track.label) {
+                    // Parse codec info from track label if available
+                    const codecMatch = track.label.match(/(\w+)/);
+                    if (codecMatch) {
+                        this.streamMetadata.codec = codecMatch[1];
+                    }
+                }
+            }
+
+            // Try to get audio tracks info
+            if (video.audioTracks && video.audioTracks.length > 0) {
+                const audioTrack = video.audioTracks[0];
+                if (audioTrack.language) {
+                    this.streamMetadata.audioCodec = audioTrack.language;
+                }
+            }
+
+            this.updateStreamDetails(playerId);
+        },
         
         cleanup() {
             console.log('Cleaning up stream player...');
+            
+            // Reset stream metadata
+            this.streamMetadata = {
+                codec: null,
+                resolution: null,
+                audioCodec: null,
+                audioChannels: null,
+                bitrate: null,
+                framerate: null,
+                profile: null,
+                level: null
+            };
             
             if (this.hls) {
                 console.log('Destroying HLS player');

@@ -92,6 +92,40 @@
                 <span class="ml-2 text-gray-300" id="{{ $playerId }}-status">Connecting...</span>
             </div>
         </div>
+
+        <!-- Stream Details Toggle -->
+        <div class="absolute bottom-2 right-2">
+            <button 
+                onclick="toggleStreamDetails('{{ $playerId }}')"
+                class="bg-black bg-opacity-75 hover:bg-opacity-90 text-white text-xs px-2 py-1 rounded transition-colors"
+                title="Toggle Stream Details"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Stream Details Overlay -->
+        <div 
+            id="{{ $playerId }}-details-overlay"
+            class="absolute top-2 left-2 bg-black bg-opacity-90 text-white text-xs p-3 rounded max-w-xs hidden"
+        >
+            <div class="flex justify-between items-center mb-2">
+                <span class="font-medium">Stream Details</span>
+                <button 
+                    onclick="toggleStreamDetails('{{ $playerId }}')"
+                    class="text-gray-300 hover:text-white"
+                >
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="{{ $playerId }}-details" class="space-y-1">
+                <div class="text-gray-400">Loading stream details...</div>
+            </div>
+        </div>
     </div>
 
     <x-filament::section collapsible="true" :collapsed="true">
@@ -160,4 +194,13 @@
             @endif
         </div>
     </x-filament::section>
+
+    <script>
+        function toggleStreamDetails(playerId) {
+            const overlay = document.getElementById(playerId + '-details-overlay');
+            if (overlay) {
+                overlay.classList.toggle('hidden');
+            }
+        }
+    </script>
 </x-dynamic-component>
