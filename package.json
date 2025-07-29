@@ -23,6 +23,7 @@
     "dependencies": {
         "easyqrcodejs": "^4.6.2",
         "hls.js": "^1.6.7",
-        "mpegts.js": "^1.8.0"
+        "mpegts.js": "^1.8.0",
+        "video.js": "^8.23.3"
     }
 }
