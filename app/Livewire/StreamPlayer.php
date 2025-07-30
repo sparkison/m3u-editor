@@ -47,10 +47,10 @@ class StreamPlayer extends Component
         Log::info('StreamPlayer closePlayer called');
         
         $this->showModal = false;
-        // $this->streamUrl = '';
-        // $this->streamFormat = 'ts';
-        // $this->channelTitle = '';
-        // $this->channelLogo = '';
+        $this->streamUrl = '';
+        $this->streamFormat = 'ts';
+        $this->channelTitle = '';
+        $this->channelLogo = '';
 
         // Dispatch event to cleanup player
         $this->dispatch('cleanupPlayer', playerId: $this->playerId);
