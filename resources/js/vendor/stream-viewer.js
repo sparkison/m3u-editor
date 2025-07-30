@@ -364,7 +364,9 @@ function streamPlayer() {
             });
             
             video.addEventListener('error', (e) => {
-                console.error('Native video error:', e, video.error);
+                if (video.error.code === video.error.MEDIA_ELEMENT_ERROR) {
+                    return; // Ignore MEDIA_ELEMENT_ERROR which can happen on cleanup
+                }
                 let errorMessage = 'Playback failed';
                 if (video.error) {
                     switch(video.error.code) {
