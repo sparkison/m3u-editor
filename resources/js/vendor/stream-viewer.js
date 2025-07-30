@@ -18,6 +18,10 @@ function streamPlayer() {
         selectedAudioTrack: null,
         
         initPlayer(url, format, playerId) {
+            if (!url) {
+                return
+            }
+            
             console.log('initPlayer called with:', { url, format, playerId });
             
             const video = document.getElementById(playerId);
@@ -34,12 +38,6 @@ function streamPlayer() {
             
             if (!video) {
                 console.error('Video element not found:', playerId);
-                return;
-            }
-            
-            if (!url) {
-                console.error('No stream URL provided');
-                this.showError(playerId, 'No stream URL provided');
                 return;
             }
             
