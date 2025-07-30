@@ -4,9 +4,6 @@ function streamPlayer() {
         player: null,
         hls: null,
         mpegts: null,
-        currentTranscodeUrl: null,
-        selectedServerAudioTrack: 0,
-        availableServerAudioTracks: [],
         streamMetadata: {
             codec: null,
             resolution: null,
@@ -22,9 +19,6 @@ function streamPlayer() {
         
         initPlayer(url, format, playerId) {
             console.log('initPlayer called with:', { url, format, playerId });
-            
-            // Set this instance as the global instance for audio track switching
-            window.streamPlayerInstance = this;
             
             const video = document.getElementById(playerId);
             const loadingEl = document.getElementById(playerId + '-loading');
@@ -443,30 +437,7 @@ function streamPlayer() {
             if (this.streamMetadata.audioChannels) {
                 detailsHtml += `<div class="flex justify-between gap-1"><span>Audio Channels:</span><span class="font-mono">${this.streamMetadata.audioChannels}</span></div>`;
             }
-            
-            // For client-side audio tracks (non-server transcoding) - only show if no server audio selector exists
-            if (this.availableAudioTracks && this.availableAudioTracks.length > 1 && !existingAudioSelector && !this.availableServerAudioTracks.length) {
-                detailsHtml += `<div class="border-t pt-2 mt-2">`;
-                detailsHtml += `<div class="flex justify-between items-center gap-1 mb-1">`;
-                detailsHtml += `<span class="text-sm">Audio Track:</span>`;
-                detailsHtml += `<select onchange="selectAudioTrack('${playerId}', this.value)" class="text-xs bg-gray-700 border border-gray-600 rounded px-1 py-0.5 text-white">`;
-                
-                this.availableAudioTracks.forEach((track, index) => {
-                    const selected = index === this.selectedAudioTrack ? 'selected' : '';
-                    const estimatedTag = track.estimated ? ' (estimated)' : '';
-                    const codecInfo = track.codec ? ` - ${track.codec}` : '';
-                    const label = track.language !== 'unknown' ? `${track.label} (${track.language})${codecInfo}` : `${track.label}${codecInfo}`;
-                    detailsHtml += `<option value="${index}" ${selected}>${label}${estimatedTag}</option>`;
-                });
-                
-                detailsHtml += `</select></div>`;
-                
-                if (this.availableAudioTracks.some(track => track.estimated)) {
-                    detailsHtml += `<div class="text-xs text-yellow-400">Note: Audio track switching may not work due to browser limitations</div>`;
-                }
-                detailsHtml += `</div>`;
-            }
-            
+                        
             if (this.streamMetadata.bitrate) {
                 const bitrateKbps = Math.round(this.streamMetadata.bitrate / 1000);
                 detailsHtml += `<div class="flex justify-between gap-1"><span>Bitrate:</span><span class="font-mono">${bitrateKbps} kbps</span></div>`;
@@ -500,13 +471,6 @@ function streamPlayer() {
                     detailsEl.innerHTML = preservedHtml + '<div class="text-gray-500 dark:text-gray-400 text-sm">Stream details not available</div>';
                 }
                 detailsEl.style.display = 'block';
-                
-                // After preserving, make sure the audio selector shows the correct value
-                if (existingAudioSelector && this.selectedServerAudioTrack !== undefined) {
-                    setTimeout(() => {
-                        this.updateAudioTrackSelector(playerId, this.selectedServerAudioTrack);
-                    }, 50);
-                }
             } else {
                 if (detailsHtml) {
                     detailsEl.innerHTML = detailsHtml;
@@ -575,8 +539,6 @@ function streamPlayer() {
         
         detectAudioTracks(video, playerId) {
             console.log('Detecting audio tracks for:', playerId);
-            const videoSrc = video.src || video.currentSrc;
-            const isMKV = videoSrc && videoSrc.toLowerCase().includes('.mkv');
             
             // Reset audio tracks
             this.availableAudioTracks = [];
@@ -618,97 +580,12 @@ function streamPlayer() {
                     }
                 }
             } else {
-                console.log('No real audio tracks found, checking for estimated tracks');
-                
-                // For MKV files, create estimated tracks since browsers often don't expose them
-                if (isMKV && video.duration && video.duration > 30) {
-                    console.log('Creating estimated audio tracks for MKV file');
-                    
-                    // Use different estimation strategies
-                    this.estimateAudioTracksForMKV(video, playerId);
-                } else {
-                    // For other formats, try basic detection
-                    this.detectBasicAudioInfo(video, playerId);
-                }
+                console.log('No real audio tracks found');
             }
             
             // Default audio channels if we have tracks but no channels
             if (this.availableAudioTracks.length > 0 && !this.streamMetadata.audioChannels) {
                 this.streamMetadata.audioChannels = '2.0'; // Stereo default
-            }
-        },
-        
-        estimateAudioTracksForMKV(video, playerId) {
-            console.log('Estimating audio tracks for MKV file');
-            
-            // Common MKV scenarios - often have multiple language tracks
-            const commonLanguages = ['eng', 'spa', 'fra', 'deu', 'jpn', 'kor'];
-            
-            // Create estimated tracks based on duration and common patterns
-            if (video.duration > 30) { // Likely has audio
-                // Create multiple estimated tracks for MKV
-                this.availableAudioTracks = [
-                    {
-                        index: 0,
-                        id: 'estimated-0',
-                        label: 'Default Audio',
-                        language: 'eng',
-                        enabled: true,
-                        estimated: true
-                    },
-                    {
-                        index: 1,
-                        id: 'estimated-1', 
-                        label: 'Audio Track 2',
-                        language: 'unknown',
-                        enabled: false,
-                        estimated: true
-                    }
-                ];
-                
-                // For longer content, assume more tracks might exist
-                if (video.duration > 3600) { // > 1 hour content
-                    this.availableAudioTracks.push({
-                        index: 2,
-                        id: 'estimated-2',
-                        label: 'Audio Track 3',
-                        language: 'unknown',
-                        enabled: false,
-                        estimated: true
-                    });
-                }
-                
-                this.selectedAudioTrack = 0;
-                console.log('Created estimated audio tracks:', this.availableAudioTracks);
-                
-                // Set likely codec for MKV
-                if (!this.streamMetadata.audioCodec) {
-                    this.streamMetadata.audioCodec = 'AAC'; // Common for MKV
-                }
-            }
-        },
-        
-        detectBasicAudioInfo(video, playerId) {
-            console.log('Detecting basic audio info');
-            
-            // Check if there's likely to be audio based on video duration
-            if (video.duration && video.duration > 10) {
-                // Assume basic audio track exists
-                this.availableAudioTracks = [{
-                    index: 0,
-                    id: 'default-0',
-                    label: 'Default Audio',
-                    language: 'unknown',
-                    enabled: true,
-                    estimated: false
-                }];
-                
-                this.selectedAudioTrack = 0;
-                
-                // Set basic codec
-                if (!this.streamMetadata.audioCodec) {
-                    this.streamMetadata.audioCodec = 'AAC';
-                }
             }
         },
         
@@ -759,84 +636,6 @@ function streamPlayer() {
             }
         },
         
-        selectAudioTrack(playerId, trackIndex) {
-            console.log('Selecting audio track:', trackIndex);
-            
-            const video = document.getElementById(playerId);
-            if (!video) return;
-            
-            const videoSrc = video.src || video.currentSrc;
-            const trackIndexNum = parseInt(trackIndex);
-            
-            // Check if this is a server-transcoded stream
-            if (this.currentTranscodeUrl && this.availableServerAudioTracks.length > 0) {
-                console.log('Switching server-side transcoded audio track');
-                this.switchServerAudioTrack(playerId, trackIndexNum);
-                return;
-            }
-            
-            // If we have real audio tracks, use them
-            if (video.audioTracks && video.audioTracks.length > trackIndexNum) {
-                console.log('Switching real audio track');
-                
-                // Disable all tracks first
-                for (let i = 0; i < video.audioTracks.length; i++) {
-                    video.audioTracks[i].enabled = false;
-                }
-                
-                // Enable selected track
-                video.audioTracks[trackIndexNum].enabled = true;
-                this.selectedAudioTrack = trackIndexNum;
-                
-                // Update our tracking
-                this.availableAudioTracks.forEach((track, index) => {
-                    track.enabled = index === trackIndexNum;
-                });
-                
-                console.log(`Enabled native audio track ${trackIndexNum}`);
-            } else {
-                console.log('Switching estimated audio track (limited functionality)');
-                
-                // For estimated tracks, we can't actually change the audio
-                // but we can update the UI to show the selection
-                this.selectedAudioTrack = trackIndexNum;
-                
-                // Update the available tracks to reflect the selection
-                if (this.availableAudioTracks) {
-                    this.availableAudioTracks.forEach((track, index) => {
-                        track.enabled = index === trackIndexNum;
-                    });
-                }
-                
-                // Provide user feedback about limitations
-                const isMKV = videoSrc && videoSrc.toLowerCase().includes('.mkv');
-                if (isMKV) {
-                    console.warn(`Selected estimated MKV audio track ${trackIndexNum} - browser API limitations prevent actual audio switching`);
-                    
-                    // Optional: Show user notification about limitations
-                    const detailsEl = document.getElementById(playerId + '-details');
-                    if (detailsEl) {
-                        // Add temporary feedback message
-                        const feedbackDiv = document.createElement('div');
-                        feedbackDiv.className = 'text-xs text-yellow-400 mt-1';
-                        feedbackDiv.textContent = 'Audio track selection simulated - browser limitations with MKV files';
-                        detailsEl.appendChild(feedbackDiv);
-                        
-                        // Remove feedback after 3 seconds
-                        setTimeout(() => {
-                            if (feedbackDiv.parentNode) {
-                                feedbackDiv.parentNode.removeChild(feedbackDiv);
-                            }
-                        }, 3000);
-                    }
-                } else {
-                    console.log(`Selected estimated audio track ${trackIndexNum} (no actual audio change)`);
-                }
-            }
-            
-            this.updateStreamDetails(playerId);
-        },
-        
         cleanup() {
             console.log('Cleaning up stream player...');
             
@@ -855,9 +654,6 @@ function streamPlayer() {
             // Reset audio track data
             this.availableAudioTracks = [];
             this.selectedAudioTrack = null;
-            this.availableServerAudioTracks = [];
-            this.selectedServerAudioTrack = 0;
-            this.currentTranscodeUrl = null;
             this.baseUrl = null;
             
             if (this.hls) {
@@ -917,32 +713,11 @@ function toggleStreamDetails(playerId) {
     }
 }
 
-// Global audio track selector function
-function selectAudioTrack(playerId, trackIndex) {
-    // Find the stream player instance and call its selectAudioTrack method
-    const videoElement = document.getElementById(playerId);
-    if (videoElement && videoElement._streamPlayer) {
-        videoElement._streamPlayer.selectAudioTrack(playerId, parseInt(trackIndex));
-    } else {
-        // Fallback: try to find the instance through Alpine.js
-        const alpineData = Alpine.$data(document.getElementById(playerId));
-        if (alpineData && typeof alpineData.selectAudioTrack === 'function') {
-            alpineData.selectAudioTrack(playerId, parseInt(trackIndex));
-        }
-    }
-}
-
 // Make streamPlayer function globally accessible
 window.streamPlayer = streamPlayer;
-
-// Create a global instance for audio track switching
-window.streamPlayerInstance = null;
 
 // Make retryStream function globally accessible
 window.retryStream = retryStream;
 
 // Make toggleStreamDetails function globally accessible
 window.toggleStreamDetails = toggleStreamDetails;
-
-// Make selectAudioTrack function globally accessible  
-window.selectAudioTrack = selectAudioTrack;
