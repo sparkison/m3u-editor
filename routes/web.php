@@ -120,13 +120,6 @@ Route::group(['prefix' => 'epg'], function () {
         ->name('api.epg.sync');
 });
 
-/*
- * Stream transcoding endpoints
- */
-Route::get('/transcode', [App\Http\Controllers\StreamTranscodeController::class, 'transcode'])
-    ->name('stream.transcode');
-Route::get('/probe', [App\Http\Controllers\StreamTranscodeController::class, 'probe'])
-    ->name('stream.probe');
 
 /*
  * Xtream API endpoints at root
