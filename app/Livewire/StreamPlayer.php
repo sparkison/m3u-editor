@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use Livewire\Component;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class StreamPlayer extends Component
 {
@@ -28,7 +29,7 @@ class StreamPlayer extends Component
         
         $this->streamUrl = $channelData['url'] ?? '';
         $this->streamFormat = $channelData['format'] ?? 'ts';
-        $this->channelTitle = $channelData['title'] ?? $channelData['display_name'] ?? 'Unknown Channel';
+        $this->channelTitle = Str::replace("'", "`", $channelData['title'] ?? ($channelData['name_custom'] ?? $channelData['name'] ?? 'Unknown Channel'));
         $this->channelLogo = $channelData['logo'] ?? $channelData['icon'] ?? '';
         $this->showModal = true;
         

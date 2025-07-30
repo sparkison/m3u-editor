@@ -17,7 +17,7 @@
             playerId: '{{ $playerId }}',
             streamUrl: '{{ $url }}',
             streamFormat: '{{ $format }}',
-            channelTitle: '{{ $record->title ?? $record->name }}'
+            channelTitle: '{{ Str::replace("'", "`", $record->title ?? $record->name) }}'
         }"
         x-init="
             console.log('Series preview initializing:', { playerId, streamUrl, streamFormat });
