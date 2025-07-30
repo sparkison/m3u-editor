@@ -179,15 +179,25 @@
                                         <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate" x-text="channel.display_name"></p>
                                         <p class="text-xs text-gray-500 dark:text-gray-400 truncate" x-text="channelId"></p>
                                     </div>
-                                    <!-- Play Button (only show if channel has URL) -->
-                                    <div x-show="channel.url" class="flex-shrink-0">
-                                        <button 
-                                            @click="
+                                    <!-- Play Buttons (only show if channel has URL) -->
+                                    <div x-show="channel.url" class="flex-shrink-0 flex space-x-1">
+                                        {{-- <button 
+                                            @click.stop="
                                                 console.log('Play button clicked for channel:', channel); 
                                                 window.dispatchEvent(new CustomEvent('openStreamPlayer', { detail: channel }))
                                             "
                                             class="p-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-full transition-colors"
-                                            title="Play Stream"
+                                            title="Play Stream in Modal"
+                                        >
+                                            <x-heroicon-s-play class="w-4 h-4" />
+                                        </button> --}}
+                                        
+                                        <button 
+                                            @click.stop="
+                                                window.dispatchEvent(new CustomEvent('openFloatingStream', { detail: channel }))
+                                            "
+                                            class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-900/20 rounded-full transition-colors"
+                                            title="Play Stream in Floating Window"
                                         >
                                             <x-heroicon-s-play class="w-4 h-4" />
                                         </button>
@@ -292,6 +302,35 @@
                                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Description:</span>
                                 <p class="text-sm text-gray-600 dark:text-gray-400" x-text="selectedProgramme?.desc"></p>
                             </div>
+                            
+                            <!-- Action Buttons -->
+                            <div x-show="selectedProgramme?.channel?.url" class="flex space-x-3 pt-4 border-t border-gray-200 dark:border-gray-600">
+                                <x-filament::button
+                                    color="primary"
+                                    size="sm"
+                                    @click="
+                                        console.log('Opening modal stream for channel:', selectedProgramme?.channel); 
+                                        window.dispatchEvent(new CustomEvent('openStreamPlayer', { detail: selectedProgramme?.channel }));
+                                        selectedProgramme = null;
+                                    "
+                                >
+                                    <x-heroicon-m-play class="w-4 h-4 mr-2" />
+                                    Play in Modal
+                                </x-filament::button>
+                                
+                                <x-filament::button
+                                    color="gray"
+                                    size="sm"
+                                    @click="
+                                        console.log('Opening floating stream for channel:', selectedProgramme?.channel); 
+                                        window.dispatchEvent(new CustomEvent('openFloatingStream', { detail: selectedProgramme?.channel }));
+                                        selectedProgramme = null;
+                                    "
+                                >
+                                    <x-heroicon-m-window class="w-4 h-4 mr-2" />
+                                    Play Floating
+                                </x-filament::button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -300,4 +339,7 @@
 
         <!-- Stream Player Component -->
         @livewire('stream-player')
+
+        <!-- Floating Stream Players -->
+        <x-floating-stream-players />
 </div>
