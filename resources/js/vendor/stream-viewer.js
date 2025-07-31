@@ -23,26 +23,16 @@ function streamPlayer() {
             }
             
             console.log('initPlayer called with:', { url, format, playerId });
-            
             const video = document.getElementById(playerId);
             const loadingEl = document.getElementById(playerId + '-loading');
             const errorEl = document.getElementById(playerId + '-error');
             const statusEl = document.getElementById(playerId + '-status');
             
-            console.log('DOM elements found:', { 
-                video: !!video, 
-                loadingEl: !!loadingEl, 
-                errorEl: !!errorEl, 
-                statusEl: !!statusEl 
-            });
-            
             if (!video) {
                 console.error('Video element not found:', playerId);
                 return;
             }
-            
-            console.log('Starting player initialization...');
-            
+                        
             // Store reference to video element for cleanup
             this.player = video;
             
@@ -59,7 +49,6 @@ function streamPlayer() {
             !!statusEl && (statusEl.textContent = 'Connecting...');
             !!loadingEl && (loadingEl.style.display = 'flex');
             !!errorEl && (errorEl.style.display = 'none');
-            
             try {
                 if (format === 'hls' || url.includes('.m3u8')) {
                     console.log('Initializing HLS player');
@@ -108,6 +97,7 @@ function streamPlayer() {
                     }
                 });
                 
+                // Load source and attach media
                 this.hls.loadSource(url);
                 this.hls.attachMedia(video);
                 
@@ -230,9 +220,9 @@ function streamPlayer() {
             console.log('MPEG-TS libraries available:', typeof mpegts !== 'undefined', mpegts?.getFeatureList().mseLivePlayback);
             
             // Set some defaults for MPEG-TS streams
-            this.streamMetadata.codec = 'H.264';
-            this.streamMetadata.audioCodec = 'AAC';
-            this.streamMetadata.audioChannels = '2.0';
+            this.streamMetadata.codec = '...';
+            this.streamMetadata.audioCodec = '...';
+            this.streamMetadata.audioChannels = '...';
             this.updateStreamDetails(playerId);
             
             if (typeof mpegts !== 'undefined' && mpegts.getFeatureList().mseLivePlayback) {
@@ -243,6 +233,7 @@ function streamPlayer() {
                     isLive: true
                 });
                 
+                // Attach media element and load
                 this.mpegts.attachMediaElement(video);
                 this.mpegts.load();
                 
@@ -416,69 +407,36 @@ function streamPlayer() {
             const detailsEl = document.getElementById(playerId + '-details');
             if (!detailsEl) return;
 
-            // Check if we have server transcoding UI that we need to preserve
-            const existingTranscodeIndicator = detailsEl.querySelector('.bg-blue-900');
-            const existingAudioSelector = detailsEl.querySelector(`#${playerId}-audio-selector`);
-            
             let detailsHtml = '';
-            
             if (this.streamMetadata.resolution) {
                 detailsHtml += `<div class="flex justify-between gap-1"><span>Resolution:</span><span class="font-mono">${this.streamMetadata.resolution}</span></div>`;
             }
-            
             if (this.streamMetadata.codec) {
                 detailsHtml += `<div class="flex justify-between gap-1"><span>Video Codec:</span><span class="font-mono">${this.streamMetadata.codec}</span></div>`;
             }
-            
             if (this.streamMetadata.audioCodec) {
                 detailsHtml += `<div class="flex justify-between gap-1"><span>Audio Codec:</span><span class="font-mono">${this.streamMetadata.audioCodec}</span></div>`;
             }
-            
             if (this.streamMetadata.audioChannels) {
                 detailsHtml += `<div class="flex justify-between gap-1"><span>Audio Channels:</span><span class="font-mono">${this.streamMetadata.audioChannels}</span></div>`;
             }
-                        
             if (this.streamMetadata.bitrate) {
                 const bitrateKbps = Math.round(this.streamMetadata.bitrate / 1000);
                 detailsHtml += `<div class="flex justify-between gap-1"><span>Bitrate:</span><span class="font-mono">${bitrateKbps} kbps</span></div>`;
             }
-            
             if (this.streamMetadata.framerate) {
                 detailsHtml += `<div class="flex justify-between gap-1"><span>Frame Rate:</span><span class="font-mono">${this.streamMetadata.framerate} fps</span></div>`;
             }
-            
             if (this.streamMetadata.profile) {
                 detailsHtml += `<div class="flex justify-between gap-1"><span>Profile:</span><span class="font-mono">${this.streamMetadata.profile}</span></div>`;
             }
 
-            // If we have server transcoding UI, preserve it and maintain proper order
-            if (existingTranscodeIndicator || existingAudioSelector) {
-                let preservedHtml = '';
-                
-                // Always put transcode indicator first
-                if (existingTranscodeIndicator) {
-                    preservedHtml += existingTranscodeIndicator.outerHTML;
-                }
-                
-                // Then audio selector
-                if (existingAudioSelector) {
-                    preservedHtml += existingAudioSelector.outerHTML;
-                }
-                
-                if (detailsHtml) {
-                    detailsEl.innerHTML = preservedHtml + detailsHtml;
-                } else {
-                    detailsEl.innerHTML = preservedHtml + '<div class="text-gray-500 dark:text-gray-400 text-sm">Stream details not available</div>';
-                }
+            if (detailsHtml) {
+                detailsEl.innerHTML = detailsHtml;
                 detailsEl.style.display = 'block';
             } else {
-                if (detailsHtml) {
-                    detailsEl.innerHTML = detailsHtml;
-                    detailsEl.style.display = 'block';
-                } else {
-                    detailsEl.innerHTML = '<div class="text-gray-500 dark:text-gray-400 text-sm">Stream details not available</div>';
-                    detailsEl.style.display = 'block';
-                }
+                detailsEl.innerHTML = '<div class="text-gray-500 dark:text-gray-400 text-sm">Stream details not available</div>';
+                detailsEl.style.display = 'block';
             }
         },
 
