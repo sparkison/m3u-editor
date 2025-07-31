@@ -216,8 +216,15 @@ class EpgApiController extends Controller
                         format: $proxyFormat
                     );
                 } else {
-                    $channelFormat = Str::endsWith($url, '.m3u8') ? 'hls' : 'ts';
+                    if (Str::endsWith($url, '.m3u8')) {
+                        $channelFormat = 'hls';
+                    } elseif (Str::endsWith($url, '.ts')) {
+                        $channelFormat = 'ts';
+                    } else {
+                        $channelFormat = $channel->container_extension ?? 'ts';
+                    }
                 }
+
                 // Get the icon
                 $icon = '';
                 if ($channel->logo_type === ChannelLogoType::Epg) {
