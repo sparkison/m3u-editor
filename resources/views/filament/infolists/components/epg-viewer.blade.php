@@ -96,7 +96,7 @@
             </div>
 
             <!-- EPG Grid Container -->
-            <div class="bg-white dark:bg-gray-800 relative border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden" style="height: 600px;">
+            <div class="bg-white dark:bg-gray-800 relative border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden" style="height: 600px; padding-bottom: 48px;">
                  <!-- Loading More Overlay -->
                 <div 
                     x-show="loadingMore" 
@@ -181,7 +181,11 @@
                                     </div>
                                     <!-- Play Buttons (only show if channel has URL) -->
                                     <div x-show="channel.url" class="flex-shrink-0 flex space-x-1">
-                                        {{-- <button 
+                                        {{-- 
+                                        // Disabled - using floating player only for now
+                                        // If you want to re-enable the modal player, uncomment this block
+                                        // and the `@livewire('stream-player')` in the footer of this component
+                                        <button 
                                             @click.stop="
                                                 console.log('Play button clicked for channel:', channel); 
                                                 window.dispatchEvent(new CustomEvent('openStreamPlayer', { detail: channel }))
@@ -338,7 +342,7 @@
         </div>
 
         <!-- Stream Player Component -->
-        @livewire('stream-player')
+        {{-- @livewire('stream-player') --}}
 
         <!-- Floating Stream Players -->
         <x-floating-stream-players />
