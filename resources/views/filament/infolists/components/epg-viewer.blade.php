@@ -176,7 +176,7 @@
                                         >
                                     </div>
                                     <div class="min-w-0 flex-1">
-                                        <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate" x-text="channel.display_name"></p>
+                                        <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate" x-text="channel.display_name" x-tooltip="channel.display_name"></p>
                                         <p class="text-xs text-gray-500 dark:text-gray-400 truncate" x-text="channelId"></p>
                                     </div>
                                     <!-- Play Buttons (only show if channel has URL) -->
