@@ -3,6 +3,7 @@ function multiStreamManager() {
     return {
         players: [],
         zIndexCounter: 1000,
+        _initialized: false,
         dragState: {
             isDragging: false,
             playerId: null,
@@ -21,6 +22,11 @@ function multiStreamManager() {
         },
 
         init() {
+            // Only initialize if not already done for this instance
+            if (this._initialized) {
+                return;
+            }
+            
             // Check if we already have a listener
             if (window._floatingStreamListenerAdded) {
                 return;
@@ -43,6 +49,9 @@ function multiStreamManager() {
             // Global mouse events for drag and resize
             document.addEventListener('mousemove', (e) => this.handleMouseMove(e));
             document.addEventListener('mouseup', () => this.handleMouseUp());
+            
+            // Mark as initialized
+            this._initialized = true;
         },
 
         openStream(channelData) {
@@ -116,15 +125,26 @@ function multiStreamManager() {
                 // Cleanup via video element
                 const videoElement = document.getElementById(player.id + '-video');
                 if (videoElement && videoElement._streamPlayer) {
-                    videoElement._streamPlayer.cleanup();
+                    try {
+                        videoElement._streamPlayer.cleanup();
+                    } catch (e) {
+                        console.warn('Error cleaning up video element:', e);
+                    }
                 }
                 
                 // Also cleanup via stored reference
                 if (player.streamPlayer && typeof player.streamPlayer.cleanup === 'function') {
-                    player.streamPlayer.cleanup();
+                    try {
+                        player.streamPlayer.cleanup();
+                    } catch (e) {
+                        console.warn('Error cleaning up player reference:', e);
+                    }
                 }
             });
             this.players = [];
+            
+            // Reset initialization flag
+            this._initialized = false;
         },
 
         bringToFront(playerId) {
