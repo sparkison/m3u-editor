@@ -225,6 +225,13 @@ class EpgApiController extends Controller
                     }
                 }
 
+                // MKV compatibility hack
+                if (Str::endsWith($url, '.mkv')) {
+                    // Use a little "hack" to allow playback of MKV streams
+                    // We'll change the format so that the mpegts.js player is used
+                    $channelFormat = 'ts';
+                }
+
                 // Get the icon
                 $icon = '';
                 if ($channel->logo_type === ChannelLogoType::Epg) {
