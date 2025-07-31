@@ -171,7 +171,7 @@
                                         <img 
                                             :src="channel.icon || '/placeholder.png'" 
                                             :alt="channel.display_name"
-                                            class="w-8 h-8 rounded object-cover"
+                                            class="w-8 h-8 rounded object-contain"
                                             onerror="this.src='/placeholder.png'"
                                         >
                                     </div>
