@@ -6,7 +6,14 @@ function epgViewer(config) {
         loadingMore: false,
         error: null,
         epgData: null,
-        currentDate: new Date().toISOString().split('T')[0],
+        currentDate: (() => {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const dateStr = `${year}-${month}-${day}`;
+            return dateStr;
+        })(),
         timeSlots: [],
         selectedProgramme: null,
         currentTimePosition: -1,
@@ -70,21 +77,21 @@ function epgViewer(config) {
 
         updateCurrentTime() {
             const now = new Date();
-            console.log('Current time:', now);
-            console.log('Current date:', this.currentDate);
-            console.log('Is today?', this.isToday());
 
             if (this.isToday()) {
                 const hours = now.getHours() + now.getMinutes() / 60;
                 this.currentTimePosition = hours * 100; // 100px per hour
-                console.log('Current time position:', this.currentTimePosition, 'px (', hours, 'hours )');
             } else {
                 this.currentTimePosition = -1;
             }
         },
 
         isToday() {
-            const today = new Date().toISOString().split('T')[0];
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const today = `${year}-${month}-${day}`;
             return this.currentDate === today;
         },
 
@@ -193,21 +200,37 @@ function epgViewer(config) {
         },
 
         previousDay() {
-            const date = new Date(this.currentDate);
+            const [year, month, day] = this.currentDate.split('-').map(Number);
+            const date = new Date(year, month - 1, day); // month is 0-indexed in Date constructor
             date.setDate(date.getDate() - 1);
-            this.currentDate = date.toISOString().split('T')[0];
+            
+            const newYear = date.getFullYear();
+            const newMonth = String(date.getMonth() + 1).padStart(2, '0');
+            const newDay = String(date.getDate()).padStart(2, '0');
+            this.currentDate = `${newYear}-${newMonth}-${newDay}`;
+            
             this.loadEpgData();
         },
 
         nextDay() {
-            const date = new Date(this.currentDate);
+            const [year, month, day] = this.currentDate.split('-').map(Number);
+            const date = new Date(year, month - 1, day); // month is 0-indexed in Date constructor
             date.setDate(date.getDate() + 1);
-            this.currentDate = date.toISOString().split('T')[0];
+            
+            const newYear = date.getFullYear();
+            const newMonth = String(date.getMonth() + 1).padStart(2, '0');
+            const newDay = String(date.getDate()).padStart(2, '0');
+            this.currentDate = `${newYear}-${newMonth}-${newDay}`;
+            
             this.loadEpgData();
         },
 
         goToToday() {
-            this.currentDate = new Date().toISOString().split('T')[0];
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            this.currentDate = `${year}-${month}-${day}`;
             this.loadEpgData();
         },
 
@@ -224,13 +247,14 @@ function epgViewer(config) {
                 if (timeHeaderElement) {
                     timeHeaderElement.scrollLeft = scrollLeft;
                 }
-
-                console.log('Scrolled to current time position:', scrollLeft);
             }
         },
 
         formatDate(dateStr) {
-            const date = new Date(dateStr);
+            // Parse the date string safely in local timezone
+            const [year, month, day] = dateStr.split('-').map(Number);
+            const date = new Date(year, month - 1, day); // month is 0-indexed
+            
             return date.toLocaleDateString('en-US', {
                 weekday: 'long',
                 year: 'numeric',
@@ -240,10 +264,8 @@ function epgViewer(config) {
         },
 
         formatTime(hour) {
-            console.log('Formatting time for hour:', hour);
             // Format as HH:00 
             const formatted = hour.toString().padStart(2, '0') + ':00';
-            console.log('Formatted time:', formatted);
             return formatted;
         },
 
