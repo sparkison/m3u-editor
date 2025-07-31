@@ -65,9 +65,7 @@
                         class="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors focus:outline-none"
                         title="Minimize"
                     >
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
-                        </svg>
+                        <x-heroicon-o-minus class="w-3 h-3" />
                     </button>
                     
                     <!-- Close Button -->
@@ -76,9 +74,7 @@
                         class="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors focus:outline-none"
                         title="Close"
                     >
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
+                        <x-heroicon-o-x-mark class="w-3 h-3" />
                     </button>
                 </div>
             </div>
@@ -134,9 +130,7 @@
                     class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 hidden"
                 >
                     <div class="text-center text-white p-4">
-                        <svg class="w-8 h-8 mx-auto mb-2 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
+                        <x-heroicon-o-exclamation-triangle class="w-8 h-8 mx-auto mb-2 text-red-400" />
                         <p class="text-sm">Failed to load stream</p>
                         <button 
                             class="mt-2 px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-xs transition-colors"
@@ -165,9 +159,7 @@
                         class="bg-black bg-opacity-75 hover:bg-opacity-90 text-white text-xs px-2 py-1 rounded transition-colors"
                         title="Toggle Stream Details"
                     >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
+                        <x-heroicon-o-information-circle class="w-4 h-4" />
                     </button>
                 </div>
 
@@ -188,9 +180,7 @@
                             "
                             class="text-gray-300 hover:text-white"
                         >
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                            </svg>
+                            <x-heroicon-o-x-mark class="w-3 h-3" />
                         </button>
                     </div>
                     <div :id="player.id + '-video-details'" class="space-y-1">
