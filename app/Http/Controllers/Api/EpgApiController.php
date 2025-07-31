@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\ChannelLogoType;
 use App\Enums\PlaylistChannelId;
 use App\Facades\ProxyFacade;
 use App\Http\Controllers\Controller;
@@ -217,6 +218,16 @@ class EpgApiController extends Controller
                 } else {
                     $channelFormat = Str::endsWith($url, '.m3u8') ? 'hls' : 'ts';
                 }
+                // Get the icon
+                $icon = '';
+                if ($channel->logo_type === ChannelLogoType::Epg) {
+                    $icon = $epgData->icon ?? '';
+                } elseif ($channel->logo_type === ChannelLogoType::Channel) {
+                    $icon = $channel->logo ?? '';
+                }
+                if (empty($icon)) {
+                    $icon = url('/placeholder.png');
+                }
                 $playlistChannelData[$channelNo] = [
                     'id' => $channelNo,
                     'url' => $url,
@@ -226,7 +237,7 @@ class EpgApiController extends Controller
                     'display_name' => $channel->name_custom ?? $channel->name,
                     'channel_number' => $channel->channel,
                     'group' => $channel->group ?? $channel->group_internal,
-                    'logo' => $channel->logo ?? '',
+                    'icon' => $icon,
                     'has_epg' => $epgData !== null,
                     'epg_channel_id' => $epgData->channel_id ?? null
                 ];
