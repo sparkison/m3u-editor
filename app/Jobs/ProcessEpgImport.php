@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\EpgSourceType;
 use Exception;
 use XMLReader;
 use Throwable;
@@ -9,7 +10,8 @@ use App\Enums\Status;
 use App\Events\SyncCompleted;
 use App\Models\Epg;
 use App\Models\Job;
-use App\Services\EpgCacheService;
+use App\Services\SchedulesDirectService;
+use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -27,6 +29,9 @@ class ProcessEpgImport implements ShouldQueue
     // NOTE: this only applies to M3U+ files
     //       Xtream API files are not limited
     public $maxItems = 50000;
+
+    // Don't retry the job on failure
+    public $tries = 1;
 
     // Default user agent to use for HTTP requests
     // Used when user agent is not set in the EPG
@@ -51,7 +56,7 @@ class ProcessEpgImport implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(): void
+    public function handle(SchedulesDirectService $service): void
     {
         if (!$this->force) {
             // Don't update if currently processing
@@ -86,7 +91,83 @@ class ProcessEpgImport implements ShouldQueue
 
             $channelReader = null;
             $filePath = null;
-            if ($epg->url && str_starts_with($epg->url, 'http')) {
+            if ($epg->source_type === EpgSourceType::SCHEDULES_DIRECT) {
+                if (!$epg->hasSchedulesDirectCredentials()) {
+                    // Log the exception
+                    logger()->error("Error processing \"{$this->epg->name}\"");
+
+                    // Send notification
+                    $error = "Invalid Schedules Direct credentials. Unable to get results from the API. Please check the credentials and try again.";
+                    Notification::make()
+                        ->danger()
+                        ->title("Error processing \"{$this->epg->name}\"")
+                        ->body('Please view your notifications for details.')
+                        ->broadcast($this->epg->user);
+                    Notification::make()
+                        ->danger()
+                        ->title("Error processing \"{$this->epg->name}\"")
+                        ->body($error)
+                        ->sendToDatabase($this->epg->user);
+
+                    // Update the EPG
+                    $this->epg->update([
+                        'status' => Status::Failed,
+                        'synced' => now(),
+                        'errors' => $error,
+                        'progress' => 100,
+                        'processing' => false,
+                    ]);
+
+                    // Fire the epg synced event
+                    event(new SyncCompleted($this->epg));
+                    return;
+                } else {
+                    // Sync the EPG data from Schedules Direct
+                    // Notify user we're starting the sync...
+                    Notification::make()
+                        ->info()
+                        ->title('Starting Schedules Direct Data Sync')
+                        ->body("Schedules Direct Data Sync started for EPG \"{$epg->name}\".")
+                        ->broadcast($epg->user)
+                        ->sendToDatabase($epg->user);
+
+                    $shouldSync = true;
+                    if (!$this->force) {
+                        // If not forcing, check last modified time
+                        $lastModified = Storage::disk('local')->exists($epg->file_path)
+                            ? Storage::disk('local')->lastModified($epg->file_path)
+                            : null;
+
+                        if ($lastModified) {
+                            $lastModifiedTime = Carbon::createFromTimestamp($lastModified);
+                            $lastModifiedTime->addMinutes(10); // Add 10 minutes to last modified time
+                            if (!$lastModifiedTime->isPast()) { // If modified within the last 10 minutes, skip
+                                $shouldSync = false;
+                            }
+                        }
+                    }
+                    if ($shouldSync) {
+                        $service->syncEpgData($epg);
+                    }
+
+                    // Calculate the time taken to complete the import
+                    $completedIn = $start->diffInSeconds(now());
+                    $completedInRounded = round($completedIn, 2);
+
+                    // Notify user of success
+                    Notification::make()
+                        ->success()
+                        ->title('Schedules Direct Data Synced')
+                        ->body("Schedules Direct Data Synced successfully for EPG \"{$epg->name}\". Completed in {$completedInRounded} seconds. Now parsing data and generating EPG cache...")
+                        ->broadcast($epg->user)
+                        ->sendToDatabase($epg->user);
+
+                    // After syncing, the XML file should be available
+                    if (Storage::disk('local')->exists($epg->file_path)) {
+                        $filePath = Storage::disk('local')->path($epg->file_path);
+                    }
+                }
+            } else if ($epg->url && str_starts_with($epg->url, 'http')) {
                 // Normalize the EPG url and get the filename
                 $url = str($epg->url)->replace(' ', '%20');
 
@@ -99,7 +180,7 @@ class ProcessEpgImport implements ShouldQueue
 
                 // Get the file path
                 $filePath = Storage::disk('local')->path($epg->file_path);
-                
+
                 // If the file exists, delete it
                 if (Storage::disk('local')->exists($epg->file_path)) {
                     Storage::disk('local')->delete($epg->file_path);
@@ -273,7 +354,7 @@ class ProcessEpgImport implements ShouldQueue
 
                 // Run completion after channels imported
                 $jobs[] = new ProcessEpgImportComplete($userId, $epgId, $batchNo, $start);
-                
+
                 // Lastly, we'll run the cache job
                 $jobs[] = new GenerateEpgCache($epg->uuid);
                 Bus::chain($jobs)
