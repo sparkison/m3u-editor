@@ -823,8 +823,8 @@ class ChannelResource extends Resource
     {
         return [
             'index' => Pages\ListChannels::route('/'),
-            //'view' => Pages\ViewChannel::route('/{record}'),
             //'create' => Pages\CreateChannel::route('/create'),
+            //'view' => Pages\ViewChannel::route('/{record}'),
             // 'edit' => Pages\EditChannel::route('/{record}/edit'),
         ];
     }

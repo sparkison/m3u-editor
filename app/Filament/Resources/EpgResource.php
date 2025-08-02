@@ -276,8 +276,8 @@ class EpgResource extends Resource
     {
         return [
             'index' => Pages\ListEpgs::route('/'),
-            'view' => Pages\ViewEpg::route('/{record}'),
             // 'create' => Pages\CreateEpg::route('/create'),
+            'view' => Pages\ViewEpg::route('/{record}'),
             // 'edit' => Pages\EditEpg::route('/{record}/edit'),
         ];
     }
