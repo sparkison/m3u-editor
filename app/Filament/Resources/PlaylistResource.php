@@ -491,8 +491,8 @@ class PlaylistResource extends Resource
         return [
             // Playlists
             'index' => Pages\ListPlaylists::route('/'),
-            'view' => Pages\ViewPlaylist::route('/{record}'),
             'create' => Pages\CreatePlaylist::route('/create'),
+            'view' => Pages\ViewPlaylist::route('/{record}'),
             'edit' => Pages\EditPlaylist::route('/{record}/edit'),
 
             // Playlist Sync Statuses
