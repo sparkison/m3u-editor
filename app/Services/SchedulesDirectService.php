@@ -538,26 +538,10 @@ class SchedulesDirectService
                 ]);
 
                 try {
-                    // Stream program IDs from file and fetch in batches
-                    $programLookup = $this->streamFetchPrograms($tempProgramIdFile, $epg->sd_token, $chunkIndex);
-
-                    // Process schedules with the fetched program data using streaming approach
+                    // Stream process programs directly without creating lookup arrays
                     $chunkProgramsWritten = 0;
-                    foreach ($scheduleChunk as $schedule) {
-                        $stationId = $schedule['stationID'] ?? null;
-                        if (!$stationId) continue;
-
-                        foreach ($schedule['programs'] ?? [] as $program) {
-                            $programId = $program['programID'];
-                            $fullProgramData = $programLookup[$programId] ?? null;
-
-                            if ($fullProgramData) {
-                                $this->writeProgramToXMLTV($file, $stationId, $program, $fullProgramData);
-                                $chunkProgramsWritten++;
-                                $totalProgramsWritten++;
-                            }
-                        }
-                    }
+                    $this->streamProcessProgramsDirectly($tempProgramIdFile, $epg->sd_token, $chunkIndex, $scheduleChunk, $file, $chunkProgramsWritten);
+                    $totalProgramsWritten += $chunkProgramsWritten;
 
                     Log::debug("Chunk completed", [
                         'chunk' => $chunkIndex,
@@ -568,9 +552,6 @@ class SchedulesDirectService
                     // Update progress
                     $progress = min(100, (int)(($chunkIndex / $totalChunks) * 100));
                     $epg->update(['sd_progress' => $progress]);
-
-                    // Clear data immediately to free memory
-                    unset($programLookup);
                 } catch (\Exception $e) {
                     Log::error("Error processing chunk programs", [
                         'chunk' => $chunkIndex,
@@ -601,11 +582,10 @@ class SchedulesDirectService
     }
 
     /**
-     * Stream fetch programs from file-based program ID list using JsonMachine for memory efficiency
+     * Stream process programs directly without creating lookup arrays - pure streaming approach
      */
-    private function streamFetchPrograms(string $programIdFile, string $token, int $chunkIndex): array
+    private function streamProcessProgramsDirectly(string $programIdFile, string $token, int $chunkIndex, array $scheduleChunk, $file, int &$programsWritten): void
     {
-        $programLookup = [];
         $handle = fopen($programIdFile, 'r');
         
         if (!$handle) {
@@ -614,7 +594,6 @@ class SchedulesDirectService
 
         $batch = [];
         $batchIndex = 0;
-        $totalPrograms = 0;
 
         try {
             // Stream through program IDs and batch them
@@ -622,11 +601,10 @@ class SchedulesDirectService
                 $programId = trim($line);
                 if (!empty($programId)) {
                     $batch[] = $programId;
-                    $totalPrograms++;
 
-                    // When we reach batch size, fetch the programs
+                    // When we reach batch size, process the programs immediately
                     if (count($batch) >= self::PROGRAMS_BATCH_SIZE) {
-                        $this->processProgramBatch($batch, $batchIndex, $token, $chunkIndex, $programLookup);
+                        $this->processProgramBatchDirectly($batch, $batchIndex, $token, $chunkIndex, $scheduleChunk, $file, $programsWritten);
                         $batch = []; // Clear the batch
                         $batchIndex++;
                         
@@ -638,67 +616,74 @@ class SchedulesDirectService
 
             // Process remaining programs in the last batch
             if (!empty($batch)) {
-                $this->processProgramBatch($batch, $batchIndex, $token, $chunkIndex, $programLookup);
+                $this->processProgramBatchDirectly($batch, $batchIndex, $token, $chunkIndex, $scheduleChunk, $file, $programsWritten);
             }
 
-            Log::debug("Completed streaming program fetch", [
+            Log::debug("Completed streaming direct program processing", [
                 'chunk' => $chunkIndex,
-                'total_programs' => $totalPrograms,
                 'total_batches' => $batchIndex + 1,
-                'programs_in_lookup' => count($programLookup)
+                'programs_written' => $programsWritten
             ]);
 
         } finally {
             fclose($handle);
         }
-
-        return $programLookup;
     }
 
     /**
-     * Process a batch of programs using JsonMachine streaming for memory efficiency
+     * Process a batch of programs and immediately write matching schedule entries - no arrays
      */
-    private function processProgramBatch(array $programBatch, int $batchIndex, string $token, int $chunkIndex, array &$programLookup): void
+    private function processProgramBatchDirectly(array $programBatch, int $batchIndex, string $token, int $chunkIndex, array $scheduleChunk, $file, int &$programsWritten): void
     {
         // Create a temporary file for the API response
         $tempResponseFile = tempnam(sys_get_temp_dir(), 'epg_programs_response_');
         
         try {
-            Log::debug("Fetching program batch", [
+            Log::debug("Fetching program batch for direct processing", [
                 'chunk' => $chunkIndex,
                 'batch' => $batchIndex + 1,
                 'batch_size' => count($programBatch)
             ]);
 
-            // Stream the API response directly to a file to avoid memory usage
+            // Stream the API response directly to a file
             $response = Http::withHeaders([
                 'User-Agent' => self::$USER_AGENT,
                 'token' => $token,
             ])
-                ->timeout(300) // 5 minutes for large batches
+                ->timeout(300)
                 ->sink($tempResponseFile)
                 ->post(self::BASE_URL . '/programs', $programBatch);
 
             if ($response->successful()) {
-                // Use JsonMachine to stream through the response file
+                // Stream through the program response and match with schedules immediately
                 $programs = Items::fromFile($tempResponseFile);
                 
                 foreach ($programs as $program) {
-                    // Convert JsonMachine object to array for consistency
-                    $programArray = json_decode(json_encode($program), true);
-                    if (isset($programArray['programID'])) {
-                        $programLookup[$programArray['programID']] = $programArray;
+                    $programId = $program->programID ?? null;
+                    if (!$programId) continue;
+
+                    // Find matching schedule entries and write them immediately
+                    foreach ($scheduleChunk as $schedule) {
+                        $stationId = $schedule['stationID'] ?? null;
+                        if (!$stationId) continue;
+
+                        foreach ($schedule['programs'] ?? [] as $scheduleProgram) {
+                            if ($scheduleProgram['programID'] === $programId) {
+                                $this->writeProgramToXMLTVDirect($file, $stationId, $scheduleProgram, $program);
+                                $programsWritten++;
+                            }
+                        }
                     }
                 }
 
-                // Clear the JsonMachine iterator
+                // Clear the JsonMachine iterator immediately
                 unset($programs);
 
-                Log::debug("Program batch processed with streaming", [
+                Log::debug("Program batch processed directly", [
                     'chunk' => $chunkIndex,
                     'batch' => $batchIndex + 1,
                     'programs_in_batch' => count($programBatch),
-                    'lookup_size' => count($programLookup)
+                    'programs_written_in_batch' => $programsWritten
                 ]);
             } else {
                 Log::error("Failed to fetch program batch", [
@@ -708,7 +693,7 @@ class SchedulesDirectService
                 ]);
             }
         } catch (\Exception $e) {
-            Log::error("Error fetching program batch", [
+            Log::error("Error processing program batch directly", [
                 'chunk' => $chunkIndex,
                 'batch' => $batchIndex + 1,
                 'error' => $e->getMessage()
@@ -719,6 +704,81 @@ class SchedulesDirectService
                 unlink($tempResponseFile);
             }
         }
+    }
+
+    /**
+     * Write a single program to XMLTV file working directly with JsonMachine objects
+     */
+    private function writeProgramToXMLTVDirect($file, string $stationId, array $scheduleProgram, $programData): void
+    {
+        // Handle schedule program data (always array)
+        $airDateTime = $scheduleProgram['airDateTime'];
+        $duration = $scheduleProgram['duration'];
+        $isNew = $scheduleProgram['new'] ?? false;
+
+        $start = Carbon::parse($airDateTime)->format('YmdHis O');
+        $stop = Carbon::parse($airDateTime)
+            ->addSeconds($duration)
+            ->format('YmdHis O');
+
+        fwrite($file, "  <programme channel=\"{$stationId}\" start=\"{$start}\" stop=\"{$stop}\">\n");
+
+        // Title - work directly with JsonMachine object
+        if (!empty($programData->titles[0]->title120)) {
+            $title = htmlspecialchars($programData->titles[0]->title120);
+            fwrite($file, "    <title>{$title}</title>\n");
+        }
+
+        // Episode title
+        if (!empty($programData->episodeTitle150)) {
+            $subTitle = htmlspecialchars($programData->episodeTitle150);
+            fwrite($file, "    <sub-title>{$subTitle}</sub-title>\n");
+        }
+
+        // Description
+        if (!empty($programData->descriptions->description1000[0]->description)) {
+            $desc = htmlspecialchars($programData->descriptions->description1000[0]->description);
+            fwrite($file, "    <desc>{$desc}</desc>\n");
+        }
+
+        // Categories/Genres
+        if (!empty($programData->genres)) {
+            foreach ($programData->genres as $genre) {
+                $genre = htmlspecialchars($genre);
+                fwrite($file, "    <category>{$genre}</category>\n");
+            }
+        }
+
+        // Episode numbering
+        if (!empty($programData->metadata)) {
+            foreach ($programData->metadata as $metadata) {
+                if (isset($metadata->Gracenote->season) && isset($metadata->Gracenote->episode)) {
+                    $season = max(0, $metadata->Gracenote->season - 1);
+                    $episode = max(0, $metadata->Gracenote->episode - 1);
+                    fwrite($file, "    <episode-num system=\"xmltv_ns\">{$season}.{$episode}.</episode-num>\n");
+                    break;
+                }
+            }
+        }
+
+        // Content rating
+        if (!empty($programData->contentRating)) {
+            foreach ($programData->contentRating as $rating) {
+                if ($rating->country === 'USA') {
+                    $ratingSystem = htmlspecialchars($rating->body);
+                    $ratingValue = htmlspecialchars($rating->code);
+                    fwrite($file, "    <rating system=\"{$ratingSystem}\"><value>{$ratingValue}</value></rating>\n");
+                    break;
+                }
+            }
+        }
+
+        // New flag
+        if (!empty($isNew)) {
+            fwrite($file, "    <premiere />\n");
+        }
+
+        fwrite($file, "  </programme>\n");
     }
 
     /**
