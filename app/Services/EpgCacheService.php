@@ -65,7 +65,7 @@ class EpgCacheService
     }
 
     /**
-     * Cache EPG data from XML file using memory-efficient streaming
+     * Cache EPG data from XML file
      */
     public function cacheEpgData(Epg $epg): bool
     {
@@ -121,7 +121,7 @@ class EpgCacheService
     }
 
     /**
-     * Parse and save channels using memory-efficient streaming
+     * Parse and save channels
      */
     private function parseAndSaveChannels(Epg $epg, string $filePath): int
     {
@@ -149,13 +149,14 @@ class EpgCacheService
     }
 
     /**
-     * Parse and save programmes using memory-efficient streaming by date
+     * Parse and save programmes using direct file append
      */
     private function parseAndSaveProgrammes(Epg $epg, string $filePath): array
     {
         $totalProgrammes = 0;
         $dateRangeTracker = ['min_date' => null, 'max_date' => null];
-        $dateFiles = [];
+        $processedDates = [];
+        $openFiles = []; // Keep track of open file handles
 
         foreach ($this->parseProgrammesStream($filePath) as $programme) {
             $date = Carbon::parse($programme['start'])->format('Y-m-d');
@@ -168,36 +169,73 @@ class EpgCacheService
                 $dateRangeTracker['max_date'] = $date;
             }
 
-            // Initialize date file if not exists
-            if (!isset($dateFiles[$date])) {
-                $dateFiles[$date] = [];
-            }
-            if (!isset($dateFiles[$date][$programme['channel']])) {
-                $dateFiles[$date][$programme['channel']] = [];
-            }
-
-            $dateFiles[$date][$programme['channel']][] = $programme;
+            // Use direct file append with minimal memory footprint
+            $this->directAppendProgramme($epg, $date, $programme['channel'], $programme, $openFiles);
             $totalProgrammes++;
+            $processedDates[$date] = true;
 
-            // Save and clear memory periodically for each date
-            if (count($dateFiles[$date]) > 100) { // Batch by number of channels per date
-                $this->saveDateProgrammes($epg, $date, $dateFiles[$date]);
-                $dateFiles[$date] = [];
+            // Force garbage collection every 50 programmes (more frequent)
+            if ($totalProgrammes % 50 === 0) {
+                if (function_exists('gc_collect_cycles')) {
+                    gc_collect_cycles();
+                }
+
+                // Close file handles periodically to prevent too many open files
+                if (count($openFiles) > 10) {
+                    foreach ($openFiles as $handle) {
+                        if (is_resource($handle)) {
+                            fclose($handle);
+                        }
+                    }
+                    $openFiles = [];
+                }
             }
         }
 
-        // Save remaining programmes
-        foreach ($dateFiles as $date => $dateProgrammes) {
-            if (!empty($dateProgrammes)) {
-                $this->saveDateProgrammes($epg, $date, $dateProgrammes);
+        // Close any remaining file handles
+        foreach ($openFiles as $handle) {
+            if (is_resource($handle)) {
+                fclose($handle);
             }
         }
 
         return [
             'total' => $totalProgrammes,
-            'date_count' => count(array_keys($dateFiles)),
+            'date_count' => count($processedDates),
             'date_range' => $dateRangeTracker,
         ];
+    }
+
+    /**
+     * Direct append programme - JSONL format for efficiency
+     */
+    private function directAppendProgramme(Epg $epg, string $date, string $channelId, array $programme, array &$openFiles): void
+    {
+        $filename = "programmes-{$date}.jsonl"; // Use JSONL format for line-by-line append
+        $programmesPath = $this->getCacheFilePath($epg, $filename);
+        $fullPath = Storage::disk('local')->path($programmesPath);
+
+        // Ensure directory exists
+        $dir = dirname($fullPath);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
+        // Prepare the programme record with channel info
+        $record = [
+            'channel' => $channelId,
+            'programme' => $programme
+        ];
+
+        // Append to file using direct file operations (most memory efficient)
+        $line = json_encode($record, JSON_UNESCAPED_UNICODE) . "\n";
+
+        try {
+            // Use file_put_contents with append flag - minimal memory usage
+            file_put_contents($fullPath, $line, FILE_APPEND | LOCK_EX);
+        } catch (\Exception $e) {
+            Log::error("Failed to append programme to {$filename}: {$e->getMessage()}");
+        }
     }
 
     /**
@@ -326,7 +364,7 @@ class EpgCacheService
     }
 
     /**
-     * Save channel batch to file using memory-efficient approach
+     * Save channel batch to file
      */
     private function saveChannelBatch(Epg $epg, array $channelBatch, bool $isFirst): void
     {
@@ -368,50 +406,7 @@ class EpgCacheService
     }
 
     /**
-     * Save programmes for a specific date using memory-efficient approach
-     */
-    private function saveDateProgrammes(Epg $epg, string $date, array $dateProgrammes): void
-    {
-        $filename = "programmes-{$date}.json";
-        $programmesPath = $this->getCacheFilePath($epg, $filename);
-
-        if (Storage::disk('local')->exists($programmesPath)) {
-            // Merge with existing data for this date using JsonMachine
-            $existingData = [];
-
-            try {
-                $existingStream = Items::fromFile(
-                    Storage::disk('local')->path($programmesPath),
-                    ['decoder' => new ExtJsonDecoder(true)]
-                );
-
-                // Convert existing data to array for merging
-                foreach ($existingStream as $channelId => $programmes) {
-                    $existingData[$channelId] = $programmes;
-                }
-            } catch (\Exception $e) {
-                Log::warning("Could not read existing programme data for {$date}, creating new file: {$e->getMessage()}");
-                $existingData = [];
-            }
-
-            // Merge programmes
-            foreach ($dateProgrammes as $channelId => $programmes) {
-                if (!isset($existingData[$channelId])) {
-                    $existingData[$channelId] = [];
-                }
-                $existingData[$channelId] = array_merge($existingData[$channelId], $programmes);
-            }
-            $dateProgrammes = $existingData;
-        }
-
-        Storage::disk('local')->put(
-            $programmesPath,
-            json_encode($dateProgrammes, JSON_UNESCAPED_UNICODE)
-        );
-    }
-
-    /**
-     * Get cached channels using memory-efficient streaming
+     * Get cached channels
      */
     public function getCachedChannels(Epg $epg, int $page = 1, int $perPage = 50): array
     {
@@ -492,30 +487,50 @@ class EpgCacheService
     }
 
     /**
-     * Get cached programmes for a specific date and channels using memory-efficient streaming
+     * Get cached programmes for a specific date and channels
      */
     public function getCachedProgrammes(Epg $epg, string $date, array $channelIds = []): array
     {
-        $programmesPath = $this->getCacheFilePath($epg, "programmes-{$date}.json");
+        $programmesPath = $this->getCacheFilePath($epg, "programmes-{$date}.jsonl");
 
         if (!Storage::disk('local')->exists($programmesPath)) {
             return [];
         }
 
         try {
-            // Use JsonMachine for memory-efficient parsing
-            $programmesStream = Items::fromFile(
-                Storage::disk('local')->path($programmesPath),
-                ['decoder' => new ExtJsonDecoder(true)]
-            );
-
             $programmes = [];
-            foreach ($programmesStream as $channelId => $channelProgrammes) {
-                // Filter by channel IDs if provided
-                if (!empty($channelIds) && !in_array($channelId, $channelIds)) {
-                    continue;
+            $fullPath = Storage::disk('local')->path($programmesPath);
+
+            // Read JSONL file line by line
+            if (($handle = fopen($fullPath, 'r')) !== false) {
+                while (($line = fgets($handle)) !== false) {
+                    $line = trim($line);
+                    if (empty($line)) continue;
+
+                    try {
+                        $record = json_decode($line, true);
+                        if (!$record || !isset($record['channel']) || !isset($record['programme'])) {
+                            continue;
+                        }
+
+                        $channelId = $record['channel'];
+                        $programme = $record['programme'];
+
+                        // Filter by channel IDs if provided
+                        if (!empty($channelIds) && !in_array($channelId, $channelIds)) {
+                            continue;
+                        }
+
+                        if (!isset($programmes[$channelId])) {
+                            $programmes[$channelId] = [];
+                        }
+                        $programmes[$channelId][] = $programme;
+                    } catch (\Exception $lineError) {
+                        Log::warning("Failed to parse programme line: {$lineError->getMessage()}");
+                        continue;
+                    }
                 }
-                $programmes[$channelId] = $channelProgrammes;
+                fclose($handle);
             }
 
             return $programmes;
@@ -526,7 +541,7 @@ class EpgCacheService
     }
 
     /**
-     * Get cached programmes for a date range and channels using memory-efficient streaming
+     * Get cached programmes for a date range and channels
      */
     public function getCachedProgrammesRange(Epg $epg, string $startDate, string $endDate, array $channelIds = []): array
     {
@@ -558,27 +573,54 @@ class EpgCacheService
     }
 
     /**
-     * Stream cached programmes for a specific date using generators
+     * Stream cached programmes for a specific date using generators with JSONL format
      */
     private function streamCachedProgrammesForDate(Epg $epg, string $date, array $channelIds = []): \Generator
     {
-        $programmesPath = $this->getCacheFilePath($epg, "programmes-{$date}.json");
+        $programmesPath = $this->getCacheFilePath($epg, "programmes-{$date}.jsonl");
         if (!Storage::disk('local')->exists($programmesPath)) {
             return;
         }
-        try {
-            // Use JsonMachine for memory-efficient parsing
-            $programmesStream = Items::fromFile(
-                Storage::disk('local')->path($programmesPath),
-                ['decoder' => new ExtJsonDecoder(true)]
-            );
-            foreach ($programmesStream as $channelId => $channelProgrammes) {
-                // Filter by channel IDs if provided
-                if (!empty($channelIds) && !in_array($channelId, $channelIds)) {
-                    continue;
-                }
 
-                yield $channelId => $channelProgrammes;
+        try {
+            $channelProgrammes = [];
+            $fullPath = Storage::disk('local')->path($programmesPath);
+
+            // Read JSONL file line by line
+            if (($handle = fopen($fullPath, 'r')) !== false) {
+                while (($line = fgets($handle)) !== false) {
+                    $line = trim($line);
+                    if (empty($line)) continue;
+
+                    try {
+                        $record = json_decode($line, true);
+                        if (!$record || !isset($record['channel']) || !isset($record['programme'])) {
+                            continue;
+                        }
+
+                        $channelId = $record['channel'];
+                        $programme = $record['programme'];
+
+                        // Filter by channel IDs if provided
+                        if (!empty($channelIds) && !in_array($channelId, $channelIds)) {
+                            continue;
+                        }
+
+                        if (!isset($channelProgrammes[$channelId])) {
+                            $channelProgrammes[$channelId] = [];
+                        }
+                        $channelProgrammes[$channelId][] = $programme;
+                    } catch (\Exception $lineError) {
+                        Log::warning("Failed to parse programme line: {$lineError->getMessage()}");
+                        continue;
+                    }
+                }
+                fclose($handle);
+            }
+
+            // Yield each channel's programmes
+            foreach ($channelProgrammes as $channelId => $programmes) {
+                yield $channelId => $programmes;
             }
         } catch (\Exception $e) {
             Log::error("Error streaming cached programmes for date {$date}: {$e->getMessage()}");
@@ -586,7 +628,7 @@ class EpgCacheService
     }
 
     /**
-     * Get cache metadata using memory-efficient parsing
+     * Get cache metadata
      */
     public function getCacheMetadata(Epg $epg): ?array
     {

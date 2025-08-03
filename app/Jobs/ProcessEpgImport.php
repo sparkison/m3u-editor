@@ -374,7 +374,6 @@ class ProcessEpgImport implements ShouldQueue
                             ->sendToDatabase($epg->user);
                         $epg->update([
                             'status' => Status::Failed,
-                            'channels' => 0, // not using...
                             'synced' => now(),
                             'errors' => $error,
                             'progress' => 100,
