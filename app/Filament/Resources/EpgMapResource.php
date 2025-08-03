@@ -187,7 +187,7 @@ class EpgMapResource extends Resource
                             '\s+(FHD|HD).*$',
                             '\[.*\]'
                         ])
-                        ->splitKeys(['Tab', 'Return', ',']),
+                        ->splitKeys(['Tab', 'Return']),
                 ]),
         ];
     }

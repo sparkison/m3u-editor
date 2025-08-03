@@ -793,7 +793,7 @@ class PlaylistResource extends Resource
                             'Sports.*HD$',
                             '\[.*\]'
                         ])
-                        ->splitKeys(['Tab', 'Return', ','])
+                        ->splitKeys(['Tab', 'Return'])
                         ->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
                     Forms\Components\TagsInput::make('import_prefs.ignored_file_types')
                         ->label('Ignored file types')
@@ -803,7 +803,7 @@ class PlaylistResource extends Resource
                             '.avi',
                             '.mkv',
                             '.mp4',
-                        ])->splitKeys(['Tab', 'Return', ',', ' ']),
+                        ])->splitKeys(['Tab', 'Return']),
                 ]),
         ];
 
