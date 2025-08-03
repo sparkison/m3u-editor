@@ -260,15 +260,6 @@ class SchedulesDirectService
     }
 
     /**
-     * Get schedule hashes for station IDs (for change detection like Perl script)
-     */
-    public function getSchedulesHash(string $token, array $stationRequests): array
-    {
-        $response = $this->makeRequest('POST', '/schedules/md5', $stationRequests, $token);
-        return $response->json();
-    }
-
-    /**
      * Get schedules for station IDs
      */
     public function getSchedules(string $token, array $stationRequests): array
@@ -438,7 +429,7 @@ class SchedulesDirectService
     private function writeXMLTVHeader($file, array $lineupData): void
     {
         fwrite($file, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-        fwrite($file, "<tv generator-info-name=\"M3U Editor Schedules Direct Integration\" generator-info-url=\"https://github.com/sparkison/m3u-editor\">\n");
+        fwrite($file, "<tv generator-info-name=\"m3u editor Schedules Direct Integration\" generator-info-url=\"https://github.com/sparkison/m3u-editor\">\n");
 
         // Write channels
         $stationsById = [];
@@ -494,10 +485,9 @@ class SchedulesDirectService
         // Process schedules and programs in a single streaming pass
         $chunkIndex = 0;
         $totalProgramsWritten = 0;
-
         foreach ($this->processScheduleChunks($epg->sd_token, $stationIds, $dates) as $scheduleChunk) {
+            // Increment chunk index
             $chunkIndex++;
-
             Log::debug("Processing schedule chunk", [
                 'chunk' => $chunkIndex,
                 'total_chunks' => $totalChunks
@@ -509,7 +499,6 @@ class SchedulesDirectService
             $seenProgramIds = []; // Small lookup table for deduplication
             $scheduleCount = 0;
             $programCount = 0;
-            
             foreach ($scheduleChunk as $schedule) {
                 $scheduleCount++;
                 foreach ($schedule['programs'] ?? [] as $program) {
@@ -522,8 +511,9 @@ class SchedulesDirectService
                     }
                 }
             }
-            fclose($programIdHandle);
 
+            // Close the program ID file handle
+            fclose($programIdHandle);
             Log::debug("Collected program IDs from schedule chunk", [
                 'chunk' => $chunkIndex,
                 'schedules_in_chunk' => $scheduleCount,
@@ -536,13 +526,11 @@ class SchedulesDirectService
                     'chunk' => $chunkIndex,
                     'program_count' => $programCount
                 ]);
-
                 try {
                     // Stream process programs directly without creating lookup arrays
                     $chunkProgramsWritten = 0;
                     $this->streamProcessProgramsDirectly($tempProgramIdFile, $epg->sd_token, $chunkIndex, $scheduleChunk, $file, $chunkProgramsWritten);
                     $totalProgramsWritten += $chunkProgramsWritten;
-
                     Log::debug("Chunk completed", [
                         'chunk' => $chunkIndex,
                         'programs_written' => $chunkProgramsWritten,
@@ -574,7 +562,6 @@ class SchedulesDirectService
                 gc_collect_cycles();
             }
         }
-
         Log::debug("EPG processing completed", [
             'total_programs_written' => $totalProgramsWritten,
             'chunks_processed' => $chunkIndex
@@ -587,14 +574,12 @@ class SchedulesDirectService
     private function streamProcessProgramsDirectly(string $programIdFile, string $token, int $chunkIndex, array $scheduleChunk, $file, int &$programsWritten): void
     {
         $handle = fopen($programIdFile, 'r');
-        
         if (!$handle) {
             throw new \Exception("Cannot open program ID file: {$programIdFile}");
         }
 
         $batch = [];
         $batchIndex = 0;
-
         try {
             // Stream through program IDs and batch them
             while (($line = fgets($handle)) !== false) {
@@ -607,7 +592,7 @@ class SchedulesDirectService
                         $this->processProgramBatchDirectly($batch, $batchIndex, $token, $chunkIndex, $scheduleChunk, $file, $programsWritten);
                         $batch = []; // Clear the batch
                         $batchIndex++;
-                        
+
                         // Small delay between batches
                         usleep(100000); // 100ms
                     }
@@ -618,13 +603,11 @@ class SchedulesDirectService
             if (!empty($batch)) {
                 $this->processProgramBatchDirectly($batch, $batchIndex, $token, $chunkIndex, $scheduleChunk, $file, $programsWritten);
             }
-
             Log::debug("Completed streaming direct program processing", [
                 'chunk' => $chunkIndex,
                 'total_batches' => $batchIndex + 1,
                 'programs_written' => $programsWritten
             ]);
-
         } finally {
             fclose($handle);
         }
@@ -637,7 +620,6 @@ class SchedulesDirectService
     {
         // Create a temporary file for the API response
         $tempResponseFile = tempnam(sys_get_temp_dir(), 'epg_programs_response_');
-        
         try {
             Log::debug("Fetching program batch for direct processing", [
                 'chunk' => $chunkIndex,
@@ -649,15 +631,10 @@ class SchedulesDirectService
             $response = Http::withHeaders([
                 'User-Agent' => self::$USER_AGENT,
                 'token' => $token,
-            ])
-                ->timeout(300)
-                ->sink($tempResponseFile)
-                ->post(self::BASE_URL . '/programs', $programBatch);
-
+            ])->timeout(300)->sink($tempResponseFile)->post(self::BASE_URL . '/programs', $programBatch);
             if ($response->successful()) {
                 // Stream through the program response and match with schedules immediately
                 $programs = Items::fromFile($tempResponseFile);
-                
                 foreach ($programs as $program) {
                     $programId = $program->programID ?? null;
                     if (!$programId) continue;
@@ -669,7 +646,7 @@ class SchedulesDirectService
 
                         foreach ($schedule['programs'] ?? [] as $scheduleProgram) {
                             if ($scheduleProgram['programID'] === $programId) {
-                                $this->writeProgramToXMLTVDirect($file, $stationId, $scheduleProgram, $program);
+                                $this->writeProgramToXMLTV($file, $stationId, $scheduleProgram, $program);
                                 $programsWritten++;
                             }
                         }
@@ -678,7 +655,6 @@ class SchedulesDirectService
 
                 // Clear the JsonMachine iterator immediately
                 unset($programs);
-
                 Log::debug("Program batch processed directly", [
                     'chunk' => $chunkIndex,
                     'batch' => $batchIndex + 1,
@@ -709,18 +685,16 @@ class SchedulesDirectService
     /**
      * Write a single program to XMLTV file working directly with JsonMachine objects
      */
-    private function writeProgramToXMLTVDirect($file, string $stationId, array $scheduleProgram, $programData): void
+    private function writeProgramToXMLTV($file, string $stationId, array $scheduleProgram, $programData): void
     {
         // Handle schedule program data (always array)
         $airDateTime = $scheduleProgram['airDateTime'];
         $duration = $scheduleProgram['duration'];
         $isNew = $scheduleProgram['new'] ?? false;
-
         $start = Carbon::parse($airDateTime)->format('YmdHis O');
-        $stop = Carbon::parse($airDateTime)
-            ->addSeconds($duration)
-            ->format('YmdHis O');
+        $stop = Carbon::parse($airDateTime)->addSeconds($duration)->format('YmdHis O');
 
+        // Start programme entry
         fwrite($file, "  <programme channel=\"{$stationId}\" start=\"{$start}\" stop=\"{$stop}\">\n");
 
         // Title - work directly with JsonMachine object
@@ -778,81 +752,7 @@ class SchedulesDirectService
             fwrite($file, "    <premiere />\n");
         }
 
-        fwrite($file, "  </programme>\n");
-    }
-
-    /**
-     * Write a single program to XMLTV file
-     */
-    private function writeProgramToXMLTV($file, string $stationId, $program, array $programData): void
-    {
-        // Handle both objects and arrays for program data
-        $airDateTime = is_object($program) ? $program->airDateTime : $program['airDateTime'];
-        $duration = is_object($program) ? $program->duration : $program['duration'];
-        $isNew = is_object($program) ? ($program->new ?? false) : ($program['new'] ?? false);
-
-        $start = Carbon::parse($airDateTime)->format('YmdHis O');
-        $stop = Carbon::parse($airDateTime)
-            ->addSeconds($duration)
-            ->format('YmdHis O');
-
-        fwrite($file, "  <programme channel=\"{$stationId}\" start=\"{$start}\" stop=\"{$stop}\">\n");
-
-        // Title
-        if (!empty($programData['titles'][0]['title120'])) {
-            $title = htmlspecialchars($programData['titles'][0]['title120']);
-            fwrite($file, "    <title>{$title}</title>\n");
-        }
-
-        // Episode title
-        if (!empty($programData['episodeTitle150'])) {
-            $subTitle = htmlspecialchars($programData['episodeTitle150']);
-            fwrite($file, "    <sub-title>{$subTitle}</sub-title>\n");
-        }
-
-        // Description
-        if (!empty($programData['descriptions']['description1000'][0]['description'])) {
-            $desc = htmlspecialchars($programData['descriptions']['description1000'][0]['description']);
-            fwrite($file, "    <desc>{$desc}</desc>\n");
-        }
-
-        // Categories/Genres
-        if (!empty($programData['genres'])) {
-            foreach ($programData['genres'] as $genre) {
-                $genre = htmlspecialchars($genre);
-                fwrite($file, "    <category>{$genre}</category>\n");
-            }
-        }
-
-        // Episode numbering
-        if (!empty($programData['metadata'])) {
-            foreach ($programData['metadata'] as $metadata) {
-                if (isset($metadata['Gracenote']['season']) && isset($metadata['Gracenote']['episode'])) {
-                    $season = max(0, $metadata['Gracenote']['season'] - 1);
-                    $episode = max(0, $metadata['Gracenote']['episode'] - 1);
-                    fwrite($file, "    <episode-num system=\"xmltv_ns\">{$season}.{$episode}.</episode-num>\n");
-                    break;
-                }
-            }
-        }
-
-        // Content rating
-        if (!empty($programData['contentRating'])) {
-            foreach ($programData['contentRating'] as $rating) {
-                if ($rating['country'] === 'USA') {
-                    $ratingSystem = htmlspecialchars($rating['body']);
-                    $ratingValue = htmlspecialchars($rating['code']);
-                    fwrite($file, "    <rating system=\"{$ratingSystem}\"><value>{$ratingValue}</value></rating>\n");
-                    break;
-                }
-            }
-        }
-
-        // New flag
-        if (!empty($isNew)) {
-            fwrite($file, "    <premiere />\n");
-        }
-
+        // End programme entry
         fwrite($file, "  </programme>\n");
     }
 
@@ -864,11 +764,9 @@ class SchedulesDirectService
         $headers = [
             'User-Agent' => self::$USER_AGENT,
         ];
-
         if ($token) {
             $headers['token'] = $token;
         }
-
         $url = self::BASE_URL . $endpoint;
 
         // Configure timeout based on endpoint and data size
@@ -906,10 +804,8 @@ class SchedulesDirectService
             'data_size' => is_array($data) ? count($data) : 0,
             'has_token' => !empty($token)
         ]);
-
         try {
             $startTime = microtime(true);
-
             if ($method === 'GET' && !empty($data)) {
                 $url .= '?' . http_build_query($data);
                 $response = $request->get($url);
@@ -920,9 +816,7 @@ class SchedulesDirectService
             } else {
                 $response = $request->send($method, $url, ['json' => $data]);
             }
-
             $duration = round(microtime(true) - $startTime, 2);
-
             Log::debug("Schedules Direct API request completed", [
                 'method' => $method,
                 'endpoint' => $endpoint,
@@ -940,7 +834,6 @@ class SchedulesDirectService
             ]);
             throw new \Exception("Schedules Direct API request failed: {$e->getMessage()}");
         }
-
         if ($response->failed()) {
             $body = $response->json();
             $message = $body['message'] ?? $body['response'] ?? 'Unknown error';
@@ -954,10 +847,8 @@ class SchedulesDirectService
                 'message' => $message,
                 'full_response' => $response->body()
             ]);
-
             throw new \Exception("Schedules Direct API error: {$message} (Code: {$code})");
         }
-
         return $response;
     }
 }
