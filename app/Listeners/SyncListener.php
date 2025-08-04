@@ -15,11 +15,16 @@ class SyncListener
     public function handle(SyncCompleted $event): void
     {
         if ($event->model instanceof \App\Models\Playlist) {
+            $lastSync = $event->model->syncStatuses()->first();
             $event->model->postProcesses()->where([
                 ['event', 'synced'],
                 ['enabled', true],
-            ])->get()->each(function ($postProcess) use ($event) {
-                dispatch(new RunPostProcess($postProcess, $event->model));
+            ])->get()->each(function ($postProcess) use ($event, $lastSync) {
+                dispatch(new RunPostProcess(
+                    $postProcess,
+                    $event->model,
+                    $lastSync
+                ));
             });
         }
         if ($event->model instanceof \App\Models\Epg) {
@@ -27,7 +32,10 @@ class SyncListener
                 ['event', 'synced'],
                 ['enabled', true],
             ])->get()->each(function ($postProcess) use ($event) {
-                dispatch(new RunPostProcess($postProcess, $event->model));
+                dispatch(new RunPostProcess(
+                    $postProcess,
+                    $event->model
+                ));
             });
         }
     }

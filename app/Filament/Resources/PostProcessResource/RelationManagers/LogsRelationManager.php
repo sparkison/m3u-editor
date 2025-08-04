@@ -35,7 +35,14 @@ class LogsRelationManager extends RelationManager
                     ->sortable()
                     ->badge()
                     ->toggleable()
-                    ->color(fn($state) => $state === 'success' ? 'success' : 'danger'),
+                    ->color(function ($state) {
+                        return match (strtolower($state)) {
+                            'success' => 'success',
+                            'error' => 'danger',
+                            'skipped' => 'warning',
+                            default => 'secondary'
+                        };
+                    }),
                 Tables\Columns\TextColumn::make('type')
                     ->label('Process Event')
                     ->badge()
