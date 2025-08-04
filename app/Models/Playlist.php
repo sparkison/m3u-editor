@@ -126,7 +126,8 @@ class Playlist extends Model
 
     public function syncStatuses(): HasMany
     {
-        return $this->hasMany(PlaylistSyncStatus::class);
+        return $this->hasMany(PlaylistSyncStatus::class)
+            ->orderBy('created_at', 'desc');
     }
 
     public function categories(): HasMany

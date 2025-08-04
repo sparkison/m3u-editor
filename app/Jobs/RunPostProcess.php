@@ -31,6 +31,7 @@ class RunPostProcess implements ShouldQueue
     public function __construct(
         public PostProcess $postProcess,
         public Model $model,
+        public ?Model $lastSync = null
     ) {
         //
     }
@@ -46,9 +47,36 @@ class RunPostProcess implements ShouldQueue
         $status = $this->model->status;
         $postProcess = $this->postProcess;
         $metadata = $postProcess->metadata;
-        $sendFailed = ((bool)$metadata['send_failed']) ?? false;
+        $sendFailed = (bool)($metadata['send_failed'] ?? false);
+
         if ($status === Status::Failed && !$sendFailed) {
             // If the model status is failed and we don't want to execute the post process, then just return
+            return;
+        }
+
+        // Merge the sync data with the model
+        if ($this->lastSync) {
+            $syncData = $this->lastSync->syncStats;
+            if ($syncData) {
+                foreach ($syncData as $key => $value) {
+                    // Only add if not already present in the model
+                    if (!isset($this->model->{$key})) {
+                        $this->model->{$key} = $value;
+                    }
+                }
+            }
+        }
+
+        // Check if conditions are met before executing
+        if (!$this->checkConditions()) {
+            // Log that conditions were not met
+            PostProcessLog::create([
+                'name' => $name,
+                'type' => $postProcess->event,
+                'post_process_id' => $postProcess->id,
+                'status' => 'skipped',
+                'message' => 'Post process skipped: conditions not met',
+            ]);
             return;
         }
         try {
@@ -69,7 +97,7 @@ class RunPostProcess implements ShouldQueue
                             $value = PlaylistUrlFacade::getUrls($this->model)['m3u'];
                         }
                     } else {
-                        $value = $this->model->{$var['value']};
+                        $value = $this->model->{$var['value']} ?? '';
                     }
                     $queryVars[$var['variable_name']] = $value;
                 }
@@ -94,11 +122,7 @@ class RunPostProcess implements ShouldQueue
                         ->success()
                         ->title($title)
                         ->body($body)
-                        ->broadcast($user);
-                    Notification::make()
-                        ->success()
-                        ->title($title)
-                        ->body($body)
+                        ->broadcast($user)
                         ->sendToDatabase($user);
                 } else {
                     $title = "Error running post processing for \"$name\"";
@@ -114,11 +138,7 @@ class RunPostProcess implements ShouldQueue
                         ->danger()
                         ->title($title)
                         ->body($body)
-                        ->broadcast($user);
-                    Notification::make()
-                        ->danger()
-                        ->title($title)
-                        ->body($body)
+                        ->broadcast($user)
                         ->sendToDatabase($user);
                 }
             } else {
@@ -139,7 +159,7 @@ class RunPostProcess implements ShouldQueue
                         if ($var['value'] === 'status') {
                             $value = $this->model->status->value ?? '';
                         } else {
-                            $value = $this->model->{$var['value']};
+                            $value = $this->model->{$var['value']} ?? '';
                         }
                     }
                     $exportVars[$var['export_name']] = $value;
@@ -178,11 +198,7 @@ class RunPostProcess implements ShouldQueue
                         ->success()
                         ->title($title)
                         ->body($body)
-                        ->broadcast($user);
-                    Notification::make()
-                        ->success()
-                        ->title($title)
-                        ->body($body)
+                        ->broadcast($user)
                         ->sendToDatabase($user);
                 } else {
                     // Error running the script
@@ -199,11 +215,7 @@ class RunPostProcess implements ShouldQueue
                         ->danger()
                         ->title($title)
                         ->body($body)
-                        ->broadcast($user);
-                    Notification::make()
-                        ->danger()
-                        ->title($title)
-                        ->body($body)
+                        ->broadcast($user)
                         ->sendToDatabase($user);
                 }
             }
@@ -238,5 +250,83 @@ class RunPostProcess implements ShouldQueue
                     ->delete();
             }
         }
+    }
+
+    /**
+     * Check if all conditions are met for this post process
+     */
+    protected function checkConditions(): bool
+    {
+        $conditions = $this->postProcess->conditions;
+
+        // If no conditions are set, allow execution
+        if (empty($conditions)) {
+            return true;
+        }
+
+        // Check each condition - all must be true for execution
+        foreach ($conditions as $condition) {
+            if (!$this->evaluateCondition($condition)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Evaluate a single condition
+     */
+    protected function evaluateCondition(array $condition): bool
+    {
+        $field = $condition['field'] ?? null;
+        $operator = $condition['operator'] ?? null;
+        $expectedValue = $condition['value'] ?? null;
+
+        if (!$field || !$operator) {
+            return false;
+        }
+
+        // Get the actual value from the model
+        $actualValue = $this->getFieldValue($field);
+        return match ($operator) {
+            'equals' => $actualValue == $expectedValue,
+            'not_equals' => $actualValue != $expectedValue,
+            'greater_than' => is_numeric($actualValue) && is_numeric($expectedValue) && $actualValue > $expectedValue,
+            'less_than' => is_numeric($actualValue) && is_numeric($expectedValue) && $actualValue < $expectedValue,
+            'greater_than_or_equal' => is_numeric($actualValue) && is_numeric($expectedValue) && $actualValue >= $expectedValue,
+            'less_than_or_equal' => is_numeric($actualValue) && is_numeric($expectedValue) && $actualValue <= $expectedValue,
+            'contains' => is_string($actualValue) && is_string($expectedValue) && str_contains($actualValue, $expectedValue),
+            'not_contains' => is_string($actualValue) && is_string($expectedValue) && !str_contains($actualValue, $expectedValue),
+            'starts_with' => is_string($actualValue) && is_string($expectedValue) && str_starts_with($actualValue, $expectedValue),
+            'ends_with' => is_string($actualValue) && is_string($expectedValue) && str_ends_with($actualValue, $expectedValue),
+            'is_true' => (bool)$actualValue === true,
+            'is_false' => (bool)$actualValue === false,
+            'is_empty' => empty($actualValue),
+            'is_not_empty' => !empty($actualValue),
+            default => false,
+        };
+    }
+
+    /**
+     * Get the value of a field from the model or related data
+     */
+    protected function getFieldValue(string $field): mixed
+    {
+        $syncData = $this->lastSync
+            ? $this->lastSync->syncStats
+            : null;
+        return match ($field) {
+            'id' => $this->model->id,
+            'uuid' => $this->model->uuid,
+            'name' => $this->model->name,
+            'url' => $this->model->url ?? null,
+            'status' => $this->model->status?->value ?? $this->model->status,
+            'synctime' => $this->model->sync_time,
+            'added_groups' => $syncData ? $syncData->added_groups : 'N/A',
+            'removed_groups' => $syncData ? $syncData->removed_groups : 'N/A',
+            'added_channels' => $syncData ? $syncData->added_channels : 'N/A',
+            'removed_channels' => $syncData ? $syncData->removed_channels : 'N/A',
+            default => null,
+        };
     }
 }

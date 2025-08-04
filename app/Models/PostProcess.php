@@ -22,6 +22,7 @@ class PostProcess extends Model
         'enabled' => 'boolean',
         'user_id' => 'integer',
         'metadata' => 'array',
+        'conditions' => 'array',
     ];
 
     public function user(): BelongsTo

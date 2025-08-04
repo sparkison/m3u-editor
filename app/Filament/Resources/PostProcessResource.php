@@ -200,6 +200,11 @@ class PostProcessResource extends Resource
                                     'name' => 'Name',
                                     'url' => 'URL',
                                     'status' => 'Status',
+                                    'synctime' => 'Sync time',
+                                    'added_groups' => '# Groups added (Playlist only)',
+                                    'removed_groups' => '# Groups removed (Playlist only)',
+                                    'added_channels' => '# Channels added (Playlist only)',
+                                    'removed_channels' => '# Channels removed (Playlist only)',
                                 ])->helperText('Value to use for this variable.'),
                         ])
                         ->columns(2)
@@ -235,12 +240,70 @@ class PostProcessResource extends Resource
                                     'name' => 'Name',
                                     'url' => 'URL',
                                     'status' => 'Status',
+                                    'synctime' => 'Sync time',
+                                    'added_groups' => '# Groups added (Playlist only)',
+                                    'removed_groups' => '# Groups removed (Playlist only)',
+                                    'added_channels' => '# Channels added (Playlist only)',
+                                    'removed_channels' => '# Channels removed (Playlist only)',
                                 ])->helperText('Value to use for this variable.'),
                         ])
                         ->columns(2)
                         ->columnSpanFull()
                         ->addActionLabel('Add named export'),
                 ])->hidden(fn(Get $get) => ! $get('metadata.local')),
+            Forms\Components\Fieldset::make('Conditional Settings')
+                ->schema([
+                    Forms\Components\Repeater::make('conditions')
+                        ->label('Conditions')
+                        ->schema([
+                            Forms\Components\Select::make('field')
+                                ->label('Field')
+                                ->required()
+                                ->options([
+                                    'id' => 'ID',
+                                    'uuid' => 'UUID',
+                                    'name' => 'Name',
+                                    'url' => 'URL',
+                                    'status' => 'Status',
+                                    'synctime' => 'Sync time',
+                                    'added_groups' => '# Groups added (Playlist only)',
+                                    'removed_groups' => '# Groups removed (Playlist only)',
+                                    'added_channels' => '# Channels added (Playlist only)',
+                                    'removed_channels' => '# Channels removed (Playlist only)',
+                                ])
+                                ->helperText('Field to check condition against.'),
+                            Forms\Components\Select::make('operator')
+                                ->label('Condition')
+                                ->required()
+                                ->options([
+                                    'equals' => 'Equals',
+                                    'not_equals' => 'Not equals',
+                                    'greater_than' => 'Greater than',
+                                    'less_than' => 'Less than',
+                                    'greater_than_or_equal' => 'Greater than or equal',
+                                    'less_than_or_equal' => 'Less than or equal',
+                                    'contains' => 'Contains',
+                                    'not_contains' => 'Does not contain',
+                                    'starts_with' => 'Starts with',
+                                    'ends_with' => 'Ends with',
+                                    'is_true' => 'Is true',
+                                    'is_false' => 'Is false',
+                                    'is_empty' => 'Is empty',
+                                    'is_not_empty' => 'Is not empty',
+                                ])
+                                ->helperText('Condition to check.')
+                                ->live(),
+                            Forms\Components\TextInput::make('value')
+                                ->label('Value')
+                                ->helperText('Value to compare against (not needed for true/false/empty conditions).')
+                                ->hidden(fn(Get $get) => in_array($get('operator'), ['is_true', 'is_false', 'is_empty', 'is_not_empty']))
+                                ->required(fn(Get $get) => !in_array($get('operator'), ['is_true', 'is_false', 'is_empty', 'is_not_empty'])),
+                        ])
+                        ->columns(3)
+                        ->columnSpanFull()
+                        ->addActionLabel('Add condition')
+                        ->helperText('Add conditions that must be met for this post process to execute. All conditions must be true for execution.'),
+                ]),
         ];
         return [
             Forms\Components\Grid::make()
