@@ -443,19 +443,20 @@ class SchedulesDirectService
 
             fwrite($file, "  <channel id=\"{$mapping['stationID']}\">\n");
 
-            // Channel number and callsign
-            $channelNumber = htmlspecialchars($mapping['channel'] ?? $station['callsign']);
-            fwrite($file, "    <display-name>{$channelNumber}</display-name>\n");
+            // Display names - prefer name, then callsign, then channel number
+            if (!empty($station['name'])) {
+                $name = htmlspecialchars($station['name']);
+                fwrite($file, "    <display-name>{$name}</display-name>\n");
+            }
 
             if (!empty($station['callsign'])) {
                 $callsign = htmlspecialchars($station['callsign']);
                 fwrite($file, "    <display-name>{$callsign}</display-name>\n");
             }
 
-            if (!empty($station['name'])) {
-                $name = htmlspecialchars($station['name']);
-                fwrite($file, "    <display-name>{$name}</display-name>\n");
-            }
+            // Channel number and callsign
+            $channelNumber = htmlspecialchars($mapping['channel'] ?? $station['callsign']);
+            fwrite($file, "    <display-name>{$channelNumber}</display-name>\n");
 
             fwrite($file, "  </channel>\n");
         }

@@ -328,9 +328,13 @@ class EpgCacheService
                     'start' => $startDateTime->toISOString(),
                     'stop' => $stopDateTime ? $stopDateTime->toISOString() : null,
                     'title' => '',
+                    'subtitle' => '',
                     'desc' => '',
                     'category' => '',
-                    'icon' => ''
+                    'episode_num' => '',
+                    'rating' => '',
+                    'icon' => '',
+                    'new' => false,
                 ];
 
                 while (@$innerReader->read()) {
@@ -338,6 +342,9 @@ class EpgCacheService
                         switch ($innerReader->name) {
                             case 'title':
                                 $programme['title'] = trim($innerReader->readString() ?: '');
+                                break;
+                            case 'sub-title':
+                                $programme['subtitle'] = trim($innerReader->readString() ?: '');
                                 break;
                             case 'desc':
                                 $programme['desc'] = trim($innerReader->readString() ?: '');
@@ -349,6 +356,23 @@ class EpgCacheService
                                 break;
                             case 'icon':
                                 $programme['icon'] = trim($innerReader->getAttribute('src') ?: '');
+                                break;
+                            case 'premiere':
+                                $programme['new'] = true;
+                                break;
+                            case 'episode-num':
+                                $programme['episode_num'] = trim($innerReader->readString() ?: '');
+                                break;
+                            case 'rating':
+                                // Read rating value
+                                while (@$innerReader->read()) {
+                                    if ($innerReader->nodeType == XMLReader::ELEMENT && $innerReader->name === 'value') {
+                                        $programme['rating'] = trim($innerReader->readString() ?: '');
+                                        break;
+                                    } elseif ($innerReader->nodeType == XMLReader::END_ELEMENT && $innerReader->name === 'rating') {
+                                        break;
+                                    }
+                                }
                                 break;
                         }
                     }
