@@ -253,11 +253,32 @@
                                                 x-data="{ 
                                                     get tooltipContent() {
                                                         let content = '<p><strong>' + programme.title + '</strong></p>';
+                                                        if (programme.new) {
+                                                            content += '<small>New Episode</small><br/>';
+                                                        }
+                                                        if (programme.episode_num) {
+                                                            // Assuming episode_num is in xmltv_ns format
+                                                            let season = 0, episode = 0;
+                                                            const parts = programme.episode_num.split('.');
+                                                            if (parts.length > 0) {
+                                                                season = parseInt(parts[0], 10) + 1; // xmltv_ns is zero-based
+                                                            }
+                                                            if (parts.length > 1) {
+                                                                episode = parseInt(parts[1], 10) + 1;
+                                                            }
+                                                            if (season > 0 && episode > 0) {
+                                                                content += '<small>Season ' + season + ', Episode ' + episode + '</small><br/>';
+                                                            } else if (season > 0) {
+                                                                content += '<small>Season ' + season + '</small><br/>';
+                                                            } else if (episode > 0) {
+                                                                content += '<small>Episode ' + episode + '</small><br/>';
+                                                            }
+                                                        }
                                                         if (programme.desc && programme.desc.trim()) {
-                                                            content += '\n\n<p>' + programme.desc + '</p>';
+                                                            content += '<p>' + programme.desc + '</p>';
                                                         }
                                                         if (programme.category && programme.category.trim()) {
-                                                            content += '\n\n<small>Category: ' + programme.category + '</small>';
+                                                            content += '<small>Category: ' + programme.category + '</small>';
                                                         }
                                                         return content;
                                                     }
@@ -267,6 +288,9 @@
                                                 <div class="p-2 h-full overflow-hidden flex flex-col justify-center">
                                                     <div class="text-xs font-medium text-gray-900 dark:text-gray-100 truncate leading-tight" x-text="programme.title"></div>
                                                     <div class="text-xs text-gray-600 dark:text-gray-300 truncate" x-text="formatProgrammeTime(programme)"></div>
+                                                    <div x-show="programme.new" class="absolute top-0.5 right-0.5 bg-gray-500 text-white text-xs px-1 rounded-xl opacity-100" style="font-size: 10px; line-height: 1;">
+                                                        New
+                                                    </div>
                                                 </div>
                                             </div>
                                         </template>
