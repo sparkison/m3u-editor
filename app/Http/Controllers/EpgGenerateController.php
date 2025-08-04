@@ -238,16 +238,16 @@ class EpgGenerateController extends Controller
                     // Get all programmes from cache (last 1 day to next 5 days for EPG generation)
                     $startDate = Carbon::now()->subDays(1)->format('Y-m-d');
                     $endDate = Carbon::now()->addDays(5)->format('Y-m-d');
-                    
+
                     // Get all channel IDs that this EPG should map to
                     $epgChannelIds = [];
                     foreach ($channels as $channelMapping) {
                         $epgChannelIds = array_merge($epgChannelIds, array_keys($channelMapping));
                     }
-                    
+
                     // Get programmes from cache for date range
                     $cachedProgrammes = $cacheService->getCachedProgrammesRange($epg, $startDate, $endDate, $epgChannelIds);
-                    
+
                     // Output programmes from cache
                     foreach ($cachedProgrammes as $channelId => $programmes) {
                         foreach ($programmes as $programme) {
@@ -256,22 +256,25 @@ class EpgGenerateController extends Controller
                             if (!count($filtered)) {
                                 continue;
                             }
-                            
+
                             foreach ($filtered as $ch) {
                                 $mappedChannelId = $ch[$channelId];
-                                
+
                                 // Format times for XMLTV
                                 $start = $this->formatXmltvDateTime($programme['start']);
                                 $stop = $this->formatXmltvDateTime($programme['stop']);
-                                
+
                                 // Output programme tag
                                 echo '  <programme channel="' . htmlspecialchars($mappedChannelId) . '"';
                                 if ($start) echo ' start="' . $start . '"';
                                 if ($stop) echo ' stop="' . $stop . '"';
                                 echo '>' . PHP_EOL;
-                                
+
                                 if ($programme['title']) {
                                     echo '    <title>' . htmlspecialchars($programme['title']) . '</title>' . PHP_EOL;
+                                }
+                                if ($programme['subtitle']) {
+                                    echo '    <sub-title>' . htmlspecialchars($programme['subtitle']) . '</sub-title>' . PHP_EOL;
                                 }
                                 if ($programme['desc']) {
                                     echo '    <desc>' . htmlspecialchars($programme['desc']) . '</desc>' . PHP_EOL;
@@ -279,10 +282,19 @@ class EpgGenerateController extends Controller
                                 if ($programme['category']) {
                                     echo '    <category>' . htmlspecialchars($programme['category']) . '</category>' . PHP_EOL;
                                 }
+                                if ($programme['episode_num']) {
+                                    echo '    <episode-num system="xmltv_ns">' . htmlspecialchars($programme['episode_num']) . '</episode-num>' . PHP_EOL;
+                                }
                                 if ($programme['icon']) {
                                     echo '    <icon src="' . htmlspecialchars($programme['icon']) . '"/>' . PHP_EOL;
                                 }
-                                
+                                if ($programme['rating']) {
+                                    echo '    <rating><value>' . htmlspecialchars($programme['rating']) . '</value></rating>' . PHP_EOL;
+                                }
+                                if (!empty($programme['new']) && $programme['new']) {
+                                    echo '    <premiere/>' . PHP_EOL;
+                                }
+
                                 echo '  </programme>' . PHP_EOL;
                             }
                         }
@@ -379,7 +391,7 @@ class EpgGenerateController extends Controller
         if (!$datetime) {
             return null;
         }
-        
+
         try {
             $carbon = Carbon::parse($datetime);
             // Format as YYYYMMDDHHMMSS +ZZZZ
@@ -407,7 +419,7 @@ class EpgGenerateController extends Controller
         } else if ($epg->url) {
             $filePath = $epg->url;
         }
-        
+
         if (!$filePath) {
             // Send notification
             $error = "Invalid EPG file. Unable to read or download an associated EPG file. Please check the URL or uploaded file and try again.";
