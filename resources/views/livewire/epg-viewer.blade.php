@@ -1,11 +1,3 @@
-@php
-    $record = $getRecord();
-    $class = class_basename($record);
-    $route = $class === 'Epg' 
-        ? route('api.epg.data', ['uuid' => $record?->uuid]) 
-        : route('api.epg.playlist.data', ['uuid' => $record?->uuid]) ;
-@endphp
-
 <div 
     x-data="epgViewer({ 
         apiUrl: '{{ $route }}' 
@@ -86,12 +78,6 @@
                     >
                         Now
                     </x-filament::button>
-                    {{-- <input 
-                        type="date" 
-                        x-model="currentDate"
-                        @change="loadEpgData()"
-                        class="px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    > --}}
                 </div>
             </div>
 
@@ -179,24 +165,21 @@
                                         <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate" x-text="channel.display_name" x-tooltip="channel.display_name"></p>
                                         <p class="text-xs text-gray-500 dark:text-gray-400 truncate" x-text="channelId"></p>
                                     </div>
-                                    <!-- Play Buttons (only show if channel has URL) -->
-                                    <div x-show="channel.url" class="flex-shrink-0 flex space-x-1">
-                                        {{-- 
-                                        // Disabled - using floating player only for now
-                                        // If you want to re-enable the modal player, uncomment this block
-                                        // and the `@livewire('stream-player')` in the footer of this component
-                                        <button 
-                                            @click.stop="
-                                                console.log('Play button clicked for channel:', channel); 
-                                                window.dispatchEvent(new CustomEvent('openStreamPlayer', { detail: channel }))
-                                            "
-                                            class="p-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-full transition-colors"
-                                            title="Play Stream in Modal"
+                                    <!-- Action Buttons -->
+                                    <div class="flex-shrink-0 flex space-x-1">
+                                        <!-- Edit Button (only show if channel has database_id) -->
+                                        {{-- <button 
+                                            x-show="channel.database_id"
+                                            @click.stop="$wire.openChannelEdit(channel.database_id)"
+                                            class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-900/20 rounded-full transition-colors"
+                                            title="Edit Channel"
                                         >
-                                            <x-heroicon-s-play class="w-4 h-4" />
+                                            <x-heroicon-s-pencil class="w-4 h-4" />
                                         </button> --}}
-                                        
+
+                                        <!-- Play Button (only show if channel has URL) -->
                                         <button 
+                                            x-show="channel.url"
                                             @click.stop="
                                                 window.dispatchEvent(new CustomEvent('openFloatingStream', { detail: channel }))
                                             "
@@ -245,54 +228,51 @@
                                     <!-- Programme blocks -->
                                     <div class="absolute inset-0">
                                         <template x-for="programme in getChannelProgrammes(channelId)" :key="`${channelId}-${programme.start}-${programme.title}`">
-                                            <div 
-                                                class="absolute top-1 bottom-1 rounded shadow-sm cursor-pointer group transition-all duration-200"
-                                                :class="getProgrammeColorClass(programme)"
-                                                :style="getProgrammeStyle(programme)"
-                                                @click="selectProgramme(programme)"
-                                                x-data="{ 
-                                                    get tooltipContent() {
-                                                        let content = '<p><strong>' + programme.title + '</strong></p>';
-                                                        if (programme.new) {
-                                                            content += '<small>New Episode</small><br/>';
-                                                        }
-                                                        if (programme.episode_num) {
-                                                            // Assuming episode_num is in xmltv_ns format
-                                                            let season = 0, episode = 0;
-                                                            const parts = programme.episode_num.split('.');
-                                                            if (parts.length > 0) {
-                                                                season = parseInt(parts[0], 10) + 1; // xmltv_ns is zero-based
-                                                            }
-                                                            if (parts.length > 1) {
-                                                                episode = parseInt(parts[1], 10) + 1;
-                                                            }
-                                                            if (season > 0 && episode > 0) {
-                                                                content += '<small>Season ' + season + ', Episode ' + episode + '</small><br/>';
-                                                            } else if (season > 0) {
-                                                                content += '<small>Season ' + season + '</small><br/>';
-                                                            } else if (episode > 0) {
-                                                                content += '<small>Episode ' + episode + '</small><br/>';
-                                                            }
-                                                        }
-                                                        if (programme.desc && programme.desc.trim()) {
-                                                            content += '<p>' + programme.desc + '</p>';
-                                                        }
-                                                        if (programme.category && programme.category.trim()) {
-                                                            content += '<small>Category: ' + programme.category + '</small>';
-                                                        }
-                                                        return content;
-                                                    }
-                                                }"
-                                                x-tooltip.html="tooltipContent"
-                                            >
-                                                <div class="p-2 h-full overflow-hidden flex flex-col justify-center">
-                                                    <div class="text-xs font-medium text-gray-900 dark:text-gray-100 truncate leading-tight" x-text="programme.title"></div>
-                                                    <div class="text-xs text-gray-600 dark:text-gray-300 truncate" x-text="formatProgrammeTime(programme)"></div>
-                                                    <div x-show="programme.new" class="absolute top-0.5 right-0.5 bg-gray-500 text-white text-xs px-1 rounded-xl opacity-100" style="font-size: 10px; line-height: 1;">
-                                                        New
+                                            <x-filament::modal width="2xl">
+                                                <x-slot name="trigger">
+                                                    <div 
+                                                        class="absolute top-1 bottom-1 rounded shadow-sm cursor-pointer group transition-all duration-200"
+                                                        :class="getProgrammeColorClass(programme)"
+                                                        :style="getProgrammeStyle(programme)"
+                                                        x-tooltip.html="getTooltipContent(programme)"
+                                                    >
+                                                        <div class="p-2 h-full overflow-hidden flex flex-col justify-center">
+                                                            <div class="text-xs font-medium text-gray-900 dark:text-gray-100 truncate leading-tight" x-text="programme.title"></div>
+                                                            <div class="text-xs text-gray-600 dark:text-gray-300 truncate" x-text="formatProgrammeTime(programme)"></div>
+                                                            <div x-show="programme.new" class="absolute top-0.5 right-0.5 bg-gray-500 text-white text-xs px-1 rounded-xl opacity-100" style="font-size: 10px; line-height: 1;">
+                                                                New
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </x-slot>
+
+                                                <x-slot name="heading">
+                                                    <span x-text="programme.title"></span>
+                                                </x-slot>
+
+                                                <div class="space-y-1">
+                                                    <div>
+                                                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Time:</span>
+                                                        <span class="text-sm text-gray-900 dark:text-gray-100 ml-2" x-text="formatProgrammeTime(programme)"></span>
+                                                    </div>
+                                                    <div x-show="programme.category">
+                                                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Category:</span>
+                                                        <span class="text-sm text-gray-900 dark:text-gray-100 ml-2" x-text="programme.category"></span>
+                                                    </div>
+                                                    <div x-show="programme.episode_num">
+                                                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Episode:</span>
+                                                        <span class="text-sm text-gray-900 dark:text-gray-100 ml-2" x-text="getProgrammeSeasonEpisode(programme)"></span>
+                                                    </div>
+                                                    <div x-show="programme.new">
+                                                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">New Episode</span>
+                                                        <span class="text-sm text-gray-900 dark:text-gray-100 ml-2"><x-heroicon-s-check class="w-4 h-4 inline-block" /></span>
+                                                    </div>
+                                                    <div x-show="programme.desc" class="space-y-2">
+                                                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Description</span>
+                                                        <p class="text-sm text-gray-600 dark:text-gray-400" x-text="programme.desc"></p>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            </x-filament::modal>
                                         </template>
                                     </div>
                                 </div>
@@ -301,73 +281,11 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Programme Details Modal -->
-            <div x-show="selectedProgramme" x-transition.opacity class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
-                <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-                    <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity" @click="selectedProgramme = null"></div>
-                    
-                    <div class="inline-block w-full max-w-lg p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-lg">
-                        <div class="flex items-start justify-between">
-                            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100" x-text="selectedProgramme?.title"></h3>
-                            <button @click="selectedProgramme = null" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
-                                <x-heroicon-s-x-mark class="w-6 h-6" />
-                            </button>
-                        </div>
-                        
-                        <div class="mt-4 space-y-3">
-                            <div>
-                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Time:</span>
-                                <span class="text-sm text-gray-900 dark:text-gray-100 ml-2" x-text="selectedProgramme ? formatProgrammeTime(selectedProgramme) : ''"></span>
-                            </div>
-                            
-                            <div x-show="selectedProgramme?.category">
-                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Category:</span>
-                                <span class="text-sm text-gray-900 dark:text-gray-100 ml-2" x-text="selectedProgramme?.category"></span>
-                            </div>
-                            
-                            <div x-show="selectedProgramme?.desc" class="space-y-2">
-                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Description:</span>
-                                <p class="text-sm text-gray-600 dark:text-gray-400" x-text="selectedProgramme?.desc"></p>
-                            </div>
-                            
-                            <!-- Action Buttons -->
-                            <div x-show="selectedProgramme?.channel?.url" class="flex space-x-3 pt-4 border-t border-gray-200 dark:border-gray-600">
-                                <x-filament::button
-                                    color="primary"
-                                    size="sm"
-                                    @click="
-                                        console.log('Opening modal stream for channel:', selectedProgramme?.channel); 
-                                        window.dispatchEvent(new CustomEvent('openStreamPlayer', { detail: selectedProgramme?.channel }));
-                                        selectedProgramme = null;
-                                    "
-                                >
-                                    <x-heroicon-m-play class="w-4 h-4 mr-2" />
-                                    Play in Modal
-                                </x-filament::button>
-                                
-                                <x-filament::button
-                                    color="gray"
-                                    size="sm"
-                                    @click="
-                                        console.log('Opening floating stream for channel:', selectedProgramme?.channel); 
-                                        window.dispatchEvent(new CustomEvent('openFloatingStream', { detail: selectedProgramme?.channel }));
-                                        selectedProgramme = null;
-                                    "
-                                >
-                                    <x-heroicon-m-window class="w-4 h-4 mr-2" />
-                                    Play Floating
-                                </x-filament::button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
-
-        <!-- Stream Player Component -->
-        {{-- @livewire('stream-player') --}}
 
         <!-- Floating Stream Players -->
         <x-floating-stream-players />
+        
+        <!-- Filament Actions Modals -->
+        <x-filament-actions::modals />
 </div>

@@ -930,7 +930,7 @@ class ChannelResource extends Resource
                         ->helperText("Leave empty to use default value.")
                         ->columnSpan(1)
                         ->rules(['min:1', 'max:255'])
-                        ->hiddenOn('create'),
+                        ->hidden(!$edit),
                     Forms\Components\TextInput::make('name_custom')
                         ->label('Name')
                         ->hint('tvg-name')
@@ -994,7 +994,7 @@ class ChannelResource extends Resource
                         ->columnSpanFull()
                         ->placeholder('Enter a group title')
                         ->hint('group-title')
-                        ->hiddenOn('create')
+                        ->hidden(!$edit)
                         ->rules(['min:1', 'max:255'])
                         ->hidden(fn(Get $get) => !$get('custom_playlist_id')),
                 ]),

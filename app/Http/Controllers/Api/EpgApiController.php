@@ -244,6 +244,7 @@ class EpgApiController extends Controller
                 }
                 $playlistChannelData[$channelNo] = [
                     'id' => $channelNo,
+                    'database_id' => $channel->id, // Add the actual database ID for editing
                     'url' => $url,
                     'format' => $channelFormat,
                     'tvg_id' => $tvgId,

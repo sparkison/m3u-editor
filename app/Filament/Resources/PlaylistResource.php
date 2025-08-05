@@ -21,12 +21,12 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
 use App\Facades\PlaylistUrlFacade;
-use App\Filament\Infolists\Components\EpgViewer;
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\CreatePlaylistSyncStatus;
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\EditPlaylistSyncStatus;
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ListPlaylistSyncStatuses;
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ViewPlaylistSyncStatus;
 use App\Forms\Components\MediaFlowProxyUrl;
+use App\Livewire\EpgViewer;
 use App\Livewire\PlaylistEpgUrl;
 use App\Livewire\PlaylistInfo;
 use App\Livewire\PlaylistM3uUrl;
@@ -716,7 +716,7 @@ class PlaylistResource extends Resource
                     ])->contained(false),
                 Infolists\Components\Section::make()
                     ->schema([
-                        EpgViewer::make(),
+                        Infolists\Components\Livewire::make(EpgViewer::class),
                     ])
                     ->collapsible(false),
             ]);

@@ -2,11 +2,12 @@
 
 namespace App\Filament\Resources\EpgResource\Pages;
 
-use App\Filament\Infolists\Components\EpgViewer;
 use App\Filament\Resources\EpgResource;
+use App\Livewire\EpgViewer;
 use Filament\Actions;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
@@ -95,7 +96,7 @@ class ViewEpg extends ViewRecord
 
                 Section::make('Guide')
                     ->schema([
-                        EpgViewer::make(),
+                        Infolists\Components\Livewire::make(EpgViewer::class),
                     ])
                     ->collapsible(false),
             ]);

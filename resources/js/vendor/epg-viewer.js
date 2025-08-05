@@ -15,7 +15,6 @@ function epgViewer(config) {
             return dateStr;
         })(),
         timeSlots: [],
-        selectedProgramme: null,
         currentTimePosition: -1,
 
         // Pagination
@@ -195,10 +194,6 @@ function epgViewer(config) {
             return this.currentDate;
         },
 
-        selectProgramme(programme) {
-            this.selectedProgramme = programme;
-        },
-
         previousDay() {
             const [year, month, day] = this.currentDate.split('-').map(Number);
             const date = new Date(year, month - 1, day); // month is 0-indexed in Date constructor
@@ -297,6 +292,61 @@ function epgViewer(config) {
                 console.log('No programmes found for channel:', channelId);
             }
             return programmes;
+        },
+
+        getTooltipContent(programme) {
+            let content = '<p><strong>' + programme.title + '</strong></p>';
+            if (programme.new) {
+                content += '<small>New Episode</small><br/>';
+            }
+            if (programme.episode_num) {
+                // Assuming episode_num is in xmltv_ns format
+                let season = 0, episode = 0;
+                const parts = programme.episode_num.split('.');
+                if (parts.length > 0) {
+                    season = parseInt(parts[0], 10) + 1; // xmltv_ns is zero-based
+                }
+                if (parts.length > 1) {
+                    episode = parseInt(parts[1], 10) + 1;
+                }
+                if (season > 0 && episode > 0) {
+                    content += '<small>Season ' + season + ', Episode ' + episode + '</small><br/>';
+                } else if (season > 0) {
+                    content += '<small>Season ' + season + '</small><br/>';
+                } else if (episode > 0) {
+                    content += '<small>Episode ' + episode + '</small><br/>';
+                }
+            }
+            if (programme.desc && programme.desc.trim()) {
+                content += '<p>' + programme.desc + '</p>';
+            }
+            if (programme.category && programme.category.trim()) {
+                content += '<small>Category: ' + programme.category + '</small>';
+            }
+            return content;
+        },
+
+        getProgrammeSeasonEpisode(programme) {
+            let content = '';
+            if (programme.episode_num) {
+                // Assuming episode_num is in xmltv_ns format
+                let season = 0, episode = 0;
+                const parts = programme.episode_num.split('.');
+                if (parts.length > 0) {
+                    season = parseInt(parts[0], 10) + 1; // xmltv_ns is zero-based
+                }
+                if (parts.length > 1) {
+                    episode = parseInt(parts[1], 10) + 1;
+                }
+                if (season > 0 && episode > 0) {
+                    content += 'Season ' + season + ', Episode ' + episode;
+                } else if (season > 0) {
+                    content += 'Season ' + season;
+                } else if (episode > 0) {
+                    content += 'Episode ' + episode;
+                }
+            }
+            return content;
         },
 
         getProgrammeStyle(programme) {
