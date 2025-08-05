@@ -375,25 +375,26 @@ class EpgResource extends Resource
                                     }
 
                                     try {
+                                        // Authenticate to get fresh token
                                         $authData = $service->authenticate($username, $password);
 
-                                        // Get account lineups first
-                                        $accountLineups = [];
-                                        try {
-                                            $userLineups = $service->getUserLineups($authData['token']);
-                                            $accountLineups = $userLineups['lineups'] ?? [];
-                                        } catch (\Exception $e) {
-                                            // If we can't get account lineups, fall back to headend search
-                                        }
+                                        // // Get account lineups first
+                                        // $accountLineups = [];
+                                        // try {
+                                        //     $userLineups = $service->getUserLineups($authData['token']);
+                                        //     $accountLineups = $userLineups['lineups'] ?? [];
+                                        // } catch (\Exception $e) {
+                                        //     // If we can't get account lineups, fall back to headend search
+                                        // }
 
                                         $options = [];
 
-                                        // First, add account lineups that match the search
-                                        foreach ($accountLineups as $lineup) {
-                                            if (stripos($lineup['name'], $search) !== false) {
-                                                $options[$lineup['lineup']] = "{$lineup['name']}";
-                                            }
-                                        }
+                                        // // First, add account lineups that match the search
+                                        // foreach ($accountLineups as $lineup) {
+                                        //     if (stripos($lineup['name'], $search) !== false) {
+                                        //         $options[$lineup['lineup']] = "{$lineup['name']}";
+                                        //     }
+                                        // }
 
                                         // Then add available lineups from headends
                                         $headends = $service->getHeadends($authData['token'], $country, $postalCode);
@@ -424,19 +425,8 @@ class EpgResource extends Resource
                                             return $value;
                                         }
 
+                                        // Authenticate to get fresh token
                                         $authData = $service->authenticate($username, $password);
-
-                                        // Check account lineups first
-                                        try {
-                                            $userLineups = $service->getUserLineups($authData['token']);
-                                            foreach ($userLineups['lineups'] ?? [] as $lineup) {
-                                                if ($lineup['lineup'] === $value) {
-                                                    return "{$lineup['name']}";
-                                                }
-                                            }
-                                        } catch (\Exception $e) {
-                                            // Continue to headend search
-                                        }
 
                                         // Check available lineups
                                         $headends = $service->getHeadends($authData['token'], $country, $postalCode);
