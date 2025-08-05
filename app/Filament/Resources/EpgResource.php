@@ -391,7 +391,7 @@ class EpgResource extends Resource
                                         // First, add account lineups that match the search
                                         foreach ($accountLineups as $lineup) {
                                             if (stripos($lineup['name'], $search) !== false) {
-                                                $options[$lineup['lineup']] = "✅ {$lineup['name']} (In Account)";
+                                                $options[$lineup['lineup']] = "{$lineup['name']}";
                                             }
                                         }
 
@@ -402,7 +402,7 @@ class EpgResource extends Resource
                                                 if (stripos($lineup['name'], $search) !== false) {
                                                     // Don't duplicate if already in account
                                                     if (!isset($options[$lineup['lineup']])) {
-                                                        $options[$lineup['lineup']] = "⚠️ {$lineup['name']} ({$headend['transport']}) - Not Added";
+                                                        $options[$lineup['lineup']] = "{$lineup['name']} ({$headend['transport']})";
                                                     }
                                                 }
                                             }
@@ -431,7 +431,7 @@ class EpgResource extends Resource
                                             $userLineups = $service->getUserLineups($authData['token']);
                                             foreach ($userLineups['lineups'] ?? [] as $lineup) {
                                                 if ($lineup['lineup'] === $value) {
-                                                    return "✅ {$lineup['name']} (In Account)";
+                                                    return "{$lineup['name']}";
                                                 }
                                             }
                                         } catch (\Exception $e) {
@@ -443,7 +443,7 @@ class EpgResource extends Resource
                                         foreach ($headends as $headend) {
                                             foreach ($headend['lineups'] as $lineup) {
                                                 if ($lineup['lineup'] === $value) {
-                                                    return "⚠️ {$lineup['name']} ({$headend['transport']}) - Not Added";
+                                                    return "{$lineup['name']} ({$headend['transport']})";
                                                 }
                                             }
                                         }
@@ -536,8 +536,7 @@ class EpgResource extends Resource
                                             foreach ($headends as $headend) {
                                                 foreach ($headend['lineups'] as $lineup) {
                                                     $lineupCount++;
-                                                    $status = in_array($lineup['lineup'], $accountLineups) ? ' ✅ (In Account)' : ' ⚠️ (Not Added)';
-                                                    $lineupList .= "• {$lineup['name']} ({$headend['transport']}){$status}\n";
+                                                    $lineupList .= "{$lineup['name']} ({$headend['transport']}) • \n";
                                                 }
                                             }
 
@@ -555,41 +554,41 @@ class EpgResource extends Resource
                                                 ->send();
                                         }
                                     }),
-                                Forms\Components\Actions\Action::make('add_lineup')
-                                    ->label('Add Lineup to Account')
-                                    ->icon('heroicon-o-plus')
-                                    ->color('success')
-                                    ->action(function (Get $get, SchedulesDirectService $service) {
-                                        $username = $get('sd_username');
-                                        $password = $get('sd_password');
-                                        $lineupId = $get('sd_lineup_id');
+                                // Forms\Components\Actions\Action::make('add_lineup')
+                                //     ->label('Add Lineup to Account')
+                                //     ->icon('heroicon-o-plus')
+                                //     ->color('success')
+                                //     ->action(function (Get $get, SchedulesDirectService $service) {
+                                //         $username = $get('sd_username');
+                                //         $password = $get('sd_password');
+                                //         $lineupId = $get('sd_lineup_id');
 
-                                        if (!$username || !$password || !$lineupId) {
-                                            Notification::make()
-                                                ->warning()
-                                                ->title('Missing information')
-                                                ->body('Please enter credentials and select a lineup first')
-                                                ->send();
-                                            return;
-                                        }
+                                //         if (!$username || !$password || !$lineupId) {
+                                //             Notification::make()
+                                //                 ->warning()
+                                //                 ->title('Missing information')
+                                //                 ->body('Please enter credentials and select a lineup first')
+                                //                 ->send();
+                                //             return;
+                                //         }
 
-                                        try {
-                                            $authData = $service->authenticate($username, $password);
-                                            $result = $service->addLineup($authData['token'], $lineupId);
+                                //         try {
+                                //             $authData = $service->authenticate($username, $password);
+                                //             $result = $service->addLineup($authData['token'], $lineupId);
 
-                                            Notification::make()
-                                                ->success()
-                                                ->title('Lineup added successfully!')
-                                                ->body("Lineup {$lineupId} has been added to your Schedules Direct account")
-                                                ->send();
-                                        } catch (\Exception $e) {
-                                            Notification::make()
-                                                ->danger()
-                                                ->title('Failed to add lineup')
-                                                ->body($e->getMessage())
-                                                ->send();
-                                        }
-                                    })
+                                //             Notification::make()
+                                //                 ->success()
+                                //                 ->title('Lineup added successfully!')
+                                //                 ->body("Lineup {$lineupId} has been added to your Schedules Direct account")
+                                //                 ->send();
+                                //         } catch (\Exception $e) {
+                                //             Notification::make()
+                                //                 ->danger()
+                                //                 ->title('Failed to add lineup')
+                                //                 ->body($e->getMessage())
+                                //                 ->send();
+                                //         }
+                                //     })
                             ]),
                         ]),
                 ]),
