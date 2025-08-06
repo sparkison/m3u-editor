@@ -54,19 +54,70 @@ class EpgApiController extends Controller
                 ], 500);
             }
 
-            // Get cached channels with pagination
+            // Use database EpgChannel records for consistent ordering (similar to playlist view)
+            $epgChannels = $epg->channels()
+                ->orderBy('name')  // Consistent alphabetical ordering
+                ->orderBy('channel_id')  // Secondary sort by channel ID
+                ->limit($perPage)
+                ->offset(($page - 1) * $perPage)
+                ->get();
+
+            // Get the channel IDs from database records to fetch cache data
+            $channelIds = $epgChannels->pluck('channel_id')->toArray();
+
+            // Get cached channel data for these specific channels
             $cacheService = new EpgCacheService();
-            $channelData = $cacheService->getCachedChannels($epg, $page, $perPage);
-            $channels = $channelData['channels'];
-            $pagination = $channelData['pagination'];
+            
+            // First try to get cached data for just the channels we need (more efficient)
+            $cachedChannelsData = [];
+            if (!empty($channelIds)) {
+                // Get all cached channels once to avoid multiple file reads
+                $allCachedChannels = $cacheService->getCachedChannels($epg, 1, 99999); // Get all channels
+                $cachedChannelsData = $allCachedChannels['channels'];
+            }
+
+            // Build ordered channels array using database order
+            $channels = [];
+            foreach ($epgChannels as $epgChannel) {
+                $channelId = $epgChannel->channel_id;
+                
+                // Get cached data for this channel, or create basic structure if not found in cache
+                if (isset($cachedChannelsData[$channelId])) {
+                    $cachedData = $cachedChannelsData[$channelId];
+                    // Ensure we have the database name if cache doesn't have display_name
+                    if (empty($cachedData['display_name']) && !empty($epgChannel->name)) {
+                        $cachedData['display_name'] = $epgChannel->name;
+                    }
+                } else {
+                    // Channel exists in database but not in cache - create basic structure
+                    Log::warning("Channel {$channelId} found in database but not in cache for EPG {$epg->name}");
+                    $cachedData = [
+                        'id' => $channelId,
+                        'display_name' => $epgChannel->name ?: $channelId,
+                        'icon' => $epgChannel->icon ?? '',
+                        'lang' => 'en'
+                    ];
+                }
+                
+                $channels[$channelId] = $cachedData;
+            }
 
             // Get cached programmes for the requested date and channels
-            $channelIds = array_keys($channels);
             $programmes = $cacheService->getCachedProgrammes($epg, $startDate, $channelIds);
 
             // Get cache metadata
             $metadata = $cacheService->getCacheMetadata($epg);
 
+            // Create pagination info using database count for accuracy
+            $totalChannels = $epg->channels()->count();
+            $pagination = [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total_channels' => $totalChannels,
+                'returned_channels' => count($channels),
+                'has_more' => (($page - 1) * $perPage + $perPage) < $totalChannels,
+                'next_page' => (($page - 1) * $perPage + $perPage) < $totalChannels ? $page + 1 : null,
+            ];
             return response()->json([
                 'epg' => [
                     'id' => $epg->id,
