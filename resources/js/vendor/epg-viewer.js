@@ -104,6 +104,7 @@ function epgViewer(config) {
             this.currentPage = 1;
             this.allChannels = {};
             this.allProgrammes = {};
+            this.clearProgrammeCache();
 
             try {
                 await this.loadPage(1);
@@ -141,6 +142,9 @@ function epgViewer(config) {
 
                 const data = await response.json();
                 console.log('EPG data loaded successfully:', data);
+
+                // Clear programme cache when new data is loaded
+                this.clearProgrammeCache();
 
                 // Merge channels and programmes
                 Object.assign(this.allChannels, data.channels || {});
@@ -310,11 +314,21 @@ function epgViewer(config) {
         },
 
         getChannelProgrammes(channelId) {
-            const programmes = this.allProgrammes?.[channelId] || [];
-            if (programmes.length === 0) {
-                console.log('No programmes found for channel:', channelId);
+            // Use a cached result to avoid repeated computations
+            if (!this._cachedProgrammes) {
+                this._cachedProgrammes = {};
             }
-            return programmes;
+            
+            if (this._cachedProgrammes[channelId] === undefined) {
+                this._cachedProgrammes[channelId] = this.allProgrammes?.[channelId] || [];
+            }
+            
+            return this._cachedProgrammes[channelId];
+        },
+
+        // Clear programme cache when data is refreshed
+        clearProgrammeCache() {
+            this._cachedProgrammes = {};
         },
 
         getTooltipContent(programme) {
@@ -425,6 +439,28 @@ function epgViewer(config) {
             if (event.key === 'Enter') {
                 event.preventDefault();
                 this.performSearch();
+            }
+        },
+
+        // Refresh EPG data (called after channel updates)
+        async refreshEpgData() {
+            console.log('Refreshing EPG data after channel update...');
+            
+            // Show loading state briefly to provide visual feedback
+            this.loadingMore = true;
+            
+            try {
+                // Small delay to ensure any database changes are committed
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Reload the current data
+                await this.loadEpgData();
+                
+                console.log('EPG data refreshed successfully');
+            } catch (error) {
+                console.error('Error refreshing EPG data:', error);
+            } finally {
+                this.loadingMore = false;
             }
         }
     }

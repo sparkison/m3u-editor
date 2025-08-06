@@ -81,6 +81,7 @@ class EpgApiController extends Controller
                 $channelId = $epgChannel->channel_id;
                 $channels[$channelId] = [
                     'id' => $channelId,
+                    // 'database_id' => $epgChannel->id, // Add the actual database ID for editing
                     'display_name' => $epgChannel->name ?? $epgChannel->display_name ?? $channelId,
                     'icon' => $epgChannel->icon ?? '',
                     'lang' => $epgChannel->lang ?? 'en'
@@ -235,8 +236,8 @@ class EpgApiController extends Controller
                     // Add the playlist channel info to the EPG channel map
                     $epgChannelMap[$epgId][$epgData->channel_id][] = [
                         'playlist_channel_id' => $channelNo,
-                        'title' => $channel->title_custom ?? $channel->title,
-                        'display_name' => $channel->name_custom ?? $channel->name,
+                        'display_name' => $channel->title_custom ?? $channel->title,
+                        'title' => $channel->name_custom ?? $channel->name,
                         'channel_number' => $channel->channel,
                         'group' => $channel->group ?? $channel->group_internal,
                         'logo' => $channel->logo ?? ''
@@ -300,8 +301,8 @@ class EpgApiController extends Controller
                     'url' => $url,
                     'format' => $channelFormat,
                     'tvg_id' => $tvgId,
-                    'title' => $channel->title_custom ?? $channel->title,
-                    'display_name' => $channel->name_custom ?? $channel->name,
+                    'display_name' => $channel->title_custom ?? $channel->title,
+                    'title' => $channel->name_custom ?? $channel->name,
                     'channel_number' => $channel->channel,
                     'group' => $channel->group ?? $channel->group_internal,
                     'icon' => $icon,

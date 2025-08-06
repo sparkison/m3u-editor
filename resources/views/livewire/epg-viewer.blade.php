@@ -4,9 +4,8 @@
     })"
     x-init="init(); loadEpgData()"
     x-on:beforeunload.window="destroy()"
-    x-on:alpine:destroyed="destroy()"
-    x-on:close-modal.window="destroy()"
     x-on:livewire:navigating.window="destroy()"
+    x-on:refresh-epg-data.window="refreshEpgData()"
     class="w-full"
 >
         <!-- Loading State -->
@@ -152,7 +151,7 @@
                                 <!-- Search Status Indicator -->
                                 <div x-show="isSearchActive" class="flex items-center space-x-1">
                                     <x-heroicon-m-magnifying-glass class="w-3 h-3 text-indigo-500 dark:text-indigo-400" />
-                                    <span class="text-xs text-indigo-600 dark:text-indigo-400" x-text="`\"${searchTerm}\"`"></span>
+                                    <span class="text-xs text-indigo-600 dark:text-indigo-400" x-text="'&quot;' + searchTerm + '&quot;'"></span>
                                 </div>
                             </div>
                         </div>
@@ -193,12 +192,12 @@
                     <!-- Channel List (Fixed vertically, scrolls with timeline) -->
                     <div class="w-60 border-r border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 overflow-hidden">
                         <div 
-                            class="overflow-y-auto h-full"
+                            class="overflow-y-auto overflow-x-hidden h-full"
                             @scroll="if (scrollContainer) scrollContainer.scrollTop = $el.scrollTop"
                             x-ref="channelScroll"
                         >
                             <template x-for="(channel, channelId) in epgData?.channels || {}" :key="channelId">
-                                <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-600 flex items-center space-x-3 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors" style="height: 60px;">
+                                <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-600 flex items-center space-x-3 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors group relative" style="height: 60px;">
                                     <div class="flex-shrink-0">
                                         <img 
                                             :src="channel.icon || '/placeholder.png'" 
@@ -212,16 +211,17 @@
                                         <p class="text-xs text-gray-500 dark:text-gray-400 truncate" x-text="channelId"></p>
                                     </div>
                                     <!-- Action Buttons -->
-                                    <div class="flex-shrink-0 flex space-x-1">
+                                    <div x-show="channel.database_id || channel.url" 
+                                        class="absolute p-2 rounded-xl bg-white shadow-sm dark:bg-gray-800 right-1 top-1/2 -translate-y-1/2 flex space-x-1 transform translate-x-8 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:translate-x-0 group-focus-within:opacity-100 transition-all duration-200 ease-in-out">
                                         <!-- Edit Button (only show if channel has database_id) -->
-                                        {{-- <button 
+                                        <button 
                                             x-show="channel.database_id"
                                             @click.stop="$wire.openChannelEdit(channel.database_id)"
                                             class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-900/20 rounded-full transition-colors"
                                             title="Edit Channel"
                                         >
                                             <x-heroicon-s-pencil class="w-4 h-4" />
-                                        </button> --}}
+                                        </button>
 
                                         <!-- Play Button (only show if channel has URL) -->
                                         <button 
@@ -243,7 +243,7 @@
                                 <div class="flex flex-col items-center space-y-2">
                                     <x-heroicon-m-magnifying-glass class="w-8 h-8 text-gray-400 dark:text-gray-500" />
                                     <div class="text-sm font-medium text-gray-600 dark:text-gray-400">No channels found</div>
-                                    <div class="text-xs text-gray-500 dark:text-gray-400" x-text="`No results for \"${searchTerm}\"`"></div>
+                                    <div class="text-xs text-gray-500 dark:text-gray-400" x-text="'No results for &quot;' + searchTerm + '&quot;'"></div>
                                     <button 
                                         @click="clearSearch()"
                                         class="mt-2 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 underline"
@@ -288,7 +288,7 @@
                                     
                                     <!-- Programme blocks -->
                                     <div class="absolute inset-0">
-                                        <template x-for="programme in getChannelProgrammes(channelId)" :key="`${channelId}-${programme.start}-${programme.title}`">
+                                        <template x-for="(programme, programmeIndex) in getChannelProgrammes(channelId)" :key="`${channelId}-${programmeIndex}-${programme.start || 'nostart'}-${programme.stop || 'nostop'}-${(programme.title || 'notitle').replace(/[^a-zA-Z0-9]/g, '')}`">
                                             <x-filament::modal width="2xl">
                                                 <x-slot name="trigger">
                                                     <div 
