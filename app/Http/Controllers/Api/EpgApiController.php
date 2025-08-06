@@ -67,39 +67,17 @@ class EpgApiController extends Controller
 
             // Get cached channel data for these specific channels
             $cacheService = new EpgCacheService();
-            
-            // First try to get cached data for just the channels we need (more efficient)
-            $cachedChannelsData = [];
-            if (!empty($channelIds)) {
-                // Get all cached channels once to avoid multiple file reads
-                $allCachedChannels = $cacheService->getCachedChannels($epg, 1, 99999); // Get all channels
-                $cachedChannelsData = $allCachedChannels['channels'];
-            }
 
             // Build ordered channels array using database order
             $channels = [];
             foreach ($epgChannels as $epgChannel) {
                 $channelId = $epgChannel->channel_id;
-                
-                // Get cached data for this channel, or create basic structure if not found in cache
-                if (isset($cachedChannelsData[$channelId])) {
-                    $cachedData = $cachedChannelsData[$channelId];
-                    // Ensure we have the database name if cache doesn't have display_name
-                    if (empty($cachedData['display_name']) && !empty($epgChannel->name)) {
-                        $cachedData['display_name'] = $epgChannel->name;
-                    }
-                } else {
-                    // Channel exists in database but not in cache - create basic structure
-                    Log::warning("Channel {$channelId} found in database but not in cache for EPG {$epg->name}");
-                    $cachedData = [
-                        'id' => $channelId,
-                        'display_name' => $epgChannel->name ?: $channelId,
-                        'icon' => $epgChannel->icon ?? '',
-                        'lang' => 'en'
-                    ];
-                }
-                
-                $channels[$channelId] = $cachedData;
+                $channels[$channelId] = [
+                    'id' => $channelId,
+                    'display_name' => $epgChannel->name ?? $epgChannel->display_name ?? $channelId,
+                    'icon' => $epgChannel->icon ?? '',
+                    'lang' => $epgChannel->lang ?? 'en'
+                ];
             }
 
             // Get cached programmes for the requested date and channels
