@@ -24,6 +24,10 @@ function epgViewer(config) {
         allChannels: {},
         allProgrammes: {},
 
+        // Search functionality
+        searchTerm: '',
+        isSearchActive: false,
+
         // Cleanup resources
         timeUpdateInterval: null,
         scrollEventListener: null,
@@ -120,7 +124,13 @@ function epgViewer(config) {
 
             try {
                 console.log(`Loading page ${page} of EPG data...`);
-                const url = `${this.apiUrl}?start_date=${this.currentDate}&end_date=${this.getEndDate()}&page=${page}&per_page=${this.perPage}`;
+                let url = `${this.apiUrl}?start_date=${this.currentDate}&end_date=${this.getEndDate()}&page=${page}&per_page=${this.perPage}`;
+                
+                // Add search parameter if active
+                if (this.isSearchActive && this.searchTerm.trim()) {
+                    url += `&search=${encodeURIComponent(this.searchTerm.trim())}`;
+                }
+                
                 console.log('Request URL:', url);
 
                 const response = await fetch(url);
@@ -204,6 +214,10 @@ function epgViewer(config) {
             const newDay = String(date.getDate()).padStart(2, '0');
             this.currentDate = `${newYear}-${newMonth}-${newDay}`;
             
+            // Clear search when navigating dates
+            this.searchTerm = '';
+            this.isSearchActive = false;
+            
             this.loadEpgData();
         },
 
@@ -217,6 +231,10 @@ function epgViewer(config) {
             const newDay = String(date.getDate()).padStart(2, '0');
             this.currentDate = `${newYear}-${newMonth}-${newDay}`;
             
+            // Clear search when navigating dates
+            this.searchTerm = '';
+            this.isSearchActive = false;
+            
             this.loadEpgData();
         },
 
@@ -226,6 +244,11 @@ function epgViewer(config) {
             const month = String(now.getMonth() + 1).padStart(2, '0');
             const day = String(now.getDate()).padStart(2, '0');
             this.currentDate = `${year}-${month}-${day}`;
+            
+            // Clear search when navigating dates
+            this.searchTerm = '';
+            this.isSearchActive = false;
+            
             this.loadEpgData();
         },
 
@@ -376,6 +399,32 @@ function epgViewer(config) {
                 return 'bg-indigo-100 dark:bg-indigo-900 border border-indigo-300 dark:border-indigo-700 hover:bg-indigo-200 dark:hover:bg-indigo-800'; // Future programme
             } else {
                 return 'bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600'; // Past programme
+            }
+        },
+
+        // Search functionality
+        performSearch() {
+            if (!this.searchTerm.trim()) {
+                return;
+            }
+            
+            console.log('Performing search for:', this.searchTerm);
+            this.isSearchActive = true;
+            this.loadEpgData(); // Reload data with search
+        },
+
+        clearSearch() {
+            console.log('Clearing search');
+            this.searchTerm = '';
+            this.isSearchActive = false;
+            this.loadEpgData(); // Reload data without search
+        },
+
+        // Handle Enter key in search input
+        handleSearchKeydown(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                this.performSearch();
             }
         }
     }

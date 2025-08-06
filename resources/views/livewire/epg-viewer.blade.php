@@ -32,8 +32,9 @@
 
         <!-- EPG Content -->
         <div x-show="!loading && !error" class="space-y-4">
-            <!-- Date Navigation -->
-            <div class="flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+            <!-- Date Navigation and Search -->
+            <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                <!-- Date Navigation -->
                 <div class="flex items-center space-x-4">
                     <x-filament::button 
                         icon="heroicon-m-chevron-left"
@@ -59,7 +60,43 @@
                     </x-filament::button>
                 </div>
 
+                <!-- Search Bar -->
                 <div class="flex items-center space-x-2">
+                    <div class="relative flex-1 lg:w-80">
+                        <x-filament::input.wrapper>
+                            <x-filament::input
+                                type="text" 
+                                x-model="searchTerm"
+                                @keydown="handleSearchKeydown($event)"
+                                placeholder="Search channels..."
+                            />
+                            <x-slot name="suffix">
+                                <!-- Clear Button -->
+                                <button 
+                                    x-show="searchTerm.length > 0"
+                                    @click="clearSearch()"
+                                    class="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                                    title="Clear search"
+                                >
+                                    <x-heroicon-m-x-mark class="w-4 h-4" />
+                                </button>
+                                <!-- Search Button -->
+                                <button 
+                                    @click="performSearch()"
+                                    :disabled="!searchTerm.trim()"
+                                    :class="searchTerm.trim() ? 'text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300' : 'text-gray-300 dark:text-gray-600 cursor-not-allowed'"
+                                    class="p-1 transition-colors"
+                                    title="Search"
+                                >
+                                    <x-heroicon-m-magnifying-glass class="w-4 h-4" />
+                                </button>
+                            </x-slot>
+                        </x-filament::input.wrapper>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex items-center">
                     <x-filament::button
                         icon="heroicon-m-calendar"
                         icon-position="before"
@@ -107,8 +144,17 @@
                     <div class="flex">
                         <!-- Channel Column Header -->
                         <div class="w-60 px-4 py-3 border-r border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-800">
-                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Channels</span>
-                            <span class="text-xs text-gray-500 dark:text-gray-400 ml-2" x-text="`(${Object.keys(epgData?.channels || {}).length})`"></span>
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Channels</span>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400 ml-2" x-text="`(${Object.keys(epgData?.channels || {}).length})`"></span>
+                                </div>
+                                <!-- Search Status Indicator -->
+                                <div x-show="isSearchActive" class="flex items-center space-x-1">
+                                    <x-heroicon-m-magnifying-glass class="w-3 h-3 text-indigo-500 dark:text-indigo-400" />
+                                    <span class="text-xs text-indigo-600 dark:text-indigo-400" x-text="`\"${searchTerm}\"`"></span>
+                                </div>
+                            </div>
                         </div>
                         <!-- Time Slots Header (Scrollable) -->
                         <div class="flex-1 relative overflow-hidden">
@@ -191,6 +237,21 @@
                                     </div>
                                 </div>
                             </template>
+
+                            <!-- No Results Message -->
+                            <div x-show="isSearchActive && Object.keys(epgData?.channels || {}).length === 0 && !loadingMore && !loading" class="px-4 py-8 text-center">
+                                <div class="flex flex-col items-center space-y-2">
+                                    <x-heroicon-m-magnifying-glass class="w-8 h-8 text-gray-400 dark:text-gray-500" />
+                                    <div class="text-sm font-medium text-gray-600 dark:text-gray-400">No channels found</div>
+                                    <div class="text-xs text-gray-500 dark:text-gray-400" x-text="`No results for \"${searchTerm}\"`"></div>
+                                    <button 
+                                        @click="clearSearch()"
+                                        class="mt-2 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 underline"
+                                    >
+                                        Clear search
+                                    </button>
+                                </div>
+                            </div>
 
                             <!-- Loading indicator at bottom when more data is being loaded -->
                             <div x-show="hasMore && !loadingMore" class="px-4 py-3 text-center">

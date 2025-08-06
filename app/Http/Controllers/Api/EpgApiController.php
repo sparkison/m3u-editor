@@ -11,7 +11,6 @@ use App\Models\Playlist;
 use App\Models\MergedPlaylist;
 use App\Models\CustomPlaylist;
 use App\Services\EpgCacheService;
-use App\Services\ProxyService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -33,6 +32,7 @@ class EpgApiController extends Controller
         // Pagination parameters
         $page = (int) $request->get('page', 1);
         $perPage = (int) $request->get('per_page', 50);
+        $search = $request->get('search', null);
 
         // Date parameters
         $startDate = $request->get('start_date', Carbon::now()->format('Y-m-d'));
@@ -58,6 +58,13 @@ class EpgApiController extends Controller
             $epgChannels = $epg->channels()
                 ->orderBy('name')  // Consistent alphabetical ordering
                 ->orderBy('channel_id')  // Secondary sort by channel ID
+                ->when($search, function ($queryBuilder) use ($search) {
+                    $search = Str::lower($search);
+                    return $queryBuilder->where(function ($query) use ($search) {
+                        $query->whereRaw('LOWER(name) LIKE ?', ['%' . $search . '%'])
+                            ->orWhereRaw('LOWER(display_name) LIKE ?', ['%' . $search . '%']);
+                    });
+                })
                 ->limit($perPage)
                 ->offset(($page - 1) * $perPage)
                 ->get();
@@ -87,7 +94,13 @@ class EpgApiController extends Controller
             $metadata = $cacheService->getCacheMetadata($epg);
 
             // Create pagination info using database count for accuracy
-            $totalChannels = $epg->channels()->count();
+            $totalChannels = $epg->channels()->when($search, function ($queryBuilder) use ($search) {
+                $search = Str::lower($search);
+                return $queryBuilder->where(function ($query) use ($search) {
+                    $query->whereRaw('LOWER(name) LIKE ?', ['%' . $search . '%'])
+                        ->orWhereRaw('LOWER(display_name) LIKE ?', ['%' . $search . '%']);
+                });
+            })->count();
             $pagination = [
                 'current_page' => $page,
                 'per_page' => $perPage,
@@ -149,6 +162,7 @@ class EpgApiController extends Controller
         // Pagination parameters
         $page = (int) $request->get('page', 1);
         $perPage = (int) $request->get('per_page', 50);
+        $search = $request->get('search', null);
 
         // Date parameters
         $startDate = $request->get('start_date', Carbon::now()->format('Y-m-d'));
@@ -173,6 +187,15 @@ class EpgApiController extends Controller
                 ->orderBy('channels.sort') // Secondary sort
                 ->orderBy('channels.channel')
                 ->orderBy('channels.title')
+                ->when($search, function ($queryBuilder) use ($search) {
+                    $search = Str::lower($search);
+                    return $queryBuilder->where(function ($query) use ($search) {
+                        $query->whereRaw('LOWER(channels.name) LIKE ?', ['%' . $search . '%'])
+                            ->orWhereRaw('LOWER(channels.name_custom) LIKE ?', ['%' . $search . '%'])
+                            ->orWhereRaw('LOWER(channels.title) LIKE ?', ['%' . $search . '%'])
+                            ->orWhereRaw('LOWER(channels.title_custom) LIKE ?', ['%' . $search . '%']);
+                    });
+                })
                 ->limit($perPage)
                 ->offset(($page - 1) * $perPage)
                 ->select('channels.*')
@@ -288,7 +311,15 @@ class EpgApiController extends Controller
             }
 
             // Apply pagination to playlist channels
-            $totalChannels = $playlist->channels()->where('enabled', true)->count();
+            $totalChannels = $playlist->channels()->when($search, function ($queryBuilder) use ($search) {
+                $search = Str::lower($search);
+                return $queryBuilder->where(function ($query) use ($search) {
+                    $query->whereRaw('LOWER(channels.name) LIKE ?', ['%' . $search . '%'])
+                        ->orWhereRaw('LOWER(channels.name_custom) LIKE ?', ['%' . $search . '%'])
+                        ->orWhereRaw('LOWER(channels.title) LIKE ?', ['%' . $search . '%'])
+                        ->orWhereRaw('LOWER(channels.title_custom) LIKE ?', ['%' . $search . '%']);
+                });
+            })->where('enabled', true)->count();
             $skip = ($page - 1) * $perPage;
             $channels = $playlistChannelData;
 
