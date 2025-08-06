@@ -287,6 +287,19 @@ class PostProcessResource extends Resource
                         ->columnSpanFull()
                         ->addActionLabel('Add named export'),
                 ])->hidden(fn(Get $get) => $get('metadata.local') !== 'path'),
+
+            Forms\Components\TextInput::make('metadata.subject')
+                ->label('Email Subject')
+                ->columnSpan(2)
+                ->maxLength(255)
+                ->helperText('Subject line for the email (optional).')
+                ->hidden(fn(Get $get) => $get('metadata.local') !== 'email'),
+            Forms\Components\Textarea::make('metadata.body')
+                ->label('Email Body')
+                ->columnSpan(2)
+                ->helperText('Body content for the email (optional).')
+                ->hidden(fn(Get $get) => $get('metadata.local') !== 'email'),
+
             Forms\Components\Fieldset::make('Email Variables')
                 ->schema([
                     Forms\Components\Repeater::make('metadata.email_vars')
