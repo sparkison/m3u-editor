@@ -134,7 +134,7 @@ class RunPostProcess implements ShouldQueue
                 // Send email using the configured email service
                 $to = explode(',', $metadata['path']);
                 Config::set('mail.default', 'smtp');
-                Config::set('mail.from.address', $settings->smtp_from_address);
+                Config::set('mail.from.address', $settings->smtp_from_address ?? 'no-reply@m3u-editor.dev');
                 Config::set('mail.from.name', 'm3u editor');
                 Config::set('mail.mailers.smtp.host', $settings->smtp_host);
                 Config::set('mail.mailers.smtp.username', $settings->smtp_username);
