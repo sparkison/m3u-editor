@@ -30,6 +30,7 @@ class Epg extends Model
         'status' => Status::class,
         'processing' => 'boolean',
         'is_cached' => 'boolean',
+        'cache_meta' => 'array',
         'source_type' => EpgSourceType::class,
         'sd_token_expires_at' => 'datetime',
         'sd_last_sync' => 'datetime',
@@ -48,6 +49,19 @@ class Epg extends Model
         'sd_token',
     ];
 
+    /**
+     * Boot function for model
+     */
+    protected static function boot()
+    {
+        parent::boot();
+        static::creating(function ($epg) {
+            if (empty($epg->uuid)) {
+                $epg->uuid = Str::uuid();
+            }
+        });
+    }
+
     public function getFolderPathAttribute(): string
     {
         return "epg/{$this->uuid}";
@@ -58,52 +72,47 @@ class Epg extends Model
         return "epg/{$this->uuid}/epg.xml";
     }
 
-    /**
-     * Check if this EPG uses Schedules Direct
-     */
+    public function getCachedEpgMetaAttribute()
+    {
+        if (!$this->is_cached || empty($this->cache_meta)) {
+            return [
+                'min_date' => null,
+                'max_date' => null,
+                'total_programmes' => null,
+                'version' => null,
+            ];
+        }
+        $range = $this->cache_meta['programme_date_range'] ?? null;
+        $totalPrograms = $this->cache_meta['total_programmes'] ?? null;
+        $version = $this->cache_meta['cache_version'] ?? null;
+        return [
+            'min_date' => $range['min_date'] ?? null,
+            'max_date' => $range['max_date'] ?? null,
+            'total_programmes' => $totalPrograms,
+            'version' => $version,
+        ];
+    }
+
     public function isSchedulesDirect(): bool
     {
         return $this->source_type === EpgSourceType::SCHEDULES_DIRECT;
     }
 
-    /**
-     * Check if Schedules Direct token is valid
-     */
     public function hasValidSchedulesDirectToken(): bool
     {
-        return $this->sd_token && 
-               $this->sd_token_expires_at && 
-               $this->sd_token_expires_at->isFuture();
+        return $this->sd_token &&
+            $this->sd_token_expires_at &&
+            $this->sd_token_expires_at->isFuture();
     }
 
-    /**
-     * Check if Schedules Direct credentials are configured
-     */
     public function hasSchedulesDirectCredentials(): bool
     {
         return !empty($this->sd_username) && !empty($this->sd_password);
     }
 
-    /**
-     * Check if Schedules Direct lineup is configured
-     */
     public function hasSchedulesDirectLineup(): bool
     {
         return !empty($this->sd_lineup_id);
-    }
-
-    /**
-     * Boot function for model
-     */
-    protected static function boot()
-    {
-        parent::boot();
-        
-        static::creating(function ($epg) {
-            if (empty($epg->uuid)) {
-                $epg->uuid = Str::uuid();
-            }
-        });
     }
 
     public function user(): BelongsTo

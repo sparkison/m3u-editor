@@ -5,8 +5,6 @@ namespace App\Filament\Resources\EpgResource\Pages;
 use App\Filament\Resources\EpgResource;
 use App\Livewire\EpgViewer;
 use Filament\Actions;
-use Filament\Infolists\Components\Section;
-use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
@@ -77,24 +75,44 @@ class ViewEpg extends ViewRecord
         $record->loadCount('channels');
         return $infolist
             ->schema([
-                Section::make('EPG Information')
+                Infolists\Components\Section::make('EPG Information')
                     ->schema([
-                        TextEntry::make('name')
-                            ->label('Name'),
-                        TextEntry::make('status')
-                            ->badge()
-                            ->color(fn($state) => $state?->getColor()),
-                        TextEntry::make('synced')
-                            ->label('Last Synced')
-                            ->since()
-                            ->placeholder('Never'),
-                        TextEntry::make('channels_count')
-                            ->label('Total Channels')
-                            ->default($record->channels_count),
-                    ])
-                    ->columns(2),
+                        Infolists\Components\Grid::make()
+                            ->columns(2)
+                            ->columnSpan(2)
+                            ->schema([
+                                Infolists\Components\TextEntry::make('name')
+                                    ->label('Name'),
+                                Infolists\Components\TextEntry::make('status')
+                                    ->badge()
+                                    ->color(fn($state) => $state?->getColor()),
+                                Infolists\Components\TextEntry::make('synced')
+                                    ->label('Last Synced')
+                                    ->since()
+                                    ->placeholder('Never'),
+                                Infolists\Components\TextEntry::make('channels_count')
+                                    ->label('Total Channels')
+                                    ->default($record->channels_count),
+                                Infolists\Components\IconEntry::make('is_cached')
+                                    ->label('Cached')
+                                    ->icon(fn(string $state): string => match ($state) {
+                                        '1' => 'heroicon-o-check-circle',
+                                        '0' => 'heroicon-o-x-mark',
+                                        default => 'heroicon-o-x-mark',
+                                    }),
+                            ]),
+                        Infolists\Components\Grid::make()
+                            ->columns(1)
+                            ->columnSpan(1)
+                            ->schema([
 
-                Section::make('Guide')
+                                Infolists\Components\KeyValueEntry::make('cached_epg_meta')
+                                    ->label('Cache Metadata')
+                            ])
+                    ])
+                    ->columns(3),
+
+                Infolists\Components\Section::make('Guide')
                     ->schema([
                         Infolists\Components\Livewire::make(EpgViewer::class),
                     ])

@@ -110,7 +110,7 @@ class EpgCacheService
             );
 
             // Flag EPG as cached
-            $epg->update(['is_cached' => true]);
+            $epg->update(['is_cached' => true, 'cache_meta' => $metadata]);
 
             Log::debug("EPG cache generated successfully", $metadata);
             return true;
@@ -678,7 +678,7 @@ class EpgCacheService
         $cacheDir = $this->getCacheDir($epg);
         try {
             // Flag EPG as not cached
-            $epg->update(['is_cached' => false]);
+            $epg->update(['is_cached' => false, 'cache_meta' => null]);
 
             // Delete cache directory
             Storage::disk('local')->deleteDirectory($cacheDir);
