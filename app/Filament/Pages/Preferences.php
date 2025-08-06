@@ -11,6 +11,9 @@ use Filament\Forms\Set;
 use Filament\Notifications\Notification;
 use Filament\Pages\SettingsPage;
 use Filament\Support\Enums\MaxWidth;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Mail;
 
 class Preferences extends SettingsPage
 {
@@ -320,31 +323,102 @@ class Preferences extends SettingsPage
                         Forms\Components\Tabs\Tab::make('SMTP')
                             ->columns(2)
                             ->schema([
-                                Forms\Components\TextInput::make('smtp_host')
-                                    ->label('SMTP Host')
-                                    ->placeholder('Enter SMTP Host'),
-                                Forms\Components\TextInput::make('smtp_port')
-                                    ->label('SMTP Port')
-                                    ->placeholder('Enter SMTP Port')
-                                    ->numeric(),
-                                Forms\Components\TextInput::make('smtp_username')
-                                    ->label('SMTP Username')
-                                    ->placeholder('Enter SMTP Username'),
-                                Forms\Components\TextInput::make('smtp_password')
-                                    ->label('SMTP Password')
-                                    ->revealable()
-                                    ->placeholder('Enter SMTP Password')
-                                    ->password(),
-                                Forms\Components\Select::make('smtp_encryption')
-                                    ->label('SMTP Encryption')
-                                    ->options([
-                                        'tls' => 'TLS',
-                                        'ssl' => 'SSL',
-                                        null => 'None',
+                                Forms\Components\Section::make('SMTP Settings')
+                                    ->columnSpanFull()
+                                    ->columns(2)
+                                    ->headerActions([
+                                        Forms\Components\Actions\Action::make('send_test_email')
+                                            ->label('Send Test Email')
+                                            ->icon('heroicon-o-envelope')
+                                            ->iconPosition('after')
+                                            ->color('gray')
+                                            ->size('sm')
+                                            ->form([
+                                                Forms\Components\TextInput::make('to_email')
+                                                    ->label('To Email Address')
+                                                    ->email()
+                                                    ->required()
+                                                    ->placeholder('Enter To Email Address')
+                                                    ->helperText('A test email will be sent to this address using the entered SMTP settings.'),
+                                            ])
+                                            ->action(function (array $data, $get): void {
+                                                try {
+                                                    // Get SMTP settings from the form state
+                                                    $formState = $this->form->getState();
+
+                                                    // Make sure all required fields are present
+                                                    if (empty($formState['smtp_host']) || empty($formState['smtp_port']) || empty($formState['smtp_username']) || empty($formState['smtp_password'])) {
+                                                        Notification::make()
+                                                            ->danger()
+                                                            ->title('Missing SMTP Fields')
+                                                            ->body('Please fill in all required SMTP fields before sending a test email.')
+                                                            ->send();
+                                                        return;
+                                                    }
+
+                                                    // Configure mail settings temporarily
+                                                    Config::set('mail.default', 'smtp');
+                                                    Config::set('mail.from.address', $formState['smtp_from_address'] ?? 'no-reply@m3u-editor.dev');
+                                                    Config::set('mail.from.name', 'm3u editor');
+                                                    Config::set('mail.mailers.smtp.host', $formState['smtp_host']);
+                                                    Config::set('mail.mailers.smtp.username', $formState['smtp_username']);
+                                                    Config::set('mail.mailers.smtp.password', $formState['smtp_password']);
+                                                    Config::set('mail.mailers.smtp.port', $formState['smtp_port']);
+                                                    Config::set('mail.mailers.smtp.encryption', $formState['smtp_encryption']);
+
+                                                    Mail::raw('This is a test email to verify your SMTP settings.', function ($message) use ($data) {
+                                                        $message->to($data['to_email'])
+                                                            ->subject('Test Email from m3u editor');
+                                                    });
+
+                                                    Notification::make()
+                                                        ->success()
+                                                        ->title('Test Email Sent')
+                                                        ->body('Test email sent successfully to ' . $data['to_email'])
+                                                        ->send();
+                                                } catch (\Exception $e) {
+                                                    Notification::make()
+                                                        ->danger()
+                                                        ->title('Error Sending Test Email')
+                                                        ->body($e->getMessage())
+                                                        ->send();
+                                                }
+                                            }),
+                                    ])
+                                    ->schema([
+                                        Forms\Components\TextInput::make('smtp_host')
+                                            ->label('SMTP Host')
+                                            ->placeholder('Enter SMTP Host')
+                                            ->helperText('Required to send emails.'),
+                                        Forms\Components\TextInput::make('smtp_port')
+                                            ->label('SMTP Port')
+                                            ->placeholder('Enter SMTP Port')
+                                            ->numeric()
+                                            ->helperText('Required to send emails.'),
+                                        Forms\Components\TextInput::make('smtp_username')
+                                            ->label('SMTP Username')
+                                            ->placeholder('Enter SMTP Username')
+                                            ->helperText('Required to send emails, if your provider requires authentication.'),
+                                        Forms\Components\TextInput::make('smtp_password')
+                                            ->label('SMTP Password')
+                                            ->revealable()
+                                            ->placeholder('Enter SMTP Password')
+                                            ->password()
+                                            ->helperText('Required to send emails, if your provider requires authentication.'),
+                                        Forms\Components\Select::make('smtp_encryption')
+                                            ->label('SMTP Encryption')
+                                            ->options([
+                                                'tls' => 'TLS',
+                                                'ssl' => 'SSL',
+                                                null => 'None',
+                                            ])
+                                            ->placeholder('Select encryption type (optional)'),
+                                        Forms\Components\TextInput::make('smtp_from_address')
+                                            ->label('SMTP From Address')
+                                            ->placeholder('Enter SMTP From Address')
+                                            ->email()
+                                            ->helperText('The "From" email address for outgoing emails. Defaults to no-reply@m3u-editor.dev.'),
                                     ]),
-                                Forms\Components\TextInput::make('smtp_from_address')
-                                    ->label('SMTP From Address')
-                                    ->placeholder('Enter SMTP From Address'),
                             ]),
                         Forms\Components\Tabs\Tab::make('Debugging')
                             ->schema([
@@ -369,7 +443,7 @@ class Preferences extends SettingsPage
                                                     ->title("WebSocket Connection Test")
                                                     ->body($data['message'])
                                                     ->persistent()
-                                                    ->broadcast(auth()->user());
+                                                    ->broadcast(Auth::user());
                                             }),
                                         Forms\Components\Actions\Action::make('view_logs')
                                             ->label('View Logs')
