@@ -25,12 +25,27 @@ class EpgViewer extends Component implements HasForms, HasActions
     public $record;
     public $type;
     public $editingChannelId = null;
-    protected $cachedRecord = null;
+    
+    // Use static cache to prevent Livewire from clearing it
+    protected static $recordCache = [];
+    protected static $maxCacheSize = 20; // Limit cache size to prevent memory issues
 
     public function mount($record): void
     {
         $this->record = $record;
         $this->type = class_basename($this->record);
+    }
+
+    /**
+     * Clear old cache entries if cache gets too large
+     */
+    protected static function maintainCacheSize(): void
+    {
+        if (count(static::$recordCache) > static::$maxCacheSize) {
+            // Remove the oldest entries (first half of cache)
+            $halfSize = intval(static::$maxCacheSize / 2);
+            static::$recordCache = array_slice(static::$recordCache, $halfSize, null, true);
+        }
     }
 
     protected function getActions(): array
@@ -42,55 +57,11 @@ class EpgViewer extends Component implements HasForms, HasActions
 
     public function editChannelAction(): Action
     {
-        // Return "EditAction" to get correct form and action for editing channels
         return EditAction::make('editChannel')
             ->label('Edit Channel')
-            ->record(function () {
-                // Use cached record if available and matches current editing channel
-                if ($this->cachedRecord && $this->cachedRecord->id == $this->editingChannelId) {
-                    Log::debug('Using cached record', [
-                        'channel_id' => $this->cachedRecord->id,
-                        'channel_name' => $this->cachedRecord->name ?? 'unknown'
-                    ]);
-                    return $this->cachedRecord;
-                }
-                
-                Log::debug('EditAction record function called', [
-                    'editingChannelId' => $this->editingChannelId,
-                    'type' => $this->type,
-                    'cached_record_id' => $this->cachedRecord ? $this->cachedRecord->id : 'none'
-                ]);
-                
-                if (!$this->editingChannelId) {
-                    Log::warning('No editingChannelId set');
-                    return null;
-                }
-                
-                $channel = $this->type === 'Epg'
-                    ? EpgChannel::find($this->editingChannelId)
-                    : Channel::with([
-                        'epgChannel',
-                        'failovers'
-                    ])->find($this->editingChannelId);
-                
-                // Cache the record for subsequent calls
-                $this->cachedRecord = $channel;
-                
-                Log::debug('Found and cached channel', [
-                    'channel_id' => $channel?->id,
-                    'channel_name' => $channel?->name ?? 'unknown',
-                    'query_type' => $this->type
-                ]);
-                
-                return $channel;
-            })
+            ->record(fn () => $this->getChannelRecord())
             ->form($this->type === 'Epg' ? EpgChannelResource::getForm() : ChannelResource::getForm(edit: true))
             ->action(function (array $data, $record) {
-                Log::debug('EditAction action called', [
-                    'record_id' => $record?->id,
-                    'data_keys' => array_keys($data)
-                ]);
-                
                 if ($record) {
                     $record->update($data);
 
@@ -100,42 +71,53 @@ class EpgViewer extends Component implements HasForms, HasActions
                         ->body('The channel has been successfully updated.')
                         ->send();
 
-                    Log::debug('Channel updated, triggering EPG refresh', [
-                        'channel_id' => $record->id,
-                        'channel_name' => $record->name ?? 'unknown'
-                    ]);
+                    // Update the static cache with fresh data
+                    $cacheKey = "{$this->type}_{$record->id}";
+                    static::$recordCache[$cacheKey] = $record->fresh(['epgChannel', 'failovers']);
 
                     // Refresh the EPG data to reflect the changes
                     $this->dispatch('refresh-epg-data');
                 }
                 
-                // Clear cache after action completes
-                Log::debug('Clearing cache after action completion');
-                $this->cachedRecord = null;
                 $this->editingChannelId = null;
             })
             ->slideOver()
             ->modalWidth('4xl');
     }
 
-    public function openChannelEdit($channelId)
+    protected function getChannelRecord()
     {
-        Log::debug('Opening channel edit modal', [
-            'channel_id' => $channelId,
-            'type' => $this->type,
-            'current_editing_id' => $this->editingChannelId,
-            'has_cached_record' => $this->cachedRecord ? $this->cachedRecord->id : 'none'
-        ]);
+        $cacheKey = "{$this->type}_{$this->editingChannelId}";
         
-        // Only clear cache if we're editing a different channel
-        if ($this->editingChannelId !== $channelId) {
-            Log::debug('Clearing cache - different channel', [
-                'old_channel' => $this->editingChannelId,
-                'new_channel' => $channelId
-            ]);
-            $this->cachedRecord = null;
+        // Use static cache if available
+        if (isset(static::$recordCache[$cacheKey])) {
+            return static::$recordCache[$cacheKey];
+        }
+        if (!$this->editingChannelId) {
+            return null;
+        }
+
+        Log::debug('Loading channel record', [
+            'editingChannelId' => $this->editingChannelId,
+            'type' => $this->type,
+            'cache_key' => $cacheKey,
+            'cache_size' => count(static::$recordCache)
+        ]);
+        $channel = $this->type === 'Epg'
+            ? EpgChannel::find($this->editingChannelId)
+            : Channel::with(['epgChannel', 'failovers'])->find($this->editingChannelId);
+        
+        // Cache the record in static cache
+        if ($channel) {
+            static::$recordCache[$cacheKey] = $channel;
+            static::maintainCacheSize();
         }
         
+        return $channel;
+    }
+
+    public function openChannelEdit($channelId)
+    {
         $this->editingChannelId = $channelId;
         $this->mountAction('editChannel');
     }

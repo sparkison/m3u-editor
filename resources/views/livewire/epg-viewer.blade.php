@@ -6,6 +6,7 @@
     x-on:beforeunload.window="destroy()"
     x-on:livewire:navigating.window="destroy()"
     x-on:refresh-epg-data.window="refreshEpgData()"
+    wire:ignore.self
     class="w-full"
 >
         <!-- Loading State -->
@@ -30,7 +31,7 @@
         </div>
 
         <!-- EPG Content -->
-        <div x-show="!loading && !error" class="space-y-4">
+        <div x-show="!loading && !error" class="space-y-4" wire:ignore.self>
             <!-- Date Navigation and Search -->
             <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                 <!-- Date Navigation -->
@@ -128,6 +129,7 @@
                     x-transition:leave="transition ease-in duration-200"
                     x-transition:leave-start="opacity-100"
                     x-transition:leave-end="opacity-0"
+                    wire:ignore
                     class="absolute top-0 left-0 right-0 z-50 bg-indigo-50 dark:bg-indigo-900 border-b border-indigo-200 dark:border-indigo-800 px-4 py-2"
                 >
                     <div class="flex items-center justify-center space-x-2">
@@ -213,13 +215,14 @@
                                     <!-- Action Buttons -->
                                     <div x-show="channel.database_id || channel.url" 
                                         class="absolute p-2 rounded-xl bg-white shadow-sm dark:bg-gray-800 right-1 top-1/2 -translate-y-1/2 flex space-x-1 transform translate-x-8 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:translate-x-0 group-focus-within:opacity-100 transition-all duration-200 ease-in-out">
-                                        {{-- <!-- Edit Button (only show if channel has database_id) -->
+                                        <!-- Edit Button (only show if channel has database_id) -->
                                         <button 
                                             x-show="channel.database_id"
                                             @click.stop="
                                                 if (!modalLoading) {
                                                     modalLoading = true;
                                                     $wire.openChannelEdit(channel.database_id);
+                                                    // Prevent multiple clicks
                                                     setTimeout(() => { modalLoading = false; }, 1000);
                                                 }
                                             "
@@ -228,7 +231,7 @@
                                             title="Edit Channel"
                                         >
                                             <x-heroicon-s-pencil class="w-4 h-4" />
-                                        </button> --}}
+                                        </button>
 
                                         <!-- Play Button (only show if channel has URL) -->
                                         <button 
