@@ -216,8 +216,15 @@
                                         <!-- Edit Button (only show if channel has database_id) -->
                                         <button 
                                             x-show="channel.database_id"
-                                            @click.stop="$wire.openChannelEdit(channel.database_id)"
-                                            class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-900/20 rounded-full transition-colors"
+                                            @click.stop="
+                                                if (!modalLoading) {
+                                                    modalLoading = true;
+                                                    $wire.openChannelEdit(channel.database_id);
+                                                    setTimeout(() => { modalLoading = false; }, 1000);
+                                                }
+                                            "
+                                            :disabled="modalLoading"
+                                            class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-900/20 rounded-full transition-colors disabled:opacity-50"
                                             title="Edit Channel"
                                         >
                                             <x-heroicon-s-pencil class="w-4 h-4" />

@@ -31,6 +31,12 @@ function epgViewer(config) {
         searchTerm: '',
         isSearchActive: false,
 
+        // Modal loading state to prevent rapid clicking
+        modalLoading: false,
+
+        // Channel editing modal (handled outside Livewire to prevent re-renders)
+        channelEditModal: null,
+        
         // Cleanup resources
         timeUpdateInterval: null,
         scrollEventListener: null,
@@ -461,6 +467,27 @@ function epgViewer(config) {
                 console.error('Error refreshing EPG data:', error);
             } finally {
                 this.loadingMore = false;
+            }
+        },
+
+        // Handle channel edit modal outside of Livewire to prevent re-renders
+        openChannelEditModal(detail) {
+            console.log('Opening channel edit modal for channel:', detail.channelId);
+            
+            // Create a simple modal or redirect to edit page
+            // For now, we'll use a browser-native approach or integrate with Filament's modal system
+            const channelId = detail.channelId;
+            const type = detail.type;
+            
+            // You can implement a custom modal here or redirect to an edit page
+            // This prevents Livewire from re-rendering the entire EPG view
+            console.log(`Edit channel ${channelId} of type ${type}`);
+            
+            // For demonstration, we'll create a simple alert
+            // In a real implementation, you'd want to create a proper modal
+            if (confirm(`Edit channel ${channelId}? (This is a placeholder - implement proper modal)`)) {
+                // Call the Livewire method without re-rendering the component
+                this.$wire.call('updateChannel', channelId, { name: 'Updated Channel' });
             }
         }
     }
