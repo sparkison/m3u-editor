@@ -48,10 +48,21 @@ class EpgViewer extends Component implements HasForms, HasActions
             ->record(function () {
                 // Use cached record if available and matches current editing channel
                 if ($this->cachedRecord && $this->cachedRecord->id == $this->editingChannelId) {
+                    Log::debug('Using cached record', [
+                        'channel_id' => $this->cachedRecord->id,
+                        'channel_name' => $this->cachedRecord->name ?? 'unknown'
+                    ]);
                     return $this->cachedRecord;
                 }
                 
+                Log::debug('EditAction record function called', [
+                    'editingChannelId' => $this->editingChannelId,
+                    'type' => $this->type,
+                    'cached_record_id' => $this->cachedRecord ? $this->cachedRecord->id : 'none'
+                ]);
+                
                 if (!$this->editingChannelId) {
+                    Log::warning('No editingChannelId set');
                     return null;
                 }
                 
@@ -65,10 +76,21 @@ class EpgViewer extends Component implements HasForms, HasActions
                 // Cache the record for subsequent calls
                 $this->cachedRecord = $channel;
                 
+                Log::debug('Found and cached channel', [
+                    'channel_id' => $channel?->id,
+                    'channel_name' => $channel?->name ?? 'unknown',
+                    'query_type' => $this->type
+                ]);
+                
                 return $channel;
             })
             ->form($this->type === 'Epg' ? EpgChannelResource::getForm() : ChannelResource::getForm(edit: true))
             ->action(function (array $data, $record) {
+                Log::debug('EditAction action called', [
+                    'record_id' => $record?->id,
+                    'data_keys' => array_keys($data)
+                ]);
+                
                 if ($record) {
                     $record->update($data);
 
@@ -78,11 +100,17 @@ class EpgViewer extends Component implements HasForms, HasActions
                         ->body('The channel has been successfully updated.')
                         ->send();
 
+                    Log::debug('Channel updated, triggering EPG refresh', [
+                        'channel_id' => $record->id,
+                        'channel_name' => $record->name ?? 'unknown'
+                    ]);
+
                     // Refresh the EPG data to reflect the changes
                     $this->dispatch('refresh-epg-data');
                 }
                 
                 // Clear cache after action completes
+                Log::debug('Clearing cache after action completion');
                 $this->cachedRecord = null;
                 $this->editingChannelId = null;
             })
@@ -92,8 +120,19 @@ class EpgViewer extends Component implements HasForms, HasActions
 
     public function openChannelEdit($channelId)
     {
+        Log::debug('Opening channel edit modal', [
+            'channel_id' => $channelId,
+            'type' => $this->type,
+            'current_editing_id' => $this->editingChannelId,
+            'has_cached_record' => $this->cachedRecord ? $this->cachedRecord->id : 'none'
+        ]);
+        
         // Only clear cache if we're editing a different channel
         if ($this->editingChannelId !== $channelId) {
+            Log::debug('Clearing cache - different channel', [
+                'old_channel' => $this->editingChannelId,
+                'new_channel' => $channelId
+            ]);
             $this->cachedRecord = null;
         }
         

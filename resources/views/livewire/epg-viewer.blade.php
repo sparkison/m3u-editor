@@ -213,7 +213,7 @@
                                     <!-- Action Buttons -->
                                     <div x-show="channel.database_id || channel.url" 
                                         class="absolute p-2 rounded-xl bg-white shadow-sm dark:bg-gray-800 right-1 top-1/2 -translate-y-1/2 flex space-x-1 transform translate-x-8 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:translate-x-0 group-focus-within:opacity-100 transition-all duration-200 ease-in-out">
-                                        <!-- Edit Button (only show if channel has database_id) -->
+                                        {{-- <!-- Edit Button (only show if channel has database_id) -->
                                         <button 
                                             x-show="channel.database_id"
                                             @click.stop="
@@ -228,7 +228,7 @@
                                             title="Edit Channel"
                                         >
                                             <x-heroicon-s-pencil class="w-4 h-4" />
-                                        </button>
+                                        </button> --}}
 
                                         <!-- Play Button (only show if channel has URL) -->
                                         <button 
