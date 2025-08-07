@@ -88,8 +88,11 @@ class ProcessM3uImportComplete implements ShouldQueue
             ['new', true],
         ]);
 
-        // If not a new playlist, create a new playlst sync status!
-        if (!$this->isNew) {
+        // See if sync logs are disabled
+        $syncLogsDisabled = config('dev.disable_sync_logs', false);
+
+        // If not a new playlist, and sync logs are not disabled, create a new playlst sync status!
+        if (!$this->isNew && !$syncLogsDisabled) {
             // Get counts for removed and new groups/channels
             $removedGroupCount = $removedGroups->count();
             $newGroupCount = $newGroups->count();
