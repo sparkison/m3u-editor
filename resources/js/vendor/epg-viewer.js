@@ -23,6 +23,9 @@ function epgViewer(config) {
         hasMore: true,
         allChannels: {},
         allProgrammes: {},
+        
+        // Pre-built channels with programmes for efficient template access
+        processedChannels: {},
 
         // Search functionality
         searchTerm: '',
@@ -104,7 +107,7 @@ function epgViewer(config) {
             this.currentPage = 1;
             this.allChannels = {};
             this.allProgrammes = {};
-            this.clearProgrammeCache();
+            this.processedChannels = {};
 
             try {
                 await this.loadPage(1);
@@ -143,12 +146,8 @@ function epgViewer(config) {
                 const data = await response.json();
                 console.log('EPG data loaded successfully:', data);
 
-                // Clear programme cache when new data is loaded
-                this.clearProgrammeCache();
-
-                // Merge channels and programmes
-                Object.assign(this.allChannels, data.channels || {});
-                Object.assign(this.allProgrammes, data.programmes || {});
+                // Process only new channels incrementally
+                this.processNewChannels(data.channels || {}, data.programmes || {});
 
                 // Update pagination state
                 this.currentPage = data.pagination.current_page;
@@ -159,7 +158,7 @@ function epgViewer(config) {
                     epg: data.epg || null,
                     playlist: data.playlist || null,
                     date_range: data.date_range,
-                    channels: this.allChannels,
+                    channels: this.processedChannels,
                     programmes: this.allProgrammes,
                     pagination: data.pagination
                 };
@@ -314,21 +313,22 @@ function epgViewer(config) {
         },
 
         getChannelProgrammes(channelId) {
-            // Use a cached result to avoid repeated computations
-            if (!this._cachedProgrammes) {
-                this._cachedProgrammes = {};
-            }
-            
-            if (this._cachedProgrammes[channelId] === undefined) {
-                this._cachedProgrammes[channelId] = this.allProgrammes?.[channelId] || [];
-            }
-            
-            return this._cachedProgrammes[channelId];
+            return this.allProgrammes?.[channelId] || [];
         },
 
-        // Clear programme cache when data is refreshed
-        clearProgrammeCache() {
-            this._cachedProgrammes = {};
+        // Process new channels incrementally without rebuilding everything
+        processNewChannels(newChannels, newProgrammes) {
+            // Merge new data efficiently
+            Object.assign(this.allChannels, newChannels);
+            Object.assign(this.allProgrammes, newProgrammes);
+            
+            // Process the new channels synchronously to maintain DOM alignment
+            for (const [channelId, channelData] of Object.entries(newChannels)) {
+                this.processedChannels[channelId] = {
+                    ...channelData,
+                    programmes: this.allProgrammes[channelId] || []
+                };
+            }
         },
 
         getTooltipContent(programme) {

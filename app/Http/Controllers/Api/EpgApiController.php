@@ -81,7 +81,7 @@ class EpgApiController extends Controller
                 $channelId = $epgChannel->channel_id;
                 $channels[$channelId] = [
                     'id' => $channelId,
-                    // 'database_id' => $epgChannel->id, // Add the actual database ID for editing
+                    'database_id' => $epgChannel->id, // Add the actual database ID for editing
                     'display_name' => $epgChannel->name ?? $epgChannel->display_name ?? $channelId,
                     'icon' => $epgChannel->icon ?? '',
                     'lang' => $epgChannel->lang ?? 'en'

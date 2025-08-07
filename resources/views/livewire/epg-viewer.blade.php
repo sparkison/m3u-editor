@@ -288,7 +288,7 @@
                                     
                                     <!-- Programme blocks -->
                                     <div class="absolute inset-0">
-                                        <template x-for="(programme, programmeIndex) in getChannelProgrammes(channelId)" :key="`${channelId}-${programmeIndex}-${programme.start || 'nostart'}-${programme.stop || 'nostop'}-${(programme.title || 'notitle').replace(/[^a-zA-Z0-9]/g, '')}`">
+                                        <template x-for="(programme, programmeIndex) in channel.programmes" :key="`${channelId}-${programmeIndex}-${programme.start || 'nostart'}-${programme.stop || 'nostop'}-${(programme.title || 'notitle').replace(/[^a-zA-Z0-9]/g, '')}`">
                                             <x-filament::modal width="2xl">
                                                 <x-slot name="trigger">
                                                     <div 
