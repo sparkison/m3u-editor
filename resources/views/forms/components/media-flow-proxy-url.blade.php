@@ -3,7 +3,10 @@
     @php($urls = \App\Facades\PlaylistUrlFacade::getMediaFlowProxyUrls($record))
     @php($m3uUrl = $urls['m3u'])
     <div class="flex gap-2 items-center justify-start mb-4">
-        <x-filament::input.wrapper prefix-icon="heroicon-o-globe-alt">
+        <x-filament::input.wrapper suffix-icon="heroicon-o-globe-alt">
+            <x-slot name="prefix">
+                <x-copy-to-clipboard :text="$m3uUrl" />
+            </x-slot>
             <x-filament::input
                 type="text"
                 :value="$m3uUrl"
