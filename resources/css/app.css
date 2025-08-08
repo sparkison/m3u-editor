@@ -3,3 +3,25 @@
 @import "./components/tables.scss";
 @import "./components/widgets.css";
 @import "./components/footer.css";
+
+/* EPG Viewer Mobile Optimizations */
+@media (max-width: 767px) {
+    /* Hide scrollbars on mobile for cleaner look */
+    .timeline-scroll::-webkit-scrollbar,
+    .time-header-scroll::-webkit-scrollbar {
+        display: none;
+    }
+    
+    .timeline-scroll,
+    .time-header-scroll {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+}
+
+/* High DPI screen optimizations */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .programme-block {
+        border-width: 0.5px;
+    }
+}

@@ -17,6 +17,9 @@ function epgViewer(config) {
         timeSlots: [],
         currentTimePosition: -1,
 
+        // Mobile detection
+        isMobile: window.innerWidth < 768,
+
         // Pagination
         currentPage: 1,
         perPage: 50,
@@ -47,6 +50,11 @@ function epgViewer(config) {
             // Update current time every minute
             this.timeUpdateInterval = setInterval(() => this.updateCurrentTime(), 60000);
 
+            // Setup mobile detection with resize listener
+            const updateMobile = () => { this.isMobile = window.innerWidth < 768; };
+            window.addEventListener('resize', updateMobile);
+            this.resizeListener = updateMobile;
+
             // Setup scroll listener for pagination
             this.$nextTick(() => {
                 // The main scrollable container is the timeline-scroll element
@@ -66,6 +74,12 @@ function epgViewer(config) {
             if (this.timeUpdateInterval) {
                 clearInterval(this.timeUpdateInterval);
                 this.timeUpdateInterval = null;
+            }
+
+            // Remove resize listener
+            if (this.resizeListener) {
+                window.removeEventListener('resize', this.resizeListener);
+                this.resizeListener = null;
             }
 
             // Remove scroll event listener
@@ -402,8 +416,12 @@ function epgViewer(config) {
             const startHours = (start - dayStart) / (1000 * 60 * 60);
             const durationHours = (stop - start) / (1000 * 60 * 60);
 
-            const leftPos = startHours * 100; // 100px per hour
-            const width = Math.max(durationHours * 100, 60); // Minimum 60px width
+            // 100px per hour
+            const pixelsPerHour = 100;
+            const minWidth = 60;
+
+            const leftPos = startHours * pixelsPerHour;
+            const width = Math.max(durationHours * pixelsPerHour, minWidth);
 
             return `left: ${leftPos}px; width: ${width}px;`;
         },

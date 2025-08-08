@@ -33,95 +33,108 @@
         <!-- EPG Content -->
         <div x-show="!loading && !error" class="space-y-6" wire:ignore.self>
             <!-- Date Navigation and Search -->
-            <div class="filament-section bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10 rounded-xl p-6">
-                <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
-                    <!-- Date Navigation -->
-                    <div class="flex items-center space-x-4">
-                    <x-filament::button 
-                        icon="heroicon-m-chevron-left"
-                        icon-position="before"
-                        color="gray"
-                        @click="previousDay()"
-                    >
-                        Previous
-                    </x-filament::button>
-                    
-                    <div class="flex flex-col">
-                        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100" x-text="epgData?.epg?.name || epgData?.playlist?.name || 'EPG Viewer'"></h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400" x-text="formatDate(currentDate)"></p>
-                    </div>
-                    
-                    <x-filament::button 
-                        icon="heroicon-m-chevron-right"
-                        icon-position="after"
-                        color="gray"
-                        @click="nextDay()"
-                    >
-                        Next
-                    </x-filament::button>
-                </div>
+            <div class="filament-section bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10 rounded-xl p-4 md:p-6">
+                <div class="flex flex-col gap-4">
+                    <!-- Header Row -->
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <!-- Date Navigation -->
+                        <div class="flex items-center justify-between sm:justify-start gap-2 sm:gap-4">
+                            <x-filament::button 
+                                icon="heroicon-m-chevron-left"
+                                icon-position="before"
+                                color="gray"
+                                size="sm"
+                                @click="previousDay()"
+                            >
+                                <span class="hidden sm:inline">Previous</span>
+                                <span class="sm:hidden">Prev</span>
+                            </x-filament::button>
+                            
+                            <div class="flex flex-col text-center sm:text-left">
+                                <h3 class="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 truncate" x-text="epgData?.epg?.name || epgData?.playlist?.name || 'EPG Viewer'"></h3>
+                                <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400" x-text="formatDate(currentDate)"></p>
+                            </div>
+                            
+                            <x-filament::button 
+                                icon="heroicon-m-chevron-right"
+                                icon-position="after"
+                                color="gray"
+                                size="sm"
+                                @click="nextDay()"
+                            >
+                                <span class="hidden sm:inline">Next</span>
+                                <span class="sm:hidden">Next</span>
+                            </x-filament::button>
+                        </div>
 
-                <!-- Search Bar -->
-                <div class="flex items-center space-x-2">
-                    <div class="relative flex-1 lg:w-80">
-                        <x-filament::input.wrapper>
-                            <x-filament::input
-                                type="text" 
-                                x-model="searchTerm"
-                                @keydown="handleSearchKeydown($event)"
-                                placeholder="Search channels..."
-                            />
-                            <x-slot name="suffix">
-                                <!-- Clear Button -->
-                                <button 
-                                    x-show="searchTerm.length > 0"
-                                    @click="clearSearch()"
-                                    class="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                                    title="Clear search"
-                                >
-                                    <x-heroicon-m-x-mark class="w-4 h-4" />
-                                </button>
-                                <!-- Search Button -->
-                                <button 
-                                    @click="performSearch()"
-                                    :disabled="!searchTerm.trim()"
-                                    :class="searchTerm.trim() ? 'text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300' : 'text-gray-300 dark:text-gray-600 cursor-not-allowed'"
-                                    class="p-1 transition-colors"
-                                    title="Search"
-                                >
-                                    <x-heroicon-m-magnifying-glass class="w-4 h-4" />
-                                </button>
-                            </x-slot>
-                        </x-filament::input.wrapper>
+                        <!-- Action Buttons -->
+                        <div class="flex items-center justify-center sm:justify-end gap-2">
+                            <x-filament::button
+                                icon="heroicon-m-calendar"
+                                icon-position="before"
+                                color="gray"
+                                size="sm"
+                                x-show="!isToday()"
+                                @click="goToToday()"
+                            >
+                                <span class="hidden sm:inline">Today</span>
+                                <span class="sm:hidden">Today</span>
+                            </x-filament::button>
+                            <x-filament::button
+                                icon="heroicon-m-clock"
+                                icon-position="before"
+                                color="gray"
+                                size="sm"
+                                x-show="isToday()"
+                                @click="scrollToCurrentTime()"
+                            >
+                                <span class="hidden sm:inline">Now</span>
+                                <span class="sm:hidden">Now</span>
+                            </x-filament::button>
+                        </div>
                     </div>
-                </div>
 
-                <!-- Action Buttons -->
-                <div class="flex items-center">
-                    <x-filament::button
-                        icon="heroicon-m-calendar"
-                        icon-position="before"
-                        color="gray"
-                        x-show="!isToday()"
-                        @click="goToToday()"
-                    >
-                        Today
-                    </x-filament::button>
-                    <x-filament::button
-                        icon="heroicon-m-clock"
-                        icon-position="before"
-                        color="gray"
-                        x-show="isToday()"
-                        @click="scrollToCurrentTime()"
-                    >
-                        Now
-                    </x-filament::button>
-                </div>
+                    <!-- Search Bar -->
+                    <div class="flex items-center space-x-2">
+                        <div class="relative flex-1">
+                            <x-filament::input.wrapper>
+                                <x-filament::input
+                                    type="text" 
+                                    x-model="searchTerm"
+                                    @keydown="handleSearchKeydown($event)"
+                                    placeholder="Search channels..."
+                                />
+                                <x-slot name="suffix">
+                                    <!-- Clear Button -->
+                                    <button 
+                                        x-show="searchTerm.length > 0"
+                                        @click="clearSearch()"
+                                        class="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                                        title="Clear search"
+                                    >
+                                        <x-heroicon-m-x-mark class="w-4 h-4" />
+                                    </button>
+                                    <!-- Search Button -->
+                                    <button 
+                                        @click="performSearch()"
+                                        :disabled="!searchTerm.trim()"
+                                        :class="searchTerm.trim() ? 'text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300' : 'text-gray-300 dark:text-gray-600 cursor-not-allowed'"
+                                        class="p-1 transition-colors"
+                                        title="Search"
+                                    >
+                                        <x-heroicon-m-magnifying-glass class="w-4 h-4" />
+                                    </button>
+                                </x-slot>
+                            </x-filament::input.wrapper>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- EPG Grid Container -->
-            <div class="filament-section bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10 rounded-xl overflow-hidden relative" style="height: 600px; padding-bottom: 48px;">
+            <div class="filament-section bg-white dark:bg-gray-800 shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10 rounded-xl overflow-hidden relative" 
+                 :style="isMobile ? 'height: 500px; padding-bottom: 48px;' : 'height: 600px; padding-bottom: 48px;'"
+            >
                  <!-- Loading More Overlay -->
                 <div 
                     x-show="loadingMore" 
@@ -146,14 +159,17 @@
                 <div class="sticky top-0 z-10 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
                     <div class="flex">
                         <!-- Channel Column Header -->
-                        <div class="w-60 px-4 py-3 border-r border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-800">
+                        <div :class="isMobile ? 'w-32' : 'w-60'" class="px-2 md:px-4 py-3 border-r border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-800">
                             <div class="flex items-center justify-between">
                                 <div>
-                                    <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Channels</span>
-                                    <span class="text-xs text-gray-500 dark:text-gray-400 ml-2" x-text="`(${Object.keys(epgData?.channels || {}).length})`"></span>
+                                    <span :class="isMobile ? 'text-xs' : 'text-sm'" class="font-medium text-gray-900 dark:text-gray-100">
+                                        <span x-show="!isMobile">Channels</span>
+                                        <span x-show="isMobile">Ch.</span>
+                                    </span>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400 ml-1" x-text="`(${Object.keys(epgData?.channels || {}).length})`"></span>
                                 </div>
                                 <!-- Search Status Indicator -->
-                                <div x-show="isSearchActive" class="flex items-center space-x-1">
+                                <div x-show="isSearchActive && !isMobile" class="flex items-center space-x-1">
                                     <x-heroicon-m-magnifying-glass class="w-3 h-3 text-indigo-500 dark:text-indigo-400" />
                                     <span class="text-xs text-indigo-600 dark:text-indigo-400" x-text="'&quot;' + searchTerm + '&quot;'"></span>
                                 </div>
@@ -168,8 +184,8 @@
                             >
                                 <div class="flex relative" style="width: 2400px;"> <!-- 24 hours * 100px per hour -->
                                     <template x-for="hour in timeSlots" :key="hour">
-                                        <div class="w-25 px-2 py-3 border-r border-gray-200 dark:border-gray-600 text-center bg-gray-100 dark:bg-gray-800" style="width: 100px;">
-                                            <span class="text-xs font-medium text-gray-700 dark:text-gray-300" x-text="formatTime(hour)"></span>
+                                        <div class="px-1 md:px-2 py-3 border-r border-gray-200 dark:border-gray-600 text-center bg-gray-100 dark:bg-gray-800" style="width: 100px;">
+                                            <span class="font-medium text-xs text-gray-700 dark:text-gray-300" x-text="formatTime(hour)"></span>
                                         </div>
                                     </template>
                                     <!-- Current time indicator (moves with content) -->
@@ -194,8 +210,8 @@
                 <!-- Scrollable Content Area -->
                 <div class="flex h-full overflow-hidden" x-data="{
                     virtualScrollTop: 0,
-                    itemHeight: 60,
-                    containerHeight: 552,
+                    get itemHeight() { return isMobile ? 48 : 60; },
+                    get containerHeight() { return isMobile ? 452 : 552; },
                     get totalChannels() { return Object.keys(epgData?.channels || {}).length; },
                     get startIndex() { return Math.max(0, Math.floor(this.virtualScrollTop / this.itemHeight) - 5); },
                     get endIndex() { return Math.min(this.totalChannels, this.startIndex + Math.ceil(this.containerHeight / this.itemHeight) + 15); },
@@ -211,7 +227,7 @@
                     }
                 }">
                     <!-- Channel List (Virtual Scrolled) -->
-                    <div class="w-60 border-r border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 overflow-hidden">
+                    <div :class="isMobile ? 'w-32' : 'w-60'" class="border-r border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 overflow-hidden">
                         <div 
                             class="overflow-y-auto overflow-x-hidden h-full"
                             @scroll="
@@ -229,23 +245,25 @@
                                 <!-- Only render visible items -->
                                 <template x-for="item in visibleChannels" :key="item.id">
                                     <div 
-                                        class="absolute w-full px-4 py-3 border-b border-gray-100 dark:border-gray-600 flex items-center space-x-3 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors group"
+                                        :class="isMobile ? 'px-2 py-2' : 'px-4 py-3'"
+                                        class="absolute w-full border-b border-gray-100 dark:border-gray-600 flex items-center space-x-2 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors group"
                                         :style="`top: ${item.top}px; height: ${itemHeight}px;`"
                                     >
                                         <div class="flex-shrink-0">
                                             <img 
                                                 :src="item.channel.icon || '/placeholder.png'" 
                                                 :alt="item.channel.display_name"
-                                                class="w-8 h-8 rounded object-contain"
+                                                :class="isMobile ? 'w-6 h-6' : 'w-8 h-8'"
+                                                class="rounded object-contain"
                                                 onerror="this.src='/placeholder.png'"
                                             >
                                         </div>
                                         <div class="min-w-0 flex-1">
-                                            <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate" x-text="item.channel.display_name" x-tooltip="item.channel.display_name"></p>
-                                            <p class="text-xs text-gray-500 dark:text-gray-400 truncate" x-text="item.id"></p>
+                                            <p :class="isMobile ? 'text-xs' : 'text-sm'" class="font-medium text-gray-900 dark:text-gray-100 truncate" x-text="item.channel.display_name" x-tooltip="item.channel.display_name"></p>
+                                            <p x-show="!isMobile" class="text-xs text-gray-500 dark:text-gray-400 truncate" x-text="item.id"></p>
                                         </div>
                                         <!-- Action Buttons -->
-                                        <div x-show="item.channel.database_id || item.channel.url" 
+                                        <div x-show="!isMobile && (item.channel.database_id || item.channel.url)" 
                                             class="absolute p-2 rounded-xl bg-white/90 shadow-sm dark:bg-gray-800/90 right-1 top-1/2 -translate-y-1/2 flex space-x-1 transform translate-x-8 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:translate-x-0 group-focus-within:opacity-100 transition-all duration-200 ease-in-out">
                                             <!-- Edit Button -->
                                             <button 
@@ -275,15 +293,20 @@
                                                 <x-heroicon-s-play class="w-4 h-4" />
                                             </button>
                                         </div>
+                                        <!-- Mobile action indicator -->
+                                        <div x-show="isMobile && (item.channel.database_id || item.channel.url)" 
+                                            class="flex-shrink-0 text-gray-400 dark:text-gray-500">
+                                            <x-heroicon-m-ellipsis-horizontal class="w-4 h-4" />
+                                        </div>
                                     </div>
                                 </template>
                             </div>
 
                             <!-- No Results Message -->
-                            <div x-show="isSearchActive && Object.keys(epgData?.channels || {}).length === 0 && !loadingMore && !loading" class="px-4 py-8 text-center">
+                            <div x-show="isSearchActive && Object.keys(epgData?.channels || {}).length === 0 && !loadingMore && !loading" :class="isMobile ? 'px-2 py-6' : 'px-4 py-8'" class="text-center">
                                 <div class="flex flex-col items-center space-y-2">
-                                    <x-heroicon-m-magnifying-glass class="w-8 h-8 text-gray-400 dark:text-gray-500" />
-                                    <div class="text-sm font-medium text-gray-600 dark:text-gray-400">No channels found</div>
+                                    <x-heroicon-m-magnifying-glass :class="isMobile ? 'w-6 h-6' : 'w-8 h-8'" class="text-gray-400 dark:text-gray-500" />
+                                    <div :class="isMobile ? 'text-xs' : 'text-sm'" class="font-medium text-gray-600 dark:text-gray-400">No channels found</div>
                                     <div class="text-xs text-gray-500 dark:text-gray-400" x-text="'No results for &quot;' + searchTerm + '&quot;'"></div>
                                     <button 
                                         @click="clearSearch()"
@@ -295,7 +318,7 @@
                             </div>
 
                             <!-- Loading indicator at bottom when more data is being loaded -->
-                            <div x-show="hasMore && !loadingMore" class="px-4 py-3 text-center">
+                            <div x-show="hasMore && !loadingMore" :class="isMobile ? 'px-2 py-2' : 'px-4 py-3'" class="text-center">
                                 <div class="text-xs text-gray-500 dark:text-gray-400">Scroll down for more channels...</div>
                             </div>
                         </div>
@@ -329,23 +352,37 @@
                                         <!-- Time grid background -->
                                         <div class="absolute inset-0 flex">
                                             <template x-for="hour in timeSlots" :key="`${item.id}-${hour}`">
-                                                <div class="w-25 border-r border-gray-200 dark:border-gray-600" style="width: 100px;"></div>
+                                                <div class="border-r border-gray-200 dark:border-gray-600" style="width: 100px;"></div>
                                             </template>
                                         </div>
                                         
                                         <!-- Programme blocks -->
                                         <div class="absolute inset-0">
                                             <template x-for="(programme, programmeIndex) in item.channel.programmes" :key="`${item.id}-${programmeIndex}-${programme.start || 'nostart'}-${programme.stop || 'nostop'}-${(programme.title || 'notitle').replace(/[^a-zA-Z0-9]/g, '')}`">
-                                                <x-filament::modal width="2xl">
+                                                <div 
+                                                    class="absolute rounded shadow-sm cursor-pointer group transition-all duration-200"
+                                                    :class="getProgrammeColorClass(programme)"
+                                                    :style="`${getProgrammeStyle(programme)}; top: 2px; bottom: 2px;`"
+                                                    x-tooltip.html="getTooltipContent(programme)"
+                                                >
+                                                    <div class="h-full p-2 overflow-hidden flex flex-col justify-center">
+                                                        <div class="font-medium text-xs text-gray-900 dark:text-gray-100 truncate leading-tight" x-text="programme.title"></div>
+                                                        <div class="text-xs text-gray-600 dark:text-gray-300 truncate" x-text="formatProgrammeTime(programme)"></div>
+                                                        <div x-show="programme.new" class="absolute top-0.5 right-0.5 bg-gray-500 text-white text-xs px-1 rounded-xl opacity-100" style="font-size: 10px; line-height: 1;">
+                                                            New
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {{-- <x-filament::modal width="2xl">
                                                     <x-slot name="trigger">
                                                         <div 
-                                                            class="absolute top-1 bottom-1 rounded shadow-sm cursor-pointer group transition-all duration-200"
+                                                            class="absolute rounded shadow-sm cursor-pointer group transition-all duration-200"
                                                             :class="getProgrammeColorClass(programme)"
-                                                            :style="getProgrammeStyle(programme)"
+                                                            :style="`${getProgrammeStyle(programme)}; top: 2px; bottom: 2px;`"
                                                             x-tooltip.html="getTooltipContent(programme)"
                                                         >
-                                                            <div class="p-2 h-full overflow-hidden flex flex-col justify-center">
-                                                                <div class="text-xs font-medium text-gray-900 dark:text-gray-100 truncate leading-tight" x-text="programme.title"></div>
+                                                            <div class="h-full p-2 overflow-hidden flex flex-col justify-center">
+                                                                <div class="font-medium text-xs text-gray-900 dark:text-gray-100 truncate leading-tight" x-text="programme.title"></div>
                                                                 <div class="text-xs text-gray-600 dark:text-gray-300 truncate" x-text="formatProgrammeTime(programme)"></div>
                                                                 <div x-show="programme.new" class="absolute top-0.5 right-0.5 bg-gray-500 text-white text-xs px-1 rounded-xl opacity-100" style="font-size: 10px; line-height: 1;">
                                                                     New
@@ -380,7 +417,7 @@
                                                             <p class="text-sm text-gray-600 dark:text-gray-400" x-text="programme.desc"></p>
                                                         </div>
                                                     </div>
-                                                </x-filament::modal>
+                                                </x-filament::modal> --}}
                                             </template>
                                         </div>
                                     </div>
