@@ -37,24 +37,27 @@ class Preferences extends SettingsPage
                     ->tabs([
                         Forms\Components\Tabs\Tab::make('Appearance')
                             ->schema([
-                                Forms\Components\Select::make('navigation_position')
-                                    ->label('Navigation position')
-                                    ->helperText('Choose the position of primary navigation')
-                                    ->options([
-                                        'left' => 'Left',
-                                        'top' => 'Top',
-                                    ]),
-                                Forms\Components\Toggle::make('show_breadcrumbs')
-                                    ->label('Show breadcrumbs')
-                                    ->helperText('Show breadcrumbs under the page titles'),
-                                Forms\Components\Select::make('content_width')
-                                    ->label('Max width of the page content')
-                                    ->options([
-                                        MaxWidth::ScreenMedium->value => 'Medium',
-                                        MaxWidth::ScreenLarge->value => 'Large',
-                                        MaxWidth::ScreenExtraLarge->value => 'XL',
-                                        MaxWidth::ScreenTwoExtraLarge->value => '2XL',
-                                        MaxWidth::Full->value => 'Full',
+                                Forms\Components\Section::make('Layout options')
+                                    ->schema([
+                                        Forms\Components\Select::make('navigation_position')
+                                            ->label('Navigation position')
+                                            ->helperText('Choose the position of primary navigation')
+                                            ->options([
+                                                'left' => 'Left',
+                                                'top' => 'Top',
+                                            ]),
+                                        Forms\Components\Toggle::make('show_breadcrumbs')
+                                            ->label('Show breadcrumbs')
+                                            ->helperText('Show breadcrumbs under the page titles'),
+                                        Forms\Components\Select::make('content_width')
+                                            ->label('Max width of the page content')
+                                            ->options([
+                                                MaxWidth::ScreenMedium->value => 'Medium',
+                                                MaxWidth::ScreenLarge->value => 'Large',
+                                                MaxWidth::ScreenExtraLarge->value => 'XL',
+                                                MaxWidth::ScreenTwoExtraLarge->value => '2XL',
+                                                MaxWidth::Full->value => 'Full',
+                                            ]),
                                     ]),
                             ]),
                         Forms\Components\Tabs\Tab::make('Proxy')
@@ -511,7 +514,7 @@ class Preferences extends SettingsPage
                                             ->helperText('When enabled you can access the queue manager using the "Queue Manager" button. When disabled, the queue manager endpoint will return a 403 (Unauthorized).'),
                                     ]),
                             ]),
-                    ])
+                    ])->contained(false)
             ]);
     }
 
