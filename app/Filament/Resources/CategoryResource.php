@@ -108,7 +108,7 @@ class CategoryResource extends Resource
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\ViewAction::make(),
                     Tables\Actions\Action::make('add')
-                        ->label('Add to custom playlist')
+                        ->label('Add to Custom Playlist')
                         ->form([
                             Forms\Components\Select::make('playlist')
                                 ->required()
@@ -133,7 +133,7 @@ class CategoryResource extends Resource
                         ->modalDescription('Add the selected series to the chosen custom playlist.')
                         ->modalSubmitActionLabel('Add now'),
                     Tables\Actions\Action::make('move')
-                        ->label('Move series to category')
+                        ->label('Move Series to Category')
                         ->form([
                             Forms\Components\Select::make('category')
                                 ->required()
@@ -161,8 +161,8 @@ class CategoryResource extends Resource
                         ->modalDescription('Move the series to another category.')
                         ->modalSubmitActionLabel('Move now'),
                     Tables\Actions\Action::make('process')
-                        ->label('Process category series')
-                        ->icon('heroicon-o-arrow-path')
+                        ->label('Fetch Series Metadata')
+                        ->icon('heroicon-o-arrow-down-tray')
                         ->action(function ($record) {
                             foreach ($record->enabled_series as $series) {
                                 app('Illuminate\Contracts\Bus\Dispatcher')
@@ -179,8 +179,8 @@ class CategoryResource extends Resource
                                 ->send();
                         })
                         ->requiresConfirmation()
-                        ->icon('heroicon-o-arrow-path')
-                        ->modalIcon('heroicon-o-arrow-path')
+                        ->icon('heroicon-o-arrow-down-tray')
+                        ->modalIcon('heroicon-o-arrow-down-tray')
                         ->modalDescription('Process series for selected category now? Only enabled series will be processed. This will fetch all episodes and seasons for the category series. This may take a while depending on the number of series in the category.')
                         ->modalSubmitActionLabel('Yes, process now'),
                     Tables\Actions\Action::make('sync')
@@ -246,7 +246,7 @@ class CategoryResource extends Resource
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\BulkAction::make('add')
-                        ->label('Add to custom playlist')
+                        ->label('Add to Custom Playlist')
                         ->form([
                             Forms\Components\Select::make('playlist')
                                 ->required()
@@ -276,7 +276,7 @@ class CategoryResource extends Resource
                         ->modalDescription('Add the selected category series to the chosen custom playlist.')
                         ->modalSubmitActionLabel('Add now'),
                     Tables\Actions\BulkAction::make('move')
-                        ->label('Move series to category')
+                        ->label('Move Series to Category')
                         ->form([
                             Forms\Components\Select::make('category')
                                 ->required()
@@ -326,8 +326,8 @@ class CategoryResource extends Resource
                         ->modalDescription('Move the category series to another category.')
                         ->modalSubmitActionLabel('Move now'),
                     Tables\Actions\BulkAction::make('process')
-                        ->label('Process series categories')
-                        ->icon('heroicon-o-arrow-path')
+                        ->label('Fetch Series Metadata')
+                        ->icon('heroicon-o-arrow-down-tray')
                         ->action(function (Collection $records) {
                             foreach ($records as $record) {
                                 foreach ($record->enabled_series as $series) {
@@ -346,8 +346,8 @@ class CategoryResource extends Resource
                                 ->send();
                         })
                         ->requiresConfirmation()
-                        ->icon('heroicon-o-arrow-path')
-                        ->modalIcon('heroicon-o-arrow-path')
+                        ->icon('heroicon-o-arrow-down-tray')
+                        ->modalIcon('heroicon-o-arrow-down-tray')
                         ->modalDescription('Process series for selected category now? Only enabled series will be processed. This will fetch all episodes and seasons for the category series. This may take a while depending on the number of series in the category.')
                         ->modalSubmitActionLabel('Yes, process now'),
                     Tables\Actions\BulkAction::make('sync')

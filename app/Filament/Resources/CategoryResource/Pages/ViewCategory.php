@@ -20,7 +20,7 @@ class ViewCategory extends ViewRecord
         return [
             Actions\ActionGroup::make([
                 Actions\Action::make('add')
-                    ->label('Add to custom playlist')
+                    ->label('Add to Custom Playlist')
                     ->form([
                         Forms\Components\Select::make('playlist')
                             ->required()
@@ -45,7 +45,7 @@ class ViewCategory extends ViewRecord
                     ->modalDescription('Add the selected series to the chosen custom playlist.')
                     ->modalSubmitActionLabel('Add now'),
                 Actions\Action::make('move')
-                    ->label('Move series to category')
+                    ->label('Move Series to Category')
                     ->form([
                         Forms\Components\Select::make('category')
                             ->required()
@@ -73,8 +73,8 @@ class ViewCategory extends ViewRecord
                     ->modalDescription('Move the series to another category.')
                     ->modalSubmitActionLabel('Move now'),
                 Actions\Action::make('process')
-                    ->label('Process category series')
-                    ->icon('heroicon-o-arrow-path')
+                    ->label('Fetch Series Metadata')
+                    ->icon('heroicon-o-arrow-down-tray')
                     ->action(function ($record) {
                         foreach ($record->enabled_series as $series) {
                             app('Illuminate\Contracts\Bus\Dispatcher')
@@ -91,8 +91,8 @@ class ViewCategory extends ViewRecord
                             ->send();
                     })
                     ->requiresConfirmation()
-                    ->icon('heroicon-o-arrow-path')
-                    ->modalIcon('heroicon-o-arrow-path')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->modalIcon('heroicon-o-arrow-down-tray')
                     ->modalDescription('Process series for this category now? Only enabled series will be processed. This will fetch all episodes and seasons for the category series. This may take a while depending on the number of series in the category.')
                     ->modalSubmitActionLabel('Yes, process now'),
                 Actions\Action::make('sync')

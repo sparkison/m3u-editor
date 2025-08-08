@@ -133,7 +133,7 @@ class GroupResource extends Resource
                 Tables\Actions\ActionGroup::make([
                     Tables\Actions\ViewAction::make(),
                     Tables\Actions\Action::make('add')
-                        ->label('Add to custom playlist')
+                        ->label('Add to Custom Playlist')
                         ->form([
                             Forms\Components\Select::make('playlist')
                                 ->required()
@@ -233,7 +233,7 @@ class GroupResource extends Resource
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\BulkAction::make('add')
-                        ->label('Add to custom playlist')
+                        ->label('Add to Custom Playlist')
                         ->form([
                             Forms\Components\Select::make('playlist')
                                 ->required()

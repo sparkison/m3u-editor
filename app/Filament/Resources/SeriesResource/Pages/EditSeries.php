@@ -16,8 +16,8 @@ class EditSeries extends EditRecord
         return [
             Actions\ActionGroup::make([
                 Actions\Action::make('process')
-                    ->label('Process Series')
-                    ->icon('heroicon-o-arrow-path')
+                    ->label('Fetch Series Metadata')
+                    ->icon('heroicon-o-arrow-down-tray')
                     ->action(function ($record) {
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new \App\Jobs\ProcessM3uImportSeriesEpisodes(
@@ -32,8 +32,8 @@ class EditSeries extends EditRecord
                             ->send();
                     })
                     ->requiresConfirmation()
-                    ->icon('heroicon-o-arrow-path')
-                    ->modalIcon('heroicon-o-arrow-path')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->modalIcon('heroicon-o-arrow-down-tray')
                     ->modalDescription('Process series now? This will fetch all episodes and seasons for this series.')
                     ->modalSubmitActionLabel('Yes, process now'),
                 Actions\Action::make('sync')

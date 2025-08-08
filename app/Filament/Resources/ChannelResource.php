@@ -376,8 +376,8 @@ class ChannelResource extends Resource
         return [
             Tables\Actions\ActionGroup::make([
                 Tables\Actions\Action::make('process_vod')
-                    ->label('Process VOD')
-                    ->icon('heroicon-o-arrow-path')
+                    ->label('Fetch VOD Metadata')
+                    ->icon('heroicon-o-arrow-down-tray')
                     ->action(function ($record) {
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new \App\Jobs\ProcessVodChannels(channel: $record));
@@ -392,8 +392,8 @@ class ChannelResource extends Resource
                     ->disabled(fn($record): bool => !$record->is_vod)
                     ->hidden(fn($record): bool => !$record->is_vod)
                     ->requiresConfirmation()
-                    ->icon('heroicon-o-arrow-path')
-                    ->modalIcon('heroicon-o-arrow-path')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->modalIcon('heroicon-o-arrow-down-tray')
                     ->modalDescription('Fetch and process VOD metadata for the selected channel.')
                     ->modalSubmitActionLabel('Yes, process now'),
                 Tables\Actions\EditAction::make('edit_custom')
@@ -428,7 +428,7 @@ class ChannelResource extends Resource
         return [
             Tables\Actions\BulkActionGroup::make([
                 Tables\Actions\BulkAction::make('add')
-                    ->label('Add to custom playlist')
+                    ->label('Add to Custom Playlist')
                     ->form([
                         Forms\Components\Select::make('playlist')
                             ->required()
@@ -499,8 +499,8 @@ class ChannelResource extends Resource
                     ->modalDescription('Move the selected channel(s) to the chosen group.')
                     ->modalSubmitActionLabel('Move now'),
                 Tables\Actions\BulkAction::make('process_vod')
-                    ->label('Process VOD')
-                    ->icon('heroicon-o-arrow-path')
+                    ->label('Fetch VOD Metadata')
+                    ->icon('heroicon-o-arrow-down-tray')
                     ->action(function ($records) {
                         $count = 0;
                         foreach ($records as $record) {
@@ -520,8 +520,8 @@ class ChannelResource extends Resource
                     })
                     ->deselectRecordsAfterCompletion()
                     ->requiresConfirmation()
-                    ->icon('heroicon-o-arrow-path')
-                    ->modalIcon('heroicon-o-arrow-path')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->modalIcon('heroicon-o-arrow-down-tray')
                     ->modalDescription('Fetch and process VOD metadata for the selected channels? Only VOD channels will be processed.')
                     ->modalSubmitActionLabel('Yes, process now'),
                 Tables\Actions\BulkAction::make('map')

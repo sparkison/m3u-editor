@@ -20,7 +20,7 @@ class ViewGroup extends ViewRecord
         return [
             Actions\ActionGroup::make([
                 Actions\Action::make('add')
-                    ->label('Add to custom playlist')
+                    ->label('Add to Custom Playlist')
                     ->form([
                         Forms\Components\Select::make('playlist')
                             ->required()

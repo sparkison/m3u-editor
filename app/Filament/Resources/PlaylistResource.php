@@ -208,7 +208,7 @@ class PlaylistResource extends Resource
             ->actions([
                 Tables\Actions\ActionGroup::make([
                     Tables\Actions\Action::make('process')
-                        ->label(fn($record): string => $record->xtream ? 'Process All' : 'Process')
+                        ->label('Sync And Process')
                         ->icon('heroicon-o-arrow-path')
                         ->action(function ($record) {
                             $record->update([
@@ -232,8 +232,8 @@ class PlaylistResource extends Resource
                         ->modalDescription('Process playlist now?')
                         ->modalSubmitActionLabel('Yes, process now'),
                     Tables\Actions\Action::make('process_series')
-                        ->label('Process Series')
-                        ->icon('heroicon-o-arrow-path')
+                        ->label('Fetch Series Metadata')
+                        ->icon('heroicon-o-arrow-down-tray')
                         ->action(function ($record) {
                             $record->update([
                                 'status' => Status::Processing,
@@ -252,13 +252,13 @@ class PlaylistResource extends Resource
                         ->disabled(fn($record): bool => $record->status === Status::Processing)
                         ->hidden(fn($record): bool => !$record->xtream)
                         ->requiresConfirmation()
-                        ->icon('heroicon-o-arrow-path')
-                        ->modalIcon('heroicon-o-arrow-path')
+                        ->icon('heroicon-o-arrow-down-tray')
+                        ->modalIcon('heroicon-o-arrow-down-tray')
                         ->modalDescription('Fetch Series metadata for this playlist now? Only enabled Series will be included.')
                         ->modalSubmitActionLabel('Yes, process now'),
                     Tables\Actions\Action::make('process_vod')
-                        ->label('Process VOD')
-                        ->icon('heroicon-o-arrow-path')
+                        ->label('Fetch VOD Metadata')
+                        ->icon('heroicon-o-arrow-down-tray')
                         ->action(function ($record) {
                             $record->update([
                                 'status' => Status::Processing,
@@ -277,8 +277,8 @@ class PlaylistResource extends Resource
                         ->disabled(fn($record): bool => $record->status === Status::Processing)
                         ->hidden(fn($record): bool => !$record->xtream)
                         ->requiresConfirmation()
-                        ->icon('heroicon-o-arrow-path')
-                        ->modalIcon('heroicon-o-arrow-path')
+                        ->icon('heroicon-o-arrow-down-tray')
+                        ->modalIcon('heroicon-o-arrow-down-tray')
                         ->modalDescription('Fetch VOD metadata for this playlist now? Only enabled VOD channels will be included.')
                         ->modalSubmitActionLabel('Yes, process now'),
                     Tables\Actions\Action::make('Download M3U')
@@ -544,8 +544,8 @@ class PlaylistResource extends Resource
                     ->modalDescription('Process playlist now?')
                     ->modalSubmitActionLabel('Yes, process now'),
                 Actions\Action::make('process_series')
-                    ->label('Process Series')
-                    ->icon('heroicon-o-arrow-path')
+                    ->label('Fetch Series Metadata')
+                    ->icon('heroicon-o-arrow-down-tray')
                     ->action(function ($record) {
                         $record->update([
                             'status' => Status::Processing,
@@ -564,13 +564,13 @@ class PlaylistResource extends Resource
                     ->disabled(fn($record): bool => $record->status === Status::Processing)
                     ->hidden(fn($record): bool => !$record->xtream)
                     ->requiresConfirmation()
-                    ->icon('heroicon-o-arrow-path')
-                    ->modalIcon('heroicon-o-arrow-path')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->modalIcon('heroicon-o-arrow-down-tray')
                     ->modalDescription('Fetch Series metadata for this playlist now? Only enabled Series will be included.')
                     ->modalSubmitActionLabel('Yes, process now'),
                 Actions\Action::make('process_vod')
-                    ->label('Process VOD')
-                    ->icon('heroicon-o-arrow-path')
+                    ->label('Fetch VOD Metadata')
+                    ->icon('heroicon-o-arrow-down-tray')
                     ->action(function ($record) {
                         $record->update([
                             'status' => Status::Processing,
@@ -589,8 +589,8 @@ class PlaylistResource extends Resource
                     ->disabled(fn($record): bool => $record->status === Status::Processing)
                     ->hidden(fn($record): bool => !$record->xtream)
                     ->requiresConfirmation()
-                    ->icon('heroicon-o-arrow-path')
-                    ->modalIcon('heroicon-o-arrow-path')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->modalIcon('heroicon-o-arrow-down-tray')
                     ->modalDescription('Fetch VOD metadata for this playlist now? Only enabled VOD channels will be included.')
                     ->modalSubmitActionLabel('Yes, process now'),
                 Actions\Action::make('Download M3U')
