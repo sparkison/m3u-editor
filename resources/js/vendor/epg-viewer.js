@@ -353,6 +353,7 @@ function epgViewer(config) {
 
         getTooltipContent(programme) {
             let content = '<p><strong>' + programme.title + '</strong></p>';
+            content += '<small>' + this.formatProgrammeTime(programme) + '</small><br/>';
             if (programme.new) {
                 content += '<small>New Episode</small><br/>';
             }

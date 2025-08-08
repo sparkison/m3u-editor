@@ -153,10 +153,9 @@ class EpisodesRelationManager extends RelationManager
                 SeriesPreview::make('preview')
                     ->columnSpanFull()
                     ->hiddenLabel(),
-
                 Infolists\Components\Section::make('Episode Details')
                     ->collapsible()
-                    ->collapsed(false)
+                    ->collapsed(true)
                     ->columns(2)
                     ->schema([
                         Infolists\Components\TextEntry::make('series.name')
@@ -208,8 +207,7 @@ class EpisodesRelationManager extends RelationManager
                                     ->icon('heroicon-m-star')
                                     ->getStateUsing(function ($record) {
                                         $info = $record->info ?? [];
-                                        $rating = $info['rating'] ?? null;
-                                        return $rating ? "★ {$rating}" : null;
+                                        return $info['rating'] ?? null;
                                     }),
                                 Infolists\Components\TextEntry::make('info.bitrate')
                                     ->label('Bitrate')
@@ -251,18 +249,6 @@ class EpisodesRelationManager extends RelationManager
                             ->copyable()
                             ->url(fn($record) => $record->url)
                             ->openUrlInNewTab(),
-                    ]),
-
-                Infolists\Components\Section::make('Stream Info')
-                    ->description('Click to load stream info')
-                    ->icon('heroicon-m-wifi')
-                    ->collapsible()
-                    ->collapsed()
-                    ->schema([
-                        Infolists\Components\Livewire::make(ChannelStreamStats::class)
-                            ->label('Stream Stats')
-                            ->columnSpanFull()
-                            ->lazy(),
                     ]),
             ]);
     }
