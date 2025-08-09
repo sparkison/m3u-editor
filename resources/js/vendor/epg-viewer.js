@@ -26,7 +26,7 @@ function epgViewer(config) {
         hasMore: true,
         allChannels: {},
         allProgrammes: {},
-        
+
         // Pre-built channels with programmes for efficient template access
         processedChannels: {},
 
@@ -39,7 +39,7 @@ function epgViewer(config) {
 
         // Channel editing modal (handled outside Livewire to prevent re-renders)
         channelEditModal: null,
-        
+
         // Cleanup resources
         timeUpdateInterval: null,
         scrollEventListener: null,
@@ -149,12 +149,12 @@ function epgViewer(config) {
             try {
                 console.log(`Loading page ${page} of EPG data...`);
                 let url = `${this.apiUrl}?start_date=${this.currentDate}&end_date=${this.getEndDate()}&page=${page}&per_page=${this.perPage}`;
-                
+
                 // Add search parameter if active
                 if (this.isSearchActive && this.searchTerm.trim()) {
                     url += `&search=${encodeURIComponent(this.searchTerm.trim())}`;
                 }
-                
+
                 console.log('Request URL:', url);
 
                 const response = await fetch(url);
@@ -231,16 +231,16 @@ function epgViewer(config) {
             const [year, month, day] = this.currentDate.split('-').map(Number);
             const date = new Date(year, month - 1, day); // month is 0-indexed in Date constructor
             date.setDate(date.getDate() - 1);
-            
+
             const newYear = date.getFullYear();
             const newMonth = String(date.getMonth() + 1).padStart(2, '0');
             const newDay = String(date.getDate()).padStart(2, '0');
             this.currentDate = `${newYear}-${newMonth}-${newDay}`;
-            
+
             // Clear search when navigating dates
             this.searchTerm = '';
             this.isSearchActive = false;
-            
+
             this.loadEpgData();
         },
 
@@ -248,16 +248,16 @@ function epgViewer(config) {
             const [year, month, day] = this.currentDate.split('-').map(Number);
             const date = new Date(year, month - 1, day); // month is 0-indexed in Date constructor
             date.setDate(date.getDate() + 1);
-            
+
             const newYear = date.getFullYear();
             const newMonth = String(date.getMonth() + 1).padStart(2, '0');
             const newDay = String(date.getDate()).padStart(2, '0');
             this.currentDate = `${newYear}-${newMonth}-${newDay}`;
-            
+
             // Clear search when navigating dates
             this.searchTerm = '';
             this.isSearchActive = false;
-            
+
             this.loadEpgData();
         },
 
@@ -267,11 +267,11 @@ function epgViewer(config) {
             const month = String(now.getMonth() + 1).padStart(2, '0');
             const day = String(now.getDate()).padStart(2, '0');
             this.currentDate = `${year}-${month}-${day}`;
-            
+
             // Clear search when navigating dates
             this.searchTerm = '';
             this.isSearchActive = false;
-            
+
             this.loadEpgData();
         },
 
@@ -295,7 +295,7 @@ function epgViewer(config) {
             // Parse the date string safely in local timezone
             const [year, month, day] = dateStr.split('-').map(Number);
             const date = new Date(year, month - 1, day); // month is 0-indexed
-            
+
             return date.toLocaleDateString('en-US', {
                 weekday: 'long',
                 year: 'numeric',
@@ -341,7 +341,7 @@ function epgViewer(config) {
             // Merge new data efficiently
             Object.assign(this.allChannels, newChannels);
             Object.assign(this.allProgrammes, newProgrammes);
-            
+
             // Process the new channels synchronously to maintain DOM alignment
             for (const [channelId, channelData] of Object.entries(newChannels)) {
                 this.processedChannels[channelId] = {
@@ -446,7 +446,7 @@ function epgViewer(config) {
             if (!this.searchTerm.trim()) {
                 return;
             }
-            
+
             console.log('Performing search for:', this.searchTerm);
             this.isSearchActive = true;
             this.loadEpgData(); // Reload data with search
@@ -468,40 +468,100 @@ function epgViewer(config) {
         },
 
         // Refresh EPG data (called after channel updates)
-        async refreshEpgData() {
-            console.log('Refreshing EPG data after channel update...');
-            
+        async refreshEpgData(data) {
+            console.log('Refreshing EPG data after channel update...', data);
+
             // Show loading state briefly to provide visual feedback
             this.loadingMore = true;
-            
+
             try {
-                // Small delay to ensure any database changes are committed
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                // Reload the current data
-                await this.loadEpgData();
-                
-                console.log('EPG data refreshed successfully');
+                // For backward compatibility - if data is an array of channels, update them
+                if (Array.isArray(data)) {
+                    for (const updatedChannel of data) {
+                        this.updateChannelData(updatedChannel);
+                    }
+                } else if (data) {
+                    // Single channel update
+                    this.updateChannelData(data);
+                }
             } catch (error) {
                 console.error('Error refreshing EPG data:', error);
+                this.error = 'Failed to refresh EPG data: ' + error.message;
             } finally {
-                this.loadingMore = false;
+                // Hide loading state
+                setTimeout(() => {
+                    this.loadingMore = false;
+                }, 300);
+            }
+        },
+
+        // Update specific channel data without full reload
+        updateChannelData(updatedChannelData) {
+            console.log('Updating channel data:', updatedChannelData);
+
+            // Handle both single object and array of objects
+            const channels = Array.isArray(updatedChannelData) ? updatedChannelData : [updatedChannelData];
+
+            for (const updatedChannel of channels) {
+                const databaseId = updatedChannel.database_id;
+                let foundChannelId = null;
+
+                // Search through the channels object to find matching database_id
+                if (this.epgData?.channels) {
+                    for (const [channelId, channelData] of Object.entries(this.epgData.channels)) {
+                        if (channelData.database_id === databaseId) {
+                            foundChannelId = channelId;
+                            break;
+                        }
+                    }
+                }
+
+                if (foundChannelId && this.epgData.channels[foundChannelId]) {
+                    console.log(`Found channel with database_id ${databaseId} at channel_id ${foundChannelId}`);
+
+                    // Update the channel's display data
+                    this.epgData.channels[foundChannelId].display_name = updatedChannel.display_name;
+                    this.epgData.channels[foundChannelId].icon = updatedChannel.icon;
+
+                    // Update format if provided
+                    if (updatedChannel.format) {
+                        this.epgData.channels[foundChannelId].format = updatedChannel.format;
+                    }
+
+                    // Update URL if provided
+                    if (updatedChannel.url) {
+                        this.epgData.channels[foundChannelId].url = updatedChannel.url;
+                    }
+
+                    // Update programmes if provided
+                    if (updatedChannel.programmes) {
+                        this.epgData.channels[foundChannelId].programmes = updatedChannel.programmes;
+                        // Also update the allProgrammes cache
+                        this.allProgrammes[foundChannelId] = updatedChannel.programmes;
+                    }
+
+                    console.log(`Updated channel ${foundChannelId} (database_id: ${databaseId}) successfully`);
+                } else {
+                    console.warn(`Channel with database_id ${databaseId} not found in current EPG data`);
+                    console.log('Available channels:', Object.keys(this.epgData?.channels || {}));
+                    console.log('Available database_ids:', Object.values(this.epgData?.channels || {}).map(c => c.database_id));
+                }
             }
         },
 
         // Handle channel edit modal outside of Livewire to prevent re-renders
         openChannelEditModal(detail) {
             console.log('Opening channel edit modal for channel:', detail.channelId);
-            
+
             // Create a simple modal or redirect to edit page
             // For now, we'll use a browser-native approach or integrate with Filament's modal system
             const channelId = detail.channelId;
             const type = detail.type;
-            
+
             // You can implement a custom modal here or redirect to an edit page
             // This prevents Livewire from re-rendering the entire EPG view
             console.log(`Edit channel ${channelId} of type ${type}`);
-            
+
             // For demonstration, we'll create a simple alert
             // In a real implementation, you'd want to create a proper modal
             if (confirm(`Edit channel ${channelId}? (This is a placeholder - implement proper modal)`)) {

@@ -5,7 +5,7 @@
     x-init="init(); loadEpgData()"
     x-on:beforeunload.window="destroy()"
     x-on:livewire:navigating.window="destroy()"
-    x-on:refresh-epg-data.window="refreshEpgData()"
+    x-on:refresh-epg-data.window="(e) => refreshEpgData(e.detail)"
     wire:ignore.self
 >
     <div>

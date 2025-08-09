@@ -2,10 +2,14 @@
 
 namespace App\Livewire;
 
+use App\Enums\ChannelLogoType;
+use App\Facades\ProxyFacade;
 use App\Filament\Resources\ChannelResource;
 use App\Filament\Resources\EpgChannelResource;
 use App\Models\Channel;
+use App\Models\Epg;
 use App\Models\EpgChannel;
+use App\Services\EpgCacheService;
 use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
@@ -15,6 +19,7 @@ use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
+use Illuminate\Support\Str;
 
 class EpgViewer extends Component implements HasForms, HasActions
 {
@@ -25,7 +30,7 @@ class EpgViewer extends Component implements HasForms, HasActions
     public $record;
     public $type;
     public $editingChannelId = null;
-    
+
     // Use static cache to prevent Livewire from clearing it
     protected static $recordCache = [];
     protected static $maxCacheSize = 20; // Limit cache size to prevent memory issues
@@ -59,7 +64,7 @@ class EpgViewer extends Component implements HasForms, HasActions
     {
         return EditAction::make('editChannel')
             ->label('Edit Channel')
-            ->record(fn () => $this->getChannelRecord())
+            ->record(fn() => $this->getChannelRecord())
             ->form($this->type === 'Epg' ? EpgChannelResource::getForm() : ChannelResource::getForm(edit: true))
             ->action(function (array $data, $record) {
                 if ($record) {
@@ -73,12 +78,85 @@ class EpgViewer extends Component implements HasForms, HasActions
 
                     // Update the static cache with fresh data
                     $cacheKey = "{$this->type}_{$record->id}";
-                    static::$recordCache[$cacheKey] = $record->fresh(['epgChannel', 'failovers']);
+                    $eager = $this->type === 'Epg' ? [] : ['epgChannel', 'failovers'];
+                    $updated = $record->fresh($eager);
+                    static::$recordCache[$cacheKey] = $updated;
 
                     // Refresh the EPG data to reflect the changes
-                    $this->dispatch('refresh-epg-data');
+                    $channelId = $this->type === 'Epg'
+                        ? $updated->channel_id
+                        : $updated->channel;
+                    $displayName = $this->type === 'Epg'
+                        ? ($updated->display_name ?? $updated->name ?? $channelId)
+                        : ($updated->title_custom ?? $updated->title);
+                    $channelData = [
+                        'channel_id' => $channelId,
+                        'display_name' => $displayName,
+                        'database_id' => $updated->id,
+                    ];
+
+                    // Add URL for Playlist channels
+                    if ($this->type !== 'Epg') {
+                        $playlist = $updated->playlist;
+                        $proxyEnabled = $playlist->enable_proxy;
+                        $proxyFormat = $playlist->proxy_options['output'] ?? 'ts';
+                        $channelFormat = $proxyFormat;
+                        $url = $updated->url_custom ?? $updated->url;
+
+                        // Get the URL based on proxy settings
+                        if ($proxyEnabled) {
+                            $url = ProxyFacade::getProxyUrlForChannel(
+                                id: $updated->id,
+                                format: $proxyFormat
+                            );
+                        } else {
+                            if (Str::endsWith($url, '.m3u8')) {
+                                $channelFormat = 'hls';
+                            } elseif (Str::endsWith($url, '.ts')) {
+                                $channelFormat = 'ts';
+                            } else {
+                                $channelFormat = $channel->container_extension ?? 'ts';
+                            }
+                        }
+
+                        // MKV compatibility hack
+                        if (Str::endsWith($url, '.mkv')) {
+                            // Use a little "hack" to allow playback of MKV streams
+                            // We'll change the format so that the mpegts.js player is used
+                            $channelFormat = 'ts';
+                        }
+
+                        // Get the icon
+                        $icon = '';
+                        if ($updated->logo_type === ChannelLogoType::Epg) {
+                            $icon = $updated->epgChannel?->icon ?? '';
+                        } elseif ($updated->logo_type === ChannelLogoType::Channel) {
+                            $icon = $updated->logo ?? '';
+                        }
+                        if (empty($icon)) {
+                            $icon = url('/placeholder.png');
+                        }
+
+                        // Add URL, format, and icon to channel data
+                        $channelData['url'] = $url;
+                        $channelData['format'] = $channelFormat;
+                        $channelData['icon'] = $icon;
+
+                        // Fetch programme data for Playlist channels if they have an EPG channel
+                        if ($updated->epgChannel) {
+                            // Fetch programme data for this channel
+                            $programmes = $this->fetchProgrammeData($updated->epgChannel, $channelId);
+                            $channelData['programmes'] = $programmes;
+                        } else {
+                            // If no EPG channel, set programmes to empty
+                            $channelData['programmes'] = [];
+                        }
+                    } else {
+                        // No need to updated programmes for EPG channels
+                        $channelData['icon'] = $updated->icon ?? url('/placeholder.png');
+                    }
+                    $this->dispatch('refresh-epg-data', $channelData);
                 }
-                
                 $this->editingChannelId = null;
             })
             ->slideOver()
@@ -88,7 +166,7 @@ class EpgViewer extends Component implements HasForms, HasActions
     protected function getChannelRecord()
     {
         $cacheKey = "{$this->type}_{$this->editingChannelId}";
-        
+
         // Use static cache if available
         if (isset(static::$recordCache[$cacheKey])) {
             return static::$recordCache[$cacheKey];
@@ -97,23 +175,60 @@ class EpgViewer extends Component implements HasForms, HasActions
             return null;
         }
 
-        Log::debug('Loading channel record', [
-            'editingChannelId' => $this->editingChannelId,
-            'type' => $this->type,
-            'cache_key' => $cacheKey,
-            'cache_size' => count(static::$recordCache)
-        ]);
         $channel = $this->type === 'Epg'
             ? EpgChannel::find($this->editingChannelId)
             : Channel::with(['epgChannel', 'failovers'])->find($this->editingChannelId);
-        
+
         // Cache the record in static cache
         if ($channel) {
             static::$recordCache[$cacheKey] = $channel;
             static::maintainCacheSize();
         }
-        
+
         return $channel;
+    }
+
+    /**
+     * Fetch programme data for a channel
+     */
+    protected function fetchProgrammeData($epgChannel, $channelId)
+    {
+        try {
+            // Get today's date for programme lookup
+            $today = now()->format('Y-m-d');
+
+            // Get the EPG that this channel belongs to - ensure it's fully loaded
+            $epg = $epgChannel->epg;
+
+            // If EPG is not fully loaded, reload it with all attributes
+            if (!$epg || !$epg->uuid) {
+                $epg = Epg::find($epgChannel->epg_id);
+            }
+
+            if (!$epg) {
+                Log::debug('No EPG found for EPG channel', [
+                    'epg_channel_id' => $epgChannel->id,
+                    'epg_channel_epg_id' => $epgChannel->epg_id,
+                ]);
+                return [];
+            }
+
+            // Use the EpgCacheService to get programme data
+            $cacheService = app(\App\Services\EpgCacheService::class);
+
+            // Get programmes for this specific channel
+            $programmes = $cacheService->getCachedProgrammes($epg, $today, [$epgChannel->channel_id]);
+
+            // Return programmes for this channel, or empty array if none found
+            return $programmes[$epgChannel->channel_id] ?? [];
+        } catch (\Exception $e) {
+            Log::error('Failed to fetch programme data', [
+                'channel_id' => $channelId,
+                'epg_channel_id' => $epgChannel->id ?? null,
+                'error' => $e->getMessage()
+            ]);
+            return [];
+        }
     }
 
     public function openChannelEdit($channelId)
