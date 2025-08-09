@@ -38,7 +38,18 @@ class RunPostProcess implements ShouldQueue
         public Model $model,
         public ?Model $lastSync = null
     ) {
-        //
+        // Merge the sync data with the model
+        if ($lastSync) {
+            $syncData = $lastSync->sync_stats;
+            if ($syncData) {
+                foreach ($syncData as $key => $value) {
+                    // Only add if not already present in the model
+                    if (!isset($this->model->{$key})) {
+                        $this->model->{$key} = $value;
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -59,17 +70,20 @@ class RunPostProcess implements ShouldQueue
             return;
         }
 
-        // Merge the sync data with the model
+        // If last sync is available, we can use it to get the list of groups/channels added/removed
+        // and include that in the email variables
         if ($this->lastSync) {
-            $syncData = $this->lastSync->sync_stats;
-            if ($syncData) {
-                foreach ($syncData as $key => $value) {
-                    // Only add if not already present in the model
-                    if (!isset($this->model->{$key})) {
-                        $this->model->{$key} = $value;
-                    }
-                }
-            }
+            // Add the counts of added/removed groups/channels to the model
+            $this->model->added_groups = $this->lastSync->addedGroups()->count();
+            $this->model->removed_groups = $this->lastSync->removedGroups()->count();
+            $this->model->added_channels = $this->lastSync->addedChannels()->count();
+            $this->model->removed_channels = $this->lastSync->removedChannels()->count();
+
+            // Also add the names of the groups/channels added/removed
+            $this->model->added_group_names = implode(' • ', $this->lastSync->addedGroups()->pluck('name')->toArray());
+            $this->model->removed_group_names = implode(' • ', $this->lastSync->removedGroups()->pluck('name')->toArray());
+            $this->model->added_channel_names = implode(' • ', $this->lastSync->addedChannels()->pluck('name')->toArray());
+            $this->model->removed_channel_names = implode(' • ', $this->lastSync->removedChannels()->pluck('name')->toArray());
         }
 
         // Check if conditions are met before executing
@@ -88,15 +102,6 @@ class RunPostProcess implements ShouldQueue
             // See if calling webhook, or running a script
             // If the metadata is a URL, then we're calling a webhook
             if (str_contains($metadata['path'], '@')) {
-                // If last sync is available, we can use it to get the list of groups/channels added/removed
-                // and include that in the email variables
-                if ($this->lastSync) {
-                    $addedGroups = $this->lastSync->addedGroups()->pluck('name')->toArray();
-                    $removedGroups = $this->lastSync->removedGroups()->pluck('name')->toArray();
-                    $addedChannels = $this->lastSync->addedChannels()->pluck('name')->toArray();
-                    $removedChannels = $this->lastSync->removedChannels()->pluck('name')->toArray();
-                }
-
                 // Email processing
                 $emailVars = [];
                 $vars = $metadata['email_vars'] ?? [];
@@ -115,20 +120,6 @@ class RunPostProcess implements ShouldQueue
                         }
                     }
                     $emailVars[$var['value']] = $value;
-
-                    // If added/removed groups/channels, include them
-                    if (isset($addedGroups) && $var['value'] === 'added_groups') {
-                        $emailVars['added_groups'] = "Added {$value} groups [" . implode(' • ', $addedGroups) . "]";
-                    }
-                    if (isset($removedGroups) && $var['value'] === 'removed_groups') {
-                        $emailVars['removed_groups'] = "Removed {$value} groups [" . implode(' • ', $removedGroups) . "]";
-                    }
-                    if (isset($addedChannels) && $var['value'] === 'added_channels') {
-                        $emailVars['added_channels'] = "Added {$value} channels [" . implode(' • ', $addedChannels) . "]";
-                    }
-                    if (isset($removedChannels) && $var['value'] === 'removed_channels') {
-                        $emailVars['removed_channels'] = "Removed {$value} channels [" . implode(' • ', $removedChannels) . "]";
-                    }
                 }
 
                 // Send email using the configured email service

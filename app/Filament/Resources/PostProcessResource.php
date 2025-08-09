@@ -225,7 +225,7 @@ class PostProcessResource extends Resource
                                 ->label('Value')
                                 ->required()
                                 ->options([
-                                    // Playlist fields
+                                    // Shared fields
                                     'id' => 'ID',
                                     'uuid' => 'UUID',
                                     'name' => 'Name',
@@ -238,6 +238,10 @@ class PostProcessResource extends Resource
                                     'removed_groups' => '# Groups removed (Playlist only)',
                                     'added_channels' => '# Channels added (Playlist only)',
                                     'removed_channels' => '# Channels removed (Playlist only)',
+                                    'added_group_names' => 'Group names added (Playlist only)',
+                                    'removed_group_names' => 'Group names removed (Playlist only)',
+                                    'added_channel_names' => 'Channel names added (Playlist only)',
+                                    'removed_channel_names' => 'Channel names removed (Playlist only)',
                                 ])->helperText('Value to use for this variable.'),
                         ])
                         ->columns(2)
@@ -268,7 +272,7 @@ class PostProcessResource extends Resource
                                 ->label('Value')
                                 ->required()
                                 ->options([
-                                    // Playlist fields
+                                    // Shared fields
                                     'id' => 'ID',
                                     'uuid' => 'UUID',
                                     'name' => 'Name',
@@ -281,6 +285,10 @@ class PostProcessResource extends Resource
                                     'removed_groups' => '# Groups removed (Playlist only)',
                                     'added_channels' => '# Channels added (Playlist only)',
                                     'removed_channels' => '# Channels removed (Playlist only)',
+                                    'added_group_names' => 'Group names added (Playlist only)',
+                                    'removed_group_names' => 'Group names removed (Playlist only)',
+                                    'added_channel_names' => 'Channel names added (Playlist only)',
+                                    'removed_channel_names' => 'Channel names removed (Playlist only)',
                                 ])->helperText('Value to use for this variable.'),
                         ])
                         ->columns(2)
@@ -307,7 +315,7 @@ class PostProcessResource extends Resource
                                 ->required()
                                 ->columnSpanFull()
                                 ->options([
-                                    // Playlist fields
+                                    // Shared fields
                                     'id' => 'ID',
                                     'uuid' => 'UUID',
                                     'name' => 'Name',
@@ -320,6 +328,10 @@ class PostProcessResource extends Resource
                                     'removed_groups' => '# Groups removed (Playlist only)',
                                     'added_channels' => '# Channels added (Playlist only)',
                                     'removed_channels' => '# Channels removed (Playlist only)',
+                                    'added_group_names' => 'Group names added (Playlist only)',
+                                    'removed_group_names' => 'Group names removed (Playlist only)',
+                                    'added_channel_names' => 'Channel names added (Playlist only)',
+                                    'removed_channel_names' => 'Channel names removed (Playlist only)',
                                 ])->helperText('Value to include in the email.'),
                         ])
                         ->columns(2)
@@ -335,7 +347,7 @@ class PostProcessResource extends Resource
                                 ->label('Field')
                                 ->required()
                                 ->options([
-                                    // Playlist fields
+                                    // Shared fields
                                     'id' => 'ID',
                                     'uuid' => 'UUID',
                                     'name' => 'Name',
@@ -348,6 +360,10 @@ class PostProcessResource extends Resource
                                     'removed_groups' => '# Groups removed (Playlist only)',
                                     'added_channels' => '# Channels added (Playlist only)',
                                     'removed_channels' => '# Channels removed (Playlist only)',
+                                    'added_group_names' => 'Group names added (Playlist only)',
+                                    'removed_group_names' => 'Group names removed (Playlist only)',
+                                    'added_channel_names' => 'Channel names added (Playlist only)',
+                                    'removed_channel_names' => 'Channel names removed (Playlist only)',
                                 ])
                                 ->helperText('Field to check condition against.'),
                             Forms\Components\Select::make('operator')
