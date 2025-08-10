@@ -4,8 +4,8 @@ namespace App\Filament\Resources;
 
 use App\Enums\ChannelLogoType;
 use App\Facades\ProxyFacade;
-use App\Filament\Resources\ChannelResource\Pages;
-use App\Filament\Resources\ChannelResource\RelationManagers;
+use App\Filament\Resources\VodResource\Pages;
+use App\Filament\Resources\VodResource\RelationManagers;
 use App\Infolists\Components\VideoPreview;
 use App\Livewire\ChannelStreamStats;
 use App\Models\Channel;
@@ -31,7 +31,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
-class ChannelResource extends Resource
+class VodResource extends Resource
 {
     protected static ?string $model = Channel::class;
 
@@ -46,24 +46,24 @@ class ChannelResource extends Resource
     {
         return parent::getGlobalSearchEloquentQuery()
             ->where('user_id', auth()->id())
-            ->where('is_vod', false);
+            ->where('is_vod', true);
     }
 
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->where('is_vod', false);
+            ->where('is_vod', true);
     }
 
     protected static ?string $navigationIcon = 'heroicon-o-film';
 
     protected static ?string $navigationGroup = 'Channels & VOD';
 
-    protected static ?string $navigationLabel = 'Live Channels';
+    protected static ?string $navigationLabel = 'VOD Channels';
 
-    protected static ?string $modelLabel = 'Live Channel';
+    protected static ?string $modelLabel = 'VOD Channel';
 
-    protected static ?string $pluralModelLabel = 'Live Channels';
+    protected static ?string $pluralModelLabel = 'VOD Channels';
 
     public static function getNavigationSort(): ?int
     {
@@ -92,7 +92,7 @@ class ChannelResource extends Resource
             ->modifyQueryUsing(function (Builder $query) {
                 $query->with(['epgChannel', 'playlist'])
                     ->withCount(['failovers'])
-                    ->where('is_vod', false);
+                    ->where('is_vod', true);
             })
             ->deferLoading()
             ->paginated([10, 25, 50, 100])
@@ -111,7 +111,7 @@ class ChannelResource extends Resource
                 ->checkFileExistence(false)
                 ->size('inherit', 'inherit')
                 ->extraImgAttributes(fn($record): array => [
-                    'style' => 'height:2.5rem; width:auto; border-radius:4px;', // Live channel style
+                    'style' => 'width:80px; height:120px;', // VOD channel style
                 ])
                 ->getStateUsing(function ($record) {
                     if ($record->logo_type === ChannelLogoType::Channel) {
@@ -149,6 +149,15 @@ class ChannelResource extends Resource
                 ->counts('failovers')
                 ->toggleable()
                 ->sortable(),
+            Tables\Columns\IconColumn::make('has_metadata')
+                ->label('Metadata')
+                ->icon(function ($record): string {
+                    if ($record->has_metadata) {
+                        return 'heroicon-o-check-circle';
+                    }
+                    return 'heroicon-o-minus';
+                })
+                ->color(fn($record): string => $record->has_metadata ? 'success' : 'gray'),
             Tables\Columns\TextInputColumn::make('stream_id_custom')
                 ->label('ID')
                 ->rules(['min:0', 'max:255'])
@@ -314,6 +323,26 @@ class ChannelResource extends Resource
                 ->query(function ($query) {
                     return $query->where('enabled', false);
                 }),
+            Tables\Filters\Filter::make('has_metadata')
+                ->label('Has metadata')
+                ->toggle()
+                ->query(function ($query) {
+                    return $query->where([
+                        ['is_vod', '=', true],
+                        ['info', '!=', null],
+                        ['movie_data', '!=', null],
+                    ]);
+                }),
+            Tables\Filters\Filter::make('does_not_have_metadata')
+                ->label('Does not have metadata')
+                ->toggle()
+                ->query(function ($query) {
+                    return $query->where([
+                        ['is_vod', '=', true],
+                        ['info', '=', null],
+                        ['movie_data', '=', null],
+                    ]);
+                }),
             Tables\Filters\Filter::make('mapped')
                 ->label('EPG is mapped')
                 ->toggle()
@@ -333,26 +362,34 @@ class ChannelResource extends Resource
     {
         return [
             Tables\Actions\ActionGroup::make([
-                Tables\Actions\EditAction::make('edit_custom')
+                Tables\Actions\EditAction::make('edit')
                     ->slideOver()
                     ->form(fn(Tables\Actions\EditAction $action): array => [
                         Forms\Components\Grid::make()
                             ->schema(self::getForm(edit: true))
                             ->columns(2)
                     ]),
+                Tables\Actions\Action::make('process_vod')
+                    ->label('Fetch VOD Metadata')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->action(function ($record) {
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new \App\Jobs\ProcessVodChannels(channel: $record));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Fetching VOD metadata for channel')
+                            ->body('The VOD metadata fetching and processing has been started. You will be notified when it is complete.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->modalIcon('heroicon-o-arrow-down-tray')
+                    ->modalDescription('Fetch and process VOD metadata for the selected channel.')
+                    ->modalSubmitActionLabel('Yes, process now'),
                 Tables\Actions\DeleteAction::make()->hidden(fn(Model $record) => !$record->is_custom),
-            ])->button()->hiddenLabel()->size('sm')->hidden(fn(Model $record) => !$record->is_custom),
-            Tables\Actions\EditAction::make('edit')
-                ->slideOver()
-                ->form(fn(Tables\Actions\EditAction $action): array => [
-                    Forms\Components\Grid::make()
-                        ->schema(self::getForm(edit: true))
-                        ->columns(2)
-                ])
-                ->button()
-                ->hiddenLabel()
-                ->disabled(fn(Model $record) => $record->is_custom)
-                ->hidden(fn(Model $record) => $record->is_custom),
+            ])->button()->hiddenLabel()->size('sm'),
             Tables\Actions\ViewAction::make()
                 ->button()
                 ->hiddenLabel()
@@ -435,6 +472,32 @@ class ChannelResource extends Resource
                     ->modalIcon('heroicon-o-arrows-right-left')
                     ->modalDescription('Move the selected channel(s) to the chosen group.')
                     ->modalSubmitActionLabel('Move now'),
+                Tables\Actions\BulkAction::make('process_vod')
+                    ->label('Fetch VOD Metadata')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->action(function ($records) {
+                        $count = 0;
+                        foreach ($records as $record) {
+                            if ($record->is_vod) {
+                                $count++;
+                                app('Illuminate\Contracts\Bus\Dispatcher')
+                                    ->dispatch(new \App\Jobs\ProcessVodChannels(channel: $record));
+                            }
+                        }
+
+                        Notification::make()
+                            ->success()
+                            ->title("Fetching VOD metadata for {$count} channel(s)")
+                            ->body('The VOD metadata fetching and processing has been started. You will be notified when it is complete.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->deselectRecordsAfterCompletion()
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->modalIcon('heroicon-o-arrow-down-tray')
+                    ->modalDescription('Fetch and process VOD metadata for the selected channels? Only VOD channels will be processed.')
+                    ->modalSubmitActionLabel('Yes, process now'),
                 Tables\Actions\BulkAction::make('map')
                     ->label('Map EPG to selected')
                     ->form(EpgMapResource::getForm(showPlaylist: false, showEpg: true))
@@ -733,10 +796,10 @@ class ChannelResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListChannels::route('/'),
-            //'create' => Pages\CreateChannel::route('/create'),
-            //'view' => Pages\ViewChannel::route('/{record}'),
-            // 'edit' => Pages\EditChannel::route('/{record}/edit'),
+            'index' => Pages\ListVod::route('/'),
+            //'create' => Pages\CreateVod::route('/create'),
+            //'view' => Pages\ViewVod::route('/{record}'),
+            // 'edit' => Pages\EditVod::route('/{record}/edit'),
         ];
     }
 
@@ -1020,6 +1083,31 @@ class ChannelResource extends Resource
                         ->helperText('Indicates the shift of the program schedule, use the values -2,-1,0,1,2,.. and so on.')
                         ->rules(['nullable', 'numeric']),
                 ]),
+            Forms\Components\Fieldset::make('VOD Settings')
+                ->columns(2)
+                ->columnSpanFull()
+                ->schema([
+                    Forms\Components\TextInput::make('container_extension')
+                        ->label('Container Extension')
+                        ->helperText('The file extension of the VOD container (e.g., mp4, mkv, etc.).')
+                        ->placeholder('mp4')
+                        ->rules(['nullable', 'string', 'max:10']),
+                    Forms\Components\TextInput::make('year')
+                        ->label('Year')
+                        ->helperText('The year of the VOD content.')
+                        ->placeholder('2000')
+                        ->rules(['nullable', 'integer', 'digits:4']),
+                    Forms\Components\TextInput::make('rating')
+                        ->label('Rating')
+                        ->helperText('10 based rating of the VOD content.')
+                        ->placeholder('8.7')
+                        ->rules(['nullable', 'string', 'max:10']),
+                    Forms\Components\TextInput::make('rating_5based')
+                        ->label('Rating (5-based)')
+                        ->helperText('The rating of the VOD content on a scale of 0 to 5.')
+                        ->placeholder('5')
+                        ->rules(['nullable', 'numeric', 'min:0', 'max:5']),
+                ])->hidden(fn(Get $get) => !$get('is_custom')),
             Forms\Components\Fieldset::make('Failover Channels')
                 ->schema([
                     Forms\Components\Repeater::make('failovers')
@@ -1113,6 +1201,7 @@ class ChannelResource extends Resource
     {
         $data['user_id'] = auth()->id();
         $data['is_custom'] = true;
+        $data['is_vod'] = true;
         if (!$data['shift']) {
             $data['shift'] = 0; // Default shift to 0 if not provided
         }

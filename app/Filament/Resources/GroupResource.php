@@ -4,7 +4,6 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\GroupResource\Pages;
 use App\Filament\Resources\GroupResource\RelationManagers;
-use App\Filament\Resources\GroupResource\RelationManagers\ChannelsRelationManager;
 use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Models\Playlist;
@@ -364,7 +363,8 @@ class GroupResource extends Resource
     public static function getRelations(): array
     {
         return [
-            ChannelsRelationManager::class,
+            RelationManagers\ChannelsRelationManager::class,
+            RelationManagers\VodRelationManager::class,
         ];
     }
 

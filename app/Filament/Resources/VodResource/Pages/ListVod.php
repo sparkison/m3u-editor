@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Filament\Resources\ChannelResource\Pages;
+namespace App\Filament\Resources\VodResource\Pages;
 
 use App\Filament\Exports\ChannelExporter;
 use App\Filament\Imports\ChannelImporter;
-use App\Filament\Resources\ChannelResource;
+use App\Filament\Resources\VodResource;
 use App\Filament\Resources\EpgMapResource;
 use App\Models\Channel;
 use App\Models\Epg;
@@ -22,13 +22,12 @@ use Hydrat\TableLayoutToggle\Concerns\HasToggleableTable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 
-class ListChannels extends ListRecords
+class ListVod extends ListRecords
 {
-    // use HasToggleableTable;
+    protected static string $resource = VodResource::class;
 
-    protected static string $resource = ChannelResource::class;
+    protected ?string $subheading = 'NOTE: VOD output order is based on: 1 Sort order, 2 Channel no. and 3 Title - in that order. You can edit your Playlist output to auto sort as well, which will define the sort order based on the playlist order.';
 
-    protected ?string $subheading = 'NOTE: Playlist channel output order is based on: 1 Sort order, 2 Channel no. and 3 Channel title - in that order. You can edit your Playlist output to auto sort as well, which will define the sort order based on the playlist order.';
     public function setPage($page, $pageName = 'page'): void
     {
         parent::setPage($page, $pageName);
@@ -43,7 +42,7 @@ class ListChannels extends ListRecords
                 ->label('Create Custom Channel')
                 ->modalHeading('New Custom Channel')
                 ->modalDescription('NOTE: Custom channels need to be associated with a Playlist or Custom Playlist.')
-                ->using(fn(array $data, string $model): Model => ChannelResource::createCustomChannel(
+                ->using(fn(array $data, string $model): Model => VodResource::createCustomChannel(
                     data: $data,
                     model: $model,
                 ))
@@ -314,7 +313,7 @@ class ListChannels extends ListRecords
     {
         $where = [
             ['user_id', auth()->id()],
-            ['is_vod', false], // Only live channels
+            ['is_vod', true], // Only VOD channels
         ];
 
         // Change count based on view
@@ -343,7 +342,7 @@ class ListChannels extends ListRecords
 
         // Return tabs
         return [
-            'all' => Tab::make('All Live Channels')
+            'all' => Tab::make('All VOD Channels')
                 ->badge($totalCount),
             'enabled' => Tab::make('Enabled')
                 // ->icon('heroicon-m-check')
@@ -365,15 +364,5 @@ class ListChannels extends ListRecords
                 ->modifyQueryUsing(fn($query) => $query->where('is_custom', true))
                 ->badge($customCount),
         ];
-    }
-
-    /**
-     * @deprecated Override the `table()` method to configure the table.
-     */
-    protected function getTableQuery(): ?Builder
-    {
-        return static::getResource()::getEloquentQuery()
-            ->where('user_id', auth()->id())
-            ->where('is_vod', false);
     }
 }

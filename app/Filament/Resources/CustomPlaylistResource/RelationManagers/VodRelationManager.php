@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\CustomPlaylistResource\RelationManagers;
 
 use App\Enums\ChannelLogoType;
-use App\Filament\Resources\ChannelResource;
+use App\Filament\Resources\VodResource;
 use App\Models\Channel;
 use App\Models\ChannelFailover;
 use Filament\Forms;
@@ -24,15 +24,15 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\HtmlString;
 use Spatie\Tags\Tag;
 
-class ChannelsRelationManager extends RelationManager
+class VodRelationManager extends RelationManager
 {
     protected static string $relationship = 'channels';
 
-    protected static ?string $label = 'Live Channels';
-    protected static ?string $pluralLabel = 'Live Channels';
+    protected static ?string $label = 'VOD Channels';
+    protected static ?string $pluralLabel = 'VOD Channels';
 
-    protected static ?string $title = 'Live Channels';
-    protected static ?string $navigationLabel = 'Live Channels';
+    protected static ?string $title = 'VOD Channels';
+    protected static ?string $navigationLabel = 'VOD Channels';
 
     public function isReadOnly(): bool
     {
@@ -47,7 +47,7 @@ class ChannelsRelationManager extends RelationManager
 
     public function infolist(Infolist $infolist): Infolist
     {
-        return ChannelResource::infolist($infolist);
+        return VodResource::infolist($infolist);
     }
 
     public function table(Table $table): Table
@@ -110,7 +110,7 @@ class ChannelsRelationManager extends RelationManager
                     ->select('channels.*', DB::raw("{$orderByClause} as tag_name_sort"))
                     ->distinct();
             });
-        $defaultColumns = ChannelResource::getTableColumns(showGroup: true, showPlaylist: true);
+        $defaultColumns = VodResource::getTableColumns(showGroup: true, showPlaylist: true);
 
         // Inject the custom group column after the group column
         array_splice($defaultColumns, 13, 0, [$groupColumn]);
@@ -125,19 +125,19 @@ class ChannelsRelationManager extends RelationManager
             ->modifyQueryUsing(function (Builder $query) {
                 $query->with(['tags', 'epgChannel', 'playlist'])
                     ->withCount(['failovers'])
-                    ->where('is_vod', false); // Only show live channels
+                    ->where('is_vod', true); // Only show VOD content
             })
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
             ->columns($defaultColumns)
-            ->filters(ChannelResource::getTableFilters(showPlaylist: true))
+            ->filters(VodResource::getTableFilters(showPlaylist: true))
             ->headerActions([
                 Tables\Actions\CreateAction::make()
-                    ->label('Create Custom Channel')
-                    ->form(ChannelResource::getForm(customPlaylist: $ownerRecord))
-                    ->modalHeading('New Custom Channel')
-                    ->modalDescription('NOTE: Custom channels need to be associated with a Playlist or Custom Playlist.')
-                    ->using(fn(array $data, string $model): Model => ChannelResource::createCustomChannel(
+                    ->label('Create Custom VOD')
+                    ->form(VodResource::getForm(customPlaylist: $ownerRecord))
+                    ->modalHeading('New Custom VOD')
+                    ->modalDescription('NOTE: Custom VOD need to be associated with a Playlist or Custom Playlist.')
+                    ->using(fn(array $data, string $model): Model => VodResource::createCustomChannel(
                         data: $data,
                         model: $model,
                     ))
@@ -148,10 +148,10 @@ class ChannelsRelationManager extends RelationManager
                             ->getRecordSelect()
                             ->getSearchResultsUsing(function (string $search) {
                                 $searchLower = strtolower($search);
-                                $channels = Auth::user()->channels()
+                                $vods = Auth::user()->channels()
                                     ->withoutEagerLoads()
                                     ->with('playlist')
-                                    ->where('is_vod', false) // Only live channels
+                                    ->where('is_vod', true) // Only VOD content
                                     ->where(function ($query) use ($searchLower) {
                                         $query->whereRaw('LOWER(title) LIKE ?', ["%{$searchLower}%"])
                                             ->orWhereRaw('LOWER(title_custom) LIKE ?', ["%{$searchLower}%"])
@@ -165,10 +165,10 @@ class ChannelsRelationManager extends RelationManager
 
                                 // Create options array
                                 $options = [];
-                                foreach ($channels as $channel) {
-                                    $displayTitle = $channel->title_custom ?: $channel->title;
-                                    $playlistName = $channel->getEffectivePlaylist()->name ?? 'Unknown';
-                                    $options[$channel->id] = "{$displayTitle} [{$playlistName}]";
+                                foreach ($vods as $vod) {
+                                    $displayTitle = $vod->title_custom ?: $vod->title;
+                                    $playlistName = $vod->getEffectivePlaylist()->name ?? 'Unknown';
+                                    $options[$vod->id] = "{$displayTitle} [{$playlistName}]";
                                 }
 
                                 return $options;
@@ -180,14 +180,6 @@ class ChannelsRelationManager extends RelationManager
                                 return "{$displayTitle} [{$playlistName}]";
                             })
                     ])
-
-                // Advanced attach when adding pivot values:
-                // Tables\Actions\AttachAction::make()->form(fn(Tables\Actions\AttachAction $action): array => [
-                //     $action->getRecordSelect(),
-                //     Forms\Components\TextInput::make('title')
-                //         ->label('Title')
-                //         ->required(),
-                // ]),
             ])
             ->actions([
                 Tables\Actions\DetachAction::make()
@@ -195,10 +187,10 @@ class ChannelsRelationManager extends RelationManager
                     ->button()->hiddenLabel()
                     ->icon('heroicon-o-x-circle')
                     ->size('sm'),
-                ...ChannelResource::getTableActions(),
+                ...VodResource::getTableActions(),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
-                ...ChannelResource::getTableBulkActions(addToCustom: false),
+                ...VodResource::getTableBulkActions(addToCustom: false),
                 Tables\Actions\DetachBulkAction::make()->color('danger'),
                 Tables\Actions\BulkAction::make('add_to_group')
                     ->label('Add to custom group')
@@ -208,11 +200,7 @@ class ChannelsRelationManager extends RelationManager
                             ->options(
                                 Tag::query()
                                     ->where('type', $ownerRecord->uuid)
-                                    ->get()
-                                    ->map(fn($name) => [
-                                        'id' => $name->getAttributeValue('name'),
-                                        'name' => $name->getAttributeValue('name')
-                                    ])->pluck('id', 'name')
+                                    ->pluck('name', 'name')
                             )->required(),
                     ])
                     ->action(function (Collection $records, $data) use ($ownerRecord): void {
@@ -223,7 +211,7 @@ class ChannelsRelationManager extends RelationManager
                         Notification::make()
                             ->success()
                             ->title('Added to group')
-                            ->body('The selected channels have been added to the custom group.')
+                            ->body('The selected VOD have been added to the custom group.')
                             ->send();
                     })
                     ->deselectRecordsAfterCompletion()

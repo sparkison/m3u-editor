@@ -2,8 +2,7 @@
 
 namespace App\Filament\Resources\GroupResource\RelationManagers;
 
-use App\Filament\Resources\ChannelResource;
-use App\Filament\Resources\ChannelResource\Pages\ListChannels;
+use App\Filament\Resources\VodResource;
 use App\Models\Channel;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -13,13 +12,16 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Hydrat\TableLayoutToggle\Concerns\HasToggleableTable;
 
-class ChannelsRelationManager extends RelationManager
+class VodRelationManager extends RelationManager
 {
-    // use HasToggleableTable;
+    protected static string $relationship = 'vod_channels';
 
-    protected static string $relationship = 'live_channels';
+    protected static ?string $label = 'VOD Channels';
+    protected static ?string $pluralLabel = 'VOD Channels';
+
+    protected static ?string $title = 'VOD Channels';
+    protected static ?string $navigationLabel = 'VOD Channels';
 
     protected $listeners = ['refreshRelation' => '$refresh'];
 
@@ -31,21 +33,21 @@ class ChannelsRelationManager extends RelationManager
     public function form(Form $form): Form
     {
         return $form
-            ->schema(ChannelResource::getForm());
+            ->schema(VodResource::getForm());
     }
 
     public function infolist(Infolist $infolist): Infolist
     {
-        return ChannelResource::infolist($infolist);
+        return VodResource::infolist($infolist);
     }
 
     public function table(Table $table): Table
     {
-        return ChannelResource::setupTable($table, $this->ownerRecord->id);
+        return VodResource::setupTable($table, $this->ownerRecord->id);
     }
 
     public function getTabs(): array
     {
-        return ListChannels::setupTabs($this->ownerRecord->id);
+        return \App\Filament\Resources\VodResource\Pages\ListVod::setupTabs($this->ownerRecord->id);
     }
 }
