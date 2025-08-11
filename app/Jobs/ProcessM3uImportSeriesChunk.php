@@ -19,8 +19,8 @@ class ProcessM3uImportSeriesChunk implements ShouldQueue
     // Don't retry the job on failure
     public $tries = 1;
 
-    // Giving a timeout of 15 minutes to the Job to process the file
-    public $timeout = 60 * 15;
+    // Giving a timeout of 30 minutes to the Job to process the file
+    public $timeout = 60 * 30;
 
     // Default user agent to use for HTTP requests
     // Used when user agent is not set in the playlist
