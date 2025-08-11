@@ -115,7 +115,34 @@ class SeriesRelationManager extends RelationManager
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
             ->columns($defaultColumns)
-            ->filters(SeriesResource::getTableFilters(showPlaylist: true))
+            ->filters([
+                ...SeriesResource::getTableFilters(showPlaylist: true),
+                Tables\Filters\SelectFilter::make('playlist_category')
+                    ->label('Custom Category')
+                    ->options(function () use ($ownerRecord) {
+                        return $ownerRecord->tags()
+                            ->where('type', $ownerRecord->uuid . '-category')
+                            ->get()
+                            ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
+                            ->toArray();
+                    })
+                    ->query(function (Builder $query, array $data) use ($ownerRecord): Builder {
+                        if (empty($data['values'])) {
+                            return $query;
+                        }
+
+                        return $query->where(function ($query) use ($data, $ownerRecord) {
+                            foreach ($data['values'] as $categoryName) {
+                                $query->orWhereHas('tags', function ($tagQuery) use ($categoryName, $ownerRecord) {
+                                    $tagQuery->where('type', $ownerRecord->uuid . '-category')
+                                        ->where('name->en', $categoryName);
+                                });
+                            }
+                        });
+                    })
+                    ->multiple()
+                    ->searchable(),
+            ])
             ->headerActions([
                 Tables\Actions\AttachAction::make()
                     ->form(fn(Tables\Actions\AttachAction $action): array => [

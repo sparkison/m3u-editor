@@ -130,7 +130,34 @@ class VodRelationManager extends RelationManager
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
             ->columns($defaultColumns)
-            ->filters(VodResource::getTableFilters(showPlaylist: true))
+            ->filters([
+                ...VodResource::getTableFilters(showPlaylist: true),
+                Tables\Filters\SelectFilter::make('playlist_group')
+                    ->label('Custom Group')
+                    ->options(function () use ($ownerRecord) {
+                        return $ownerRecord->tags()
+                            ->where('type', $ownerRecord->uuid)
+                            ->get()
+                            ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
+                            ->toArray();
+                    })
+                    ->query(function (Builder $query, array $data) use ($ownerRecord): Builder {
+                        if (empty($data['values'])) {
+                            return $query;
+                        }
+
+                        return $query->where(function ($query) use ($data, $ownerRecord) {
+                            foreach ($data['values'] as $groupName) {
+                                $query->orWhereHas('tags', function ($tagQuery) use ($groupName, $ownerRecord) {
+                                    $tagQuery->where('type', $ownerRecord->uuid)
+                                        ->where('name->en', $groupName);
+                                });
+                            }
+                        });
+                    })
+                    ->multiple()
+                    ->searchable(),
+            ])
             ->headerActions([
                 Tables\Actions\CreateAction::make()
                     ->label('Create Custom VOD')
