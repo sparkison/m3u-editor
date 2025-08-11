@@ -2,12 +2,20 @@
 
 namespace App\Services;
 
+use App\Facades\PlaylistUrlFacade;
+use App\Models\CustomPlaylist;
 use App\Models\Epg;
+use App\Models\MergedPlaylist;
+use App\Models\Playlist;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use JsonMachine\Items;
 use JsonMachine\JsonDecoder\ExtJsonDecoder;
+use Filament\Forms;
+use Filament\Actions;
+use Filament\Notifications\Notification;
+use Filament\Tables;
 use XMLReader;
 
 class EpgCacheService
@@ -721,5 +729,197 @@ class EpgCacheService
         }
 
         return null;
+    }
+
+    /**
+     * Get the cache file path for a playlist
+     */
+    static function getPlaylistEpgCachePath(
+        Playlist|MergedPlaylist|CustomPlaylist $playlist,
+        bool $compressed = false
+    ): string {
+        // Playlist UUID can change, so use ID for cache file names
+        $filename = "playlist-{$playlist->id}-epg";
+        if ($compressed) {
+            $filename .= '.xml.gz';
+        } else {
+            $filename .= '.xml';
+        }
+        return 'playlist-epg-files/' . $filename;
+    }
+
+    /**
+     * Clear cache for a specific playlist
+     */
+    public static function clearPlaylistEpgCacheFile($playlist): bool
+    {
+        $disk = Storage::disk('local');
+        $xmlPath = self::getPlaylistEpgCachePath($playlist, false);
+        $gzPath = self::getPlaylistEpgCachePath($playlist, true);
+
+        try {
+            $cleared = false;
+            if ($disk->exists($xmlPath)) {
+                $disk->delete($xmlPath);
+                $cleared = true;
+            }
+            if ($disk->exists($gzPath)) {
+                $disk->delete($gzPath);
+                $cleared = true;
+            }
+            return $cleared;
+        } catch (\Exception $e) {
+            Log::error("Failed to clear playlist EPG cache: {$e->getMessage()}");
+        }
+
+        return false;
+    }
+
+    public static function getEpgTableAction()
+    {
+        return Tables\Actions\Action::make('Download EPG')
+            ->label('Download EPG')
+            ->icon('heroicon-o-arrow-down-tray')
+            ->modalHeading('Download EPG')
+            ->modalIcon('heroicon-o-arrow-down-tray')
+            ->modalDescription('Select the EPG format to download and your download will begin immediately.')
+            ->modalWidth('md')
+            ->form(function ($record) {
+                $urls = PlaylistUrlFacade::getUrls($record);
+                return [
+                    Forms\Components\Select::make('format')
+                        ->label('EPG Format')
+                        ->options([
+                            'uncompressed' => 'Uncompressed EPG',
+                            'compressed' => 'Gzip Compressed EPG',
+                        ])
+                        ->default('uncompressed')
+                        ->required()
+                        ->reactive()
+                        ->afterStateUpdated(function ($state, $set) use ($urls) {
+                            if ($state === 'uncompressed') {
+                                $set('download_url', $urls['epg']);
+                            } else {
+                                $set('download_url', $urls['epg_zip']);
+                            }
+                        })->hintAction(
+                            Forms\Components\Actions\Action::make('clear_cache')
+                                ->icon('heroicon-m-trash')
+                                ->label('Clear Cache')
+                                ->requiresConfirmation()
+                                ->color('warning')
+                                ->modalIcon('heroicon-m-trash')
+                                ->modalHeading('Clear Playlist EPG File Cache')
+                                ->modalDescription('Clear the EPG file cache for this playlist? It will be automatically regenerated on the next download.')
+                                ->action(function ($record, $state) {
+                                    $status = self::clearPlaylistEpgCacheFile($record);
+                                    if ($status) {
+                                        Notification::make()
+                                            ->title('Cache Cleared')
+                                            ->success()
+                                            ->send();
+                                    } else {
+                                        Notification::make()
+                                            ->title('File not yet cached')
+                                            ->warning()
+                                            ->send();
+                                    }
+                                })
+                        ),
+                    Forms\Components\TextInput::make('download_url')
+                        ->label('Download URL')
+                        ->default($urls['epg'])
+                        ->required()
+                        ->disabled()
+                        ->dehydrated(fn(): bool => true),
+                ];
+            })
+            ->action(function (array $data): void {
+                dump($data);
+                $url = $data['download_url'] ?? '';
+                if ($url) {
+                    redirect($url);
+                } else {
+                    Notification::make()
+                        ->title('Download URL not available')
+                        ->danger()
+                        ->send();
+                }
+            })
+            ->modalSubmitActionLabel('Download EPG');
+    }
+
+    public static function getEpgPlaylistAction()
+    {
+        return Actions\Action::make('Download EPG')
+            ->label('Download EPG')
+            ->icon('heroicon-o-arrow-down-tray')
+            ->modalHeading('Download EPG')
+            ->modalIcon('heroicon-o-arrow-down-tray')
+            ->modalDescription('Select the EPG format to download and your download will begin immediately.')
+            ->modalWidth('md')
+            ->form(function ($record) {
+                $urls = PlaylistUrlFacade::getUrls($record);
+                return [
+                    Forms\Components\Select::make('format')
+                        ->label('EPG Format')
+                        ->options([
+                            'uncompressed' => 'Uncompressed EPG',
+                            'compressed' => 'Gzip Compressed EPG',
+                        ])
+                        ->default('uncompressed')
+                        ->required()
+                        ->reactive()
+                        ->afterStateUpdated(function ($state, $set) use ($urls) {
+                            if ($state === 'uncompressed') {
+                                $set('download_url', $urls['epg']);
+                            } else {
+                                $set('download_url', $urls['epg_zip']);
+                            }
+                        })
+                        ->hintAction(
+                            Forms\Components\Actions\Action::make('clear_cache')
+                                ->icon('heroicon-m-trash')
+                                ->label('Clear Cache')
+                                ->requiresConfirmation()
+                                ->color('warning')
+                                ->modalIcon('heroicon-m-trash')
+                                ->modalHeading('Clear Playlist EPG File Cache')
+                                ->modalDescription('Clear the EPG file cache for this playlist? It will be automatically regenerated on the next download.')
+                                ->action(function ($record, $state) {
+                                    $status = self::clearPlaylistEpgCacheFile($record);
+                                    if ($status) {
+                                        Notification::make()
+                                            ->title('Cache Cleared')
+                                            ->success()
+                                            ->send();
+                                    } else {
+                                        Notification::make()
+                                            ->title('File not yet cached')
+                                            ->warning()
+                                            ->send();
+                                    }
+                                })
+                        ),
+                    Forms\Components\TextInput::make('download_url')
+                        ->label('Download URL')
+                        ->default($urls['epg'])
+                        ->required()
+                        ->disabled()
+                        ->dehydrated(fn(): bool => true),
+                ];
+            })
+            ->action(function (array $data): void {
+                $url = $data['download_url'] ?? '';
+                if ($url) {
+                    redirect($url);
+                } else {
+                    Notification::make()
+                        ->title('Download URL not available')
+                        ->danger()
+                        ->send();
+                }
+            })
+            ->modalSubmitActionLabel('Download EPG');
     }
 }

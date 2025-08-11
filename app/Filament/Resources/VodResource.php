@@ -370,7 +370,7 @@ class VodResource extends Resource
                             ->columns(2)
                     ]),
                 Tables\Actions\Action::make('process_vod')
-                    ->label('Fetch VOD Metadata')
+                    ->label('Fetch Metadata')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->action(function ($record) {
                         app('Illuminate\Contracts\Bus\Dispatcher')
@@ -473,7 +473,7 @@ class VodResource extends Resource
                     ->modalDescription('Move the selected channel(s) to the chosen group.')
                     ->modalSubmitActionLabel('Move now'),
                 Tables\Actions\BulkAction::make('process_vod')
-                    ->label('Fetch VOD Metadata')
+                    ->label('Fetch Metadata')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->action(function ($records) {
                         $count = 0;
@@ -1107,7 +1107,7 @@ class VodResource extends Resource
                         ->helperText('The rating of the VOD content on a scale of 0 to 5.')
                         ->placeholder('5')
                         ->rules(['nullable', 'numeric', 'min:0', 'max:5']),
-                ])->hidden(fn(Get $get) => !$get('is_custom')),
+                ]),
             Forms\Components\Fieldset::make('Failover Channels')
                 ->schema([
                     Forms\Components\Repeater::make('failovers')

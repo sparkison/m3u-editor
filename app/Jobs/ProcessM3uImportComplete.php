@@ -10,6 +10,7 @@ use App\Models\Job;
 use App\Models\PlaylistSyncStatus;
 use App\Models\PlaylistSyncStatusLog;
 use App\Models\User;
+use App\Services\EpgCacheService;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -328,6 +329,9 @@ class ProcessM3uImportComplete implements ShouldQueue
                 ->body("\"{$playlist->name}\" has been synced successfully. Import completed in {$completedInRounded} seconds.")
                 ->sendToDatabase($playlist->user);
         }
+
+        // Cleanup cached EPG files
+        EpgCacheService::clearPlaylistEpgCacheFile($playlist);
 
         // Clean up sync logs
         $syncStatusQuery = $playlist->syncStatuses();

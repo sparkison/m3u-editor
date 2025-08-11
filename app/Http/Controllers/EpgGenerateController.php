@@ -6,7 +6,6 @@ use DOMDocument;
 use XMLReader;
 use App\Enums\ChannelLogoType;
 use App\Enums\PlaylistChannelId;
-use App\Models\Channel;
 use App\Models\CustomPlaylist;
 use App\Models\Epg;
 use App\Models\MergedPlaylist;
@@ -20,6 +19,11 @@ use Illuminate\Support\Str;
 
 class EpgGenerateController extends Controller
 {
+    /**
+     * File cache configuration
+     */
+    private const CACHE_TTL_HOURS = 12; // Cache files for 12 hours
+
     /**
      * Generate the EPG XML file
      *
@@ -37,17 +41,13 @@ class EpgGenerateController extends Controller
             $playlist = CustomPlaylist::where('uuid', $uuid)->firstOrFail();
         }
 
-        // Generate a filename
-        $filename = Str::slug($playlist->name) . '.xml';
-        return response()->stream(
-            fn() => $this->generate($playlist),
-            200,
-            [
-                'Access-Control-Allow-Origin' => '*',
-                'Content-Disposition' => "attachment; filename=$filename",
-                'Content-Type' => 'application/xml'
-            ]
-        );
+        // Check if we have a valid cached file
+        if ($this->isCacheValid($playlist, false)) {
+            return $this->serveCachedFile($playlist, false);
+        }
+
+        // Generate and cache new file
+        return $this->generateAndCache($playlist, false);
     }
 
     /**
@@ -67,27 +67,13 @@ class EpgGenerateController extends Controller
             $playlist = CustomPlaylist::where('uuid', $uuid)->firstOrFail();
         }
 
-        // Generate a filename
-        $filename = Str::slug($playlist->name) . '.xml.gz';
+        // Check if we have a valid cached file
+        if ($this->isCacheValid($playlist, true)) {
+            return $this->serveCachedFile($playlist, true);
+        }
 
-        // Start output buffering
-        ob_start();
-
-        // Generate the EPG content
-        $this->generate($playlist);
-
-        // Get the contents of the output buffer
-        $content = ob_get_clean();
-
-        // Compress the content
-        $compressedContent = gzencode($content, 9);
-
-        // Return the compressed content as a response
-        return response($compressedContent, 200, [
-            'Content-Type' => 'application/gzip',
-            'Content-Disposition' => "attachment; filename=\"$filename\"",
-            'Access-Control-Allow-Origin' => '*',
-        ]);
+        // Generate and cache new file
+        return $this->generateAndCache($playlist, true);
     }
 
     /**
@@ -234,7 +220,10 @@ class EpgGenerateController extends Controller
 
             try {
                 // Try to use cached data first
-                if ($cacheService->isCacheValid($epg)) {
+                // if ($cacheService->isCacheValid($epg)) {
+                // Do a quick check instead of fetching metadata and parsing
+                // If flagged as cached, use the cache
+                if ($epg->is_cached) {
                     // Get all programmes from cache (last 1 day to next 5 days for EPG generation)
                     $startDate = Carbon::now()->subDays(1)->format('Y-m-d');
                     $endDate = Carbon::now()->addDays(5)->format('Y-m-d');
@@ -351,6 +340,117 @@ class EpgGenerateController extends Controller
 
         // Close it out
         echo '</tv>';
+    }
+
+    /**
+     * Check if cache file is valid and not expired
+     */
+    private function isCacheValid($playlist, bool $compressed = false): bool
+    {
+        $cacheFilePath = EpgCacheService::getPlaylistEpgCachePath($playlist, $compressed);
+        $disk = Storage::disk('local');
+
+        if (!$disk->exists($cacheFilePath)) {
+            return false;
+        }
+
+        // Check if file is older than TTL
+        $cacheFileTime = $disk->lastModified($cacheFilePath);
+        $expiryTime = now()->subHours(self::CACHE_TTL_HOURS)->timestamp;
+
+        return $cacheFileTime >= $expiryTime;
+    }
+
+    /**
+     * Serve cached file directly
+     */
+    private function serveCachedFile($playlist, bool $compressed = false)
+    {
+        $cacheFilePath = EpgCacheService::getPlaylistEpgCachePath($playlist, $compressed);
+        $disk = Storage::disk('local');
+
+        $filename = Str::slug($playlist->name) . ($compressed ? '.xml.gz' : '.xml');
+        $contentType = $compressed ? 'application/gzip' : 'application/xml';
+
+        return response()->stream(
+            function () use ($disk, $cacheFilePath) {
+                $stream = $disk->readStream($cacheFilePath);
+                fpassthru($stream);
+                fclose($stream);
+            },
+            200,
+            [
+                'Access-Control-Allow-Origin' => '*',
+                'Content-Disposition' => "attachment; filename=\"$filename\"",
+                'Content-Type' => $contentType,
+                'X-EPG-Cache' => 'HIT'
+            ]
+        );
+    }
+
+    /**
+     * Generate and cache EPG file
+     */
+    private function generateAndCache($playlist, bool $compressed = false)
+    {
+        $cacheFilePath = EpgCacheService::getPlaylistEpgCachePath($playlist, $compressed);
+        $disk = Storage::disk('local');
+
+        // Ensure cache directory exists
+        $cacheDir = dirname($cacheFilePath);
+        if (!$disk->exists($cacheDir)) {
+            $disk->makeDirectory($cacheDir, 0755, true);
+        }
+
+        $filename = Str::slug($playlist->name) . ($compressed ? '.xml.gz' : '.xml');
+        $contentType = $compressed ? 'application/gzip' : 'application/xml';
+
+        if ($compressed) {
+            // For compressed, generate content then compress and save
+            ob_start();
+            $this->generate($playlist);
+            $content = ob_get_clean();
+            $compressedContent = gzencode($content, 9);
+
+            // Save to cache
+            $disk->put($cacheFilePath, $compressedContent);
+
+            return response($compressedContent, 200, [
+                'Content-Type' => $contentType,
+                'Content-Disposition' => "attachment; filename=\"$filename\"",
+                'Access-Control-Allow-Origin' => '*',
+                'X-EPG-Cache' => 'MISS'
+            ]);
+        } else {
+            // For regular XML, stream while saving to cache
+            return response()->stream(
+                function () use ($playlist, $disk, $cacheFilePath) {
+                    // Open a temporary stream to capture output
+                    $tempStream = fopen('php://temp', 'r+');
+
+                    // Capture output
+                    ob_start();
+                    $this->generate($playlist);
+                    $content = ob_get_clean();
+
+                    // Write to temp stream and cache file
+                    fwrite($tempStream, $content);
+                    $disk->put($cacheFilePath, $content);
+
+                    // Output the content
+                    rewind($tempStream);
+                    fpassthru($tempStream);
+                    fclose($tempStream);
+                },
+                200,
+                [
+                    'Access-Control-Allow-Origin' => '*',
+                    'Content-Disposition' => "attachment; filename=\"$filename\"",
+                    'Content-Type' => $contentType,
+                    'X-EPG-Cache' => 'MISS'
+                ]
+            );
+        }
     }
 
     /**

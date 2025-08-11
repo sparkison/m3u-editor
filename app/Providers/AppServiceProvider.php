@@ -18,6 +18,7 @@ use App\Models\Epg;
 use App\Models\Group;
 use App\Models\Playlist;
 use App\Models\User;
+use App\Services\EpgCacheService;
 use App\Services\FfmpegCodecService;
 use App\Services\HlsStreamService;
 use App\Services\PlaylistUrlService;
@@ -63,13 +64,13 @@ class AppServiceProvider extends ServiceProvider
             foreach (['sqlite', 'jobs'] as $connection) {
                 DB::connection($connection)
                     ->statement('
-                    PRAGMA synchronous = NORMAL;
-                    PRAGMA mmap_size = 134217728; -- 128 megabytes
-                    PRAGMA cache_size = 1000000000;
-                    PRAGMA foreign_keys = true;
-                    PRAGMA busy_timeout = 5000;
-                    PRAGMA temp_store = memory;
-                ');
+                        PRAGMA synchronous = NORMAL;
+                        PRAGMA mmap_size = 134217728; -- 128 megabytes
+                        PRAGMA cache_size = 1000000000;
+                        PRAGMA foreign_keys = true;
+                        PRAGMA busy_timeout = 5000;
+                        PRAGMA temp_store = memory;
+                    ');
             }
         } catch (\Throwable $throwable) {
             return;
@@ -171,6 +172,11 @@ class AppServiceProvider extends ServiceProvider
                 if ($playlist->uploads && Storage::disk('local')->exists($playlist->uploads)) {
                     Storage::disk('local')->delete($playlist->uploads);
                 }
+                
+                // Delete cached EPG files
+                EpgCacheService::clearPlaylistEpgCacheFile($playlist);
+
+                // Remove short URLs and detach playlist auths
                 $playlist->removeShortUrls();
                 $playlist->playlistAuths()->detach();
                 event(new PlaylistDeleted($playlist));
@@ -358,7 +364,7 @@ class AppServiceProvider extends ServiceProvider
     {
         // Register the backup destination list records component
         Livewire::component('backup-destination-list-records', BackupDestinationListRecords::class);
-        
+
         // Register the stream player component
         Livewire::component('stream-player', StreamPlayer::class);
     }

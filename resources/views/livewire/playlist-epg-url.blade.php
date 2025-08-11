@@ -51,4 +51,37 @@
             Use the following URL to access your EPG in GZIP format.
         </div>
     </div>
+    
+    <x-filament::modal id="epg-file-cache" icon="heroicon-o-trash" icon-color="warning" alignment="center">
+        <x-slot name="trigger">
+            <x-filament::button icon="heroicon-o-trash" color="gray" size="sm">
+                Clear Playlist EPG File Cache
+            </x-filament::button>
+        </x-slot>
+
+        <x-slot name="heading">
+            Clear Playlist EPG File Cache
+        </x-slot>
+
+        Clear the EPG file cache for this playlist? It will be automatically regenerated on the next download.
+
+        <x-slot name="footerActions">
+            <x-filament::button
+                wire:click="$dispatch('close-modal', { id: 'epg-file-cache' })"
+                label="Cancel"
+                width="full"
+                color="gray"
+            >
+                Cancel
+            </x-filament::button>
+            <x-filament::button
+                wire:click="clearEpgFileCache"
+                label="Clear Playlist EPG File Cache"
+                color="warning"
+            >
+                Confirm
+            </x-filament::button>
+        </x-slot>
+    </x-filament::modal>
+    
 </div>

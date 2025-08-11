@@ -32,6 +32,7 @@ use App\Livewire\PlaylistInfo;
 use App\Livewire\PlaylistM3uUrl;
 use App\Livewire\XtreamApiInfo;
 use App\Models\SourceGroup;
+use App\Services\EpgCacheService;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Illuminate\Contracts\Support\Htmlable;
@@ -286,24 +287,7 @@ class PlaylistResource extends Resource
                         ->icon('heroicon-o-arrow-down-tray')
                         ->url(fn($record) => PlaylistUrlFacade::getUrls($record)['m3u'])
                         ->openUrlInNewTab(),
-                    Tables\Actions\Action::make('Download EPG')
-                        ->label('Download EPG')
-                        ->icon('heroicon-o-arrow-down-tray')
-                        ->modalHeading('Download EPG')
-                        ->modalIcon('heroicon-o-arrow-down-tray')
-                        ->modalDescription('Select the EPG format to download and your download will begin immediately.')
-                        ->modalWidth('md')
-                        ->modalFooterActions([
-                            Tables\Actions\Action::make('uncompressed')
-                                ->requiresConfirmation()
-                                ->label('Download uncompressed EPG')
-                                ->action(fn($record) => redirect(PlaylistUrlFacade::getUrls($record)['epg'])),
-                            Tables\Actions\Action::make('compressed')
-                                ->requiresConfirmation()
-                                ->label('Download gzip EPG')
-                                ->action(fn($record) => redirect(PlaylistUrlFacade::getUrls($record)['epg_zip']))
-                        ])
-                        ->modalSubmitActionLabel('Download EPG'),
+                    EpgCacheService::getEpgTableAction(),
                     Tables\Actions\Action::make('HDHomeRun URL')
                         ->label('HDHomeRun URL')
                         ->icon('heroicon-o-arrow-top-right-on-square')
@@ -598,11 +582,7 @@ class PlaylistResource extends Resource
                     ->icon('heroicon-o-arrow-down-tray')
                     ->url(fn($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['m3u'])
                     ->openUrlInNewTab(),
-                Actions\Action::make('Download EPG')
-                    ->label('Download EPG')
-                    ->icon('heroicon-o-arrow-down-tray')
-                    ->url(fn($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['epg'])
-                    ->openUrlInNewTab(),
+                EpgCacheService::getEpgPlaylistAction(),
                 Actions\Action::make('HDHomeRun URL')
                     ->label('HDHomeRun URL')
                     ->icon('heroicon-o-arrow-top-right-on-square')

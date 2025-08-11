@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use App\Facades\PlaylistUrlFacade;
 use App\Forms\Components\XtreamApiInfo;
+use App\Services\EpgCacheService;
 use Filament\Forms\FormsComponent;
 use Illuminate\Support\Facades\Redis;
 
@@ -120,24 +121,7 @@ class CustomPlaylistResource extends Resource
                         ->icon('heroicon-o-arrow-down-tray')
                         ->url(fn($record) => PlaylistUrlFacade::getUrls($record)['m3u'])
                         ->openUrlInNewTab(),
-                    Tables\Actions\Action::make('Download EPG')
-                        ->label('Download EPG')
-                        ->icon('heroicon-o-arrow-down-tray')
-                        ->modalHeading('Download EPG')
-                        ->modalIcon('heroicon-o-arrow-down-tray')
-                        ->modalDescription('Select the EPG format to download and your download will begin immediately.')
-                        ->modalWidth('md')
-                        ->modalFooterActions([
-                            Tables\Actions\Action::make('uncompressed')
-                                ->requiresConfirmation()
-                                ->label('Download uncompressed EPG')
-                                ->action(fn($record) => redirect(PlaylistUrlFacade::getUrls($record)['epg'])),
-                            Tables\Actions\Action::make('compressed')
-                                ->requiresConfirmation()
-                                ->label('Download gzip EPG')
-                                ->action(fn($record) => redirect(PlaylistUrlFacade::getUrls($record)['epg_zip']))
-                        ])
-                        ->modalSubmitActionLabel('Download EPG'),
+                    EpgCacheService::getEpgTableAction(),
                     Tables\Actions\Action::make('HDHomeRun URL')
                         ->label('HDHomeRun Url')
                         ->icon('heroicon-o-arrow-top-right-on-square')
