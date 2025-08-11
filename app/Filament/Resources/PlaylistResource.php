@@ -209,7 +209,7 @@ class PlaylistResource extends Resource
             ->actions([
                 Tables\Actions\ActionGroup::make([
                     Tables\Actions\Action::make('process')
-                        ->label('Sync And Process')
+                        ->label('Sync and Process')
                         ->icon('heroicon-o-arrow-path')
                         ->action(function ($record) {
                             $record->update([
@@ -504,7 +504,7 @@ class PlaylistResource extends Resource
                 ),
             Actions\ActionGroup::make([
                 Actions\Action::make('process')
-                    ->label(fn($record): string => $record->xtream ? 'Process All' : 'Process')
+                    ->label('Sync and Process')
                     ->icon('heroicon-o-arrow-path')
                     ->action(function ($record) {
                         $record->update([
