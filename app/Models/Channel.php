@@ -36,6 +36,8 @@ class Channel extends Model
         'kodidrop' => 'array',
         'is_custom' => 'boolean',
         'is_vod' => 'boolean',
+        'info' => 'array',
+        'movie_data' => 'array',
         'logo_type' => ChannelLogoType::class,
     ];
 

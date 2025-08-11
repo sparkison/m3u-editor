@@ -835,7 +835,6 @@ class EpgCacheService
                 ];
             })
             ->action(function (array $data): void {
-                dump($data);
                 $url = $data['download_url'] ?? '';
                 if ($url) {
                     redirect($url);

@@ -888,7 +888,7 @@ class XtreamApiController extends Controller
                 'description' => $info['description'] ?? '',
                 'plot' => $info['plot'] ?? '',
                 'age' => $info['age'] ?? '',
-                'mpaa_rating' => $info['mpaa_rating'] ?? $channel->rating,
+                'mpaa_rating' => $info['mpaa_rating'] ?? '',
                 'rating_count_kinopoisk' => $info['rating_count_kinopoisk'] ?? 0,
                 'country' => $info['country'] ?? '',
                 'genre' => $info['genre'] ?? '',
@@ -896,7 +896,7 @@ class XtreamApiController extends Controller
                 'duration_secs' => $info['duration_secs'] ?? 0,
                 'duration' => $info['duration'] ?? '00:00:00',
                 'bitrate' => $info['bitrate'] ?? 0,
-                'rating' => $info['rating'] ?? 0,
+                'rating' => $channel->rating ?? $info['rating'],
                 'releasedate' => $info['releasedate'] ?? $channel->year,
                 'subtitles' => $info['subtitles'] ?? [],
             ];

@@ -1087,6 +1087,7 @@ class VodResource extends Resource
                 ->columns(2)
                 ->columnSpanFull()
                 ->schema([
+                    // Basic VOD Information
                     Forms\Components\TextInput::make('container_extension')
                         ->label('Container Extension')
                         ->helperText('The file extension of the VOD container (e.g., mp4, mkv, etc.).')
@@ -1101,12 +1102,237 @@ class VodResource extends Resource
                         ->label('Rating')
                         ->helperText('10 based rating of the VOD content.')
                         ->placeholder('8.7')
-                        ->rules(['nullable', 'string', 'max:10']),
+                        ->rules(['nullable', 'numeric', 'max:10']),
                     Forms\Components\TextInput::make('rating_5based')
                         ->label('Rating (5-based)')
                         ->helperText('The rating of the VOD content on a scale of 0 to 5.')
                         ->placeholder('5')
                         ->rules(['nullable', 'numeric', 'min:0', 'max:5']),
+
+                    // Info fields - Basic Details
+                    Forms\Components\TextInput::make('info.name')
+                        ->label('Title (Info)')
+                        ->helperText('The title from metadata info.')
+                        ->placeholder('Movie Title')
+                        ->rules(['nullable', 'string', 'max:255']),
+                    Forms\Components\TextInput::make('info.o_name')
+                        ->label('Original Title')
+                        ->helperText('The original title in the source language.')
+                        ->placeholder('Original Movie Title')
+                        ->rules(['nullable', 'string', 'max:255']),
+                    Forms\Components\TextInput::make('info.release_date')
+                        ->label('Release Date')
+                        ->helperText('The release date of the content.')
+                        ->placeholder('YYYY-MM-DD')
+                        ->rules(['nullable', 'string', 'max:20']),
+                    Forms\Components\TextInput::make('info.releasedate')
+                        ->label('Release Date (Alt)')
+                        ->helperText('Alternative release date field.')
+                        ->placeholder('YYYY or YYYY-MM-DD')
+                        ->rules(['nullable', 'string', 'max:20']),
+                    Forms\Components\TextInput::make('info.duration')
+                        ->label('Duration')
+                        ->helperText('Duration in HH:MM:SS format.')
+                        ->placeholder('01:30:00')
+                        ->rules(['nullable', 'string', 'max:20']),
+                    Forms\Components\TextInput::make('info.duration_secs')
+                        ->label('Duration (Seconds)')
+                        ->helperText('Duration in seconds.')
+                        ->placeholder('5400')
+                        ->type('number')
+                        ->rules(['nullable', 'integer', 'min:0']),
+                    Forms\Components\TextInput::make('info.episode_run_time')
+                        ->label('Episode Runtime')
+                        ->helperText('Episode runtime in minutes.')
+                        ->placeholder('45')
+                        ->type('number')
+                        ->rules(['nullable', 'integer', 'min:0']),
+                    Forms\Components\TextInput::make('info.bitrate')
+                        ->label('Bitrate')
+                        ->helperText('Video bitrate in kbps.')
+                        ->placeholder('5000')
+                        ->type('number')
+                        ->rules(['nullable', 'integer', 'min:0']),
+
+                    // Content Classification
+                    Forms\Components\TextInput::make('info.genre')
+                        ->label('Genre')
+                        ->helperText('Genre of the content.')
+                        ->placeholder('Action, Drama, Comedy')
+                        ->rules(['nullable', 'string', 'max:255']),
+                    Forms\Components\TextInput::make('info.country')
+                        ->label('Country')
+                        ->helperText('Country of origin.')
+                        ->placeholder('USA, UK, etc.')
+                        ->rules(['nullable', 'string', 'max:255']),
+                    Forms\Components\TextInput::make('info.age')
+                        ->label('Age Rating')
+                        ->helperText('Age rating or classification.')
+                        ->placeholder('PG-13, R, etc.')
+                        ->rules(['nullable', 'string', 'max:10']),
+                    Forms\Components\TextInput::make('info.mpaa_rating')
+                        ->label('MPAA Rating')
+                        ->helperText('MPAA rating classification.')
+                        ->placeholder('PG, PG-13, R, NC-17')
+                        ->rules(['nullable', 'string', 'max:10']),
+
+                    // Ratings and Reviews
+                    Forms\Components\TextInput::make('info.rating_count_kinopoisk')
+                        ->label('Kinopoisk Rating Count')
+                        ->helperText('Number of ratings on Kinopoisk.')
+                        ->placeholder('15000')
+                        ->type('number')
+                        ->rules(['nullable', 'integer', 'min:0']),
+
+                    // External IDs and URLs
+                    Forms\Components\TextInput::make('info.tmdb_id')
+                        ->label('TMDB ID')
+                        ->helperText('The Movie Database ID.')
+                        ->placeholder('123456')
+                        ->type('number')
+                        ->rules(['nullable', 'integer', 'min:0']),
+                    Forms\Components\TextInput::make('info.kinopoisk_url')
+                        ->label('Kinopoisk URL')
+                        ->helperText('URL to Kinopoisk page.')
+                        ->placeholder('https://www.kinopoisk.ru/film/123456/')
+                        ->type('url')
+                        ->rules(['nullable', 'url', 'max:500']),
+                    Forms\Components\TextInput::make('info.youtube_trailer')
+                        ->label('YouTube Trailer')
+                        ->helperText('YouTube trailer URL or ID.')
+                        ->placeholder('https://www.youtube.com/watch?v=abc123')
+                        ->type('url')
+                        ->rules(['nullable', 'url', 'max:500']),
+
+                    // Images
+                    Forms\Components\TextInput::make('info.cover_big')
+                        ->label('Cover Image (Large)')
+                        ->helperText('URL to large cover image.')
+                        ->placeholder('https://example.com/cover.jpg')
+                        ->type('url')
+                        ->rules(['nullable', 'url', 'max:500']),
+                    Forms\Components\TextInput::make('info.movie_image')
+                        ->label('Movie Image')
+                        ->helperText('URL to movie poster/image.')
+                        ->placeholder('https://example.com/poster.jpg')
+                        ->type('url')
+                        ->rules(['nullable', 'url', 'max:500']),
+
+                    // Cast and Crew
+                    Forms\Components\Textarea::make('info.director')
+                        ->label('Director')
+                        ->helperText('Director(s) of the content.')
+                        ->placeholder('John Doe, Jane Smith')
+                        ->rows(2)
+                        ->rules(['nullable', 'string', 'max:1000']),
+                    Forms\Components\Textarea::make('info.actors')
+                        ->label('Actors')
+                        ->helperText('Main actors in the content.')
+                        ->placeholder('Actor 1, Actor 2, Actor 3')
+                        ->rows(3)
+                        ->rules(['nullable', 'string', 'max:2000']),
+                    Forms\Components\Textarea::make('info.cast')
+                        ->label('Cast')
+                        ->helperText('Full cast information.')
+                        ->placeholder('Complete cast list')
+                        ->rows(3)
+                        ->columnSpanFull()
+                        ->rules(['nullable', 'string', 'max:2000']),
+
+                    // Descriptions
+                    Forms\Components\Textarea::make('info.description')
+                        ->label('Description')
+                        ->helperText('Short description of the content.')
+                        ->placeholder('Brief description...')
+                        ->rows(3)
+                        ->columnSpanFull()
+                        ->rules(['nullable', 'string', 'max:2000']),
+                    Forms\Components\Textarea::make('info.plot')
+                        ->label('Plot')
+                        ->helperText('Detailed plot summary.')
+                        ->placeholder('Detailed plot summary...')
+                        ->rows(4)
+                        ->columnSpanFull()
+                        ->rules(['nullable', 'string', 'max:5000']),
+
+                    // Array fields using repeaters
+                    Forms\Components\Repeater::make('info.backdrop_path')
+                        ->label('Backdrop Images')
+                        ->helperText('Add backdrop/poster image URLs for this content.')
+                        ->columnSpanFull()
+                        ->simple(
+                            Forms\Components\TextInput::make('url')
+                                ->label('Image URL')
+                                ->placeholder('https://example.com/backdrop.jpg')
+                                ->type('url')
+                                ->required()
+                                ->rules(['url', 'max:500'])
+                        )
+                        ->addActionLabel('Add backdrop image')
+                        ->reorderable()
+                        ->collapsible()
+                        ->defaultItems(0)
+                        ->minItems(0)
+                        ->formatStateUsing(function ($state) {
+                            if (!is_array($state)) {
+                                return [];
+                            }
+                            // Filter out empty values and convert to repeater format
+                            $filtered = array_filter($state, function ($url) {
+                                return !empty(trim($url));
+                            });
+                            return array_map(fn($url) => ['url' => $url], array_values($filtered));
+                        })
+                        ->dehydrateStateUsing(function ($state) {
+                            if (!is_array($state)) {
+                                return [];
+                            }
+                            // Convert repeater format back to simple array of URLs, filtering out empty values
+                            $urls = array_column($state, 'url');
+                            $filtered = array_filter($urls, function ($url) {
+                                return !empty(trim($url));
+                            });
+                            return array_values($filtered); // Re-index the array
+                        }),
+                    
+                    Forms\Components\Repeater::make('info.subtitles')
+                        ->label('Subtitles')
+                        ->helperText('Add available subtitle languages for this content.')
+                        ->columnSpanFull()
+                        ->simple(
+                            Forms\Components\TextInput::make('language')
+                                ->label('Language')
+                                ->placeholder('English, Spanish, French, etc.')
+                                ->required()
+                                ->rules(['string', 'max:100'])
+                        )
+                        ->addActionLabel('Add subtitle language')
+                        ->reorderable()
+                        ->collapsible()
+                        ->defaultItems(0)
+                        ->minItems(0)
+                        ->formatStateUsing(function ($state) {
+                            if (!is_array($state)) {
+                                return [];
+                            }
+                            // Filter out empty values and convert to repeater format
+                            $filtered = array_filter($state, function ($language) {
+                                return !empty(trim($language));
+                            });
+                            return array_map(fn($language) => ['language' => $language], array_values($filtered));
+                        })
+                        ->dehydrateStateUsing(function ($state) {
+                            if (!is_array($state)) {
+                                return [];
+                            }
+                            // Convert repeater format back to simple array of languages, filtering out empty values
+                            $languages = array_column($state, 'language');
+                            $filtered = array_filter($languages, function ($language) {
+                                return !empty(trim($language));
+                            });
+                            return array_values($filtered); // Re-index the array
+                        }),
+
                 ]),
             Forms\Components\Fieldset::make('Failover Channels')
                 ->schema([
