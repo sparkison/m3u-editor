@@ -22,7 +22,7 @@ return [
 
     'shared_streaming' => [
         // Enable shared streaming functionality
-        'enabled' => env('SHARED_STREAMING_ENABLED', false),
+        'enabled' => env('SHARED_STREAMING_ENABLED', true),
         
         // Maximum concurrent shared streams
         'max_concurrent_streams' => env('SHARED_MAX_CONCURRENT_STREAMS', 50),
