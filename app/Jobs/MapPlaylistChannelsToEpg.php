@@ -149,8 +149,8 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
 
                     // Get the title and stream id
                     $streamId = trim($channel->stream_id_custom ?? $channel->stream_id);
-                    $name = trim($channel->name);
-                    $title = trim($channel->title ?? $channel->title);
+                    $name = trim($channel->name_custom ?? $channel->name);
+                    $title = trim($channel->title_custom ?? $channel->title);
 
                     // Get cleaned title and stream id
                     if (!empty($patterns)) {
