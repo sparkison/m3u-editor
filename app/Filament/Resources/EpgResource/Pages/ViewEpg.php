@@ -2,7 +2,9 @@
 
 namespace App\Filament\Resources\EpgResource\Pages;
 
+use App\Enums\Status;
 use App\Filament\Resources\EpgResource;
+use App\Filament\Resources\EpgResource\Widgets;
 use App\Livewire\EpgViewer;
 use Filament\Actions;
 use Filament\Infolists;
@@ -14,17 +16,27 @@ class ViewEpg extends ViewRecord
 {
     protected static string $resource = EpgResource::class;
 
+    public function getVisibleHeaderWidgets(): array
+    {
+        return [
+            Widgets\ImportProgress::class
+        ];
+    }
+
     protected function getHeaderActions(): array
     {
         return [
             Actions\Action::make('refresh')
                 ->label('Process')
                 ->icon('heroicon-o-arrow-path')
+                ->color('gray')
                 ->action(function () {
                     $record = $this->getRecord();
                     $record->update([
-                        'status' => \App\Enums\Status::Processing,
+                        'status' => Status::Processing,
                         'progress' => 0,
+                        'sd_progress' => 0,
+                        'cache_progress' => 0,
                     ]);
                     app('Illuminate\Contracts\Bus\Dispatcher')
                         ->dispatch(new \App\Jobs\ProcessEpgImport($record, force: true));
@@ -44,8 +56,13 @@ class ViewEpg extends ViewRecord
             Actions\Action::make('cache')
                 ->label('Generate Cache')
                 ->icon('heroicon-o-arrows-pointing-in')
+                ->color('gray')
                 ->action(function () {
                     $record = $this->getRecord();
+                    $record->update([
+                        'status' => Status::Processing,
+                        'cache_progress' => 0,
+                    ]);
                     app('Illuminate\Contracts\Bus\Dispatcher')
                         ->dispatch(new \App\Jobs\GenerateEpgCache($record->uuid, notify: true));
                 })->after(function () {

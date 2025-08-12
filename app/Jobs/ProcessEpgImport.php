@@ -356,7 +356,7 @@ class ProcessEpgImport implements ShouldQueue
                 $jobs[] = new ProcessEpgImportComplete($userId, $epgId, $batchNo, $start);
 
                 // Lastly, we'll run the cache job
-                $jobs[] = new GenerateEpgCache($epg->uuid);
+                $jobs[] = new GenerateEpgCache($epg->uuid, notify: true);
                 Bus::chain($jobs)
                     ->onConnection('redis') // force to use redis connection
                     ->onQueue('import')

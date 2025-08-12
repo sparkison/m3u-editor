@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\Status;
 use App\Models\Epg;
 use App\Services\EpgCacheService;
 use Filament\Notifications\Notification;
@@ -37,7 +38,13 @@ class GenerateEpgCache implements ShouldQueue
         }
 
         $start = microtime(true);
+        $epg->update([
+            'status' => Status::Processing,
+        ]);
         $result = $cacheService->cacheEpgData($epg);
+        $epg->update([
+            'status' => Status::Completed,
+        ]);
         $duration = microtime(true) - $start;
 
         if ($result) {
@@ -45,7 +52,7 @@ class GenerateEpgCache implements ShouldQueue
                 $msg = "Cache generated successfully in " . round($duration, 2) . " seconds";
                 Notification::make()
                     ->success()
-                    ->title("Successfully created cache for \"{$epg->name}\"")
+                    ->title("EPG cache created for \"{$epg->name}\"")
                     ->body($msg)
                     ->broadcast($epg->user)
                     ->sendToDatabase($epg->user);

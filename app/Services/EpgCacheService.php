@@ -86,6 +86,9 @@ class EpgCacheService
             Log::debug("Starting EPG cache generation for {$epg->name}");
             set_time_limit(600); // 10 minutes
 
+            // Get the channel count for progress tracking
+            $totalChannels = $epg->channels()->count();
+
             // Start by clearing existing cache
             $this->clearCache($epg);
             $cacheDir = $this->getCacheDir($epg);
@@ -93,12 +96,12 @@ class EpgCacheService
 
             // Parse and save channels using streaming
             Log::debug("Parsing and saving channels for {$epg->name}");
-            $channelCount = $this->parseAndSaveChannels($epg, $epgFilePath);
+            $channelCount = $this->parseAndSaveChannels($epg, $epgFilePath, $totalChannels);
             Log::debug("Processed {$channelCount} channels");
 
             // Parse and save programmes using streaming by date
             Log::debug("Parsing and saving programmes for {$epg->name}");
-            $programmeStats = $this->parseAndSaveProgrammes($epg, $epgFilePath);
+            $programmeStats = $this->parseAndSaveProgrammes($epg, $epgFilePath, $totalChannels);
             Log::debug("Processed {$programmeStats['total']} programmes across {$programmeStats['date_count']} dates");
 
             // Save metadata
@@ -118,7 +121,11 @@ class EpgCacheService
             );
 
             // Flag EPG as cached
-            $epg->update(['is_cached' => true, 'cache_meta' => $metadata]);
+            $epg->update([
+                'is_cached' => true,
+                'cache_meta' => $metadata,
+                'cache_progress' => 100
+            ]);
 
             Log::debug("EPG cache generated successfully", $metadata);
             return true;
@@ -131,7 +138,7 @@ class EpgCacheService
     /**
      * Parse and save channels
      */
-    private function parseAndSaveChannels(Epg $epg, string $filePath): int
+    private function parseAndSaveChannels(Epg $epg, string $filePath, int $totalChannels): int
     {
         $channelCount = 0;
         $batchSize = 1000; // Process channels in batches
@@ -145,6 +152,11 @@ class EpgCacheService
             if (count($channelBatch) >= $batchSize) {
                 $this->saveChannelBatch($epg, $channelBatch, $channelCount <= $batchSize);
                 $channelBatch = [];
+
+                // Update progress
+                // Max is 20% for channels since programmes are more intensive
+                $progress = $totalChannels > 0 ? min(20, round(($channelCount / $totalChannels) * 20)) : 20;
+                $epg->update(['cache_progress' => $progress]);
             }
         }
 
@@ -159,7 +171,7 @@ class EpgCacheService
     /**
      * Parse and save programmes using direct file append
      */
-    private function parseAndSaveProgrammes(Epg $epg, string $filePath): array
+    private function parseAndSaveProgrammes(Epg $epg, string $filePath, int $totalChannels): array
     {
         $totalProgrammes = 0;
         $dateRangeTracker = ['min_date' => null, 'max_date' => null];
@@ -197,6 +209,11 @@ class EpgCacheService
                     }
                     $openFiles = [];
                 }
+
+                // Update progress
+                // Max is 80% for programmes
+                $progress = $totalChannels > 0 ? 20 + min(80, round(($totalProgrammes / (self::MAX_PROGRAMMES)) * 80)) : 100;
+                $epg->update(['cache_progress' => $progress]);
             }
         }
 
@@ -686,7 +703,11 @@ class EpgCacheService
         $cacheDir = $this->getCacheDir($epg);
         try {
             // Flag EPG as not cached
-            $epg->update(['is_cached' => false, 'cache_meta' => null]);
+            $epg->update([
+                'is_cached' => false,
+                'cache_meta' => null,
+                'cache_progress' => 0
+            ]);
 
             // Delete cache directory
             Storage::disk('local')->deleteDirectory($cacheDir);

@@ -88,20 +88,29 @@ class EpgResource extends Resource
                     ->toggleable()
                     ->badge()
                     ->color(fn(Status $state) => $state->getColor()),
+                ProgressColumn::make('progress')
+                    ->label('Sync Progress')
+                    ->tooltip('Progress of EPG import/sync')
+                    ->sortable()
+                    ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
+                    ->toggleable(),
+                ProgressColumn::make('cache_progress')
+                    ->label('Cache Progress')
+                    ->tooltip('Progress of EPG cache generation')
+                    ->sortable()
+                    ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
+                    ->toggleable(),
+                ProgressColumn::make('sd_progress')
+                    ->label('SD Progress')
+                    ->tooltip('Progress of Schedules Direct import (if using)')
+                    ->sortable()
+                    ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
+                    ->toggleable(),
                 Tables\Columns\IconColumn::make('is_cached')
                     ->label('Cached')
                     ->boolean()
                     ->toggleable()
                     ->sortable(),
-                ProgressColumn::make('progress')
-                    ->sortable()
-                    ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
-                    ->toggleable(),
-                ProgressColumn::make('sd_progress')
-                    ->label('Schedules Direct')
-                    ->sortable()
-                    ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
-                    ->toggleable(),
                 Tables\Columns\ToggleColumn::make('auto_sync')
                     ->label('Auto Sync')
                     ->toggleable()
@@ -142,6 +151,8 @@ class EpgResource extends Resource
                             $record->update([
                                 'status' => Status::Processing,
                                 'progress' => 0,
+                                'sd_progress' => 0,
+                                'cache_progress' => 0,
                             ]);
                             app('Illuminate\Contracts\Bus\Dispatcher')
                                 ->dispatch(new \App\Jobs\ProcessEpgImport($record, force: true));
@@ -163,6 +174,10 @@ class EpgResource extends Resource
                         ->label('Generate Cache')
                         ->icon('heroicon-o-arrows-pointing-in')
                         ->action(function ($record) {
+                            $record->update([
+                                'status' => Status::Processing,
+                                'cache_progress' => 0,
+                            ]);
                             app('Illuminate\Contracts\Bus\Dispatcher')
                                 ->dispatch(new \App\Jobs\GenerateEpgCache($record->uuid, notify: true));
                         })->after(function () {
@@ -192,6 +207,7 @@ class EpgResource extends Resource
                                 'processing' => false,
                                 'progress' => 0,
                                 'sd_progress' => 0,
+                                'cache_progress' => 0,
                                 'synced' => null,
                                 'errors' => null,
                             ]);
@@ -225,6 +241,8 @@ class EpgResource extends Resource
                                 $record->update([
                                     'status' => Status::Processing,
                                     'progress' => 0,
+                                    'sd_progress' => 0,
+                                    'cache_progress' => 0,
                                 ]);
                                 app('Illuminate\Contracts\Bus\Dispatcher')
                                     ->dispatch(new \App\Jobs\ProcessEpgImport($record, force: true));
@@ -249,6 +267,10 @@ class EpgResource extends Resource
                         ->icon('heroicon-o-arrows-pointing-in')
                         ->action(function ($records) {
                             foreach ($records as $record) {
+                                $record->update([
+                                    'status' => Status::Processing,
+                                    'cache_progress' => 0,
+                                ]);
                                 app('Illuminate\Contracts\Bus\Dispatcher')
                                     ->dispatch(new \App\Jobs\GenerateEpgCache($record->uuid, notify: true));
                             }

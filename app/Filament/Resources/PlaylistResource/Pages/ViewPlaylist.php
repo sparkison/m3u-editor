@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\PlaylistResource\Pages;
 
 use App\Filament\Resources\PlaylistResource;
-use App\Filament\Resources\PlaylistResource\Widgets\ImportProgress;
+use App\Filament\Resources\PlaylistResource\Widgets;
 use Filament\Actions;
 use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
@@ -16,7 +16,7 @@ class ViewPlaylist extends ViewRecord
     public function getVisibleHeaderWidgets(): array
     {
         return [
-            ImportProgress::class
+            Widgets\ImportProgress::class
         ];
     }
 

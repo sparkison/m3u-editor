@@ -160,7 +160,8 @@ function epgViewer(config) {
                 const response = await fetch(url);
 
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    const error = await response.json();
+                    throw new Error(error.suggestion || `HTTP ${response.status}: ${response.statusText}`);
                 }
 
                 const data = await response.json();
