@@ -25,8 +25,8 @@ use App\Filament\Resources\PlaylistSyncStatusResource\Pages\CreatePlaylistSyncSt
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\EditPlaylistSyncStatus;
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ListPlaylistSyncStatuses;
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ViewPlaylistSyncStatus;
-use App\Forms\Components\MediaFlowProxyUrl;
 use App\Livewire\EpgViewer;
+use App\Livewire\MediaFlowProxyUrl;
 use App\Livewire\PlaylistEpgUrl;
 use App\Livewire\PlaylistInfo;
 use App\Livewire\PlaylistM3uUrl;
@@ -663,6 +663,13 @@ class PlaylistResource extends Resource
 
     public static function infolist(Infolist $infolist): Infolist
     {
+        $links = [
+            Infolists\Components\Livewire::make(PlaylistM3uUrl::class),
+            Infolists\Components\Livewire::make(PlaylistEpgUrl::class),
+        ];
+        if (PlaylistUrlFacade::mediaFlowProxyEnabled()) {
+            $links[] = Infolists\Components\Livewire::make(MediaFlowProxyUrl::class);
+        };
         return $infolist
             ->schema([
                 Infolists\Components\Tabs::make()
@@ -679,10 +686,7 @@ class PlaylistResource extends Resource
                             ->schema([
                                 Infolists\Components\Section::make()
                                     ->columns(2)
-                                    ->schema([
-                                        Infolists\Components\Livewire::make(PlaylistM3uUrl::class),
-                                        Infolists\Components\Livewire::make(PlaylistEpgUrl::class)
-                                    ])
+                                    ->schema($links)
                             ]),
                         Infolists\Components\Tabs\Tab::make('Xtream API')
                             ->icon('heroicon-m-bolt')
@@ -1132,61 +1136,16 @@ class PlaylistResource extends Resource
                         ->schema($fields),
                 ];
 
-                // See if MediaFlow Proxy is set up
-                if ($section === 'General' && PlaylistUrlFacade::mediaFlowProxyEnabled()) {
-                    $fields[] = Forms\Components\Section::make('MediaFlow Proxy')
-                        ->description('Your MediaFlow Proxy generated links – to disable clear the MediaFlow Proxy values from the app Settings page.')
-                        ->collapsible()
-                        ->collapsed(false)
-                        ->headerActions([
-                            Forms\Components\Actions\Action::make('mfproxy_git')
-                                ->label('GitHub')
-                                ->icon('heroicon-o-arrow-top-right-on-square')
-                                ->iconPosition('after')
-                                ->color('gray')
-                                ->size('sm')
-                                ->url('https://github.com/mhdzumair/mediaflow-proxy')
-                                ->openUrlInNewTab(true),
-                            Forms\Components\Actions\Action::make('mfproxy_docs')
-                                ->label('Docs')
-                                ->icon('heroicon-o-arrow-top-right-on-square')
-                                ->iconPosition('after')
-                                ->size('sm')
-                                ->url(fn($record) => PlaylistUrlFacade::getMediaFlowProxyServerUrl($record) . '/docs')
-                                ->openUrlInNewTab(true),
-                        ])
-                        ->schema([
-                            MediaFlowProxyUrl::make('mediaflow_proxy_url')
-                                ->label('Proxied M3U URL')
-                                ->columnSpan(2)
-                                ->dehydrated(false) // don't save the value in the database
-                        ]);
-                };
-            }
-
-            $tabs[] = Forms\Components\Tabs\Tab::make($section)
-                ->schema($fields);
-        }
-
-        // Compose the form with tabs and sections
-        return [
-            Forms\Components\Grid::make()
-                ->columns(5)
-                ->schema([
-                    Forms\Components\Tabs::make()
-                        ->tabs($tabs)
-                        ->columnSpan(3)
-                        ->contained(false)
-                        ->persistTabInQueryString(),
-                    Forms\Components\Grid::make()
+                // If general section, add AUTH management
+                if ($section === 'General') {
+                    $fields[] = Forms\Components\Grid::make()
                         ->columns(2)
-                        ->columnSpan(2)
+                        ->columnSpanFull()
                         ->schema([
                             Forms\Components\Section::make('Auth')
                                 ->compact()
                                 ->description('Add and manage authentication.')
-                                ->icon('heroicon-m-key')
-                                ->columnSpan(2)
+                                ->columnSpanFull()
                                 ->schema([
                                     Forms\Components\Select::make('assigned_auth_ids')
                                         ->label('Assigned Auths')
@@ -1259,7 +1218,24 @@ class PlaylistResource extends Resource
                                         })
                                         ->dehydrated(false), // Don't save this field directly
                                 ]),
-                        ])
+                        ]);
+                };
+            }
+
+            $tabs[] = Forms\Components\Tabs\Tab::make($section)
+                ->schema($fields);
+        }
+
+        // Compose the form with tabs and sections
+        return [
+            Forms\Components\Grid::make()
+                ->columns(3)
+                ->schema([
+                    Forms\Components\Tabs::make()
+                        ->tabs($tabs)
+                        ->columnSpanFull()
+                        ->contained(false)
+                        ->persistTabInQueryString(),
                 ])->columnSpanFull(),
 
         ];
