@@ -40,7 +40,7 @@
 
     <x-filament::modal id="epg-file-cache" icon="heroicon-o-trash" icon-color="warning" alignment="center">
         <x-slot name="trigger">
-            <x-filament::button icon="heroicon-o-trash" color="gray" size="sm">
+            <x-filament::button icon="heroicon-o-trash" color="gray" size="xs">
                 Clear Playlist EPG File Cache
             </x-filament::button>
         </x-slot>
@@ -52,21 +52,25 @@
         Clear the EPG file cache for this playlist? It will be automatically regenerated on the next download.
 
         <x-slot name="footerActions">
-            <x-filament::button
-                wire:click="$dispatch('close-modal', { id: 'epg-file-cache' })"
-                label="Cancel"
-                width="full"
-                color="gray"
-            >
-                Cancel
-            </x-filament::button>
-            <x-filament::button
-                wire:click="clearEpgFileCache"
-                label="Clear Playlist EPG File Cache"
-                color="warning"
-            >
-                Confirm
-            </x-filament::button>
+            <div class="grid grid-cols-2 gap-2 w-full">
+                <x-filament::button
+                    wire:click="$dispatch('close-modal', { id: 'epg-file-cache' })"
+                    label="Cancel"
+                    width="full"
+                    color="gray"
+                    class="w-full"
+                >
+                    Cancel
+                </x-filament::button>
+                <x-filament::button
+                    wire:click="clearEpgFileCache"
+                    label="Clear Playlist EPG File Cache"
+                    color="warning"
+                    class="w-full"
+                >
+                    Confirm
+                </x-filament::button>
+            </div>
         </x-slot>
     </x-filament::modal>
 </x-dynamic-component>
