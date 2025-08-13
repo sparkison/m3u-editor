@@ -2,7 +2,7 @@
 
 ![logo](./public/favicon.png)
 
-A powerful `IPTV` editor, similar to **xteve** or **threadfin**, with `EPG` management and much more!
+A full-featured and powerful `IPTV` editor, including features similar to **xteve** or **threadfin**. Also includes full `EPG` management, full Xtream API output, series management with ability to store and sync .strm files, post processing with ability to call custom scripts, send webhook requests, or send an email, and much more!
 
 Works with m3u, m3u8, m3u+ and Xtream codes api!
 
@@ -10,11 +10,13 @@ EPG support for XMLTV files (local or remote), XMLTV URLs, and full **Schedules 
 
 ### Questions/issues/suggestions
 
-Feel free to [open an issue](https://github.com/sparkison/m3u-editor/issues/new?template=bug_report.md) on this repo, you can also join our Discord server to ask questions and get help, help others, suggest new ideas, and offer suggestions for improvements! 🎉
+Feel free to [open an issue](https://github.com/sparkison/m3u-editor/issues/new?template=bug_report.md) on this repo, or hit us up on [Discord](https://discord.gg/rS3abJ5dz7)
 
 ### Join us on Discord
 
 [![](https://dcbadge.limes.pink/api/server/rS3abJ5dz7)](https://discord.gg/rS3abJ5dz7)
+
+Join our [Discord](https://discord.gg/rS3abJ5dz7) server to ask questions and get help, help others, suggest new ideas, and offer suggestions for improvements! You can also try out and help test new features! 🎉
 
 ## Prerequisites
 
@@ -24,7 +26,7 @@ Feel free to [open an issue](https://github.com/sparkison/m3u-editor/issues/new?
 
 ## 📖 Documentation
 
-Check out the docs: [m3u editor docs](https://sparkison.github.io/m3u-editor-docs/)
+Check out the docs: [m3u editor docs](https://sparkison.github.io/m3u-editor-docs/) (we could use some help with this one...)
 
 ## 🐳 Docker quick start
 
