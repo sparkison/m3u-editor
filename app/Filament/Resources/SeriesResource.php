@@ -523,6 +523,7 @@ class SeriesResource extends Resource
                         ->icon('heroicon-o-cog')
                         ->description('Generate .strm files and sync them to a local file path')
                         ->collapsible()
+                        ->collapsed()
                         ->schema([
                             Forms\Components\Grid::make(1)
                                 ->schema([
