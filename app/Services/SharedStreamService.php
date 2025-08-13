@@ -2346,41 +2346,51 @@ class SharedStreamService
 
         $bufferKey = self::BUFFER_PREFIX . $streamKey;
         $redis = $this->redis();
-        $targetChunkSize = 188 * 1000; // 188KB chunks
+
+        // Adaptive chunk size based on current buffer state
+        $currentSegments = $redis->llen("{$bufferKey}:segments");
+        $targetChunkSize = $this->calculateOptimalChunkSize($currentSegments);
+
         $accumulatedData = '';
         $accumulatedSize = 0;
-        $maxReadTime = 2; // Maximum 2 seconds to read data
+        $maxReadTime = 1; // Reduced to prevent buffer bloat
         $startTime = time();
         $readAttempts = 0;
-        $maxReadAttempts = 20; // Maximum read attempts
+        $maxReadAttempts = 10; // Maximum read attempts
 
         while (
             $accumulatedSize < $targetChunkSize &&
             (time() - $startTime) < $maxReadTime &&
             $readAttempts < $maxReadAttempts
         ) {
-
             $readAttempts++;
 
-            // Try to read data from FFmpeg stdout
-            $chunk = fread($stdout, 32768); // Read 32KB chunks
-            if ($chunk !== false && strlen($chunk) > 0) {
-                $accumulatedData .= $chunk;
-                $accumulatedSize += strlen($chunk);
+            // Use stream_select for non-blocking read
+            $read = [$stdout];
+            $write = null;
+            $except = null;
+            $result = stream_select($read, $write, $except, 0, 50000); // 50ms timeout
 
-                // Only log every 10th read attempt or when target size is reached to reduce noise
-                if ($accumulatedSize >= $targetChunkSize || ($readAttempts % 10 === 0 && $readAttempts > 0)) {
-                    Log::channel('ffmpeg')->debug("Stream {$streamKey}: Read " . round($accumulatedSize / 1024, 1) . "KB from FFmpeg in {$readAttempts} attempts");
+            if ($result > 0 && in_array($stdout, $read)) {
+                $chunk = fread($stdout, 16384); // Smaller 16KB chunks
+                if ($chunk !== false && strlen($chunk) > 0) {
+                    $accumulatedData .= $chunk;
+                    $accumulatedSize += strlen($chunk);
                 }
             } else {
-                // No immediate data available, small sleep
-                usleep(100000); // 100ms
-            }
+                // Check for errors but don't wait long
+                $error = fread($stderr, 512);
+                if ($error !== false && strlen($error) > 0) {
+                    // Only log critical errors, not progress updates
+                    if (!preg_match('/size=|time=|bitrate=|speed=/', $error)) {
+                        Log::channel('ffmpeg')->error("Stream {$streamKey}: FFmpeg error: {$error}");
+                    }
+                }
 
-            // Check for errors
-            $error = fread($stderr, 1024);
-            if ($error !== false && strlen($error) > 0) {
-                Log::channel('ffmpeg')->error("Stream {$streamKey}: FFmpeg error: {$error}");
+                // If no data available, break early to prevent hanging
+                if ($readAttempts > 3) {
+                    break;
+                }
             }
         }
 
@@ -2398,11 +2408,12 @@ class SharedStreamService
             $redis->setex($segmentKey, self::SEGMENT_EXPIRY, $accumulatedData);
             $redis->lpush("{$bufferKey}:segments", $newSegmentNumber);
 
-            // Keep only recent segments (prevent memory bloat)
-            $redis->ltrim("{$bufferKey}:segments", 0, 50);
+            // Keep only recent segments and clean up aggressively
+            $maxSegments = $this->calculateMaxSegments($currentSegments);
+            $redis->ltrim("{$bufferKey}:segments", 0, $maxSegments - 1);
 
             // Clean up old segments - only delete segments that are definitely old
-            $segmentsToCleanup = $redis->lrange("{$bufferKey}:segments", 50, -1);
+            $segmentsToCleanup = $redis->lrange("{$bufferKey}:segments", $maxSegments, -1);
             foreach ($segmentsToCleanup as $oldSegmentNum) {
                 $oldSegmentKey = "{$bufferKey}:segment_{$oldSegmentNum}";
                 $redis->del($oldSegmentKey);
@@ -2419,6 +2430,38 @@ class SharedStreamService
         }
 
         return null;
+    }
+
+    /**
+     * Calculate optimal chunk size based on buffer state
+     */
+    private function calculateOptimalChunkSize(int $currentSegments): int
+    {
+        // Adaptive chunk sizing to prevent buffer bloat
+        if ($currentSegments > 30) {
+            return 64 * 1024; // 64KB for high buffer
+        } elseif ($currentSegments > 15) {
+            return 128 * 1024; // 128KB for medium buffer
+        } else {
+            return 188 * 1024; // 188KB for low buffer
+        }
+    }
+
+    /**
+     * Calculate maximum segments to keep in buffer
+     */
+    private function calculateMaxSegments(int $currentSegments): int
+    {
+        // Dynamic buffer sizing based on current state
+        $baseMax = 25; // Base maximum
+
+        if ($currentSegments > 40) {
+            return 15; // Aggressive cleanup when buffer is too large
+        } elseif ($currentSegments > 25) {
+            return 20; // Medium cleanup
+        } else {
+            return $baseMax; // Normal operation
+        }
     }
 
     /**
