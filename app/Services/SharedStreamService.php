@@ -885,7 +885,10 @@ class SharedStreamService
                 // No immediate data available, check for errors
                 $error = fread($stderr, 1024);
                 if ($error !== false && strlen($error) > 0) {
-                    Log::channel('ffmpeg')->error("Stream {$streamKey} FFmpeg error during initial buffering: {$error}");
+                    // Log any stderr output for debugging
+                    // This may include warnings or errors from FFmpeg
+                    // Don't assume it's an error that should stop buffering
+                    Log::channel('ffmpeg')->info("Stream {$streamKey} FFmpeg running initial buffering: {$error}");
                 }
 
                 // Increment wait time only when no data is available

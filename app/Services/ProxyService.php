@@ -612,7 +612,7 @@ class ProxyService
                 $output = "-c:v {$videoCodec} " . ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "") . " {$audioOutputArgs} -c:s {$subtitleCodec} ";
                 
                 // Add MPEG-TS specific options for better compatibility
-                $output .= "-f mpegts -mpegts_copyts 1 -mpegts_original_network_id 1 ";
+                $output .= "-f mpegts -mpegts_copyts 0 -mpegts_original_network_id 1 ";
                 $output .= "-mpegts_transport_stream_id 1 -mpegts_service_id 1 ";
                 $output .= "-mpegts_pmt_start_pid 4096 -mpegts_start_pid 256 ";
                 $output .= "-muxrate 0 -pcr_period 20 ";
@@ -642,22 +642,22 @@ class ProxyService
             $cmd .= $hwaccelArgs;
 
             // Input stream analysis and buffer handling
-            $cmd .= '-fflags nobuffer+igndts -flags low_delay -avoid_negative_ts disabled ';
-            $cmd .= '-analyzeduration 2M -probesize 2M -max_delay 500000 ';
+            $cmd .= '-fflags nobuffer+igndts -flags low_delay -avoid_negative_ts make_zero ';
+            $cmd .= '-analyzeduration 1M -probesize 1M -max_delay 200000 ';
             
             // Better error handling and stream format detection
             $cmd .= '-err_detect ignore_err -ignore_unknown -fflags +discardcorrupt ';
-            $cmd .= '-thread_queue_size 512 ';
+            $cmd .= '-thread_queue_size 256 ';
 
             // Pre-input HTTP options:
             $cmd .= "-user_agent " . escapeshellarg($userAgent) . " -referer " . escapeshellarg("MyComputer") . " " .
                 '-multiple_requests 1 -reconnect_on_network_error 1 ' .
                 '-reconnect_on_http_error 5xx,4xx -reconnect_streamed 1 ' .
-                '-reconnect_delay_max 5 ';
+                '-reconnect_delay_max 2 ';
 
             // Add rw_timeout for all http/https inputs to make ffmpeg fail faster on stall
             if (preg_match('/^https?:\/\//', $streamUrl)) {
-                $cmd .= '-rw_timeout 20000000 '; // 20 seconds in microseconds
+                $cmd .= '-rw_timeout 10000000 '; // 10 seconds in microseconds
             }
 
             if ($isMkv) {
