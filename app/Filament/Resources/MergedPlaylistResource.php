@@ -289,29 +289,31 @@ class MergedPlaylistResource extends Resource
                         ->label('Enable Proxy')
                         ->hint(fn(Get $get): string => $get('enable_proxy') ? 'Proxied' : 'Not proxied')
                         ->hintIcon(fn(Get $get): string => !$get('enable_proxy') ? 'heroicon-m-lock-open' : 'heroicon-m-lock-closed')
-                        ->columnSpanFull()
                         ->live()
+                        ->helperText('When enabled, all streams will be proxied through the application. This allows for better compatibility with various clients and enables features such as stream limiting and output format selection.')
                         ->inline(false)
-                        ->default(false)
-                        ->helperText('When enabled, channel urls will be proxied through m3u editor and streamed via ffmpeg (m3u editor will act as your client, playing the channels directly and sending the content to your client).'),
+                        ->default(false),
                     Forms\Components\TextInput::make('streams')
-                        ->label('HDHR Streams')
-                        ->helperText('Number of streams available for HDHR service (if using).')
+                        ->label('HDHR/Xtream API Streams')
+                        ->helperText('Number of streams available for HDHR and Xtream API service (if using).')
                         ->columnSpan(1)
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'Enter 0 to use to use provider defined value. This value is also used when generating the Xtream API user info response.'
+                        )
                         ->rules(['min:0'])
                         ->type('number')
                         ->default(1) // Default to 1 stream
-                        ->required()
-                        ->hidden(fn(Get $get): bool => !$get('enable_proxy')),
+                        ->required(),
                     Forms\Components\Select::make('proxy_options.output')
                         ->label('Proxy Output Format')
                         ->required()
-                        ->columnSpan(1)
+                        ->columnSpanFull()
                         ->options([
                             'ts' => 'MPEG-TS (.ts)',
                             'hls' => 'HLS (.m3u8)',
                         ])
-                        ->default('ts')->helperText('NOTE: Only HLS streaming supports multiple clients per stream.')
+                        ->default('ts')
                         ->hidden(fn(Get $get): bool => !$get('enable_proxy')),
 
                 ])

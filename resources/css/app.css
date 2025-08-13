@@ -25,3 +25,7 @@
         border-width: 0.5px;
     }
 }
+
+.fi-dropdown-panel {
+    z-index: 20; /* Ensure dropdowns appear above other elements */
+}
