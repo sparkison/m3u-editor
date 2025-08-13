@@ -497,6 +497,10 @@ class StreamController extends Controller
                     }
                     return;
                 }
+                if ($process->isSuccessful()) {
+                     // Finished streaming segment; stop the loop so it doesn’t replay
+                     break;
+                }
                 if (++$retries >= $maxRetries) {
                     // Log error and stop trying this stream...
                     Log::channel('ffmpeg')
