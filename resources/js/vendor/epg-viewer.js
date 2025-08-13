@@ -317,14 +317,14 @@ function epgViewer(config) {
             const stop = programme.stop ? new Date(programme.stop) : null;
 
             const startTime = start.toLocaleTimeString('en-US', {
-                hour: '2-digit',
+                hour: 'numeric',
                 minute: '2-digit',
                 hour12: true
             });
 
             if (stop) {
                 const stopTime = stop.toLocaleTimeString('en-US', {
-                    hour: '2-digit',
+                    hour: 'numeric',
                     minute: '2-digit',
                     hour12: true
                 });
