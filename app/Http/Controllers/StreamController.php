@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Process\Process as SymfonyProcess;
+use Carbon\Carbon;
 
 class StreamController extends Controller
 {
@@ -47,6 +48,33 @@ class StreamController extends Controller
         $sourceChannel = $channel;
         $streams = collect([$channel])->concat($channel->failoverChannels);
 
+        /* ── Timeshift parameters, if the request asked for them ───────────── */
+        $utcPresent = $request->filled('utc');
+        if ($utcPresent) {
+            $utc    = (int) $request->query('utc');              // programme start
+            $lutc   = (int) ($request->query('lutc') ?? time()); // “live” (default = now)
+            $offset = max(1, intdiv($lutc - $utc, 60));          // minutes to rewind
+
+            // “…://host/live/u/p/<id>.<ext>”  →  “…://host/streaming/timeshift.php?username=u&password=p&stream=id&start=stamp&duration=offset”
+            $rewrite = static function (string $url, string $stamp, int $offset): string {
+                if (preg_match('~^(https?://[^/]+)/live/([^/]+)/([^/]+)/([^/]+)\.[^/]+$~', $url, $m)) {
+                    [$_, $base, $user, $pass, $id] = $m;
+                    return sprintf(
+                        '%s/streaming/timeshift.php?username=%s&password=%s&stream=%s&start=%s&duration=%d',
+                        $base,
+                        $user,
+                        $pass,
+                        $id,
+                        $stamp,
+                        $offset
+                    );
+                }
+
+                return $url; // fallback if pattern does not match
+            };
+        }
+        /* ─────────────────────────────────────────────────────────────────── */
+
         // Loop over the failover channels and grab the first one that works.
         foreach ($streams as $stream) {
             // Get the title for the channel
@@ -55,6 +83,14 @@ class StreamController extends Controller
 
             // Setup streams array
             $streamUrl = $stream->url_custom ?? $stream->url;
+            if ($utcPresent && $format === 'ts') {       // only live-TS needs shift
+                $epgShift = (int) ($stream->tvg_shift ?? 0);
+                $stampUtc = $utc - ($epgShift * 3600);
+                $stamp    = Carbon::createFromTimestamp($stampUtc, 'UTC')
+                    ->setTimezone(config('app.timezone'))
+                    ->format('Y-m-d:H-i');
+                $streamUrl = $rewrite($streamUrl, $stamp, $offset);
+            }
             if ($stream->is_custom && !$streamUrl) {
                 Log::channel('ffmpeg')->debug("Custom channel {$stream->id} ({$title}) has no URL set. Using failover channels only.");
                 continue; // Skip if no URL is set
@@ -427,9 +463,12 @@ class StreamController extends Controller
                 $process = SymfonyProcess::fromShellCommandline($cmd);
                 $process->setTimeout(null);
                 try {
-                    $process->run(function ($type, $buffer) {
+                    $process->run(function ($type, $buffer) use (&$process) {
                         if (connection_aborted()) {
-                            throw new \Exception("Connection aborted by client.");
+                            if ($process->isRunning()) {
+                                $process->stop(1); // SIGTERM then SIGKILL
+                            }
+                            return;
                         }
                         if ($type === SymfonyProcess::OUT) {
                             echo $buffer;
@@ -444,7 +483,7 @@ class StreamController extends Controller
                         }
                     });
                 } catch (\Exception $e) {
-                    // Log eror and attempt to reconnect.
+                    // Log error and attempt to reconnect.
                     if (!connection_aborted()) {
                         Log::channel('ffmpeg')
                             ->error("Error streaming $type (\"$title\"): " . $e->getMessage());
