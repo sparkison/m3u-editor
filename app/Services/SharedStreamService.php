@@ -528,8 +528,8 @@ class SharedStreamService
             'format' => $format,
             'status' => 'starting',
             'client_count' => 1,
-            'created_at' => now()->timestamp,
-            'last_client_activity' => now()->timestamp,
+            'created_at' => time(),
+            'last_client_activity' => time(),
             'options' => $options
         ];
         // 1. Create or update database record for persistent tracking
@@ -1183,7 +1183,7 @@ class SharedStreamService
                 $streamInfo = $this->getStreamInfo($streamKey);
                 if ($streamInfo) {
                     $streamInfo['client_count'] = $activeClientCount;
-                    $streamInfo['last_client_activity'] = now()->timestamp;
+                    $streamInfo['last_client_activity'] = time();
                     // If a client is joining, it's definitely not clientless anymore
                     unset($streamInfo['clientless_since']);
                     $this->setStreamInfo($streamKey, $streamInfo);
@@ -1238,11 +1238,11 @@ class SharedStreamService
                 if ($streamInfo) {
                     $playlistId = $streamInfo['options']['playlist_id'] ?? null;
                     $streamInfo['client_count'] = $activeClientCount;
-                    $streamInfo['last_client_activity'] = now()->timestamp;
+                    $streamInfo['last_client_activity'] = time();
 
                     // If no clients left, mark when it became clientless
                     if ($activeClientCount === 0) {
-                        $streamInfo['clientless_since'] = now()->timestamp;
+                        $streamInfo['clientless_since'] = time();
                         Log::channel('ffmpeg')->debug("Stream {$streamKey} now has no clients. Starting cleanup process.");
 
                         // Clean up the stream completely
@@ -1932,7 +1932,7 @@ class SharedStreamService
         if ($streamInfo) {
             Log::channel('ffmpeg')->debug(">>>>> Updating stream activity for {$streamKey}");
 
-            $streamInfo['last_activity'] = now()->timestamp;
+            $streamInfo['last_activity'] = time();
             $streamInfo['buffer_size'] = $this->getStreamBufferDiskUsage($streamKey);
             $this->setStreamInfo($streamKey, $streamInfo);
         } else {
@@ -1953,10 +1953,11 @@ class SharedStreamService
         // Set debounce key with expiration (value is arbitrary)
         Redis::setex($debounceKey, self::STAT_UPDATE_INTERVAL, '1');
         try {
+            $now = Carbon::now();
             $updated = SharedStreamClient::where('stream_id', $streamKey)
                 ->where('client_id', $clientId)
                 ->where('status', 'connected')
-                ->update(['last_activity_at' => now()]);
+                ->update(['last_activity_at' => $now]);
 
             if ($updated) {
                 Log::channel('ffmpeg')->debug(">>>>> Updating client activity for {$streamKey} - client ID: {$clientId}");
@@ -2495,8 +2496,8 @@ class SharedStreamService
                 'format' => $format,
                 'status' => 'starting',
                 'client_count' => 0,
-                'created_at' => now()->timestamp,
-                'last_client_activity' => now()->timestamp,
+                'created_at' => time(),
+                'last_client_activity' => time(),
                 'options' => []
             ];
 
@@ -2744,7 +2745,7 @@ class SharedStreamService
                             ...$originalStreamInfo,
                             'status' => 'failed_over',
                             'failover_stream_key' => $failoverStreamKey,
-                            'failed_over_at' => now()->timestamp,
+                            'failed_over_at' => time(),
                         ]
                     ]);
 
