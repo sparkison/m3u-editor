@@ -48,12 +48,15 @@ class StreamController extends Controller
         $sourceChannel = $channel;
         $streams = collect([$channel])->concat($channel->failoverChannels);
 
-        /* ── Timeshift parameters, if the request asked for them ───────────── */
+        /* ── Timeshift SETUP (TiviMate → portal format) ───────────────────── */
+        // TiviMate sends utc/lutc as UNIX epochs (UTC). We only convert TZ + format.
         $utcPresent = $request->filled('utc');
         if ($utcPresent) {
-            $utc    = (int) $request->query('utc');              // programme start
-            $lutc   = (int) ($request->query('lutc') ?? time()); // “live” (default = now)
-            $offset = max(1, intdiv($lutc - $utc, 60));          // minutes to rewind
+            $utc  = (int) $request->query('utc');               // programme start (UTC epoch)
+            $lutc = (int) ($request->query('lutc') ?? time());  // “live” now (UTC epoch)
+
+            // duration (minutes) from start → now; ceil avoids off-by-one near edges
+            $offset = max(1, (int) ceil(max(0, $lutc - $utc) / 60));
 
             // “…://host/live/u/p/<id>.<ext>”  →  “…://host/streaming/timeshift.php?username=u&password=p&stream=id&start=stamp&duration=offset”
             $rewrite = static function (string $url, string $stamp, int $offset): string {
@@ -69,7 +72,6 @@ class StreamController extends Controller
                         $offset
                     );
                 }
-
                 return $url; // fallback if pattern does not match
             };
         }
@@ -83,14 +85,7 @@ class StreamController extends Controller
 
             // Setup streams array
             $streamUrl = $stream->url_custom ?? $stream->url;
-            if ($utcPresent && $format === 'ts') {       // only live-TS needs shift
-                $epgShift = (int) ($stream->tvg_shift ?? 0);
-                $stampUtc = $utc - ($epgShift * 3600);
-                $stamp    = Carbon::createFromTimestamp($stampUtc, 'UTC')
-                    ->setTimezone(config('app.timezone'))
-                    ->format('Y-m-d:H-i');
-                $streamUrl = $rewrite($streamUrl, $stamp, $offset);
-            }
+
             if ($stream->is_custom && !$streamUrl) {
                 Log::channel('ffmpeg')->debug("Custom channel {$stream->id} ({$title}) has no URL set. Using failover channels only.");
                 continue; // Skip if no URL is set
@@ -98,6 +93,26 @@ class StreamController extends Controller
 
             // Check if playlist is specified
             $playlist = $stream->getEffectivePlaylist();
+
+            // ── Apply timeshift rewriting AFTER we know the provider timezone ──
+            if ($utcPresent && $format === 'ts') { // only live-TS needs shift
+                // Use the portal/provider timezone (DST-aware). Prefer per-playlist; fallback to config; last resort UTC.
+                $providerTz = $playlist->server_timezone
+                    ?? config('proxy.provider_timezone', 'Europe/Paris');
+
+                // Convert the absolute UTC epoch from TiviMate to provider-local time string expected by timeshift.php
+                $stamp = Carbon::createFromTimestampUTC($utc)
+                    ->setTimezone($providerTz)
+                    ->format('Y-m-d:H-i');
+
+                $streamUrl = $rewrite($streamUrl, $stamp, $offset);
+
+                // Helpful debug for verification
+                Log::channel('ffmpeg')->debug(sprintf(
+                    '[TIMESHIFT] utc=%d lutc=%d tz=%s start=%s offset(min)=%d',
+                    $utc, $lutc, $providerTz, $stamp, $offset
+                ));
+            }
 
             // Make sure we have a valid source channel
             $badSourceCacheKey = ProxyService::BAD_SOURCE_CACHE_PREFIX . $stream->id . ':' . $playlist->id;
@@ -284,8 +299,8 @@ class StreamController extends Controller
         // Get user preferences
         $settings = ProxyService::getStreamSettings();
 
-        // Get user agent
-        $userAgent = escapeshellarg($userAgent) ?: escapeshellarg($settings['ffmpeg_user_agent']);
+        // Get user agent (safe null-handling)
+        $userAgent = escapeshellarg($userAgent ?? $settings['ffmpeg_user_agent']);
 
         // If failover support is enabled, we need to run a pre-check with ffprobe to ensure the source is valid
         if ($failoverSupport) {
