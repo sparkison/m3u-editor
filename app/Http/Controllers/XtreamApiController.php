@@ -313,8 +313,12 @@ class XtreamApiController extends Controller
                 $expires = $xtreamStatus['user_info']['exp_date']
                     ? $xtreamStatus['user_info']['exp_date']
                     : $now->copy()->startOfYear()->addYears(1)->timestamp;
+                $streams = (int)$playlist->streams === 0
+                    ? ($xtreamStatus['user_info']['max_connections'] ?? $playlist->streams ?? 1)
+                    : $playlist->streams;
             } else {
                 $expires = $now->copy()->startOfYear()->addYears(1)->timestamp;
+                $streams = $playlist->streams ?? 1;
             }
             $userInfo = [
                 'username' => $username,
@@ -326,7 +330,7 @@ class XtreamApiController extends Controller
                 'is_trial' => '0',
                 'active_cons' => '0',
                 'created_at' => (string)($playlist->user ? $playlist->user->created_at->timestamp : $now->timestamp),
-                'max_connections' => (string)($playlist->streams ?? 1),
+                'max_connections' => (string)$streams,
                 'allowed_output_formats' => ['m3u8', 'ts'],
             ];
 

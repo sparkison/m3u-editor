@@ -41,7 +41,7 @@ class PlaylistGenerateController extends Controller
                     break;
                 }
             }
-            
+
             if (!$authenticated) {
                 return response()->json(['Error' => 'Unauthorized'], 401);
             }
@@ -230,7 +230,7 @@ class PlaylistGenerateController extends Controller
                     break;
                 }
             }
-            
+
             if (!$authenticated) {
                 return response()->json(['Error' => 'Unauthorized'], 401);
             }
@@ -356,7 +356,9 @@ class PlaylistGenerateController extends Controller
     {
         // Return the HDHR device info
         $uuid = $playlist->uuid;
-        $tunerCount = $playlist->streams;
+        $tunerCount = (int)$playlist->streams === 0
+            ? ($xtreamStatus['user_info']['max_connections'] ?? $playlist->streams ?? 1)
+            : $playlist->streams;
         $deviceId = substr($uuid, 0, 8);
         $proxyOverrideUrl = config('proxy.url_override');
         if (!empty($proxyOverrideUrl)) {
