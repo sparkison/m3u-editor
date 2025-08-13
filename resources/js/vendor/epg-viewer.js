@@ -306,9 +306,10 @@ function epgViewer(config) {
         },
 
         formatTime(hour) {
-            // Format as HH:00 
-            const formatted = hour.toString().padStart(2, '0') + ':00';
-            return formatted;
+            // Convert 24-hour format to 12-hour format with AM/PM
+            const period = hour < 12 ? 'AM' : 'PM';
+            const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+            return `${displayHour}:00 ${period}`;
         },
 
         formatProgrammeTime(programme) {
@@ -318,14 +319,14 @@ function epgViewer(config) {
             const startTime = start.toLocaleTimeString('en-US', {
                 hour: '2-digit',
                 minute: '2-digit',
-                hour12: false
+                hour12: true
             });
 
             if (stop) {
                 const stopTime = stop.toLocaleTimeString('en-US', {
                     hour: '2-digit',
                     minute: '2-digit',
-                    hour12: false
+                    hour12: true
                 });
                 return `${startTime} - ${stopTime}`;
             }
