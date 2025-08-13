@@ -14,10 +14,16 @@ use Illuminate\Support\Facades\Redis;
 class PlaylistInfo extends Component
 {
     public Model $record;
+    public bool $isVisible = true;
 
     public function render()
     {
         return view('livewire.playlist-info');
+    }
+
+    public function toggleVisibility()
+    {
+        $this->isVisible = !$this->isVisible;
     }
 
     public function getStats(): array
