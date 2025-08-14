@@ -36,10 +36,15 @@ return [
             'url' => null,
             'database' => database_path('database.sqlite'),
             'prefix' => '',
-            'foreign_key_constraints' => true,
-            'busy_timeout' => null,
-            'journal_mode' => null,
-            'synchronous' => null,
+            'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
+            // Add these options for better concurrency
+            'options' => [
+                PDO::SQLITE_ATTR_OPEN_FLAGS => PDO::SQLITE_OPEN_READWRITE | PDO::SQLITE_OPEN_CREATE,
+            ],
+            'journal_mode' => 'WAL',
+            'synchronous' => 'NORMAL',
+            'cache_size' => 10000,
+            'busy_timeout' => 30000,
         ],
 
         'jobs' => [
@@ -48,9 +53,14 @@ return [
             'database' => database_path('jobs.sqlite'),
             'prefix' => '',
             'foreign_key_constraints' => true,
-            'busy_timeout' => null,
-            'journal_mode' => null,
-            'synchronous' => null,
+            // Add these options for better concurrency
+            'options' => [
+                PDO::SQLITE_ATTR_OPEN_FLAGS => PDO::SQLITE_OPEN_READWRITE | PDO::SQLITE_OPEN_CREATE,
+            ],
+            'journal_mode' => 'WAL',
+            'synchronous' => 'NORMAL',
+            'cache_size' => 10000,
+            'busy_timeout' => 30000,
         ],
 
         'mysql' => [
@@ -158,7 +168,7 @@ return [
 
         'options' => [
             'cluster' => env('REDIS_CLUSTER', 'redis'),
-            'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_') . '_database_'),
+            'prefix' => env('REDIS_PREFIX', 'm3u_editor_database_'),
         ],
 
         'default' => [
@@ -170,16 +180,7 @@ return [
             'database' => env('REDIS_DB', '0'),
         ],
 
-        // Add import connection
-        'import' => [
-            'url' => env('REDIS_URL'),
-            'host' => env('REDIS_HOST', '127.0.0.1'),
-            'username' => env('REDIS_USERNAME'),
-            'password' => env('REDIS_PASSWORD'),
-            'port' => env('REDIS_SERVER_PORT', '36790'),
-            'database' => env('REDIS_DB', '3'),
-        ],
-
+        // Add cache connection
         'cache' => [
             'url' => env('REDIS_URL'),
             'host' => env('REDIS_HOST', '127.0.0.1'),
@@ -187,6 +188,26 @@ return [
             'password' => env('REDIS_PASSWORD'),
             'port' => env('REDIS_SERVER_PORT', '36790'),
             'database' => env('REDIS_CACHE_DB', '1'),
+        ],
+
+        // Add import connection
+        'import' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'username' => env('REDIS_USERNAME'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('REDIS_SERVER_PORT', '36790'),
+            'database' => env('REDIS_IMPORT_DB', '3'),
+        ],
+
+        // Add session connection
+        'session' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'username' => env('REDIS_USERNAME'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('REDIS_SERVER_PORT', '36790'),
+            'database' => env('REDIS_SESSION_DB', '5'),
         ],
 
     ],
