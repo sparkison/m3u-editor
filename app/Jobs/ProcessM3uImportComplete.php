@@ -334,7 +334,7 @@ class ProcessM3uImportComplete implements ShouldQueue
         EpgCacheService::clearPlaylistEpgCacheFile($playlist);
 
         // Clean up sync logs
-        $syncStatusQuery = $playlist->syncStatuses();
+        $syncStatusQuery = $playlist->syncStatusesUnordered();
         if ($syncStatusQuery->count() > $this->maxLogs) {
             $syncStatusQuery
                 ->orderBy('created_at', 'asc')
