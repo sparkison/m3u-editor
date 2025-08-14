@@ -153,17 +153,28 @@ class MergedPlaylistResource extends Resource
     public static function getForm($creating = false): array
     {
         $schema = [
-            Forms\Components\TextInput::make('name')
-                ->required()
-                ->helperText('Enter the name of the playlist. Internal use only.'),
-            Forms\Components\TextInput::make('user_agent')
-                ->helperText('User agent string to use for making requests.')
-                ->default('Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13')
-                ->required(),
+            Forms\Components\Grid::make()
+                ->columns(2)
+                ->columnSpanFull()
+                ->schema([
+                    Forms\Components\TextInput::make('name')
+                        ->required()
+                        ->helperText('Enter the name of the playlist. Internal use only.'),
+                    Forms\Components\TextInput::make('user_agent')
+                        ->helperText('User agent string to use for making requests.')
+                        ->default('Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13')
+                        ->required(),
+                ]),
             Forms\Components\Grid::make()
                 ->columnSpanFull()
                 ->columns(3)
                 ->schema([
+                    Forms\Components\Toggle::make('short_urls_enabled')
+                        ->label('Use Short URLs')
+                        ->helperText('When enabled, short URLs will be used for the playlist links. Save changes to generate the short URLs (or remove them).')
+                        ->columnSpan(2)
+                        ->inline(false)
+                        ->default(false),
                     Forms\Components\Toggle::make('edit_uuid')
                         ->label('View/Update Unique Identifier')
                         ->columnSpanFull()
@@ -191,35 +202,6 @@ class MergedPlaylistResource extends Resource
                         ->required(),
                 ])->hiddenOn('create'),
         ];
-        if (PlaylistUrlFacade::mediaFlowProxyEnabled()) {
-            $schema[] = Forms\Components\Section::make('MediaFlow Proxy')
-                ->description('Your MediaFlow Proxy generated links – to disable clear the MediaFlow Proxy values from the app Settings page.')
-                ->collapsible()
-                ->collapsed($creating)
-                ->headerActions([
-                    Forms\Components\Actions\Action::make('mfproxy_git')
-                        ->label('GitHub')
-                        ->icon('heroicon-o-arrow-top-right-on-square')
-                        ->iconPosition('after')
-                        ->color('gray')
-                        ->size('sm')
-                        ->url('https://github.com/mhdzumair/mediaflow-proxy')
-                        ->openUrlInNewTab(true),
-                    Forms\Components\Actions\Action::make('mfproxy_docs')
-                        ->label('Docs')
-                        ->icon('heroicon-o-arrow-top-right-on-square')
-                        ->iconPosition('after')
-                        ->size('sm')
-                        ->url(fn($record) => PlaylistUrlFacade::getMediaFlowProxyServerUrl($record) . '/docs')
-                        ->openUrlInNewTab(true),
-                ])
-                ->schema([
-                    MediaFlowProxyUrl::make('mediaflow_proxy_url')
-                        ->label('Proxied M3U URL')
-                        ->columnSpan(2)
-                        ->dehydrated(false) // don't save the value in the database
-                ])->hiddenOn(['create']);
-        }
         $outputScheme = [
             Forms\Components\Section::make('Playlist Output')
                 ->description('Determines how the playlist is output')
@@ -305,19 +287,44 @@ class MergedPlaylistResource extends Resource
                         ->type('number')
                         ->default(1) // Default to 1 stream
                         ->required(),
+                    Forms\Components\TextInput::make('available_streams')
+                        ->label('Available Streams')
+                        ->hint('Set to 0 for unlimited streams.')
+                        ->helperText('Number of streams available for this playlist (only applies to custom channels assigned to this Custom Playlist).')
+                        ->columnSpan(1)
+                        ->rules(['min:1'])
+                        ->type('number')
+                        ->default(0) // Default to 0 streams (for unlimted)
+                        ->required()
+                        ->hidden(fn(Get $get): bool => !$get('enable_proxy')),
                     Forms\Components\Select::make('proxy_options.output')
                         ->label('Proxy Output Format')
                         ->required()
-                        ->columnSpanFull()
                         ->options([
                             'ts' => 'MPEG-TS (.ts)',
                             'hls' => 'HLS (.m3u8)',
                         ])
                         ->default('ts')
                         ->hidden(fn(Get $get): bool => !$get('enable_proxy')),
-
                 ])
         ];
+
+        $urls = [
+            PlaylistM3uUrl::make('m3u_url')
+                ->label('M3U URL')
+                ->columnSpan(1)
+                ->dehydrated(false), // don't save the value in the database
+            PlaylistEpgUrl::make('epg_url')
+                ->label('EPG URL')
+                ->columnSpan(1)
+                ->dehydrated(false), // don't save the value in the database
+        ];
+        if (PlaylistUrlFacade::mediaFlowProxyEnabled()) {
+            $urls[] = MediaFlowProxyUrl::make('mediaflow_proxy_url')
+                ->label('Proxied M3U URL')
+                ->columnSpan(1)
+                ->dehydrated(false); // don't save the value in the database
+        }
         return [
             Forms\Components\Grid::make()
                 ->hiddenOn(['edit']) // hide this field on the edit form
@@ -328,137 +335,141 @@ class MergedPlaylistResource extends Resource
                 ->columns(2),
             Forms\Components\Grid::make()
                 ->hiddenOn(['create']) // hide this field on the create form
-                ->columns(5)
                 ->columnSpanFull()
+                ->columns(2)
                 ->schema([
                     Forms\Components\Tabs::make('tabs')
-                        ->columnSpan(3)
+                        ->columnSpanFull()
+                        ->contained(false)
                         ->persistTabInQueryString()
                         ->tabs([
                             Forms\Components\Tabs\Tab::make('General')
                                 ->columns(2)
-                                ->schema($schema),
+                                ->schema([
+                                    Forms\Components\Section::make('Playlist Settings')
+                                        ->compact()
+                                        ->collapsible()
+                                        ->collapsed(true)
+                                        ->icon('heroicon-m-cog')
+                                        ->columnSpan(2)
+                                        ->schema([
+                                            ...$schema,
+
+                                        ])
+                                ]),
+
+                            Forms\Components\Tabs\Tab::make('Auth')
+                                ->columns(2)
+                                ->icon('heroicon-m-key')
+                                ->schema([
+                                    Forms\Components\Section::make('Auth')
+                                        ->compact()
+                                        ->description('Add and manage authentication.')
+                                        ->icon('heroicon-m-key')
+                                        ->columnSpan(2)
+                                        ->schema([
+                                            Forms\Components\Select::make('assigned_auth_ids')
+                                                ->label('Assigned Auths')
+                                                ->multiple()
+                                                ->options(function ($record) {
+                                                    $options = [];
+
+                                                    // Get currently assigned auths for this playlist
+                                                    if ($record) {
+                                                        $currentAuths = $record->playlistAuths()->get();
+                                                        foreach ($currentAuths as $auth) {
+                                                            $options[$auth->id] = $auth->name . ' (currently assigned)';
+                                                        }
+                                                    }
+
+                                                    // Get unassigned auths
+                                                    $unassignedAuths = \App\Models\PlaylistAuth::where('user_id', \Illuminate\Support\Facades\Auth::id())
+                                                        ->whereDoesntHave('assignedPlaylist')
+                                                        ->get();
+
+                                                    foreach ($unassignedAuths as $auth) {
+                                                        $options[$auth->id] = $auth->name;
+                                                    }
+
+                                                    return $options;
+                                                })
+                                                ->searchable()
+                                                ->nullable()
+                                                ->placeholder('Select auths or leave empty')
+                                                ->default(function ($record) {
+                                                    if ($record) {
+                                                        return $record->playlistAuths()->pluck('playlist_auths.id')->toArray();
+                                                    }
+                                                    return [];
+                                                })
+                                                ->afterStateHydrated(function ($component, $state, $record) {
+                                                    if ($record) {
+                                                        $currentAuthIds = $record->playlistAuths()->pluck('playlist_auths.id')->toArray();
+                                                        $component->state($currentAuthIds);
+                                                    }
+                                                })
+                                                ->helperText('Only unassigned auths are available. Each auth can only be assigned to one playlist at a time.')
+                                                ->afterStateUpdated(function ($state, $record) {
+                                                    if (!$record) return;
+
+                                                    $currentAuthIds = $record->playlistAuths()->pluck('playlist_auths.id')->toArray();
+                                                    $newAuthIds = $state ? (is_array($state) ? $state : [$state]) : [];
+
+                                                    // Find auths to remove (currently assigned but not in new selection)
+                                                    $authsToRemove = array_diff($currentAuthIds, $newAuthIds);
+                                                    foreach ($authsToRemove as $authId) {
+                                                        $auth = \App\Models\PlaylistAuth::find($authId);
+                                                        if ($auth) {
+                                                            $auth->clearAssignment();
+                                                        }
+                                                    }
+
+                                                    // Find auths to add (in new selection but not currently assigned)
+                                                    $authsToAdd = array_diff($newAuthIds, $currentAuthIds);
+                                                    foreach ($authsToAdd as $authId) {
+                                                        $auth = \App\Models\PlaylistAuth::find($authId);
+                                                        if ($auth) {
+                                                            $auth->assignTo($record);
+                                                        }
+                                                    }
+                                                })
+                                                ->dehydrated(false), // Don't save this field directly
+                                        ])
+                                ]),
+                            Forms\Components\Tabs\Tab::make('Links')
+                                ->columns(2)
+                                ->icon('heroicon-m-link')
+                                ->schema([
+                                    Forms\Components\Section::make('Links')
+                                        ->compact()
+                                        ->description('Manage playlist links and URL options.')
+                                        ->icon('heroicon-m-link')
+                                        ->columnSpan(2)
+                                        ->columns(2)
+                                        ->schema($urls)
+                                ]),
+                            Forms\Components\Tabs\Tab::make('Xtream API')
+                                ->columns(2)
+                                ->icon('heroicon-m-bolt')
+                                ->schema([
+                                    Forms\Components\Section::make('Xtream API')
+                                        ->compact()
+                                        ->description('Xtream API connection details.')
+                                        ->icon('heroicon-m-bolt')
+                                        ->columnSpan(2)
+                                        ->schema([
+                                            XtreamApiInfo::make('xtream_api_info')
+                                                ->label('Xtream API Info')
+                                                ->columnSpan(2)
+                                                ->dehydrated(false), // don't save the value in the database
+                                        ]),
+                                ]),
+
                             Forms\Components\Tabs\Tab::make('Output')
                                 ->columns(2)
                                 ->schema($outputScheme),
                         ]),
-                    Forms\Components\Grid::make()
-                        ->columnSpan(2)
-                        ->columns(2)
-                        ->schema([
-
-                            Forms\Components\Section::make('Auth')
-                                ->compact()
-                                ->description('Add and manage authentication.')
-                                ->icon('heroicon-m-key')
-                                ->collapsible()
-                                ->collapsed(true)
-                                ->schema([
-                                    Forms\Components\Select::make('assigned_auth_ids')
-                                        ->label('Assigned Auths')
-                                        ->multiple()
-                                        ->options(function ($record) {
-                                            $options = [];
-
-                                            // Get currently assigned auths for this playlist
-                                            if ($record) {
-                                                $currentAuths = $record->playlistAuths()->get();
-                                                foreach ($currentAuths as $auth) {
-                                                    $options[$auth->id] = $auth->name . ' (currently assigned)';
-                                                }
-                                            }
-
-                                            // Get unassigned auths
-                                            $unassignedAuths = \App\Models\PlaylistAuth::where('user_id', \Illuminate\Support\Facades\Auth::id())
-                                                ->whereDoesntHave('assignedPlaylist')
-                                                ->get();
-
-                                            foreach ($unassignedAuths as $auth) {
-                                                $options[$auth->id] = $auth->name;
-                                            }
-
-                                            return $options;
-                                        })
-                                        ->searchable()
-                                        ->nullable()
-                                        ->placeholder('Select auths or leave empty')
-                                        ->default(function ($record) {
-                                            if ($record) {
-                                                return $record->playlistAuths()->pluck('playlist_auths.id')->toArray();
-                                            }
-                                            return [];
-                                        })
-                                        ->afterStateHydrated(function ($component, $state, $record) {
-                                            if ($record) {
-                                                $currentAuthIds = $record->playlistAuths()->pluck('playlist_auths.id')->toArray();
-                                                $component->state($currentAuthIds);
-                                            }
-                                        })
-                                        ->helperText('Only unassigned auths are available. Each auth can only be assigned to one playlist at a time.')
-                                        ->afterStateUpdated(function ($state, $record) {
-                                            if (!$record) return;
-
-                                            $currentAuthIds = $record->playlistAuths()->pluck('playlist_auths.id')->toArray();
-                                            $newAuthIds = $state ? (is_array($state) ? $state : [$state]) : [];
-
-                                            // Find auths to remove (currently assigned but not in new selection)
-                                            $authsToRemove = array_diff($currentAuthIds, $newAuthIds);
-                                            foreach ($authsToRemove as $authId) {
-                                                $auth = \App\Models\PlaylistAuth::find($authId);
-                                                if ($auth) {
-                                                    $auth->clearAssignment();
-                                                }
-                                            }
-
-                                            // Find auths to add (in new selection but not currently assigned)
-                                            $authsToAdd = array_diff($newAuthIds, $currentAuthIds);
-                                            foreach ($authsToAdd as $authId) {
-                                                $auth = \App\Models\PlaylistAuth::find($authId);
-                                                if ($auth) {
-                                                    $auth->assignTo($record);
-                                                }
-                                            }
-                                        })
-                                        ->dehydrated(false), // Don't save this field directly
-                                ]),
-                            Forms\Components\Section::make('Xtream API')
-                                ->compact()
-                                ->description('Xtream API connection details.')
-                                ->icon('heroicon-m-bolt')
-                                ->collapsible()
-                                ->columnSpan(2)
-                                ->collapsed(true)
-                                ->schema([
-                                    XtreamApiInfo::make('xtream_api_info')
-                                        ->label('Xtream API Info')
-                                        ->columnSpan(2)
-                                        ->dehydrated(false), // don't save the value in the database
-                                ]),
-                            Forms\Components\Section::make('Links')
-                                ->compact()
-                                ->icon('heroicon-m-link')
-                                ->collapsible()
-                                ->persistCollapsed()
-                                ->collapsed(true)
-                                ->schema([
-                                    Forms\Components\Toggle::make('short_urls_enabled')
-                                        ->label('Use Short URLs')
-                                        ->helperText('When enabled, short URLs will be used for the playlist links. Save changes to generate the short URLs (or remove them).')
-                                        ->columnSpan(2)
-                                        ->inline(false)
-                                        ->default(false),
-                                    PlaylistM3uUrl::make('m3u_url')
-                                        ->label('M3U URL')
-                                        ->columnSpan(2)
-                                        ->dehydrated(false), // don't save the value in the database
-                                    PlaylistEpgUrl::make('epg_url')
-                                        ->label('EPG URL')
-                                        ->columnSpan(2)
-                                        ->dehydrated(false) // don't save the value in the database
-                                ])
-                        ])
-                ])
-
+                ]),
         ];
     }
 }
