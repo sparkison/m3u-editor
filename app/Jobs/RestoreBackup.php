@@ -8,8 +8,6 @@ use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 
 class RestoreBackup implements ShouldQueue
@@ -49,7 +47,7 @@ class RestoreBackup implements ShouldQueue
             Artisan::call('migrate', ['--force' => true]);
 
             // Clear invalid session data
-            DB::table('sessions')->truncate();
+            Session::flush();
 
             // Pause to allow the restore to complete
             sleep(3);
