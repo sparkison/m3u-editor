@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Process\Process as SymfonyProcess;
+use Carbon\Carbon;
 
 class StreamController extends Controller
 {
@@ -47,6 +48,35 @@ class StreamController extends Controller
         $sourceChannel = $channel;
         $streams = collect([$channel])->concat($channel->failoverChannels);
 
+        /* ── Timeshift SETUP (TiviMate → portal format) ───────────────────── */
+        // TiviMate sends utc/lutc as UNIX epochs (UTC). We only convert TZ + format.
+        $utcPresent = $request->filled('utc');
+        if ($utcPresent) {
+            $utc  = (int) $request->query('utc');               // programme start (UTC epoch)
+            $lutc = (int) ($request->query('lutc') ?? time());  // “live” now (UTC epoch)
+
+            // duration (minutes) from start → now; ceil avoids off-by-one near edges
+            $offset = max(1, (int) ceil(max(0, $lutc - $utc) / 60));
+
+            // “…://host/live/u/p/<id>.<ext>”  →  “…://host/streaming/timeshift.php?username=u&password=p&stream=id&start=stamp&duration=offset”
+            $rewrite = static function (string $url, string $stamp, int $offset): string {
+                if (preg_match('~^(https?://[^/]+)/live/([^/]+)/([^/]+)/([^/]+)\.[^/]+$~', $url, $m)) {
+                    [$_, $base, $user, $pass, $id] = $m;
+                    return sprintf(
+                        '%s/streaming/timeshift.php?username=%s&password=%s&stream=%s&start=%s&duration=%d',
+                        $base,
+                        $user,
+                        $pass,
+                        $id,
+                        $stamp,
+                        $offset
+                    );
+                }
+                return $url; // fallback if pattern does not match
+            };
+        }
+        /* ─────────────────────────────────────────────────────────────────── */
+
         // Loop over the failover channels and grab the first one that works.
         foreach ($streams as $stream) {
             // Get the title for the channel
@@ -55,6 +85,7 @@ class StreamController extends Controller
 
             // Setup streams array
             $streamUrl = $stream->url_custom ?? $stream->url;
+
             if ($stream->is_custom && !$streamUrl) {
                 Log::channel('ffmpeg')->debug("Custom channel {$stream->id} ({$title}) has no URL set. Using failover channels only.");
                 continue; // Skip if no URL is set
@@ -62,6 +93,26 @@ class StreamController extends Controller
 
             // Check if playlist is specified
             $playlist = $stream->getEffectivePlaylist();
+
+            // ── Apply timeshift rewriting AFTER we know the provider timezone ──
+            if ($utcPresent && $format === 'ts') { // only live-TS needs shift
+                // Use the portal/provider timezone (DST-aware). Prefer per-playlist; fallback to config; last resort UTC.
+                $providerTz = $playlist->server_timezone
+                    ?? config('proxy.provider_timezone', 'Europe/Paris');
+
+                // Convert the absolute UTC epoch from TiviMate to provider-local time string expected by timeshift.php
+                $stamp = Carbon::createFromTimestampUTC($utc)
+                    ->setTimezone($providerTz)
+                    ->format('Y-m-d:H-i');
+
+                $streamUrl = $rewrite($streamUrl, $stamp, $offset);
+
+                // Helpful debug for verification
+                Log::channel('ffmpeg')->debug(sprintf(
+                    '[TIMESHIFT] utc=%d lutc=%d tz=%s start=%s offset(min)=%d',
+                    $utc, $lutc, $providerTz, $stamp, $offset
+                ));
+            }
 
             // Make sure we have a valid source channel
             $badSourceCacheKey = ProxyService::BAD_SOURCE_CACHE_PREFIX . $stream->id . ':' . $playlist->id;
@@ -248,8 +299,8 @@ class StreamController extends Controller
         // Get user preferences
         $settings = ProxyService::getStreamSettings();
 
-        // Get user agent
-        $userAgent = escapeshellarg($userAgent) ?: escapeshellarg($settings['ffmpeg_user_agent']);
+        // Get user agent (safe null-handling)
+        $userAgent = escapeshellarg($userAgent ?? $settings['ffmpeg_user_agent']);
 
         // If failover support is enabled, we need to run a pre-check with ffprobe to ensure the source is valid
         if ($failoverSupport) {
@@ -427,9 +478,12 @@ class StreamController extends Controller
                 $process = SymfonyProcess::fromShellCommandline($cmd);
                 $process->setTimeout(null);
                 try {
-                    $process->run(function ($type, $buffer) {
+                    $process->run(function ($type, $buffer) use (&$process) {
                         if (connection_aborted()) {
-                            throw new \Exception("Connection aborted by client.");
+                            if ($process->isRunning()) {
+                                $process->stop(1); // SIGTERM then SIGKILL
+                            }
+                            return;
                         }
                         if ($type === SymfonyProcess::OUT) {
                             echo $buffer;
@@ -444,7 +498,7 @@ class StreamController extends Controller
                         }
                     });
                 } catch (\Exception $e) {
-                    // Log eror and attempt to reconnect.
+                    // Log error and attempt to reconnect.
                     if (!connection_aborted()) {
                         Log::channel('ffmpeg')
                             ->error("Error streaming $type (\"$title\"): " . $e->getMessage());
@@ -457,6 +511,10 @@ class StreamController extends Controller
                         $process->stop(1); // SIGTERM then SIGKILL
                     }
                     return;
+                }
+                if ($process->isSuccessful()) {
+                     // Finished streaming segment; stop the loop so it doesn’t replay
+                     break;
                 }
                 if (++$retries >= $maxRetries) {
                     // Log error and stop trying this stream...
