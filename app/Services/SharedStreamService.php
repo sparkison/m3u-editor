@@ -2349,7 +2349,7 @@ class SharedStreamService
 
         // Adaptive chunk size based on current buffer state
         $currentSegments = $redis->llen("{$bufferKey}:segments");
-        $targetChunkSize = $this->calculateOptimalChunkSize($currentSegments);
+        $targetChunkSize = 188 * 1024; // Default to 188KB
 
         $accumulatedData = '';
         $accumulatedSize = 0;
@@ -2430,21 +2430,6 @@ class SharedStreamService
         }
 
         return null;
-    }
-
-    /**
-     * Calculate optimal chunk size based on buffer state
-     */
-    private function calculateOptimalChunkSize(int $currentSegments): int
-    {
-        // Adaptive chunk sizing to prevent buffer bloat
-        if ($currentSegments > 30) {
-            return 64 * 1024; // 64KB for high buffer
-        } elseif ($currentSegments > 15) {
-            return 128 * 1024; // 128KB for medium buffer
-        } else {
-            return 188 * 1024; // 188KB for low buffer
-        }
     }
 
     /**
