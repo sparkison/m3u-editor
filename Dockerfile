@@ -27,12 +27,10 @@ RUN apk update && apk --no-cache add \
     tzdata \
     # HW accelerated video encoding
     libva \
-    libva-dev \
-    libdrm-dev \
     libva-utils \
+    libdrm \
     mesa-dri-gallium \
     mesa-va-gallium \
-    mesa-dev \
     # FFmpeg
     ffmpeg \
     jellyfin-ffmpeg \
@@ -46,9 +44,27 @@ RUN apk update && apk --no-cache add \
 
 # Add architecture-specific packages conditionally
 RUN if [ "$(uname -m)" = "x86_64" ]; then \
-        apk add --no-cache intel-media-driver libva-intel-driver intel-media-sdk; \
+        echo "Installing Intel VAAPI drivers for x86_64..." && \
+        apk add --no-cache \
+            intel-media-driver \
+            libva-intel-driver \
+            intel-media-sdk \
+            libmfx \
+            libva-dev \
+            libdrm-dev \
+            mesa-dev; \
+    elif [ "$(uname -m)" = "aarch64" ]; then \
+        echo "Installing ARM-compatible VAAPI drivers for aarch64..." && \
+        apk add --no-cache \
+            libva-dev \
+            libdrm-dev \
+            mesa-dev; \
     else \
-        echo "Skipping Intel-specific packages on $(uname -m) architecture"; \
+        echo "Installing basic VAAPI support for $(uname -m) architecture..." && \
+        apk add --no-cache \
+            libva-dev \
+            libdrm-dev \
+            mesa-dev; \
     fi
 
 # Install PostgreSQL server & client
