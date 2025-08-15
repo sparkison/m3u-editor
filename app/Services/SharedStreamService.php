@@ -1956,6 +1956,36 @@ class SharedStreamService
     }
 
     /**
+     * Remove directory
+     */
+    public function removeDirectory(string $dir): bool
+    {
+        try {
+            if (!is_dir($dir)) {
+                return true;
+            }
+
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($dir, \RecursiveDirectoryIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::CHILD_FIRST
+            );
+
+            foreach ($iterator as $file) {
+                if ($file->isDir()) {
+                    rmdir($file->getRealPath());
+                } else {
+                    unlink($file->getRealPath());
+                }
+            }
+
+            return rmdir($dir);
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error removing directory {$dir}: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Clean up orphaned Redis keys that don't have corresponding database records
      */
     public function cleanupOrphanedKeys(): int
