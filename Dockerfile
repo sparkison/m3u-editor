@@ -34,7 +34,7 @@ RUN apk update && apk --no-cache add \
     mesa-va-gallium \
     mesa-dev \
     # FFmpeg
-    ffmpeg --enable-vaapi --enable-libdrm \
+    ffmpeg \
     jellyfin-ffmpeg \
     # nginx + php-fpm
     nginx \
