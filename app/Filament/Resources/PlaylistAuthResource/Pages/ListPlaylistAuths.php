@@ -13,7 +13,7 @@ class ListPlaylistAuths extends ListRecords
 {
     protected static string $resource = PlaylistAuthResource::class;
 
-    protected ?string $subheading = 'Create credentials and assign them to your Playlist for simple authentication.';
+    protected ?string $subheading = 'Create credentials and assign them to your Playlist for simple authentication. They can also be used to access the Xtream API for the assigned Playlists.';
 
     protected function getHeaderActions(): array
     {
@@ -28,7 +28,7 @@ class ListPlaylistAuths extends ListRecords
                         ->success()
                         ->title('Playlist Auth created')
                         ->body('You can now assign Playlists to this Auth.'),
-                )->successRedirectUrl(fn($record): string => EditPlaylistAuth::getUrl(['record' => $record])),
+                ),
         ];
     }
 
