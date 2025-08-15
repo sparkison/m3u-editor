@@ -107,7 +107,7 @@ class PlaylistAuthResource extends Resource
         return [
             'index' => Pages\ListPlaylistAuths::route('/'),
             // 'create' => Pages\CreatePlaylistAuth::route('/create'),
-            'edit' => Pages\EditPlaylistAuth::route('/{record}/edit'),
+            // 'edit' => Pages\EditPlaylistAuth::route('/{record}/edit'),
         ];
     }
 
@@ -136,108 +136,108 @@ class PlaylistAuthResource extends Resource
                 ->columnSpan(1),
         ];
 
-        $editSchema = array_merge($schema, [
-            Forms\Components\Select::make('assigned_playlist')
-                ->label('Assigned to Playlist')
-                ->options(function ($record) {
-                    $options = [];
-
-                    // Add currently assigned playlist if any
-                    if ($record && $record->isAssigned()) {
-                        $assignedModel = $record->getAssignedModel();
-                        if ($assignedModel) {
-                            $type = match (get_class($assignedModel)) {
-                                \App\Models\Playlist::class => 'Playlist',
-                                \App\Models\CustomPlaylist::class => 'Custom Playlist',
-                                \App\Models\MergedPlaylist::class => 'Merged Playlist',
-                                default => 'Unknown'
-                            };
-                            $key = get_class($assignedModel) . '|' . $assignedModel->id;
-                            $options[$key] = $assignedModel->name . " ({$type}) - Currently Assigned";
-                        }
-                    }
-
-                    // Add all available playlists for current user
-                    $userId = \Illuminate\Support\Facades\Auth::id();
-
-                    // Standard Playlists
-                    $playlists = \App\Models\Playlist::where('user_id', $userId)->get();
-                    foreach ($playlists as $playlist) {
-                        $key = \App\Models\Playlist::class . '|' . $playlist->id;
-                        if (!isset($options[$key])) {
-                            $options[$key] = $playlist->name . ' (Playlist)';
-                        }
-                    }
-
-                    // Custom Playlists
-                    $customPlaylists = \App\Models\CustomPlaylist::where('user_id', $userId)->get();
-                    foreach ($customPlaylists as $playlist) {
-                        $key = \App\Models\CustomPlaylist::class . '|' . $playlist->id;
-                        if (!isset($options[$key])) {
-                            $options[$key] = $playlist->name . ' (Custom Playlist)';
-                        }
-                    }
-
-                    // Merged Playlists
-                    $mergedPlaylists = \App\Models\MergedPlaylist::where('user_id', $userId)->get();
-                    foreach ($mergedPlaylists as $playlist) {
-                        $key = \App\Models\MergedPlaylist::class . '|' . $playlist->id;
-                        if (!isset($options[$key])) {
-                            $options[$key] = $playlist->name . ' (Merged Playlist)';
-                        }
-                    }
-
-                    return $options;
-                })
-                ->searchable()
-                ->nullable()
-                ->placeholder('Select a playlist or leave empty')
-                ->helperText('Assign this auth to a specific playlist. Each auth can only be assigned to one playlist at a time.')
-                ->default(function ($record) {
-                    if ($record && $record->isAssigned()) {
-                        $assignedModel = $record->getAssignedModel();
-                        if ($assignedModel) {
-                            return get_class($assignedModel) . '|' . $assignedModel->id;
-                        }
-                    }
-                    return null;
-                })
-                ->afterStateHydrated(function ($component, $state, $record) {
-                    if ($record && $record->isAssigned()) {
-                        $assignedModel = $record->getAssignedModel();
-                        if ($assignedModel) {
-                            $value = get_class($assignedModel) . '|' . $assignedModel->id;
-                            $component->state($value);
-                        }
-                    }
-                })
-                ->afterStateUpdated(function ($state, $record) {
-                    if (!$record) return;
-
-                    if ($state) {
-                        // Parse the selection (format: "ModelClass|ID")
-                        [$modelClass, $modelId] = explode('|', $state, 2);
-                        $model = $modelClass::find($modelId);
-
-                        if ($model) {
-                            $record->assignTo($model);
-                        }
-                    } else {
-                        // Clear assignment
-                        $record->clearAssignment();
-                    }
-                })
-                ->dehydrated(false) // Don't save this field directly
-                ->columnSpan(2),
-        ]);
         return [
             Forms\Components\Grid::make()
                 ->hiddenOn(['edit']) // hide this field on the edit form
                 ->schema($schema)
                 ->columns(2),
-            Forms\Components\Section::make('Playlist Auth')
+            Forms\Components\Grid::make()
                 ->hiddenOn(['create']) // hide this field on the create form
-                ->schema($editSchema)
+                ->schema([
+                    ...$schema,
+                    Forms\Components\Select::make('assigned_playlist')
+                        ->label('Assigned to Playlist')
+                        ->options(function ($record) {
+                            $options = [];
+
+                            // Add currently assigned playlist if any
+                            if ($record && $record->isAssigned()) {
+                                $assignedModel = $record->getAssignedModel();
+                                if ($assignedModel) {
+                                    $type = match (get_class($assignedModel)) {
+                                        \App\Models\Playlist::class => 'Playlist',
+                                        \App\Models\CustomPlaylist::class => 'Custom Playlist',
+                                        \App\Models\MergedPlaylist::class => 'Merged Playlist',
+                                        default => 'Unknown'
+                                    };
+                                    $key = get_class($assignedModel) . '|' . $assignedModel->id;
+                                    $options[$key] = $assignedModel->name . " ({$type}) - Currently Assigned";
+                                }
+                            }
+
+                            // Add all available playlists for current user
+                            $userId = \Illuminate\Support\Facades\Auth::id();
+
+                            // Standard Playlists
+                            $playlists = \App\Models\Playlist::where('user_id', $userId)->get();
+                            foreach ($playlists as $playlist) {
+                                $key = \App\Models\Playlist::class . '|' . $playlist->id;
+                                if (!isset($options[$key])) {
+                                    $options[$key] = $playlist->name . ' (Playlist)';
+                                }
+                            }
+
+                            // Custom Playlists
+                            $customPlaylists = \App\Models\CustomPlaylist::where('user_id', $userId)->get();
+                            foreach ($customPlaylists as $playlist) {
+                                $key = \App\Models\CustomPlaylist::class . '|' . $playlist->id;
+                                if (!isset($options[$key])) {
+                                    $options[$key] = $playlist->name . ' (Custom Playlist)';
+                                }
+                            }
+
+                            // Merged Playlists
+                            $mergedPlaylists = \App\Models\MergedPlaylist::where('user_id', $userId)->get();
+                            foreach ($mergedPlaylists as $playlist) {
+                                $key = \App\Models\MergedPlaylist::class . '|' . $playlist->id;
+                                if (!isset($options[$key])) {
+                                    $options[$key] = $playlist->name . ' (Merged Playlist)';
+                                }
+                            }
+
+                            return $options;
+                        })
+                        ->searchable()
+                        ->nullable()
+                        ->placeholder('Select a playlist or leave empty')
+                        ->helperText('Assign this auth to a specific playlist. Each auth can only be assigned to one playlist at a time.')
+                        ->default(function ($record) {
+                            if ($record && $record->isAssigned()) {
+                                $assignedModel = $record->getAssignedModel();
+                                if ($assignedModel) {
+                                    return get_class($assignedModel) . '|' . $assignedModel->id;
+                                }
+                            }
+                            return null;
+                        })
+                        ->afterStateHydrated(function ($component, $state, $record) {
+                            if ($record && $record->isAssigned()) {
+                                $assignedModel = $record->getAssignedModel();
+                                if ($assignedModel) {
+                                    $value = get_class($assignedModel) . '|' . $assignedModel->id;
+                                    $component->state($value);
+                                }
+                            }
+                        })
+                        ->afterStateUpdated(function ($state, $record) {
+                            if (!$record) return;
+
+                            if ($state) {
+                                // Parse the selection (format: "ModelClass|ID")
+                                [$modelClass, $modelId] = explode('|', $state, 2);
+                                $model = $modelClass::find($modelId);
+
+                                if ($model) {
+                                    $record->assignTo($model);
+                                }
+                            } else {
+                                // Clear assignment
+                                $record->clearAssignment();
+                            }
+                        })
+                        ->dehydrated(false) // Don't save this field directly
+                        ->columnSpan(2),
+                ])
                 ->columns(2),
         ];
     }

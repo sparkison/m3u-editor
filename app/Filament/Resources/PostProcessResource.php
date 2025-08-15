@@ -127,7 +127,8 @@ class PostProcessResource extends Resource
                 ->default(false)->helperText('Process on failed syncs too (default is only successful syncs).'),
             Forms\Components\TextInput::make('name')
                 ->required()
-                ->maxLength(255),
+                ->maxLength(255)
+                ->helperText('A descriptive name for this post process.'),
             Forms\Components\Select::make('event')
                 ->required()
                 ->options([
@@ -135,11 +136,14 @@ class PostProcessResource extends Resource
                     'created' => 'Created',
                     // 'updated' => 'Updated', // Can lead to a lot of calls! Updates are called during the sync process.
                     'deleted' => 'Deleted',
-                ])->default('synced'),
+                ])
+                ->default('synced')
+                ->helperText('The event that will trigger this post process.'),
             Forms\Components\ToggleButtons::make('metadata.local')
                 ->label('Type')
                 ->grouped()
                 ->required()
+                ->columnSpanFull()
                 ->options([
                     'url' => 'URL',
                     'path' => 'Local file',
@@ -151,7 +155,8 @@ class PostProcessResource extends Resource
                     'email' => 'heroicon-s-envelope',
                 ])
                 ->live()
-                ->default('url'),
+                ->default('url')
+                ->helperText('Select whether to send a request to a URL, execute a local script, or send an email.'),
             Forms\Components\TextInput::make('metadata.path')
                 ->label(fn(Get $get) => ucfirst($get('metadata.local') ?? 'url'))
                 ->columnSpan(2)
