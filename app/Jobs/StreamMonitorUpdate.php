@@ -2,8 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Models\Channel;
-use App\Models\Episode;
 use App\Services\SharedStreamService;
 use App\Services\StreamMonitorService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -17,7 +15,6 @@ use Illuminate\Support\Facades\Log;
  * - Monitor stream health and bandwidth
  * - Update real-time statistics
  * - Detect and handle stream failures
- * - Track client connections and disconnections
  */
 class StreamMonitorUpdate implements ShouldQueue
 {
@@ -47,20 +44,7 @@ class StreamMonitorUpdate implements ShouldQueue
             $monitorService->updateSystemStats();
 
             // Get current stream status
-            // $streamStats = $monitorService->getStreamStats(); // this is inaccurate and uses an earlier Redis version...
             $systemStats = $monitorService->getSystemStats();
-
-            // Need to remove any stale clients
-            // We can be pretty agressive with this, as the timestamp will be updated frequently for active connections
-            $activeClients = $sharedStreamService->getAllActiveClients();
-            $removedClients = 0;
-            foreach ($activeClients as $client) {
-                if (isset($client['last_activity_at']) && time() - $client['last_activity_at'] > 30) { // 30 seconds
-                    Log::channel('ffmpeg')->info("StreamMonitor: Removing stale client {$client['client_id']} from stream {$client['stream_id']}");
-                    $sharedStreamService->removeClient($client['stream_id'], $client['client_id']);
-                    $removedClients++;
-                }
-            }
 
             // Update stream health for all active streams
             $activeStreams = $sharedStreamService->getAllActiveStreams();
@@ -70,16 +54,15 @@ class StreamMonitorUpdate implements ShouldQueue
                 try {
                     // Check stream health
                     $health = $monitorService->checkStreamHealth($streamKey);
-
                     if (!$health['healthy']) {
                         $unhealthyStreams++;
                         Log::channel('ffmpeg')->warning("StreamMonitor: Unhealthy stream detected: {$streamKey} - {$health['reason']}");
 
-                        // Attempt to restart if it's a critical failure
+                        // Attempt to cleanup if it's a critical failure
+                        // Failover attempts are handled in the SharedStreamService
                         if ($health['critical']) {
                             Log::channel('ffmpeg')->error("StreamMonitor: Critical failure for stream {$streamKey}");
-
-                            // @TODO: Implement failover logic if needed...
+                            $sharedStreamService->cleanupStream($streamKey);
                         }
                     }
 
@@ -108,7 +91,6 @@ class StreamMonitorUpdate implements ShouldQueue
 
             Log::channel('ffmpeg')->debug(
                 "StreamMonitor: Updated stats - " . count($activeStreams) . " streams, " .
-                    "{$removedClients} stale clients removed, " .
                     "{$unhealthyStreams} unhealthy, " . round($totalBandwidth / 1024 / 1024, 2) . "MB/s bandwidth"
             );
         } catch (\Exception $e) {
