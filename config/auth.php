@@ -18,6 +18,10 @@ return [
         'passwords' => env('AUTH_PASSWORD_BROKER', 'users'),
     ],
 
+    // Auto-login settings
+    'auto_login' => env('AUTO_LOGIN', false),
+    'auto_login_email' => env('AUTO_LOGIN_EMAIL', 'admin@test.com'), // default install email is: admin@test.com
+
     /*
     |--------------------------------------------------------------------------
     | Authentication Guards
