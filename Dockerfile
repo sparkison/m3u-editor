@@ -21,17 +21,21 @@ RUN apk update && apk --no-cache add \
     ca-certificates \
     nodejs \
     npm \
-    ffmpeg \
-    jellyfin-ffmpeg \
     redis \
     git \
     bash \
     tzdata \
     # HW accelerated video encoding
     libva \
+    libva-dev \
+    libdrm-dev \
     libva-utils \
     mesa-dri-gallium \
     mesa-va-gallium \
+    mesa-dev \
+    # FFmpeg
+    ffmpeg --enable-vaapi --enable-libdrm \
+    jellyfin-ffmpeg \
     # nginx + php-fpm
     nginx \
     php84-cli \
