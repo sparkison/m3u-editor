@@ -10,10 +10,16 @@ use Illuminate\Database\Eloquent\Model;
 class PlaylistEpgUrl extends Component
 {
     public Model $record;
+    public string $modalId = '';
 
     public function render()
     {
         return view('livewire.playlist-epg-url');
+    }
+
+    public function mount()
+    {
+        $this->modalId = 'epg-url-modal-' . $this->record->getKey();
     }
 
     public function clearEpgFileCache()
@@ -32,5 +38,8 @@ class PlaylistEpgUrl extends Component
                 ->warning()
                 ->send();
         }
+
+        // Close the modal
+        $this->dispatch('close-modal', id: $this->modalId);
     }
 }

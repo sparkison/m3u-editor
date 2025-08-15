@@ -3,6 +3,7 @@
     @php($urls = \App\Facades\PlaylistUrlFacade::getUrls($record))
     @php($epgUrl = $urls['epg'])
     @php($epgZippedUrl = $urls['epg_zip'])
+    @php($epgCacheModalId = 'epg-url-modal-' . $record->getKey())
     <div x-data="{ state: $wire.$entangle('{{ $getStatePath() }}') }">
         <div class="flex gap-2 items-center justify-start mb-4">
             <x-filament::input.wrapper>
@@ -38,7 +39,7 @@
         </div>
     </div>
 
-    <x-filament::modal id="epg-file-cache" icon="heroicon-o-trash" icon-color="warning" alignment="center">
+    <x-filament::modal id="{{ $epgCacheModalId }}" icon="heroicon-o-trash" icon-color="warning" alignment="center">
         <x-slot name="trigger">
             <x-filament::button icon="heroicon-o-trash" color="gray" size="xs">
                 Clear Playlist EPG File Cache
@@ -51,12 +52,11 @@
 
         Clear the EPG file cache for this playlist? It will be automatically regenerated on the next download.
 
-        <x-slot name="footerActions">
+        <x-slot name="footer">
             <div class="grid grid-cols-2 gap-2 w-full">
                 <x-filament::button
-                    wire:click="$dispatch('close-modal', { id: 'epg-file-cache' })"
+                    wire:click="$dispatch('close-modal', { id: '{{ $epgCacheModalId }}' })"
                     label="Cancel"
-                    width="full"
                     color="gray"
                     class="w-full"
                 >

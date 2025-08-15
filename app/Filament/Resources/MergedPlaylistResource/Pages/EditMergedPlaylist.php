@@ -35,5 +35,8 @@ class EditMergedPlaylist extends EditRecord
                 ->warning()
                 ->send();
         }
+
+        // Close the modal
+        $this->dispatch('close-modal', id: 'epg-url-modal-' . $this->record->getKey());
     }
 }
