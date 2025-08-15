@@ -88,14 +88,6 @@ class AppServiceProvider extends ServiceProvider
         // Setup the middleware
         $this->setupMiddleware();
 
-        // Check if auto-login is enabled
-        if (config('auth.auto_login') && !auth()->check()) {
-            $user = User::where('email', config('auth.auto_login_email'))->first();
-            if ($user) {
-                auth()->login($user);
-            }
-        }
-
         // Setup the gates
         $this->setupGates();
 
