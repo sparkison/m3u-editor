@@ -39,7 +39,7 @@ class ProcessM3uImport implements ShouldQueue
 
     // Default user agent to use for HTTP requests
     // Used when user agent is not set in the playlist
-    public $userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13';
+    public $userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36';
 
     // Delete the job if the model is missing
     public $deleteWhenMissingModels = true;

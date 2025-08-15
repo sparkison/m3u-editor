@@ -642,7 +642,7 @@ class EpgResource extends Resource
                         ->schema([
                             Forms\Components\TextInput::make('user_agent')
                                 ->helperText('User agent string to use for fetching the EPG.')
-                                ->default('Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.13) Gecko/20080311 Firefox/2.0.0.13')
+                                ->default('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36')
                                 ->columnSpan(2)
                                 ->required(),
                             Forms\Components\Toggle::make('disable_ssl_verification')
