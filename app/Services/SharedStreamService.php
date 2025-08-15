@@ -644,6 +644,7 @@ class SharedStreamService
 
         // Store process info in stream data
         $streamInfo['pid'] = $pid;
+        $streamInfo['status'] = 'active'; // Set status to active
         $this->setStreamInfo($streamKey, $streamInfo);
 
         // Set up error logging from stderr
@@ -1160,8 +1161,8 @@ class SharedStreamService
         // Check if the process is actually running (phantom stream detection)
         $pid = $streamInfo['pid'] ?? null;
         if ($pid && !$this->isProcessRunning($pid)) {
-            // Just log it for now, don't delete immediately
             Log::channel('ffmpeg')->warning("👻 Possible phantom stream detected for {$streamKey} with PID {$pid} - process not running");
+            return false;
         }
 
         return true;
