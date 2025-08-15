@@ -85,14 +85,6 @@ class AppServiceProvider extends ServiceProvider
             request()->server->set('HTTPS', request()->header('X-Forwarded-Proto', 'https') == 'https' ? 'on' : 'off');
         }
 
-        // Check if auto-login is enabled
-        if (config('auth.auto_login') && !auth()->check()) {
-            $user = User::where('email', config('auth.auto_login_email'))->first();
-            if ($user) {
-                auth()->login($user);
-            }
-        }
-
         // Setup the middleware
         $this->setupMiddleware();
 

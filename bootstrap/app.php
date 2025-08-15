@@ -14,6 +14,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware
+            ->use([
+                \App\Http\Middleware\AutoLoginMiddleware::class,
+            ])
             ->redirectGuestsTo('login')
             ->trustProxies(at: ['*'])
             ->validateCsrfTokens(except: [
