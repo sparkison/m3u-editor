@@ -313,6 +313,11 @@ class CustomPlaylistResource extends Resource
                         ])
                         ->default('ts')
                         ->hidden(fn(Get $get): bool => !$get('enable_proxy')),
+                    Forms\Components\TextInput::make('server_timezone')
+                        ->label('Provider Timezone')
+                        ->helperText('The portal/provider timezone (DST-aware). Needed to correctly use timeshift functionality when playlist proxy is enabled.')
+                        ->placeholder('Etc/UTC')
+                        ->hidden(fn(Get $get): bool => !$get('enable_proxy')),
                 ])
         ];
 

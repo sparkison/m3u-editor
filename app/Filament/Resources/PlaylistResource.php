@@ -1066,6 +1066,11 @@ class PlaylistResource extends Resource
                         ->default('ts')
                         ->helperText(fn() => config('proxy.shared_streaming.enabled') ? '' : 'NOTE: Only HLS streaming supports multiple connections per stream. MPEG-TS creates a new stream for each connection.')
                         ->hidden(fn(Get $get): bool => !$get('enable_proxy')),
+                    Forms\Components\TextInput::make('server_timezone')
+                        ->label('Provider Timezone')
+                        ->helperText('The portal/provider timezone (DST-aware). Needed to correctly use timeshift functionality when playlist proxy is enabled.')
+                        ->placeholder('Etc/UTC')
+                        ->hidden(fn(Get $get): bool => !$get('enable_proxy')),
                 ]),
             Forms\Components\Section::make('EPG Output')
                 ->description('EPG output options')
