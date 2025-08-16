@@ -30,10 +30,6 @@ Schedule::command('app:hls-prune')
     ->withoutOverlapping();
 
 // Shared stream management jobs
-Schedule::job(new \App\Jobs\StreamMonitorUpdate())
-    ->everyFiveMinutes()
-    ->withoutOverlapping()
-    ->name('shared-stream-monitor');
 Schedule::job(new \App\Jobs\SharedStreamCleanup())
     ->everyFiveMinutes()
     ->withoutOverlapping()
