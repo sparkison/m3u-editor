@@ -35,27 +35,6 @@ class QuickActionsWidget extends Widget
         }
     }
 
-    public function refreshSystemStats()
-    {
-        try {
-            // Force refresh of system statistics
-            \App\Jobs\StreamMonitorUpdate::dispatch();
-            
-            Notification::make()
-                ->title('System Stats Refreshed')
-                ->body('System statistics update has been queued')
-                ->info()
-                ->send();
-                
-        } catch (\Exception $e) {
-            Notification::make()
-                ->title('Refresh Failed')
-                ->body($e->getMessage())
-                ->danger()
-                ->send();
-        }
-    }
-
     public function getViewData(): array
     {
         $totalStreams = SharedStream::count();

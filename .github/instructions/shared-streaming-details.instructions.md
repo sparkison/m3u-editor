@@ -18,7 +18,6 @@ Some of the relevant files for the Shared Streaming functionality include:
 - `app/Http/Controllers/Api/SharedStreamApiController.php`: The API controller for handling shared streaming requests via API, or using with apps like Grafana.
 - `app/Jobs/SharedStreamCleanup.php`: The job for cleaning up old shared streams.
 - `app/Jobs/StreamBufferManager.php`: The job for managing the stream buffer.
-- `app/Jobs/StreamMonitorUpdate.php`: The job for updating the stream monitor.
 - `app/Models/SharedStream.php`: The model representing a shared stream instance.
 - `app/Services/SharedStreamService.php`: The service class that contains the business logic for shared streaming.
 - `docs/buffered-streaming.md`: The documentation for the buffered streaming feature.
