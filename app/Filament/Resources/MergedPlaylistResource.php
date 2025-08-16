@@ -287,15 +287,10 @@ class MergedPlaylistResource extends Resource
                         ->type('number')
                         ->default(1) // Default to 1 stream
                         ->required(),
-                    Forms\Components\TextInput::make('available_streams')
-                        ->label('Available Streams')
-                        ->hint('Set to 0 for unlimited streams.')
-                        ->helperText('Number of streams available for this playlist (only applies to custom channels assigned to this Custom Playlist).')
-                        ->columnSpan(1)
-                        ->rules(['min:1'])
-                        ->type('number')
-                        ->default(0) // Default to 0 streams (for unlimted)
-                        ->required()
+                    Forms\Components\TextInput::make('server_timezone')
+                        ->label('Provider Timezone')
+                        ->helperText('The portal/provider timezone (DST-aware). Needed to correctly use timeshift functionality when playlist proxy is enabled.')
+                        ->placeholder('Etc/UTC')
                         ->hidden(fn(Get $get): bool => !$get('enable_proxy')),
                     Forms\Components\Select::make('proxy_options.output')
                         ->label('Proxy Output Format')
