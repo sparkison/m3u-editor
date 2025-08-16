@@ -57,6 +57,8 @@ class GeneralSettings extends Settings
     public ?bool $stream_file_sync_include_season = false;
     public ?string $stream_file_sync_location = null;
 
+    public ?bool $force_video_player_proxy = false;
+
     public static function group(): string
     {
         return 'general';
