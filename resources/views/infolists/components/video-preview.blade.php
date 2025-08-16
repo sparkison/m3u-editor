@@ -1,7 +1,8 @@
 <x-dynamic-component :component="$getEntryWrapperView()" :entry="$entry">
     @php($record = $getRecord())
+    @php($settings = app(\App\Settings\GeneralSettings::class))
     @php($playlist = App\Models\Playlist::find($record->playlist_id) ?? null)
-    @php($proxyEnabled = $playlist->enable_proxy)
+    @php($proxyEnabled = $settings->force_video_player_proxy || $playlist->enable_proxy)
     @php($url = $record->url_custom ?? $record->url)
     @if($proxyEnabled)
         @php($format =  $playlist->proxy_options['output'] ?? 'ts')

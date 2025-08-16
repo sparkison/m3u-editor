@@ -69,10 +69,19 @@ class Preferences extends SettingsPage
                                     ->collapsible()
                                     ->collapsed(false)
                                     ->schema([
-                                        Forms\Components\Toggle::make('ffmpeg_debug')
-                                            ->label('Debug')
+                                        Forms\Components\Grid::make()
                                             ->columnSpanFull()
-                                            ->helperText('When enabled FFmpeg will output verbose logging to the log file (/var/www/logs/ffmpeg-YYYY-MM-DD.log). When disabled, FFmpeg will only log errors.'),
+                                            ->columns(2)
+                                            ->schema([
+                                                Forms\Components\Toggle::make('ffmpeg_debug')
+                                                    ->label('Debug')
+                                                    ->columnSpan(1)
+                                                    ->helperText('When enabled FFmpeg will output verbose logging to the log file (/var/www/logs/ffmpeg-YYYY-MM-DD.log). When disabled, FFmpeg will only log errors.'),
+                                                Forms\Components\Toggle::make('force_video_player_proxy')
+                                                    ->label('Force Video Player Proxy')
+                                                    ->columnSpan(1)
+                                                    ->helperText('When enabled, the in-app video player will always use the proxy. This can be useful to bypass mixed content issues when using HTTPS. When disabled, the video player will respect the playlist proxy settings.'),
+                                            ]),
                                         Forms\Components\Grid::make()
                                             ->columnSpanFull()
                                             ->columns(2)

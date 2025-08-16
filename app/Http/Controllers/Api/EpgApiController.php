@@ -11,6 +11,7 @@ use App\Models\Playlist;
 use App\Models\MergedPlaylist;
 use App\Models\CustomPlaylist;
 use App\Services\EpgCacheService;
+use App\Settings\GeneralSettings;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -159,6 +160,8 @@ class EpgApiController extends Controller
             return response()->json(['error' => 'Playlist not found'], 404);
         }
         $cacheService = new EpgCacheService();
+        $settings = app(GeneralSettings::class);
+        $forceProxy = $settings->force_video_player_proxy ?? false;
 
         // Pagination parameters
         $page = (int) $request->get('page', 1);
@@ -203,7 +206,7 @@ class EpgApiController extends Controller
                 ->get();
 
             // Check the proxy format
-            $proxyEnabled = $playlist->enable_proxy;
+            $proxyEnabled = $forceProxy || $playlist->enable_proxy;
             $proxyFormat = $playlist->proxy_options['output'] ?? 'ts';
 
             // If auto channel increment is enabled, set the starting channel number
