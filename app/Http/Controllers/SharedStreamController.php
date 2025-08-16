@@ -399,14 +399,11 @@ class SharedStreamController extends Controller
      */
     public function stopStream(Request $request, string $streamKey): \Illuminate\Http\JsonResponse
     {
-        $stats = $this->sharedStreamService->getStreamStats($streamKey);
-        if (!$stats) {
-            abort(404, 'Stream not found');
-        }
+        $activeClients = $this->sharedStreamService->getClients($streamKey);
 
         // Remove all clients to trigger cleanup
-        foreach ($stats['clients'] as $client) {
-            $this->sharedStreamService->removeClient($streamKey, $client['id']);
+        foreach ($activeClients as $client) {
+            $this->sharedStreamService->removeClient($streamKey, $client['client_id']);
         }
 
         Log::channel('ffmpeg')->info("Manually stopped shared stream {$streamKey}");
