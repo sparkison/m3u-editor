@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Str;
 
@@ -127,16 +128,36 @@ class SharedStream extends Model
             return false;
         }
 
-        // Check if process is still running
-        // Use ps to check process status (works on both Linux and macOS)
-        $output = shell_exec("ps -p {$this->process_id} -o stat= 2>/dev/null");
+        $pid = (int)$this->process_id;
+        if (!function_exists('posix_getpgid')) {
+            // Fallback for non-POSIX systems (e.g., Windows)
+            try {
+                // Use ps to check process status (works on both Linux and macOS)
+                $output = shell_exec("ps -p {$pid} -o stat= 2>/dev/null");
 
-        if (empty(trim($output))) {
-            // Process doesn't exist
-            return false;
+                if (empty(trim($output))) {
+                    // Process doesn't exist
+                    return false;
+                }
+
+                $stat = trim($output);
+                // Check for zombie or dead processes
+                // Z = zombie, X = dead on most systems
+                if (preg_match('/^[ZX]/', $stat)) {
+                    Log::channel('ffmpeg')->debug("Process {$pid} exists but is in state '{$stat}' (zombie/dead)");
+                    return false;
+                }
+
+                // Process exists and is not zombie/dead
+                return true;
+            } catch (\Exception $e) {
+                Log::channel('ffmpeg')->error("Error checking if process {$pid} is running: " . $e->getMessage());
+                return false;
+            }
         }
-
-        return true;
+        // Check if the process is running using posix_getpgid
+        // this is a more reliable way to check if a process is running
+        return posix_getpgid($pid) !== false;
     }
 
     /**
