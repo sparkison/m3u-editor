@@ -1058,7 +1058,7 @@ class XtreamApiController extends Controller
 
             // Check if channel is currently playing
             $isNowPlaying = SharedStream::active()
-                ->where('stream_info->options->model_id', $channel->id)
+                ->where('stream_info->model_id', $channel->id)
                 ->exists();
 
             // Filter programmes to current time and future, then limit
@@ -1133,7 +1133,7 @@ class XtreamApiController extends Controller
             if (isset($programmes[$channel->epgChannel->channel_id])) {
                 // Check if channel is currently playing
                 $isNowPlaying = SharedStream::active()
-                    ->where('stream_info->options->model_id', $channel->id)
+                    ->where('stream_info->model_id', $channel->id)
                     ->exists();
 
                 $now = Carbon::now();
