@@ -373,6 +373,19 @@ class PlaylistResource extends Resource
                         ->modalIcon('heroicon-o-numbered-list')
                         ->modalDescription('Reset playlist active streams count. Proceed with caution as this could lead to an incorrect count if there are streams currently running.')
                         ->modalSubmitActionLabel('Yes, reset now'),
+                    Tables\Actions\Action::make('purge_series')
+                        ->label('Purge Series')
+                        ->icon('heroicon-s-trash')
+                        ->color('danger')
+                        ->action(function ($record) {
+                            $record->series()->delete();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-s-trash')
+                        ->modalIcon('heroicon-s-trash')
+                        ->modalDescription('This action will permanently delete all series associated with the playlist. Proceed with caution.')
+                        ->modalSubmitActionLabel('Purge now')
+                        ->hidden(fn($record): bool => !$record->xtream),
                     Tables\Actions\DeleteAction::make(),
                 ])->button()->hiddenLabel()->size('sm'),
                 Tables\Actions\EditAction::make()->button()->hiddenLabel()->size('sm'),
