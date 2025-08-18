@@ -445,4 +445,143 @@ class XtreamApiControllerTest extends TestCase
         // Assert that failover records were deleted
         $this->assertDatabaseCount('channel_failovers', 0);
     }
+
+    public function test_get_short_epg_action_with_missing_stream_id_returns_error(): void
+    {
+        $response = $this->getJson(route('xtream.api.player') . '?' . http_build_query([
+            'username' => $this->username,
+            'password' => $this->password,
+            'action' => 'get_short_epg',
+        ]));
+
+        $response->assertStatus(400)
+            ->assertJson([
+                'error' => 'stream_id parameter is required for get_short_epg action'
+            ]);
+    }
+
+    public function test_get_short_epg_action_with_non_existent_channel_returns_error(): void
+    {
+        $response = $this->getJson(route('xtream.api.player') . '?' . http_build_query([
+            'username' => $this->username,
+            'password' => $this->password,
+            'action' => 'get_short_epg',
+            'stream_id' => 99999,
+        ]));
+
+        $response->assertStatus(404)
+            ->assertJson([
+                'error' => 'Channel not found'
+            ]);
+    }
+
+    public function test_get_short_epg_action_with_channel_without_epg_returns_empty_list(): void
+    {
+        $channel = Channel::factory()->create([
+            'playlist_id' => $this->playlist->id,
+            'enabled' => true,
+            'is_vod' => false,
+            'user_id' => $this->user->id,
+        ]);
+
+        $response = $this->getJson(route('xtream.api.player') . '?' . http_build_query([
+            'username' => $this->username,
+            'password' => $this->password,
+            'action' => 'get_short_epg',
+            'stream_id' => $channel->id,
+        ]));
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'epg_listings' => []
+            ]);
+    }
+
+    public function test_get_simple_date_table_action_with_missing_stream_id_returns_error(): void
+    {
+        $response = $this->getJson(route('xtream.api.player') . '?' . http_build_query([
+            'username' => $this->username,
+            'password' => $this->password,
+            'action' => 'get_simple_date_table',
+        ]));
+
+        $response->assertStatus(400)
+            ->assertJson([
+                'error' => 'stream_id parameter is required for get_simple_date_table action'
+            ]);
+    }
+
+    public function test_get_simple_date_table_action_with_non_existent_channel_returns_error(): void
+    {
+        $response = $this->getJson(route('xtream.api.player') . '?' . http_build_query([
+            'username' => $this->username,
+            'password' => $this->password,
+            'action' => 'get_simple_date_table',
+            'stream_id' => 99999,
+        ]));
+
+        $response->assertStatus(404)
+            ->assertJson([
+                'error' => 'Channel not found'
+            ]);
+    }
+
+    public function test_get_simple_date_table_action_with_channel_without_epg_returns_empty_list(): void
+    {
+        $channel = Channel::factory()->create([
+            'playlist_id' => $this->playlist->id,
+            'enabled' => true,
+            'is_vod' => false,
+            'user_id' => $this->user->id,
+        ]);
+
+        $response = $this->getJson(route('xtream.api.player') . '?' . http_build_query([
+            'username' => $this->username,
+            'password' => $this->password,
+            'action' => 'get_simple_date_table',
+            'stream_id' => $channel->id,
+        ]));
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'epg_listings' => []
+            ]);
+    }
+
+    public function test_get_short_epg_action_respects_limit_parameter(): void
+    {
+        $channel = Channel::factory()->create([
+            'playlist_id' => $this->playlist->id,
+            'enabled' => true,
+            'is_vod' => false,
+            'user_id' => $this->user->id,
+        ]);
+
+        // Test with limit parameter
+        $response = $this->getJson(route('xtream.api.player') . '?' . http_build_query([
+            'username' => $this->username,
+            'password' => $this->password,
+            'action' => 'get_short_epg',
+            'stream_id' => $channel->id,
+            'limit' => 2,
+        ]));
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'epg_listings'
+            ]);
+
+        // Test default limit (should be 4)
+        $response = $this->getJson(route('xtream.api.player') . '?' . http_build_query([
+            'username' => $this->username,
+            'password' => $this->password,
+            'action' => 'get_short_epg',
+            'stream_id' => $channel->id,
+        ]));
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'epg_listings'
+            ]);
+    }
 }

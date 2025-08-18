@@ -6,9 +6,12 @@ use App\Enums\ChannelLogoType;
 use App\Enums\PlaylistChannelId;
 use App\Models\Channel;
 use App\Models\CustomPlaylist;
+use App\Models\Epg;
 use App\Models\MergedPlaylist;
 use App\Models\Playlist;
 use App\Models\Series;
+use App\Models\SharedStream;
+use App\Services\EpgCacheService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -84,6 +87,23 @@ class XtreamApiController extends Controller
      * Returns movie information and metadata in a structured format.
      * Uses channel's `info` and `movie_data` fields when available, or builds data from other channel fields.
      *
+     * ### get_short_epg
+     * Returns a limited number of EPG programmes for a specific live stream/channel.
+     * Requires `stream_id` parameter to specify which channel to retrieve EPG data for.
+     * Supports optional `limit` parameter (default=4) to control the number of programmes returned.
+     * Returns programmes from current time onwards, including currently playing programme if any.
+     * Includes `now_playing` flag to indicate if the channel is currently streaming.
+     * 
+     * ### get_simple_date_table
+     * Returns full EPG data for a specific live stream/channel for the current date.
+     * Requires `stream_id` parameter to specify which channel to retrieve EPG data for.
+     * Returns all programmes for today with programme details and timing information.
+     * Includes `now_playing` flag to indicate if the channel is currently streaming.
+     *
+     * ### m3u_plus
+     * Redirects to the `m3u` method to generate an M3U playlist in the M3U Plus format.
+     * `output` parameter is ignored for this action and will instead use your Playlist configuration for M3U Plus output.
+     * 
      * @param string $uuid The UUID of the playlist (required path parameter)
      * @param \Illuminate\Http\Request $request The HTTP request containing query parameters:
      *   - username (string, required): User's Xtream API username
@@ -91,6 +111,9 @@ class XtreamApiController extends Controller
      *   - action (string, optional): Defaults to 'panel'. Determines the API action
      *   - category_id (string, optional): Filter results by category ID (required for get_series, optional for get_live_streams and get_vod_streams)
      *   - series_id (int, optional): Series ID (required for get_series_info action)
+     *   - vod_id (int, optional): VOD/Movie ID (required for get_vod_info action)
+     *   - stream_id (int, optional): Channel/Stream ID (required for get_short_epg and get_simple_date_table actions)
+     *   - limit (int, optional): Number of EPG programmes to return for get_short_epg (default=4)
      *
      * @response 200 scenario="Panel action response" {
      *   "user_info": {
@@ -262,6 +285,58 @@ class XtreamApiController extends Controller
      *   }
      * ]
      *
+     * @response 200 scenario="Short EPG response" {
+     *   "epg_listings": [
+     *     {
+     *       "id": "8037716",
+     *       "epg_id": "8",
+     *       "title": "Morning News",
+     *       "lang": "en",
+     *       "start": "2025-08-14 07:00:00",
+     *       "end": "2025-08-14 07:15:00",
+     *       "description": "Latest morning news and updates",
+     *       "channel_id": "cnn.us",
+     *       "start_timestamp": "1755154800",
+     *       "stop_timestamp": "1755155700",
+     *       "now_playing": 1,
+     *       "has_archive": 0
+     *     },
+     *     {
+     *       "id": "8037717",
+     *       "epg_id": "8",
+     *       "title": "Business Report",
+     *       "lang": "en",
+     *       "start": "2025-08-14 07:15:00",
+     *       "end": "2025-08-14 07:30:00",
+     *       "description": "Financial market updates",
+     *       "channel_id": "cnn.us",
+     *       "start_timestamp": "1755155700",
+     *       "stop_timestamp": "1755156600",
+     *       "now_playing": 0,
+     *       "has_archive": 0
+     *     }
+     *   ]
+     * }
+     *
+     * @response 200 scenario="Simple date table response" {
+     *   "epg_listings": [
+     *     {
+     *       "id": "8037716",
+     *       "epg_id": "8",
+     *       "title": "Morning News",
+     *       "lang": "en",
+     *       "start": "2025-08-14 07:00:00",
+     *       "end": "2025-08-14 07:15:00",
+     *       "description": "Latest morning news and updates",
+     *       "channel_id": "cnn.us",
+     *       "start_timestamp": "1755154800",
+     *       "stop_timestamp": "1755155700",
+     *       "now_playing": 1,
+     *       "has_archive": 0
+     *     }
+     *   ]
+     * }
+     *
      * @response 200 scenario="Account info response" {
      *   "username": "test_user",
      *   "password": "test_pass",
@@ -279,6 +354,8 @@ class XtreamApiController extends Controller
      * @response 400 scenario="Bad Request" {"error": "Invalid action"}
      * @response 400 scenario="Missing category_id for get_series" {"error": "category_id parameter is required for get_series action"}
      * @response 400 scenario="Missing series_id for get_series_info" {"error": "series_id parameter is required for get_series_info action"}
+     * @response 400 scenario="Missing stream_id for get_short_epg" {"error": "stream_id parameter is required for get_short_epg action"}
+     * @response 400 scenario="Missing stream_id for get_simple_date_table" {"error": "stream_id parameter is required for get_simple_date_table action"}
      * @response 401 scenario="Unauthorized - Missing Credentials" {"error": "Unauthorized - Missing credentials"}
      * @response 401 scenario="Unauthorized - Invalid Credentials" {"error": "Unauthorized"}
      * @response 404 scenario="Not Found (e.g., playlist not found)" {"error": "Playlist not found"}
@@ -321,7 +398,11 @@ class XtreamApiController extends Controller
                 $expires = $now->copy()->startOfYear()->addYears(1)->timestamp;
                 $streams = $playlist->streams ?? 1;
             }
+            $activeConnections = SharedStream::active()
+                ->where('stream_info->options->playlist_id', $playlist->id)
+                ->count();
             $userInfo = [
+                // 'playlist_id' => (string)$playlist->id, // Debugging
                 'username' => $username,
                 'password' => $password,
                 'message' => 'Welcome to m3u editor Xtream API',
@@ -329,7 +410,7 @@ class XtreamApiController extends Controller
                 'status' => 'Active',
                 'exp_date' => (string)$expires,
                 'is_trial' => '0',
-                'active_cons' => '0',
+                'active_cons' => (string)$activeConnections,
                 'created_at' => (string)($playlist->user ? $playlist->user->created_at->timestamp : $now->timestamp),
                 'max_connections' => (string)$streams,
                 'allowed_output_formats' => ['m3u8', 'ts'],
@@ -928,7 +1009,179 @@ class XtreamApiController extends Controller
                 'info' => $defaultInfo,
                 'movie_data' => $defaultMovieData,
             ]);
+        } else if ($action === 'get_short_epg') {
+            $streamId = $request->input('stream_id');
+            $limit = $request->input('limit');
+            $limit = (int) ($limit ?? 4);
+
+            if (!$streamId) {
+                return response()->json(['error' => 'stream_id parameter is required for get_short_epg action'], 400);
+            }
+
+            // Find the channel
+            $channel = $playlist->channels()
+                ->where('enabled', true)
+                ->where('id', $streamId)
+                ->with('epgChannel')
+                ->first();
+
+            if (!$channel) {
+                return response()->json(['error' => 'Channel not found'], 404);
+            }
+
+            if (!$channel->epgChannel) {
+                return response()->json(['epg_listings' => []]);
+            }
+
+            // Get EPG data using EpgCacheService
+            $cacheService = new EpgCacheService();
+            $epg = Epg::find($channel->epgChannel->epg_id);
+
+            if (!$epg || !$epg->is_cached) {
+                return response()->json(['epg_listings' => []]);
+            }
+
+            // Get programmes for today and tomorrow to ensure we have enough data
+            $today = Carbon::now()->format('Y-m-d');
+            $tomorrow = Carbon::now()->addDay()->format('Y-m-d');
+
+            $todayProgrammes = $cacheService->getCachedProgrammes($epg, $today, [$channel->epgChannel->channel_id]);
+            $tomorrowProgrammes = $cacheService->getCachedProgrammes($epg, $tomorrow, [$channel->epgChannel->channel_id]);
+
+            $allProgrammes = [];
+            if (isset($todayProgrammes[$channel->epgChannel->channel_id])) {
+                $allProgrammes = array_merge($allProgrammes, $todayProgrammes[$channel->epgChannel->channel_id]);
+            }
+            if (isset($tomorrowProgrammes[$channel->epgChannel->channel_id])) {
+                $allProgrammes = array_merge($allProgrammes, $tomorrowProgrammes[$channel->epgChannel->channel_id]);
+            }
+
+            // Check if channel is currently playing
+            $isNowPlaying = SharedStream::active()
+                ->where('stream_info->options->model_id', $channel->id)
+                ->exists();
+
+            // Filter programmes to current time and future, then limit
+            $now = Carbon::now();
+            $epgListings = [];
+            $count = 0;
+
+            foreach ($allProgrammes as $programme) {
+                if ($count >= $limit) break;
+
+                $startTime = Carbon::parse($programme['start']);
+                $endTime = Carbon::parse($programme['stop']);
+
+                // Include current programme and future programmes
+                if ($endTime->gt($now)) {
+                    $isCurrentProgramme = $startTime->lte($now) && $endTime->gt($now);
+
+                    $epgListings[] = [
+                        'id' => $programme['id'] ?? $count,
+                        'epg_id' => (string) $epg->id,
+                        'title' => $programme['title'] ?? '',
+                        'lang' => $programme['lang'] ?? 'en',
+                        'start' => $startTime->format('Y-m-d H:i:s'),
+                        'end' => $endTime->format('Y-m-d H:i:s'),
+                        'description' => $programme['desc'] ?? '',
+                        'channel_id' => $channel->epgChannel->channel_id,
+                        'start_timestamp' => (string) $startTime->timestamp,
+                        'stop_timestamp' => (string) $endTime->timestamp,
+                        'now_playing' => ($isCurrentProgramme && $isNowPlaying) ? 1 : 0,
+                        'has_archive' => 0
+                    ];
+                    $count++;
+                }
+            }
+
+            return response()->json(['epg_listings' => $epgListings]);
+        } else if ($action === 'get_simple_date_table') {
+            $streamId = $request->input('stream_id');
+
+            if (!$streamId) {
+                return response()->json(['error' => 'stream_id parameter is required for get_simple_date_table action'], 400);
+            }
+
+            // Find the channel
+            $channel = $playlist->channels()
+                ->where('enabled', true)
+                ->where('id', $streamId)
+                ->with('epgChannel')
+                ->first();
+
+            if (!$channel) {
+                return response()->json(['error' => 'Channel not found'], 404);
+            }
+
+            if (!$channel->epgChannel) {
+                return response()->json(['epg_listings' => []]);
+            }
+
+            // Get EPG data using EpgCacheService
+            $cacheService = new EpgCacheService();
+            $epg = Epg::find($channel->epgChannel->epg_id);
+
+            if (!$epg || !$epg->is_cached) {
+                return response()->json(['epg_listings' => []]);
+            }
+
+            // Get programmes for today
+            $today = Carbon::now()->format('Y-m-d');
+            $programmes = $cacheService->getCachedProgrammes($epg, $today, [$channel->epgChannel->channel_id]);
+
+            $epgListings = [];
+            if (isset($programmes[$channel->epgChannel->channel_id])) {
+                // Check if channel is currently playing
+                $isNowPlaying = SharedStream::active()
+                    ->where('stream_info->options->model_id', $channel->id)
+                    ->exists();
+
+                $now = Carbon::now();
+                foreach ($programmes[$channel->epgChannel->channel_id] as $index => $programme) {
+                    $startTime = Carbon::parse($programme['start']);
+                    $endTime = Carbon::parse($programme['stop']);
+                    $isCurrentProgramme = $startTime->lte($now) && $endTime->gt($now);
+
+                    $epgListings[] = [
+                        'id' => $programme['id'] ?? $index,
+                        'epg_id' => (string) $epg->id,
+                        'title' => $programme['title'] ?? '',
+                        'lang' => $programme['lang'] ?? 'en',
+                        'start' => $startTime->format('Y-m-d H:i:s'),
+                        'end' => $endTime->format('Y-m-d H:i:s'),
+                        'description' => $programme['desc'] ?? '',
+                        'channel_id' => $channel->epgChannel->channel_id,
+                        'start_timestamp' => (string) $startTime->timestamp,
+                        'stop_timestamp' => (string) $endTime->timestamp,
+                        'now_playing' => ($isCurrentProgramme && $isNowPlaying) ? 1 : 0,
+                        'has_archive' => 0
+                    ];
+                }
+            }
+
+            return response()->json(['epg_listings' => $epgListings]);
+        } else if ($action === 'm3u_plus') {
+            // For m3u_plus, redirect to the m3u method which handles the request
+            return $this->m3u($playlist);
+        } else {
+            return response()->json(['error' => 'Invalid action parameter'], 400);
         }
+    }
+
+    /**
+     * Redirects to the M3U playlist generation route.
+     * 
+     * This method handles the M3U playlist request by calling the PlaylistGenerateController
+     * with the appropriate playlist UUID.
+     *
+     * @param mixed $playlist The authenticated playlist instance.
+     * @return \Illuminate\Http\Response
+     */
+    public function m3u($playlist)
+    {
+        return app()->call('App\\Http\\Controllers\\PlaylistGenerateController@__invoke', [
+            'uuid' => $playlist->uuid,
+        ]);
     }
 
     /**
