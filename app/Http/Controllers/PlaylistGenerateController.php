@@ -173,8 +173,9 @@ class PlaylistGenerateController extends Controller
             200,
             [
                 'Access-Control-Allow-Origin' => '*',
-                'Content-Disposition' => "attachment; filename=$filename",
-                'Content-Type' => 'application/vnd.apple.mpegurl'
+                'Content-Type' => 'audio/x-mpegurl',
+                'Cache-Control' => 'no-cache, must-revalidate',
+                'Pragma' => 'no-cache'
             ]
         );
     }
