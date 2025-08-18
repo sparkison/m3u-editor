@@ -34,6 +34,9 @@ class DuplicatePlaylist implements ShouldQueue
             // Get the base playlist
             $playlist = $this->playlist;
 
+            // Current timestamp
+            $now = now();
+
             // Create a new playlist
             $newPlaylist = $playlist->replicate(except: [
                 'id',
@@ -44,8 +47,8 @@ class DuplicatePlaylist implements ShouldQueue
             ]);
             $newPlaylist->name = $this->name ?? $playlist->name . ' (Copy)';
             $newPlaylist->uuid = Str::orderedUuid()->toString();
-            $newPlaylist->created_at = now();
-            $newPlaylist->updated_at = now();
+            $newPlaylist->created_at = $now;
+            $newPlaylist->updated_at = $now;
             $newPlaylist->saveQuietly(); // Don't fire model events to prevent auto sync
 
             // Copy the groups
@@ -55,8 +58,8 @@ class DuplicatePlaylist implements ShouldQueue
                     'playlist_id',
                 ]);
                 $newGroup->playlist_id = $newPlaylist->id;
-                $newGroup->created_at = now();
-                $newGroup->updated_at = now();
+                $newGroup->created_at = $now;
+                $newGroup->updated_at = $now;
                 $newGroup->save();
 
                 // Copy the group channels
@@ -68,9 +71,67 @@ class DuplicatePlaylist implements ShouldQueue
                     ]);
                     $newChannel->group_id = $newGroup->id;
                     $newChannel->playlist_id = $newPlaylist->id;
-                    $newChannel->created_at = now();
-                    $newChannel->updated_at = now();
+                    $newChannel->created_at = $now;
+                    $newChannel->updated_at = $now;
                     $newChannel->save();
+                }
+            }
+
+            // Copy the categories
+            foreach ($playlist->categories()->get() as $category) {
+                $newCategory = $category->replicate(except: [
+                    'id',
+                    'playlist_id',
+                ]);
+                $newCategory->playlist_id = $newPlaylist->id;
+                $newCategory->created_at = $now;
+                $newCategory->updated_at = $now;
+                $newCategory->save();
+
+                // Copy the category series
+                foreach ($category->series()->get() as $series) {
+                    $newSeries = $series->replicate(except: [
+                        'id',
+                        'category_id',
+                        'playlist_id',
+                    ]);
+                    $newSeries->category_id = $newCategory->id;
+                    $newSeries->playlist_id = $newPlaylist->id;
+                    $newSeries->created_at = $now;
+                    $newSeries->updated_at = $now;
+                    $newSeries->save();
+
+                    // Copy the series seasons
+                    foreach ($series->seasons()->get() as $season) {
+                        $newSeason = $season->replicate(except: [
+                            'id',
+                            'series_id',
+                            'category_id',
+                            'playlist_id',
+                        ]);
+                        $newSeason->series_id = $newSeries->id;
+                        $newSeason->category_id = $newCategory->id;
+                        $newSeason->playlist_id = $newPlaylist->id;
+                        $newSeason->created_at = $now;
+                        $newSeason->updated_at = $now;
+                        $newSeason->save();
+
+                        // Copy the season episodes
+                        foreach ($season->episodes()->get() as $episode) {
+                            $newEpisode = $episode->replicate(except: [
+                                'id',
+                                'season_id',
+                                'series_id',
+                                'playlist_id',
+                            ]);
+                            $newEpisode->season_id = $newSeason->id;
+                            $newEpisode->series_id = $newSeries->id;
+                            $newEpisode->playlist_id = $newPlaylist->id;
+                            $newEpisode->created_at = $now;
+                            $newEpisode->updated_at = $now;
+                            $newEpisode->save();
+                        }
+                    }
                 }
             }
 
