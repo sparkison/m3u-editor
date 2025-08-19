@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Facades\GitInfo;
 use App\Providers\VersionServiceProvider;
 use Filament\Widgets\Widget;
 
@@ -22,6 +23,8 @@ class UpdateNoticeWidget extends Widget
             'repo' => config('dev.repo'),
             'latestVersion' => $latestVersion,
             'updateAvailable' => $updateAvailable,
+            'branch' => GitInfo::getBranch() ?? null,
+            'commit' => GitInfo::getCommit() ?? null,
         ];
     }
 }
