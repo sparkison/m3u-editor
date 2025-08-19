@@ -36,7 +36,7 @@ class XtreamApiController extends Controller
      * ## Supported Actions:
      * 
      * ### panel (default)
-     * Returns user authentication info and server details. This is the default action if none is specified. Returns the same response as: `get_user_info`, `get_account_info`, and `get_server_info`.
+     * Returns user authentication info and server details. This is the default action if none is specified. Returns the same response as: `get_user_info`, `get_account_info` and `get_server_info`.
      * 
      * ### get_live_streams
      * Returns a JSON array of live stream objects. Only enabled, non-VOD channels are included.
@@ -52,13 +52,9 @@ class XtreamApiController extends Controller
      * 
      * ### get_series
      * Returns a JSON array of series objects. Only enabled series are included.
+     * Supports optional category filtering via `category_id` parameter.
      * Each object contains: `num`, `name`, `series_id`, `cover`, `plot`, `cast`, `director`, `genre`, `releaseDate`, 
      * `last_modified`, `rating`, `rating_5based`, `backdrop_path`, `youtube_trailer`, `episode_run_time`, `category_id`.
-     * 
-     * ### get_series_info
-     * Returns detailed information for a specific series, including its seasons and episodes.
-     * Requires `series_id` parameter to specify which series to retrieve.
-     * Returns series info, seasons, and episode details.
      * 
      * ### get_live_categories
      * Returns a JSON array of live stream categories/groups. Only groups with enabled, non-VOD channels are included.
@@ -72,14 +68,10 @@ class XtreamApiController extends Controller
      * Returns a JSON array of series categories. Only categories with enabled series are included.
      * Each category contains: `category_id`, `category_name`, `parent_id`.
      * 
-     * ### get_account_info
-     * Returns account information including user details and allowed output formats.
-     * This provides the same user information as the panel action but in a more focused format.
-     * Contains: `username`, `password`, `message`, `auth`, `status`, `exp_date`, `is_trial`, 
-     * `active_cons`, `created_at`, `max_connections`, `allowed_output_formats`.
-     * 
-     * ### get_server_info
-     * Returns server information including URL, port, protocol, timezone, and current timestamp.
+     * ### get_series_info
+     * Returns detailed information for a specific series, including its seasons and episodes.
+     * Requires `series_id` parameter to specify which series to retrieve.
+     * Returns series info, seasons, and episode details.
      * 
      * ### get_vod_info
      * Returns detailed information for a specific VOD/movie stream.
@@ -103,6 +95,15 @@ class XtreamApiController extends Controller
      * ### m3u_plus
      * Redirects to the `m3u` method to generate an M3U playlist in the M3U Plus format.
      * `output` parameter is ignored for this action and will instead use your Playlist configuration for M3U Plus output.
+     * 
+     * ### get_user_info
+     * ### get_account_info
+     * ### get_server_info
+     * Returns account and server information including user details and allowed output formats.
+     * This provides the same user information as the panel.
+     * Contains: `username`, `password`, `message`, `auth`, `status`, `exp_date`, `is_trial`, 
+     * `active_cons`, `created_at`, `max_connections`, `allowed_output_formats`.
+     * 
      * 
      * @param string $uuid The UUID of the playlist (required path parameter)
      * @param \Illuminate\Http\Request $request The HTTP request containing query parameters:
