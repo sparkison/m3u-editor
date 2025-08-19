@@ -21,9 +21,16 @@
             </div>
 
             <div class="flex-1">
-                <h2 class="grid flex-1 text-base font-semibold leading-6 text-gray-950 dark:text-white">
-                    v{{ $versionData['version'] }}
-                </h2>
+                <div class="flex-1 flex items-start gap-x-2">
+                    <h2 class="grid text-base font-semibold leading-6 text-gray-950 dark:text-white">
+                        v{{ $versionData['version'] }}
+                    </h2>
+                    @if ($versionData['branch'])
+                        <x-filament::badge x-tooltip="'Commit: {{ $versionData['commit'] }}'" class="cursor-pointer" size="sm" color="primary">
+                            {{ $versionData['branch'] }}
+                        </x-filament::badge>
+                    @endif
+                </div>
 
                 @if ($versionData['updateAvailable'])
                     <div>
