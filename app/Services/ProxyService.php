@@ -35,7 +35,7 @@ class ProxyService
                 return "$proxyUrlOverride/api/stream/$id/playlist.m3u8";
             } else {
                 if ($sharedStreamingEnabled) {
-                    return "$proxyUrlOverride/shared/stream/$id";
+                    return "$proxyUrlOverride/shared/stream/$id.ts";
                 }
                 return "$proxyUrlOverride/stream/$id.ts";
             }
