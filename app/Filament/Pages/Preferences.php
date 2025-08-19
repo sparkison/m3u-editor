@@ -375,6 +375,7 @@ class Preferences extends SettingsPage
                             ->columns(2)
                             ->schema([
                                 Forms\Components\Section::make('SMTP Settings')
+                                    ->description('Configure SMTP settings to send emails from the application.')
                                     ->columnSpanFull()
                                     ->columns(2)
                                     ->headerActions([
@@ -384,6 +385,7 @@ class Preferences extends SettingsPage
                                             ->iconPosition('after')
                                             ->color('gray')
                                             ->size('sm')
+                                            ->modalWidth('md')
                                             ->form([
                                                 Forms\Components\TextInput::make('to_email')
                                                     ->label('To Email Address')
@@ -440,20 +442,24 @@ class Preferences extends SettingsPage
                                         Forms\Components\TextInput::make('smtp_host')
                                             ->label('SMTP Host')
                                             ->placeholder('Enter SMTP Host')
+                                            ->requiredWith('smtp_port')
                                             ->helperText('Required to send emails.'),
                                         Forms\Components\TextInput::make('smtp_port')
                                             ->label('SMTP Port')
                                             ->placeholder('Enter SMTP Port')
+                                            ->requiredWith('smtp_host')
                                             ->numeric()
                                             ->helperText('Required to send emails.'),
                                         Forms\Components\TextInput::make('smtp_username')
                                             ->label('SMTP Username')
                                             ->placeholder('Enter SMTP Username')
+                                            ->requiredWith('smtp_password')
                                             ->helperText('Required to send emails, if your provider requires authentication.'),
                                         Forms\Components\TextInput::make('smtp_password')
                                             ->label('SMTP Password')
                                             ->revealable()
                                             ->placeholder('Enter SMTP Password')
+                                            ->requiredWith('smtp_username')
                                             ->password()
                                             ->helperText('Required to send emails, if your provider requires authentication.'),
                                         Forms\Components\Select::make('smtp_encryption')
