@@ -24,6 +24,10 @@ class RunPostProcess implements ShouldQueue
 {
     use Queueable;
 
+    // Giving a timeout of 15 minutes to the Job for long-running post processes
+    // This should be sufficient for most tasks, but can be adjusted if needed
+    public $timeout = 60 * 15;
+
     // Make sure the process logs are cleaned up
     public int $maxLogs = 50;
 
