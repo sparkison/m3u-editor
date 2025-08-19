@@ -9,6 +9,7 @@ use App\Models\Playlist;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
 
 class RestartQueue implements ShouldQueue
 {
@@ -62,11 +63,12 @@ class RestartQueue implements ShouldQueue
                     'status' => Status::Failed,
                     'processing' => false,
                     'progress' => 0,
-                    'synced' => null,
                     'errors' => 'The EPG mapping process was interrupted and has been marked as failed.',
                 ]);
         } catch (\Exception $e) {
-            // Ignore
+            Log::error('Failed to restart queue: ' . $e->getMessage(), [
+                'exception' => $e,
+            ]);
         }
     }
 }
