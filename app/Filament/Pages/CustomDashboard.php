@@ -15,6 +15,7 @@ class CustomDashboard extends Dashboard
     {
         return [
             Actions\Action::make('Reset Queue')
+                ->label('Reset Queue')
                 ->action(function () {
                     app('Illuminate\Contracts\Bus\Dispatcher')
                         ->dispatch(new RestartQueue());
