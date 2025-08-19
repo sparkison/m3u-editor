@@ -1,6 +1,16 @@
 # Alpine
 FROM alpine:3.21.3
 
+# Git build arguments
+ARG GIT_BRANCH
+ARG GIT_COMMIT
+ARG GIT_TAG
+
+# Set environment variables for git information
+ENV GIT_BRANCH=${GIT_BRANCH}
+ENV GIT_COMMIT=${GIT_COMMIT}
+ENV GIT_TAG=${GIT_TAG}
+
 # Set the working directory
 WORKDIR /var/www/html
 
@@ -139,6 +149,12 @@ RUN chmod +x /usr/local/bin/start-container
 
 # Copy application code
 COPY . /var/www/html
+
+# Create git info file
+RUN echo "GIT_BRANCH=${GIT_BRANCH}" > /var/www/html/.git-info && \
+    echo "GIT_COMMIT=${GIT_COMMIT}" >> /var/www/html/.git-info && \
+    echo "GIT_TAG=${GIT_TAG}" >> /var/www/html/.git-info && \
+    echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> /var/www/html/.git-info
 
 # Install composer dependencies
 RUN composer install --no-dev --no-interaction --no-progress -o
