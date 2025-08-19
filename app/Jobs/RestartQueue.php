@@ -38,6 +38,7 @@ class RestartQueue implements ShouldQueue
                     'status' => Status::Pending,
                     'processing' => false,
                     'progress' => 0,
+                    'series_progress' => 0,
                     'channels' => 0,
                     'synced' => null,
                     'errors' => null,
@@ -48,6 +49,8 @@ class RestartQueue implements ShouldQueue
                     'status' => Status::Pending,
                     'processing' => false,
                     'progress' => 0,
+                    'sd_progress' => 0,
+                    'cache_progress' => 0,
                     'synced' => null,
                     'errors' => null,
                 ]);
