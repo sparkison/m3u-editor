@@ -403,14 +403,14 @@ else
 fi
 echo ""
 
+# Run migrations
+echo "💾 Running migrations..."
+php artisan migrate --force
+
 # Flush FFmpeg process cache and prune HLS
 php artisan app:flush-ffmpeg-process-cache
 php artisan app:hls-prune
 echo ""
-
-# Run migrations
-echo "💾 Running migrations..."
-php artisan migrate --force
 
 # Build assets
 echo "🛠️ Building assets..."
