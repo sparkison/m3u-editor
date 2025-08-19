@@ -94,7 +94,7 @@ class XtreamApiController extends Controller
      * Returns programmes from current time onwards, including currently playing programme if any.
      * Includes `now_playing` flag to indicate if the channel is currently streaming.
      * 
-     * ### get_simple_date_table
+     * ### get_simple_data_table
      * Returns full EPG data for a specific live stream/channel for the current date.
      * Requires `stream_id` parameter to specify which channel to retrieve EPG data for.
      * Returns all programmes for today with programme details and timing information.
@@ -112,7 +112,7 @@ class XtreamApiController extends Controller
      *   - category_id (string, optional): Filter results by category ID (required for get_series, optional for get_live_streams and get_vod_streams)
      *   - series_id (int, optional): Series ID (required for get_series_info action)
      *   - vod_id (int, optional): VOD/Movie ID (required for get_vod_info action)
-     *   - stream_id (int, optional): Channel/Stream ID (required for get_short_epg and get_simple_date_table actions)
+     *   - stream_id (int, optional): Channel/Stream ID (required for get_short_epg and get_simple_data_table actions)
      *   - limit (int, optional): Number of EPG programmes to return for get_short_epg (default=4)
      *
      * @response 200 scenario="Panel action response" {
@@ -355,7 +355,7 @@ class XtreamApiController extends Controller
      * @response 400 scenario="Missing category_id for get_series" {"error": "category_id parameter is required for get_series action"}
      * @response 400 scenario="Missing series_id for get_series_info" {"error": "series_id parameter is required for get_series_info action"}
      * @response 400 scenario="Missing stream_id for get_short_epg" {"error": "stream_id parameter is required for get_short_epg action"}
-     * @response 400 scenario="Missing stream_id for get_simple_date_table" {"error": "stream_id parameter is required for get_simple_date_table action"}
+     * @response 400 scenario="Missing stream_id for get_simple_data_table" {"error": "stream_id parameter is required for get_simple_data_table action"}
      * @response 401 scenario="Unauthorized - Missing Credentials" {"error": "Unauthorized - Missing credentials"}
      * @response 401 scenario="Unauthorized - Invalid Credentials" {"error": "Unauthorized"}
      * @response 404 scenario="Not Found (e.g., playlist not found)" {"error": "Playlist not found"}
@@ -1095,11 +1095,11 @@ class XtreamApiController extends Controller
             }
 
             return response()->json(['epg_listings' => $epgListings]);
-        } else if ($action === 'get_simple_date_table') {
+        } else if ($action === 'get_simple_data_table') {
             $streamId = $request->input('stream_id');
 
             if (!$streamId) {
-                return response()->json(['error' => 'stream_id parameter is required for get_simple_date_table action'], 400);
+                return response()->json(['error' => 'stream_id parameter is required for get_simple_data_table action'], 400);
             }
 
             // Find the channel
