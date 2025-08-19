@@ -77,6 +77,10 @@ Route::group(['prefix' => 'monitor'], function () {
     Route::get('health', [\App\Http\Controllers\Api\SharedStreamApiController::class, 'getHealth'])
         ->name('api.monitor.health');
     
+    // System information (including git info)
+    Route::get('system', [\App\Http\Controllers\Api\SystemInfoController::class, 'getSystemInfo'])
+        ->name('api.monitor.system');
+    
     // Stream management
     Route::get('streams', [\App\Http\Controllers\Api\SharedStreamApiController::class, 'getActiveStreams'])
         ->name('api.monitor.streams');

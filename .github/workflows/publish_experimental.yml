@@ -26,6 +26,10 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: sparkison/m3u-editor:experimental-amd64
+          build-args: |
+            GIT_BRANCH=${{ github.ref_name }}
+            GIT_COMMIT=${{ github.sha }}
+            GIT_TAG=${{ github.ref_type == 'tag' && github.ref_name || '' }}
           provenance: false
           sbom: false
 
@@ -51,6 +55,10 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: sparkison/m3u-editor:experimental-arm64
+          build-args: |
+            GIT_BRANCH=${{ github.ref_name }}
+            GIT_COMMIT=${{ github.sha }}
+            GIT_TAG=${{ github.ref_type == 'tag' && github.ref_name || '' }}
           provenance: false
           sbom: false
 
