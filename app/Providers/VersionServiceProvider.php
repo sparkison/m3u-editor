@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Facades\GitInfo;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\ServiceProvider;
@@ -49,13 +50,27 @@ class VersionServiceProvider extends ServiceProvider
         } catch (\Exception $e) {
             $remoteVersion = null;
         }
+        try {
+            $branch = GitInfo::getBranch();
+        } catch (\Exception $e) {
+            $branch = 'master'; // Default branch if GitInfo is not available
+        }
         if ($remoteVersion === null || $refresh) {
             $remoteVersion = '';
             try {
-                $response = Http::get('https://raw.githubusercontent.com/sparkison/m3u-editor/refs/heads/master/config/dev.php');
+                $response = Http::get('https://raw.githubusercontent.com/sparkison/m3u-editor/refs/heads/' . $branch . '/config/dev.php');
                 if ($response->ok()) {
                     $results = $response->body();
-                    preg_match("/'version'\s*=>\s*'([^']+)'/", $results, $matches);
+                    switch ($branch) {
+                        case 'dev':
+                            preg_match("/'dev_version'\s*=>\s*'([^']+)'/", $results, $matches);
+                            break;
+                        case 'experimental':
+                            preg_match("/'experimental_version'\s*=>\s*'([^']+)'/", $results, $matches);
+                            break;
+                        default:
+                            preg_match("/'version'\s*=>\s*'([^']+)'/", $results, $matches);
+                    }
                     if (!empty($matches[1])) {
                         $remoteVersion = $matches[1];
                         Cache::put(self::$cacheKey, $remoteVersion, 60 * 5);
