@@ -258,7 +258,11 @@ class ProcessM3uImportComplete implements ShouldQueue
                 $epg = $user->epgs()->where('url', $epgUrl)->first();
                 if (!$epg) {
                     $headers = @get_headers($epgUrl);
-                    if (strpos($headers[0], '200') !== false) {
+                    if (
+                        strpos($headers[0], '200') !== false ||
+                        strpos($headers[0], '301') !== false ||
+                        strpos($headers[0], '302') !== false
+                    ) {
                         // EPG found, create it
                         $epg = $user->epgs()->create([
                             'name' => $playlist->name . ' EPG',
