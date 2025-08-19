@@ -26,11 +26,7 @@ class VersionServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        try {
-            self::$branch = GitInfo::getBranch();
-        } catch (\Exception $e) {
-            self::$branch = 'master'; // Default branch if GitInfo is not available
-        }
+        self::$branch = GitInfo::getBranch() ?? 'master';
     }
 
     public static function updateAvailable(): bool
