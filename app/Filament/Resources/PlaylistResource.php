@@ -1259,10 +1259,39 @@ class PlaylistResource extends Resource
 
     public static function getFormSteps(): array
     {
+        // @TODO - allow for creating Auths in the wizard
         $wizard = [];
         foreach (self::getFormSections(creating: true) as $step => $fields) {
             $wizard[] = Forms\Components\Wizard\Step::make($step)
                 ->schema($fields);
+
+            // If the first step, add a auth next
+            if ($step === 'Name') {
+                $wizard[] = Forms\Components\Wizard\Step::make('Auth')
+                    ->schema([
+                        Forms\Components\Group::make()
+                            ->relationship(
+                                'playlistAuths',
+                                condition: fn(?array $state): bool => filled($state['username']),
+                            )
+                            ->schema([
+                                Forms\Components\TextInput::make('name')
+                                    ->label('Auth Name')
+                                    ->requiredWith('username')
+                                    ->default(fn($record) => $record?->name ?? 'Auth for ' . $record?->title)
+                                    ->columnSpanFull(),
+                                Forms\Components\TextInput::make('username')
+                                    ->label('Username')
+                                    ->columnSpan(1),
+                                Forms\Components\TextInput::make('password')
+                                    ->label('Password')
+                                    ->password()
+                                    ->requiredWith('username')
+                                    ->revealable()
+                                    ->columnSpan(1),
+                            ]),
+                    ]);
+            }
         }
         return $wizard;
     }
