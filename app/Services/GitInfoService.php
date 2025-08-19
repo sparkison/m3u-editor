@@ -33,7 +33,7 @@ class GitInfoService
 
         return [
             'source' => 'none',
-            'branch' => null,
+            'branch' => 'master', // default to master
             'commit' => null,
             'tag' => null,
             'build_date' => null,
