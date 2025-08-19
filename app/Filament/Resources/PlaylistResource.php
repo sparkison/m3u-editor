@@ -1263,6 +1263,44 @@ class PlaylistResource extends Resource
         foreach (self::getFormSections(creating: true) as $step => $fields) {
             $wizard[] = Forms\Components\Wizard\Step::make($step)
                 ->schema($fields);
+
+            // Add auth after type step
+            if ($step === 'Type') {
+                $wizard[] = Forms\Components\Wizard\Step::make('Auth')
+                    ->schema([
+                        Forms\Components\Toggle::make('create_auth')
+                            ->label('Create authentication for this playlist')
+                            ->helperText('Enable this to create new authentication credentials that will be assigned to this playlist. You can also create and assign auths to this playlist after creation.')
+                            ->live()
+                            ->default(false)
+                            ->columnSpanFull(),
+
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\TextInput::make('auth_name')
+                                    ->label('Auth Name')
+                                    ->helperText('Internal name for this authentication.')
+                                    ->placeholder('Auth for My Playlist')
+                                    ->requiredWith('auth_username')
+                                    ->columnSpan(2),
+
+                                Forms\Components\TextInput::make('auth_username')
+                                    ->label('Username')
+                                    ->helperText('Username for playlist access.')
+                                    ->requiredWith('auth_name')
+                                    ->columnSpan(1),
+
+                                Forms\Components\TextInput::make('auth_password')
+                                    ->label('Password')
+                                    ->password()
+                                    ->revealable()
+                                    ->helperText('Password for playlist access.')
+                                    ->requiredWith('auth_username')
+                                    ->columnSpan(1),
+                            ])
+                            ->hidden(fn(Forms\Get $get): bool => !$get('create_auth')),
+                    ]);
+            }
         }
         return $wizard;
     }
