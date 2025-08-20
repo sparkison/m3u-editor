@@ -65,17 +65,16 @@ class ProcessM3uImportChunk implements ShouldQueue
 
             // Deduplicate the channels
             $bulk = collect($bulk)
-                ->unique(function ($item) {
-                    return $item['title'] . $item['name'] . $item['group_internal'] . $item['playlist_id'];
-                })->toArray();
+                ->unique(fn($item) => $item['source_id'] . $item['playlist_id'])
+                ->toArray();
 
             // Upsert the channels
-            Channel::upsert($bulk, uniqueBy: ['title', 'name', 'group_internal', 'playlist_id'], update: [
+            Channel::upsert($bulk, uniqueBy: ['source_id', 'playlist_id'], update: [
                 // Don't update the following fields...
                 // 'title',
                 // 'name',
                 // 'group', // user override
-                // 'group_internal',
+                // 'stream_id',
                 // 'playlist_id',
                 // 'user_id',
                 // 'logo', // user override
@@ -86,7 +85,7 @@ class ProcessM3uImportChunk implements ShouldQueue
                 // 'sort',
                 // ...only update the following fields
                 'url',
-                'stream_id',
+                'group_internal',
                 'lang', // should we update this? Not sure it's set anywhere...
                 'country', // should we update this? Not sure it's set anywhere...
                 'import_batch_no',

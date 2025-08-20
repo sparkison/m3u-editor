@@ -621,17 +621,9 @@ class ProcessM3uImport implements ShouldQueue
                                 continue 2;
                             }
                         }
-                        // Get the source ID from the URL
-                        $sourceId = null;
-                        if (str_contains($url, '/')) {
-                            $urlParts = explode('/', $url);
-                            $streamIdWithExtension = end($urlParts);
-                            $sourceId = pathinfo($streamIdWithExtension, PATHINFO_FILENAME); // Get the stream ID without extension
-                        }
                         $channel = [
                             ...$channelFields,
                             'url' => $url,
-                            'source_id' => $sourceId, // source ID for the channel
                         ];
                         $extvlcopt = [];
                         $kodidrop = [];
@@ -678,6 +670,9 @@ class ProcessM3uImport implements ShouldQueue
                             // Channel will be skipped on import of not set to something...
                             $channel['title'] = $channel['stream_id'] ?? $channel['name'];
                         }
+
+                        // Set the source ID based on our composite index
+                        $channel['source_id'] = md5($channel['title'] . $channel['name'] . $channel['group_internal'] . $this->playlist->id);
 
                         // Get the channel group and determine if the channel should be included
                         $channelGroup = explode(';', $channel['group']);
