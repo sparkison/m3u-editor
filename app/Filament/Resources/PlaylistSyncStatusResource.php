@@ -58,6 +58,20 @@ class PlaylistSyncStatusResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->toggleable(),
+                Tables\Columns\TextColumn::make('sync_stats.status')
+                    ->label('Status')
+                    ->searchable()
+                    ->badge()
+                    ->color(function ($state) {
+                        return match ($state) {
+                            'success' => 'success',
+                            'canceled' => 'warning',
+                            default => 'info',
+                        };
+                    })
+                    ->default('success')
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('added_channels_count')
                     ->label('Added Channels')
                     ->counts('addedChannels')

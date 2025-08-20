@@ -11,6 +11,7 @@ use App\Models\PlaylistSyncStatus;
 use App\Models\PlaylistSyncStatusLog;
 use App\Models\User;
 use App\Services\EpgCacheService;
+use App\Settings\GeneralSettings;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -47,18 +48,26 @@ class ProcessM3uImportComplete implements ShouldQueue
         public bool $maxHit = false,
         public bool $isNew = false,
     ) {
-        $this->invalidateImport = config('dev.invalidate_import', false);
+        // Set the invalidate import settings from config
+        $this->invalidateImport = config('dev.invalidate_import', null);
         $this->invalidateImportThreshold = config('dev.invalidate_import_threshold', 100);
     }
 
     /**
      * Execute the job.
      */
-    public function handle(): void
+    public function handle(GeneralSettings $settings): void
     {
         // Calculate the time taken to complete the import
         $completedIn = $this->start->diffInSeconds(now());
         $completedInRounded = round($completedIn, 2);
+
+        // Check invalidation settings
+        if ($this->invalidateImport === null) {
+            // If not set via config, check the settings
+            $this->invalidateImport = $settings->invalidate_import ?? false;
+            $this->invalidateImportThreshold = $settings->invalidate_import_threshold ?? 100;
+        }
 
         $user = User::find($this->userId);
         $playlist = $user->playlists()->find($this->playlistId);
@@ -117,6 +126,31 @@ class ProcessM3uImportComplete implements ShouldQueue
                     // If the new count will be less than the current count (minus the threshold), invalidate the import
                     if ($newCount < ($currentCount - $this->invalidateImportThreshold)) {
                         $message = "Playlist Sync Invalidated: The channel count would have been {$newCount} after import, which is less than the current count of {$currentCount} minus the threshold of {$this->invalidateImportThreshold}.";
+                        if (!$syncLogsDisabled) {
+                            $sync = PlaylistSyncStatus::create([
+                                'name' => $playlist->name,
+                                'user_id' => $user->id,
+                                'playlist_id' => $playlist->id,
+                                'sync_stats' => [
+                                    'time' => $completedIn,
+                                    'time_rounded' => $completedInRounded,
+                                    'removed_groups' => $removedGroupCount,
+                                    'added_groups' => $newGroupCount,
+                                    'removed_channels' => $removedChannelCount,
+                                    'added_channels' => $newChannelCount,
+                                    'max_hit' => $this->maxHit,
+                                    'message' => $message,
+                                    'status' => 'canceled',
+                                ]
+                            ]);
+                            $this->createSyncLogEntries(
+                                $sync,
+                                $newChannels,
+                                $removedChannels,
+                                $newGroups,
+                                $removedGroups
+                            );
+                        }
 
                         // Invalidate the import
                         $playlist->update([
@@ -157,77 +191,16 @@ class ProcessM3uImportComplete implements ShouldQueue
                         'removed_channels' => $removedChannelCount,
                         'added_channels' => $newChannelCount,
                         'max_hit' => $this->maxHit,
+                        'status' => 'success',
                     ]
                 ]);
-
-                // Limit logged entries
-                $limit = config('dev.max_channels');
-
-                // Create the sync log entries
-                $bulk = [];
-                $removedGroups->limit($limit)->cursor()->each(function ($group) use ($sync, &$bulk) {
-                    $bulk[] = [
-                        'playlist_sync_status_id' => $sync->id,
-                        'name' => $group->name,
-                        'type' => 'group',
-                        'status' => 'removed',
-                        'meta' => $group,
-                        'playlist_id' => $group->playlist_id,
-                        'user_id' => $group->user_id,
-                    ];
-                    if (count($bulk) >= 100) {
-                        PlaylistSyncStatusLog::insert($bulk);
-                        $bulk = [];
-                    }
-                });
-                $newGroups->limit($limit)->cursor()->each(function ($group) use ($sync, &$bulk) {
-                    $bulk[] = [
-                        'playlist_sync_status_id' => $sync->id,
-                        'name' => $group->name,
-                        'type' => 'group',
-                        'status' => 'added',
-                        'meta' => $group,
-                        'playlist_id' => $group->playlist_id,
-                        'user_id' => $group->user_id,
-                    ];
-                    if (count($bulk) >= 100) {
-                        PlaylistSyncStatusLog::insert($bulk);
-                        $bulk = [];
-                    }
-                });
-                $removedChannels->limit($limit)->cursor()->each(function ($channel) use ($sync, &$bulk) {
-                    $bulk[] = [
-                        'playlist_sync_status_id' => $sync->id,
-                        'name' => $channel->title,
-                        'type' => 'channel',
-                        'status' => 'removed',
-                        'meta' => $channel,
-                        'playlist_id' => $channel->playlist_id,
-                        'user_id' => $channel->user_id,
-                    ];
-                    if (count($bulk) >= 100) {
-                        PlaylistSyncStatusLog::insert($bulk);
-                        $bulk = [];
-                    }
-                });
-                $newChannels->limit($limit)->cursor()->each(function ($channel) use ($sync, &$bulk) {
-                    $bulk[] = [
-                        'playlist_sync_status_id' => $sync->id,
-                        'name' => $channel->title,
-                        'type' => 'channel',
-                        'status' => 'added',
-                        'meta' => $channel,
-                        'playlist_id' => $channel->playlist_id,
-                        'user_id' => $channel->user_id,
-                    ];
-                    if (count($bulk) >= 100) {
-                        PlaylistSyncStatusLog::insert($bulk);
-                        $bulk = [];
-                    }
-                });
-                if (count($bulk) > 0) {
-                    PlaylistSyncStatusLog::insert($bulk);
-                }
+                $this->createSyncLogEntries(
+                    $sync,
+                    $newChannels,
+                    $removedChannels,
+                    $newGroups,
+                    $removedGroups
+                );
             }
         }
 
@@ -366,5 +339,91 @@ class ProcessM3uImportComplete implements ShouldQueue
 
         // Fire the playlist synced event
         event(new SyncCompleted($playlist));
+    }
+
+    /**
+     * Create the sync log entries for the import.
+     *
+     * @param PlaylistSyncStatus $sync
+     * @param $newChannels
+     * @param $removedChannels
+     * @param $newGroups
+     * @param $removedGroups
+     */
+    private function createSyncLogEntries(
+        $sync,
+        $newChannels,
+        $removedChannels,
+        $newGroups,
+        $removedGroups,
+    ) {
+        // Limit logged entries
+        $limit = config('dev.max_channels');
+
+        // Create the sync log entries
+        $bulk = [];
+        $removedGroups->limit($limit)->cursor()->each(function ($group) use ($sync, &$bulk) {
+            $bulk[] = [
+                'playlist_sync_status_id' => $sync->id,
+                'name' => $group->name,
+                'type' => 'group',
+                'status' => 'removed',
+                'meta' => $group,
+                'playlist_id' => $group->playlist_id,
+                'user_id' => $group->user_id,
+            ];
+            if (count($bulk) >= 100) {
+                PlaylistSyncStatusLog::insert($bulk);
+                $bulk = [];
+            }
+        });
+        $newGroups->limit($limit)->cursor()->each(function ($group) use ($sync, &$bulk) {
+            $bulk[] = [
+                'playlist_sync_status_id' => $sync->id,
+                'name' => $group->name,
+                'type' => 'group',
+                'status' => 'added',
+                'meta' => $group,
+                'playlist_id' => $group->playlist_id,
+                'user_id' => $group->user_id,
+            ];
+            if (count($bulk) >= 100) {
+                PlaylistSyncStatusLog::insert($bulk);
+                $bulk = [];
+            }
+        });
+        $removedChannels->limit($limit)->cursor()->each(function ($channel) use ($sync, &$bulk) {
+            $bulk[] = [
+                'playlist_sync_status_id' => $sync->id,
+                'name' => $channel->title,
+                'type' => 'channel',
+                'status' => 'removed',
+                'meta' => $channel,
+                'playlist_id' => $channel->playlist_id,
+                'user_id' => $channel->user_id,
+            ];
+            if (count($bulk) >= 100) {
+                PlaylistSyncStatusLog::insert($bulk);
+                $bulk = [];
+            }
+        });
+        $newChannels->limit($limit)->cursor()->each(function ($channel) use ($sync, &$bulk) {
+            $bulk[] = [
+                'playlist_sync_status_id' => $sync->id,
+                'name' => $channel->title,
+                'type' => 'channel',
+                'status' => 'added',
+                'meta' => $channel,
+                'playlist_id' => $channel->playlist_id,
+                'user_id' => $channel->user_id,
+            ];
+            if (count($bulk) >= 100) {
+                PlaylistSyncStatusLog::insert($bulk);
+                $bulk = [];
+            }
+        });
+        if (count($bulk) > 0) {
+            PlaylistSyncStatusLog::insert($bulk);
+        }
     }
 }
