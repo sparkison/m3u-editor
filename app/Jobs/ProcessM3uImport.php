@@ -392,7 +392,7 @@ class ProcessM3uImport implements ShouldQueue
                             'title' => $item->name,
                             'name' => $item->name,
                             'url' => "$streamBaseUrl/{$item->stream_id}.$output",
-                            'logo' => $item->stream_icon,
+                            'logo' => urlencode($item->stream_icon ?? ''),
                             'group' => $category['category_name'] ?? '',
                             'group_internal' => $category['category_name'] ?? '',
                             'stream_id' => $item->epg_channel_id ?? $item->stream_id, // prefer EPG id for mapping, if set
@@ -428,7 +428,7 @@ class ProcessM3uImport implements ShouldQueue
                             'title' => $item->name,
                             'name' => $item->name,
                             'url' => "$vodBaseUrl/{$item->stream_id}." . $extension,
-                            'logo' => $item->stream_icon,
+                            'logo' => urlencode($item->stream_icon ?? ''),
                             'group' => $category['category_name'] ?? '',
                             'group_internal' => $category['category_name'] ?? '',
                             'stream_id' => $item->stream_id,
@@ -642,6 +642,8 @@ class ProcessM3uImport implements ShouldQueue
                                     if ($extTag->hasAttribute($attribute)) {
                                         if ($attribute === 'tvg-chno') {
                                             $channel[$key] = (int)$extTag->getAttribute($attribute);
+                                        } elseif ($attribute === 'tvg-logo') {
+                                            $channel[$key] = urlencode($extTag->getAttribute($attribute));
                                         } else {
                                             $channel[$key] = str_replace(
                                                 [',', '"', "'"],
