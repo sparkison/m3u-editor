@@ -310,8 +310,38 @@ class Preferences extends SettingsPage
                                     ])
                             ]),
 
-                        Forms\Components\Tabs\Tab::make('File Sync Options')
+                        Forms\Components\Tabs\Tab::make('Sync Options')
                             ->schema([
+                                Forms\Components\Section::make('Sync Invalidation')
+                                    ->description('Prevent sync from proceeding if conditions are met.')
+                                    ->columnSpan('full')
+                                    ->columns(1)
+                                    ->collapsible(false)
+                                    ->schema([
+                                        Forms\Components\Toggle::make('invalidate_import')
+                                            ->label('Enable import invalidation')
+                                            ->disabled(fn() => !empty(config('dev.invalidate_import')))
+                                            ->hint(fn() => !empty(config('dev.invalidate_import')) ? 'Already set by environment variable!' : null)
+                                            ->default(function () {
+                                                return !empty(config('dev.invalidate_import')) ? (bool) config('dev.invalidate_import') : false;
+                                            })
+                                            ->afterStateHydrated(function (Forms\Components\Toggle $component, $state) {
+                                                if (!empty(config('dev.invalidate_import'))) {
+                                                    $component->state((bool) config('dev.invalidate_import'));
+                                                }
+                                            })
+                                            ->dehydrated(fn() => empty(config('dev.invalidate_import')))
+                                            ->helperText('Invalidate Playlist sync if conditon met.'),
+                                        Forms\Components\TextInput::make('invalidate_import_threshold')
+                                            ->label('Import invalidation threshold')
+                                            ->suffixIcon(fn() => !empty(config('dev.invalidate_import_threshold')) ? 'heroicon-m-lock-closed' : null)
+                                            ->disabled(fn() => !empty(config('dev.invalidate_import_threshold')))
+                                            ->hint(fn() => !empty(config('dev.invalidate_import_threshold')) ? 'Already set by environment variable!' : null)
+                                            ->dehydrated(fn() => empty(config('dev.invalidate_import_threshold')))
+                                            ->placeholder(fn() => empty(config('dev.invalidate_import_threshold')) ? 100 : config('dev.invalidate_import_threshold'))
+                                            ->numeric()
+                                            ->helperText('If the current sync will have less channels than the current channel count (less this value), the sync will be invalidated and canceled.'),
+                                    ]),
                                 Forms\Components\Section::make('Stream location file settings')
                                     ->description('Generate .strm files and sync them to a local file path. Options can be overriden per Series on the Series edit page.')
                                     ->columnSpan('full')

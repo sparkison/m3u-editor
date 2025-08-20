@@ -29,6 +29,10 @@ class ViewPlaylistSyncStatus extends ViewRecord
             ->schema([
                 Infolists\Components\Section::make('Sync Status')
                     ->description('General sync information')
+                    ->compact()
+                    ->collapsible()
+                    ->collapsed(true)
+                    ->persistCollapsed(true)
                     ->columnSpanFull()
                     ->columns(3)
                     ->schema([
@@ -40,6 +44,21 @@ class ViewPlaylistSyncStatus extends ViewRecord
                         Infolists\Components\TextEntry::make('created_at')
                             ->label('Synced at')
                             ->dateTime(),
+                        Infolists\Components\TextEntry::make('sync_stats.status')
+                            ->label('Status')
+                            ->default('success')
+                            ->badge()
+                            ->color(function ($state) {
+                                return match ($state) {
+                                    'success' => 'success',
+                                    'canceled' => 'warning',
+                                    default => 'info',
+                                };
+                            }),
+                        Infolists\Components\TextEntry::make('sync_stats.message')
+                            ->label('Message')
+                            ->columnSpan(2)
+                            ->default('N/A'),
                     ]),
             ]);
     }

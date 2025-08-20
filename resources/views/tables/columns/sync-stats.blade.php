@@ -5,7 +5,13 @@
             @foreach($rows as $key => $value)
                 <div class="w-full flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-x-2 text-xs bg-gray-100 dark:bg-gray-800 rounded px-2 py-1">
                     <span class="font-medium text-gray-700 dark:text-gray-300 flex-shrink-0">{{ $key }}:</span>
-                    <span class="text-gray-900 dark:text-gray-100 font-mono break-all sm:text-right">{{ $value }}</span>
+                    @if(is_array($value))
+                        <span class="text-gray-900 dark:text-gray-100 font-mono break-all sm:text-right">
+                            {{ json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}
+                        </span>
+                    @else
+                        <span class="text-gray-900 dark:text-gray-100 font-mono break-all sm:text-right">{{ $value }}</span>
+                    @endif
                 </div>
             @endforeach
         </div>
