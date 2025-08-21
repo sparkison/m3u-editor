@@ -78,17 +78,14 @@ class Epg extends Model
             return [
                 'min_date' => null,
                 'max_date' => null,
-                'total_programmes' => null,
                 'version' => null,
             ];
         }
         $range = $this->cache_meta['programme_date_range'] ?? null;
-        $totalPrograms = $this->cache_meta['total_programmes'] ?? null;
         $version = $this->cache_meta['cache_version'] ?? null;
         return [
             'min_date' => $range['min_date'] ?? null,
             'max_date' => $range['max_date'] ?? null,
-            'total_programmes' => $totalPrograms,
             'version' => $version,
         ];
     }

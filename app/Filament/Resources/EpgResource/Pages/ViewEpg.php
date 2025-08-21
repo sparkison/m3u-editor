@@ -89,7 +89,11 @@ class ViewEpg extends ViewRecord
     public function infolist(Infolist $infolist): Infolist
     {
         $record = $this->getRecord();
-        $record->loadCount('channels');
+        //if ($record->channel_count === 0) {
+            $record->loadCount('channels');
+            $record->channel_count = $record->channels_count;
+        //}
+        $record->programme_count = $record->programme_count ?: ($record->cache_meta['total_programmes'] ?? 0);
         return $infolist
             ->schema([
                 Infolists\Components\Section::make('EPG Information')
@@ -101,25 +105,38 @@ class ViewEpg extends ViewRecord
                             ->columns(2)
                             ->columnSpan(2)
                             ->schema([
-                                Infolists\Components\TextEntry::make('name')
-                                    ->label('Name'),
-                                Infolists\Components\TextEntry::make('status')
-                                    ->badge()
-                                    ->color(fn($state) => $state?->getColor()),
-                                Infolists\Components\TextEntry::make('synced')
-                                    ->label('Last Synced')
-                                    ->since()
-                                    ->placeholder('Never'),
-                                Infolists\Components\TextEntry::make('channels_count')
-                                    ->label('Total Channels')
-                                    ->default($record->channels_count),
-                                Infolists\Components\IconEntry::make('is_cached')
-                                    ->label('Cached')
-                                    ->icon(fn(string $state): string => match ($state) {
-                                        '1' => 'heroicon-o-check-circle',
-                                        '0' => 'heroicon-o-x-mark',
-                                        default => 'heroicon-o-x-mark',
-                                    }),
+                                Infolists\Components\Grid::make()
+                                    ->columnSpan(1)
+                                    ->columns(1)
+                                    ->schema([
+                                        Infolists\Components\TextEntry::make('name')
+                                            ->label('Name'),
+                                        Infolists\Components\TextEntry::make('status')
+                                            ->badge()
+                                            ->color(fn($state) => $state?->getColor()),
+                                        Infolists\Components\TextEntry::make('synced')
+                                            ->label('Last Synced')
+                                            ->since()
+                                            ->placeholder('Never'),
+                                    ]),
+                                Infolists\Components\Grid::make()
+                                    ->columnSpan(1)
+                                    ->columns(1)
+                                    ->schema([
+                                        Infolists\Components\IconEntry::make('is_cached')
+                                            ->label('Cached')
+                                            ->icon(fn(string $state): string => match ($state) {
+                                                '1' => 'heroicon-o-check-circle',
+                                                '0' => 'heroicon-o-x-mark',
+                                                default => 'heroicon-o-x-mark',
+                                            }),
+                                        Infolists\Components\TextEntry::make('channel_count')
+                                            ->label('Total Channels')
+                                            ->badge(),
+                                        Infolists\Components\TextEntry::make('programme_count')
+                                            ->label('Total Programmes')
+                                            ->badge(),
+                                    ]),
                             ]),
                         Infolists\Components\Grid::make()
                             ->columns(1)
