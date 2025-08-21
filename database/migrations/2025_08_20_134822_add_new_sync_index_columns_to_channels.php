@@ -23,6 +23,19 @@ return new class extends Migration
             }
         });
 
+        // Need to remove any duplicates at this point
+        // This is necessary to ensure that the new unique index can be created without conflicts
+        Playlist::all()->each(function (Playlist $playlist) {
+            $playlist->channels()
+                ->select('source_id', 'playlist_id')
+                ->groupBy('source_id', 'playlist_id')
+                ->havingRaw('COUNT(*) > 1')
+                ->get()
+                ->each(function ($channel) {
+                    $channel->delete();
+                });
+        });
+
         // Create the new sync index columns
         Schema::table('channels', function (Blueprint $table) {
             $table->unique(['source_id', 'playlist_id'], 'idx_source_playlist');
