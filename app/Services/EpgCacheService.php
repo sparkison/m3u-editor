@@ -87,7 +87,8 @@ class EpgCacheService
             set_time_limit(600); // 10 minutes
 
             // Get the channel count for progress tracking
-            $totalChannels = $epg->channels()->count();
+            $totalChannels = $epg->channel_count ?? $epg->channels()->count();
+            $totalProgrammes = $epg->programme_count ?? 150000; // Default estimate
 
             // Start by clearing existing cache
             $this->clearCache($epg);
@@ -101,7 +102,7 @@ class EpgCacheService
 
             // Parse and save programmes using streaming by date
             Log::debug("Parsing and saving programmes for {$epg->name}");
-            $programmeStats = $this->parseAndSaveProgrammes($epg, $epgFilePath, $totalChannels);
+            $programmeStats = $this->parseAndSaveProgrammes($epg, $epgFilePath, $totalChannels, $totalProgrammes);
             Log::debug("Processed {$programmeStats['total']} programmes across {$programmeStats['date_count']} dates");
 
             // Save metadata
@@ -173,13 +174,12 @@ class EpgCacheService
     /**
      * Parse and save programmes using direct file append
      */
-    private function parseAndSaveProgrammes(Epg $epg, string $filePath, int $totalChannels): array
+    private function parseAndSaveProgrammes(Epg $epg, string $filePath, int $totalChannels, int $totalProgrammes): array
     {
-        $totalProgrammes = 0;
+        $parsedProgrammes = 0;
         $dateRangeTracker = ['min_date' => null, 'max_date' => null];
         $processedDates = [];
         $openFiles = []; // Keep track of open file handles
-        $programmeCount = $this->countProgrammesInFile($filePath);
 
         foreach ($this->parseProgrammesStream($filePath) as $programme) {
             $date = Carbon::parse($programme['start'])->format('Y-m-d');
@@ -194,11 +194,11 @@ class EpgCacheService
 
             // Use direct file append with minimal memory footprint
             $this->directAppendProgramme($epg, $date, $programme['channel'], $programme, $openFiles);
-            $totalProgrammes++;
+            $parsedProgrammes++;
             $processedDates[$date] = true;
 
             // Force garbage collection every 50 programmes (more frequent)
-            if ($totalProgrammes % 50 === 0) {
+            if ($parsedProgrammes % 50 === 0) {
                 if (function_exists('gc_collect_cycles')) {
                     gc_collect_cycles();
                 }
@@ -215,7 +215,7 @@ class EpgCacheService
 
                 // Update progress
                 $progress = $totalChannels > 0
-                    ? min(99, 20 + round(($totalProgrammes / $programmeCount) * 80))
+                    ? min(99, 20 + round(($parsedProgrammes / $totalProgrammes) * 80))
                     : 99;
                 $epg->update(['cache_progress' => $progress]);
             }
@@ -233,48 +233,6 @@ class EpgCacheService
             'date_count' => count($processedDates),
             'date_range' => $dateRangeTracker,
         ];
-    }
-
-    /**
-     * Count programmes in file for progress tracking
-     */
-    private function countProgrammesInFile(string $filePath): int
-    {
-        $count = 0;
-
-        try {
-            // Open compressed file for reading
-            $handle = gzopen($filePath, 'r');
-            if (!$handle) {
-                Log::warning("Could not open file for programme counting: {$filePath}");
-                return 0;
-            }
-
-            // Read file in chunks and count programme occurrences
-            while (!gzeof($handle)) {
-                $chunk = gzread($handle, 8192); // 8KB chunks
-                if ($chunk === false) {
-                    break;
-                }
-
-                // Count occurrences of '<programme' in this chunk
-                $count += substr_count($chunk, '<programme');
-
-                // Apply safety limit
-                if ($count > self::MAX_PROGRAMMES) {
-                    Log::warning("Programme counting limit reached at {$count}");
-                    $count = self::MAX_PROGRAMMES;
-                    break;
-                }
-            }
-
-            gzclose($handle);
-        } catch (\Exception $e) {
-            Log::warning("Error counting programmes: {$e->getMessage()}");
-            return 0;
-        }
-
-        return $count;
     }
 
     /**

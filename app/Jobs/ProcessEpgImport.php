@@ -262,14 +262,16 @@ class ProcessEpgImport implements ShouldQueue
 
                 // Update progress
                 $epg->update(['progress' => 10]);
+                $channelCount = 0;
+                $programmeCount = 0;
 
                 // Create a lazy collection to process the XML data
-                LazyCollection::make(function () use ($channelReader, $defaultChannelData) {
+                LazyCollection::make(function () use (&$programmeCount, &$channelCount, $channelReader, $defaultChannelData) {
                     // Loop through the XML data
-                    $count = 0;
+                    $channelCount = 0;
                     while (@$channelReader->read()) {
                         // Limit the number of items to process
-                        if ($count >= $this->maxItems) {
+                        if ($channelCount >= $this->maxItems) {
                             break;
                         }
 
@@ -322,9 +324,13 @@ class ProcessEpgImport implements ShouldQueue
 
                             // Only return valid channels
                             if ($elementData['channel_id']) {
-                                $count++;
+                                $channelCount++;
                                 yield $elementData;
                             }
+                        }
+                        if ($channelReader->nodeType == XMLReader::ELEMENT && $channelReader->name === 'programme') {
+                            // Increment the programme count
+                            $programmeCount++;
                         }
                     }
                 })->chunk(50)->each(function (LazyCollection $chunk) use ($epg, $batchNo) {
@@ -342,7 +348,11 @@ class ProcessEpgImport implements ShouldQueue
                 $channelReader->close();
 
                 // Update progress
-                $epg->update(['progress' => 15]);
+                $epg->update([
+                    'progress' => 15,
+                    'channel_count' => $channelCount,
+                    'programme_count' => $programmeCount,
+                ]);
 
                 // Get the jobs for the batch
                 $jobs = [];
