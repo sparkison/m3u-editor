@@ -3,6 +3,7 @@
 use App\Models\Playlist;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -25,16 +26,21 @@ return new class extends Migration
 
         // Need to remove any duplicates at this point
         // This is necessary to ensure that the new unique index can be created without conflicts
-        Playlist::all()->each(function (Playlist $playlist) {
-            $playlist->channels()
-                ->select('source_id', 'playlist_id')
-                ->groupBy('source_id', 'playlist_id')
-                ->havingRaw('COUNT(*) > 1')
-                ->get()
-                ->each(function ($channel) {
-                    $channel->delete();
-                });
-        });
+        // Only process channels where source_id is set (non-xtream playlists)
+        $duplicateIds = DB::table('channels')
+            ->select('id')
+            ->whereNotNull('source_id')
+            ->whereNotIn('id', function ($query) {
+                $query->select(DB::raw('MIN(id)'))
+                    ->from('channels')
+                    ->whereNotNull('source_id')
+                    ->groupBy('source_id', 'playlist_id');
+            })
+            ->pluck('id');
+
+        if ($duplicateIds->isNotEmpty()) {
+            DB::table('channels')->whereIn('id', $duplicateIds)->delete();
+        }
 
         // Create the new sync index columns
         Schema::table('channels', function (Blueprint $table) {
