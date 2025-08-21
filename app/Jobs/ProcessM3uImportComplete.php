@@ -241,6 +241,7 @@ class ProcessM3uImportComplete implements ShouldQueue
                             'name' => $playlist->name . ' EPG',
                             'url' => $epgUrl,
                             'user_id' => $user->id,
+                            'user_agent' => $playlist->user_agent
                         ]);
                         $msg = "\"{$playlist->name}\" EPG was created and is syncing now.";
                         Notification::make()
