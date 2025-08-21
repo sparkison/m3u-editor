@@ -56,7 +56,7 @@ return [
 
     'prefix' => env(
         'HORIZON_PREFIX',
-        Str::slug(env('APP_NAME', 'laravel'), '_').'_horizon:'
+        Str::slug(env('APP_NAME', 'laravel'), '_') . '_horizon:'
     ),
 
     /*
@@ -189,8 +189,8 @@ return [
             'maxTime' => 0,
             'maxJobs' => 0,
             'memory' => 256, // MB
-            'tries' => 1, // Number of times to attempt a job before marking it as failed
-            'timeout' => 60 * 10, // 10 minutes
+            'tries' => 3, // Number of times to attempt a job before marking it as failed
+            'timeout' => 60 * 30, // 30 minutes
             'nice' => 0,
         ],
     ],

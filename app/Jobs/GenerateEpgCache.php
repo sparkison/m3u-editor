@@ -14,9 +14,15 @@ class GenerateEpgCache implements ShouldQueue
 {
     use Queueable;
 
-    // Giving a timeout of 10 minutes to the Job to generate the cache
+    // Giving a timeout of 15 minutes to the Job to generate the cache
     // This should be sufficient for most EPGs, but can be adjusted if needed
-    public $timeout = 60 * 10;
+    public $timeout = 60 * 15;
+
+    // Allow up to 2 attempts (1 retry)
+    public $tries = 2;
+
+    // Delay between attempts if it fails
+    public $backoff = 300; // 5 minutes
 
     /**
      * Create a new job instance.
@@ -37,6 +43,9 @@ class GenerateEpgCache implements ShouldQueue
             return;
         }
 
+        // Set memory and time limits for large EPG files
+        ini_set('memory_limit', '2G');
+        set_time_limit(0); // No time limit
         $start = microtime(true);
         $epg->update([
             'status' => Status::Processing,
@@ -63,6 +72,30 @@ class GenerateEpgCache implements ShouldQueue
                 ->danger()
                 ->title("Error creating cache for \"{$epg->name}\"")
                 ->body($error)
+                ->broadcast($epg->user)
+                ->sendToDatabase($epg->user);
+        }
+    }
+
+    /**
+     * Handle a job failure.
+     */
+    public function failed(\Throwable $exception): void
+    {
+        $epg = Epg::where('uuid', $this->uuid)->first();
+        if ($epg) {
+            $epg->update([
+                'status' => Status::Failed,
+                'cache_progress' => 0,
+            ]);
+
+            Log::error("EPG cache generation failed for {$epg->name}: {$exception->getMessage()}");
+
+            // Always send failure notification
+            Notification::make()
+                ->danger()
+                ->title("EPG cache generation failed for \"{$epg->name}\"")
+                ->body("Error: {$exception->getMessage()}")
                 ->broadcast($epg->user)
                 ->sendToDatabase($epg->user);
         }
