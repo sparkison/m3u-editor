@@ -14,7 +14,7 @@
                 </path>
             </svg>
         </a>
-        <span>v{{ config('dev.version') }}</span>
+        <span>v{{ App\Providers\VersionServiceProvider::getVersion() }}</span>
     </span>
     {{--
     <span class="flex items-center gap-2">
