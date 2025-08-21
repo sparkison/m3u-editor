@@ -24,14 +24,36 @@ class ViewGroup extends ViewRecord
                     ->form([
                         Forms\Components\Select::make('playlist')
                             ->required()
+                            ->live()
                             ->label('Custom Playlist')
-                            ->helperText('Select the custom playlist you would like to add the selected channel(s) to.')
+                            ->helperText('Select the custom playlist you would like to add group channels to.')
                             ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                            ->afterStateUpdated(function (Forms\Set $set, $state) {
+                                if ($state) {
+                                    $set('category', null);
+                                }
+                            })
+                            ->searchable(),
+                        Forms\Components\Select::make('category')
+                            ->label('Custom Group')
+                            ->disabled(fn(Get $get) => !$get('playlist'))
+                            ->helperText(fn(Get $get) => !$get('playlist') ? 'Select a custom playlist first.' : 'Select the group you would like to assign to the channels to.')
+                            ->options(function ($get) {
+                                $customList = CustomPlaylist::find($get('playlist'));
+                                return $customList ? $customList->tags()
+                                    ->where('type', $customList->uuid)
+                                    ->get()
+                                    ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
+                                    ->toArray() : [];
+                            })
                             ->searchable(),
                     ])
                     ->action(function ($record, array $data): void {
                         $playlist = CustomPlaylist::findOrFail($data['playlist']);
                         $playlist->channels()->syncWithoutDetaching($record->channels()->pluck('id'));
+                        if ($data['category']) {
+                            $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
+                        }
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
                         Notification::make()
