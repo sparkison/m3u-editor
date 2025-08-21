@@ -10,6 +10,7 @@ class ProxyService
 {
     // Cache configuration for bad sources
     public const BAD_SOURCE_CACHE_SECONDS = 10; // Default for ffprobe/general errors
+    public const BAD_SOURCE_CACHE_SECONDS_GENERAL_ERROR = 5; // For general ffprobe errors
     public const BAD_SOURCE_CACHE_SECONDS_CONTENT_ERROR = 10; // For fatal stream content errors
     public const BAD_SOURCE_CACHE_PREFIX = 'failover:bad_source:';
 
