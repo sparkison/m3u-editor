@@ -488,8 +488,9 @@ class XtreamApiController extends Controller
                     $streamIcon = url('/placeholder.png');
                     if ($channel->logo_type === ChannelLogoType::Epg && $channel->epgChannel && $channel->epgChannel->icon) {
                         $streamIcon = $channel->epgChannel->icon;
-                    } elseif ($channel->logo_type === ChannelLogoType::Channel && $channel->logo) {
-                        $streamIcon = filter_var($channel->logo, FILTER_VALIDATE_URL) ? $channel->logo : url($channel->logo);
+                    } elseif ($channel->logo_type === ChannelLogoType::Channel && ($channel->logo || $channel->logo_internal)) {
+                        $logo = $channel->logo ?? $channel->logo_internal ?? '';
+                        $streamIcon = filter_var($logo, FILTER_VALIDATE_URL) ? $logo : url($logo);
                     }
 
                     // Determine category_id based on playlist type
@@ -595,8 +596,9 @@ class XtreamApiController extends Controller
                     $streamIcon = url('/placeholder.png');
                     if ($channel->logo_type === ChannelLogoType::Epg && $channel->epgChannel && $channel->epgChannel->icon) {
                         $streamIcon = $channel->epgChannel->icon;
-                    } elseif ($channel->logo_type === ChannelLogoType::Channel && $channel->logo) {
-                        $streamIcon = filter_var($channel->logo, FILTER_VALIDATE_URL) ? $channel->logo : url($channel->logo);
+                    } elseif ($channel->logo_type === ChannelLogoType::Channel && ($channel->logo || $channel->logo_internal)) {
+                        $logo = $channel->logo ?? $channel->logo_internal ?? '';
+                        $streamIcon = filter_var($logo, FILTER_VALIDATE_URL) ? $logo : url($logo);
                     }
 
                     // Determine category_id based on playlist type
@@ -964,8 +966,8 @@ class XtreamApiController extends Controller
                 'tmdb_id' => $info['tmdb_id'] ?? 0,
                 'name' => $info['name'] ?? $channel->name,
                 'o_name' => $info['o_name'] ?? $channel->name,
-                'cover_big' => $info['cover_big'] ?? $channel->logo,
-                'movie_image' => $info['movie_image'] ?? $channel->logo,
+                'cover_big' => $info['cover_big'] ?? $channel->logo ?? $channel->logo_internal,
+                'movie_image' => $info['movie_image'] ?? $channel->logo ?? $channel->logo_internal,
                 'release_date' => $info['release_date'] ?? $channel->year,
                 'episode_run_time' => $info['episode_run_time'] ?? 0,
                 'youtube_trailer' => $info['youtube_trailer'] ?? null,

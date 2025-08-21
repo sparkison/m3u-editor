@@ -250,6 +250,7 @@ class ListChannels extends ListRecords
                             ->options([
                                 'title' => 'Channel Title',
                                 'name' => 'Channel Name (tvg-name)',
+                                'logo' => 'Channel Logo (tvg-logo)',
                             ])
                             ->default('title')
                             ->required()

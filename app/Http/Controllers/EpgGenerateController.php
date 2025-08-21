@@ -152,7 +152,7 @@ class EpgGenerateController extends Controller
                 if ($channel->logo_type === ChannelLogoType::Epg) {
                     $icon = $epgData->icon ?? '';
                 } elseif ($channel->logo_type === ChannelLogoType::Channel) {
-                    $icon = $channel->logo ?? '';
+                    $icon =  $channel->logo ?? $channel->logo_internal ?? '';
                 }
                 if (empty($icon)) {
                     $icon = url('/placeholder.png');
@@ -170,7 +170,7 @@ class EpgGenerateController extends Controller
                 echo PHP_EOL . '  </channel>' . PHP_EOL;
             } else if ($dummyEpgEnabled) {
                 // Get the icon
-                $icon = $channel->logo ?? '';
+                $icon = $channel->logo ?? $channel->logo_internal ?? '';
                 if (empty($icon)) {
                     $icon = url('/placeholder.png');
                 }

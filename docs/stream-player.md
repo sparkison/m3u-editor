@@ -147,7 +147,7 @@ public function playChannel($channelId)
         'url' => $channel->stream_url,
         'format' => $channel->stream_format,
         'title' => $channel->title,
-        'logo' => $channel->logo_url
+        'logo' => $channel->logo_url ?? $channel->logo_internal
     ]);
 }
 ```

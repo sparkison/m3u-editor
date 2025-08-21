@@ -35,7 +35,18 @@ class ChannelFindAndReplaceReset implements ShouldQueue
         // Clock the time
         $start = now();
 
-        $customColumn = $this->column . '_custom';
+        // Need to treat some columns differently
+        switch ($this->column) {
+            case 'logo':
+                // Resetting the logo column, `logo_internal` is the default, `logo` is the override
+                $customColumn = 'logo';
+                break;
+            default:
+                // Most will use the same name appended with `_custom`
+                // e.g. `name_custom` for `name`
+                // or `title_custom` for `title`
+                $customColumn = $this->column . '_custom';
+        }
         $totalUpdated = 0;
 
         // Process channels in chunks for better performance
@@ -47,7 +58,7 @@ class ChannelFindAndReplaceReset implements ShouldQueue
                 ->chunkById(1000, function ($channels) use ($customColumn, &$totalUpdated) {
                     // Get IDs of channels to update
                     $channelIds = $channels->pluck('id')->toArray();
-                    
+
                     if (count($channelIds) > 0) {
                         // Batch update all channels in this chunk
                         $updated = DB::table('channels')
@@ -56,7 +67,7 @@ class ChannelFindAndReplaceReset implements ShouldQueue
                                 $customColumn => null,
                                 'updated_at' => now()
                             ]);
-                        
+
                         $totalUpdated += $updated;
                     }
                 });
@@ -67,7 +78,7 @@ class ChannelFindAndReplaceReset implements ShouldQueue
                 ->chunk(1000)
                 ->each(function ($chunk) use ($customColumn, &$totalUpdated) {
                     $channelIds = $chunk->pluck('id')->toArray();
-                    
+
                     if (count($channelIds) > 0) {
                         // Batch update all channels in this chunk
                         $updated = DB::table('channels')
@@ -76,7 +87,7 @@ class ChannelFindAndReplaceReset implements ShouldQueue
                                 $customColumn => null,
                                 'updated_at' => now()
                             ]);
-                        
+
                         $totalUpdated += $updated;
                     }
                 });

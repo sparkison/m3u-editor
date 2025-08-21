@@ -129,7 +129,7 @@ class PlaylistGenerateController extends Controller
                     if ($channel->logo_type === ChannelLogoType::Epg && $epgData) {
                         $icon = $epgData->icon ?? '';
                     } elseif ($channel->logo_type === ChannelLogoType::Channel) {
-                        $icon = $channel->logo ?? '';
+                        $icon = $channel->logo ?? $channel->logo_internal ?? '';
                     }
                     if (empty($icon)) {
                         $icon = url('/placeholder.png');

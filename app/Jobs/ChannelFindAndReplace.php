@@ -38,7 +38,19 @@ class ChannelFindAndReplace implements ShouldQueue
         // Clock the time
         $start = now();
 
-        $customColumn = "{$this->column}_custom";
+        // Need to treat some columns differently
+        switch ($this->column) {
+            case 'logo':
+                // Resetting the logo column, `logo_internal` is the default, `logo` is the override
+                $customColumn = 'logo';
+                $this->column = 'logo_internal'; // Use the internal logo column for find/replace
+                break;
+            default:
+                // Most will use the same name appended with `_custom`
+                // e.g. `name_custom` for `name`
+                // or `title_custom` for `title`
+                $customColumn = $this->column . '_custom';
+        }
         $updated = 0;
 
         // Process channels in chunks for better performance

@@ -115,9 +115,9 @@ class ChannelResource extends Resource
                 ])
                 ->getStateUsing(function ($record) {
                     if ($record->logo_type === ChannelLogoType::Channel) {
-                        return $record->logo;
+                        return $record->logo ?? $record->logo_internal;
                     }
-                    return $record->epgChannel?->icon ?? $record->logo;
+                    return $record->epgChannel?->icon ?? $record->logo ?? $record->logo_internal;
                 })
                 ->toggleable(),
             Tables\Columns\TextColumn::make('info')
@@ -672,6 +672,7 @@ class ChannelResource extends Resource
                             ->options([
                                 'title' => 'Channel Title',
                                 'name' => 'Channel Name (tvg-name)',
+                                'logo' => 'Channel Logo (tvg-logo)',
                             ])
                             ->default('title')
                             ->required()
@@ -957,9 +958,35 @@ class ChannelResource extends Resource
                         ->rules(['min:1'])
                         ->type('url')
                         ->hidden(fn(Get $get) => $get('is_custom')),
+                    Forms\Components\TextInput::make('logo_internal')
+                        ->label(fn(Get $get) => $get('is_custom') ? 'Logo' : 'Provider Logo')
+                        ->columnSpan(1)
+                        ->prefixIcon('heroicon-m-globe-alt')
+                        ->hint('tvg-logo')
+                        ->hintIcon(
+                            icon: fn(Get $get) => $get('is_custom') ? null : 'heroicon-m-question-mark-circle',
+                            tooltip: fn(Get $get) => $get('is_custom') ? null : 'The original logo from the playlist provider. This is read-only and cannot be modified. This URL is automatically updated on Playlist sync.'
+                        )
+                        ->formatStateUsing(fn($record) => $record?->logo_internal)
+                        ->disabled(fn(Get $get) => !$get('is_custom')) // make it read-only but copyable for non-custom channels
+                        ->dehydrated(fn(Get $get) => $get('is_custom')) // don't save the value in the database for custom channels
+                        ->type('url'),
+                    Forms\Components\TextInput::make('logo')
+                        ->label('Logo Override')
+                        ->columnSpan(1)
+                        ->prefixIcon('heroicon-m-globe-alt')
+                        ->hint('tvg-logo')
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'Override the provider logo with your own custom logo. This logo will be used instead of the provider logo.'
+                        )
+                        ->helperText("Leave empty to use provider logo.")
+                        ->rules(['min:1'])
+                        ->type('url')
+                        ->hidden(fn(Get $get) => $get('is_custom')),
                     Forms\Components\TextInput::make('url_proxy')
                         ->label('Proxy URL')
-                        ->columnSpan(1)
+                        ->columnSpan(2)
                         ->prefixIcon('heroicon-m-globe-alt')
                         ->hintIcon(
                             'heroicon-m-question-mark-circle',
@@ -983,12 +1010,7 @@ class ChannelResource extends Resource
                         ->dehydrated(false) // don't save the value in the database
                         ->type('url')
                         ->hiddenOn('create'),
-                    Forms\Components\TextInput::make('logo')
-                        ->label('Logo')
-                        ->hint('tvg-logo')
-                        ->columnSpan(1)
-                        ->prefixIcon('heroicon-m-globe-alt')
-                        ->url(),
+
                 ]),
             Forms\Components\Fieldset::make('EPG Settings')
                 ->schema([

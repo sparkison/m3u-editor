@@ -243,7 +243,7 @@ class EpgApiController extends Controller
                         'title' => $channel->name_custom ?? $channel->name,
                         'channel_number' => $channel->channel,
                         'group' => $channel->group ?? $channel->group_internal,
-                        'logo' => $channel->logo ?? ''
+                        'logo' => $channel->logo ?? $channel->logo_internal ?? ''
                     ];
                 }
 
@@ -293,7 +293,7 @@ class EpgApiController extends Controller
                 if ($channel->logo_type === ChannelLogoType::Epg) {
                     $icon = $epgData->icon ?? '';
                 } elseif ($channel->logo_type === ChannelLogoType::Channel) {
-                    $icon = $channel->logo ?? '';
+                    $icon = $channel->logo ?? $channel->logo_internal ?? '';
                 }
                 if (empty($icon)) {
                     $icon = url('/placeholder.png');

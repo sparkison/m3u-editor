@@ -85,6 +85,7 @@ class ProcessM3uImportChunk implements ShouldQueue
                 // 'sort',
                 // ...only update the following fields
                 'url',
+                'logo_internal', // provider logo path fallback
                 'group_internal',
                 'lang', // should we update this? Not sure it's set anywhere...
                 'country', // should we update this? Not sure it's set anywhere...

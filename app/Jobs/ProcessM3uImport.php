@@ -323,6 +323,7 @@ class ProcessM3uImport implements ShouldQueue
                 'name' => '',
                 'url' => null,
                 'logo' => null,
+                'logo_internal' => null, // internal logo path
                 'channel' => null,
                 'group' => '',
                 'group_internal' => '',
@@ -392,7 +393,7 @@ class ProcessM3uImport implements ShouldQueue
                             'title' => $item->name,
                             'name' => $item->name,
                             'url' => "$streamBaseUrl/{$item->stream_id}.$output",
-                            'logo' => urlencode($item->stream_icon ?? ''),
+                            'logo_internal' => Str::replace(' ', '%20', $item->stream_icon ?? ''), // internal logo path
                             'group' => $category['category_name'] ?? '',
                             'group_internal' => $category['category_name'] ?? '',
                             'stream_id' => $item->epg_channel_id ?? $item->stream_id, // prefer EPG id for mapping, if set
@@ -428,7 +429,7 @@ class ProcessM3uImport implements ShouldQueue
                             'title' => $item->name,
                             'name' => $item->name,
                             'url' => "$vodBaseUrl/{$item->stream_id}." . $extension,
-                            'logo' => urlencode($item->stream_icon ?? ''),
+                            'logo_internal' => Str::replace(' ', '%20', $item->stream_icon ?? ''), // internal logo path
                             'group' => $category['category_name'] ?? '',
                             'group_internal' => $category['category_name'] ?? '',
                             'stream_id' => $item->stream_id,
@@ -548,6 +549,7 @@ class ProcessM3uImport implements ShouldQueue
                     'name' => '',
                     'url' => null,
                     'logo' => null,
+                    'logo_internal' => null,
                     'channel' => null,
                     'group' => '',
                     'group_internal' => '',
@@ -586,7 +588,7 @@ class ProcessM3uImport implements ShouldQueue
                     $attributes = [
                         'name' => 'tvg-name',
                         'stream_id' => 'tvg-id',
-                        'logo' => 'tvg-logo',
+                        'logo_internal' => 'tvg-logo',
                         'group' => 'group-title',
                         'group_internal' => 'group-title',
                         'channel' => 'tvg-chno',
@@ -635,7 +637,7 @@ class ProcessM3uImport implements ShouldQueue
                                         if ($attribute === 'tvg-chno') {
                                             $channel[$key] = (int)$extTag->getAttribute($attribute);
                                         } elseif ($attribute === 'tvg-logo') {
-                                            $channel[$key] = urlencode(trim($extTag->getAttribute($attribute)));
+                                            $channel[$key] = Str::replace(' ', '%20', trim($extTag->getAttribute($attribute)));
                                         } else {
                                             $channel[$key] = str_replace(
                                                 [',', '"', "'"],
@@ -891,8 +893,8 @@ class ProcessM3uImport implements ShouldQueue
         }
 
         // Create the source groups
-        // Need to call **AFTER** the channel loop has been executed
-        // NOTE: If called before, the loop will not have run yet, and no groups will be created
+        // NOTE: Need to call **AFTER** the channel loop has been executed.
+        //       If called before, the loop will not have run yet, and no groups will be created
         foreach (array_chunk($groups, 50) as $chunk) {
             SourceGroup::upsert(
                 collect($chunk)->map(function ($groupName) use ($playlistId) {
