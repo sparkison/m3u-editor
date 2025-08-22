@@ -13,6 +13,8 @@ export default defineConfig({
                 "app/Infolists/Components/**",
                 "app/Providers/Filament/**",
                 "app/Tables/Columns/**",
+                "resources/views/livewire/**",
+                "resources/js/vendor/**",
             ],
         }),
     ],

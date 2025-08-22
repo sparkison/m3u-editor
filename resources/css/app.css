@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 @import '../../vendor/filament/filament/resources/css/theme.css';
 @import "./components/tables.scss";
 @import "./components/widgets.css";
@@ -5,6 +7,8 @@
 
 @source '../../app/Filament';
 @source '../../resources/views/filament';
+@source '../../resources/views/livewire';
+@source '../../resources/js/vendor';
 
 /* EPG Viewer Mobile Optimizations */
 @media (max-width: 767px) {
@@ -30,4 +34,34 @@
 
 .fi-dropdown-panel {
     z-index: 20; /* Ensure dropdowns appear above other elements */
+}
+
+/* Force inclusion of commonly used Alpine.js classes for Tailwind v4 */
+@utility x-show-transition {
+    transition: all 0.2s;
+}
+
+@utility epg-grid-container {
+    background-color: theme(colors.white);
+    background-color: theme(colors.gray.900 / 1);
+    box-shadow: 0 0 0 1px theme(colors.gray.950 / 0.05);
+    box-shadow: 0 0 0 1px theme(colors.white / 0.1);
+    border-radius: theme(borderRadius.md);
+    overflow: hidden;
+}
+
+@utility epg-channel-row {
+    border-bottom: 1px solid theme(colors.gray.100);
+    border-bottom: 1px solid theme(colors.gray.600);
+    display: flex;
+    align-items: center;
+    gap: theme(spacing.2);
+}
+
+@utility epg-programme-block {
+    position: absolute;
+    border-radius: theme(borderRadius.DEFAULT);
+    box-shadow: theme(boxShadow.sm);
+    cursor: pointer;
+    transition: all 0.2s;
 }
