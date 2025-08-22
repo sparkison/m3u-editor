@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Playlists;
 
-use App\Filament\Resources\Playlists\PlaylistResource;
 use Illuminate\Support\Facades\Auth;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
