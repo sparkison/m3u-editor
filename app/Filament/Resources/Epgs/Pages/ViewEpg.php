@@ -104,7 +104,7 @@ class ViewEpg extends ViewRecord
             $record->channel_count = $record->channels_count;
         //}
         $record->programme_count = $record->programme_count ?: ($record->cache_meta['total_programmes'] ?? 0);
-        return $infolist
+        return $schema
             ->schema([
                 Section::make('EPG Information')
                     ->collapsible(true)

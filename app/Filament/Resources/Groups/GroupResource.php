@@ -26,6 +26,7 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Forms\Components\TextInput;
 use App\Filament\Resources\GroupResource\Pages;
 use App\Filament\Resources\GroupResource\RelationManagers;
+use App\Filament\Resources\Playlists\PlaylistResource;
 use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Models\Playlist;

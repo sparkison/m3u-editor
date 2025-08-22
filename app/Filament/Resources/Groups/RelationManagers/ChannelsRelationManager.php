@@ -20,6 +20,12 @@ class ChannelsRelationManager extends RelationManager
 
     protected static string $relationship = 'live_channels';
 
+    protected static ?string $label = 'Live Channels';
+    protected static ?string $pluralLabel = 'Live Channels';
+
+    protected static ?string $title = 'Live Channels';
+    protected static ?string $navigationLabel = 'Live Channels';
+
     protected $listeners = ['refreshRelation' => '$refresh'];
 
     public function isReadOnly(): bool

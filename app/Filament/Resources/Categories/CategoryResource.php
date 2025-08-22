@@ -24,6 +24,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use App\Filament\Resources\CategoryResource\Pages;
 use App\Filament\Resources\CategoryResource\RelationManagers;
+use App\Filament\Resources\Playlists\PlaylistResource;
 use App\Models\Category;
 use App\Models\CustomPlaylist;
 use Filament\Forms;

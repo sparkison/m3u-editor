@@ -42,6 +42,7 @@ use App\Enums\ChannelLogoType;
 use App\Facades\ProxyFacade;
 use App\Filament\Resources\ChannelResource\Pages;
 use App\Filament\Resources\ChannelResource\RelationManagers;
+use App\Filament\Resources\EpgMaps\EpgMapResource;
 use App\Infolists\Components\VideoPreview;
 use App\Livewire\ChannelStreamStats;
 use App\Models\Channel;
