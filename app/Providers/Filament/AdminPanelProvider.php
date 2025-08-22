@@ -35,7 +35,6 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Filament\Widgets\AccountWidget;
-use ShuvroRoy\FilamentSpatieLaravelBackup\FilamentSpatieLaravelBackupPlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -100,9 +99,7 @@ class AdminPanelProvider extends PanelProvider
                 // SystemHealthWidget::class,
             ])
             ->plugins([
-                FilamentSpatieLaravelBackupPlugin::make()
-                    ->authorize(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true))
-                    ->usingPage(Backups::class),
+                // ...
             ])
             ->maxContentWidth($settings['content_width'])
             ->middleware([

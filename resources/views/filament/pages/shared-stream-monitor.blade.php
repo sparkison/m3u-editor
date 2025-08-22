@@ -82,7 +82,7 @@
         @if(empty($streams))
             <x-filament::card class="p-8 text-center">
                 <div class="text-gray-500 dark:text-gray-400">
-                    <div class="w-full mx-auto mb-4">
+                    <div class="w-full flex items-center justify-center mb-4">
                         <x-heroicon-s-video-camera class="h-12 w-12" />
                     </div>
                     <p class="text-lg font-medium">No active streams</p>

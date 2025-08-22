@@ -18,11 +18,9 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
-use ShuvroRoy\FilamentSpatieLaravelBackup\Models\BackupDestination;
-use ShuvroRoy\FilamentSpatieLaravelBackup\Pages\Backups as BaseBackups;
 use Filament\Forms;
 
-class Backups extends BaseBackups
+class Backups
 {
     protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-arrow-path';
 

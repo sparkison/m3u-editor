@@ -25,7 +25,6 @@
         "laravel/tinker": "^2.9",
         "predis/predis": "^2.3",
         "ryangjchandler/filament-progress-column": "^2.0",
-        "shuvroroy/filament-spatie-laravel-backup": "^3.0",
         "sparkison/m3u-parser": "dev-master",
         "spatie/laravel-backup": "^9.2",
         "spatie/laravel-tags": "^4.10",
