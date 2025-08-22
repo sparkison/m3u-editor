@@ -363,8 +363,11 @@ class ProxyService
             // Input analysis optimization for faster stream start
             $cmd .= '-analyzeduration 1M -probesize 1M -max_delay 500000 -fpsprobesize 0 ';
 
-            // Better error handling
-            $cmd .= '-err_detect ignore_err -ignore_unknown ';
+            // Better error handling - Enhanced for H.264 PPS issues
+            $cmd .= '-err_detect ignore_err -ignore_unknown -fflags +discardcorrupt+igndts ';
+
+            // Add H.264 specific error resilience
+            $cmd .= '-skip_frame nokey -skip_loop 0 -skip_idct 0 ';
 
             // Use the user agent from settings, escape it. $userAgent parameter is ignored for now.
             $effectiveUserAgent = $userAgent ?: $settings['ffmpeg_user_agent'];
@@ -645,9 +648,15 @@ class ProxyService
             // Input stream analysis and buffer handling
             $cmd .= '-fflags nobuffer+igndts -flags low_delay -avoid_negative_ts make_zero ';
             $cmd .= '-analyzeduration 1M -probesize 1M -max_delay 200000 ';
-            
+
             // Better error handling and stream format detection
-            $cmd .= '-err_detect ignore_err -ignore_unknown -fflags +discardcorrupt ';
+            $cmd .= '-err_detect ignore_err -ignore_unknown -fflags +discardcorrupt+igndts ';
+
+            // Add H.264 specific error resilience for PPS issues
+            $cmd .= '-skip_frame nokey -skip_loop 0 -skip_idct 0 ';
+
+            // Additional decoder options for problematic streams
+            $cmd .= '-ec guess_mvs -ec deblock ';
             $cmd .= '-thread_queue_size 256 ';
 
             // Pre-input HTTP options:
