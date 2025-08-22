@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Resources\PlaylistSyncStatuses\RelationManagers;
+namespace App\Filament\Resources\Playlists\Resources\PlaylistSyncStatuses\RelationManagers;
 
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\Layout\Split;

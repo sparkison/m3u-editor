@@ -44,7 +44,7 @@ use App\Models\PlaylistAuth;
 use Filament\Schemas\Components\Wizard\Step;
 use App\Enums\Status;
 use App\Filament\Resources\PlaylistResource\Pages;
-use App\Filament\Resources\PlaylistResource\RelationManagers;
+use App\Filament\Resources\Playlists\RelationManagers;
 use App\Models\Playlist;
 use App\Rules\CheckIfUrlOrLocalPath;
 use Carbon\Carbon;
@@ -59,10 +59,6 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
 use App\Facades\PlaylistUrlFacade;
-use App\Filament\Resources\PlaylistSyncStatuses\Pages\CreatePlaylistSyncStatus;
-use App\Filament\Resources\PlaylistSyncStatuses\Pages\EditPlaylistSyncStatus;
-use App\Filament\Resources\PlaylistSyncStatuses\Pages\ListPlaylistSyncStatuses;
-use App\Filament\Resources\PlaylistSyncStatuses\Pages\ViewPlaylistSyncStatus;
 use App\Livewire\EpgViewer;
 use App\Livewire\MediaFlowProxyUrl;
 use App\Livewire\PlaylistEpgUrl;
@@ -354,18 +350,14 @@ class PlaylistResource extends Resource
                         ->modalIcon('heroicon-o-document-duplicate')
                         ->modalDescription('Duplicate playlist now?')
                         ->modalSubmitActionLabel('Yes, duplicate now'),
-                    Action::make('Sync Logs')
+                    Action::make('view_sync_logs')
                         ->label('View Sync Logs')
                         ->color('gray')
                         ->icon('heroicon-m-arrows-right-left')
-                        ->url(
-                            fn(Playlist $record): string => PlaylistResource::getUrl(
-                                name: 'playlist-sync-statuses.index',
-                                parameters: [
-                                    'parent' => $record->id,
-                                ]
-                            )
-                        ),
+                        ->url(function (Playlist $record): string {
+                            return "/playlists/{$record->id}/playlist-sync-statuses";
+                        })
+                        ->openUrlInNewTab(false),
                     Action::make('reset')
                         ->label('Reset status')
                         ->icon('heroicon-o-arrow-uturn-left')
@@ -516,7 +508,8 @@ class PlaylistResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            // Removed SyncStatusesRelationManager to avoid showing it as a tab
+            // Sync statuses are now accessible via direct navigation to the nested resource
         ];
     }
 
@@ -528,30 +521,12 @@ class PlaylistResource extends Resource
             'create' => CreatePlaylist::route('/create'),
             'view' => ViewPlaylist::route('/{record}'),
             'edit' => EditPlaylist::route('/{record}/edit'),
-
-            // Playlist Sync Statuses
-            'playlist-sync-statuses.index' => ListPlaylistSyncStatuses::route('/{parent}/syncs'),
-            //'playlist-sync-statuses.create' => CreatePlaylistSyncStatus::route('/{parent}/syncs/create'),
-            'playlist-sync-statuses.view' => ViewPlaylistSyncStatus::route('/{parent}/syncs/{record}'),
-            //'playlist-sync-statuses.edit' => EditPlaylistSyncStatus::route('/{parent}/syncs/{record}/edit'),
         ];
     }
 
     public static function getHeaderActions(): array
     {
         return [
-            Action::make('Sync Logs')
-                ->label('Sync Logs')
-                ->color('gray')
-                ->icon('heroicon-m-arrows-right-left')
-                ->url(
-                    fn(Playlist $record): string => PlaylistResource::getUrl(
-                        name: 'playlist-sync-statuses.index',
-                        parameters: [
-                            'parent' => $record->id,
-                        ]
-                    )
-                ),
             ActionGroup::make([
                 Action::make('process')
                     ->label('Sync and Process')
