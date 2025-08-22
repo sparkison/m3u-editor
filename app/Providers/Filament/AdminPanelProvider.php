@@ -16,7 +16,6 @@ use App\Filament\Widgets\SharedStreamStatsWidget;
 //use App\Filament\Widgets\PayPalDonateWidget;
 use App\Filament\Widgets\StatsOverview;
 use App\Filament\Widgets\SystemHealthWidget;
-use App\Livewire\ProfileComponent;
 use App\Models\SharedStream;
 use App\Settings\GeneralSettings;
 use Filament\Http\Middleware\Authenticate;
@@ -37,8 +36,6 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Filament\Support\Enums\MaxWidth;
 use Filament\Widgets\AccountWidget;
 use ShuvroRoy\FilamentSpatieLaravelBackup\FilamentSpatieLaravelBackupPlugin;
-use Jeffgreco13\FilamentBreezy\BreezyCore;
-use Saade\FilamentLaravelLog\FilamentLaravelLogPlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -106,23 +103,6 @@ class AdminPanelProvider extends PanelProvider
                 FilamentSpatieLaravelBackupPlugin::make()
                     ->authorize(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true))
                     ->usingPage(Backups::class),
-                BreezyCore::make()
-                    ->myProfile(
-                        slug: 'profile',
-                        userMenuLabel: 'Profile',
-                    )
-                    ->enableTwoFactorAuthentication()
-                    ->enableSanctumTokens()
-                    ->myProfileComponents([
-                        'personal_info' => ProfileComponent::class
-                    ]),
-                FilamentLaravelLogPlugin::make()
-                    ->navigationGroup('Tools')
-                    ->navigationSort(99)
-                    ->logDirs([
-                        config('app.log.dir'),
-                    ])
-                    ->authorize(fn(): bool => $settings['show_logs'] && in_array(auth()->user()->email, config('dev.admin_emails'), true))
             ])
             ->maxContentWidth($settings['content_width'])
             ->middleware([
