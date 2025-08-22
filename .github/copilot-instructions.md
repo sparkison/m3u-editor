@@ -9,7 +9,7 @@ The Laravel Boost guidelines are specifically curated by Laravel maintainers for
 This application is a Laravel application and its main Laravel ecosystems package & versions are below. You are an expert with them all. Ensure you abide by these specific packages & versions.
 
 - php - 8.2.29
-- filament/filament (FILAMENT) - v3
+- filament/filament (FILAMENT) - v4
 - laravel/framework (LARAVEL) - v11
 - laravel/prompts (PROMPTS) - v0
 - laravel/reverb (REVERB) - v1
@@ -17,7 +17,7 @@ This application is a Laravel application and its main Laravel ecosystems packag
 - laravel/pint (PINT) - v1
 - pestphp/pest (PEST) - v3
 - laravel-echo (ECHO) - v1
-- tailwindcss (TAILWINDCSS) - v3
+- tailwindcss (TAILWINDCSS) - v4
 
 
 ## Conventions
@@ -202,19 +202,25 @@ Forms\Components\Select::make('user_id')
 </code-snippet>
 
 
-=== filament/v3 rules ===
+=== filament/v4 rules ===
 
-## Filament 3
+## Filament 4
 
-## Version 3 Changes To Focus On
-- Resources are located in `app/Filament/Resources/` directory.
-- Resource pages (List, Create, Edit) are auto-generated within the resource's directory - e.g., `app/Filament/Resources/PostResource/Pages/`.
-- Forms use the `Forms\Components` namespace for form fields.
-- Tables use the `Tables\Columns` namespace for table columns.
-- A new `Filament\Forms\Components\RichEditor` component is available.
-- Form and table schemas now use fluent method chaining.
-- Added `php artisan filament:optimize` command for production optimization.
-- Requires implementing `FilamentUser` contract for production access control.
+### Important Version 4 Changes
+- File visibility is now `private` by default.
+- The `deferFilters` method from Filament v3 is now the default behavior in Filament v4, so users must click a button before the filters are applied to the table. To disable this behavior, you can use the `deferFilters(false)` method.
+- The `Grid`, `Section`, and `Fieldset` layout components no longer span all columns by default.
+- The `all` pagination page method is not available for tables by default.
+- All action classes extend `Filament\Actions\Action`. No action classes exist in `Filament\Tables\Actions`.
+- The `Form` & `Infolist` layout components have been moved to `Filament\Schemas\Components`, for example `Grid`, `Section`, `Fieldset`, `Tabs`, `Wizard`, etc.
+- A new `Repeater` component for Forms has been added.
+- Icons now use the `Filament\Support\Icons\Heroicon` Enum by default. Other options are available and documented.
+
+### Organize Component Classes Structure
+- Schema components: `Schemas/Components/`
+- Table columns: `Tables/Columns/`
+- Table filters: `Tables/Filters/`
+- Actions: `Actions/`
 
 
 === laravel/core rules ===
@@ -295,7 +301,7 @@ Forms\Components\Select::make('user_id')
 
 ## Livewire Core
 - Use the `search-docs` tool to find exact version specific documentation for how to write Livewire & Livewire tests.
-- Use the `php artisan make:livewire [Posts\\CreatePost]` artisan command to create new components
+- Use the `php artisan make:livewire [Posts\CreatePost]` artisan command to create new components
 - State should live on the server, with the UI reflecting it.
 - All Livewire requests hit the Laravel backend, they're like regular HTTP requests. Always validate form data, and run authorization checks in Livewire actions.
 
@@ -461,11 +467,39 @@ it('has emails', function (string $email) {
 - If existing pages and components support dark mode, new pages and components must support dark mode in a similar way, typically using `dark:`.
 
 
-=== tailwindcss/v3 rules ===
+=== tailwindcss/v4 rules ===
 
-## Tailwind 3
+## Tailwind 4
 
-- Always use Tailwind CSS v3 - verify you're using only classes supported by this version.
+- Always use Tailwind CSS v4 - do not use the deprecated utilities.
+- `corePlugins` is not supported in Tailwind v4.
+- In Tailwind v4, you import Tailwind using a regular CSS `@import` statement, not using the `@tailwind` directives used in v3:
+
+<code-snippet name="Tailwind v4 Import Tailwind Diff" lang="diff"
+   - @tailwind base;
+   - @tailwind components;
+   - @tailwind utilities;
+   + @import "tailwindcss";
+</code-snippet>
+
+
+### Replaced Utilities
+- Tailwind v4 removed deprecated utilities. Do not use the deprecated option - use the replacement.
+- Opacity values are still numeric.
+
+| Deprecated |	Replacement |
+|------------+--------------|
+| bg-opacity-* | bg-black/* |
+| text-opacity-* | text-black/* |
+| border-opacity-* | border-black/* |
+| divide-opacity-* | divide-black/* |
+| ring-opacity-* | ring-black/* |
+| placeholder-opacity-* | placeholder-black/* |
+| flex-shrink-* | shrink-* |
+| flex-grow-* | grow-* |
+| overflow-ellipsis | text-ellipsis |
+| decoration-slice | box-decoration-slice |
+| decoration-clone | box-decoration-clone |
 
 
 === tests rules ===
