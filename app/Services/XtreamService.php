@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Exception;
 use App\Models\Playlist;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -76,7 +77,7 @@ class XtreamService
     protected function call(string $url, int $timeout = 60 * 15)
     {
         if (! ($this->playlist || $this->xtream_config)) {
-            throw new \Exception('Config not initialized. Call init() first with Playlist or Xtream config array.');
+            throw new Exception('Config not initialized. Call init() first with Playlist or Xtream config array.');
         }
         $attempts = 0;
         do {

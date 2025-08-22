@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use Exception;
+use Throwable;
 use App\Services\SharedStreamService;
 use App\Services\StreamMonitorService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -70,7 +72,7 @@ class StreamMonitorUpdate implements ShouldQueue
                     if (isset($health['bandwidth'])) {
                         $totalBandwidth += $health['bandwidth'];
                     }
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::channel('ffmpeg')->error("StreamMonitor: Error checking health for stream {$streamKey}: " . $e->getMessage());
                 }
             }
@@ -93,7 +95,7 @@ class StreamMonitorUpdate implements ShouldQueue
                 "StreamMonitor: Updated stats - " . count($activeStreams) . " streams, " .
                     "{$unhealthyStreams} unhealthy, " . round($totalBandwidth / 1024 / 1024, 2) . "MB/s bandwidth"
             );
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::channel('ffmpeg')->error('StreamMonitor: Error during monitoring update: ' . $e->getMessage());
             throw $e;
         }
@@ -102,7 +104,7 @@ class StreamMonitorUpdate implements ShouldQueue
     /**
      * Handle a job failure.
      */
-    public function failed(\Throwable $exception): void
+    public function failed(Throwable $exception): void
     {
         Log::channel('ffmpeg')->error('StreamMonitor: Monitoring job failed: ' . $exception->getMessage());
     }

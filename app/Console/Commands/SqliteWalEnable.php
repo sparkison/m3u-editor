@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use Illuminate\Database\Connection;
 use LogicException;
 use Illuminate\Console\Command;
 use Illuminate\Database\DatabaseManager;
@@ -29,7 +30,7 @@ class SqliteWalEnable extends Command
     /**
      * Execute the console command.
      *
-     * @param  \Illuminate\Database\DatabaseManager $manager
+     * @param DatabaseManager $manager
      * @return void
      */
     public function handle(DatabaseManager $manager)
@@ -50,9 +51,9 @@ class SqliteWalEnable extends Command
     /**
      * Returns the Database Connection
      *
-     * @param  \Illuminate\Database\DatabaseManager $manager
+     * @param DatabaseManager $manager
      * @param  string $connection
-     * @return \Illuminate\Database\Connection
+     * @return Connection
      */
     protected function getDatabase(DatabaseManager $manager, string $connection)
     {
@@ -69,7 +70,7 @@ class SqliteWalEnable extends Command
     /**
      * Sets the Journal Mode to WAL
      *
-     * @param  \Illuminate\Database\ConnectionInterface $connection
+     * @param ConnectionInterface $connection
      * @return bool
      */
     protected function setWalJournalMode(ConnectionInterface $connection)
@@ -80,7 +81,7 @@ class SqliteWalEnable extends Command
     /**
      * Returns the current Journal Mode of the Database Connection
      *
-     * @param  \Illuminate\Database\ConnectionInterface $connection
+     * @param ConnectionInterface $connection
      * @return string
      */
     protected function getJournalMode(ConnectionInterface $connection)

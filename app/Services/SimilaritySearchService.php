@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Database\Query\Builder;
 use App\Models\Channel;
 use App\Models\Epg;
 use App\Models\EpgChannel;
@@ -216,10 +217,10 @@ class SimilaritySearchService
 
     /**
      * Add database-specific search condition for additional_display_names JSONB column.
-     * 
-     * @param \Illuminate\Database\Query\Builder $query
+     *
+     * @param Builder $query
      * @param string $normalizedChan
-     * 
+     *
      * @return void
      */
     private function addJsonSearchCondition($query, string $normalizedChan): void

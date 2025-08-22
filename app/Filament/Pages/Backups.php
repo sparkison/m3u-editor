@@ -2,6 +2,11 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Actions\ActionGroup;
+use Filament\Actions\Action;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Toggle;
 use App\Jobs\CreateBackup;
 use App\Jobs\RestoreBackup;
 use App\Models\Epg;
@@ -19,7 +24,7 @@ use Filament\Forms;
 
 class Backups extends BaseBackups
 {
-    protected static ?string $navigationIcon = 'heroicon-o-arrow-path';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-arrow-path';
 
     protected static ?string $navigationLabel = 'Backup & Restore';
 
@@ -29,10 +34,10 @@ class Backups extends BaseBackups
     {
         $availableBackups = BackupDestination::query()->get();
         return [
-            Actions\ActionGroup::make([
-                Actions\Action::make('Restore Backup')
-                    ->form([
-                        Forms\Components\Select::make('backup')
+            ActionGroup::make([
+                Action::make('Restore Backup')
+                    ->schema([
+                        Select::make('backup')
                             ->required()
                             ->label('Backup file')
                             ->helperText('Select the backup you would like to restore.')
@@ -55,9 +60,9 @@ class Backups extends BaseBackups
                     ->modalIcon('heroicon-o-arrow-path')
                     ->modalDescription('NOTE: Only the database will be restored, which will overwrite any existing data with the backup data. Files will not be automatically restored, you will need to manually re-upload them where needed.')
                     ->modalSubmitActionLabel('Restore now'),
-                Actions\Action::make('Upload Backup')
-                    ->form([
-                        Forms\Components\FileUpload::make('backup')
+                Action::make('Upload Backup')
+                    ->schema([
+                        FileUpload::make('backup')
                             ->required()
                             ->label('Backup file (.ZIP files only)')
                             ->helperText('Select the backup file you would like to upload.')
@@ -86,9 +91,9 @@ class Backups extends BaseBackups
                     ->modalIcon('heroicon-o-arrow-up-tray')
                     ->modalDescription('NOTE: Only properly formatted backups will be accepted. If the backup is not valid, you will receive an error when attempting to restore.')
                     ->modalSubmitActionLabel('Upload now'),
-                Actions\Action::make('Create Backup')
-                    ->form([
-                        Forms\Components\Toggle::make('include_files')
+                Action::make('Create Backup')
+                    ->schema([
+                        Toggle::make('include_files')
                             ->label('Include Files')
                             ->helperText('When enabled, the backup will include your uploaded Playlist and EPG files.'),
                     ])

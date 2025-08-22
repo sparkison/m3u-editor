@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use Exception;
 use App\Models\Playlist;
 use App\Services\XtreamService;
 use Carbon\Carbon;
@@ -86,7 +87,7 @@ class PlaylistInfo extends Component
                     return [];
                 }
                 Cache::put($cacheKey, $xtreamInfo, now()->addSeconds(10)); // Cache for 10 seconds
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // Log the error and return empty array
                 Log::error("Failed to fetch Xtream stats for playlist {$playlist->id}: " . $e->getMessage());
                 return [];

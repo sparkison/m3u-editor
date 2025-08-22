@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use Exception;
 use App\Services\SharedStreamService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -53,7 +54,7 @@ class StreamBufferManager implements ShouldQueue
                         $totalOptimized++;
                         Log::channel('ffmpeg')->debug("BufferManagement: Optimized buffer for stream {$streamKey} ({$clientCount} clients)");
                     }
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::channel('ffmpeg')->error("BufferManagement: Error managing buffer for stream {$streamKey}: " . $e->getMessage());
                 }
             }
@@ -63,7 +64,7 @@ class StreamBufferManager implements ShouldQueue
                 "BufferManagement: Completed - Cleaned {$totalCleaned} segments, " .
                     "optimized {$totalOptimized} buffers"
             );
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::channel('ffmpeg')->error('BufferManagement: Error during buffer management: ' . $e->getMessage());
             throw $e;
         }

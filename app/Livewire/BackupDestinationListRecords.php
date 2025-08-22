@@ -2,6 +2,13 @@
 
 namespace App\Livewire;
 
+use Filament\Actions\Contracts\HasActions;
+use Filament\Actions\Concerns\InteractsWithActions;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Actions\Action;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\BulkAction;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
@@ -20,8 +27,9 @@ use ShuvroRoy\FilamentSpatieLaravelBackup\Models\BackupDestination;
 use Spatie\Backup\BackupDestination\Backup;
 use Spatie\Backup\BackupDestination\BackupDestination as SpatieBackupDestination;
 
-class BackupDestinationListRecords extends Component implements HasForms, HasTable
+class BackupDestinationListRecords extends Component implements HasForms, HasTable, HasActions
 {
+    use InteractsWithActions;
     use InteractsWithForms;
     use InteractsWithTable;
 
@@ -44,7 +52,7 @@ class BackupDestinationListRecords extends Component implements HasForms, HasTab
         return $table
             ->query(BackupDestination::query())
             ->columns([
-                Tables\Columns\TextColumn::make('path')
+                TextColumn::make('path')
                     ->label(__('filament-spatie-backup::backup.components.backup_destination_list.table.fields.path'))
                     ->searchable()
                     ->sortable(),
@@ -52,12 +60,12 @@ class BackupDestinationListRecords extends Component implements HasForms, HasTab
                 //     ->label(__('filament-spatie-backup::backup.components.backup_destination_list.table.fields.disk'))
                 //     ->searchable()
                 //     ->sortable(),
-                Tables\Columns\TextColumn::make('date')
+                TextColumn::make('date')
                     ->label(__('filament-spatie-backup::backup.components.backup_destination_list.table.fields.date'))
                     ->dateTime()
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('size')
+                TextColumn::make('size')
                     ->label(__('filament-spatie-backup::backup.components.backup_destination_list.table.fields.size'))
                     ->badge(),
             ])
@@ -66,8 +74,8 @@ class BackupDestinationListRecords extends Component implements HasForms, HasTab
                 //     ->label(__('filament-spatie-backup::backup.components.backup_destination_list.table.filters.disk'))
                 //     ->options(FilamentSpatieLaravelBackup::getFilterDisks()),
             ])
-            ->actions([
-                Tables\Actions\Action::make('delete')
+            ->recordActions([
+                Action::make('delete')
                     ->label(__('filament-spatie-backup::backup.components.backup_destination_list.table.actions.delete'))
                     ->icon('heroicon-o-trash')
                     ->visible(auth()->user()->can('delete-backup'))
@@ -88,16 +96,16 @@ class BackupDestinationListRecords extends Component implements HasForms, HasTab
                             ->success()
                             ->send();
                     }),
-                Tables\Actions\Action::make('download')
+                Action::make('download')
                     ->label(__('filament-spatie-backup::backup.components.backup_destination_list.table.actions.download'))
                     ->icon('heroicon-o-arrow-down-tray')
                     ->visible(auth()->user()->can('download-backup'))
                     ->button()->hiddenLabel()->size('sm')
                     ->action(fn(BackupDestination $record) => Storage::disk($record->disk)->download($record->path)),
-            ], position: Tables\Enums\ActionsPosition::BeforeCells)
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\BulkAction::make('delete')
+            ], position: RecordActionsPosition::BeforeCells)
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    BulkAction::make('delete')
                         ->label('Delete selected')
                         ->action(function (Collection $records): void {
                             foreach ($records as $record) {

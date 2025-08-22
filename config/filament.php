@@ -86,4 +86,22 @@ return [
 
     'livewire_loading_delay' => 'default',
 
+    /*
+    |--------------------------------------------------------------------------
+    | File Generation
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for how Filament generates files. These flags control
+    | the behavior to maintain consistency with v3 patterns.
+    |
+    */
+
+    'file_generation' => [
+        'flags' => [
+            \Filament\Support\Commands\FileGenerators\FileGenerationFlag::EMBEDDED_PANEL_RESOURCE_SCHEMAS,
+            \Filament\Support\Commands\FileGenerators\FileGenerationFlag::EMBEDDED_PANEL_RESOURCE_TABLES,
+            \Filament\Support\Commands\FileGenerators\FileGenerationFlag::PARTIAL_IMPORTS,
+        ],
+    ],
+
 ];

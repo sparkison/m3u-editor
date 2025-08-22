@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Exception;
 use App\Facades\GitInfo;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -59,7 +60,7 @@ class VersionServiceProvider extends ServiceProvider
         // If using redis, may not be initialized yet, so catch the exception
         try {
             $remoteVersion = Cache::get(self::$cacheKey);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $remoteVersion = null;
         }
         if ($remoteVersion === null || $refresh) {
@@ -83,7 +84,7 @@ class VersionServiceProvider extends ServiceProvider
                         Cache::put(self::$cacheKey, $remoteVersion, 60 * 5);
                     }
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // Ignore
             }
         }

@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Services\GitInfoService;
+use Throwable;
 use Exception;
 use App\Events\EpgCreated;
 use App\Events\EpgDeleted;
@@ -51,7 +53,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->singleton(\App\Services\GitInfoService::class);
+        $this->app->singleton(GitInfoService::class);
     }
 
     /**
@@ -72,7 +74,7 @@ class AppServiceProvider extends ServiceProvider
                         PRAGMA temp_store = memory;
                     ');
             }
-        } catch (\Throwable $throwable) {
+        } catch (Throwable $throwable) {
             return;
         }
 
@@ -96,6 +98,9 @@ class AppServiceProvider extends ServiceProvider
 
         // Register the Filament hooks
         $this->registerFilamentHooks();
+
+        // Configure Filament v4 to preserve v3 behavior
+        $this->configureFilamentV3Compatibility();
 
         // Setup the API
         $this->setupApi();
@@ -276,7 +281,7 @@ class AppServiceProvider extends ServiceProvider
                 }
                 return $channelFailover;
             });
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Log the error
             report($e);
         }
@@ -367,5 +372,40 @@ class AppServiceProvider extends ServiceProvider
 
         // Register the stream player component
         Livewire::component('stream-player', StreamPlayer::class);
+    }
+
+    /**
+     * Configure Filament v4 to preserve v3 behavior.
+     */
+    private function configureFilamentV3Compatibility(): void
+    {
+        // Preserve v3 file upload behavior (public visibility)
+        \Filament\Forms\Components\FileUpload::configureUsing(fn (\Filament\Forms\Components\FileUpload $fileUpload) => $fileUpload
+            ->visibility('public'));
+
+        \Filament\Tables\Columns\ImageColumn::configureUsing(fn (\Filament\Tables\Columns\ImageColumn $imageColumn) => $imageColumn
+            ->visibility('public'));
+
+        \Filament\Infolists\Components\ImageEntry::configureUsing(fn (\Filament\Infolists\Components\ImageEntry $imageEntry) => $imageEntry
+            ->visibility('public'));
+
+        // Preserve v3 table filter behavior (not deferred)
+        \Filament\Tables\Table::configureUsing(fn (\Filament\Tables\Table $table) => $table
+            ->deferFilters(false)
+            ->paginationPageOptions([5, 10, 25, 50, 'all']));
+
+        // Preserve v3 layout component behavior (column span full)
+        \Filament\Schemas\Components\Fieldset::configureUsing(fn (\Filament\Schemas\Components\Fieldset $fieldset) => $fieldset
+            ->columnSpanFull());
+
+        \Filament\Schemas\Components\Grid::configureUsing(fn (\Filament\Schemas\Components\Grid $grid) => $grid
+            ->columnSpanFull());
+
+        \Filament\Schemas\Components\Section::configureUsing(fn (\Filament\Schemas\Components\Section $section) => $section
+            ->columnSpanFull());
+
+        // Preserve v3 unique validation behavior (not ignoring record by default)
+        \Filament\Forms\Components\Field::configureUsing(fn (\Filament\Forms\Components\Field $field) => $field
+            ->uniqueValidationIgnoresRecordByDefault(false));
     }
 }

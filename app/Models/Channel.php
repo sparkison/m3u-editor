@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Exception;
 use App\Enums\ChannelLogoType;
 use App\Facades\ProxyFacade;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -184,7 +185,7 @@ class Channel extends Model
                 Cache::put("channel_stream_stats_{$this->id}", $streamStats, now()->addMinutes(5));
                 return $streamStats;
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Error running ffprobe for channel \"{$this->title}\": {$e->getMessage()}");
         }
         return [];

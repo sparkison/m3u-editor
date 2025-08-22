@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use Exception;
 use App\Models\Playlist;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -77,7 +78,7 @@ class CopyPlaylist implements ShouldQueue
 
             $this->copied[] = $copy->name;
             return true;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // ...
         }
         return false;

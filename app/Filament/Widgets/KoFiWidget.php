@@ -11,5 +11,5 @@ class KoFiWidget extends Widget
         'lg' => 2,
     ];
 
-    protected static string $view = 'filament.widgets.ko-fi-widget';
+    protected string $view = 'filament.widgets.ko-fi-widget';
 }

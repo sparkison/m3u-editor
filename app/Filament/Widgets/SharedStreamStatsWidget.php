@@ -10,7 +10,7 @@ use Filament\Widgets\StatsOverviewWidget\Stat;
 class SharedStreamStatsWidget extends BaseWidget
 {
     protected static ?int $sort = 2;
-    protected static ?string $pollingInterval = '5s';
+    protected ?string $pollingInterval = '5s';
 
     protected function getStats(): array
     {

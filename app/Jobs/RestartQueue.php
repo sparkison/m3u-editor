@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use Exception;
 use App\Enums\Status;
 use App\Models\Epg;
 use App\Models\EpgMap;
@@ -65,7 +66,7 @@ class RestartQueue implements ShouldQueue
                     'progress' => 0,
                     'errors' => 'The EPG mapping process was interrupted and has been marked as failed.',
                 ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Failed to restart queue: ' . $e->getMessage(), [
                 'exception' => $e,
             ]);

@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 
+use Exception;
+use App\Models\SharedStream;
 use App\Services\SharedStreamService;
 use App\Services\StreamMonitorService;
 use Illuminate\Console\Command;
@@ -172,7 +174,7 @@ class ManageSharedStreams extends Command
                 if ($success) {
                     $stopped++;
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $this->error("Failed to stop stream {$streamKey}: " . $e->getMessage());
             }
         }
@@ -208,7 +210,7 @@ class ManageSharedStreams extends Command
 
             // Second, check database streams for phantom processes
             $this->line("Checking database streams for phantom processes...");
-            $dbStreams = \App\Models\SharedStream::whereIn('status', ['starting', 'active'])->get();
+            $dbStreams = SharedStream::whereIn('status', ['starting', 'active'])->get();
 
             foreach ($dbStreams as $stream) {
                 $pid = $stream->process_id;
@@ -243,7 +245,7 @@ class ManageSharedStreams extends Command
             $this->line("- Removed {$orphanedKeys} orphaned keys");
 
             return 0;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->error("Cleanup failed: " . $e->getMessage());
             return 1;
         }
@@ -344,7 +346,7 @@ class ManageSharedStreams extends Command
             $this->line("- Inconsistencies fixed: {$stats['inconsistencies_fixed']}");
 
             return 0;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->error("Synchronization failed: " . $e->getMessage());
             return 1;
         }
@@ -424,7 +426,7 @@ class ManageSharedStreams extends Command
             }
 
             return 0;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->error('Error getting debug info: ' . $e->getMessage());
             return 1;
         }
@@ -453,7 +455,7 @@ class ManageSharedStreams extends Command
 
             $this->info("Cleared {$deleted} failover redirects");
             return 0;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->error('Error clearing redirects: ' . $e->getMessage());
             return 1;
         }

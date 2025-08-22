@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use Exception;
 use App\Enums\Status;
 use App\Facades\PlaylistUrlFacade;
 use App\Mail\PostProcessMail;
@@ -297,7 +298,7 @@ class RunPostProcess implements ShouldQueue
                         ->sendToDatabase($user);
                 }
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Log the error
             $error = "Error running post processing for \"$name\": " . $e->getMessage();
             Log::error($error);

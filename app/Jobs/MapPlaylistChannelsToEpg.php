@@ -296,7 +296,7 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
     /**
      * Handle a job failure.
      */
-    public function failed(\Throwable $exception): void
+    public function failed(Throwable $exception): void
     {
         Log::error("EPG mapping job failed: {$exception->getMessage()}");
     }

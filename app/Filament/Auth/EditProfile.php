@@ -2,17 +2,17 @@
 
 namespace App\Filament\Auth;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
 use Filament\Forms;
-use Filament\Forms\Form;
-use Filament\Pages\Auth\EditProfile as BaseEditProfile;
 
-class EditProfile extends BaseEditProfile
+class EditProfile extends \Filament\Auth\Pages\EditProfile
 {
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make()
+        return $schema
+            ->components([
+                Section::make()
                     ->description('Update your profile information')
                     ->schema([
                         // Forms\Components\FileUpload::make('avatar_url')

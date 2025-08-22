@@ -8,7 +8,7 @@ use Filament\Widgets\Widget;
 
 class UpdateNoticeWidget extends Widget
 {
-    protected static string $view = 'filament.widgets.update-notice-widget';
+    protected string $view = 'filament.widgets.update-notice-widget';
 
     public static ?int $sort = -5;
 

@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use Exception;
 use App\Models\Series;
 use App\Settings\GeneralSettings;
 use Filament\Notifications\Notification;
@@ -131,7 +132,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 ->body("Sync completed for series \"{$series->name}\".")
                 ->broadcast($series->user)
                 ->sendToDatabase($series->user);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Notification::make()
                 ->danger()
                 ->title("Error sync .strm files for series \"{$series->name}\"")

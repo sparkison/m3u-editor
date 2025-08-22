@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use Exception;
 use App\Models\SharedStream;
 use App\Services\SharedStreamService;
 use App\Services\StreamMonitorService;
@@ -10,7 +11,7 @@ use Filament\Notifications\Notification;
 
 class QuickActionsWidget extends Widget
 {
-    protected static string $view = 'filament.widgets.quick-actions';
+    protected string $view = 'filament.widgets.quick-actions';
     protected static ?int $sort = 12;
     protected int | string | array $columnSpan = 'full';
 
@@ -26,7 +27,7 @@ class QuickActionsWidget extends Widget
                 ->success()
                 ->send();
                 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Notification::make()
                 ->title('Cleanup Failed')
                 ->body($e->getMessage())

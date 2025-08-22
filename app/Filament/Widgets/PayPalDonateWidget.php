@@ -8,5 +8,5 @@ class PayPalDonateWidget extends Widget
 {
     // protected int | string | array $columnSpan = 2;
     
-    protected static string $view = 'filament.widgets.pay-pal-donate-widget';
+    protected string $view = 'filament.widgets.pay-pal-donate-widget';
 }

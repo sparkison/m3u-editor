@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\Response;
 use Exception;
 use App\Models\Channel;
 use App\Models\Episode;
@@ -46,11 +47,11 @@ class HlsStreamController extends Controller
     /**
      * Launch (or re-launch) an FFmpeg HLS job for this channel,
      * then send the contents of the .m3u8 file.
-     * 
+     *
      * @param Request $request
      * @param int|string $encodedId
-     * 
-     * @return \Illuminate\Http\Response
+     *
+     * @return Response
      */
     public function serveChannelPlaylist(Request $request, $encodedId)
     {
@@ -71,11 +72,11 @@ class HlsStreamController extends Controller
 
     /**
      * Serve individual .ts segments.
-     * 
+     *
      * @param Request $request
      * @param int|string $channelId
-     * 
-     * @return \Illuminate\Http\Response
+     *
+     * @return Response
      */
     public function serveChannelSegment(Request $request, $channelId, $segment)
     {
@@ -89,11 +90,11 @@ class HlsStreamController extends Controller
     /**
      * Launch (or re-launch) an FFmpeg HLS job for this episode,
      * then send the contents of the .m3u8 file.
-     * 
+     *
      * @param Request $request
      * @param int|string $encodedId
-     * 
-     * @return \Illuminate\Http\Response
+     *
+     * @return Response
      */
     public function serveEpisodePlaylist(Request $request, $encodedId)
     {
@@ -114,11 +115,11 @@ class HlsStreamController extends Controller
 
     /**
      * Serve individual .ts segments.
-     * 
+     *
      * @param Request $request
      * @param int|string $episodeId
-     * 
-     * @return \Illuminate\Http\Response
+     *
+     * @return Response
      */
     public function serveEpisodeSegment(Request $request, $episodeId, $segment)
     {
@@ -131,13 +132,13 @@ class HlsStreamController extends Controller
 
     /**
      * Serve the HLS playlist for a channel or episode.
-     * 
+     *
      * @param string $type 'channel' or 'episode'
      * @param string $encodedId Base64 encoded ID of the channel or episode
      * @param mixed $model The Channel or Episode model instance
      * @param string $title The title of the channel or episode
-     * 
-     * @return \Illuminate\Http\Response
+     *
+     * @return Response
      */
     private function servePlaylist(
         $type,
@@ -262,12 +263,12 @@ class HlsStreamController extends Controller
 
     /**
      * Serve a segment for a channel or episode.
-     * 
+     *
      * @param string $type 'channel' or 'episode'
      * @param int|string $modelId The ID of the channel or episode
      * @param string $segment The segment file name
-     * 
-     * @return \Illuminate\Http\Response
+     *
+     * @return Response
      */
     private function serveSegment($type, $modelId, $segment)
     {

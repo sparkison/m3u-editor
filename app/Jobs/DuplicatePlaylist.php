@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use Exception;
 use App\Models\Playlist;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -162,7 +163,7 @@ class DuplicatePlaylist implements ShouldQueue
                 ->title('Playlist Duplicated')
                 ->body("\"{$playlist->name}\" has been duplicated successfully, new playlist: \"{$newPlaylist->name}\"")
                 ->sendToDatabase($playlist->user);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
 
             // Log the exception

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Actions\Action;
 use App\Jobs\RestartQueue;
 use Filament\Pages\Dashboard;
 use Filament\Actions;
@@ -9,12 +10,12 @@ use Filament\Notifications\Notification;
 
 class CustomDashboard extends Dashboard
 {
-    protected static ?string $navigationIcon = 'heroicon-o-tv';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-tv';
 
     protected function getActions(): array
     {
         return [
-            Actions\Action::make('Reset Queue')
+            Action::make('Reset Queue')
                 ->label('Reset Queue')
                 ->action(function () {
                     app('Illuminate\Contracts\Bus\Dispatcher')

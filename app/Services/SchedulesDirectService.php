@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use Generator;
+use Exception;
 use App\Models\Epg;
 use Carbon\Carbon;
 use Illuminate\Http\Client\Response;
@@ -33,7 +35,7 @@ class SchedulesDirectService
     /**
      * Generator to yield station chunks for memory-efficient processing
      */
-    private function getStationChunks(array $stationIds, int $chunkSize): \Generator
+    private function getStationChunks(array $stationIds, int $chunkSize): Generator
     {
         $totalStations = count($stationIds);
         for ($i = 0; $i < $totalStations; $i += $chunkSize) {
@@ -44,7 +46,7 @@ class SchedulesDirectService
     /**
      * Generator to process schedules in memory-efficient chunks
      */
-    private function processScheduleChunks(string $token, array $stationIds, array $dates): \Generator
+    private function processScheduleChunks(string $token, array $stationIds, array $dates): Generator
     {
         foreach ($this->getStationChunks($stationIds, self::STATIONS_PER_CHUNK) as $chunkIndex => $stationChunk) {
             $chunkNumber = $chunkIndex + 1;
@@ -74,9 +76,9 @@ class SchedulesDirectService
                         // Clear the chunk data immediately
                         unset($chunkSchedules, $stationRequests);
                     } else {
-                        throw new \Exception('Empty or invalid response received');
+                        throw new Exception('Empty or invalid response received');
                     }
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     if ($retry === self::MAX_RETRIES - 1) {
                         Log::error("Max retries exceeded for chunk {$chunkNumber}, skipping");
                     }
@@ -102,13 +104,13 @@ class SchedulesDirectService
         ]);
 
         if ($response->failed()) {
-            throw new \Exception('Authentication failed: ' . $response->body());
+            throw new Exception('Authentication failed: ' . $response->body());
         }
 
         $data = $response->json();
 
         if (isset($data['code']) && $data['code'] !== 0) {
-            throw new \Exception('Authentication error: ' . ($data['message'] ?? 'Unknown error'));
+            throw new Exception('Authentication error: ' . ($data['message'] ?? 'Unknown error'));
         }
 
         return [
@@ -123,7 +125,7 @@ class SchedulesDirectService
     public function authenticateFromEpg(Epg $epg): array
     {
         if (!$epg->sd_username || !$epg->sd_password) {
-            throw new \Exception('Schedules Direct credentials not configured');
+            throw new Exception('Schedules Direct credentials not configured');
         }
 
         $response = Http::withHeaders([
@@ -134,13 +136,13 @@ class SchedulesDirectService
         ]);
 
         if ($response->failed()) {
-            throw new \Exception('Authentication failed: ' . $response->body());
+            throw new Exception('Authentication failed: ' . $response->body());
         }
 
         $data = $response->json();
 
         if (isset($data['code']) && $data['code'] !== 0) {
-            throw new \Exception('Authentication error: ' . ($data['message'] ?? 'Unknown error'));
+            throw new Exception('Authentication error: ' . ($data['message'] ?? 'Unknown error'));
         }
 
         // Update the EPG model with new token data
@@ -174,7 +176,7 @@ class SchedulesDirectService
         ])->get(self::BASE_URL . '/available/countries');
 
         if ($response->failed()) {
-            throw new \Exception('Failed to get countries from Schedules Direct');
+            throw new Exception('Failed to get countries from Schedules Direct');
         }
 
         return $response->json();
@@ -220,7 +222,7 @@ class SchedulesDirectService
 
         if ($response->failed()) {
             $errorData = $response->json();
-            throw new \Exception('Failed to add lineup: ' . ($errorData['message'] ?? $response->body()));
+            throw new Exception('Failed to add lineup: ' . ($errorData['message'] ?? $response->body()));
         }
 
         return $response->json();
@@ -235,7 +237,7 @@ class SchedulesDirectService
 
         if ($response->failed()) {
             $errorData = $response->json();
-            throw new \Exception('Failed to remove lineup: ' . ($errorData['message'] ?? $response->body()));
+            throw new Exception('Failed to remove lineup: ' . ($errorData['message'] ?? $response->body()));
         }
 
         return $response->json();
@@ -294,7 +296,7 @@ class SchedulesDirectService
 
             // Get lineup data
             if (!$epg->hasSchedulesDirectLineup()) {
-                throw new \Exception('No lineup configured for Schedules Direct EPG');
+                throw new Exception('No lineup configured for Schedules Direct EPG');
             }
 
             // Reset EPG SD sync status
@@ -307,7 +309,7 @@ class SchedulesDirectService
             // Check if lineup is already in account, if not add it
             try {
                 $lineupData = $this->getLineup($epg->sd_token, $epg->sd_lineup_id);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 if (str_contains($e->getMessage(), 'Lineup not in account') || str_contains($e->getMessage(), 'not subscribed')) {
                     Log::debug("Adding lineup {$epg->sd_lineup_id} to Schedules Direct account", ['epg_id' => $epg->id]);
                     $this->addLineup($epg->sd_token, $epg->sd_lineup_id);
@@ -354,7 +356,7 @@ class SchedulesDirectService
                 'stations_processed' => count($stationIds),
                 'file_path' => $xmlFilePath
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $errors = $epg->sd_errors ?? [];
             $errors[] = [
                 'timestamp' => now()->toISOString(),
@@ -396,7 +398,7 @@ class SchedulesDirectService
         // Open file for writing
         $file = fopen($filePath, 'w');
         if (!$file) {
-            throw new \Exception("Cannot open file for writing: {$filePath}");
+            throw new Exception("Cannot open file for writing: {$filePath}");
         }
         try {
             // Write XML header and channels
@@ -407,7 +409,7 @@ class SchedulesDirectService
 
             // Write XML footer
             fwrite($file, "</tv>\n");
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Failed to stream process to XMLTV", [
                 'epg_id' => $epg->id,
                 'error' => $e->getMessage(),
@@ -541,7 +543,7 @@ class SchedulesDirectService
                     // Update progress
                     $progress = min(100, (int)(($chunkIndex / $totalChunks) * 100));
                     $epg->update(['sd_progress' => $progress]);
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::error("Error processing chunk programs", [
                         'chunk' => $chunkIndex,
                         'error' => $e->getMessage()
@@ -576,7 +578,7 @@ class SchedulesDirectService
     {
         $handle = fopen($programIdFile, 'r');
         if (!$handle) {
-            throw new \Exception("Cannot open program ID file: {$programIdFile}");
+            throw new Exception("Cannot open program ID file: {$programIdFile}");
         }
 
         $batch = [];
@@ -669,7 +671,7 @@ class SchedulesDirectService
                     'status' => $response->status()
                 ]);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Error processing program batch directly", [
                 'chunk' => $chunkIndex,
                 'batch' => $batchIndex + 1,
@@ -825,7 +827,7 @@ class SchedulesDirectService
                 'status_code' => $response->status(),
                 'response_size' => strlen($response->body())
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Schedules Direct API request failed", [
                 'method' => $method,
                 'endpoint' => $endpoint,
@@ -833,7 +835,7 @@ class SchedulesDirectService
                 'error' => $e->getMessage(),
                 'error_class' => get_class($e)
             ]);
-            throw new \Exception("Schedules Direct API request failed: {$e->getMessage()}");
+            throw new Exception("Schedules Direct API request failed: {$e->getMessage()}");
         }
         if ($response->failed()) {
             $body = $response->json();
@@ -848,7 +850,7 @@ class SchedulesDirectService
                 'message' => $message,
                 'full_response' => $response->body()
             ]);
-            throw new \Exception("Schedules Direct API error: {$message} (Code: {$code})");
+            throw new Exception("Schedules Direct API error: {$message} (Code: {$code})");
         }
         return $response;
     }

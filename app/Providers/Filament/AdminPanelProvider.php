@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use Filament\Support\Enums\Width;
 use Exception;
 use App\Filament\Pages\Backups;
 use App\Filament\Widgets\UpdateNoticeWidget;
@@ -33,7 +34,6 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
-use Filament\Support\Enums\MaxWidth;
 use Filament\Widgets\AccountWidget;
 use ShuvroRoy\FilamentSpatieLaravelBackup\FilamentSpatieLaravelBackupPlugin;
 
@@ -52,7 +52,7 @@ class AdminPanelProvider extends PanelProvider
         $settings = [
             'navigation_position' => 'left',
             'show_breadcrumbs' => true,
-            'content_width' => MaxWidth::ScreenLarge,
+            'content_width' => Width::ScreenLarge,
             'show_logs' => false,
         ];
         try {
@@ -120,6 +120,7 @@ class AdminPanelProvider extends PanelProvider
                 Authenticate::class,
             ])
             ->spa()
+            ->viteTheme('resources/css/app.css')
             ->spaUrlExceptions(fn(): array => [
                 '*/playlist.m3u',
                 '*/epg.xml',

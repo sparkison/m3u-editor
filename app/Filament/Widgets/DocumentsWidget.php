@@ -8,5 +8,5 @@ class DocumentsWidget extends Widget
 {
     //    protected int | string | array $columnSpan = 2;
 
-    protected static string $view = 'filament.widgets.docs-widget';
+    protected string $view = 'filament.widgets.docs-widget';
 }

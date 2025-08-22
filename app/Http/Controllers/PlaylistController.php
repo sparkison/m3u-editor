@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\JsonResponse;
 use App\Jobs\ProcessM3uImport;
 use App\Models\Channel;
 use App\Models\CustomPlaylist;
@@ -12,17 +13,17 @@ use Illuminate\Http\Request;
 class PlaylistController extends Controller
 {
     /**
-     * 
+     *
      * Sync the selected Playlist.
      *
      * Use the `uuid` parameter to select the playlist to refresh.
      * You can find the playlist UUID by using the `User > Get your Playlists` endpoint.
      *
-     * @param \Illuminate\Http\Request $request
+     * @param Request $request
      * @param string $uuid
      *
-     * @return \Illuminate\Http\JsonResponse
-     * 
+     * @return JsonResponse
+     *
      * @unauthenticated
      * @response array{message: "Playlist is currently being synced..."}
      */

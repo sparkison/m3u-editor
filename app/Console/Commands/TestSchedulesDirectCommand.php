@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use Exception;
 use App\Services\SchedulesDirectService;
 use Illuminate\Console\Command;
 
@@ -64,7 +65,7 @@ class TestSchedulesDirectCommand extends Command
                             if (count($preview) > 3) {
                                 $this->line("      ... and " . (count($preview) - 3) . " more channels");
                             }
-                        } catch (\Exception $e) {
+                        } catch (Exception $e) {
                             $this->line("    Preview failed: " . $e->getMessage());
                         }
                     }
@@ -74,7 +75,7 @@ class TestSchedulesDirectCommand extends Command
             $this->info("\n✓ Schedules Direct API test completed successfully");
             return Command::SUCCESS;
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->error("✗ Test failed: " . $e->getMessage());
             return Command::FAILURE;
         }

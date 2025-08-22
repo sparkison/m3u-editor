@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use DateTime;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -66,8 +67,8 @@ class SharedStreamStat extends Model
      */
     public static function getStatsForRange(
         string $streamId,
-        \DateTime $startTime,
-        \DateTime $endTime
+        DateTime $startTime,
+        DateTime $endTime
     ) {
         return self::where('stream_id', $streamId)
                   ->whereBetween('recorded_at', [$startTime, $endTime])

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Exception;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -113,7 +115,7 @@ class Episode extends Model
                 }
                 return $streamStats;
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Error running ffprobe for episode \"{$this->title}\": {$e->getMessage()}");
         }
         return [];
@@ -131,12 +133,12 @@ class Episode extends Model
         try {
             // If it's a timestamp string, parse it
             if (is_numeric($value)) {
-                return \Carbon\Carbon::createFromTimestamp($value);
+                return Carbon::createFromTimestamp($value);
             }
 
             // Try to parse as a regular date/time string
-            return \Carbon\Carbon::parse($value);
-        } catch (\Exception $e) {
+            return Carbon::parse($value);
+        } catch (Exception $e) {
             // If parsing fails, return null
             return null;
         }

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use Exception;
+use Illuminate\Http\Response;
 use DOMDocument;
 use XMLReader;
 use App\Enums\ChannelLogoType;
@@ -23,12 +25,11 @@ class EpgGenerateController extends Controller
      * File cache configuration
      */
     private const CACHE_TTL_HOURS = 12; // Cache files for 12 hours
-
     /**
      * Generate the EPG XML file
      *
      * @param string $uuid
-     * @return \Illuminate\Http\Response
+     * @return Response
      */
     public function __invoke(string $uuid)
     {
@@ -54,7 +55,7 @@ class EpgGenerateController extends Controller
      * Generate the EPG XML file and compress it
      *
      * @param string $uuid
-     * @return \Illuminate\Http\Response
+     * @return Response
      */
     public function compressed(string $uuid)
     {
@@ -292,7 +293,7 @@ class EpgGenerateController extends Controller
                     // Fallback to original XML reading if cache is not available
                     $this->processEpgWithXmlReader($epg, $channels, $playlist);
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // If cache fails, fallback to original XML reading
                 $this->processEpgWithXmlReader($epg, $channels, $playlist);
             }
@@ -496,7 +497,7 @@ class EpgGenerateController extends Controller
             $carbon = Carbon::parse($datetime);
             // Format as YYYYMMDDHHMMSS +ZZZZ
             return $carbon->format('YmdHis O');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return null;
         }
     }

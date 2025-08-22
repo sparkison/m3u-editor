@@ -2,6 +2,7 @@
 
 namespace App\Filament\Exports;
 
+use Filament\Forms\Components\Select;
 use App\Models\Channel;
 use App\Models\Playlist;
 use Filament\Actions\Exports\ExportColumn;
@@ -16,7 +17,7 @@ class ChannelExporter extends Exporter
     public static function getOptionsFormComponents(): array
     {
         return [
-            Forms\Components\Select::make('playlist')
+            Select::make('playlist')
                 ->required()
                 ->label('Playlist')
                 ->helperText('Select the playlist you would like to export channels for.')

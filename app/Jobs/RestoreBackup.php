@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use Exception;
 use App\Models\Job;
 use App\Models\User;
 use Filament\Notifications\Notification;
@@ -67,7 +68,7 @@ class RestoreBackup implements ShouldQueue
                     ->body($message)
                     ->sendToDatabase($user);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Log the error
             logger()->error('Failed to restore backup', ['error' => $e->getMessage()]);
 

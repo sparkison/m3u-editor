@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use Exception;
 use Carbon\Carbon;
 use App\Services\HlsStreamService;
 use App\Services\SharedStreamService;
@@ -43,7 +44,7 @@ class PruneStaleHlsProcesses extends Command
                             "stale clients removed: {$removedClients}."
                     );
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::channel('ffmpeg')->error('StreamMonitor: Error during monitoring update: ' . $e->getMessage());
                 throw $e;
             }

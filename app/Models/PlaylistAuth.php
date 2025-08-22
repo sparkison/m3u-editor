@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use InvalidArgumentException;
 use App\Pivots\PlaylistAuthPivot;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -66,7 +67,7 @@ class PlaylistAuth extends Model
     public function assignTo(Model $model): void
     {
         if (!in_array(get_class($model), [Playlist::class, CustomPlaylist::class, MergedPlaylist::class])) {
-            throw new \InvalidArgumentException('PlaylistAuth can only be assigned to Playlist, CustomPlaylist, or MergedPlaylist models');
+            throw new InvalidArgumentException('PlaylistAuth can only be assigned to Playlist, CustomPlaylist, or MergedPlaylist models');
         }
 
         // Remove any existing assignment

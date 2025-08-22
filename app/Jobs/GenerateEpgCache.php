@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use Throwable;
 use App\Enums\Status;
 use App\Models\Epg;
 use App\Services\EpgCacheService;
@@ -80,7 +81,7 @@ class GenerateEpgCache implements ShouldQueue
     /**
      * Handle a job failure.
      */
-    public function failed(\Throwable $exception): void
+    public function failed(Throwable $exception): void
     {
         $epg = Epg::where('uuid', $this->uuid)->first();
         if ($epg) {

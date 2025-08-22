@@ -2,6 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
+use Exception;
+use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Facades\DB;
+use App\Models\SharedStreamStat;
+use App\Models\SharedStream;
+use App\Models\SharedStreamClient;
 use App\Http\Controllers\Controller;
 use App\Services\SharedStreamService;
 use App\Services\StreamMonitorService;
@@ -60,7 +66,7 @@ class SharedStreamApiController extends Controller
                 'data' => $result,
                 'message' => 'Stream created/joined successfully'
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'error' => $e->getMessage()
@@ -94,7 +100,7 @@ class SharedStreamApiController extends Controller
                 'success' => $success,
                 'message' => $success ? 'Stream stopped successfully' : 'Failed to stop stream'
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'error' => $e->getMessage()
@@ -115,7 +121,7 @@ class SharedStreamApiController extends Controller
                 'data' => $result,
                 'message' => 'Cleanup completed successfully'
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'error' => $e->getMessage()
@@ -149,9 +155,9 @@ class SharedStreamApiController extends Controller
     private function checkRedisConnection(): bool
     {
         try {
-            \Illuminate\Support\Facades\Redis::ping();
+            Redis::ping();
             return true;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return false;
         }
     }
@@ -159,9 +165,9 @@ class SharedStreamApiController extends Controller
     private function checkDatabaseConnection(): bool
     {
         try {
-            \Illuminate\Support\Facades\DB::connection()->getPdo();
+            DB::connection()->getPdo();
             return true;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return false;
         }
     }
@@ -221,7 +227,7 @@ class SharedStreamApiController extends Controller
             $systemStats = $this->monitorService->getSystemStats();
             
             // Get recent performance metrics
-            $recentMetrics = \App\Models\SharedStreamStat::selectRaw('
+            $recentMetrics = SharedStreamStat::selectRaw('
                     AVG(client_count) as avg_clients,
                     AVG(bandwidth_kbps) as avg_bandwidth,
                     MAX(client_count) as peak_clients,
@@ -240,7 +246,7 @@ class SharedStreamApiController extends Controller
                 ],
                 'timestamp' => now()->toISOString()
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'error' => $e->getMessage()
@@ -254,12 +260,12 @@ class SharedStreamApiController extends Controller
     public function getRealTimeMetrics(): JsonResponse
     {
         try {
-            $activeStreams = \App\Models\SharedStream::active()->count();
-            $totalClients = \App\Models\SharedStream::active()->sum('client_count');
-            $totalBandwidth = \App\Models\SharedStream::active()->sum('bandwidth_kbps');
+            $activeStreams = SharedStream::active()->count();
+            $totalClients = SharedStream::active()->sum('client_count');
+            $totalBandwidth = SharedStream::active()->sum('bandwidth_kbps');
             
             // Get recent connections (last 5 minutes)
-            $recentConnections = \App\Models\SharedStreamClient::where('connected_at', '>=', now()->subMinutes(5))
+            $recentConnections = SharedStreamClient::where('connected_at', '>=', now()->subMinutes(5))
                 ->count();
 
             return response()->json([
@@ -275,7 +281,7 @@ class SharedStreamApiController extends Controller
                 ],
                 'timestamp' => now()->toISOString()
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'error' => $e->getMessage()
@@ -297,7 +303,7 @@ class SharedStreamApiController extends Controller
                 'count' => count($alerts),
                 'timestamp' => now()->toISOString()
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'error' => $e->getMessage()
@@ -334,7 +340,7 @@ class SharedStreamApiController extends Controller
                 default => 'EXTRACT(HOUR FROM recorded_at)',
             };
 
-            $stats = \App\Models\SharedStreamStat::selectRaw("
+            $stats = SharedStreamStat::selectRaw("
                     {$groupBy} as period,
                     AVG(client_count) as avg_clients,
                     AVG(bandwidth_kbps) as avg_bandwidth,
@@ -352,7 +358,7 @@ class SharedStreamApiController extends Controller
                 'metric' => $metric,
                 'timestamp' => now()->toISOString()
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'error' => $e->getMessage()
@@ -368,7 +374,7 @@ class SharedStreamApiController extends Controller
         $alerts = [];
         
         // Check for unhealthy streams
-        $unhealthyStreams = \App\Models\SharedStream::where('health_status', '!=', 'healthy')
+        $unhealthyStreams = SharedStream::where('health_status', '!=', 'healthy')
                                                   ->where('status', 'active')
                                                   ->count();
         
@@ -394,7 +400,7 @@ class SharedStreamApiController extends Controller
         }
 
         // Check for high bandwidth usage
-        $totalBandwidth = \App\Models\SharedStream::active()->sum('bandwidth_kbps');
+        $totalBandwidth = SharedStream::active()->sum('bandwidth_kbps');
         $threshold = config('proxy.shared_streaming.monitoring.bandwidth_threshold', 50000);
         
         if ($totalBandwidth > $threshold) {

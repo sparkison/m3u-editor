@@ -1,8 +1,10 @@
 @import '../../vendor/filament/filament/resources/css/theme.css';
-
 @import "./components/tables.scss";
 @import "./components/widgets.css";
 @import "./components/footer.css";
+
+@source '../../app/Filament';
+@source '../../resources/views/filament';
 
 /* EPG Viewer Mobile Optimizations */
 @media (max-width: 767px) {

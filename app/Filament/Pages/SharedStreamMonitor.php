@@ -2,6 +2,11 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Actions\Action;
+use Filament\Support\Enums\Size;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Exception;
 use App\Models\Channel;
 use App\Models\Episode;
 use App\Models\SharedStream;
@@ -12,7 +17,6 @@ use Carbon\Carbon;
 use Filament\Actions;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Filament\Support\Enums\ActionSize;
 use Filament\Support\Enums\IconPosition;
 use Illuminate\Support\Facades\Redis;
 
@@ -23,13 +27,13 @@ use Illuminate\Support\Facades\Redis;
  */
 class SharedStreamMonitor extends Page
 {
-    protected static ?string $navigationIcon = 'heroicon-o-signal';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-signal';
     protected static ?string $navigationLabel = 'Buffered Streams';
     protected static ?string $title = 'Buffered Stream Monitor';
-    protected static ?string $navigationGroup = 'Tools';
+    protected static string | \UnitEnum | null $navigationGroup = 'Tools';
     protected static ?int $navigationSort = 15;
 
-    protected static string $view = 'filament.pages.shared-stream-monitor';
+    protected string $view = 'filament.pages.shared-stream-monitor';
 
     public $streams = [];
     public $globalStats = [];
@@ -66,27 +70,27 @@ class SharedStreamMonitor extends Page
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('refresh')
+            Action::make('refresh')
                 ->label('Refresh')
                 ->icon('heroicon-o-arrow-path')
-                ->size(ActionSize::Small)
+                ->size(Size::Small)
                 ->action('refreshData'),
 
-            Actions\Action::make('cleanup')
+            Action::make('cleanup')
                 ->label('Cleanup Streams')
                 ->icon('heroicon-o-trash')
-                ->size(ActionSize::Small)
+                ->size(Size::Small)
                 ->color('danger')
                 ->requiresConfirmation()
                 ->modalDescription('This will stop all inactive streams and clean up orphaned processes.')
                 ->action('cleanupStreams'),
 
-            Actions\Action::make('settings')
+            Action::make('settings')
                 ->label('Settings')
                 ->icon('heroicon-o-cog-6-tooth')
-                ->size(ActionSize::Small)
+                ->size(Size::Small)
                 ->modalSubmitActionLabel('Save Settings')
-                ->form($this->getSettingsForm())
+                ->schema($this->getSettingsForm())
                 ->action(function (array $data): void {
                     $this->saveSettings($data);
                 }),
@@ -211,24 +215,24 @@ class SharedStreamMonitor extends Page
     protected function getSettingsForm(): array
     {
         return [
-            \Filament\Forms\Components\TextInput::make('refresh_interval')
+            TextInput::make('refresh_interval')
                 ->label('Refresh Interval (seconds)')
                 ->numeric()
                 ->default($this->refreshInterval)
                 ->minValue(1)
                 ->maxValue(60),
 
-            \Filament\Forms\Components\Toggle::make('auto_cleanup')
+            Toggle::make('auto_cleanup')
                 ->label('Auto Cleanup Inactive Streams')
                 ->default(true),
 
-            \Filament\Forms\Components\TextInput::make('cleanup_interval')
+            TextInput::make('cleanup_interval')
                 ->label('Cleanup Interval (minutes)')
                 ->numeric()
                 ->default(10)
                 ->minValue(1),
 
-            \Filament\Forms\Components\TextInput::make('max_buffer_size')
+            TextInput::make('max_buffer_size')
                 ->label('Max Buffer Size (MB)')
                 ->numeric()
                 ->default(100)
@@ -326,7 +330,7 @@ class SharedStreamMonitor extends Page
         try {
             Redis::ping();
             return true;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return false;
         }
     }

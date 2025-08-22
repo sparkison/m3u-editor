@@ -2,6 +2,7 @@
 
 namespace App\Pivots;
 
+use InvalidArgumentException;
 use App\Models\MergedPlaylist;
 use App\Models\CustomPlaylist;
 use App\Models\Playlist;
@@ -60,7 +61,7 @@ class PlaylistAuthPivot extends Pivot
         static::creating(function ($pivot) {
             $existing = static::where('playlist_auth_id', $pivot->playlist_auth_id)->first();
             if ($existing) {
-                throw new \InvalidArgumentException(
+                throw new InvalidArgumentException(
                     "PlaylistAuth ID {$pivot->playlist_auth_id} is already assigned to a model. " .
                     "Use the assignTo() method on PlaylistAuth to reassign."
                 );

@@ -2,15 +2,16 @@
 
 namespace App\Filament\Widgets;
 
+use Carbon\Carbon;
 use App\Models\SharedStream;
 use App\Models\SharedStreamStat;
 use Filament\Widgets\ChartWidget;
 
 class SharedStreamPerformanceChart extends ChartWidget
 {
-    protected static ?string $heading = 'Stream Performance (Last 24 Hours)';
+    protected ?string $heading = 'Stream Performance (Last 24 Hours)';
     protected static ?int $sort = 3;
-    protected static ?string $pollingInterval = '30s';
+    protected ?string $pollingInterval = '30s';
     
     protected function getData(): array
     {
@@ -29,7 +30,7 @@ class SharedStreamPerformanceChart extends ChartWidget
         $bandwidthData = [];
 
         foreach ($stats as $stat) {
-            $labels[] = \Carbon\Carbon::parse($stat->hour)->format('H:i');
+            $labels[] = Carbon::parse($stat->hour)->format('H:i');
             $clientData[] = round($stat->avg_clients, 1);
             $bandwidthData[] = round($stat->avg_bandwidth / 1000, 2); // Convert to Mbps
         }

@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use Exception;
 use App\Models\Channel;
 use App\Models\Playlist;
 use App\Services\XtreamService;
@@ -98,7 +99,7 @@ class ProcessVodChannels implements ShouldQueue
                 } else {
                     Log::warning('No VOD data found for channel ID ' . $channel->id);
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // Log the error and continue processing other channels
                 Log::error('Failed to process VOD data for channel ID ' . $channel->id . ': ' . $e->getMessage());
                 Notification::make()

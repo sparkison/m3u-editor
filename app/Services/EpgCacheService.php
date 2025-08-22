@@ -2,6 +2,11 @@
 
 namespace App\Services;
 
+use Exception;
+use Generator;
+use Filament\Actions\Action;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use App\Facades\PlaylistUrlFacade;
 use App\Models\CustomPlaylist;
 use App\Models\Epg;
@@ -66,7 +71,7 @@ class EpgCacheService
             $cacheCreated = $metadata['cache_created'] ?? 0;
 
             return $epgFileModified <= $cacheCreated;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::warning("Invalid cache metadata for EPG {$epg->uuid}: {$e->getMessage()}");
             return false;
         }
@@ -133,7 +138,7 @@ class EpgCacheService
 
             Log::debug("EPG cache generated successfully", $metadata);
             return true;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Failed to cache EPG data for {$epg->name}: {$e->getMessage()}");
             return false;
         }
@@ -265,7 +270,7 @@ class EpgCacheService
         try {
             // Use file_put_contents with append flag - minimal memory usage
             file_put_contents($fullPath, $line, FILE_APPEND | LOCK_EX);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Failed to append programme to {$filename}: {$e->getMessage()}");
         }
     }
@@ -273,7 +278,7 @@ class EpgCacheService
     /**
      * Stream parse channels from EPG file using generators
      */
-    private function parseChannelsStream(string $filePath): \Generator
+    private function parseChannelsStream(string $filePath): Generator
     {
         $channelReader = new XMLReader();
         $channelReader->open('compress.zlib://' . $filePath);
@@ -320,7 +325,7 @@ class EpgCacheService
     /**
      * Stream parse programmes from EPG file using generators
      */
-    private function parseProgrammesStream(string $filePath): \Generator
+    private function parseProgrammesStream(string $filePath): Generator
     {
         $programReader = new XMLReader();
         $programReader->open('compress.zlib://' . $filePath);
@@ -447,7 +452,7 @@ class EpgCacheService
                     foreach ($existingStream as $channelId => $channel) {
                         $existingData[$channelId] = $channel;
                     }
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::warning("Could not read existing channel data, creating new file: {$e->getMessage()}");
                     $existingData = [];
                 }
@@ -526,7 +531,7 @@ class EpgCacheService
                     'next_page' => $hasMore ? $page + 1 : null,
                 ]
             ];
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Error reading cached channels: {$e->getMessage()}");
             return [
                 'channels' => [],
@@ -581,7 +586,7 @@ class EpgCacheService
                             $programmes[$channelId] = [];
                         }
                         $programmes[$channelId][] = $programme;
-                    } catch (\Exception $lineError) {
+                    } catch (Exception $lineError) {
                         Log::warning("Failed to parse programme line: {$lineError->getMessage()}");
                         continue;
                     }
@@ -590,7 +595,7 @@ class EpgCacheService
             }
 
             return $programmes;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Error reading cached programmes for date {$date}: {$e->getMessage()}");
             return [];
         }
@@ -631,7 +636,7 @@ class EpgCacheService
     /**
      * Stream cached programmes for a specific date using generators with JSONL format
      */
-    private function streamCachedProgrammesForDate(Epg $epg, string $date, array $channelIds = []): \Generator
+    private function streamCachedProgrammesForDate(Epg $epg, string $date, array $channelIds = []): Generator
     {
         $programmesPath = $this->getCacheFilePath($epg, "programmes-{$date}.jsonl");
         if (!Storage::disk('local')->exists($programmesPath)) {
@@ -666,7 +671,7 @@ class EpgCacheService
                             $channelProgrammes[$channelId] = [];
                         }
                         $channelProgrammes[$channelId][] = $programme;
-                    } catch (\Exception $lineError) {
+                    } catch (Exception $lineError) {
                         Log::warning("Failed to parse programme line: {$lineError->getMessage()}");
                         continue;
                     }
@@ -678,7 +683,7 @@ class EpgCacheService
             foreach ($channelProgrammes as $channelId => $programmes) {
                 yield $channelId => $programmes;
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Error streaming cached programmes for date {$date}: {$e->getMessage()}");
         }
     }
@@ -695,7 +700,7 @@ class EpgCacheService
         try {
             $metadata = json_decode(Storage::disk('local')->get($metadataPath), true);
             return $metadata;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Error reading cache metadata: {$e->getMessage()}");
             return null;
         }
@@ -722,7 +727,7 @@ class EpgCacheService
             // Log cache clearing
             Log::debug("Cleared cache for EPG {$epg->name}");
             return true;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Failed to clear cache for EPG {$epg->name}: {$e->getMessage()}");
             return false;
         }
@@ -752,7 +757,7 @@ class EpgCacheService
 
                 return Carbon::parse($dateString);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::warning("Failed to parse XMLTV datetime: {$datetime}");
         }
 
@@ -796,7 +801,7 @@ class EpgCacheService
                 $cleared = true;
             }
             return $cleared;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Failed to clear playlist EPG cache: {$e->getMessage()}");
         }
 
@@ -805,17 +810,17 @@ class EpgCacheService
 
     public static function getEpgTableAction()
     {
-        return Tables\Actions\Action::make('Download EPG')
+        return Action::make('Download EPG')
             ->label('Download EPG')
             ->icon('heroicon-o-arrow-down-tray')
             ->modalHeading('Download EPG')
             ->modalIcon('heroicon-o-arrow-down-tray')
             ->modalDescription('Select the EPG format to download and your download will begin immediately.')
             ->modalWidth('md')
-            ->form(function ($record) {
+            ->schema(function ($record) {
                 $urls = PlaylistUrlFacade::getUrls($record);
                 return [
-                    Forms\Components\Select::make('format')
+                    Select::make('format')
                         ->label('EPG Format')
                         ->options([
                             'uncompressed' => 'Uncompressed EPG',
@@ -831,7 +836,7 @@ class EpgCacheService
                                 $set('download_url', $urls['epg_zip']);
                             }
                         })->hintAction(
-                            Forms\Components\Actions\Action::make('clear_cache')
+                            Action::make('clear_cache')
                                 ->icon('heroicon-m-trash')
                                 ->label('Clear Cache')
                                 ->requiresConfirmation()
@@ -854,7 +859,7 @@ class EpgCacheService
                                     }
                                 })
                         ),
-                    Forms\Components\TextInput::make('download_url')
+                    TextInput::make('download_url')
                         ->label('Download URL')
                         ->default($urls['epg'])
                         ->required()
@@ -878,17 +883,17 @@ class EpgCacheService
 
     public static function getEpgPlaylistAction()
     {
-        return Actions\Action::make('Download EPG')
+        return Action::make('Download EPG')
             ->label('Download EPG')
             ->icon('heroicon-o-arrow-down-tray')
             ->modalHeading('Download EPG')
             ->modalIcon('heroicon-o-arrow-down-tray')
             ->modalDescription('Select the EPG format to download and your download will begin immediately.')
             ->modalWidth('md')
-            ->form(function ($record) {
+            ->schema(function ($record) {
                 $urls = PlaylistUrlFacade::getUrls($record);
                 return [
-                    Forms\Components\Select::make('format')
+                    Select::make('format')
                         ->label('EPG Format')
                         ->options([
                             'uncompressed' => 'Uncompressed EPG',
@@ -905,7 +910,7 @@ class EpgCacheService
                             }
                         })
                         ->hintAction(
-                            Forms\Components\Actions\Action::make('clear_cache')
+                            Action::make('clear_cache')
                                 ->icon('heroicon-m-trash')
                                 ->label('Clear Cache')
                                 ->requiresConfirmation()
@@ -928,7 +933,7 @@ class EpgCacheService
                                     }
                                 })
                         ),
-                    Forms\Components\TextInput::make('download_url')
+                    TextInput::make('download_url')
                         ->label('Download URL')
                         ->default($urls['epg'])
                         ->required()

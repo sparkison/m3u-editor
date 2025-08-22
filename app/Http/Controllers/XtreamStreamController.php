@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\PlaylistAuth;
 use App\Facades\ProxyFacade;
 use App\Models\Playlist;
 use App\Models\MergedPlaylist;
@@ -28,7 +29,7 @@ class XtreamStreamController extends Controller
         $playlist = null;
 
         // Method 1: Try to authenticate using PlaylistAuth credentials
-        $playlistAuth = \App\Models\PlaylistAuth::where('username', $username)
+        $playlistAuth = PlaylistAuth::where('username', $username)
             ->where('password', $password)
             ->where('enabled', true)
             ->first();

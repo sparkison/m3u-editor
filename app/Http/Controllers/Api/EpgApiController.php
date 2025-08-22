@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use Exception;
+use Illuminate\Http\JsonResponse;
 use App\Enums\ChannelLogoType;
 use App\Enums\PlaylistChannelId;
 use App\Facades\ProxyFacade;
@@ -24,7 +26,7 @@ class EpgApiController extends Controller
      *
      * @param string $uuid
      * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function getData(string $uuid, Request $request)
     {
@@ -131,7 +133,7 @@ class EpgApiController extends Controller
                     'programme_date_range' => $metadata['programme_date_range'] ?? null,
                 ]
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Error retrieving EPG data for {$epg->name}: {$e->getMessage()}");
             return response()->json([
                 'error' => 'Failed to retrieve EPG data: ' . $e->getMessage()
@@ -144,7 +146,7 @@ class EpgApiController extends Controller
      *
      * @param string $uuid Playlist UUID
      * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function getDataForPlaylist(string $uuid, Request $request)
     {
@@ -389,7 +391,7 @@ class EpgApiController extends Controller
                             }
                         }
                     }
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::error("Error processing EPG {$epgId}: {$e->getMessage()}");
                     // Continue with other EPGs
                 }
@@ -425,7 +427,7 @@ class EpgApiController extends Controller
                     'channels_with_epg' => count(array_filter($playlistChannelData, fn($ch) => $ch['has_epg'])),
                 ]
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Error retrieving EPG data for playlist {$playlist->name}: {$e->getMessage()}");
             return response()->json([
                 'error' => 'Failed to retrieve EPG data: ' . $e->getMessage()
@@ -462,7 +464,7 @@ class EpgApiController extends Controller
 
                 return Carbon::parse($dateString);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Return null if parsing fails
         }
 

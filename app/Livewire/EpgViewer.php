@@ -2,10 +2,11 @@
 
 namespace App\Livewire;
 
+use Exception;
 use App\Enums\ChannelLogoType;
 use App\Facades\ProxyFacade;
-use App\Filament\Resources\ChannelResource;
-use App\Filament\Resources\EpgChannelResource;
+use App\Filament\Resources\Channels\ChannelResource;
+use App\Filament\Resources\EpgChannels\EpgChannelResource;
 use App\Models\Channel;
 use App\Models\Epg;
 use App\Models\EpgChannel;
@@ -65,7 +66,7 @@ class EpgViewer extends Component implements HasForms, HasActions
         return EditAction::make('editChannel')
             ->label('Edit Channel')
             ->record(fn() => $this->getChannelRecord())
-            ->form($this->type === 'Epg' ? EpgChannelResource::getForm() : ChannelResource::getForm(edit: true))
+            ->schema($this->type === 'Epg' ? EpgChannelResource::getForm() : ChannelResource::getForm(edit: true))
             ->action(function (array $data, $record) {
                 if ($record) {
                     $record->update($data);
@@ -214,14 +215,14 @@ class EpgViewer extends Component implements HasForms, HasActions
             }
 
             // Use the EpgCacheService to get programme data
-            $cacheService = app(\App\Services\EpgCacheService::class);
+            $cacheService = app(EpgCacheService::class);
 
             // Get programmes for this specific channel
             $programmes = $cacheService->getCachedProgrammes($epg, $today, [$epgChannel->channel_id]);
 
             // Return programmes for this channel, or empty array if none found
             return $programmes[$epgChannel->channel_id] ?? [];
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Failed to fetch programme data', [
                 'channel_id' => $channelId,
                 'epg_channel_id' => $epgChannel->id ?? null,

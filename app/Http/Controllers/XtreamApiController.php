@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\PlaylistAuth;
+use Illuminate\Http\Response;
+use Illuminate\Http\RedirectResponse;
 use App\Enums\ChannelLogoType;
 use App\Enums\PlaylistChannelId;
 use App\Models\Channel;
@@ -24,55 +27,55 @@ class XtreamApiController extends Controller
 {
     /**
      * Xtream API request handler.
-     * 
+     *
      * This endpoint serves as the primary interface for Xtream API interactions.
      * It requires authentication via username and password provided as query parameters.
      * The `action` query parameter dictates the specific operation to perform and the structure of the response.
-     * 
-     * The `username` and `password` parameters are mandatory for all actions. 
-     * 
+     *
+     * The `username` and `password` parameters are mandatory for all actions.
+     *
      * You will use your m3u editor login username (default is admin), and the password will be your playlist unique identifier for the playlist you would like to access via the Xtream API.
-     * 
+     *
      * ## Supported Actions:
-     * 
+     *
      * ### panel (default)
      * Returns user authentication info and server details. This is the default action if none is specified. Returns the same response as: `get_user_info`, `get_account_info` and `get_server_info`.
-     * 
+     *
      * ### get_live_streams
      * Returns a JSON array of live stream objects. Only enabled, non-VOD channels are included.
      * Supports optional category filtering via `category_id` parameter.
-     * Each stream object contains: `num`, `name`, `stream_type`, `stream_id`, `stream_icon`, `epg_channel_id`, 
+     * Each stream object contains: `num`, `name`, `stream_type`, `stream_id`, `stream_icon`, `epg_channel_id`,
      * `added`, `category_id`, `tv_archive`, `direct_source`, `tv_archive_duration`.
-     * 
+     *
      * ### get_vod_streams
      * Returns a JSON array of VOD channel objects (movies marked as VOD). Only enabled VOD channels are included.
      * Supports optional category filtering via `category_id` parameter.
-     * Each object contains: `num`, `name`, `title`, `year`, `stream_type` (always "movie"), `stream_id`, `stream_icon`, 
+     * Each object contains: `num`, `name`, `title`, `year`, `stream_type` (always "movie"), `stream_id`, `stream_icon`,
      * `rating`, `rating_5based`, `added`, `category_id`, `category_ids`, `container_extension`, `custom_sid`, `direct_source`.
-     * 
+     *
      * ### get_series
      * Returns a JSON array of series objects. Only enabled series are included.
      * Supports optional category filtering via `category_id` parameter.
-     * Each object contains: `num`, `name`, `series_id`, `cover`, `plot`, `cast`, `director`, `genre`, `releaseDate`, 
+     * Each object contains: `num`, `name`, `series_id`, `cover`, `plot`, `cast`, `director`, `genre`, `releaseDate`,
      * `last_modified`, `rating`, `rating_5based`, `backdrop_path`, `youtube_trailer`, `episode_run_time`, `category_id`.
-     * 
+     *
      * ### get_live_categories
      * Returns a JSON array of live stream categories/groups. Only groups with enabled, non-VOD channels are included.
      * Each category contains: `category_id`, `category_name`, `parent_id`.
-     * 
+     *
      * ### get_vod_categories
      * Returns a JSON array of VOD categories/groups. Only groups with enabled VOD channels are included.
      * Each category contains: `category_id`, `category_name`, `parent_id`.
-     * 
+     *
      * ### get_series_categories
      * Returns a JSON array of series categories. Only categories with enabled series are included.
      * Each category contains: `category_id`, `category_name`, `parent_id`.
-     * 
+     *
      * ### get_series_info
      * Returns detailed information for a specific series, including its seasons and episodes.
      * Requires `series_id` parameter to specify which series to retrieve.
      * Returns series info, seasons, and episode details.
-     * 
+     *
      * ### get_vod_info
      * Returns detailed information for a specific VOD/movie stream.
      * Requires `vod_id` parameter to specify which VOD stream to retrieve.
@@ -85,7 +88,7 @@ class XtreamApiController extends Controller
      * Supports optional `limit` parameter (default=4) to control the number of programmes returned.
      * Returns programmes from current time onwards, including currently playing programme if any.
      * Includes `now_playing` flag to indicate if the channel is currently streaming.
-     * 
+     *
      * ### get_simple_data_table
      * Returns full EPG data for a specific live stream/channel for the current date.
      * Requires `stream_id` parameter to specify which channel to retrieve EPG data for.
@@ -95,20 +98,20 @@ class XtreamApiController extends Controller
      * ### m3u_plus
      * Redirects to the `m3u` method to generate an M3U playlist in the M3U Plus format.
      * `output` parameter is ignored for this action and will instead use your Playlist configuration for M3U Plus output.
-     * 
+     *
      * ### get_user_info
      * ### get_account_info
      * ### get_server_info
      * Returns account and server information including user details and allowed output formats.
      * This provides the same user information as the panel.
-     * Contains: `username`, `password`, `message`, `auth`, `status`, `exp_date`, `is_trial`, 
+     * Contains: `username`, `password`, `message`, `auth`, `status`, `exp_date`, `is_trial`,
      * `active_cons`, `created_at`, `max_connections`, `allowed_output_formats`.
-     * 
-     * 
+     *
+     *
      * @param string $uuid The UUID of the playlist (required path parameter)
-     * @param \Illuminate\Http\Request $request The HTTP request containing query parameters:
+     * @param Request $request The HTTP request containing query parameters:
      *   - username (string, required): User's Xtream API username
-     *   - password (string, required): User's Xtream API password  
+     *   - password (string, required): User's Xtream API password 
      *   - action (string, optional): Defaults to 'panel'. Determines the API action
      *   - category_id (string, optional): Filter results by category ID (required for get_series, optional for get_live_streams and get_vod_streams)
      *   - series_id (int, optional): Series ID (required for get_series_info action)
@@ -141,7 +144,7 @@ class XtreamApiController extends Controller
      *     "time_now": "2025-06-20 12:00:00"
      *   }
      * }
-     * 
+     *
      * @response 200 scenario="Live streams response" [
      *   {
      *     "num": 1,
@@ -157,7 +160,7 @@ class XtreamApiController extends Controller
      *     "tv_archive_duration": 24
      *   }
      * ]
-     * 
+     *
      * @response 200 scenario="VOD streams response" [
      *   {
      *     "num": 1,
@@ -177,7 +180,7 @@ class XtreamApiController extends Controller
      *     "direct_source": ""
      *   }
      * ]
-     * 
+     *
      * @response 200 scenario="Series response" [
      *   {
      *     "num": 1,
@@ -198,7 +201,7 @@ class XtreamApiController extends Controller
      *     "category_id": "2"
      *   }
      * ]
-     * 
+     *
      * @response 200 scenario="Series info response" {
      *   "info": {
      *     "name": "Breaking Bad",
@@ -246,7 +249,7 @@ class XtreamApiController extends Controller
      *     "1": []
      *   }
      * }
-     * 
+     *
      * @response 200 scenario="Live categories response" [
      *   {
      *     "category_id": "1",
@@ -259,7 +262,7 @@ class XtreamApiController extends Controller
      *     "parent_id": 0
      *   }
      * ]
-     * 
+     *
      * @response 200 scenario="VOD categories response" [
      *   {
      *     "category_id": "1",
@@ -272,7 +275,7 @@ class XtreamApiController extends Controller
      *     "parent_id": 0
      *   }
      * ]
-     * 
+     *
      * @response 200 scenario="Series categories response" [
      *   {
      *     "category_id": "1",
@@ -361,7 +364,7 @@ class XtreamApiController extends Controller
      * @response 401 scenario="Unauthorized - Invalid Credentials" {"error": "Unauthorized"}
      * @response 404 scenario="Not Found (e.g., playlist not found)" {"error": "Playlist not found"}
      * @response 404 scenario="Series not found" {"error": "Series not found or not enabled"}
-     * 
+     *
      * @unauthenticated
      */
     public function handle(Request $request)
@@ -1173,12 +1176,12 @@ class XtreamApiController extends Controller
 
     /**
      * Redirects to the M3U playlist generation route.
-     * 
+     *
      * This method handles the M3U playlist request by calling the PlaylistGenerateController
      * with the appropriate playlist UUID.
      *
      * @param mixed $playlist The authenticated playlist instance.
-     * @return \Illuminate\Http\Response
+     * @return Response
      */
     public function m3u($playlist)
     {
@@ -1189,12 +1192,12 @@ class XtreamApiController extends Controller
 
     /**
      * Redirects to the EPG generation route.
-     * 
+     *
      * This method handles the EPG request by authenticating the user and redirecting
      * to the appropriate EPG generation URL based on the playlist UUID.
      *
-     * @param \Illuminate\Http\Request $request
-     * @return \Illuminate\Http\RedirectResponse
+     * @param Request $request
+     * @return RedirectResponse
      */
     public function epg(Request $request)
     {
@@ -1218,11 +1221,11 @@ class XtreamApiController extends Controller
 
     /**
      * Authenticate the user based on the provided credentials.
-     * 
+     *
      * This method checks for PlaylistAuth credentials first, then falls back to
      * the original authentication method using username and password.
      *
-     * @param \Illuminate\Http\Request $request
+     * @param Request $request
      * @return array|bool Returns an array with playlist and auth method, or false if authentication fails.
      */
     private function authenticate(Request $request)
@@ -1238,7 +1241,7 @@ class XtreamApiController extends Controller
         $authMethod = 'none';
 
         // Method 1: Try to authenticate using PlaylistAuth credentials
-        $playlistAuth = \App\Models\PlaylistAuth::where('username', $username)
+        $playlistAuth = PlaylistAuth::where('username', $username)
             ->where('password', $password)
             ->where('enabled', true)
             ->first();

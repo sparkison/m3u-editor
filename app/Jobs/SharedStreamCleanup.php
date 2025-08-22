@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use Exception;
+use Throwable;
 use App\Services\SharedStreamService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -85,7 +87,7 @@ class SharedStreamCleanup implements ShouldQueue
             // Clean up orphaned Redis keys that don't have a database entry
             $orphanedKeys = $sharedStreamService->cleanupOrphanedKeys();
             Log::channel('ffmpeg')->info("SharedStreamCleanup: Completed - Cleaned {$cleanedUp} streams ({$staleStreams} stale), {$orphanedKeys} orphaned keys");
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::channel('ffmpeg')->error('SharedStreamCleanup: Error during cleanup: ' . $e->getMessage());
             throw $e; // Re-throw to allow for retries if configured
         }
@@ -94,7 +96,7 @@ class SharedStreamCleanup implements ShouldQueue
     /**
      * Handle a job failure.
      */
-    public function failed(\Throwable $exception): void
+    public function failed(Throwable $exception): void
     {
         Log::channel('ffmpeg')->error('SharedStreamCleanup: Job failed permanently: ' . $exception->getMessage());
     }

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Exception;
 use App\Settings\GeneralSettings;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Horizon\Horizon;
@@ -31,7 +32,7 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
         $userPreferences = app(GeneralSettings::class);
         try {
             $enableQueueManager = $userPreferences->show_queue_manager;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $enableQueueManager = false;
         }
         Gate::define('viewHorizon', fn($user) => $user && $enableQueueManager);

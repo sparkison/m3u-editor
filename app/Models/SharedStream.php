@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Exception;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -150,7 +151,7 @@ class SharedStream extends Model
 
                 // Process exists and is not zombie/dead
                 return true;
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::channel('ffmpeg')->error("Error checking if process {$pid} is running: " . $e->getMessage());
                 return false;
             }

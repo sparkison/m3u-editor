@@ -20,7 +20,7 @@
 }
 
 .fi-footer > span:last-child {
-    @apply border-0 pl-0 !important;
+    @apply !border-0 !pl-0;
 }
 
 .fi-footer.fi-sidebar > span {

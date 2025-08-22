@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Exception;
 use App\Models\Channel;
 use App\Models\Episode;
 use App\Models\Playlist;
@@ -42,7 +43,7 @@ class StreamMonitorService
     private function getSharedStreamStats(): array
     {
         // Fetch all shared streams from the database
-        $streams = \App\Models\SharedStream::with('clients')->get();
+        $streams = SharedStream::with('clients')->get();
         $result = [];
         $totalClients = 0;
 
@@ -307,7 +308,7 @@ class StreamMonitorService
             // Use cross-platform approach that works on both Linux and macOS
             $output = shell_exec('ps aux | grep -E "(ffmpeg|jellyfin-ffmpeg)" | grep -v grep | wc -l 2>/dev/null || echo 0');
             return (int) trim($output);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return 0;
         }
     }
@@ -323,7 +324,7 @@ class StreamMonitorService
                 $seconds = (float) explode(' ', $uptime)[0];
                 return $this->formatDuration($seconds);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Fallback for non-Linux systems
         }
 
@@ -532,7 +533,7 @@ class StreamMonitorService
             Redis::hMSet($this->getSystemStatsKey(), $stats);
 
             return $stats;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Failed to update system stats: " . $e->getMessage());
             return [];
         }
@@ -561,7 +562,7 @@ class StreamMonitorService
             }
 
             return $stats;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Failed to get stream stats: " . $e->getMessage());
             return [];
         }
@@ -639,7 +640,7 @@ class StreamMonitorService
             }
 
             return $health;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Failed to check stream health: " . $e->getMessage());
             return [
                 'status' => 'error',
@@ -680,7 +681,7 @@ class StreamMonitorService
             $merged['last_updated'] = (string) time();
 
             Redis::hMSet($globalKey, $merged);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("Failed to update global stats: " . $e->getMessage());
         }
     }
@@ -692,7 +693,7 @@ class StreamMonitorService
     {
         try {
             return posix_kill($pid, 0);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return false;
         }
     }
@@ -769,7 +770,7 @@ class StreamMonitorService
         try {
             Redis::ping();
             return true;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return false;
         }
     }
@@ -816,7 +817,7 @@ class StreamMonitorService
 
             // Fallback: return 1 if we can't determine
             return 1;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return 1;
         }
     }

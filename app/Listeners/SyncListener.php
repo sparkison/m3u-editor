@@ -2,6 +2,8 @@
 
 namespace App\Listeners;
 
+use App\Models\Playlist;
+use App\Models\Epg;
 use App\Events\SyncCompleted;
 use App\Jobs\RunPostProcess;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -14,7 +16,7 @@ class SyncListener
      */
     public function handle(SyncCompleted $event): void
     {
-        if ($event->model instanceof \App\Models\Playlist) {
+        if ($event->model instanceof Playlist) {
             $lastSync = $event->model->syncStatuses()->first();
             $event->model->postProcesses()->where([
                 ['event', 'synced'],
@@ -27,7 +29,7 @@ class SyncListener
                 ));
             });
         }
-        if ($event->model instanceof \App\Models\Epg) {
+        if ($event->model instanceof Epg) {
             $event->model->postProcesses()->where([
                 ['event', 'synced'],
                 ['enabled', true],

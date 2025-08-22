@@ -2,6 +2,9 @@
 
 namespace App\Jobs;
 
+use M3uParser\Tag\ExtInf;
+use M3uParser\Tag\ExtVlcOpt;
+use M3uParser\Tag\KodiDrop;
 use Throwable;
 use Exception;
 use App\Enums\Status;
@@ -630,7 +633,7 @@ class ProcessM3uImport implements ShouldQueue
                         $extvlcopt = [];
                         $kodidrop = [];
                         foreach ($item->getExtTags() as $extTag) {
-                            if ($extTag instanceof \M3uParser\Tag\ExtInf) {
+                            if ($extTag instanceof ExtInf) {
                                 $channel['title'] = $extTag->getTitle();
                                 foreach ($attributes as $key => $attribute) {
                                     if ($extTag->hasAttribute($attribute)) {
@@ -648,13 +651,13 @@ class ProcessM3uImport implements ShouldQueue
                                     }
                                 }
                             }
-                            if ($extTag instanceof \M3uParser\Tag\ExtVlcOpt) {
+                            if ($extTag instanceof ExtVlcOpt) {
                                 $extvlcopt[] = [
                                     'key' => $extTag->getKey(),
                                     'value' => $extTag->getValue(),
                                 ];
                             }
-                            if ($extTag instanceof \M3uParser\Tag\KodiDrop) {
+                            if ($extTag instanceof KodiDrop) {
                                 $kodidrop[] = [
                                     'key' => $extTag->getKey(),
                                     'value' => $extTag->getValue(),
@@ -763,7 +766,7 @@ class ProcessM3uImport implements ShouldQueue
                 event(new SyncCompleted($this->playlist));
                 return;
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Log the exception
             logger()->error("Error processing \"{$this->playlist->name}\": {$e->getMessage()}");
 

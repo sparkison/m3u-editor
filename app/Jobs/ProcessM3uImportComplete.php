@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use Exception;
 use App\Enums\Status;
 use App\Events\SyncCompleted;
 use App\Models\Channel;
@@ -260,7 +261,7 @@ class ProcessM3uImportComplete implements ShouldQueue
                             ->sendToDatabase($playlist->user);
                     }
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // Handle any exceptions that occur during EPG creation
                 Notification::make()
                     ->danger()

@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use Exception;
 use App\Models\User;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -46,7 +47,7 @@ class CreateBackup implements ShouldQueue
                     ->body($message)
                     ->sendToDatabase($user);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Log the error
             logger()->error('Failed to create backup', ['error' => $e->getMessage()]);
 
