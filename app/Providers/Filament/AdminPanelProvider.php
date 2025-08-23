@@ -93,6 +93,13 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 CustomDashboard::class
             ])
+            ->navigationGroups([
+                'Playlist',
+                'Channels & VOD',
+                'Series',
+                'EPG',
+                'Tools'
+            ])
             ->breadcrumbs($settings['show_breadcrumbs'])
             ->widgets([
                 UpdateNoticeWidget::class,
@@ -131,8 +138,8 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ])
-            ->spa()
             ->viteTheme('resources/css/app.css')
+            ->spa()
             ->spaUrlExceptions(fn(): array => [
                 '*/playlist.m3u',
                 '*/epg.xml',
