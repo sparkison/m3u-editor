@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
 @import '../../vendor/filament/filament/resources/css/theme.css';
+@import '../../vendor/filafly/brisk/resources/css/theme.css';
+
 @import "./components/tables.scss";
 @import "./components/widgets.css";
 @import "./components/footer.css";
@@ -67,4 +69,15 @@
     box-shadow: theme(boxShadow.sm);
     cursor: pointer;
     transition: all 0.2s;
+}
+
+.fi-fo-toggle-buttons {
+    overflow: hidden;
+}
+.fi-fo-toggle-buttons .fi-btn {
+    border-radius: 0;
+}
+
+.fi-btn {
+    @apply rounded-lg px-3;
 }

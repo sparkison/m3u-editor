@@ -14,6 +14,7 @@
         "calebporzio/sushi": "^2.5",
         "dedoc/scramble": "^0.12.11",
         "dragonmantank/cron-expression": "^3.4",
+        "filafly/brisk": "^1.0",
         "filament/filament": "^4.0",
         "filament/spatie-laravel-settings-plugin": "^4.0",
         "filament/spatie-laravel-tags-plugin": "^4.0",

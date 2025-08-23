@@ -529,6 +529,7 @@ class Preferences extends SettingsPage
                                             ->iconPosition('after')
                                             ->color('gray')
                                             ->size('sm')
+                                            ->modalWidth('md')
                                             ->schema([
                                                 TextInput::make('message')
                                                     ->label('Message')
