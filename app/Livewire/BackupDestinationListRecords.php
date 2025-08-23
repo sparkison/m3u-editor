@@ -59,7 +59,7 @@ class BackupDestinationListRecords extends Component implements HasForms, HasTab
                     return collect($data)
                         ->when(
                             filled($sortColumn),
-                            fn(Collection $data): Collection => $data->sortBy(
+                            fn($data) => $data->sortBy(
                                 $sortColumn,
                                 SORT_NATURAL,
                                 $sortDirection === 'desc',
@@ -67,7 +67,7 @@ class BackupDestinationListRecords extends Component implements HasForms, HasTab
                         )
                         ->when(
                             filled($search),
-                            fn(Collection $data): Collection => $data->filter(
+                            fn($data) => $data->filter(
                                 fn(array $record): bool => Str::contains(
                                     Str::lower($record['path'] . $record['disk'] . $record['date']),
                                     Str::lower($search),
