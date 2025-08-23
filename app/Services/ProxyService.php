@@ -364,7 +364,7 @@ class ProxyService
             $cmd .= '-analyzeduration 1M -probesize 1M -max_delay 500000 -fpsprobesize 0 ';
 
             // Better error handling
-            $cmd .= '-err_detect ignore_err -ignore_unknown -fflags +discardcorrupt+igndts ';
+            $cmd .= '-err_detect ignore_err -ignore_unknown -fflags +discardcorrupt ';
 
             // Use the user agent from settings, escape it. $userAgent parameter is ignored for now.
             $effectiveUserAgent = $userAgent ?: $settings['ffmpeg_user_agent'];
