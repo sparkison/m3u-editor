@@ -151,7 +151,7 @@ class SeriesRelationManager extends RelationManager
             ])
             ->headerActions([
                 AttachAction::make()
-                    ->form(fn(AttachAction $action): array => [
+                    ->schema(fn(AttachAction $action): array => [
                         $action
                             ->getRecordSelect()
                             ->getSearchResultsUsing(function (string $search) {
@@ -187,7 +187,7 @@ class SeriesRelationManager extends RelationManager
                     ])
 
                 // Advanced attach when adding pivot values:
-                // Tables\Actions\AttachAction::make()->form(fn(Tables\Actions\AttachAction $action): array => [
+                // Tables\Actions\AttachAction::make()->schema(fn(Tables\Actions\AttachAction $action): array => [
                 //     $action->getRecordSelect(),
                 //     Forms\Components\TextInput::make('title')
                 //         ->label('Title')
@@ -207,7 +207,7 @@ class SeriesRelationManager extends RelationManager
                 DetachBulkAction::make()->color('danger'),
                 BulkAction::make('add_to_category')
                     ->label('Add to custom category')
-                    ->form([
+                    ->schema([
                         Select::make('category')
                             ->label('Select group')
                             ->options(

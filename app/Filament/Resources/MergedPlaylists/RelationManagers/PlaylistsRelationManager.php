@@ -70,7 +70,7 @@ class PlaylistsRelationManager extends RelationManager
                     ),
 
                 // Advanced attach when adding pivot values:
-                // Tables\Actions\AttachAction::make()->form(fn(Tables\Actions\AttachAction $action): array => [
+                // Tables\Actions\AttachAction::make()->schema(fn(Tables\Actions\AttachAction $action): array => [
                 //     $action->getRecordSelect(),
                 //     Forms\Components\TextInput::make('title')
                 //         ->label('Title')

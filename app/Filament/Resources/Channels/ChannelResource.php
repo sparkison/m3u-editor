@@ -400,7 +400,7 @@ class ChannelResource extends Resource
             BulkActionGroup::make([
                 BulkAction::make('add')
                     ->label('Add to Custom Playlist')
-                    ->form([
+                    ->schema([
                         Select::make('playlist')
                             ->required()
                             ->live()
@@ -449,7 +449,7 @@ class ChannelResource extends Resource
                     ->modalSubmitActionLabel('Add now'),
                 BulkAction::make('move')
                     ->label('Move to Group')
-                    ->form([
+                    ->schema([
                         Select::make('playlist')
                             ->required()
                             ->live()
@@ -493,7 +493,7 @@ class ChannelResource extends Resource
                     ->modalSubmitActionLabel('Move now'),
                 BulkAction::make('map')
                     ->label('Map EPG to selected')
-                    ->form(EpgMapResource::getForm(showPlaylist: false, showEpg: true))
+                    ->schema(EpgMapResource::getForm(showPlaylist: false, showEpg: true))
                     ->action(function (Collection $records, array $data): void {
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new MapPlaylistChannelsToEpg(
@@ -517,7 +517,7 @@ class ChannelResource extends Resource
                     ->modalSubmitActionLabel('Map now'),
                 BulkAction::make('preferred_logo')
                     ->label('Update preferred icon')
-                    ->form([
+                    ->schema([
                         Select::make('logo_type')
                             ->label('Preferred Icon')
                             ->helperText('Prefer logo from channel or EPG.')
@@ -548,7 +548,7 @@ class ChannelResource extends Resource
                     ->modalSubmitActionLabel('Update now'),
                 BulkAction::make('failover')
                     ->label('Add as failover')
-                    ->form(function (Collection $records) {
+                    ->schema(function (Collection $records) {
                         $existingFailoverIds = $records->pluck('id')->toArray();
                         $initialMasterOptions = [];
                         foreach ($records as $record) {
@@ -643,7 +643,7 @@ class ChannelResource extends Resource
                     ->modalSubmitActionLabel('Add failovers now'),
                 BulkAction::make('find-replace')
                     ->label('Find & Replace')
-                    ->form([
+                    ->schema([
                         Toggle::make('use_regex')
                             ->label('Use Regex')
                             ->live()
@@ -700,7 +700,7 @@ class ChannelResource extends Resource
                     ->modalSubmitActionLabel('Replace now'),
                 BulkAction::make('find-replace-reset')
                     ->label('Undo Find & Replace')
-                    ->form([
+                    ->schema([
                         Select::make('column')
                             ->label('Column to reset')
                             ->options([

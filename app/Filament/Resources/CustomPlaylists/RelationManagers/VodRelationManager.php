@@ -177,7 +177,7 @@ class VodRelationManager extends RelationManager
                     ))
                     ->slideOver(),
                 AttachAction::make()
-                    ->form(fn(AttachAction $action): array => [
+                    ->schema(fn(AttachAction $action): array => [
                         $action
                             ->getRecordSelect()
                             ->getSearchResultsUsing(function (string $search) {
@@ -228,7 +228,7 @@ class VodRelationManager extends RelationManager
                 DetachBulkAction::make()->color('danger'),
                 BulkAction::make('add_to_group')
                     ->label('Add to custom group')
-                    ->form([
+                    ->schema([
                         Select::make('group')
                             ->label('Select group')
                             ->options(

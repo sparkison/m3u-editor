@@ -278,7 +278,7 @@ class SeriesResource extends Resource
             BulkActionGroup::make([
                 BulkAction::make('add')
                     ->label('Add to Custom Playlist')
-                    ->form([
+                    ->schema([
                         Select::make('playlist')
                             ->required()
                             ->live()
@@ -327,7 +327,7 @@ class SeriesResource extends Resource
                     ->modalSubmitActionLabel('Add now'),
                 BulkAction::make('move')
                     ->label('Move Series to Category')
-                    ->form([
+                    ->schema([
                         Select::make('category')
                             ->required()
                             ->live()

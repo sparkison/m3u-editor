@@ -275,7 +275,7 @@ class GroupResource extends Resource
                 BulkActionGroup::make([
                     BulkAction::make('add')
                         ->label('Add to Custom Playlist')
-                        ->form([
+                        ->schema([
                             Select::make('playlist')
                                 ->required()
                                 ->live()
@@ -327,7 +327,7 @@ class GroupResource extends Resource
                         ->modalSubmitActionLabel('Add now'),
                     BulkAction::make('move')
                         ->label('Move Channels to Group')
-                        ->form([
+                        ->schema([
                             Select::make('group')
                                 ->required()
                                 ->live()
