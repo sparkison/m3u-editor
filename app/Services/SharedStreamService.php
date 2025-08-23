@@ -1856,27 +1856,32 @@ class SharedStreamService
             }
         }
 
-        // Clean up connected clients
-        SharedStreamClient::where('stream_id', $streamKey)
-            ->update(['status' => 'disconnected', 'last_activity_at' => now()]);
-
-        // Finally, update the database to mark the stream as stopped
+        // Finally, cleanup the stream record from database
+        // NOTE: the clients will cascade delete
         SharedStream::where('stream_id', $streamKey)
-            ->update([
-                'status' => 'stopped',
-                'started_at' => null,
-                'stopped_at' => now(),
-                'process_id' => null,
-                'buffer_size' => 0, // Reset buffer size
-                'error_message' => null, // Reset error message
-                // 'stream_info' => null, // Reset stream info (should we do this? might need details in other methods...)
-                'client_count' => 0,
-                'bandwidth_kbps' => 0,
-                'bytes_transferred' => 0,
-                'last_client_activity' => null,
-                'health_check_at' => null, // Reset health check timestamp
-                'health_status' => 'unknown' // Reset health status
-            ]);
+            ->delete();
+
+        // // Clean up connected clients
+        // SharedStreamClient::where('stream_id', $streamKey)
+        //     ->update(['status' => 'disconnected', 'last_activity_at' => now()]);
+
+        // // Finally, update the database to mark the stream as stopped
+        // SharedStream::where('stream_id', $streamKey)
+        //     ->update([
+        //         'status' => 'stopped',
+        //         'started_at' => null,
+        //         'stopped_at' => now(),
+        //         'process_id' => null,
+        //         'buffer_size' => 0, // Reset buffer size
+        //         'error_message' => null, // Reset error message
+        //         // 'stream_info' => null, // Reset stream info (should we do this? might need details in other methods...)
+        //         'client_count' => 0,
+        //         'bandwidth_kbps' => 0,
+        //         'bytes_transferred' => 0,
+        //         'last_client_activity' => null,
+        //         'health_check_at' => null, // Reset health check timestamp
+        //         'health_status' => 'unknown' // Reset health status
+        //     ]);
     }
 
     /**
