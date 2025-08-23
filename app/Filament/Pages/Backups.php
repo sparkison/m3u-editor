@@ -19,8 +19,10 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Filament\Forms;
+use ShuvroRoy\FilamentSpatieLaravelBackup\FilamentSpatieLaravelBackup;
+use ShuvroRoy\FilamentSpatieLaravelBackup\Pages\Backups as BaseBackups;
 
-class Backups
+class Backups extends BaseBackups
 {
     protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-arrow-path';
 
@@ -30,7 +32,11 @@ class Backups
 
     protected function getActions(): array
     {
-        $availableBackups = BackupDestination::query()->get();
+        $data = [];
+        foreach (FilamentSpatieLaravelBackup::getDisks() as $disk) {
+            $data = array_merge($data, FilamentSpatieLaravelBackup::getBackupDestinationData($disk));
+        }
+        $data = collect($data)->sortByDesc('date');
         return [
             ActionGroup::make([
                 Action::make('Restore Backup')
@@ -39,7 +45,7 @@ class Backups
                             ->required()
                             ->label('Backup file')
                             ->helperText('Select the backup you would like to restore.')
-                            ->options($availableBackups->pluck('path', 'path'))
+                            ->options($data->pluck('path', 'path'))
                             ->searchable(),
                     ])
                     ->action(function (array $data): void {
