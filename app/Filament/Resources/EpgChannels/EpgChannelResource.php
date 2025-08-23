@@ -40,7 +40,8 @@ class EpgChannelResource extends Resource
 
     protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-photo';
 
-    protected static ?string $label = 'Channels';
+    protected static ?string $label = 'EPG Channel';
+    protected static ?string $pluralLabel = 'EPG Channels';
 
     protected static string | \UnitEnum | null $navigationGroup = 'EPG';
 

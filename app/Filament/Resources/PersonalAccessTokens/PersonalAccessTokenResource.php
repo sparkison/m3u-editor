@@ -58,10 +58,10 @@ class PersonalAccessTokenResource extends Resource
                 ->required()
                 ->options([
                     'create' => 'Create',
-                    'read' => 'Read',
+                    'view' => 'View',
                     'update' => 'Update',
                     'delete' => 'Delete'
-                ])->default(['create', 'read', 'update']),
+                ])->default(['create', 'view', 'update']),
             Forms\Components\DatePicker::make('expires_at')
                 ->label('Expiration Date')
                 ->helperText('Select Expiration Date, or leave empty for no expiration')
