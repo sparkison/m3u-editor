@@ -647,7 +647,7 @@ class ProxyService
             $cmd .= '-analyzeduration 1M -probesize 1M -max_delay 200000 ';
 
             // Better error handling and stream format detection
-            $cmd .= '-err_detect ignore_err -ignore_unknown -fflags +discardcorrupt+igndts ';
+            $cmd .= '-err_detect ignore_err -ignore_unknown -fflags +discardcorrupt ';
             $cmd .= '-thread_queue_size 256 ';
 
             // Pre-input HTTP options:
