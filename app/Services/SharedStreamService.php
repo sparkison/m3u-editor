@@ -1149,7 +1149,11 @@ class SharedStreamService
     public function isStreamActive(string $streamKey, bool $checkProcess = true): bool
     {
         $streamInfo = $this->getStreamInfo($streamKey);
-        if (!$streamInfo || !in_array($streamInfo['status'] ?? '', ['active', 'starting'])) {
+        if (
+            !$streamInfo ||
+            !array_key_exists('pid', $streamInfo) ||
+            !in_array($streamInfo['status'] ?? '', ['active', 'starting'])
+        ) {
             return false;
         }
 
@@ -2321,6 +2325,8 @@ class SharedStreamService
             $pid = $this->getProcessPid($streamId);
             if ($pid) {
                 Log::channel('ffmpeg')->debug("Stopping FFmpeg process (PID: {$pid}) for stream {$streamId}");
+            } else {
+                Log::channel('ffmpeg')->debug("No active FFmpeg process found for stream {$streamId}");
             }
 
             // Clean up the stream data (this will also stop the process)

@@ -231,7 +231,7 @@ class SharedStreamController extends Controller
         $streamKey = $streamInfo['stream_key'];
 
         // Step 2.1: Wait for stream to become active
-        $streamReadyTimeout = 25; // seconds
+        $streamReadyTimeout = 10; // seconds
         $startTime = time();
         $streamReady = false;
 
@@ -263,6 +263,7 @@ class SharedStreamController extends Controller
 
         if (!$streamReady) {
             Log::channel('ffmpeg')->error("Stream {$streamKey}: Client {$clientId} - Stream did not become active within {$streamReadyTimeout}s timeout. Aborting.");
+            $this->sharedStreamService->cleanupStream($streamKey);
             abort(503, 'Stream not ready within timeout period.');
         }
 
