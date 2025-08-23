@@ -19,6 +19,7 @@ use App\Filament\Widgets\StatsOverview;
 use App\Filament\Widgets\SystemHealthWidget;
 use App\Models\SharedStream;
 use App\Settings\GeneralSettings;
+use Boquizo\FilamentLogViewer\FilamentLogViewerPlugin;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -108,6 +109,10 @@ class AdminPanelProvider extends PanelProvider
                 FilamentSpatieLaravelBackupPlugin::make()
                     ->authorize(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true))
                     ->usingPage(Backups::class),
+                FilamentLogViewerPlugin::make()
+                    ->navigationGroup('Tools')
+                    ->navigationSort(99)
+                    ->authorize(fn(): bool => $settings['show_logs'] && in_array(auth()->user()->email, config('dev.admin_emails'), true)),
             ])
             ->maxContentWidth($settings['content_width'])
             ->middleware([

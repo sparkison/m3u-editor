@@ -10,6 +10,9 @@
 @source '../../resources/views/livewire';
 @source '../../resources/js/vendor';
 
+/* Filament plugins */
+@source '../../vendor/gboquizosanchez/filament-log-viewer/resources/views*.blade.php';
+
 /* EPG Viewer Mobile Optimizations */
 @media (max-width: 767px) {
     /* Hide scrollbars on mobile for cleaner look */
