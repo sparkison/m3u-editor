@@ -427,11 +427,6 @@ class PostProcessResource extends Resource
         ];
         return [
             Grid::make()
-                ->hiddenOn(['edit']) // hide this field on the edit form
-                ->schema($schema)
-                ->columns(2),
-            Section::make('Post Process')
-                ->hiddenOn(['create']) // hide this field on the create form
                 ->schema($schema)
                 ->columns(2),
         ];
