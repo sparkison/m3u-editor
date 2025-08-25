@@ -9,16 +9,8 @@ use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Toggle;
 use App\Jobs\CreateBackup;
 use App\Jobs\RestoreBackup;
-use App\Models\Epg;
-use App\Models\Playlist;
-use Filament\Actions;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Support\Htmlable;
-use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Storage;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
-use Filament\Forms;
 use ShuvroRoy\FilamentSpatieLaravelBackup\FilamentSpatieLaravelBackup;
 use ShuvroRoy\FilamentSpatieLaravelBackup\Pages\Backups as BaseBackups;
 
@@ -26,7 +18,6 @@ class Backups extends BaseBackups
 {
     protected static string | \BackedEnum | null $navigationIcon = '';
     protected static ?string $navigationLabel = 'Backup & Restore';
-
     protected ?string $subheading = 'NOTE: Restoring a backup will overwrite any existing data. Your manually uploaded EPG and Playlist files will NOT be restored. You will need to download the backup and manually re-upload where needed.';
 
     protected function getActions(): array

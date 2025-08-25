@@ -81,7 +81,7 @@ class BackupDestinationListRecords extends Component implements HasForms, HasTab
                     ->label(__('filament-spatie-backup::backup.components.backup_destination_list.table.fields.path'))
                     ->searchable()
                     ->sortable(),
-                // Tables\Columns\TextColumn::make('disk')
+                // TextColumn::make('disk')
                 //     ->label(__('filament-spatie-backup::backup.components.backup_destination_list.table.fields.disk'))
                 //     ->searchable()
                 //     ->sortable(),
