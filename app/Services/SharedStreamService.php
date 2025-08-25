@@ -1909,7 +1909,7 @@ class SharedStreamService
         }
 
         $keyCount = count($keys) ?? 0;
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Cleaned up Redis {$keyCount} buffer keys");
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Cleaned up {$keyCount} Redis buffer keys");
     }
 
     /**
