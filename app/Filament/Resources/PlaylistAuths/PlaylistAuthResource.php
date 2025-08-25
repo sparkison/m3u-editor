@@ -35,6 +35,7 @@ class PlaylistAuthResource extends Resource
     protected static ?string $model = PlaylistAuth::class;
 
     protected static ?string $recordTitleAttribute = 'name';
+    protected static string | \UnitEnum | null $navigationGroup = 'Playlist';
 
     public static function getGloballySearchableAttributes(): array
     {
@@ -45,13 +46,6 @@ class PlaylistAuthResource extends Resource
     {
         return parent::getGlobalSearchEloquentQuery()
             ->where('user_id', auth()->id());
-    }
-
-    protected static string | \UnitEnum | null $navigationGroup = 'Playlist';
-
-    public static function getNavigationSort(): ?int
-    {
-        return 5;
     }
 
     public static function form(Schema $schema): Schema

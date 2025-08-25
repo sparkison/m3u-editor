@@ -42,6 +42,10 @@ class PostProcessResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
+    protected static ?string $label = 'Post Process';
+    protected static ?string $pluralLabel = 'Post Processing';
+    protected static string | \UnitEnum | null $navigationGroup = 'Tools';
+    
     public static function getGloballySearchableAttributes(): array
     {
         return ['name'];
@@ -51,16 +55,6 @@ class PostProcessResource extends Resource
     {
         return parent::getGlobalSearchEloquentQuery()
             ->where('user_id', auth()->id());
-    }
-
-    protected static ?string $label = 'Post Process';
-    protected static ?string $pluralLabel = 'Post Processing';
-
-    protected static string | \UnitEnum | null $navigationGroup = 'Tools';
-
-    public static function getNavigationSort(): ?int
-    {
-        return 7;
     }
 
     public static function form(Schema $schema): Schema

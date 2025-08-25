@@ -13,6 +13,8 @@ class ListPersonalAccessTokens extends ListRecords
 {
     protected static string $resource = PersonalAccessTokenResource::class;
 
+    protected ?string $subheading = 'Manage your API tokens. Tokens allow you to authenticate API requests for certain API actions.';
+
     protected function getHeaderActions(): array
     {
         return [
