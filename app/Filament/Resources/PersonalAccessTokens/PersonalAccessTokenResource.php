@@ -18,8 +18,6 @@ class PersonalAccessTokenResource extends Resource
 {
     protected static ?string $model = PersonalAccessToken::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedKey;
-
     protected static string | \UnitEnum | null $navigationGroup = 'Tools';
 
     protected static ?string $navigationLabel = 'API Tokens';

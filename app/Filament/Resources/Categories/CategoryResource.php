@@ -54,8 +54,6 @@ class CategoryResource extends Resource
             ->where('user_id', auth()->id());
     }
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-queue-list';
-
     protected static string | \UnitEnum | null $navigationGroup = 'Series';
 
     public static function getNavigationSort(): ?int

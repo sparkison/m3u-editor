@@ -38,8 +38,6 @@ class EpgChannelResource extends Resource
             ->where('user_id', auth()->id());
     }
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-photo';
-
     protected static ?string $label = 'EPG Channel';
     protected static ?string $pluralLabel = 'EPG Channels';
 

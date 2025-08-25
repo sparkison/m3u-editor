@@ -95,8 +95,6 @@ class PlaylistResource extends Resource
             ->where('user_id', Auth::id());
     }
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-play';
-
     protected static string | \UnitEnum | null $navigationGroup = 'Playlist';
 
     public static function getNavigationSort(): ?int

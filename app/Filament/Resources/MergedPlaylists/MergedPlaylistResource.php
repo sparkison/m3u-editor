@@ -59,10 +59,6 @@ class MergedPlaylistResource extends Resource
             ->where('user_id', Auth::id());
     }
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-forward';
-
-    protected static string | \UnitEnum | null $navigationGroup = 'Playlist';
-
     public static function getNavigationSort(): ?int
     {
         return 3;

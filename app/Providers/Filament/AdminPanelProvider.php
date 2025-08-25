@@ -42,13 +42,6 @@ use ShuvroRoy\FilamentSpatieLaravelBackup\FilamentSpatieLaravelBackupPlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
-    protected static ?string $navigationIcon = 'heroicon-o-tachometer';
-
-    public static function getNavigationIcon(): ?string
-    {
-        return 'heroicon-o-tachometer';
-    }
-
     public function panel(Panel $panel): Panel
     {
         $userPreferences = app(GeneralSettings::class);
@@ -126,6 +119,7 @@ class AdminPanelProvider extends PanelProvider
                 FilamentLogViewerPlugin::make()
                     ->navigationGroup('Tools')
                     ->navigationSort(99)
+                    ->navigationIcon('')
                     ->authorize(fn(): bool => $settings['show_logs'] && in_array(auth()->user()->email, config('dev.admin_emails'), true)),
             ])
             ->maxContentWidth($settings['content_width'])

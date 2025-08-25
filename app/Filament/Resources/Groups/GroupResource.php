@@ -57,8 +57,6 @@ class GroupResource extends Resource
             ->where('user_id', auth()->id());
     }
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-queue-list';
-
     protected static string | \UnitEnum | null $navigationGroup = 'Channels & VOD';
 
     public static function getNavigationSort(): ?int

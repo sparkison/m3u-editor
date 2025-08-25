@@ -47,8 +47,6 @@ class PlaylistAuthResource extends Resource
             ->where('user_id', auth()->id());
     }
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-lock-closed';
-
     protected static string | \UnitEnum | null $navigationGroup = 'Playlist';
 
     public static function getNavigationSort(): ?int

@@ -74,8 +74,6 @@ class SeriesResource extends Resource
             ->where('user_id', auth()->id());
     }
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-film';
-
     protected static string | \UnitEnum | null $navigationGroup = 'Series';
 
     public static function getNavigationSort(): ?int

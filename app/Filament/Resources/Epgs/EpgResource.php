@@ -66,8 +66,6 @@ class EpgResource extends Resource
             ->where('user_id', Auth::id());
     }
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-calendar-days';
-
     protected static ?string $label = 'EPG';
     protected static ?string $pluralLabel = 'EPGs';
 

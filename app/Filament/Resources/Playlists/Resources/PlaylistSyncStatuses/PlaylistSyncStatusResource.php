@@ -21,9 +21,6 @@ use Filament\Tables\Enums\RecordActionsPosition;
 class PlaylistSyncStatusResource extends Resource
 {
     protected static ?string $model = PlaylistSyncStatus::class;
-
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
-
     protected static ?string $parentResource = PlaylistResource::class;
 
     public static function getParentResourceRegistration(): ?ParentResourceRegistration

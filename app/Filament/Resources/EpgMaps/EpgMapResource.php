@@ -38,8 +38,6 @@ class EpgMapResource extends Resource
 {
     protected static ?string $model = EpgMap::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-map';
-
     protected static ?string $label = 'EPG Map';
     protected static ?string $pluralLabel = 'EPG Maps';
 

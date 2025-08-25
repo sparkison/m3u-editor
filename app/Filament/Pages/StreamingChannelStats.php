@@ -14,7 +14,6 @@ use Illuminate\Support\Facades\Redis;
 
 class StreamingChannelStats extends Page
 {
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-video-camera';
     protected static ?string $navigationLabel = 'Streaming Stats';
     protected static ?string $title = 'Active Streaming Statistics';
     protected static string | \UnitEnum | null $navigationGroup = 'Tools';

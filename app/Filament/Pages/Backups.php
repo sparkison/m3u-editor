@@ -24,8 +24,7 @@ use ShuvroRoy\FilamentSpatieLaravelBackup\Pages\Backups as BaseBackups;
 
 class Backups extends BaseBackups
 {
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-arrow-path';
-
+    protected static string | \BackedEnum | null $navigationIcon = '';
     protected static ?string $navigationLabel = 'Backup & Restore';
 
     protected ?string $subheading = 'NOTE: Restoring a backup will overwrite any existing data. Your manually uploaded EPG and Playlist files will NOT be restored. You will need to download the backup and manually re-upload where needed.';
