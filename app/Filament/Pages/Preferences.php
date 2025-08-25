@@ -560,13 +560,13 @@ class Preferences extends SettingsPage
                                             ->url('/horizon')
                                             ->openUrlInNewTab(true),
                                     ])->schema([
-                                        Toggle::make('show_logs')
-                                            ->label('Make log files viewable')
-                                            ->hintIcon(
-                                                'heroicon-m-question-mark-circle',
-                                                tooltip: 'You may need to refresh the page after applying this setting to view the logs. When disabled you will get a 404.'
-                                            )
-                                            ->helperText('When enabled, there will be an additional navigation item (Logs) to view the log file content.'),
+                                        // Toggle::make('show_logs')
+                                        //     ->label('Make log files viewable')
+                                        //     ->hintIcon(
+                                        //         'heroicon-m-question-mark-circle',
+                                        //         tooltip: 'You may need to refresh the page after applying this setting to view the logs. When disabled you will get a 404.'
+                                        //     )
+                                        //     ->helperText('When enabled, there will be an additional navigation item (Logs) to view the log file content.'),
                                         Toggle::make('show_queue_manager')
                                             ->label('Allow queue manager access')
                                             ->helperText('When enabled you can access the queue manager using the "Queue Manager" button. When disabled, the queue manager endpoint will return a 403 (Unauthorized).'),

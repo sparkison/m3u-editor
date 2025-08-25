@@ -49,14 +49,14 @@ class AdminPanelProvider extends PanelProvider
             'navigation_position' => 'left',
             'show_breadcrumbs' => true,
             'content_width' => Width::ScreenLarge,
-            'show_logs' => false,
+            // 'show_logs' => false, // Default always enabled for admins
         ];
         try {
             $settings = [
                 'navigation_position' => $userPreferences->navigation_position ?? $settings['navigation_position'],
                 'show_breadcrumbs' => $userPreferences->show_breadcrumbs ?? $settings['show_breadcrumbs'],
                 'content_width' => $userPreferences->content_width ?? $settings['content_width'],
-                'show_logs' => $userPreferences->show_logs ?? $settings['show_logs'],
+                // 'show_logs' => $userPreferences->show_logs ?? $settings['show_logs'],
             ];
         } catch (Exception $e) {
             // Ignore
@@ -120,7 +120,7 @@ class AdminPanelProvider extends PanelProvider
                     ->navigationGroup('Tools')
                     ->navigationSort(99)
                     ->navigationIcon('')
-                    ->authorize(fn(): bool => $settings['show_logs'] && in_array(auth()->user()->email, config('dev.admin_emails'), true)),
+                    ->authorize(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true)),
             ])
             ->maxContentWidth($settings['content_width'])
             ->middleware([
