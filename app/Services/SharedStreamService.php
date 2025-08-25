@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /**
  * Shared Stream Service - Replicates xTeVe's streaming architecture
@@ -1781,69 +1782,58 @@ class SharedStreamService
     {
         // First, kill the FFmpeg process if it exists
         $pid = $this->getProcessPid($streamKey);
-        if ($pid && $this->isProcessRunning($pid)) {
-            Log::channel('ffmpeg')->debug("Terminating FFmpeg process (PID: {$pid}) for stream {$streamKey}");
+        try {
+            if ($pid && $this->isProcessRunning($pid)) {
+                Log::channel('ffmpeg')->debug("Terminating FFmpeg process (PID: {$pid}) for stream {$streamKey}");
 
-            // Try graceful termination first (SIGTERM)
-            exec("kill -TERM {$pid} 2>/dev/null");
+                // Try graceful termination first (SIGTERM)
+                exec("kill -TERM {$pid} 2>/dev/null");
 
-            // Wait a moment for graceful shutdown
-            sleep(1);
+                // Wait a moment for graceful shutdown
+                sleep(1);
 
-            // If still running, force kill (SIGKILL)
-            if ($this->isProcessRunning($pid)) {
-                Log::channel('ffmpeg')->warning("FFmpeg process {$pid} didn't respond to SIGTERM, using SIGKILL");
-                exec("kill -KILL {$pid} 2>/dev/null");
-                sleep(1); // Give it a moment to die
+                // If still running, force kill (SIGKILL)
+                if ($this->isProcessRunning($pid)) {
+                    Log::channel('ffmpeg')->warning("FFmpeg process {$pid} didn't respond to SIGTERM, using SIGKILL");
+                    exec("kill -KILL {$pid} 2>/dev/null");
+                    sleep(1); // Give it a moment to die
+                }
+
+                // Verify it's actually dead
+                if (!$this->isProcessRunning($pid)) {
+                    Log::channel('ffmpeg')->debug("FFmpeg process {$pid} successfully terminated for stream {$streamKey}");
+                } else {
+                    Log::channel('ffmpeg')->error("Failed to terminate FFmpeg process {$pid} for stream {$streamKey}");
+                }
             }
 
-            // Verify it's actually dead
-            if (!$this->isProcessRunning($pid)) {
-                Log::channel('ffmpeg')->debug("FFmpeg process {$pid} successfully terminated for stream {$streamKey}");
-            } else {
-                Log::channel('ffmpeg')->error("Failed to terminate FFmpeg process {$pid} for stream {$streamKey}");
+            // Clean up active process if it exists
+            if (isset($this->activeProcesses[$streamKey])) {
+                $processInfo = $this->activeProcesses[$streamKey];
+
+                // Close file handles
+                if (is_resource($processInfo['stdout'])) {
+                    fclose($processInfo['stdout']);
+                }
+                if (is_resource($processInfo['stderr'])) {
+                    fclose($processInfo['stderr']);
+                }
+
+                // Close the process
+                if (is_resource($processInfo['process'])) {
+                    proc_close($processInfo['process']);
+                }
+
+                unset($this->activeProcesses[$streamKey]);
+                Log::channel('ffmpeg')->debug("Stream {$streamKey}: Cleaned up active process handles");
             }
+        } catch (\Exception $e) {
+            Log::channel('ffmpeg')->error("Error terminating FFmpeg process for {$streamKey}: " . $e->getMessage());
         }
 
-        // Clean up active process if it exists
-        if (isset($this->activeProcesses[$streamKey])) {
-            $processInfo = $this->activeProcesses[$streamKey];
-
-            // Close file handles
-            if (is_resource($processInfo['stdout'])) {
-                fclose($processInfo['stdout']);
-            }
-            if (is_resource($processInfo['stderr'])) {
-                fclose($processInfo['stderr']);
-            }
-
-            // Close the process
-            if (is_resource($processInfo['process'])) {
-                proc_close($processInfo['process']);
-            }
-
-            unset($this->activeProcesses[$streamKey]);
-            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Cleaned up active process handles");
-        }
-
-        // Remove all Redis data related to this stream
-
-        // Use the unique part of the stream identifier (1223568:hash)
-        preg_match('/channel:(\d+:[a-f0-9]+)/', $streamKey, $matches);
-        $streamIdentifier = $matches[1] ?? str_replace('shared_stream:', '', $streamKey);
-
-        // Use shell command since Laravel Redis isn't finding the keys correctly
-        $deleteCommand = "redis-cli --scan --pattern '*{$streamIdentifier}*' | xargs redis-cli del 2>/dev/null";
-        $output = shell_exec($deleteCommand);
-        $deletedCount = (int) trim($output);
-
-        if ($deletedCount > 0) {
-            Log::channel('ffmpeg')->debug("Stream {$streamKey}: Cleaned up {$deletedCount} Redis keys including all buffer segments via shell command");
-        } else {
-            Log::channel('ffmpeg')->debug("Stream {$streamKey}: No Redis keys found to clean up (pattern: *{$streamIdentifier}*)");
-        }
-
-        Log::channel('ffmpeg')->debug("Stream {$streamKey}: All Redis buffer data and keys cleaned up");
+        // Clean up Redis keys related to the stream
+        Log::channel('ffmpeg')->debug('Cleaning up Redis buffer for stream ' . $streamKey);
+        $this->cleanupStreamRedisKeys($streamKey);
 
         // Clean up files if requested
         if ($removeFiles) {
@@ -1879,6 +1869,43 @@ class SharedStreamService
         //         'health_check_at' => null, // Reset health check timestamp
         //         'health_status' => 'unknown' // Reset health status
         //     ]);
+    }
+
+    /**
+     * Remove all Redis keys related to a stream.
+     */
+    private function cleanupStreamRedisKeys(string $streamKey): void
+    {
+        $redis = $this->redis();
+
+        // This is the actual buffer key used for segments
+        $bufferKey = self::BUFFER_PREFIX . $streamKey;
+
+        // Find all keys that start with the buffer key (segments, segments list, etc)
+        $pattern = "{$bufferKey}:*";
+
+        // NOTE: keys will be prefixed automatically by Laravel if configured
+        $keys = $redis->keys($pattern);
+
+        // Also delete the segments list key itself (no colon at the end)
+        $keys[] = "{$bufferKey}:segments";
+
+        // Clean up bandwidth and other keys as before
+        $keys[] = "bandwidth:{$streamKey}";
+        $keys[] = "client_cursors:{$streamKey}";
+        $keys[] = "stream_failover_redirect:{$streamKey}";
+        $keys[] = "stream_activity_debounce:{$streamKey}";
+
+        // Delete all matching keys at once (if any)
+        $keys = array_filter($keys); // Remove any empty values
+        if (!empty($keys)) {
+            // Remove the prefix as Laravel adds it automatically, so we need to strip it for deletion
+            $prefix = config('database.redis.options.prefix', '');
+            $keys = array_map(fn($key) => Str::replaceFirst($prefix, '', $key), $keys);
+            $redis->del($keys);
+        }
+
+        Log::channel('ffmpeg')->debug("Stream {$streamKey}: Cleaned up Redis buffer keys: " . implode(', ', $keys));
     }
 
     /**
