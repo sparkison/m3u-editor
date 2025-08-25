@@ -88,16 +88,16 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->navigationGroups([
                 NavigationGroup::make('Playlist')
-                    ->icon('heroicon-o-play'),
+                    ->icon('heroicon-m-play'),
                 NavigationGroup::make('Channels & VOD')
-                    ->icon('heroicon-o-film'),
+                    ->icon('heroicon-m-film'),
                 NavigationGroup::make('Series')
-                    ->icon('heroicon-o-video-camera'),
+                    ->icon('heroicon-m-video-camera'),
                 NavigationGroup::make('EPG')
-                    ->icon('heroicon-o-calendar-days'),
+                    ->icon('heroicon-m-calendar-days'),
                 NavigationGroup::make('Tools')
                     ->collapsed()
-                    ->icon('heroicon-o-cog'),
+                    ->icon('heroicon-m-wrench-screwdriver'),
             ])
             ->breadcrumbs($settings['show_breadcrumbs'])
             ->widgets([
