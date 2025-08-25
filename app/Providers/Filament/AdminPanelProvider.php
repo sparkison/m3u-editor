@@ -20,7 +20,6 @@ use App\Filament\Widgets\SystemHealthWidget;
 use App\Models\SharedStream;
 use App\Settings\GeneralSettings;
 use Boquizo\FilamentLogViewer\FilamentLogViewerPlugin;
-use Filafly\Themes\Brisk\BriskTheme;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -121,7 +120,6 @@ class AdminPanelProvider extends PanelProvider
                     ->navigationGroup('Tools')
                     ->navigationSort(99)
                     ->authorize(fn(): bool => $settings['show_logs'] && in_array(auth()->user()->email, config('dev.admin_emails'), true)),
-                BriskTheme::make(),
             ])
             ->maxContentWidth($settings['content_width'])
             ->middleware([
