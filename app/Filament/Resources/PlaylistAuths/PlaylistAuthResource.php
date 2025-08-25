@@ -48,6 +48,11 @@ class PlaylistAuthResource extends Resource
             ->where('user_id', auth()->id());
     }
 
+    public static function getNavigationSort(): ?int
+    {
+        return 5;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema

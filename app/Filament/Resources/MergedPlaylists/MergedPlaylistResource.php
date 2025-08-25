@@ -47,6 +47,7 @@ class MergedPlaylistResource extends Resource
     protected static ?string $model = MergedPlaylist::class;
 
     protected static ?string $recordTitleAttribute = 'name';
+    protected static string | \UnitEnum | null $navigationGroup = 'Playlist';
 
     public static function getGloballySearchableAttributes(): array
     {

@@ -35,6 +35,11 @@ class PersonalAccessTokenResource extends Resource
             ->where('tokenable_id', auth()->id());
     }
 
+    public static function getNavigationSort(): ?int
+    {
+        return 0;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema

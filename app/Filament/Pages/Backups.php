@@ -20,6 +20,11 @@ class Backups extends BaseBackups
     protected static ?string $navigationLabel = 'Backup & Restore';
     protected ?string $subheading = 'NOTE: Restoring a backup will overwrite any existing data. Your manually uploaded EPG and Playlist files will NOT be restored. You will need to download the backup and manually re-upload where needed.';
 
+    public static function getNavigationSort(): ?int
+    {
+        return 2;
+    }
+
     protected function getActions(): array
     {
         $data = [];

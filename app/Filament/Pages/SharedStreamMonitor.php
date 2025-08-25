@@ -27,10 +27,10 @@ use Illuminate\Support\Facades\Redis;
  */
 class SharedStreamMonitor extends Page
 {
-    protected static ?string $navigationLabel = 'Buffered Streams';
-    protected static ?string $title = 'Buffered Stream Monitor';
+    protected static ?string $navigationLabel = 'Stream Monitor';
+    protected static ?string $title = 'Stream Monitor';
     protected static string | \UnitEnum | null $navigationGroup = 'Tools';
-    protected static ?int $navigationSort = 15;
+    protected static ?int $navigationSort = 5;
 
     protected string $view = 'filament.pages.shared-stream-monitor';
 

@@ -78,6 +78,7 @@ class PlaylistResource extends Resource
     protected static ?string $model = Playlist::class;
 
     protected static ?string $recordTitleAttribute = 'name';
+    protected static string | \UnitEnum | null $navigationGroup = 'Playlist';
 
     public static function getRecordTitle(?Model $record): string|null|Htmlable
     {
@@ -94,8 +95,6 @@ class PlaylistResource extends Resource
         return parent::getGlobalSearchEloquentQuery()
             ->where('user_id', Auth::id());
     }
-
-    protected static string | \UnitEnum | null $navigationGroup = 'Playlist';
 
     public static function getNavigationSort(): ?int
     {

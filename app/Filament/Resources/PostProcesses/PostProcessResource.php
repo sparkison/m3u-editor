@@ -57,6 +57,11 @@ class PostProcessResource extends Resource
             ->where('user_id', auth()->id());
     }
 
+    public static function getNavigationSort(): ?int
+    {
+        return 4;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema
