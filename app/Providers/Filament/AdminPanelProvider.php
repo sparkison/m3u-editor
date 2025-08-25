@@ -25,6 +25,7 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -93,11 +94,17 @@ class AdminPanelProvider extends PanelProvider
                 CustomDashboard::class
             ])
             ->navigationGroups([
-                'Playlist',
-                'Channels & VOD',
-                'Series',
-                'EPG',
-                'Tools'
+                NavigationGroup::make('Playlist')
+                    ->icon('heroicon-o-play'),
+                NavigationGroup::make('Channels & VOD')
+                    ->icon('heroicon-o-film'),
+                NavigationGroup::make('Series')
+                    ->icon('heroicon-o-video-camera'),
+                NavigationGroup::make('EPG')
+                    ->icon('heroicon-o-calendar-days'),
+                NavigationGroup::make('Tools')
+                    ->collapsed()
+                    ->icon('heroicon-o-cog'),
             ])
             ->breadcrumbs($settings['show_breadcrumbs'])
             ->widgets([
