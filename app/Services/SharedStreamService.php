@@ -2362,6 +2362,12 @@ class SharedStreamService
                 Log::channel('ffmpeg')->debug("No active FFmpeg process found for stream {$streamId}");
             }
 
+            // Decrement active stream count for playlist
+            $playlistId = $streamInfo['options']['playlist_id'] ?? null;
+            if ($playlistId) {
+                $this->decrementActiveStreams($playlistId);
+            }
+            
             // Clean up the stream data (this will also stop the process)
             $this->cleanupStream($streamId, true);
             Log::channel('ffmpeg')->debug("Successfully stopped stream {$streamId} manually");
