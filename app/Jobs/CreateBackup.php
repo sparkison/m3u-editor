@@ -8,6 +8,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class CreateBackup implements ShouldQueue
 {
@@ -64,12 +65,12 @@ class CreateBackup implements ShouldQueue
                 Notification::make()
                     ->danger()
                     ->title("Backup create failed")
-                    ->body($message)
+                    ->body("Backup create failed, please check the error logs for details")
                     ->broadcast($user);
                 Notification::make()
                     ->danger()
                     ->title("Backup create failed")
-                    ->body($message)
+                    ->body(Str::limit($message, 500))
                     ->sendToDatabase($user);
             }
         }
