@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use Exception;
-use Illuminate\Http\JsonResponse;
 use App\Models\Channel;
 use App\Models\Episode;
 use App\Services\SharedStreamService;
@@ -190,7 +188,7 @@ class SharedStreamController extends Controller
             } else {
                 return $this->streamDirect($streamInfo, $clientId, $request);
             }
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             Log::channel('ffmpeg')->error("Error starting shared stream for {$type} {$title}: " . $e->getMessage());
             abort(500, 'Failed to start stream: ' . $e->getMessage());
         }
@@ -423,7 +421,7 @@ class SharedStreamController extends Controller
     /**
      * Get stream statistics (similar to xTeVe's web interface)
      */
-    public function getStreamStats(Request $request): JsonResponse
+    public function getStreamStats(Request $request): \Illuminate\Http\JsonResponse
     {
         $streams = $this->sharedStreamService->getAllActiveStreams();
 
@@ -453,7 +451,7 @@ class SharedStreamController extends Controller
     /**
      * Stop a specific shared stream (admin function)
      */
-    public function stopStream(Request $request, string $streamKey): JsonResponse
+    public function stopStream(Request $request, string $streamKey): \Illuminate\Http\JsonResponse
     {
         $activeClients = $this->sharedStreamService->getClients($streamKey);
 
@@ -470,7 +468,7 @@ class SharedStreamController extends Controller
     /**
      * Test streaming with the provided URL
      */
-    public function testStream(Request $request): JsonResponse
+    public function testStream(Request $request): \Illuminate\Http\JsonResponse
     {
         $request->validate([
             'url' => 'required|url',
@@ -504,7 +502,7 @@ class SharedStreamController extends Controller
                     ? route('shared.stream.hls', ['streamKey' => $streamInfo['stream_key']])
                     : route('shared.stream.direct', ['streamKey' => $streamInfo['stream_key']])
             ]);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return response()->json([
                 'error' => 'Failed to start test stream: ' . $e->getMessage()
             ], 500);
