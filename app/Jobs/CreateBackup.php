@@ -7,10 +7,17 @@ use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
 
 class CreateBackup implements ShouldQueue
 {
     use Queueable;
+
+    // Only try to process the job twice
+    public $tries = 2;
+
+    // Giving a timeout of 10 minutes to the Job to process the mapping
+    public $timeout = 60 * 10;
 
     /**
      * Create a new job instance.
@@ -66,5 +73,13 @@ class CreateBackup implements ShouldQueue
                     ->sendToDatabase($user);
             }
         }
+    }
+
+    /**
+     * Handle a job failure.
+     */
+    public function failed(\Throwable $exception): void
+    {
+        Log::error("Backup creation failed: {$exception->getMessage()}");
     }
 }
