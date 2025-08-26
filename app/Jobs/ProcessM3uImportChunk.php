@@ -71,22 +71,24 @@ class ProcessM3uImportChunk implements ShouldQueue
             // Upsert the channels
             Channel::upsert($bulk, uniqueBy: ['source_id', 'playlist_id'], update: [
                 // Don't update the following fields...
-                // 'title',
-                // 'name',
-                // 'group', // user override
-                // 'stream_id',
-                // 'playlist_id',
-                // 'user_id',
-                // 'logo', // user override
-                // 'channel', // user override
+                // 'title_custom',
+                // 'name_custom',
+                // 'group', // user overridable value
+                // 'logo', // user overridable value
+                // 'channel', // user overridable value
+                // 'stream_id', // won't change
+                // 'playlist_id', // won't change
+                // 'user_id', // won't change
                 // 'enabled',
                 // 'epg_channel_id',
-                // 'new'
+                // 'new',
                 // 'sort',
                 // ...only update the following fields
                 'url',
+                'title', // provider title, update this if it changes
+                'name', // provider name, update this if it changes
                 'logo_internal', // provider logo path fallback
-                'group_internal',
+                'group_internal', // provider group, update if it changes
                 'lang', // should we update this? Not sure it's set anywhere...
                 'country', // should we update this? Not sure it's set anywhere...
                 'import_batch_no',
