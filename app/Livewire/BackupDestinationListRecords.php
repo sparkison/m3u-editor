@@ -132,12 +132,12 @@ class BackupDestinationListRecords extends Component implements HasForms, HasTab
                 BulkActionGroup::make([
                     BulkAction::make('delete')
                         ->label('Delete selected')
-                        ->action(function (Collection $records): void {
+                        ->action(function ($records): void {
                             foreach ($records as $record) {
-                                SpatieBackupDestination::create($record->disk, config('backup.backup.name'))
+                                SpatieBackupDestination::create($record['disk'], config('backup.backup.name'))
                                     ->backups()
                                     ->first(function (Backup $backup) use ($record) {
-                                        return $backup->path() === $record->path;
+                                        return $backup->path() === $record['path'];
                                     })
                                     ->delete();
                             }

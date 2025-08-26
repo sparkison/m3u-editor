@@ -1,6 +1,5 @@
 <?php
 
-use Filament\Support\Enums\MaxWidth;
 use Spatie\LaravelSettings\Migrations\SettingsMigration;
 
 return new class extends SettingsMigration
@@ -41,7 +40,7 @@ return new class extends SettingsMigration
             $this->migrator->add('general.mediaflow_proxy_password', null);
         }
         if (!$this->migrator->exists('general.content_width')) {
-            $this->migrator->add('general.content_width', MaxWidth::ScreenExtraLarge->value);
+            $this->migrator->add('general.content_width', 'screen-xl');
         }
     }
 };
