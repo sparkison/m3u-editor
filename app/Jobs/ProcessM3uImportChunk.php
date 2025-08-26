@@ -76,17 +76,19 @@ class ProcessM3uImportChunk implements ShouldQueue
                 // 'group', // user overridable value
                 // 'logo', // user overridable value
                 // 'channel', // user overridable value
-                // 'stream_id', // won't change
+                // 'stream_id_custom', // user overridable value
                 // 'playlist_id', // won't change
                 // 'user_id', // won't change
                 // 'enabled',
                 // 'epg_channel_id',
                 // 'new',
                 // 'sort',
+                // 'source_id', // won't change - for Xtream API this will be the `stream_id`, for M3U it will be a hash of the title, name, group and playlist ID
                 // ...only update the following fields
                 'url',
                 'title', // provider title, update this if it changes
                 'name', // provider name, update this if it changes
+                'stream_id', // provider stream ID or tvg-id, update this if it changes (for Xtream API this could be `epg_channel_id`)
                 'logo_internal', // provider logo path fallback
                 'group_internal', // provider group, update if it changes
                 'lang', // should we update this? Not sure it's set anywhere...
