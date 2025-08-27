@@ -554,6 +554,7 @@ class ProcessM3uImport implements ShouldQueue
                     'group' => '',
                     'group_internal' => '',
                     'stream_id' => null,
+                    'station_id' => null,
                     'lang' => null,
                     'country' => null,
                     'playlist_id' => $playlistId,
@@ -588,6 +589,7 @@ class ProcessM3uImport implements ShouldQueue
                     $attributes = [
                         'name' => 'tvg-name',
                         'stream_id' => 'tvg-id',
+                        'station_id' => 'tvc-guide-stationid', // import Gracenote station ID if available
                         'logo_internal' => 'tvg-logo',
                         'group' => 'group-title',
                         'group_internal' => 'group-title',
