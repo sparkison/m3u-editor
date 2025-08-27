@@ -19,11 +19,25 @@ use Filament\Forms;
 
 class Backups extends BaseBackups
 {
-    protected static ?string $navigationIcon = 'heroicon-o-arrow-path';
-
     protected static ?string $navigationLabel = 'Backup & Restore';
+    protected static ?string $navigationIcon = '';
 
     protected ?string $subheading = 'NOTE: Restoring a backup will overwrite any existing data. Your manually uploaded EPG and Playlist files will NOT be restored. You will need to download the backup and manually re-upload where needed.';
+
+    public function getHeading(): string|Htmlable
+    {
+        return 'Manage Backups';
+    }
+
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Tools';
+    }
+
+    public function shouldDisplayStatusListRecords(): bool
+    {
+        return false;
+    }
 
     protected function getActions(): array
     {
@@ -110,20 +124,5 @@ class Backups extends BaseBackups
                     ->modalSubmitActionLabel('Create now'),
             ])->button()->label('Actions')
         ];
-    }
-
-    public function getHeading(): string|Htmlable
-    {
-        return 'Manage Backups';
-    }
-
-    public static function getNavigationGroup(): ?string
-    {
-        return 'Tools';
-    }
-
-    public function shouldDisplayStatusListRecords(): bool
-    {
-        return false;
     }
 }

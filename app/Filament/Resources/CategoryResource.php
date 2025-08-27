@@ -36,8 +36,6 @@ class CategoryResource extends Resource
             ->where('user_id', auth()->id());
     }
 
-    protected static ?string $navigationIcon = 'heroicon-o-queue-list';
-
     protected static ?string $navigationGroup = 'Series';
 
     public static function getNavigationSort(): ?int

@@ -86,7 +86,7 @@
                         <x-heroicon-s-video-camera class="h-12 w-12" />
                     </div>
                     <p class="text-lg font-medium">No active streams</p>
-                    <p class="text-sm">Buffered streams will appear here when clients connect</p>
+                    <p class="text-sm">Streams will appear here when clients connect</p>
                 </div>
             </x-filament::card>
         @else

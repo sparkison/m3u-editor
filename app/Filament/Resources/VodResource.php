@@ -55,14 +55,9 @@ class VodResource extends Resource
             ->where('is_vod', true);
     }
 
-    protected static ?string $navigationIcon = 'heroicon-o-film';
-
     protected static ?string $navigationGroup = 'Channels & VOD';
-
     protected static ?string $navigationLabel = 'VOD Channels';
-
     protected static ?string $modelLabel = 'VOD Channel';
-
     protected static ?string $pluralModelLabel = 'VOD Channels';
 
     public static function getNavigationSort(): ?int

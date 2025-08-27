@@ -39,8 +39,6 @@ class CustomPlaylistResource extends Resource
             ->where('user_id', \Illuminate\Support\Facades\Auth::id());
     }
 
-    protected static ?string $navigationIcon = 'heroicon-o-list-bullet';
-
     protected static ?string $navigationGroup = 'Playlist';
 
     public static function getNavigationSort(): ?int

@@ -42,8 +42,6 @@ class SeriesResource extends Resource
             ->where('user_id', auth()->id());
     }
 
-    protected static ?string $navigationIcon = 'heroicon-o-film';
-
     protected static ?string $navigationGroup = 'Series';
 
     public static function getNavigationSort(): ?int

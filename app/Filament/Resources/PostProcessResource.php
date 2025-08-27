@@ -32,8 +32,6 @@ class PostProcessResource extends Resource
             ->where('user_id', auth()->id());
     }
 
-    protected static ?string $navigationIcon = 'heroicon-o-rocket-launch';
-
     protected static ?string $label = 'Post Process';
     protected static ?string $pluralLabel = 'Post Processing';
 

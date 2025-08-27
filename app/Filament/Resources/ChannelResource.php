@@ -55,8 +55,6 @@ class ChannelResource extends Resource
             ->where('is_vod', false);
     }
 
-    protected static ?string $navigationIcon = 'heroicon-o-film';
-
     protected static ?string $navigationGroup = 'Channels & VOD';
 
     protected static ?string $navigationLabel = 'Live Channels';

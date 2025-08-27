@@ -20,8 +20,6 @@ class PlaylistSyncStatusResource extends Resource
     protected static ?string $model = PlaylistSyncStatus::class;
     protected static ?string $label = 'Sync logs';
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
-
     public static ?string $parentResource = PlaylistResource::class;
 
 

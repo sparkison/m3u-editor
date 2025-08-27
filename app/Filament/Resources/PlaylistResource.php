@@ -62,8 +62,6 @@ class PlaylistResource extends Resource
             ->where('user_id', \Illuminate\Support\Facades\Auth::id());
     }
 
-    protected static ?string $navigationIcon = 'heroicon-o-play';
-
     protected static ?string $navigationGroup = 'Playlist';
 
     public static function getNavigationSort(): ?int
