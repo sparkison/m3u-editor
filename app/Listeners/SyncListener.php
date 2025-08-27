@@ -61,38 +61,7 @@ class SyncListener
         // Update status to Processing (so UI components will continue to refresh) and dispatch cache job
         $epg->update(['status' => Status::Processing]);
 
-        // Create jobs array, with cache generation as the first job
-        $jobs = [new GenerateEpgCache($epg->uuid, notify: true)];
-
-        // Check if there are any sync jobs that should be re-run
-        EpgMap::where([
-            ['epg_id', '=', $epg->id],
-            ['recurring', '=', true],
-            ['playlist_id', '!=', null],
-        ])->get()->each(function ($map) use (&$jobs) {
-            $jobs[] = new MapPlaylistChannelsToEpg(
-                epg: $map->epg_id,
-                playlist: $map->playlist_id,
-                epgMapId: $map->id,
-            );
-        });
-
-        // Bus jobs
-        Bus::chain($jobs)
-            ->onConnection('redis') // force to use redis connection
-            ->onQueue('import')
-            ->catch(function (Throwable $e) use ($epg) {
-                $error = "Error post-processing \"{$epg->name}\": {$e->getMessage()}";
-                Notification::make()
-                    ->danger()
-                    ->title("Error post-processing \"{$epg->name}\"")
-                    ->body('Please view your notifications for details.')
-                    ->broadcast($epg->user);
-                Notification::make()
-                    ->danger()
-                    ->title("Error post-processing \"{$epg->name}\"")
-                    ->body($error)
-                    ->sendToDatabase($epg->user);
-            })->dispatch();
+        // Dispatch cache generation job
+        dispatch(new GenerateEpgCache($epg->uuid, notify: true));
     }
 }
