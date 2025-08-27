@@ -188,7 +188,7 @@ return [
             'maxProcesses' => (bool) env('ENABLE_POSTGRES', false) ? 10 : 1,
             'maxTime' => 0,
             'maxJobs' => 0,
-            'memory' => 256, // MB
+            'memory' => 512, // MB
             'tries' => 3, // Number of times to attempt a job before marking it as failed
             'timeout' => 60 * 30, // 30 minutes
             'nice' => 0,
