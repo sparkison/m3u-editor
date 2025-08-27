@@ -85,20 +85,8 @@ class GenerateEpgCache implements ShouldQueue
     {
         $epg = Epg::where('uuid', $this->uuid)->first();
         if ($epg) {
-            $epg->update([
-                'status' => Status::Failed,
-                'cache_progress' => 0,
-            ]);
-
-            Log::error("EPG cache generation failed for {$epg->name}: {$exception->getMessage()}");
-
-            // Always send failure notification
-            Notification::make()
-                ->danger()
-                ->title("EPG cache generation failed for \"{$epg->name}\"")
-                ->body("Error: {$exception->getMessage()}")
-                ->broadcast($epg->user)
-                ->sendToDatabase($epg->user);
+            // We'll just log a warning since this is likely an false-positive ("Job has been tried too many times") as the job typically finishes successfully on retry
+            Log::warning("EPG cache generation failed for {$epg->name}: {$exception->getMessage()}");
         }
     }
 }
