@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\Status;
 use App\Jobs\GenerateEpgCache;
 use App\Models\Epg;
 use App\Services\EpgCacheService;
@@ -35,6 +36,9 @@ class EpgCacheHealthCheck extends Command
         } else {
             $this->info('Checking EPG cache health...');
             foreach ($epgs as $epg) {
+                if ($epg->status !== Status::Completed) {
+                    continue; // Skip EPGs that are not completed (e.g., still processing)
+                }
                 if (!$cacheService->isCacheValid($epg)) {
                     $this->warn("Cache for EPG \"{$epg->name}\" is invalid. Regenerating...");
                     $epg->update(['is_cached' => false]);
