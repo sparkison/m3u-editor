@@ -42,7 +42,7 @@ class MapEpgToChannelsComplete implements ShouldQueue
         $completedInRounded = round($completedIn, 2);
 
         // Clear out the jobs
-        Job::where(['batch_no', $this->batchNo])->delete();
+        Job::where('batch_no', $this->batchNo)->delete();
 
         // Get the map
         $map = EpgMap::where('uuid', $this->batchNo)->first();

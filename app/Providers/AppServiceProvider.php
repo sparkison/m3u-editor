@@ -70,6 +70,8 @@ class AppServiceProvider extends ServiceProvider
                         PRAGMA foreign_keys = true;
                         PRAGMA busy_timeout = 5000;
                         PRAGMA temp_store = memory;
+                        PRAGMA auto_vacuum = incremental;
+                        PRAGMA incremental_vacuum;
                     ');
             }
         } catch (\Throwable $throwable) {

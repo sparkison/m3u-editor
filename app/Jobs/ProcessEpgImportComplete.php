@@ -61,7 +61,7 @@ class ProcessEpgImportComplete implements ShouldQueue
         ])->delete();
 
         // Clear out the jobs
-        Job::where(['batch_no', $this->batchNo])->delete();
+        Job::where('batch_no', $this->batchNo)->delete();
 
         // Update the epg
         $epg->update([
