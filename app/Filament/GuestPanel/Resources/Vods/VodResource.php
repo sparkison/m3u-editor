@@ -50,7 +50,6 @@ class VodResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $playlist = PlaylistFacade::resolvePlaylistByUuid(static::getCurrentUuid());
-        dump(self::$uuid);
         return parent::getEloquentQuery()
             ->where([
                 ['enabled', true], // Only show enabled channels
