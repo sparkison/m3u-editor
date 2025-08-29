@@ -1,19 +1,19 @@
 <?php
 
-namespace App\Filament\GuestPanel\Resources\VODS\Pages;
+namespace App\Filament\GuestPanel\Resources\Vods\Pages;
 
 use App\Facades\PlaylistFacade;
 use App\Filament\GuestPanel\Pages\Concerns\HasPlaylist;
-use App\Filament\GuestPanel\Resources\VODS\VODResource;
+use App\Filament\GuestPanel\Resources\Vods\VODResource;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
 
-class ListVODS extends ListRecords
+class ListVod extends ListRecords
 {
     use HasPlaylist;
 
-    protected static string $resource = VODResource::class;
+    protected static string $resource = VodResource::class;
     protected static ?string $title = '';
 
     // @TODO:
