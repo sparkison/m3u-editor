@@ -58,6 +58,7 @@ class GuestPanelPanelProvider extends PanelProvider
             ->authMiddleware([
                 GuestPlaylistAuth::class,
             ])
+            ->breadcrumbs(false)
             ->viteTheme('resources/css/app.css')
             ->spa()
             ->topNavigation()

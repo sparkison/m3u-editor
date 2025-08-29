@@ -18,11 +18,6 @@ class GuestDashboard extends GuestAuthPage
         return '';
     }
 
-    protected static function getCurrentUuid(): ?string
-    {
-        return request()->route('uuid') ?? request()->attributes->get('playlist_uuid');
-    }
-
     public static function getUrl(
         array $parameters = [],
         bool $isAbsolute = true,

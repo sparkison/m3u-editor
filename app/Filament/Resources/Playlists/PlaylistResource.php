@@ -323,6 +323,11 @@ class PlaylistResource extends Resource
                         ->icon('heroicon-o-arrow-top-right-on-square')
                         ->url(fn($record) => PlaylistFacade::getUrls($record)['hdhr'])
                         ->openUrlInNewTab(),
+                    Action::make('Public URL')
+                        ->label('Public URL')
+                        ->icon('heroicon-o-arrow-top-right-on-square')
+                        ->url(fn($record) => '/playlist/' . $record->uuid)
+                        ->openUrlInNewTab(),
                     Action::make('Duplicate')
                         ->label('Duplicate')
                         ->schema([

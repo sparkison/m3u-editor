@@ -129,11 +129,13 @@ class SeriesResource extends Resource
             TextColumn::make('seasons_count')
                 ->label('Seasons')
                 ->counts('seasons')
+                ->badge()
                 ->toggleable()
                 ->sortable(),
             TextColumn::make('episodes_count')
                 ->label('Episodes')
                 ->counts('episodes')
+                ->badge()
                 ->toggleable()
                 ->sortable(),
             TextColumn::make('category.name')

@@ -1,0 +1,143 @@
+<?php
+
+namespace App\Filament\GuestPanel\Resources\Series;
+
+use App\Filament\GuestPanel\Pages\Concerns\HasPlaylist;
+use App\Filament\GuestPanel\Resources\Series\RelationManagers\EpisodesRelationManager;
+use App\Models\Series;
+use BackedEnum;
+use Filament\Actions;
+use Filament\Forms;
+use Filament\Infolists;
+use Filament\Tables\Columns;
+use Filament\Resources\Resource;
+use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
+use Filament\Tables;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Tables\Table;
+use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Builder;
+
+class SeriesResource extends Resource
+{
+    use HasPlaylist;
+
+    protected static ?string $model = Series::class;
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-s-play';
+    protected static ?string $slug = 'series';
+
+    public static function getUrl(
+        ?string $name = null,
+        array $parameters = [],
+        bool $isAbsolute = true,
+        ?string $panel = null,
+        ?\Illuminate\Database\Eloquent\Model $tenant = null,
+        bool $shouldGuessMissingParameters = false
+    ): string {
+        $parameters['uuid'] = static::getCurrentUuid();
+
+        // Default to 'index' if $name is not provided
+        $routeName = static::getRouteBaseName($panel) . '.' . ($name ?? 'index');
+
+        return route($routeName, $parameters, $isAbsolute);
+    }
+
+    public static function form(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                //
+            ]);
+    }
+
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                //
+            ]);
+    }
+
+    public static function table(Table $table): Table
+    {
+        return $table
+            ->columns([
+                Columns\ImageColumn::make('cover')
+                    ->width(80)
+                    ->height(120)
+                    ->searchable(),
+                Columns\TextColumn::make('name')
+                    ->description((fn($record) => Str::limit($record->plot, 200)))
+                    ->wrap()
+                    ->extraAttributes(['style' => 'min-width: 350px;'])
+                    ->searchable()
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->orWhereRaw('LOWER(series.name) LIKE ?', ['%' . strtolower($search) . '%']);
+                    }),
+                Columns\TextColumn::make('seasons_count')
+                    ->label('Seasons')
+                    ->counts('seasons')
+                    ->badge()
+                    ->toggleable()
+                    ->sortable(),
+                Columns\TextColumn::make('episodes_count')
+                    ->label('Episodes')
+                    ->counts('episodes')
+                    ->badge()
+                    ->toggleable()
+                    ->sortable(),
+                Columns\TextColumn::make('category.name')
+                    ->numeric()
+                    ->sortable(),
+                Columns\TextColumn::make('genre')
+                    ->searchable(),
+                Columns\TextColumn::make('youtube_trailer')
+                    ->label('YouTube Trailer')
+                    ->placeholder('No trailer ID set.')
+                    ->url(fn($record): string => 'https://www.youtube.com/watch?v=' . $record->youtube_trailer)
+                    ->openUrlInNewTab()
+                    ->icon('heroicon-s-play'),
+                Columns\TextColumn::make('release_date')
+                    ->searchable(),
+                Columns\TextColumn::make('rating')
+                    ->searchable(),
+                Columns\TextColumn::make('rating_5based')
+                    ->numeric()
+                    ->sortable(),
+                Columns\TextColumn::make('created_at')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Columns\TextColumn::make('updated_at')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+            ])
+            ->filters([
+                //
+            ])
+            ->recordActions([
+                Actions\ViewAction::make()
+                    ->button()->hiddenLabel()->size('sm'),
+            ], position: RecordActionsPosition::BeforeCells)
+            ->toolbarActions([
+                //
+            ]);
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            EpisodesRelationManager::class,
+        ];
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' => Pages\ListSeries::route('/'),
+            'view' => Pages\ViewSeries::route('/{record}'),
+        ];
+    }
+}

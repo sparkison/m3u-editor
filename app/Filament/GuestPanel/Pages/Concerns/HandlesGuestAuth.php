@@ -19,7 +19,13 @@ class GuestAuthPage extends Page implements HasSchemas
     public ?array $data = [];
     public $playlist = null;
     public $playlistName = null;
+    public $playlistUuid = null;
     public $authError = '';
+
+    protected static function getCurrentUuid(): ?string
+    {
+        return request()->route('uuid') ?? request()->attributes->get('playlist_uuid');
+    }
 
     public function mount(): void
     {
@@ -30,10 +36,11 @@ class GuestAuthPage extends Page implements HasSchemas
         ]);
 
         // Load playlist info
-        $playlist = PlaylistFacade::resolvePlaylistByUuid($this->getCurrentUuid());
+        $playlist = PlaylistFacade::resolvePlaylistByUuid(static::getCurrentUuid());
 
         $this->playlist = $playlist;
         $this->playlistName = $playlist->name ?? 'Playlist';
+        $this->playlistUuid = $playlist->uuid ?? null;
     }
 
     public function login(): void
@@ -90,13 +97,25 @@ class GuestAuthPage extends Page implements HasSchemas
             return false;
         }
         $result = PlaylistFacade::authenticate($username, $password);
-        return $result && $result[0];
+
+        // If authenticated, check if the playlist UUID matches
+        if ($result && $result[0]) {
+            if ($result[0]->uuid !== $this->playlistUuid) {
+                return false;
+            }
+            return true;
+        }
+
+        return false;
     }
 
     protected function tryAuthenticate(string $username, string $password): bool
     {
         $result = PlaylistFacade::authenticate($username, $password);
         if ($result && $result[0]) {
+            if ($result[0]->uuid !== $this->playlistUuid) {
+                return false;
+            }
             session(['guest_auth_username' => $username, 'guest_auth_password' => $password]);
             return true;
         }
