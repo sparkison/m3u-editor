@@ -120,6 +120,7 @@ class AdminPanelProvider extends PanelProvider
                     ->navigationGroup('Tools')
                     ->navigationSort(99)
                     ->navigationIcon('')
+                    ->navigationLabel('Logs')
                     ->authorize(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true)),
             ])
             ->maxContentWidth($settings['content_width'])

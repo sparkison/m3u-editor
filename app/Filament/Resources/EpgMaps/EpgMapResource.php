@@ -41,7 +41,7 @@ class EpgMapResource extends Resource
     protected static ?string $label = 'EPG Map';
     protected static ?string $pluralLabel = 'EPG Maps';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Playlist';
+    protected static string | \UnitEnum | null $navigationGroup = 'EPG';
 
     public static function getNavigationSort(): ?int
     {
