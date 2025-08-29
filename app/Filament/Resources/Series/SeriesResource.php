@@ -140,6 +140,7 @@ class SeriesResource extends Resource
                 ->sortable(),
             TextColumn::make('category.name')
                 ->hidden(fn() => !$showCategory)
+                ->badge()
                 ->numeric()
                 ->sortable(),
             TextColumn::make('genre')
@@ -153,9 +154,14 @@ class SeriesResource extends Resource
             TextColumn::make('release_date')
                 ->searchable(),
             TextColumn::make('rating')
+                ->badge()
+                ->color('success')
+                ->icon('heroicon-m-star')
                 ->searchable(),
             TextColumn::make('rating_5based')
-                ->numeric()
+                ->badge()
+                ->color('success')
+                ->icon('heroicon-m-star')
                 ->sortable(),
             TextColumn::make('playlist.name')
                 ->numeric()
