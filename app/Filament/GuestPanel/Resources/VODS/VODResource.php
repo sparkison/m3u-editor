@@ -19,6 +19,7 @@ use Illuminate\Support\HtmlString;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 use App\Enums\ChannelLogoType;
+use App\Facades\PlaylistFacade;
 use Filament\Tables\Enums\RecordActionsPosition;
 
 class VodResource extends Resource
@@ -48,8 +49,13 @@ class VodResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
+        $playlist = PlaylistFacade::resolvePlaylistByUuid(static::getCurrentUuid());
         return parent::getEloquentQuery()
-            ->where('is_vod', true);
+            ->where([
+                ['enabled', true], // Only show enabled channels
+                ['is_vod', true], // Only show VOD channels
+                ['playlist_id', $playlist?->id] // Only show VOD channels from the current playlist
+            ]);
     }
 
     public static function form(Schema $schema): Schema

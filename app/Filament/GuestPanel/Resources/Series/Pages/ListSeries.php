@@ -2,7 +2,6 @@
 
 namespace App\Filament\GuestPanel\Resources\Series\Pages;
 
-use App\Facades\PlaylistFacade;
 use App\Filament\GuestPanel\Pages\Concerns\HasPlaylist;
 use App\Filament\GuestPanel\Resources\Series\SeriesResource;
 use Filament\Actions;
@@ -32,19 +31,5 @@ class ListSeries extends ListRecords
     protected function getHeaderActions(): array
     {
         return [];
-    }
-
-    /**
-     * @deprecated Override the `table()` method to configure the table.
-     */
-    protected function getTableQuery(): ?Builder
-    {
-        // Filter series by the current playlist
-        $playlist = PlaylistFacade::resolvePlaylistByUuid(static::getCurrentUuid());
-        return static::getResource()::getEloquentQuery()
-            ->where([
-                ['enabled', true], // Only show enabled series
-                ['playlist_id', $playlist?->id]
-            ]);
     }
 }

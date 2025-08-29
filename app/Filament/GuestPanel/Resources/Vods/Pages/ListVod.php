@@ -2,7 +2,6 @@
 
 namespace App\Filament\GuestPanel\Resources\Vods\Pages;
 
-use App\Facades\PlaylistFacade;
 use App\Filament\GuestPanel\Pages\Concerns\HasPlaylist;
 use App\Filament\GuestPanel\Resources\Vods\VODResource;
 use Filament\Actions;
@@ -34,20 +33,5 @@ class ListVod extends ListRecords
         return [
             //
         ];
-    }
-
-    /**
-     * @deprecated Override the `table()` method to configure the table.
-     */
-    protected function getTableQuery(): ?Builder
-    {
-        // Filter series by the current playlist
-        $playlist = PlaylistFacade::resolvePlaylistByUuid(static::getCurrentUuid());
-        return static::getResource()::getEloquentQuery()
-            ->where([
-                ['enabled', true], // Only show enabled channels
-                ['is_vod', true], // Only show VOD
-                ['playlist_id', $playlist?->id]
-            ]);
     }
 }

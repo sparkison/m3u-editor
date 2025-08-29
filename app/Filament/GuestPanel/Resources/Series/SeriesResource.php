@@ -2,6 +2,7 @@
 
 namespace App\Filament\GuestPanel\Resources\Series;
 
+use App\Facades\PlaylistFacade;
 use App\Filament\GuestPanel\Pages\Concerns\HasPlaylist;
 use App\Filament\GuestPanel\Resources\Series\RelationManagers\EpisodesRelationManager;
 use App\Models\Series;
@@ -40,6 +41,16 @@ class SeriesResource extends Resource
         $routeName = static::getRouteBaseName($panel) . '.' . ($name ?? 'index');
 
         return route($routeName, $parameters, $isAbsolute);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        $playlist = PlaylistFacade::resolvePlaylistByUuid(static::getCurrentUuid());
+        return parent::getEloquentQuery()
+            ->where([
+                ['enabled', true], // Only show enabled series
+                ['playlist_id', $playlist?->id] // Only show series from the current playlist
+            ]);
     }
 
     public static function form(Schema $schema): Schema

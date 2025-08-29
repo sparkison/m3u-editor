@@ -50,16 +50,4 @@ class ViewSeries extends ViewRecord
                     ])
             ]);
     }
-
-    // @TODO:
-    // Figure out query override, this isn't correct
-
-    // public function modifyQuery($query): void
-    // {
-    //     $playlist = PlaylistFacade::resolvePlaylistByUuid(static::getCurrentUuid());
-    //     $query->where([
-    //         ['enabled', true],
-    //         ['playlist_id', $playlist?->id]
-    //     ]);
-    // }
 }
