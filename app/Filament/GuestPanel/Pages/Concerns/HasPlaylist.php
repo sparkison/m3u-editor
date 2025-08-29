@@ -6,6 +6,15 @@ use App\Facades\PlaylistFacade;
 
 trait HasPlaylist
 {
+    public static $uuid = null;
+
+    public function mount(...$params): void
+    {
+        // Load playlist info
+        static::$uuid = static::getCurrentUuid();
+        parent::mount(...$params);
+    }
+
     protected static function getCurrentUuid(): ?string
     {
         return request()->route('uuid') ?? request()->attributes->get('playlist_uuid');
