@@ -1,4 +1,4 @@
-<x-filament-panels::page>
+<div class="mt-4">
     @php $isAuthed = $this->isGuestAuthenticated(); @endphp
     @if (!$isAuthed)
         <div class="max-w-md mx-auto mt-16 p-8 bg-white dark:bg-gray-900 rounded shadow">
@@ -26,4 +26,4 @@
             <livewire:epg-viewer :record="$playlist" :view-only="true" />
         </div>
     @endif
-</x-filament-panels::page>
+</div>
