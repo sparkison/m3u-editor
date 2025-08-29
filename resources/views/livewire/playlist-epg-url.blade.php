@@ -1,7 +1,7 @@
 @php($urls = \App\Facades\PlaylistFacade::getUrls($this->record))
 @php($epgUrl = $urls['epg'])
 @php($epgZippedUrl = $urls['epg_zip'])
-<div>
+<div class="space-y-6">
     <div>
         <span class="text-sm font-medium leading-6 text-gray-950 dark:text-white">
             Uncompressed EPG URL (XMLTV format)
@@ -22,7 +22,7 @@
             </x-filament::input.wrapper>
             <x-qr-modal :title="$this->record->name" body="EPG URL" :text="$epgUrl" />
         </div>
-        <div class="fi-fo-field-wrp-helper-text break-words text-sm text-gray-500 mt-1 mb-4">
+        <div class="fi-fo-field-wrp-helper-text break-words text-sm text-gray-500 mt-1">
             Use the following URL to access your EPG in XML format.
         </div>
     </div>
@@ -47,7 +47,7 @@
             </x-filament::input.wrapper>
             <x-qr-modal :title="$this->record->name" body="EPG URL (compressed)" :text="$epgZippedUrl" />
         </div>
-        <div class="fi-fo-field-wrp-helper-text break-words text-sm text-gray-500 mt-1 mb-4">
+        <div class="fi-fo-field-wrp-helper-text break-words text-sm text-gray-500 mt-1">
             Use the following URL to access your EPG in GZIP format.
         </div>
     </div>

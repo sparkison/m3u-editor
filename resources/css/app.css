@@ -69,3 +69,8 @@
     cursor: pointer;
     transition: all 0.2s;
 }
+
+.fi-dropdown-panel {
+    max-height: 300px;
+    overflow-y: auto;
+}

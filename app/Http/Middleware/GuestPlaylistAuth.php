@@ -29,8 +29,11 @@ class GuestPlaylistAuth extends Middleware
             abort(403, 'Invalid playlist unique identifier');
         }
         if (!$this->checkExistingAuth($uuid)) {
-            // Only return 403 if not authenticated and not on the auth page
-            if ($request->route()->getName() !== GuestDashboard::getRouteName()) {
+            // Only return 403 if not authenticated and not on the dashboard/landing page
+            if (!in_array($request->route()->getName(), [
+                'filament.playlist.home', // Base panel route
+                GuestDashboard::getRouteName() // Redirected here from base route
+            ])) {
                 abort(403, 'Not authenticated');
             }
         }

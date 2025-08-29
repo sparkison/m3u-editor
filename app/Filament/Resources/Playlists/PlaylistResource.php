@@ -690,13 +690,11 @@ class PlaylistResource extends Resource
 
     public static function infolist(Schema $schema): Schema
     {
-        $links = [
-            Livewire::make(PlaylistM3uUrl::class),
-            Livewire::make(PlaylistEpgUrl::class),
-        ];
+        $extraLinks = [];
         if (PlaylistFacade::mediaFlowProxyEnabled()) {
-            $links[] = Livewire::make(MediaFlowProxyUrl::class);
+            $extraLinks[] = Livewire::make(MediaFlowProxyUrl::class);
         };
+        $extraLinks[] = Livewire::make(PlaylistEpgUrl::class);
         return $schema
             ->components([
                 Tabs::make()
@@ -713,7 +711,19 @@ class PlaylistResource extends Resource
                             ->schema([
                                 Section::make()
                                     ->columns(2)
-                                    ->schema($links)
+                                    ->schema([
+                                        Grid::make()
+                                            ->columnSpan(1)
+                                            ->columns(1)
+                                            ->schema([
+                                                Livewire::make(PlaylistM3uUrl::class)
+                                                    ->columnSpanFull()
+                                            ]),
+                                        Grid::make()
+                                            ->columnSpan(1)
+                                            ->columns(1)
+                                            ->schema($extraLinks),
+                                    ])
                             ]),
                         Tab::make('Xtream API')
                             ->icon('heroicon-m-bolt')
