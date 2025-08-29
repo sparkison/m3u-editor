@@ -6,29 +6,35 @@ use App\Models\Playlist;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Response;
+use Illuminate\Auth\Middleware\Authenticate as Middleware;
 
-class GuestPlaylistAuth
+class GuestPlaylistAuth extends Middleware
 {
     /**
-     * Handle an incoming request.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \Closure  $next
-     * @return mixed
+     * @param  array<string>  $guards
      */
-    public function handle(Request $request, Closure $next)
+    protected function authenticate($request, array $guards): void
     {
         $uuid = $request->route('uuid');
         if (!$uuid) {
-            return response()->json(['error' => 'Missing playlist UUID'], 401);
+            $uuid = $request->cookie('playlist_uuid');
+            if (!$uuid) {
+                abort(403, 'Missing playlist unique ID');
+            }
         }
         $playlist = Playlist::where('uuid', $uuid)->first();
         if (!$playlist) {
-            return response()->json(['error' => 'Invalid playlist UUID'], 401);
+            abort(403, 'Invalid playlist unique ID');
         }
-        // Optionally, you can add more checks (e.g., playlist enabled, not expired, etc.)
-        // Attach playlist to request for downstream use
-        $request->attributes->set('playlist', $playlist);
-        return $next($request);
+
+        // Store playlist id in cookies for later retrieval
+        $request->attributes->set('playlist_uuid', $playlist->uuid);
+
+        return;
+    }
+
+    protected function redirectTo($request): ?string
+    {
+        return '/'; // return to homepage if not authenticated
     }
 }
