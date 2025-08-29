@@ -24,33 +24,14 @@ class GuestDashboard extends Page implements HasSchemas
     protected static ?string $slug = 'guest';
 
     public ?array $data = [];
-
-    public $username = '';
-    public $password = '';
     public $authError = '';
 
     public function mount(): void
     {
-        $this->form->fill();
-        $this->username = session('guest_auth_username', '');
-        $this->password = session('guest_auth_password', '');
-    }
-
-    public function login(): void
-    {
-        if ($this->tryAuthenticate($this->username, $this->password)) {
-            $this->authError = '';
-        } else {
-            $this->authError = 'Invalid credentials.';
-        }
-    }
-
-    public function logout(): void
-    {
-        $this->logoutGuest();
-        $this->username = '';
-        $this->password = '';
-        $this->authError = '';
+        $this->form->fill([
+            'username' => session('guest_auth_username', ''),
+            'password' => session('guest_auth_password', ''),
+        ]);
     }
 
     public function getTitle(): string|Htmlable
@@ -74,6 +55,27 @@ class GuestDashboard extends Page implements HasSchemas
         return route(static::getRouteName($panel), $parameters, $isAbsolute);
     }
 
+    public function login(): void
+    {
+        $state = $this->form->getState();
+        $username = $state['username'] ?? '';
+        $password = $state['password'] ?? '';
+        if ($this->tryAuthenticate($username, $password)) {
+            $this->authError = '';
+            // Optionally, clear password from form state for security
+            $this->form->fill(['username' => $username, 'password' => '']);
+        } else {
+            $this->authError = 'Invalid credentials.';
+        }
+    }
+
+    public function logout(): void
+    {
+        $this->logoutGuest();
+        $this->form->fill(['username' => '', 'password' => '']);
+        $this->authError = '';
+    }
+
     public function isGuestAuthenticated(): bool
     {
         return $this->isAuthenticated();
@@ -89,15 +91,13 @@ class GuestDashboard extends Page implements HasSchemas
         return $schema
             ->components([
                 Forms\Components\TextInput::make('username')
+                    ->label('Username')
                     ->required(),
                 Forms\Components\TextInput::make('password')
+                    ->label('Password')
+                    ->password()
                     ->revealable()
                     ->required(),
             ])->statePath('data');
-    }
-
-    public function create(): void
-    {
-        dd($this->form->getState());
     }
 }
