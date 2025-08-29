@@ -23,7 +23,7 @@
         </div>
         {{-- Authenticated dashboard content goes here --}}
         <div>
-            {{-- Add more dashboard content here as needed --}}
+            <livewire:epg-viewer :record="$playlist" :view-only="true" />
         </div>
     @endif
 </x-filament-panels::page>

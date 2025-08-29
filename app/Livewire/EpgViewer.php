@@ -31,6 +31,7 @@ class EpgViewer extends Component implements HasForms, HasActions
     public $record;
     public $type;
     public $editingChannelId = null;
+    public $viewOnly = false;
 
     // Use static cache to prevent Livewire from clearing it
     protected static $recordCache = [];

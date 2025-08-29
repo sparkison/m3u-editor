@@ -263,24 +263,26 @@
                                             <p x-show="!isMobile" class="text-xs text-gray-500 dark:text-gray-400 truncate" x-text="item.id"></p>
                                         </div>
                                         <!-- Action Buttons -->
-                                        <div x-show="!isMobile && (item.channel.database_id || item.channel.url)" 
-                                            class="absolute p-2 rounded-xl bg-white/90 shadow-sm dark:bg-gray-800/90 right-1 top-1/2 -translate-y-1/2 flex space-x-1 transform translate-x-8 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:translate-x-0 group-focus-within:opacity-100 transition-all duration-200 ease-in-out">
-                                            <!-- Edit Button -->
-                                            <button 
-                                                x-show="item.channel.database_id"
-                                                @click.stop="
-                                                    if (!modalLoading) {
-                                                        modalLoading = true;
-                                                        $wire.openChannelEdit(item.channel.database_id);
-                                                        setTimeout(() => { modalLoading = false; }, 1000);
-                                                    }
-                                                "
-                                                :disabled="modalLoading"
-                                                class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-900/20 rounded-full transition-colors disabled:opacity-50"
-                                                title="Edit Channel"
-                                            >
-                                                <x-heroicon-s-pencil class="w-4 h-4" />
-                                            </button>
+                                        @if(!$viewOnly)
+                                            <div x-show="!isMobile && (item.channel.database_id || item.channel.url)" 
+                                                class="absolute p-2 rounded-xl bg-white/90 shadow-sm dark:bg-gray-800/90 right-1 top-1/2 -translate-y-1/2 flex space-x-1 transform translate-x-8 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:translate-x-0 group-focus-within:opacity-100 transition-all duration-200 ease-in-out">
+                                                <!-- Edit Button -->
+                                                <button 
+                                                    x-show="item.channel.database_id"
+                                                    @click.stop="
+                                                        if (!modalLoading) {
+                                                            modalLoading = true;
+                                                            $wire.openChannelEdit(item.channel.database_id);
+                                                            setTimeout(() => { modalLoading = false; }, 1000);
+                                                        }
+                                                    "
+                                                    :disabled="modalLoading"
+                                                    class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-900/20 rounded-full transition-colors disabled:opacity-50"
+                                                    title="Edit Channel"
+                                                >
+                                                    <x-heroicon-s-pencil class="w-4 h-4" />
+                                                </button>
+                                            @endif
                                             <!-- Play Button -->
                                             <button 
                                                 x-show="item.channel.url"

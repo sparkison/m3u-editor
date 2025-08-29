@@ -21,18 +21,32 @@ class GuestDashboard extends Page implements HasSchemas
     protected string $view = 'filament.guest-panel.pages.guest-dashboard';
     protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-play';
     protected static ?string $navigationLabel = 'Playlist';
-    protected static ?string $title = '';
     protected static ?string $slug = 'guest';
 
     public ?array $data = [];
+    public $playlistName = '';
+    public $playlist = null;
     public $authError = '';
 
     public function mount(): void
     {
+        // Pre-fill form with session data if available
         $this->form->fill([
             'username' => session('guest_auth_username', ''),
             'password' => session('guest_auth_password', ''),
         ]);
+
+        // Load playlist info
+        $playlist = PlaylistFacade::resolvePlaylistByUuid($this->getCurrentUuid());
+
+        $this->playlist = $playlist;
+        $this->playlistName = $playlist->name ?? 'Playlist';
+    }
+
+    public function getTitle(): string|Htmlable
+    {
+        // Let's hide the title for now, not sure if we need it...
+        return ''; // $this->playlistName;
     }
 
     static function shouldRegisterNavigation(): bool
