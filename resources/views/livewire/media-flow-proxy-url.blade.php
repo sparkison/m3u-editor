@@ -1,4 +1,4 @@
-@php($urls = \App\Facades\PlaylistUrlFacade::getMediaFlowProxyUrls($this->record))
+@php($urls = \App\Facades\PlaylistFacade::getMediaFlowProxyUrls($this->record))
 @php($m3uUrl = $urls['m3u'])
 <div>
      <div>

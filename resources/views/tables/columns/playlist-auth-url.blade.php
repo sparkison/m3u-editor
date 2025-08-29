@@ -1,6 +1,6 @@
 <div>
     @php($model = $getRecord()->model)
-    @php($urls = \App\Facades\PlaylistUrlFacade::getUrls($model))
+    @php($urls = \App\Facades\PlaylistFacade::getUrls($model))
     @php($m3uUrl = $urls['m3u'])
     @php($hdhrUrl = $urls['hdhr'])
     <div class="px-3 py-2 flex flex-col gap-4">

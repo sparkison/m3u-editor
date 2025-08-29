@@ -1,6 +1,6 @@
 <x-dynamic-component :component="$getFieldWrapperView()" :field="$field">
     @php($record = $getRecord())
-    @php($urls = \App\Facades\PlaylistUrlFacade::getUrls($record))
+    @php($urls = \App\Facades\PlaylistFacade::getUrls($record))
     @php($epgUrl = $urls['epg'])
     @php($epgZippedUrl = $urls['epg_zip'])
     @php($epgCacheModalId = 'epg-url-modal-' . $record->getKey())

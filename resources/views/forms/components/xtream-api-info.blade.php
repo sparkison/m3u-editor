@@ -1,6 +1,6 @@
 <x-dynamic-component :component="$getFieldWrapperView()" :field="$field">
     @php($record = $getRecord())
-    @php($info = \App\Facades\PlaylistUrlFacade::getXtreamInfo($record))
+    @php($info = \App\Facades\PlaylistFacade::getXtreamInfo($record))
     @php($url = $info['url'])
     @php($username = $info['username'])
     @php($password = $info['password'])

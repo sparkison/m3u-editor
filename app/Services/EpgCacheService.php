@@ -7,7 +7,7 @@ use Generator;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use App\Facades\PlaylistUrlFacade;
+use App\Facades\PlaylistFacade;
 use App\Models\CustomPlaylist;
 use App\Models\Epg;
 use App\Models\MergedPlaylist;
@@ -818,7 +818,7 @@ class EpgCacheService
             ->modalDescription('Select the EPG format to download and your download will begin immediately.')
             ->modalWidth('md')
             ->schema(function ($record) {
-                $urls = PlaylistUrlFacade::getUrls($record);
+                $urls = PlaylistFacade::getUrls($record);
                 return [
                     Select::make('format')
                         ->label('EPG Format')
@@ -891,7 +891,7 @@ class EpgCacheService
             ->modalDescription('Select the EPG format to download and your download will begin immediately.')
             ->modalWidth('md')
             ->schema(function ($record) {
-                $urls = PlaylistUrlFacade::getUrls($record);
+                $urls = PlaylistFacade::getUrls($record);
                 return [
                     Select::make('format')
                         ->label('EPG Format')

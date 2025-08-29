@@ -5,10 +5,12 @@ namespace App\Services;
 use App\Models\Playlist;
 use App\Models\MergedPlaylist;
 use App\Models\CustomPlaylist;
+use App\Models\PlaylistAuth;
 use App\Settings\GeneralSettings;
 use Exception;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
-class PlaylistUrlService
+class PlaylistService
 {
     /**
      * Get URLs for the given playlist
@@ -145,6 +147,114 @@ class PlaylistUrlService
         return [
             'm3u' => $m3uUrl,
             'authEnabled' => $playlistAuth ? true : false,
+        ];
+    }
+
+    /**
+     * Resolve a playlist by its UUID
+     *
+     * @param  string $uuid
+     * @return Playlist|MergedPlaylist|CustomPlaylist|null
+     */
+    public function resolvePlaylistByUuid($uuid)
+    {
+        // Fetch the playlist
+        $playlist = Playlist::where('uuid', $uuid)->first();
+        if (!$playlist) {
+            $playlist = MergedPlaylist::where('uuid', $uuid)->first();
+        }
+        if (!$playlist) {
+            $playlist = CustomPlaylist::where('uuid', $uuid)->first();
+        }
+        return $playlist;
+    }
+
+    /**
+     * Authenticate a playlist request
+     *
+     * @param  string $username
+     * @param  string $password
+     * @return array|bool [Playlist|MergedPlaylist|CustomPlaylist|null, string $authMethod, string $username, string $password] or false on failure
+     */
+    public function authenticate($username, $password): array|bool
+    {
+        if (empty($username) || empty($password)) {
+            return false;
+        }
+
+        $playlist = null;
+        $authMethod = 'none';
+
+        // Method 1: Try to authenticate using PlaylistAuth credentials
+        $playlistAuth = PlaylistAuth::where('username', $username)
+            ->where('password', $password)
+            ->where('enabled', true)
+            ->first();
+
+        if ($playlistAuth) {
+            $playlist = $playlistAuth->getAssignedModel();
+            if ($playlist) {
+                // Load necessary relationships for the playlist
+                $playlist->load([
+                    'user',
+                ]);
+                $authMethod = 'playlist_auth';
+            }
+        }
+
+        // Method 2: Fall back to original authentication:
+        //      (username = playlist owner, password = playlist UUID)
+        if (!$playlist) {
+            // Try to find playlist by UUID (password parameter)
+            try {
+                $playlist = Playlist::with([
+                    'user',
+                ])->where('uuid', $password)->firstOrFail();
+
+                // Verify username matches playlist owner's name
+                if ($playlist->user->name === $username) {
+                    $authMethod = 'owner_auth';
+                } else {
+                    $playlist = null;
+                }
+            } catch (ModelNotFoundException $e) {
+                // Try MergedPlaylist
+                try {
+                    $playlist = MergedPlaylist::with([
+                        'user',
+                    ])->where('uuid', $password)->firstOrFail();
+
+                    // Verify username matches playlist owner's name
+                    if ($playlist->user->name === $username) {
+                        $authMethod = 'owner_auth';
+                    } else {
+                        $playlist = null;
+                    }
+                } catch (ModelNotFoundException $e) {
+                    // Try CustomPlaylist
+                    try {
+                        $playlist = CustomPlaylist::with([
+                            'user',
+                        ])->where('uuid', $password)->firstOrFail();
+
+                        // Verify username matches playlist owner's name
+                        if ($playlist->user->name === $username) {
+                            $authMethod = 'owner_auth';
+                        } else {
+                            $playlist = null;
+                        }
+                    } catch (ModelNotFoundException $e) {
+                        // No playlist found
+                    }
+                }
+            }
+        }
+
+        return [
+            $playlist,
+            $authMethod,
+            $username,
+            $password
         ];
     }
 

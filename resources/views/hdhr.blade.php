@@ -41,11 +41,11 @@
         <li>Go to <strong>Settings</strong> (click the wrench icon in the top-right corner).</li>
         <li>Under <strong>Manage</strong>, select <strong>Live TV & DVR</strong>.</li>
         <li>Click on <strong>Set Up Plex Tuner</strong>.</li>
-        <li>Enter the following HDHomeRun tuner address manually: <strong>{{ \App\Facades\PlaylistUrlFacade::getUrls($playlist)['hdhr'] }}</strong></li>
+        <li>Enter the following HDHomeRun tuner address manually: <strong>{{ \App\Facades\PlaylistFacade::getUrls($playlist)['hdhr'] }}</strong></li>
         <li>Select the tuner and click <strong>Continue</strong>.</li>
         <li>Choose your location and allow Plex to fetch channel guide data.</li>
         <ul>
-            <li>If you've added an EPG and mapped it to this playlist, you can also manually add the EPG address: <strong>{{ \App\Facades\PlaylistUrlFacade::getUrls($playlist)['epg'] }}</strong></li>
+            <li>If you've added an EPG and mapped it to this playlist, you can also manually add the EPG address: <strong>{{ \App\Facades\PlaylistFacade::getUrls($playlist)['epg'] }}</strong></li>
         </ul>
         <li>Map available channels and finish setup.</li>
         <li>Once completed, you can access live TV and schedule recordings through Plex.</li>

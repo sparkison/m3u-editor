@@ -58,7 +58,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
-use App\Facades\PlaylistUrlFacade;
+use App\Facades\PlaylistFacade;
 use App\Livewire\EpgViewer;
 use App\Livewire\MediaFlowProxyUrl;
 use App\Livewire\PlaylistEpgUrl;
@@ -315,13 +315,13 @@ class PlaylistResource extends Resource
                     Action::make('Download M3U')
                         ->label('Download M3U')
                         ->icon('heroicon-o-arrow-down-tray')
-                        ->url(fn($record) => PlaylistUrlFacade::getUrls($record)['m3u'])
+                        ->url(fn($record) => PlaylistFacade::getUrls($record)['m3u'])
                         ->openUrlInNewTab(),
                     EpgCacheService::getEpgTableAction(),
                     Action::make('HDHomeRun URL')
                         ->label('HDHomeRun URL')
                         ->icon('heroicon-o-arrow-top-right-on-square')
-                        ->url(fn($record) => PlaylistUrlFacade::getUrls($record)['hdhr'])
+                        ->url(fn($record) => PlaylistFacade::getUrls($record)['hdhr'])
                         ->openUrlInNewTab(),
                     Action::make('Duplicate')
                         ->label('Duplicate')
@@ -602,13 +602,13 @@ class PlaylistResource extends Resource
                 Action::make('Download M3U')
                     ->label('Download M3U')
                     ->icon('heroicon-o-arrow-down-tray')
-                    ->url(fn($record) => PlaylistUrlFacade::getUrls($record)['m3u'])
+                    ->url(fn($record) => PlaylistFacade::getUrls($record)['m3u'])
                     ->openUrlInNewTab(),
                 EpgCacheService::getEpgPlaylistAction(),
                 Action::make('HDHomeRun URL')
                     ->label('HDHomeRun URL')
                     ->icon('heroicon-o-arrow-top-right-on-square')
-                    ->url(fn($record) => PlaylistUrlFacade::getUrls($record)['hdhr'])
+                    ->url(fn($record) => PlaylistFacade::getUrls($record)['hdhr'])
                     ->openUrlInNewTab(),
                 Action::make('Duplicate')
                     ->label('Duplicate')
@@ -689,7 +689,7 @@ class PlaylistResource extends Resource
             Livewire::make(PlaylistM3uUrl::class),
             Livewire::make(PlaylistEpgUrl::class),
         ];
-        if (PlaylistUrlFacade::mediaFlowProxyEnabled()) {
+        if (PlaylistFacade::mediaFlowProxyEnabled()) {
             $links[] = Livewire::make(MediaFlowProxyUrl::class);
         };
         return $schema

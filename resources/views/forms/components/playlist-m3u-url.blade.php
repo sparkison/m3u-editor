@@ -1,6 +1,6 @@
 <x-dynamic-component :component="$getFieldWrapperView()" :field="$field">
     @php($record = $getRecord())
-    @php($urls = \App\Facades\PlaylistUrlFacade::getUrls($record))
+    @php($urls = \App\Facades\PlaylistFacade::getUrls($record))
     @php($m3uUrl = $urls['m3u'])
     @php($hdhrUrl = $urls['hdhr'])
     <div x-data="{ state: $wire.$entangle('{{ $getStatePath() }}') }">

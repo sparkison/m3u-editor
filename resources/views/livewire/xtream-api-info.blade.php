@@ -1,4 +1,4 @@
-@php($info = \App\Facades\PlaylistUrlFacade::getXtreamInfo($this->record))
+@php($info = \App\Facades\PlaylistFacade::getXtreamInfo($this->record))
 @php($url = $info['url'])
 @php($username = $info['username'])
 @php($password = $info['password'])

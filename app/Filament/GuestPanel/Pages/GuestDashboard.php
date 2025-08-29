@@ -2,6 +2,7 @@
 
 namespace App\Filament\GuestPanel\Pages;
 
+use App\Facades\PlaylistFacade;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Illuminate\Contracts\Support\Htmlable;
@@ -15,8 +16,8 @@ class GuestDashboard extends Page
 
     public function getTitle(): string|Htmlable
     {
-        
-        return 'test';
+        $playlist = PlaylistFacade::resolvePlaylistByUuid($this->getCurrentUuid());
+        return $playlist->name ?? 'Playlist';
     }
 
     protected static function getCurrentUuid(): ?string

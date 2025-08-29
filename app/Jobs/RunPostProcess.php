@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use Exception;
 use App\Enums\Status;
-use App\Facades\PlaylistUrlFacade;
+use App\Facades\PlaylistFacade;
 use App\Mail\PostProcessMail;
 use App\Models\Epg;
 use App\Models\PostProcess;
@@ -115,7 +115,7 @@ class RunPostProcess implements ShouldQueue
                         if ($modelType === Epg::class) {
                             $value = route('epg.file', ['uuid' => $this->model->uuid]);
                         } else {
-                            $value = PlaylistUrlFacade::getUrls($this->model)['m3u'];
+                            $value = PlaylistFacade::getUrls($this->model)['m3u'];
                         }
                     } else {
                         if ($var['value'] === 'status') {
@@ -173,7 +173,7 @@ class RunPostProcess implements ShouldQueue
                         if ($modelType === Epg::class) {
                             $value = route('epg.file', ['uuid' => $this->model->uuid]);
                         } else {
-                            $value = PlaylistUrlFacade::getUrls($this->model)['m3u'];
+                            $value = PlaylistFacade::getUrls($this->model)['m3u'];
                         }
                     } else {
                         $value = $this->model->{$var['value']} ?? '';
@@ -232,7 +232,7 @@ class RunPostProcess implements ShouldQueue
                         if ($modelType === Epg::class) {
                             $value = route('epg.file', ['uuid' => $this->model->uuid]);
                         } else {
-                            $value = PlaylistUrlFacade::getUrls($this->model)['m3u'];
+                            $value = PlaylistFacade::getUrls($this->model)['m3u'];
                         }
                     } else {
                         if ($var['value'] === 'status') {

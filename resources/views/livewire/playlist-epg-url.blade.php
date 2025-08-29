@@ -1,4 +1,4 @@
-@php($urls = \App\Facades\PlaylistUrlFacade::getUrls($this->record))
+@php($urls = \App\Facades\PlaylistFacade::getUrls($this->record))
 @php($epgUrl = $urls['epg'])
 @php($epgZippedUrl = $urls['epg_zip'])
 <div>

@@ -1,6 +1,6 @@
 <x-dynamic-component :component="$getFieldWrapperView()" :field="$field">
     @php($record = $getRecord())
-    @php($urls = \App\Facades\PlaylistUrlFacade::getMediaFlowProxyUrls($record))
+    @php($urls = \App\Facades\PlaylistFacade::getMediaFlowProxyUrls($record))
     @php($m3uUrl = $urls['m3u'])
     <div class="flex gap-2 items-center justify-start mb-4">
         <x-filament::input.wrapper suffix-icon="heroicon-o-globe-alt">

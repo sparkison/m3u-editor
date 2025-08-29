@@ -23,7 +23,7 @@ use App\Models\User;
 use App\Services\EpgCacheService;
 use App\Services\FfmpegCodecService;
 use App\Services\HlsStreamService;
-use App\Services\PlaylistUrlService;
+use App\Services\PlaylistService;
 use App\Services\ProxyService;
 use App\Settings\GeneralSettings;
 use Illuminate\Database\Eloquent\Model;
@@ -353,8 +353,8 @@ class AppServiceProvider extends ServiceProvider
         });
 
         // Register the playlist url service
-        $this->app->singleton('playlistUrl', function () {
-            return new PlaylistUrlService();
+        $this->app->singleton('playlist', function () {
+            return new PlaylistService();
         });
 
         // Register the HLS stream service

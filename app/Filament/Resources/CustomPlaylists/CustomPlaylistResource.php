@@ -42,7 +42,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use App\Facades\PlaylistUrlFacade;
+use App\Facades\PlaylistFacade;
 use App\Forms\Components\XtreamApiInfo;
 use App\Services\EpgCacheService;
 use Filament\Forms\FormsComponent;
@@ -143,13 +143,13 @@ class CustomPlaylistResource extends Resource
                     Action::make('Download M3U')
                         ->label('Download M3U')
                         ->icon('heroicon-o-arrow-down-tray')
-                        ->url(fn($record) => PlaylistUrlFacade::getUrls($record)['m3u'])
+                        ->url(fn($record) => PlaylistFacade::getUrls($record)['m3u'])
                         ->openUrlInNewTab(),
                     EpgCacheService::getEpgTableAction(),
                     Action::make('HDHomeRun URL')
                         ->label('HDHomeRun URL')
                         ->icon('heroicon-o-arrow-top-right-on-square')
-                        ->url(fn($record) => PlaylistUrlFacade::getUrls($record)['hdhr'])
+                        ->url(fn($record) => PlaylistFacade::getUrls($record)['hdhr'])
                         ->openUrlInNewTab(),
                     DeleteAction::make(),
                 ])->button()->hiddenLabel()->size('sm')
@@ -355,7 +355,7 @@ class CustomPlaylistResource extends Resource
                 ->columnSpan(1)
                 ->dehydrated(false), // don't save the value in the database
         ];
-        if (PlaylistUrlFacade::mediaFlowProxyEnabled()) {
+        if (PlaylistFacade::mediaFlowProxyEnabled()) {
             $urls[] = MediaFlowProxyUrl::make('mediaflow_proxy_url')
                 ->label('Proxied M3U URL')
                 ->columnSpan(1)

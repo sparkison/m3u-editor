@@ -1,4 +1,4 @@
-@php($urls = \App\Facades\PlaylistUrlFacade::getUrls($this->record))
+@php($urls = \App\Facades\PlaylistFacade::getUrls($this->record))
 @php($m3uUrl = $urls['m3u'])
 @php($hdhrUrl = $urls['hdhr'])
 <div>

@@ -10,11 +10,13 @@ use Illuminate\Support\Facades\Facade;
  * @method static string getMediaFlowProxyUrls(Playlist|MergedPlaylist|CustomPlaylist $playlist)
  * @method static array getMediaFlowSettings()
  * @method static array getMediaFlowProxyServerUrl()
+ * @method static array|bool authenticate($username, $password) // [Playlist|MergedPlaylist|CustomPlaylist|null, string $authMethod, string $username, string $password] or false on failure
+ * @method static string resolvePlaylistByUuid(string $uuid)
  */
-class PlaylistUrlFacade extends Facade
+class PlaylistFacade extends Facade
 {
     protected static function getFacadeAccessor()
     {
-        return 'playlistUrl';
+        return 'playlist';
     }
 }
