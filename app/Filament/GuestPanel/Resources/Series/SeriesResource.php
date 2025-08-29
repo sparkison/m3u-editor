@@ -78,6 +78,7 @@ class SeriesResource extends Resource
                     ->height(120)
                     ->searchable(),
                 Tables\Columns\TextColumn::make('name')
+                    ->label('Info')
                     ->description((fn($record) => Str::limit($record->plot, 200)))
                     ->wrap()
                     ->extraAttributes(['style' => 'min-width: 350px;'])
@@ -98,7 +99,7 @@ class SeriesResource extends Resource
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('category.name')
-                    ->numeric()
+                    ->badge()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('genre')
                     ->searchable(),
@@ -111,9 +112,15 @@ class SeriesResource extends Resource
                 Tables\Columns\TextColumn::make('release_date')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('rating')
+                    ->badge()
+                    ->color('success')
+                    ->icon('heroicon-m-star')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('rating_5based')
                     ->numeric()
+                    ->badge()
+                    ->color('success')
+                    ->icon('heroicon-m-star')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
