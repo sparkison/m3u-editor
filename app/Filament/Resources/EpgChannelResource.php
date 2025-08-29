@@ -30,7 +30,7 @@ class EpgChannelResource extends Resource
             ->where('user_id', auth()->id());
     }
 
-    protected static ?string $label = 'Channels';
+    protected static ?string $label = 'EPG Channels';
 
     protected static ?string $navigationGroup = 'EPG';
 
