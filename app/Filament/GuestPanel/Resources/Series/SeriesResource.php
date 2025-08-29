@@ -9,7 +9,6 @@ use BackedEnum;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Infolists;
-use Filament\Tables\Columns;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -63,11 +62,11 @@ class SeriesResource extends Resource
     {
         return $table
             ->columns([
-                Columns\ImageColumn::make('cover')
+                Tables\Columns\ImageColumn::make('cover')
                     ->width(80)
                     ->height(120)
                     ->searchable(),
-                Columns\TextColumn::make('name')
+                Tables\Columns\TextColumn::make('name')
                     ->description((fn($record) => Str::limit($record->plot, 200)))
                     ->wrap()
                     ->extraAttributes(['style' => 'min-width: 350px;'])
@@ -75,41 +74,41 @@ class SeriesResource extends Resource
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         return $query->orWhereRaw('LOWER(series.name) LIKE ?', ['%' . strtolower($search) . '%']);
                     }),
-                Columns\TextColumn::make('seasons_count')
+                Tables\Columns\TextColumn::make('seasons_count')
                     ->label('Seasons')
                     ->counts('seasons')
                     ->badge()
                     ->toggleable()
                     ->sortable(),
-                Columns\TextColumn::make('episodes_count')
+                Tables\Columns\TextColumn::make('episodes_count')
                     ->label('Episodes')
                     ->counts('episodes')
                     ->badge()
                     ->toggleable()
                     ->sortable(),
-                Columns\TextColumn::make('category.name')
+                Tables\Columns\TextColumn::make('category.name')
                     ->numeric()
                     ->sortable(),
-                Columns\TextColumn::make('genre')
+                Tables\Columns\TextColumn::make('genre')
                     ->searchable(),
-                Columns\TextColumn::make('youtube_trailer')
+                Tables\Columns\TextColumn::make('youtube_trailer')
                     ->label('YouTube Trailer')
                     ->placeholder('No trailer ID set.')
                     ->url(fn($record): string => 'https://www.youtube.com/watch?v=' . $record->youtube_trailer)
                     ->openUrlInNewTab()
                     ->icon('heroicon-s-play'),
-                Columns\TextColumn::make('release_date')
+                Tables\Columns\TextColumn::make('release_date')
                     ->searchable(),
-                Columns\TextColumn::make('rating')
+                Tables\Columns\TextColumn::make('rating')
                     ->searchable(),
-                Columns\TextColumn::make('rating_5based')
+                Tables\Columns\TextColumn::make('rating_5based')
                     ->numeric()
                     ->sortable(),
-                Columns\TextColumn::make('created_at')
+                Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Columns\TextColumn::make('updated_at')
+                Tables\Columns\TextColumn::make('updated_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),

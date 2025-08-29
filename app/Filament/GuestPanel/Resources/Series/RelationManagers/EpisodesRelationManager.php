@@ -12,14 +12,9 @@ use Filament\Schemas\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\ImageEntry;
 use App\Infolists\Components\SeriesPreview;
-use App\Livewire\ChannelStreamStats;
-use Filament\Forms;
-use Filament\Infolists;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class EpisodesRelationManager extends RelationManager
 {
@@ -149,7 +144,7 @@ class EpisodesRelationManager extends RelationManager
                     ->tooltip('Play Episode'),
             ])
             ->toolbarActions([
-                // @TODO - add download? Would need to generate streamlink files and compress then download...
+                //
             ]);
     }
 
