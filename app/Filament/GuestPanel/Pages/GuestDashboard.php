@@ -19,9 +19,9 @@ class GuestDashboard extends Page implements HasSchemas
     use InteractsWithSchemas;
 
     protected string $view = 'filament.guest-panel.pages.guest-dashboard';
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-play';
-    protected static ?string $navigationLabel = 'Playlist';
-    protected static ?string $slug = 'guest';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-s-tv';
+    protected static ?string $navigationLabel = 'Live TV';
+    protected static ?string $slug = 'live';
 
     public ?array $data = [];
     public $playlistName = '';
@@ -45,13 +45,12 @@ class GuestDashboard extends Page implements HasSchemas
 
     public function getTitle(): string|Htmlable
     {
-        // Let's hide the title for now, not sure if we need it...
-        return ''; // $this->playlistName;
+        return '';
     }
 
     static function shouldRegisterNavigation(): bool
     {
-        return false;
+        return true;
     }
 
     protected static function getCurrentUuid(): ?string

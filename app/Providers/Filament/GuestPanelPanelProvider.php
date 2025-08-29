@@ -58,6 +58,7 @@ class GuestPanelPanelProvider extends PanelProvider
             ->authMiddleware([
                 GuestPlaylistAuth::class,
             ])
+            ->viteTheme('resources/css/app.css')
             ->spa()
             ->topNavigation()
             ->maxContentWidth(Width::Full);
