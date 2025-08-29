@@ -12,12 +12,18 @@ class GuestDashboard extends Page
     protected static ?string $navigationLabel = 'Playlist';
     protected static ?string $slug = 'guest';
 
-    /**
-     * @param  array<mixed>  $parameters
-     */
-    public static function getUrl(array $parameters = [], bool $isAbsolute = true, ?string $panel = null, $tenant = null): string
+    protected static function getCurrentUuid(): ?string
     {
-        $parameters['uuid'] = request()->route('uuid') ?? $parameters['uuid'] ?? null;
+        return request()->route('uuid') ?? request()->attributes->get('playlist_uuid');
+    }
+
+    public static function getUrl(
+        array $parameters = [],
+        bool $isAbsolute = true,
+        ?string $panel = null,
+        $tenant = null
+    ): string {
+        $parameters['uuid'] = static::getCurrentUuid();
         return route(static::getRouteName($panel), $parameters, $isAbsolute);
     }
 }
