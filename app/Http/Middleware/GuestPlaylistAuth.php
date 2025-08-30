@@ -91,8 +91,9 @@ class GuestPlaylistAuth extends Middleware
 
     private function checkExistingAuth($uuid): bool
     {
-        $username = session('guest_auth_username');
-        $password = session('guest_auth_password');
+        $prefix = $uuid ? base64_encode($uuid) . '_' : '';
+        $username = session("{$prefix}guest_auth_username");
+        $password = session("{$prefix}guest_auth_password");
         if (!$username || !$password) {
             return false;
         }

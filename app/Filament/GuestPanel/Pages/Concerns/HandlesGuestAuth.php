@@ -29,18 +29,19 @@ class GuestAuthPage extends Page implements HasSchemas
 
     public function mount(): void
     {
-        // Pre-fill form with session data if available
-        $this->form->fill([
-            'username' => session('guest_auth_username', ''),
-            'password' => session('guest_auth_password', ''),
-        ]);
-
         // Load playlist info
         $playlist = PlaylistFacade::resolvePlaylistByUuid(static::getCurrentUuid());
 
         $this->playlist = $playlist;
         $this->playlistName = $playlist->name ?? 'Playlist';
         $this->playlistUuid = $playlist->uuid ?? null;
+
+        // Pre-fill form with session data if available
+        $prefix = $this->playlistUuid ? base64_encode($this->playlistUuid) . '_' : '';
+        $this->form->fill([
+            'username' => session("{$prefix}guest_auth_username", ''),
+            'password' => session("{$prefix}guest_auth_password", ''),
+        ]);
     }
 
     public function login(): void
@@ -86,8 +87,9 @@ class GuestAuthPage extends Page implements HasSchemas
 
     protected function isAuthenticated(): bool
     {
-        $username = session('guest_auth_username');
-        $password = session('guest_auth_password');
+        $prefix = $this->playlistUuid ? base64_encode($this->playlistUuid) . '_' : '';
+        $username = session("{$prefix}guest_auth_username");
+        $password = session("{$prefix}guest_auth_password");
         if (!$username || !$password) {
             return false;
         }
@@ -111,7 +113,8 @@ class GuestAuthPage extends Page implements HasSchemas
             if ($result[0]->uuid !== $this->playlistUuid) {
                 return false;
             }
-            session(['guest_auth_username' => $username, 'guest_auth_password' => $password]);
+            $prefix = $this->playlistUuid ? base64_encode($this->playlistUuid) . '_' : '';
+            session(["{$prefix}guest_auth_username" => $username, "{$prefix}guest_auth_password" => $password]);
             return true;
         }
         return false;
@@ -119,6 +122,7 @@ class GuestAuthPage extends Page implements HasSchemas
 
     protected function logoutGuest(): void
     {
-        session()->forget(['guest_auth_username', 'guest_auth_password']);
+        $prefix = $this->playlistUuid ? base64_encode($this->playlistUuid) . '_' : '';
+        session()->forget(["{$prefix}guest_auth_username", "{$prefix}guest_auth_password"]);
     }
 }
