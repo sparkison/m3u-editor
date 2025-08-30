@@ -5,8 +5,9 @@ namespace App\Filament\GuestPanel\Resources\Vods\Pages;
 use App\Facades\PlaylistFacade;
 use App\Filament\GuestPanel\Pages\Concerns\HasPlaylist;
 use App\Filament\GuestPanel\Resources\Vods\VodResource;
+use App\Infolists\Components\VideoPreview;
 use Filament\Actions;
-use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas;
 use Filament\Schemas\Components\Section;
@@ -39,7 +40,35 @@ class ViewVod extends ViewRecord
     {
         return $schema
             ->components([
-                // 
+                VideoPreview::make('preview')
+                    ->columnSpanFull()
+                    ->withDetails(false)
+                    ->autoPlay(false)
+                    ->hiddenLabel(),
+                Section::make('Channel Details')
+                    ->icon('heroicon-m-information-circle')
+                    ->columnSpanFull()
+                    ->compact()
+                    ->collapsible(true)
+                    ->columns(3)
+                    ->persistCollapsed(true)
+                    ->schema([
+                        // Infolists\Components\TextEntry::make('url')
+                        //     ->label('URL')->columnSpanFull(),
+                        // Infolists\Components\TextEntry::make('proxy_url')
+                        //     ->label('Proxy URL')->columnSpanFull(),
+                        Infolists\Components\TextEntry::make('stream_id')
+                            ->label('Stream ID'),
+                        Infolists\Components\TextEntry::make('title')
+                            ->label('Title'),
+                        Infolists\Components\TextEntry::make('name')
+                            ->label('Name'),
+                        Infolists\Components\TextEntry::make('channel')
+                            ->label('Channel'),
+                        Infolists\Components\TextEntry::make('group')
+                            ->badge()
+                            ->label('Group'),
+                    ]),
             ]);
     }
 }
