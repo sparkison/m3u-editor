@@ -4,7 +4,6 @@ namespace App\Filament\GuestPanel\Resources\Vods;
 
 use App\Filament\GuestPanel\Pages\Concerns\HasPlaylist;
 use App\Models\Channel;
-use App\Models\VOD;
 use BackedEnum;
 use Filament\Actions;
 use Filament\Forms;
@@ -183,6 +182,7 @@ class VodResource extends Resource
             ->recordActions([
                 Actions\ViewAction::make()
                     ->button()
+                    ->icon('heroicon-s-play')
                     ->hiddenLabel()
                     ->slideOver()
             ], position: RecordActionsPosition::BeforeCells)
@@ -202,6 +202,7 @@ class VodResource extends Resource
     {
         return [
             'index' => Pages\ListVod::route('/'),
+            'view' => Pages\ViewVod::route('/{record}'),
         ];
     }
 }
