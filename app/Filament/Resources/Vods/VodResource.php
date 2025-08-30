@@ -90,6 +90,7 @@ class VodResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
+            ->where('user_id', auth()->id())
             ->where('is_vod', true);
     }
 
