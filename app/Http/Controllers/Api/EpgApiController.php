@@ -169,6 +169,7 @@ class EpgApiController extends Controller
         $page = (int) $request->get('page', 1);
         $perPage = (int) $request->get('per_page', 50);
         $search = $request->get('search', null);
+        $vod = (bool) $request->get('vod', false);
 
         // Date parameters
         $startDate = $request->get('start_date', Carbon::now()->format('Y-m-d'));
@@ -188,6 +189,9 @@ class EpgApiController extends Controller
             $playlistChannels = $playlist->channels()
                 ->leftJoin('groups', 'channels.group_id', '=', 'groups.id')
                 ->where('channels.enabled', true)
+                ->when(!$vod, function ($query) {
+                    return $query->where('channels.is_vod', false);
+                })
                 ->with(['epgChannel', 'tags', 'group'])
                 ->orderBy('groups.sort_order') // Primary sort
                 ->orderBy('channels.sort') // Secondary sort
@@ -325,7 +329,10 @@ class EpgApiController extends Controller
                         ->orWhereRaw('LOWER(channels.title) LIKE ?', ['%' . $search . '%'])
                         ->orWhereRaw('LOWER(channels.title_custom) LIKE ?', ['%' . $search . '%']);
                 });
+            })->when(!$vod, function ($query) {
+                return $query->where('channels.is_vod', false);
             })->where('enabled', true)->count();
+
             $skip = ($page - 1) * $perPage;
             $channels = $playlistChannelData;
 

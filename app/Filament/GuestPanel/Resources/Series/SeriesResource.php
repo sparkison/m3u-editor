@@ -27,6 +27,15 @@ class SeriesResource extends Resource
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-s-play';
     protected static ?string $slug = 'series';
 
+    public static function getNavigationBadge(): ?string
+    {
+        $playlist = PlaylistFacade::resolvePlaylistByUuid(static::getCurrentUuid());
+        if ($playlist) {
+            return (string) $playlist->series()->where('enabled', true)->count();
+        }
+        return '';
+    }
+
     public static function getUrl(
         ?string $name = null,
         array $parameters = [],

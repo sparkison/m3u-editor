@@ -2,6 +2,7 @@
 function epgViewer(config) {
     return {
         apiUrl: config.apiUrl,
+        vod: config.vod || false,
         loading: false,
         loadingMore: false,
         error: null,
@@ -148,7 +149,7 @@ function epgViewer(config) {
 
             try {
                 console.log(`Loading page ${page} of EPG data...`);
-                let url = `${this.apiUrl}?start_date=${this.currentDate}&end_date=${this.getEndDate()}&page=${page}&per_page=${this.perPage}`;
+                let url = `${this.apiUrl}?start_date=${this.currentDate}&end_date=${this.getEndDate()}&page=${page}&per_page=${this.perPage}&vod=${this.vod ? '1' : '0'}`;
 
                 // Add search parameter if active
                 if (this.isSearchActive && this.searchTerm.trim()) {

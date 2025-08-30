@@ -2,6 +2,7 @@
 
 namespace App\Filament\GuestPanel\Pages;
 
+use App\Facades\PlaylistFacade;
 use Filament\Pages\Page;
 use App\Filament\GuestPanel\Pages\Concerns\GuestAuthPage;
 use Illuminate\Contracts\Support\Htmlable;
@@ -15,6 +16,18 @@ class GuestDashboard extends GuestAuthPage
 
     public function getTitle(): string|Htmlable
     {
+        return '';
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        $playlist = PlaylistFacade::resolvePlaylistByUuid(static::getCurrentUuid());
+        if ($playlist) {
+            return (string) $playlist->channels()->where([
+                ['enabled', true],
+                ['is_vod', false]
+            ])->count();
+        }
         return '';
     }
 

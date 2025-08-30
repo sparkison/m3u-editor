@@ -1,6 +1,7 @@
 <div 
     x-data="epgViewer({ 
-        apiUrl: '{{ $route }}' 
+        apiUrl: '{{ $route }}',
+        vod: {{ $vod ? 'true' : 'false' }},
     })"
     x-init="init(); loadEpgData()"
     x-on:beforeunload.window="destroy()"

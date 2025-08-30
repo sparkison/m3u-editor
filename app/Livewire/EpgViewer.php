@@ -32,6 +32,7 @@ class EpgViewer extends Component implements HasForms, HasActions
     public $type;
     public $editingChannelId = null;
     public $viewOnly = false;
+    public $vod = true;
 
     // Use static cache to prevent Livewire from clearing it
     protected static $recordCache = [];
@@ -247,6 +248,7 @@ class EpgViewer extends Component implements HasForms, HasActions
 
         return view('livewire.epg-viewer', [
             'route' => $route,
+            'vod' => $this->vod,
         ]);
     }
 }

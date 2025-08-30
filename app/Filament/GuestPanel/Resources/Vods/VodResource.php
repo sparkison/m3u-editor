@@ -30,6 +30,18 @@ class VodResource extends Resource
     protected static ?string $navigationLabel = 'VOD';
     protected static ?string $slug = 'vod';
 
+    public static function getNavigationBadge(): ?string
+    {
+        $playlist = PlaylistFacade::resolvePlaylistByUuid(static::getCurrentUuid());
+        if ($playlist) {
+            return (string) $playlist->channels()->where([
+                ['enabled', true],
+                ['is_vod', true]
+            ])->count();
+        }
+        return '';
+    }
+
     public static function getUrl(
         ?string $name = null,
         array $parameters = [],

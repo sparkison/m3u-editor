@@ -34,7 +34,7 @@
         </div>
         {{-- Authenticated dashboard content goes here --}}
         <div>
-            <livewire:epg-viewer :record="$playlist" :view-only="true" />
+            <livewire:epg-viewer :record="$playlist" :view-only="true" :vod="false" />
         </div>
     @endif
 </div>
