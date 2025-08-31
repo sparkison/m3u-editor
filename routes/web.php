@@ -4,7 +4,40 @@ use App\Http\Controllers\EpgFileController;
 use App\Http\Controllers\EpgGenerateController;
 use App\Http\Controllers\PlaylistGenerateController;
 use App\Http\Controllers\XtreamApiController;
+use AshAllenDesign\ShortURL\Controllers\ShortURLController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+
+// Handle short URLs with optional path forwarding (e.g. /s/{key}/device.xml)
+Route::get('/s/{shortUrlKey}/{path?}', function (Request $request, string $shortUrlKey, string $path = null) {
+    $response = app()->call(ShortURLController::class, [
+        'request' => $request,
+        'shortURLKey' => $shortUrlKey,
+    ]);
+
+    if (! $response instanceof \Illuminate\Http\RedirectResponse) {
+        return $response;
+    }
+
+    if ($path) {
+        $parsed = parse_url($response->getTargetUrl());
+
+        $base = ($parsed['scheme'] ?? '') . '://' . ($parsed['host'] ?? '');
+        if (isset($parsed['port'])) {
+            $base .= ':' . $parsed['port'];
+        }
+        $base .= $parsed['path'] ?? '';
+        $base = rtrim($base, '/') . '/' . ltrim($path, '/');
+
+        if (! empty($parsed['query'])) {
+            $base .= '?' . $parsed['query'];
+        }
+
+        return redirect($base, $response->getStatusCode());
+    }
+
+    return $response;
+})->where('path', '.*');
 
 /*
  * Playlist/EPG output routes
