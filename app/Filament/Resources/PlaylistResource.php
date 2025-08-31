@@ -87,7 +87,8 @@ class PlaylistResource extends Resource
             ->modifyQueryUsing(function (Builder $query) {
                 $query->withCount('enabled_live_channels')
                     ->withCount('enabled_vod_channels')
-                    ->withCount('enabled_series');
+                    ->withCount('enabled_series')
+                    ->orderByRaw('COALESCE(parent_playlist_id, id), parent_playlist_id IS NOT NULL, name');
             })
             ->columns([
                 Tables\Columns\TextColumn::make('id')
@@ -96,9 +97,16 @@ class PlaylistResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->formatStateUsing(fn($state, Playlist $record) => $record->parent_playlist_id ? str_repeat('&nbsp;', 4).'↳ '.$state : $state)
+                    ->html(),
                 Tables\Columns\TextColumn::make('pairedPlaylist.name')
                     ->label('Paired With')
+                    ->toggleable()
+                    ->sortable()
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('parentPlaylist.name')
+                    ->label('Parent')
                     ->toggleable()
                     ->sortable()
                     ->placeholder('—'),
@@ -809,6 +817,16 @@ class PlaylistResource extends Resource
             Forms\Components\TextInput::make('name')
                 ->helperText('Enter the name of the playlist. Internal use only.')
                 ->required(),
+            Forms\Components\Select::make('parent_playlist_id')
+                ->label('Parent Playlist')
+                ->options(function ($record) {
+                    return \App\Models\Playlist::where('user_id', \Illuminate\Support\Facades\Auth::id())
+                        ->when($record, fn($q) => $q->where('id', '!=', $record->id))
+                        ->pluck('name', 'id');
+                })
+                ->searchable()
+                ->placeholder('None')
+                ->helperText('Choose a parent playlist to sync content from.'),
             Forms\Components\Grid::make()
                 ->columnSpanFull()
                 ->columns(3)

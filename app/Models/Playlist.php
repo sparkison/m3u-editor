@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\PlaylistChannelId;
 use App\Enums\Status;
 use App\Traits\ShortUrlTrait;
+use App\Jobs\ProcessM3uImport;
 use AshAllenDesign\ShortURL\Models\ShortURL;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -43,8 +44,27 @@ class Playlist extends Model
         'sync_logs_enabled' => 'boolean',
         'status' => Status::class,
         'id_channel_by' => PlaylistChannelId::class,
-        'paired_playlist_id' => 'integer'
+        'paired_playlist_id' => 'integer',
+        'parent_playlist_id' => 'integer'
     ];
+
+    protected static function booted(): void
+    {
+        static::saved(function (self $playlist): void {
+            if ($playlist->wasChanged('parent_playlist_id')) {
+                if ($playlist->parent_playlist_id) {
+                    $playlist->parentPlaylist?->syncChildPlaylists();
+                } else {
+                    $playlist->groups()->withoutGlobalScopes()->delete();
+                    $playlist->categories()->withoutGlobalScopes()->delete();
+                    $playlist->series()->withoutGlobalScopes()->delete();
+                    $playlist->channels()->withoutGlobalScopes()->delete();
+
+                    dispatch(new ProcessM3uImport($playlist, force: true));
+                }
+            }
+        });
+    }
 
     public function getFolderPathAttribute(): string
     {
@@ -162,6 +182,16 @@ class Playlist extends Model
         return $this->hasMany(Episode::class);
     }
 
+    public function parentPlaylist(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_playlist_id');
+    }
+
+    public function childPlaylists(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_playlist_id');
+    }
+
     public function pairedPlaylist(): BelongsTo
     {
         return $this->belongsTo(self::class, 'paired_playlist_id');
@@ -250,7 +280,7 @@ class Playlist extends Model
             $paired->save();
 
             // Sync groups
-            $paired->groups()->delete();
+            $paired->groups()->withoutGlobalScopes()->delete();
             $groupMap = [];
             foreach ($this->groups()->get() as $group) {
                 $newGroup = $group->replicate();
@@ -260,7 +290,7 @@ class Playlist extends Model
             }
 
             // Sync categories
-            $paired->categories()->delete();
+            $paired->categories()->withoutGlobalScopes()->delete();
             $categoryMap = [];
             foreach ($this->categories()->get() as $category) {
                 $newCategory = $category->replicate();
@@ -270,7 +300,7 @@ class Playlist extends Model
             }
 
             // Sync series
-            $paired->series()->delete();
+            $paired->series()->withoutGlobalScopes()->delete();
             foreach ($this->series()->get() as $series) {
                 $newSeries = $series->replicate();
                 $newSeries->playlist_id = $paired->id;
@@ -281,7 +311,7 @@ class Playlist extends Model
             }
 
             // Sync channels
-            $paired->channels()->delete();
+            $paired->channels()->withoutGlobalScopes()->delete();
             foreach ($this->channels()->get() as $channel) {
                 $newChannel = $channel->replicate();
                 $newChannel->playlist_id = $paired->id;
@@ -291,5 +321,81 @@ class Playlist extends Model
                 $newChannel->save();
             }
         });
+
+        $this->syncChildPlaylists();
+    }
+
+    public function syncChildPlaylists(): void
+    {
+        foreach ($this->childPlaylists as $child) {
+            self::withoutEvents(function () use ($child) {
+                $child->forceFill(array_filter($this->only([
+                    'name',
+                    'url',
+                    'status',
+                    'prefix',
+                    'channels',
+                    'synced',
+                    'errors',
+                    'available_streams',
+                    'groups',
+                    'uploads',
+                    'short_urls_enabled',
+                    'enable_proxy',
+                    'auto_sync',
+                    'sync_interval',
+                    'sync_time',
+                    'processing',
+                    'dummy_epg',
+                    'import_prefs',
+                    'xtream_config',
+                    'xtream_status',
+                    'short_urls',
+                    'proxy_options',
+                    'backup_before_sync',
+                    'sync_logs_enabled',
+                    'id_channel_by',
+                ]), fn($value) => !is_null($value)));
+                $child->save();
+
+                $child->groups()->withoutGlobalScopes()->delete();
+                $groupMap = [];
+                foreach ($this->groups()->get() as $group) {
+                    $newGroup = $group->replicate();
+                    $newGroup->playlist_id = $child->id;
+                    $newGroup->save();
+                    $groupMap[$group->id] = $newGroup->id;
+                }
+
+                $child->categories()->withoutGlobalScopes()->delete();
+                $categoryMap = [];
+                foreach ($this->categories()->get() as $category) {
+                    $newCategory = $category->replicate();
+                    $newCategory->playlist_id = $child->id;
+                    $newCategory->save();
+                    $categoryMap[$category->id] = $newCategory->id;
+                }
+
+                $child->series()->withoutGlobalScopes()->delete();
+                foreach ($this->series()->get() as $series) {
+                    $newSeries = $series->replicate();
+                    $newSeries->playlist_id = $child->id;
+                    if ($series->category_id && isset($categoryMap[$series->category_id])) {
+                        $newSeries->category_id = $categoryMap[$series->category_id];
+                    }
+                    $newSeries->save();
+                }
+
+                $child->channels()->withoutGlobalScopes()->delete();
+                foreach ($this->channels()->get() as $channel) {
+                    $newChannel = $channel->replicate();
+                    $newChannel->playlist_id = $child->id;
+                    if ($channel->group_id && isset($groupMap[$channel->group_id])) {
+                        $newChannel->group_id = $groupMap[$channel->group_id];
+                    }
+                    $newChannel->save();
+                }
+            });
+        }
     }
 }
