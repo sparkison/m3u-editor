@@ -97,6 +97,11 @@ class PlaylistResource extends Resource
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('pairedPlaylist.name')
+                    ->label('Paired With')
+                    ->toggleable()
+                    ->sortable()
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('url')
                     ->label('Playlist URL')
                     ->wrap()
@@ -384,6 +389,39 @@ class PlaylistResource extends Resource
                         ->modalDescription('This action will permanently delete all series associated with the playlist. Proceed with caution.')
                         ->modalSubmitActionLabel('Purge now')
                         ->hidden(fn($record): bool => !$record->xtream),
+                    Tables\Actions\Action::make('duplicate_pair')
+                        ->label('Duplicate & pair')
+                        ->icon('heroicon-o-document-duplicate')
+                        ->action(fn($record) => $record->duplicateWithPair())
+                        ->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Playlist duplicated')
+                                ->body('A paired duplicate has been created.')
+                                ->duration(3000)
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->modalIcon('heroicon-o-document-duplicate')
+                        ->modalDescription('Create a copy of this playlist and pair it so changes stay in sync.')
+                        ->modalSubmitActionLabel('Duplicate'),
+                    Tables\Actions\Action::make('unpair')
+                        ->label('Unpair')
+                        ->icon('heroicon-o-link-slash')
+                        ->visible(fn($record): bool => (bool) $record->paired_playlist_id)
+                        ->action(fn($record) => $record->unpair())
+                        ->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Playlists unpaired')
+                                ->body('This playlist is no longer paired.')
+                                ->duration(3000)
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->modalIcon('heroicon-o-link-slash')
+                        ->modalDescription('Unpair this playlist from its partner?')
+                        ->modalSubmitActionLabel('Unpair'),
                     Tables\Actions\DeleteAction::make(),
                 ])->button()->hiddenLabel()->size('sm'),
                 Tables\Actions\EditAction::make()->button()->hiddenLabel()->size('sm'),
@@ -499,6 +537,24 @@ class PlaylistResource extends Resource
                         ->modalIcon('heroicon-o-link')
                         ->modalDescription('Pair the selected playlists so that changes made to one are mirrored to the other.')
                         ->modalSubmitActionLabel('Pair'),
+                    Tables\Actions\BulkAction::make('unpair_playlists')
+                        ->label('Unpair playlists')
+                        ->icon('heroicon-o-link-slash')
+                        ->action(function (Collection $records) {
+                            foreach ($records as $record) {
+                                $record->unpair();
+                            }
+                            Notification::make()
+                                ->success()
+                                ->title('Playlists unpaired')
+                                ->body('Selected playlists have been unpaired.')
+                                ->duration(3000)
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->modalIcon('heroicon-o-link-slash')
+                        ->modalDescription('Remove pairing so selected playlists no longer stay in sync.')
+                        ->modalSubmitActionLabel('Unpair'),
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])->checkIfRecordIsSelectableUsing(
