@@ -6,10 +6,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Traits\PrimaryPlaylistScope;
 
 class Category extends Model
 {
     use HasFactory;
+    use PrimaryPlaylistScope;
 
     /**
      * The attributes that should be cast to native types.
