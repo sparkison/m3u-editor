@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\PrimaryPlaylistScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,6 +12,7 @@ use Symfony\Component\Process\Process as SymfonyProcess;
 class Episode extends Model
 {
     use HasFactory;
+    use PrimaryPlaylistScope;
 
     /**
      * The attributes that should be cast to native types.

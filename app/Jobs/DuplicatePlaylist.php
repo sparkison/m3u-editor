@@ -37,6 +37,9 @@ class DuplicatePlaylist implements ShouldQueue
             // Current timestamp
             $now = now();
 
+            // Keep track of channel ID mappings (old => new)
+            $channelMap = [];
+
             // Create a new playlist
             $newPlaylist = $playlist->replicate(except: [
                 'id',
@@ -74,6 +77,9 @@ class DuplicatePlaylist implements ShouldQueue
                     $newChannel->created_at = $now;
                     $newChannel->updated_at = $now;
                     $newChannel->save();
+
+                    // Map original channel to new channel
+                    $channelMap[$channel->id] = $newChannel->id;
                 }
             }
 
@@ -132,6 +138,27 @@ class DuplicatePlaylist implements ShouldQueue
                             $newEpisode->save();
                         }
                     }
+                }
+            }
+
+            // Copy channel failovers
+            foreach ($playlist->channels()->with('failovers')->get() as $channel) {
+                $newChannelId = $channelMap[$channel->id] ?? null;
+                if (!$newChannelId) {
+                    continue;
+                }
+
+                foreach ($channel->failovers as $failover) {
+                    $newFailover = $failover->replicate(except: [
+                        'id',
+                        'channel_id',
+                        'channel_failover_id',
+                    ]);
+                    $newFailover->channel_id = $newChannelId;
+                    $newFailover->channel_failover_id = $channelMap[$failover->channel_failover_id] ?? $failover->channel_failover_id;
+                    $newFailover->created_at = $now;
+                    $newFailover->updated_at = $now;
+                    $newFailover->save();
                 }
             }
 
