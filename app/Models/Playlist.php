@@ -42,7 +42,8 @@ class Playlist extends Model
         'backup_before_sync' => 'boolean',
         'sync_logs_enabled' => 'boolean',
         'status' => Status::class,
-        'id_channel_by' => PlaylistChannelId::class
+        'id_channel_by' => PlaylistChannelId::class,
+        'paired_playlist_id' => 'integer'
     ];
 
     public function getFolderPathAttribute(): string
@@ -159,5 +160,136 @@ class Playlist extends Model
     public function episodes(): HasMany
     {
         return $this->hasMany(Episode::class);
+    }
+
+    public function pairedPlaylist(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'paired_playlist_id');
+    }
+
+    /**
+     * Determine if this playlist has the same content as another.
+     */
+    public function isIdenticalTo(self $other): bool
+    {
+        return md5(json_encode($this->snapshot())) === md5(json_encode($other->snapshot()));
+    }
+
+    /**
+     * Pair this playlist with another one if their contents are identical.
+     */
+    public function pairWith(self $other): bool
+    {
+        if (!$this->isIdenticalTo($other)) {
+            return false;
+        }
+
+        self::withoutEvents(function () use ($other) {
+            $this->paired_playlist_id = $other->id;
+            $this->save();
+            $other->paired_playlist_id = $this->id;
+            $other->save();
+        });
+
+        $this->syncPairedPlaylist();
+
+        return true;
+    }
+
+    /**
+     * Create a snapshot of the playlist's content for comparison.
+     */
+    private function snapshot(): array
+    {
+        return [
+            'groups' => $this->groups()->orderBy('name')->pluck('name')->toArray(),
+            'categories' => $this->categories()->orderBy('name')->pluck('name')->toArray(),
+            'series' => $this->series()->orderBy('name')->pluck('name')->toArray(),
+            'channels' => $this->channels()->orderBy('name')->pluck('name')->toArray(),
+        ];
+    }
+
+    /**
+     * Synchronize this playlist's data with its paired playlist.
+     */
+    public function syncPairedPlaylist(): void
+    {
+        $paired = $this->pairedPlaylist;
+        if (!$paired) {
+            return;
+        }
+
+        self::withoutEvents(function () use ($paired) {
+            $paired->forceFill(array_filter($this->only([
+                'name',
+                'url',
+                'status',
+                'prefix',
+                'channels',
+                'synced',
+                'errors',
+                'available_streams',
+                'groups',
+                'uploads',
+                'short_urls_enabled',
+                'enable_proxy',
+                'auto_sync',
+                'sync_interval',
+                'sync_time',
+                'processing',
+                'dummy_epg',
+                'import_prefs',
+                'xtream_config',
+                'xtream_status',
+                'short_urls',
+                'proxy_options',
+                'backup_before_sync',
+                'sync_logs_enabled',
+                'id_channel_by',
+            ]), fn($value) => !is_null($value)));
+            $paired->save();
+
+            // Sync groups
+            $paired->groups()->delete();
+            $groupMap = [];
+            foreach ($this->groups()->get() as $group) {
+                $newGroup = $group->replicate();
+                $newGroup->playlist_id = $paired->id;
+                $newGroup->save();
+                $groupMap[$group->id] = $newGroup->id;
+            }
+
+            // Sync categories
+            $paired->categories()->delete();
+            $categoryMap = [];
+            foreach ($this->categories()->get() as $category) {
+                $newCategory = $category->replicate();
+                $newCategory->playlist_id = $paired->id;
+                $newCategory->save();
+                $categoryMap[$category->id] = $newCategory->id;
+            }
+
+            // Sync series
+            $paired->series()->delete();
+            foreach ($this->series()->get() as $series) {
+                $newSeries = $series->replicate();
+                $newSeries->playlist_id = $paired->id;
+                if ($series->category_id && isset($categoryMap[$series->category_id])) {
+                    $newSeries->category_id = $categoryMap[$series->category_id];
+                }
+                $newSeries->save();
+            }
+
+            // Sync channels
+            $paired->channels()->delete();
+            foreach ($this->channels()->get() as $channel) {
+                $newChannel = $channel->replicate();
+                $newChannel->playlist_id = $paired->id;
+                if ($channel->group_id && isset($groupMap[$channel->group_id])) {
+                    $newChannel->group_id = $groupMap[$channel->group_id];
+                }
+                $newChannel->save();
+            }
+        });
     }
 }

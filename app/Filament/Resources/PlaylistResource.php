@@ -467,6 +467,38 @@ class PlaylistResource extends Resource
                         ->modalIcon('heroicon-o-numbered-list')
                         ->modalDescription('Reset active streams count for the selected Playlists. Proceed with caution as this could lead to an incorrect count if there are streams currently running.')
                         ->modalSubmitActionLabel('Yes, reset now'),
+                    Tables\Actions\BulkAction::make('pair_playlists')
+                        ->label('Pair playlists')
+                        ->icon('heroicon-o-link')
+                        ->action(function (Collection $records) {
+                            if ($records->count() !== 2) {
+                                Notification::make()
+                                    ->danger()
+                                    ->title('Please select exactly two playlists to pair.')
+                                    ->duration(3000)
+                                    ->send();
+                                return;
+                            }
+                            [$first, $second] = [$records->first(), $records->last()];
+                            if (!$first->pairWith($second)) {
+                                Notification::make()
+                                    ->danger()
+                                    ->title('Playlists must be identical before pairing.')
+                                    ->duration(3000)
+                                    ->send();
+                                return;
+                            }
+                            Notification::make()
+                                ->success()
+                                ->title('Playlists paired')
+                                ->body('The selected playlists will now stay in sync.')
+                                ->duration(3000)
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->modalIcon('heroicon-o-link')
+                        ->modalDescription('Pair the selected playlists so that changes made to one are mirrored to the other.')
+                        ->modalSubmitActionLabel('Pair'),
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])->checkIfRecordIsSelectableUsing(
