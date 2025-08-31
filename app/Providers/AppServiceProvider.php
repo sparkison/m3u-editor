@@ -12,11 +12,14 @@ use App\Events\PlaylistUpdated;
 use App\Livewire\BackupDestinationListRecords;
 use App\Livewire\StreamPlayer;
 use App\Models\ChannelFailover;
+use App\Models\Channel;
 use App\Models\CustomPlaylist;
 use App\Models\MergedPlaylist;
 use App\Models\Epg;
+use App\Models\Category;
 use App\Models\Group;
 use App\Models\Playlist;
+use App\Models\Series;
 use App\Models\User;
 use App\Services\EpgCacheService;
 use App\Services\FfmpegCodecService;
@@ -143,6 +146,11 @@ class AppServiceProvider extends ServiceProvider
             // Process playlist on creation
             Playlist::created(fn(Playlist $playlist) => event(new PlaylistCreated($playlist)));
             Playlist::updated(fn(Playlist $playlist) => event(new PlaylistUpdated($playlist)));
+            Playlist::saved(function (Playlist $playlist) {
+                if ($playlist->paired_playlist_id) {
+                    $playlist->syncPairedPlaylist();
+                }
+            });
             Playlist::creating(function (Playlist $playlist) {
                 if (!$playlist->user_id) {
                     $playlist->user_id = auth()->id();
@@ -269,6 +277,31 @@ class AppServiceProvider extends ServiceProvider
                     $group->channels()
                         ->update(['group' => $group->name]);
                 }
+            });
+
+            Channel::saved(function (Channel $channel) {
+                $channel->playlist?->syncPairedPlaylist();
+            });
+            Channel::deleted(function (Channel $channel) {
+                $channel->playlist?->syncPairedPlaylist();
+            });
+            Group::saved(function (Group $group) {
+                $group->playlist?->syncPairedPlaylist();
+            });
+            Group::deleted(function (Group $group) {
+                $group->playlist?->syncPairedPlaylist();
+            });
+            Category::saved(function (Category $category) {
+                $category->playlist?->syncPairedPlaylist();
+            });
+            Category::deleted(function (Category $category) {
+                $category->playlist?->syncPairedPlaylist();
+            });
+            Series::saved(function (Series $series) {
+                $series->playlist?->syncPairedPlaylist();
+            });
+            Series::deleted(function (Series $series) {
+                $series->playlist?->syncPairedPlaylist();
             });
 
             // Failover channels
