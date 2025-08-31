@@ -64,7 +64,7 @@ class DuplicatePlaylist implements ShouldQueue
                 $newGroup->save();
 
                 // Copy the group channels
-                foreach ($group->channels()->get() as $channel) {
+                foreach ($group->channels()->with('failovers')->get() as $channel) {
                     $newChannel = $channel->replicate(except: [
                         'id',
                         'group_id',
@@ -75,6 +75,18 @@ class DuplicatePlaylist implements ShouldQueue
                     $newChannel->created_at = $now;
                     $newChannel->updated_at = $now;
                     $newChannel->save();
+
+                    // Copy the channel failovers
+                    foreach ($channel->failovers as $failover) {
+                        $newFailover = $failover->replicate(except: [
+                            'id',
+                            'channel_id',
+                        ]);
+                        $newFailover->channel_id = $newChannel->id; // Link to the new channel
+                        $newFailover->created_at = $now;
+                        $newFailover->updated_at = $now;
+                        $newFailover->save();
+                    }
                 }
             }
 
