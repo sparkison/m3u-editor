@@ -3,12 +3,15 @@
 namespace App\Filament\GuestPanel\Pages;
 
 use App\Facades\PlaylistFacade;
+use App\Filament\GuestPanel\Pages\Concerns\HasGuestAuth;
 use Filament\Pages\Page;
-use App\Filament\GuestPanel\Pages\Concerns\GuestAuthPage;
 use Illuminate\Contracts\Support\Htmlable;
+use Filament\Schemas\Contracts\HasSchemas;
 
-class GuestDashboard extends GuestAuthPage
+class GuestDashboard extends Page implements HasSchemas
 {
+    use HasGuestAuth;
+
     protected string $view = 'filament.guest-panel.pages.guest-dashboard';
     protected static string | \BackedEnum | null $navigationIcon = 'heroicon-s-tv';
     protected static ?string $navigationLabel = 'Live TV';
@@ -17,6 +20,16 @@ class GuestDashboard extends GuestAuthPage
     public function getTitle(): string|Htmlable
     {
         return '';
+    }
+
+    public static function getUrl(
+        array $parameters = [],
+        bool $isAbsolute = true,
+        ?string $panel = null,
+        $tenant = null
+    ): string {
+        $parameters['uuid'] = static::getCurrentUuid();
+        return route(static::getRouteName($panel), $parameters, $isAbsolute);
     }
 
     public static function getNavigationBadge(): ?string
@@ -29,15 +42,5 @@ class GuestDashboard extends GuestAuthPage
             ])->count();
         }
         return '';
-    }
-
-    public static function getUrl(
-        array $parameters = [],
-        bool $isAbsolute = true,
-        ?string $panel = null,
-        $tenant = null
-    ): string {
-        $parameters['uuid'] = static::getCurrentUuid();
-        return route(static::getRouteName($panel), $parameters, $isAbsolute);
     }
 }

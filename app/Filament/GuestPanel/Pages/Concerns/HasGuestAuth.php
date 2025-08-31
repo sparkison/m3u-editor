@@ -3,16 +3,11 @@
 namespace App\Filament\GuestPanel\Pages\Concerns;
 
 use App\Facades\PlaylistFacade;
-use Filament\Facades\Filament;
-use Filament\Pages\Page;
-use Illuminate\Contracts\Support\Htmlable;
-use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Schemas\Schema;
 use Filament\Forms;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
-use Illuminate\Support\Facades\Session;
 
-class GuestAuthPage extends Page implements HasSchemas
+trait HasGuestAuth
 {
     use InteractsWithSchemas;
 

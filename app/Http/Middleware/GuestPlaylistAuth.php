@@ -76,6 +76,8 @@ class GuestPlaylistAuth extends Middleware
 
         // Store playlist id in cookies for later retrieval
         $request->attributes->set('playlist_uuid', $playlist->uuid);
+
+        return $uuid;
     }
 
     protected function redirectTo($request): ?string
