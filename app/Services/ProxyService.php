@@ -518,6 +518,10 @@ class ProxyService
             $ffmpegPath = 'jellyfin-ffmpeg';
         }
 
+        // Determine if it's an MKV file by extension
+        $isMkv = stripos($streamUrl, '.mkv') !== false;
+        $isMp4 = stripos($streamUrl, '.mp4') !== false;
+
         // Determine the effective video codec based on config and settings
         $videoCodec = self::determineVideoCodec(
             config('proxy.ffmpeg_codec_video', null),
@@ -609,7 +613,7 @@ class ProxyService
             }
 
             // Set the output format and codecs
-            if ($format === 'ts') {
+            if (!($isMkv || $isMp4)) {
                 $output = "-c:v {$videoCodec} " . ($codecSpecificArgs ? trim($codecSpecificArgs) . " " : "") . " {$audioOutputArgs} -c:s {$subtitleCodec} ";
                 
                 // Add MPEG-TS specific options for better compatibility
@@ -619,7 +623,7 @@ class ProxyService
                 $output .= "-muxrate 0 -pcr_period 20 ";
                 $output .= "pipe:1";
             } else {
-                // For mp4 format
+                // For mkv/mp4 format
                 $bsfArgs = '';
                 if ($audioCodec === 'copy') {
                     // Check if the source audio is AAC, as the filter is specific to AAC ADTS
@@ -633,9 +637,6 @@ class ProxyService
 
             // Note: The previous complex ternary for mp4 audio was simplified as $qsvAudioArguments now correctly forms the full audio part.
             // If $audioCodec was 'copy', $qsvAudioArguments is just '-c:a copy' and no bitrate is added.
-
-            // Determine if it's an MKV file by extension
-            $isMkv = stripos($streamUrl, '.mkv') !== false;
 
             // Build the FFmpeg command
             $cmd = escapeshellcmd($ffmpegPath) . ' ';

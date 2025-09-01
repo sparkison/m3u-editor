@@ -4,11 +4,9 @@
     @php($playlist = App\Models\Playlist::find($record->playlist_id) ?? null)
     @php($proxyEnabled = $settings->force_video_player_proxy || $playlist->enable_proxy)
     @php($url = $record->url)
+    @php($format = pathinfo($record->url, PATHINFO_EXTENSION))
     @if($proxyEnabled)
-        @php($format =  $playlist->proxy_options['output'] ?? 'ts')
         @php($url = App\Facades\ProxyFacade::getProxyUrlForEpisode(id: $record->id, format:  $format, preview: true))
-    @else
-        @php($format = pathinfo($record->url, PATHINFO_EXTENSION))
     @endif
     @php($playerId = "episode_{$record->id}_preview")
 
