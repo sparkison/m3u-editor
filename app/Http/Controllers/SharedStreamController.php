@@ -41,7 +41,7 @@ class SharedStreamController extends Controller
         Log::channel('ffmpeg')->info("SharedStreamController: streamChannel called with encodedId: {$encodedId}, format: {$format}");
 
         // Validate format
-        if (!in_array($format, ['ts', 'm3u8'])) {
+        if (!in_array($format, ['ts', 'm3u8', 'mkv', 'mp4'])) {
             Log::channel('ffmpeg')->error("SharedStreamController: Invalid format specified: {$format}");
             abort(400, 'Invalid format specified. Use ts or m3u8.');
         }
@@ -71,7 +71,7 @@ class SharedStreamController extends Controller
     public function streamEpisode(Request $request, string $encodedId, string $format = 'ts')
     {
         // Validate format
-        if (!in_array($format, ['ts', 'm3u8'])) {
+        if (!in_array($format, ['ts', 'm3u8', 'mkv', 'mp4'])) {
             abort(400, 'Invalid format specified. Use ts or m3u8.');
         }
 
