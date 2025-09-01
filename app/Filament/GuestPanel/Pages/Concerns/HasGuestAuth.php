@@ -19,7 +19,10 @@ trait HasGuestAuth
 
     protected static function getCurrentUuid(): ?string
     {
-        return request()->route('uuid') ?? request()->attributes->get('playlist_uuid');
+        $referer = request()->header('referer');
+        $refererSegment2 = $referer ? (explode('/', parse_url($referer, PHP_URL_PATH))[2] ?? null) : null;
+        $uuid = request()->route('uuid') ?? request()->attributes->get('playlist_uuid') ?? $refererSegment2;
+        return $uuid;
     }
 
     public function mount(): void
