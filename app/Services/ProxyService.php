@@ -110,6 +110,7 @@ class ProxyService
      * @param \Illuminate\Http\Request $request
      * @param string $streamUrl
      * @param Playlist|MergedPlaylist|CustomPlaylist $playlist
+     * 
      * @return string
      */
     public static function generateTimeshiftUrl(Request $request, string $streamUrl, $playlist)
@@ -147,18 +148,19 @@ class ProxyService
             $duration = (int) $request->get('timeshift_duration'); // Duration in minutes
             $date = $request->get('timeshift_date'); // Format: YYYY-MM-DD:HH-MM-SS
             
-            // "…://host/live/u/p/<id>.<ext>" >>> "…://host/streaming/timeshift.php?username=u&password=p&stream=id&start=stamp&duration=offset"
+            // "…://host/live/u/p/<id>.<ext>" >>> "…://host/timeshift/u/p/duration/stamp/<id>.<ext>"
             $rewrite = static function (string $url, string $stamp, int $offset): string {
-                if (preg_match('~^(https?://[^/]+)/live/([^/]+)/([^/]+)/([^/]+)\.[^/]+$~', $url, $m)) {
-                    [$_, $base, $user, $pass, $id] = $m;
+                if (preg_match('~^(https?://[^/]+)/live/([^/]+)/([^/]+)/([^/]+)\.([^/]+)$~', $url, $m)) {
+                    [$_, $base, $user, $pass, $id, $ext] = $m;
                     return sprintf(
-                        '%s/streaming/timeshift.php?username=%s&password=%s&stream=%s&start=%s&duration=%d',
+                        '%s/timeshift/%s/%s/%d/%s/%s.%s',
                         $base,
                         $user,
                         $pass,
-                        $id,
+                        $offset,
                         $stamp,
-                        $offset
+                        $id,
+                        $ext
                     );
                 }
                 return $url; // fallback if pattern does not match
@@ -188,23 +190,25 @@ class ProxyService
                 $offset
             ));
         } elseif ($xtreamTimeshiftPresent) {
-            // Convert Xtream API date format to timeshift.php format
-            // Input: YYYY-MM-DD:HH-MM-SS, Output: Y-m-d:H-i
-            $convertedDate = str_replace(['-', ':'], ['-', '-'], $date);
-            if (preg_match('/^(\d{4})-(\d{2})-(\d{2}):(\d{2})-(\d{2})-(\d{2})$/', $convertedDate, $matches)) {
+            // Convert Xtream API date format to timeshift URL format
+            // Input: YYYY-MM-DD:HH-MM-SS, Output: YYYY-MM-DD:HH-MM
+            if (preg_match('/^(\d{4})-(\d{2})-(\d{2}):(\d{2})-(\d{2})-(\d{2})$/', $date, $matches)) {
                 $stamp = sprintf('%s-%s-%s:%s-%s', $matches[1], $matches[2], $matches[3], $matches[4], $matches[5]);
             } else {
-                $stamp = $convertedDate; // Use as-is if format doesn't match expected pattern
+                // If the format doesn't match expected pattern, try to clean it up
+                $stamp = preg_replace('/[^\d\-:]/', '', $date);
+                $stamp = preg_replace('/:(\d{2})$/', '', $stamp); // Remove seconds if present
             }
             
             $streamUrl = $rewrite($streamUrl, $stamp, $duration);
 
             // Helpful debug for verification
             Log::channel('ffmpeg')->debug(sprintf(
-                '[TIMESHIFT-XTREAM] duration=%d date=%s converted_stamp=%s',
+                '[TIMESHIFT-XTREAM] duration=%d date=%s converted_stamp=%s final_url=%s',
                 $duration,
                 $date,
-                $stamp
+                $stamp,
+                $streamUrl
             ));
         }
 
