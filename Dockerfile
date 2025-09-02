@@ -121,7 +121,7 @@ RUN apt-get install -y --no-install-recommends \
     php8.4-opcache \
     php8.4-pgsql \
     php8.4-igbinary \
-    php8.4-pcov php8.4-imagick \
+    php8.4-imagick \
     php8.4-redis \
     php8.4-posix
 
@@ -162,16 +162,13 @@ RUN echo "GIT_BRANCH=${GIT_BRANCH}" > /var/www/html/.git-info && \
 # Install composer dependencies
 RUN composer install --no-dev --no-interaction --no-progress -o
 
-# Setup user, group and permissions
-RUN addgroup $WWWGROUP \
-    && adduser -h /var/www/html -s /bin/bash -G $WWWGROUP -D $WWWUSER
-
 # Symlink jellyfin-ffmpeg to usr/bin
 RUN ln -s /usr/lib/jellyfin-ffmpeg/ffmpeg /usr/bin/jellyfin-ffmpeg
 RUN ln -s /usr/lib/jellyfin-ffmpeg/ffprobe /usr/bin/jellyfin-ffprobe
 
 RUN chown -R $WWWUSER:$WWWGROUP /var/www/html
 RUN chown -R $WWWUSER:$WWWGROUP /var/lib/nginx
+
 RUN mkdir -p /var/lib/postgresql && chown -R $WWWUSER:$WWWGROUP /var/lib/postgresql
 RUN mkdir -p /run/postgresql && chown -R $WWWUSER:$WWWGROUP /run/postgresql
 
