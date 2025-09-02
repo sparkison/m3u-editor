@@ -2,22 +2,22 @@
 
 namespace Tests\Feature;
 
-use App\Models\Category; // Renamed SeriesCategory to Category
+use App\Models\Category;
 use App\Models\Channel;
-use App\Models\Group;    // Renamed ChannelGroup to Group
+use App\Models\Group;
 use App\Models\Playlist;
 use App\Models\PlaylistAuth;
 use App\Models\Series;
 use App\Models\User;
-use App\Models\Season;   // Added Season
-use App\Models\Episode;  // Added Episode
-use App\Enums\ChannelLogoType; // Added
+use App\Models\Season;
+use App\Models\Episode;
+use App\Enums\ChannelLogoType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\URL; // Added
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Tests\TestCase;
-use Carbon\Carbon; // Added
+use Carbon\Carbon;
 
 class XtreamApiControllerTest extends TestCase
 {
@@ -46,7 +46,7 @@ class XtreamApiControllerTest extends TestCase
             'enabled' => true,
             'user_id' => $this->user->id,
         ]);
-        
+
         // Attach the auth to the playlist using the morphToMany relationship
         $this->playlist->playlistAuths()->attach($playlistAuth);
     }
@@ -100,20 +100,36 @@ class XtreamApiControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonStructure([
-            'user_info', 'server_info',
+            'user_info',
+            'server_info',
         ]);
         $response->assertJsonStructure([
             'user_info' => [
-                'username', 'password', 'message', 'auth', 'status',
-                'exp_date', 'is_trial', 'active_cons', 'created_at',
-                'max_connections', 'allowed_output_formats',
+                'username',
+                'password',
+                'message',
+                'auth',
+                'status',
+                'exp_date',
+                'is_trial',
+                'active_cons',
+                'created_at',
+                'max_connections',
+                'allowed_output_formats',
             ],
         ]);
         $response->assertJsonPath('user_info.status', 'Active');
         $response->assertJsonStructure([
             'server_info' => [
-                'url', 'port', 'https_port', 'rtmp_port', 'server_protocol',
-                'timezone', 'server_software', 'timestamp_now', 'time_now',
+                'url',
+                'port',
+                'https_port',
+                'rtmp_port',
+                'server_protocol',
+                'timezone',
+                'server_software',
+                'timestamp_now',
+                'time_now',
             ],
         ]);
         $response->assertJsonPath('server_info.server_software', config('app.name') . ' Xtream API');
@@ -123,7 +139,7 @@ class XtreamApiControllerTest extends TestCase
     {
         $user = User::factory()->create();
         $playlist = Playlist::factory()->for($user)->create();
-        
+
         // Create a valid auth and attach it to the playlist
         $playlistAuth = PlaylistAuth::create([
             'name' => 'Test Auth',
@@ -150,7 +166,7 @@ class XtreamApiControllerTest extends TestCase
         $plainPassword = 'password123';
         $user = User::factory()->create(['password' => Hash::make($plainPassword)]);
         $playlist = Playlist::factory()->for($user)->create();
-        
+
         // Create a disabled auth to ensure it's not used
         $playlistAuth = PlaylistAuth::create([
             'name' => 'Disabled Auth',
@@ -177,7 +193,7 @@ class XtreamApiControllerTest extends TestCase
     {
         $user = User::factory()->create(['password' => Hash::make('correct_password')]);
         $playlist = Playlist::factory()->for($user)->create();
-        
+
         // Create a disabled auth to ensure it's not used
         $playlistAuth = PlaylistAuth::create([
             'name' => 'Disabled Auth',
@@ -202,7 +218,10 @@ class XtreamApiControllerTest extends TestCase
     public function test_panel_action_with_non_existent_playlist_uuid_returns_not_found(): void
     {
         $response = $this->getJson(route('playlist.xtream.api', [
-            'uuid' => Str::uuid()->toString(), 'action' => 'panel', 'username' => 'any', 'password' => 'any',
+            'uuid' => Str::uuid()->toString(),
+            'action' => 'panel',
+            'username' => 'any',
+            'password' => 'any',
         ]));
         $response->assertStatus(404);
         $response->assertJson(['error' => 'Playlist not found']);
@@ -213,12 +232,16 @@ class XtreamApiControllerTest extends TestCase
         $playlist = Playlist::factory()->create(); // User automatically created by Playlist factory if not specified
 
         $responseMissingUser = $this->getJson(route('playlist.xtream.api', [
-            'uuid' => $playlist->uuid, 'action' => 'panel', 'password' => 'test',
+            'uuid' => $playlist->uuid,
+            'action' => 'panel',
+            'password' => 'test',
         ]));
         $responseMissingUser->assertStatus(401)->assertJson(['error' => 'Unauthorized - Missing credentials']);
 
         $responseMissingPass = $this->getJson(route('playlist.xtream.api', [
-            'uuid' => $playlist->uuid, 'action' => 'panel', 'username' => 'test',
+            'uuid' => $playlist->uuid,
+            'action' => 'panel',
+            'username' => 'test',
         ]));
         $responseMissingPass->assertStatus(401)->assertJson(['error' => 'Unauthorized - Missing credentials']);
     }
@@ -241,8 +264,17 @@ class XtreamApiControllerTest extends TestCase
 
         $response->assertJsonStructure([
             '*' => [
-                'num', 'name', 'stream_type', 'stream_id', 'stream_icon', 'epg_channel_id',
-                'added', 'category_id', 'tv_archive', 'direct_source', 'tv_archive_duration'
+                'num',
+                'name',
+                'stream_type',
+                'stream_id',
+                'stream_icon',
+                'epg_channel_id',
+                'added',
+                'category_id',
+                'tv_archive',
+                'direct_source',
+                'tv_archive_duration'
             ]
         ]);
         // Check specific icon for channel 1
@@ -279,9 +311,22 @@ class XtreamApiControllerTest extends TestCase
 
         $response->assertJsonStructure([
             '*' => [
-                'num', 'name', 'series_id', 'cover', 'plot', 'cast', 'director', 'genre',
-                'releaseDate', 'last_modified', 'rating', 'rating_5based',
-                'backdrop_path', 'youtube_trailer', 'episode_run_time', 'category_id'
+                'num',
+                'name',
+                'series_id',
+                'cover',
+                'plot',
+                'cast',
+                'director',
+                'genre',
+                'releaseDate',
+                'last_modified',
+                'rating',
+                'rating_5based',
+                'backdrop_path',
+                'youtube_trailer',
+                'episode_run_time',
+                'category_id'
             ]
         ]);
         $this->assertEquals('https://m3ueditor.test/cover1.jpg', $response->json('0.cover'));
@@ -339,9 +384,15 @@ class XtreamApiControllerTest extends TestCase
             'episodes' => [
                 '*' => [
                     '*' => [
-                        'id', 'episode_num', 'title', 'container_extension',
+                        'id',
+                        'episode_num',
+                        'title',
+                        'container_extension',
                         'info' => ['movie_image', 'plot', 'duration_secs', 'duration', 'video', 'audio', 'bitrate', 'rating'],
-                        'added', 'season', 'stream_id', 'direct_source'
+                        'added',
+                        'season',
+                        'stream_id',
+                        'direct_source'
                     ]
                 ]
             ],
