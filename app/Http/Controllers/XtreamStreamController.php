@@ -94,7 +94,7 @@ class XtreamStreamController extends Controller
     private function getValidatedStreamFromPlaylist(Model $playlist, int $streamId, string $streamType): ?Model
     {
         // Live and VOD streams are handled the same
-        if ($streamType === 'live' || $streamType === 'vod') {
+        if ($streamType === 'live' || $streamType === 'vod' || $streamType === 'timeshift') {
             // Assuming all playlist types have a 'channels' relationship defined.
             return $playlist->channels()
                 ->where('channels.id', $streamId) // Qualify column name if pivot table involved
@@ -283,8 +283,8 @@ class XtreamStreamController extends Controller
     public function handleTimeshift(Request $request, string $username, string $password, int $duration, string $date, int $streamId, string $format = 'ts')
     {
         // Timeshift is only available for live channels
-        list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'live');
-        
+        list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'timeshift');
+
         if (!($channel instanceof Channel)) {
             return response()->json(['error' => 'Unauthorized or stream not found'], 403);
         }
@@ -300,7 +300,7 @@ class XtreamStreamController extends Controller
             // If proxy enabled, call the controller method directly to avoid redirect loop
             $bufferedStreamsEnabled = config('proxy.shared_streaming.enabled', false);
             $encodedId = rtrim(base64_encode($streamId), '=');
-            
+
             if ($bufferedStreamsEnabled) {
                 return app()->call('App\\Http\\Controllers\\SharedStreamController@streamChannel', [
                     'encodedId' => $encodedId,

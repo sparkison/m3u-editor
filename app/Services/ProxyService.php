@@ -109,10 +109,10 @@ class ProxyService
      *
      * @param \Illuminate\Http\Request $request
      * @param string $streamUrl
-     * @param \App\Models\Playlist|null $playlist
+     * @param Playlist|MergedPlaylist|CustomPlaylist $playlist
      * @return string
      */
-    public static function generateTimeshiftUrl(Request $request, string $streamUrl, $playlist = null)
+    public static function generateTimeshiftUrl(Request $request, string $streamUrl, $playlist)
     {
         /* ── Timeshift SETUP (TiviMate → portal format) ───────────────────── */
         // TiviMate sends utc/lutc as UNIX epochs (UTC). We only convert TZ + format.
