@@ -109,13 +109,16 @@ class ProxyService
      *
      * @param \Illuminate\Http\Request $request
      * @param string $streamUrl
+     * @param \App\Models\Playlist|null $playlist
      * @return string
      */
-    public static function generateTimeshiftUrl(Request $request, string $streamUrl)
+    public static function generateTimeshiftUrl(Request $request, string $streamUrl, $playlist = null)
     {
         /* ── Timeshift SETUP (TiviMate → portal format) ───────────────────── */
         // TiviMate sends utc/lutc as UNIX epochs (UTC). We only convert TZ + format.
         $utcPresent = $request->filled('utc');
+        $xtreamTimeshiftPresent = $request->filled('timeshift_duration') && $request->filled('timeshift_date');
+        
         if ($utcPresent) {
             $utc = (int) $request->query('utc'); // programme start (UTC epoch)
             $lutc = (int) ($request->query('lutc') ?? time()); // “live” now (UTC epoch)
@@ -139,13 +142,34 @@ class ProxyService
                 }
                 return $url; // fallback if pattern does not match
             };
+        } elseif ($xtreamTimeshiftPresent) {
+            // Handle Xtream API timeshift format
+            $duration = (int) $request->get('timeshift_duration'); // Duration in minutes
+            $date = $request->get('timeshift_date'); // Format: YYYY-MM-DD:HH-MM-SS
+            
+            // "…://host/live/u/p/<id>.<ext>" >>> "…://host/streaming/timeshift.php?username=u&password=p&stream=id&start=stamp&duration=offset"
+            $rewrite = static function (string $url, string $stamp, int $offset): string {
+                if (preg_match('~^(https?://[^/]+)/live/([^/]+)/([^/]+)/([^/]+)\.[^/]+$~', $url, $m)) {
+                    [$_, $base, $user, $pass, $id] = $m;
+                    return sprintf(
+                        '%s/streaming/timeshift.php?username=%s&password=%s&stream=%s&start=%s&duration=%d',
+                        $base,
+                        $user,
+                        $pass,
+                        $id,
+                        $stamp,
+                        $offset
+                    );
+                }
+                return $url; // fallback if pattern does not match
+            };
         }
         /* ─────────────────────────────────────────────────────────────────── */
 
         // ── Apply timeshift rewriting AFTER we know the provider timezone ──
         if ($utcPresent) {
             // Use the portal/provider timezone (DST-aware). Prefer per-playlist; last resort UTC.
-            $providerTz = $playlist->server_timezone ?? 'Etc/UTC';
+            $providerTz = $playlist?->server_timezone ?? 'Etc/UTC';
 
             // Convert the absolute UTC epoch from TiviMate to provider-local time string expected by timeshift.php
             $stamp = Carbon::createFromTimestampUTC($utc)
@@ -156,12 +180,31 @@ class ProxyService
 
             // Helpful debug for verification
             Log::channel('ffmpeg')->debug(sprintf(
-                '[TIMESHIFT] utc=%d lutc=%d tz=%s start=%s offset(min)=%d',
+                '[TIMESHIFT-M3U] utc=%d lutc=%d tz=%s start=%s offset(min)=%d',
                 $utc,
                 $lutc,
                 $providerTz,
                 $stamp,
                 $offset
+            ));
+        } elseif ($xtreamTimeshiftPresent) {
+            // Convert Xtream API date format to timeshift.php format
+            // Input: YYYY-MM-DD:HH-MM-SS, Output: Y-m-d:H-i
+            $convertedDate = str_replace(['-', ':'], ['-', '-'], $date);
+            if (preg_match('/^(\d{4})-(\d{2})-(\d{2}):(\d{2})-(\d{2})-(\d{2})$/', $convertedDate, $matches)) {
+                $stamp = sprintf('%s-%s-%s:%s-%s', $matches[1], $matches[2], $matches[3], $matches[4], $matches[5]);
+            } else {
+                $stamp = $convertedDate; // Use as-is if format doesn't match expected pattern
+            }
+            
+            $streamUrl = $rewrite($streamUrl, $stamp, $duration);
+
+            // Helpful debug for verification
+            Log::channel('ffmpeg')->debug(sprintf(
+                '[TIMESHIFT-XTREAM] duration=%d date=%s converted_stamp=%s',
+                $duration,
+                $date,
+                $stamp
             ));
         }
 
