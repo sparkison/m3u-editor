@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Settings\GeneralSettings;
+use Carbon\Carbon;
 use Exception;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class ProxyService
@@ -100,6 +102,70 @@ class ProxyService
                 'encodedId' => $id,
                 'format' => $format
             ]);
+    }
+
+    /**
+     * Generate a timeshift URL for a given stream.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @param string $streamUrl
+     * @return string
+     */
+    public static function generateTimeshiftUrl(Request $request, string $streamUrl)
+    {
+        /* ── Timeshift SETUP (TiviMate → portal format) ───────────────────── */
+        // TiviMate sends utc/lutc as UNIX epochs (UTC). We only convert TZ + format.
+        $utcPresent = $request->filled('utc');
+        if ($utcPresent) {
+            $utc = (int) $request->query('utc'); // programme start (UTC epoch)
+            $lutc = (int) ($request->query('lutc') ?? time()); // “live” now (UTC epoch)
+
+            // duration (minutes) from start → now; ceil avoids off-by-one near edges
+            $offset = max(1, (int) ceil(max(0, $lutc - $utc) / 60));
+
+            // "…://host/live/u/p/<id>.<ext>" >>> "…://host/streaming/timeshift.php?username=u&password=p&stream=id&start=stamp&duration=offset"
+            $rewrite = static function (string $url, string $stamp, int $offset): string {
+                if (preg_match('~^(https?://[^/]+)/live/([^/]+)/([^/]+)/([^/]+)\.[^/]+$~', $url, $m)) {
+                    [$_, $base, $user, $pass, $id] = $m;
+                    return sprintf(
+                        '%s/streaming/timeshift.php?username=%s&password=%s&stream=%s&start=%s&duration=%d',
+                        $base,
+                        $user,
+                        $pass,
+                        $id,
+                        $stamp,
+                        $offset
+                    );
+                }
+                return $url; // fallback if pattern does not match
+            };
+        }
+        /* ─────────────────────────────────────────────────────────────────── */
+
+        // ── Apply timeshift rewriting AFTER we know the provider timezone ──
+        if ($utcPresent) {
+            // Use the portal/provider timezone (DST-aware). Prefer per-playlist; last resort UTC.
+            $providerTz = $playlist->server_timezone ?? 'Etc/UTC';
+
+            // Convert the absolute UTC epoch from TiviMate to provider-local time string expected by timeshift.php
+            $stamp = Carbon::createFromTimestampUTC($utc)
+                ->setTimezone($providerTz)
+                ->format('Y-m-d:H-i');
+
+            $streamUrl = $rewrite($streamUrl, $stamp, $offset);
+
+            // Helpful debug for verification
+            Log::channel('ffmpeg')->debug(sprintf(
+                '[TIMESHIFT] utc=%d lutc=%d tz=%s start=%s offset(min)=%d',
+                $utc,
+                $lutc,
+                $providerTz,
+                $stamp,
+                $offset
+            ));
+        }
+
+        return $streamUrl;
     }
 
     /**
