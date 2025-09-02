@@ -11,6 +11,9 @@ ENV GIT_BRANCH=${GIT_BRANCH}
 ENV GIT_COMMIT=${GIT_COMMIT}
 ENV GIT_TAG=${GIT_TAG}
 
+# Set non-interactive mode for apt-get
+ENV DEBIAN_FRONTEND=noninteractive
+
 # Set the working directory
 WORKDIR /var/www/html
 
