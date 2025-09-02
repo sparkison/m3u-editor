@@ -584,4 +584,94 @@ class XtreamApiControllerTest extends TestCase
                 'epg_listings'
             ]);
     }
+
+    // Tests for timeshift functionality
+    public function test_timeshift_stream_access_with_valid_credentials()
+    {
+        // Create a channel
+        $channel = Channel::factory()->create([
+            'enabled' => true,
+            'url' => 'https://test-stream.com/live/stream123.ts'
+        ]);
+
+        // Attach the channel to the playlist
+        $this->playlist->channels()->attach($channel->id);
+
+        // Test timeshift URL structure: /timeshift/{username}/{password}/{duration}/{date}/{streamId}.{format}
+        $response = $this->get(route('xtream.stream.timeshift.root', [
+            'username' => $this->username,
+            'password' => $this->password,
+            'duration' => 60, // 60 minutes
+            'date' => '2024-12-01:15-30-00', // YYYY-MM-DD:HH-MM-SS format
+            'streamId' => $channel->id,
+            'format' => 'ts'
+        ]));
+
+        // Should redirect to stream URL (since proxy is likely disabled in test)
+        $response->assertStatus(302);
+    }
+
+    public function test_timeshift_stream_access_with_invalid_credentials()
+    {
+        // Create a channel
+        $channel = Channel::factory()->create([
+            'enabled' => true,
+            'url' => 'https://test-stream.com/live/stream123.ts'
+        ]);
+
+        // Attach the channel to the playlist
+        $this->playlist->channels()->attach($channel->id);
+
+        // Test with invalid credentials
+        $response = $this->get(route('xtream.stream.timeshift.root', [
+            'username' => 'invalid_user',
+            'password' => 'invalid_pass',
+            'duration' => 60,
+            'date' => '2024-12-01:15-30-00',
+            'streamId' => $channel->id,
+            'format' => 'ts'
+        ]));
+
+        $response->assertStatus(403)
+            ->assertJson(['error' => 'Unauthorized or stream not found']);
+    }
+
+    public function test_timeshift_stream_access_with_disabled_channel()
+    {
+        // Create a disabled channel
+        $channel = Channel::factory()->create([
+            'enabled' => false,
+            'url' => 'https://test-stream.com/live/stream123.ts'
+        ]);
+
+        // Attach the channel to the playlist
+        $this->playlist->channels()->attach($channel->id);
+
+        $response = $this->get(route('xtream.stream.timeshift.root', [
+            'username' => $this->username,
+            'password' => $this->password,
+            'duration' => 60,
+            'date' => '2024-12-01:15-30-00',
+            'streamId' => $channel->id,
+            'format' => 'ts'
+        ]));
+
+        $response->assertStatus(403)
+            ->assertJson(['error' => 'Unauthorized or stream not found']);
+    }
+
+    public function test_timeshift_stream_access_with_nonexistent_channel()
+    {
+        $response = $this->get(route('xtream.stream.timeshift.root', [
+            'username' => $this->username,
+            'password' => $this->password,
+            'duration' => 60,
+            'date' => '2024-12-01:15-30-00',
+            'streamId' => 99999, // Non-existent channel ID
+            'format' => 'ts'
+        ]));
+
+        $response->assertStatus(403)
+            ->assertJson(['error' => 'Unauthorized or stream not found']);
+    }
 }

@@ -169,3 +169,7 @@ Route::get('/movie/{username}/{password}/{streamId}.{format}', [App\Http\Control
     ->name('xtream.stream.vod.root');
 Route::get('/series/{username}/{password}/{streamId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleSeries'])
     ->name('xtream.stream.series.root');
+
+// Timeshift endpoints
+Route::get('/timeshift/{username}/{password}/{duration}/{date}/{streamId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleTimeshift'])
+    ->name('xtream.stream.timeshift.root');

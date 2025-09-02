@@ -108,11 +108,11 @@ class SharedStreamController extends Controller
 
         Log::channel('ffmpeg')->debug("SharedStreamController: Stream URL found for {$title}: {$streamUrl}");
 
-        // Generate timeshift URL if applicable
-        $streamUrl = ProxyService::generateTimeshiftUrl($request, $streamUrl);
-
         // Get playlist for stream limits
         $playlist = $model->getEffectivePlaylist();
+
+        // Generate timeshift URL if applicable
+        $streamUrl = ProxyService::generateTimeshiftUrl($request, $streamUrl, $playlist);
 
         $clientId = $this->generateClientId($request);
         $userAgent = $playlist->user_agent ?? 'VLC/3.0.21';

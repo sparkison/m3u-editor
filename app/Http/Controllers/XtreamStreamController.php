@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Channel;
 use App\Models\Episode;
 use App\Models\Series;
+use App\Services\ProxyService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Hash;
@@ -251,5 +252,76 @@ class XtreamStreamController extends Controller
         }
 
         return response()->json(['error' => 'Unauthorized or stream not found'], 403);
+    }
+
+    /**
+     * Timeshift stream requests.
+     * 
+     * @tags Xtream API Streams
+     * @summary Provides timeshift streaming access for live channels.
+     * @description Handles Xtream API timeshift requests. Authenticates the request based on 
+     * Xtream credentials provided in the path. If successful and the requested channel is valid 
+     * and part of an authorized playlist, this endpoint provides timeshift access to replay
+     * content from a specific date and time.
+     * 
+     * The route for this endpoint is typically `/timeshift/{username}/{password}/{duration}/{date}/{streamId}.{format}`.
+     * 
+     * @param \Illuminate\Http\Request $request The HTTP request
+     * @param string $username User's Xtream API username (path parameter)
+     * @param string $password User's Xtream API password (path parameter)
+     * @param int $duration Duration of timeshift in minutes (path parameter)
+     * @param string $date Date and time in format YYYY-MM-DD:HH-MM-SS (path parameter)
+     * @param int $streamId The ID of the live stream (channel ID) (path parameter)
+     * @param string $format The requested stream format (e.g., 'ts', 'm3u8') (path parameter)
+     *
+     * @response 302 scenario="Successful redirect to timeshift stream URL" description="Redirects to the internal timeshift stream URL."
+     * @response 403 scenario="Forbidden/Unauthorized" {"error": "Unauthorized or stream not found"}
+     * 
+     * @unauthenticated
+     */
+    public function handleTimeshift(Request $request, string $username, string $password, int $duration, string $date, int $streamId, string $format = 'ts')
+    {
+        // Timeshift is only available for live channels
+        list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'live');
+        
+        if (!($channel instanceof Channel)) {
+            return response()->json(['error' => 'Unauthorized or stream not found'], 403);
+        }
+
+        // Parse the date parameter and add timeshift parameters to the request
+        // Date format from Xtream API: YYYY-MM-DD:HH-MM-SS
+        $request->merge([
+            'timeshift_duration' => $duration,
+            'timeshift_date' => $date,
+        ]);
+
+        if ($playlist->enable_proxy) {
+            // If proxy enabled, call the controller method directly to avoid redirect loop
+            $bufferedStreamsEnabled = config('proxy.shared_streaming.enabled', false);
+            $encodedId = rtrim(base64_encode($streamId), '=');
+            
+            if ($bufferedStreamsEnabled) {
+                return app()->call('App\\Http\\Controllers\\SharedStreamController@streamChannel', [
+                    'encodedId' => $encodedId,
+                    'format' => $format
+                ]);
+            } else {
+                if ($format === 'm3u8') {
+                    return app()->call('App\\Http\\Controllers\\HlsStreamController@serveChannelPlaylist', [
+                        'encodedId' => $encodedId,
+                    ]);
+                } else {
+                    return app()->call('App\\Http\\Controllers\\StreamController@__invoke', [
+                        'encodedId' => $encodedId,
+                        'format' => $format,
+                    ]);
+                }
+            }
+        } else {
+            // If proxy is not enabled, simply return the timeshift URL
+            $streamUrl = $channel->url_custom ?? $channel->url;
+            $streamUrl = ProxyService::generateTimeshiftUrl($request, $streamUrl, $playlist);
+            return Redirect::to($streamUrl);
+        }
     }
 }
