@@ -104,7 +104,7 @@ class SyncXtreamSeries implements ShouldQueue
                     'import_batch_no' => $batchNo,
                 ]);
             }
-            if ($playlist->auto_fetch_series_metadata && $playlistSeries->enabled) {
+            if ($playlistSeries->enabled) {
                 dispatch(new ProcessM3uImportSeriesEpisodes($playlistSeries));
             }
         }

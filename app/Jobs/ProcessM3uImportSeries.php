@@ -75,6 +75,7 @@ class ProcessM3uImportSeries implements ShouldQueue
             foreach ($series as $seriesItem) {
                 $jobs[] = new ProcessM3uImportSeriesEpisodes(
                     playlistSeries: $seriesItem,
+                    notify: false, // don't notify user for bulk syncs
                 );
             }
             $jobs[] = new ProcessM3uImportSeriesComplete(
@@ -105,7 +106,7 @@ class ProcessM3uImportSeries implements ShouldQueue
                         'series_progress' => 100,
                         'processing' => false,
                     ]);
-                    
+
                     // Fire the playlist synced event
                     event(new SyncCompleted($playlist));
                 })->dispatch();
