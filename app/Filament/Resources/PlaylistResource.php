@@ -928,9 +928,10 @@ class PlaylistResource extends Resource
         ];
 
         $processingFields = [
-            Forms\Components\Grid::make()
-                ->columns(2)
+            Forms\Components\Section::make('Playlist Processing')
+                ->description('Processing settings for the playlist')
                 ->columnSpanFull()
+                ->columns(2)
                 ->schema([
                     Forms\Components\Toggle::make('import_prefs.preprocess')
                         ->label('Preprocess playlist')
@@ -989,6 +990,32 @@ class PlaylistResource extends Resource
                             '.mp4',
                         ])->splitKeys(['Tab', 'Return']),
                 ]),
+            Forms\Components\Section::make('Series Processing')
+                ->description('Processing options for playlist series')
+                ->columnSpanFull()
+                ->collapsible()
+                ->collapsed($creating)
+                ->columns(2)
+                ->schema([
+                    Forms\Components\Toggle::make('auto_fetch_series_metadata')
+                        ->label('Auto-fetch series metadata')
+                        ->inline(false)
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'Recommend leaving this disabled, unless you are including Series in the M3U output. When accessing via the Xtream API, metadata will be automatically fetched'
+                        )
+                        ->default(false)
+                        ->helperText('This will only fetch metadata for enabled series. When disabled, series metadata will be fetched automatically when access via the Xtream API for this playlist.'),
+                    Forms\Components\Toggle::make('include_series_in_m3u')
+                        ->label('Include series in M3U output')
+                        ->inline(false)
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'Enable this to output your enabled series in the M3U file. It is recommended to enable the "Auto-fetch series metadata" option when enabled, otherwise you will need to manually fetch metadata for each series.'
+                        )
+                        ->default(false)
+                        ->helperText('When enabled, series will be included in the M3U output. It is recommended to enable the "Auto-fetch series metadata" option when enabled.'),
+                ])->hidden(fn(Get $get): bool => !$get('xtream')),
         ];
 
         $outputFields = [
@@ -1143,7 +1170,7 @@ class PlaylistResource extends Resource
             if ($section === 'Name') {
                 $section = 'General';
             }
-            if ($section !== 'Output') {
+            if (!in_array($section, ['Processing', 'Output'])) {
                 // Wrap the fields in a section
                 $fields = [
                     Forms\Components\Section::make($section)
