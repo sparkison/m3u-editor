@@ -19,6 +19,7 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
      */
     public function __construct(
         public Series $playlistSeries,
+        public bool $notify = true
     ) {}
 
     /**
@@ -36,7 +37,7 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
 
         // Process the series
         $results = $this->playlistSeries->fetchMetadata();
-        if ($results !== false) {
+        if ($this->notify && $results !== false) {
             // Check if the playlist has .strm file sync enabled
             $sync_settings = $this->playlistSeries->sync_settings;
             $syncStrmFiles = $sync_settings['enabled'] ?? false;
