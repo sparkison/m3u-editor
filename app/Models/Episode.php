@@ -20,6 +20,7 @@ class Episode extends Model
     protected $casts = [
         'id' => 'integer',
         'new' => 'boolean',
+        'enabled' => 'boolean',
         'source_episode_id' => 'integer',
         'user_id' => 'integer',
         'playlist_id' => 'integer',
