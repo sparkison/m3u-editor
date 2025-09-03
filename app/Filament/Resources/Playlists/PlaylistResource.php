@@ -954,9 +954,10 @@ class PlaylistResource extends Resource
         ];
 
         $processingFields = [
-            Grid::make()
-                ->columns(2)
+            Section::make('Playlist Processing')
+                ->description('Processing settings for the playlist')
                 ->columnSpanFull()
+                ->columns(2)
                 ->schema([
                     Toggle::make('import_prefs.preprocess')
                         ->label('Preprocess playlist')
@@ -1015,6 +1016,32 @@ class PlaylistResource extends Resource
                             '.mp4',
                         ])->splitKeys(['Tab', 'Return']),
                 ]),
+            Section::make('Series Processing')
+                ->description('Processing options for playlist series')
+                ->columnSpanFull()
+                ->collapsible()
+                ->collapsed($creating)
+                ->columns(2)
+                ->schema([
+                    Toggle::make('auto_fetch_series_metadata')
+                        ->label('Auto-fetch series metadata')
+                        ->inline(false)
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'Recommend leaving this disabled, unless you are including Series in the M3U output. When accessing via the Xtream API, metadata will be automatically fetched'
+                        )
+                        ->default(false)
+                        ->helperText('This will only fetch metadata for enabled series. When disabled, series metadata will be fetched automatically when access via the Xtream API for this playlist.'),
+                    Toggle::make('include_series_in_m3u')
+                        ->label('Include series in M3U output')
+                        ->inline(false)
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'Enable this to output your enabled series in the M3U file. It is recommended to enable the "Auto-fetch series metadata" option when enabled, otherwise you will need to manually fetch metadata for each series.'
+                        )
+                        ->default(false)
+                        ->helperText('When enabled, series will be included in the M3U output. It is recommended to enable the "Auto-fetch series metadata" option when enabled.'),
+                ])->hidden(fn(Get $get): bool => !$get('xtream')),
         ];
 
         $outputFields = [
@@ -1169,7 +1196,7 @@ class PlaylistResource extends Resource
             if ($section === 'Name') {
                 $section = 'General';
             }
-            if ($section !== 'Output') {
+            if (!in_array($section, ['Processing', 'Output'])) {
                 // Wrap the fields in a section
                 $fields = [
                     Section::make($section)
@@ -1285,6 +1312,13 @@ class PlaylistResource extends Resource
     {
         $wizard = [];
         foreach (self::getFormSections(creating: true) as $step => $fields) {
+            if (!in_array($step, ['Processing', 'Output'])) {
+                // Wrap the fields in a section
+                $fields = [
+                    Section::make('')
+                        ->schema($fields),
+                ];
+            }
             $wizard[] = Step::make($step)
                 ->schema($fields);
 
@@ -1292,64 +1326,68 @@ class PlaylistResource extends Resource
             if ($step === 'Type') {
                 $wizard[] = Step::make('Auth')
                     ->schema([
-                        ToggleButtons::make('auth_option')
-                            ->label('Authentication Option')
-                            ->options([
-                                'none' => 'No Authentication',
-                                'existing' => 'Use Existing Auth',
-                                'create' => 'Create New Auth',
-                            ])
-                            ->icons([
-                                'none' => 'heroicon-o-lock-open',
-                                'existing' => 'heroicon-o-key',
-                                'create' => 'heroicon-o-plus',
-                            ])
-                            ->default('none')
-                            ->live()
-                            ->inline()
-                            ->grouped()
-                            ->columnSpanFull(),
-
-                        // Existing Auth Selection
-                        Select::make('existing_auth_id')
-                            ->label('Select Existing Auth')
-                            ->helperText('Only unassigned auths are available. Each auth can only be assigned to one playlist at a time.')
-                            ->options(function () {
-                                return PlaylistAuth::where('user_id', Auth::id())
-                                    ->whereDoesntHave('assignedPlaylist')
-                                    ->pluck('name', 'id')
-                                    ->toArray();
-                            })
-                            ->searchable()
-                            ->placeholder('Select an auth to assign')
-                            ->columnSpanFull()
-                            ->visible(fn(Get $get): bool => $get('auth_option') === 'existing'),
-
-                        // Create New Auth Fields
-                        Grid::make(2)
+                        Section::make('Auth')
+                            ->description('Add or create additional authentication methods for this playlist.')
                             ->schema([
-                                TextInput::make('auth_name')
-                                    ->label('Auth Name')
-                                    ->helperText('Internal name for this authentication.')
-                                    ->placeholder('Auth for My Playlist')
-                                    ->required()
-                                    ->columnSpan(2),
+                                ToggleButtons::make('auth_option')
+                                    ->label('Authentication Option')
+                                    ->options([
+                                        'none' => 'No Authentication',
+                                        'existing' => 'Use Existing Auth',
+                                        'create' => 'Create New Auth',
+                                    ])
+                                    ->icons([
+                                        'none' => 'heroicon-o-lock-open',
+                                        'existing' => 'heroicon-o-key',
+                                        'create' => 'heroicon-o-plus',
+                                    ])
+                                    ->default('none')
+                                    ->live()
+                                    ->inline()
+                                    ->grouped()
+                                    ->columnSpanFull(),
 
-                                TextInput::make('auth_username')
-                                    ->label('Username')
-                                    ->helperText('Username for playlist access.')
-                                    ->required()
-                                    ->columnSpan(1),
+                                // Existing Auth Selection
+                                Select::make('existing_auth_id')
+                                    ->label('Select Existing Auth')
+                                    ->helperText('Only unassigned auths are available. Each auth can only be assigned to one playlist at a time.')
+                                    ->options(function () {
+                                        return PlaylistAuth::where('user_id', Auth::id())
+                                            ->whereDoesntHave('assignedPlaylist')
+                                            ->pluck('name', 'id')
+                                            ->toArray();
+                                    })
+                                    ->searchable()
+                                    ->placeholder('Select an auth to assign')
+                                    ->columnSpanFull()
+                                    ->visible(fn(Get $get): bool => $get('auth_option') === 'existing'),
 
-                                TextInput::make('auth_password')
-                                    ->label('Password')
-                                    ->password()
-                                    ->revealable()
-                                    ->helperText('Password for playlist access.')
-                                    ->required()
-                                    ->columnSpan(1),
+                                // Create New Auth Fields
+                                Grid::make(2)
+                                    ->schema([
+                                        TextInput::make('auth_name')
+                                            ->label('Auth Name')
+                                            ->helperText('Internal name for this authentication.')
+                                            ->placeholder('Auth for My Playlist')
+                                            ->required()
+                                            ->columnSpan(2),
+
+                                        TextInput::make('auth_username')
+                                            ->label('Username')
+                                            ->helperText('Username for playlist access.')
+                                            ->required()
+                                            ->columnSpan(1),
+
+                                        TextInput::make('auth_password')
+                                            ->label('Password')
+                                            ->password()
+                                            ->revealable()
+                                            ->helperText('Password for playlist access.')
+                                            ->required()
+                                            ->columnSpan(1),
+                                    ])
+                                    ->visible(fn(Get $get): bool => $get('auth_option') === 'create'),
                             ])
-                            ->visible(fn(Get $get): bool => $get('auth_option') === 'create'),
                     ]);
             }
         }
