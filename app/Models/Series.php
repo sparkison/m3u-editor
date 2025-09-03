@@ -65,6 +65,11 @@ class Series extends Model
         return $this->hasMany(Episode::class);
     }
 
+    public function enabled_episodes(): HasMany
+    {
+        return $this->hasMany(Episode::class)->where('enabled', true);
+    }
+
     public function fetchMetadata()
     {
         try {
