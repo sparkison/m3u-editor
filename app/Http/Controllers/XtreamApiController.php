@@ -16,6 +16,7 @@ use App\Models\Playlist;
 use App\Models\Series;
 use App\Models\SharedStream;
 use App\Services\EpgCacheService;
+use App\Services\XtreamService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -731,8 +732,19 @@ class XtreamApiController extends Controller
                 return response()->json(['error' => 'Series not found or not enabled'], 404);
             }
 
-            $now = Carbon::now();
+            // Check if series metadata has been fetched, and if so how recently
+            if (!$seriesItem->last_metadata_fetch || $seriesItem->last_metadata_fetch < now()->subDays(1)) {
+                // Either no metadata, or stale metadata
+                $results = $seriesItem->fetchMetadata();
+                if ($results === false) {
+                    return response()->json(['error' => 'Failed to fetch series metadata'], 500);
+                }
 
+                // Metadata fetched successfully
+                $seriesItem->load('seasons.episodes', 'category');
+            }
+
+            $now = Carbon::now();
             $seriesInfo = [
                 'name' => $seriesItem->name,
                 'cover' => $seriesItem->cover ? (filter_var($seriesItem->cover, FILTER_VALIDATE_URL) ? $seriesItem->cover : url($seriesItem->cover)) : url('/placeholder.png'),

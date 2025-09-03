@@ -42,6 +42,7 @@ class Playlist extends Model
         'backup_before_sync' => 'boolean',
         'sync_logs_enabled' => 'boolean',
         'include_series_in_m3u' => 'boolean',
+        'auto_fetch_series_metadata' => 'boolean',
         'status' => Status::class,
         'id_channel_by' => PlaylistChannelId::class
     ];
