@@ -260,7 +260,7 @@ if [ "${ENABLE_POSTGRES}" = "true" ]; then
 
     # Wait until it's ready
     dots=""
-    max_wait_seconds=30
+    max_wait_seconds=60
     wait_interval=1
     elapsed_wait=0
     echo "- Waiting for local Postgres to be ready (max ${max_wait_seconds}s)..."
