@@ -39,6 +39,7 @@ class Channel extends Model
         'is_vod' => 'boolean',
         'info' => 'array',
         'movie_data' => 'array',
+        'sync_settings' => 'array',
         'logo_type' => ChannelLogoType::class,
     ];
 
