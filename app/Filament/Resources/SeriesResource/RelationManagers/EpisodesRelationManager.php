@@ -37,6 +37,7 @@ class EpisodesRelationManager extends RelationManager
             ->modifyQueryUsing(function (Builder $query) {
                 $query->with(['season', 'series']);
             })
+            ->recordAction(null)
             ->defaultGroup('season')
             ->defaultSort('episode_num', 'asc')
             ->contentGrid([
