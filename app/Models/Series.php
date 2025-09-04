@@ -193,13 +193,8 @@ class Series extends Model
                     'last_metadata_fetch' => now()
                 ]);
 
-                // Check if the playlist has .strm file sync enabled
-                $sync_settings = $this->sync_settings;
-                $syncStrmFiles = $sync_settings['enabled'] ?? false;
-                if ($syncStrmFiles) {
-                    // Dispatch the job to sync .strm files
-                    dispatch(new SyncSeriesStrmFiles(series: $this));
-                }
+                // Dispatch the job to sync .strm files
+                dispatch(new SyncSeriesStrmFiles(series: $this, notify: false));
 
                 return $episodeCount;
             }

@@ -7,6 +7,7 @@ use App\Settings\GeneralSettings;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Log;
 
 class SyncSeriesStrmFiles implements ShouldQueue
 {
@@ -17,6 +18,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
      */
     public function __construct(
         public Series $series,
+        public bool $notify = true
     ) {
         //
     }
@@ -45,12 +47,14 @@ class SyncSeriesStrmFiles implements ShouldQueue
 
             // Check if sync is enabled
             if (!$sync_settings['enabled'] ?? false) {
-                Notification::make()
-                    ->danger()
-                    ->title("Error sync .strm files for series \"{$series->name}\"")
-                    ->body("Sync is not enabled for this series.")
-                    ->broadcast($series->user)
-                    ->sendToDatabase($series->user);
+                if ($this->notify) {
+                    Notification::make()
+                        ->danger()
+                        ->title("Error sync .strm files for series \"{$series->name}\"")
+                        ->body("Sync is not enabled for this series.")
+                        ->broadcast($series->user)
+                        ->sendToDatabase($series->user);
+                }
                 return;
             }
 
@@ -59,24 +63,30 @@ class SyncSeriesStrmFiles implements ShouldQueue
 
             // Check if there are any episodes
             if ($episodes->isEmpty()) {
-                Notification::make()
-                    ->danger()
-                    ->title("Error sync .strm files for series \"{$series->name}\"")
-                    ->body("No episodes found for this series. Try processing it first.")
-                    ->broadcast($series->user)
-                    ->sendToDatabase($series->user);
+                if ($this->notify) {
+                    Notification::make()
+                        ->danger()
+                        ->title("Error sync .strm files for series \"{$series->name}\"")
+                        ->body("No episodes found for this series. Try processing it first.")
+                        ->broadcast($series->user)
+                        ->sendToDatabase($series->user);
+                }
                 return;
             }
 
             // Get the path info
             $path = rtrim($sync_settings['sync_location'], '/');
             if (!is_dir($path)) {
-                Notification::make()
-                    ->danger()
-                    ->title("Error sync .strm files for series \"{$series->name}\"")
-                    ->body("Sync location \"{$path}\" does not exist.")
-                    ->broadcast($series->user)
-                    ->sendToDatabase($series->user);
+                if ($this->notify) {
+                    Notification::make()
+                        ->danger()
+                        ->title("Error sync .strm files for series \"{$series->name}\"")
+                        ->body("Sync location \"{$path}\" does not exist.")
+                        ->broadcast($series->user)
+                        ->sendToDatabase($series->user);
+                } else {
+                    Log::error("Error sync .strm files for series \"{$series->name}\": Sync location \"{$path}\" does not exist.");
+                }
                 return;
             }
 
@@ -125,12 +135,14 @@ class SyncSeriesStrmFiles implements ShouldQueue
             }
 
             // Notify the user
-            Notification::make()
-                ->success()
-                ->title("Sync .strm files for series \"{$series->name}\"")
-                ->body("Sync completed for series \"{$series->name}\".")
-                ->broadcast($series->user)
-                ->sendToDatabase($series->user);
+            if ($this->notify) {
+                Notification::make()
+                    ->success()
+                    ->title("Sync .strm files for series \"{$series->name}\"")
+                    ->body("Sync completed for series \"{$series->name}\".")
+                    ->broadcast($series->user)
+                    ->sendToDatabase($series->user);
+            }
         } catch (\Exception $e) {
             Notification::make()
                 ->danger()
