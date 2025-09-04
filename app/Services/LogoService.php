@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\ChannelLogoType;
 use App\Http\Controllers\LogoProxyController;
 
 class LogoService
@@ -18,10 +19,10 @@ class LogoService
         $logoUrl = '';
 
         // Determine logo based on logo_type preference
-        if ($channel->logo_type === 'epg' && $channel->epgChannel?->icon) {
-            $logoUrl = $channel->epgChannel->icon;
-        } elseif ($channel->logo_type === 'channel') {
-            $logoUrl = $channel->logo ?? $channel->logo_internal ?? '';
+        if ($channel->logo_type === ChannelLogoType::Channel) {
+            $logoUrl = $channel->logo ?? $channel->logo_internal;
+        } else {
+            $logoUrl = $channel->epgChannel?->icon ?? $channel->logo ?? $channel->logo_internal;
         }
 
         // Fallback to any available logo if preferred type is empty
@@ -89,11 +90,11 @@ class LogoService
     public static function preloadChannelLogos(array $channels): array
     {
         $logoUrls = [];
-        
+
         foreach ($channels as $channel) {
             $logoUrls[$channel->id] = self::getChannelLogoUrl($channel);
         }
-        
+
         return $logoUrls;
     }
 }
