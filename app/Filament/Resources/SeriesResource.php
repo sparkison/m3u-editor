@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Facades\LogoFacade;
 use App\Filament\Resources\SeriesResource\Pages;
 use App\Filament\Resources\SeriesResource\RelationManagers;
 use App\Models\Category;
@@ -67,6 +68,9 @@ class SeriesResource extends Resource
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
+            ->modifyQueryUsing(function (Builder $query) {
+                $query->with(['playlist']);
+            })
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
             ->columns(self::getTableColumns(showCategory: !$relationId, showPlaylist: !$relationId))
@@ -81,6 +85,8 @@ class SeriesResource extends Resource
             Tables\Columns\ImageColumn::make('cover')
                 ->width(80)
                 ->height(120)
+                ->checkFileExistence(false)
+                ->getStateUsing(fn($record) => LogoFacade::getSeriesLogoUrl($record))
                 ->searchable(),
             Tables\Columns\TextColumn::make('name')
                 ->description((fn($record) => Str::limit($record->plot, 200)))

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\SeriesResource\RelationManagers;
 
+use App\Facades\LogoFacade;
 use App\Infolists\Components\SeriesPreview;
 use App\Livewire\ChannelStreamStats;
 use Filament\Forms;
@@ -19,7 +20,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 class EpisodesRelationManager extends RelationManager
 {
     protected static string $relationship = 'episodes';
-    
+
     protected $listeners = ['refreshRelation' => '$refresh'];
 
     public function isReadOnly(): bool
@@ -37,7 +38,7 @@ class EpisodesRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('title')
             ->modifyQueryUsing(function (Builder $query) {
-                $query->with(['season', 'series']);
+                $query->with(['season', 'series', 'playlist']);
             })
             ->recordAction(null)
             ->defaultGroup('season')
@@ -57,13 +58,9 @@ class EpisodesRelationManager extends RelationManager
                         ->label('')
                         ->height(200)
                         ->width('full')
-                        ->checkFileExistence(false)
-                        ->defaultImageUrl('/episode-placeholder.png')
                         ->extraImgAttributes(['class' => 'episode-placeholder rounded-t-lg object-cover w-full h-48'])
-                        ->getStateUsing(function ($record) {
-                            $info = $record->info ?? [];
-                            return $info['movie_image'] ?? $info['cover_big'] ?? url('/episode-placeholder.png');
-                        }),
+                        ->checkFileExistence(false)
+                        ->getStateUsing(fn($record) => LogoFacade::getEpisodeLogoUrl($record)),
 
                     Tables\Columns\Layout\Stack::make([
                         Tables\Columns\TextColumn::make('title')
