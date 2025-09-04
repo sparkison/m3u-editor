@@ -20,7 +20,7 @@ class LogoProxyController extends Controller
         try {
             // Decode the URL
             $originalUrl = base64_decode($encodedUrl);
-            
+
             // Validate the decoded URL
             if (!filter_var($originalUrl, FILTER_VALIDATE_URL)) {
                 return $this->returnPlaceholder();
@@ -37,30 +37,21 @@ class LogoProxyController extends Controller
 
             // Fetch the logo from the remote URL
             $logoData = $this->fetchRemoteLogo($originalUrl);
-            
+
             if (!$logoData) {
                 return $this->returnPlaceholder();
             }
 
             // Cache the logo
             Storage::disk('public')->put($cacheFile, $logoData['content']);
-            
-            // Store metadata for cache management
-            Cache::put("logo_meta_{$cacheKey}", [
-                'original_url' => $originalUrl,
-                'content_type' => $logoData['content_type'],
-                'file_size' => strlen($logoData['content']),
-                'cached_at' => now(),
-            ], now()->addDays(30)); // Cache metadata for 30 days
 
             return $this->serveFromCache($cacheFile, $logoData['content_type']);
-
         } catch (\Exception $e) {
             Log::error('Logo proxy error', [
                 'encoded_url' => $encodedUrl,
                 'error' => $e->getMessage(),
             ]);
-            
+
             return $this->returnPlaceholder();
         }
     }
@@ -95,14 +86,14 @@ class LogoProxyController extends Controller
             }
 
             $contentType = $response->header('Content-Type');
-            
+
             // Validate that it's an image
             if (!str_starts_with($contentType, 'image/')) {
                 return null;
             }
 
             $content = $response->body();
-            
+
             // Check file size (limit to 5MB)
             if (strlen($content) > 5 * 1024 * 1024) {
                 return null;
@@ -112,7 +103,6 @@ class LogoProxyController extends Controller
                 'content' => $content,
                 'content_type' => $contentType,
             ];
-
         } catch (\Exception $e) {
             Log::warning('Failed to fetch remote logo', [
                 'url' => $url,
@@ -128,7 +118,7 @@ class LogoProxyController extends Controller
     private function serveFromCache(string $cacheFile, ?string $contentType = null): StreamedResponse
     {
         $filePath = Storage::disk('public')->path($cacheFile);
-        
+
         if (!$contentType) {
             // Try to determine content type from file
             $contentType = $this->getContentTypeFromFile($filePath);
@@ -152,11 +142,11 @@ class LogoProxyController extends Controller
     private function returnPlaceholder(): StreamedResponse
     {
         $placeholderPath = public_path('placeholder.png');
-        
+
         if (!file_exists($placeholderPath)) {
             // Return a minimal 1x1 transparent PNG if placeholder doesn't exist
             $transparentPng = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');
-            
+
             return response()->stream(function () use ($transparentPng) {
                 echo $transparentPng;
             }, 200, [
@@ -181,7 +171,7 @@ class LogoProxyController extends Controller
     private function getContentTypeFromFile(string $filePath): string
     {
         $mimeType = mime_content_type($filePath);
-        
+
         // Fallback to common image types if detection fails
         if (!$mimeType || !str_starts_with($mimeType, 'image/')) {
             $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
@@ -205,17 +195,14 @@ class LogoProxyController extends Controller
     {
         $cleared = 0;
         $logoFiles = Storage::disk('public')->files('logos');
-        
+
         foreach ($logoFiles as $file) {
-            $cacheKey = basename($file);
-            $metaKey = "logo_meta_{$cacheKey}";
-            
-            $metadata = Cache::get($metaKey);
-            
+            // Get file last modified timestamp
+            $lastModified = Storage::disk('public')->lastModified($file);
+
             // If no metadata or file is older than 30 days, delete it
-            if (!$metadata || now()->diffInDays($metadata['cached_at']) > 30) {
+            if (now()->diffInDays($lastModified) > 30) {
                 Storage::disk('public')->delete($file);
-                Cache::forget($metaKey);
                 $cleared++;
             }
         }
