@@ -5,5 +5,6 @@ return [
     App\Providers\Filament\AdminPanelProvider::class,
     App\Providers\Filament\GuestPanelPanelProvider::class,
     App\Providers\HorizonServiceProvider::class,
+    App\Providers\LogoServiceProvider::class,
     App\Providers\VersionServiceProvider::class,
 ];

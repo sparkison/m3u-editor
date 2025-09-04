@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\EpgFileController;
 use App\Http\Controllers\EpgGenerateController;
+use App\Http\Controllers\LogoProxyController;
 use App\Http\Controllers\PlaylistGenerateController;
 use App\Http\Controllers\XtreamApiController;
 use AshAllenDesign\ShortURL\Controllers\ShortURLController;
@@ -38,6 +39,12 @@ Route::get('/s/{shortUrlKey}/{path?}', function (Request $request, string $short
 
     return $response;
 })->where('path', '.*');
+
+/*
+ * Logo proxy route - cache and serve remote logos
+ */
+Route::get('/logos/{encodedUrl}', [LogoProxyController::class, 'serveLogo'])
+    ->name('logo.proxy');
 
 /*
  * Playlist/EPG output routes
