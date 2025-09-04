@@ -286,9 +286,9 @@ class CustomPlaylistResource extends Resource
                         ->columnSpan(1)
                         ->hintIcon(
                             'heroicon-m-question-mark-circle',
-                            tooltip: 'Enter 0 to use to use provider defined value. This value is also used when generating the Xtream API user info response.'
+                            tooltip: 'This value is also used when generating the Xtream API user info response.'
                         )
-                        ->rules(['min:0'])
+                        ->rules(['min:1'])
                         ->type('number')
                         ->default(1) // Default to 1 stream
                         ->required(),
