@@ -8,6 +8,7 @@ use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\Layout\Grid;
 use Filament\Actions\ViewAction;
+use Filament\Actions;
 use Filament\Schemas\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\ImageEntry;
@@ -15,10 +16,13 @@ use App\Infolists\Components\SeriesPreview;
 use App\Livewire\ChannelStreamStats;
 use Filament\Forms;
 use Filament\Infolists;
+use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
+use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class EpisodesRelationManager extends RelationManager
@@ -42,6 +46,7 @@ class EpisodesRelationManager extends RelationManager
             ->modifyQueryUsing(function (Builder $query) {
                 $query->with(['season', 'series']);
             })
+            ->recordAction(null)
             ->defaultGroup('season')
             ->defaultSort('episode_num', 'asc')
             ->contentGrid([
@@ -49,9 +54,12 @@ class EpisodesRelationManager extends RelationManager
                 'lg' => 3,
                 'xl' => 4,
             ])
+            ->recordUrl(null) // Disable default record URL behavior
             ->paginated([12, 24, 48, 100])
             ->defaultPaginationPageOption(12)
             ->columns([
+                ToggleColumn::make('enabled')
+                    ->label('Enabled'),
                 Stack::make([
                     ImageColumn::make('info.movie_image')
                         ->label('')
@@ -150,6 +158,54 @@ class EpisodesRelationManager extends RelationManager
             ])
             ->toolbarActions([
                 // @TODO - add download? Would need to generate streamlink files and compress then download...
+
+                // Enable/disable bulk options
+                Actions\BulkActionGroup::make([
+                    Actions\BulkAction::make('enable')
+                        ->label('Enable selected')
+                        ->action(function (Collection $records): void {
+                            foreach ($records as $record) {
+                                $record->update([
+                                    'enabled' => true,
+                                ]);
+                            }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Selected episodes enabled')
+                                ->body('The selected episodes have been enabled.')
+                                ->send();
+                        })
+                        ->color('success')
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-check-circle')
+                        ->modalIcon('heroicon-o-check-circle')
+                        ->modalDescription('Enable the selected channel(s) now?')
+                        ->modalSubmitActionLabel('Yes, enable now'),
+                    Actions\BulkAction::make('disable')
+                        ->label('Disable selected')
+                        ->action(function (Collection $records): void {
+                            foreach ($records as $record) {
+                                $record->update([
+                                    'enabled' => false,
+                                ]);
+                            }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Selected episodes disabled')
+                                ->body('The selected episodes have been disabled.')
+                                ->send();
+                        })
+                        ->color('warning')
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-x-circle')
+                        ->modalIcon('heroicon-o-x-circle')
+                        ->modalDescription('Disable the selected channel(s) now?')
+                        ->modalSubmitActionLabel('Yes, disable now'),
+                ]),
             ]);
     }
 

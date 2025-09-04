@@ -18,7 +18,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class EpisodesRelationManager extends RelationManager
 {
-    protected static string $relationship = 'episodes';
+    protected static string $relationship = 'enabled_episodes';
+    protected static ?string $title = '';
 
     public function isReadOnly(): bool
     {
