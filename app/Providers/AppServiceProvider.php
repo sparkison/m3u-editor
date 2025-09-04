@@ -328,7 +328,7 @@ class AppServiceProvider extends ServiceProvider
         // Configure the API
         Scramble::configure()
             ->routes(function (Route $route) {
-                return Str::startsWith($route->uri, [
+                return !Str::startsWith($route->uri, 'playlist/v') && Str::startsWith($route->uri, [
                     'playlist/',
                     'epg/',
                     'user/',
@@ -382,32 +382,32 @@ class AppServiceProvider extends ServiceProvider
     private function configureFilamentV3Compatibility(): void
     {
         // Preserve v3 file upload behavior (public visibility)
-        \Filament\Forms\Components\FileUpload::configureUsing(fn (\Filament\Forms\Components\FileUpload $fileUpload) => $fileUpload
+        \Filament\Forms\Components\FileUpload::configureUsing(fn(\Filament\Forms\Components\FileUpload $fileUpload) => $fileUpload
             ->visibility('public'));
 
-        \Filament\Tables\Columns\ImageColumn::configureUsing(fn (\Filament\Tables\Columns\ImageColumn $imageColumn) => $imageColumn
+        \Filament\Tables\Columns\ImageColumn::configureUsing(fn(\Filament\Tables\Columns\ImageColumn $imageColumn) => $imageColumn
             ->visibility('public'));
 
-        \Filament\Infolists\Components\ImageEntry::configureUsing(fn (\Filament\Infolists\Components\ImageEntry $imageEntry) => $imageEntry
+        \Filament\Infolists\Components\ImageEntry::configureUsing(fn(\Filament\Infolists\Components\ImageEntry $imageEntry) => $imageEntry
             ->visibility('public'));
 
         // Preserve v3 table filter behavior (not deferred)
-        \Filament\Tables\Table::configureUsing(fn (\Filament\Tables\Table $table) => $table
+        \Filament\Tables\Table::configureUsing(fn(\Filament\Tables\Table $table) => $table
             ->deferFilters(false)
             ->paginationPageOptions([5, 10, 25, 50, 'all']));
 
         // Preserve v3 layout component behavior (column span full)
-        \Filament\Schemas\Components\Fieldset::configureUsing(fn (\Filament\Schemas\Components\Fieldset $fieldset) => $fieldset
+        \Filament\Schemas\Components\Fieldset::configureUsing(fn(\Filament\Schemas\Components\Fieldset $fieldset) => $fieldset
             ->columnSpanFull());
 
-        \Filament\Schemas\Components\Grid::configureUsing(fn (\Filament\Schemas\Components\Grid $grid) => $grid
+        \Filament\Schemas\Components\Grid::configureUsing(fn(\Filament\Schemas\Components\Grid $grid) => $grid
             ->columnSpanFull());
 
-        \Filament\Schemas\Components\Section::configureUsing(fn (\Filament\Schemas\Components\Section $section) => $section
+        \Filament\Schemas\Components\Section::configureUsing(fn(\Filament\Schemas\Components\Section $section) => $section
             ->columnSpanFull());
 
         // Preserve v3 unique validation behavior (not ignoring record by default)
-        \Filament\Forms\Components\Field::configureUsing(fn (\Filament\Forms\Components\Field $field) => $field
+        \Filament\Forms\Components\Field::configureUsing(fn(\Filament\Forms\Components\Field $field) => $field
             ->uniqueValidationIgnoresRecordByDefault(false));
     }
 }

@@ -1,7 +1,7 @@
 @php($urls = \App\Facades\PlaylistFacade::getUrls($this->record))
 @php($m3uUrl = $urls['m3u'])
 @php($hdhrUrl = $urls['hdhr'])
-@php($publicUrl = url('/playlist/' . $this->record->uuid))
+@php($publicUrl = url('/playlist/v/' . $this->record->uuid))
 <div class="space-y-6">
     <div>
         <span class="text-sm font-medium leading-6 text-gray-950 dark:text-white">

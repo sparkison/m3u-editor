@@ -326,7 +326,7 @@ class PlaylistResource extends Resource
                     Action::make('Public URL')
                         ->label('Public URL')
                         ->icon('heroicon-o-arrow-top-right-on-square')
-                        ->url(fn($record) => '/playlist/' . $record->uuid)
+                        ->url(fn($record) => '/playlist/v/' . $record->uuid)
                         ->openUrlInNewTab(),
                     Action::make('Duplicate')
                         ->label('Duplicate')

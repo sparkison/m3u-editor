@@ -31,7 +31,7 @@ class GuestPanelPanelProvider extends PanelProvider
         return $panel
             ->id('playlist')
             ->userMenu(false)
-            ->path('playlist/{uuid}')
+            ->path('playlist/v/{uuid}')
             ->homeUrl(function () {
                 $uuid = request()->route('uuid') ?? request()->attributes->get('playlist_uuid');
                 return $uuid ? route('filament.playlist.home', ['uuid' => $uuid]) : '/';
