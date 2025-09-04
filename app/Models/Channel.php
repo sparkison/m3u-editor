@@ -5,6 +5,8 @@ namespace App\Models;
 use Exception;
 use App\Enums\ChannelLogoType;
 use App\Facades\ProxyFacade;
+use App\Services\XtreamService;
+use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -40,6 +42,7 @@ class Channel extends Model
         'info' => 'array',
         'movie_data' => 'array',
         'sync_settings' => 'array',
+        'last_metadata_fetch' => 'datetime',
         'logo_type' => ChannelLogoType::class,
     ];
 
@@ -190,5 +193,34 @@ class Channel extends Model
             Log::error("Error running ffprobe for channel \"{$this->title}\": {$e->getMessage()}");
         }
         return [];
+    }
+
+    public function fetchMetadata($xtream = null)
+    {
+        try {
+            if (!$xtream) {
+                $playlist = $this->playlist;
+                $xtream = XtreamService::make($playlist);
+            }
+            if (!$xtream) {
+                Notification::make()
+                    ->danger()
+                    ->title('VOD metadata sync failed')
+                    ->body('Unable to connect to Xtream API provider to get VOD info, unable to fetch metadata.')
+                    ->broadcast($playlist->user)
+                    ->sendToDatabase($playlist->user);
+                return;
+            }
+            $movieData = $xtream->getVodInfo($this->source_id);
+            $this->update([
+                'info' => $movieData['info'] ?? null,
+                'movie_data' => $movieData['movie_data'] ?? null,
+                'last_metadata_fetch' => now()
+            ]);
+            return true;
+        } catch (\Exception $e) {
+            Log::error('Failed to fetch metadata for VOD ' . $this->id, ['exception' => $e]);
+        }
+        return false;
     }
 }
