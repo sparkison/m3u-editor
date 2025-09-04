@@ -8,6 +8,7 @@ use App\Enums\ChannelLogoType;
 use App\Enums\PlaylistChannelId;
 use App\Facades\ProxyFacade;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\LogoProxyController;
 use App\Models\Epg;
 use App\Models\Playlist;
 use App\Models\MergedPlaylist;
@@ -303,6 +304,9 @@ class EpgApiController extends Controller
                 }
                 if (empty($icon)) {
                     $icon = url('/placeholder.png');
+                }
+                if ($proxyEnabled) {
+                    $icon = LogoProxyController::generateProxyUrl($icon);
                 }
                 $playlistChannelData[$channelNo] = [
                     'id' => $channelNo,

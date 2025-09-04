@@ -93,12 +93,6 @@ class PlaylistGenerateController extends Controller
                     if (!$channelNo && $playlist->auto_channel_increment) {
                         $channelNo = ++$channelNumber;
                     }
-                    if ($proxyEnabled) {
-                        $url = ProxyFacade::getProxyUrlForChannel(
-                            id: $channel->id,
-                            format: $format
-                        );
-                    }
                     if ($type === 'custom') {
                         $customGroup = $channel->tags
                             ->where('type', $playlist->uuid)
@@ -133,6 +127,14 @@ class PlaylistGenerateController extends Controller
                     }
                     if (empty($icon)) {
                         $icon = url('/placeholder.png');
+                    }
+
+                    if ($proxyEnabled) {
+                        $url = ProxyFacade::getProxyUrlForChannel(
+                            id: $channel->id,
+                            format: $format
+                        );
+                        $icon = LogoProxyController::generateProxyUrl($icon);
                     }
 
                     // Make sure TVG ID only contains characters and numbers
@@ -204,6 +206,7 @@ class PlaylistGenerateController extends Controller
                                     id: $episode->id,
                                     format: $episode->container_extension
                                 );
+                                $icon = LogoProxyController::generateProxyUrl($icon);
                             }
 
                             // Get the TVG ID
