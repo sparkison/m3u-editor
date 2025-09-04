@@ -61,6 +61,48 @@ class EditSeries extends EditRecord
                     ->modalIcon('heroicon-o-document-arrow-down')
                     ->modalDescription('Sync series .strm files now? This will generate .strm files for this series at the path set for this series.')
                     ->modalSubmitActionLabel('Yes, sync now'),
+
+                Action::make('enable')
+                    ->label('Enable all episodes')
+                    ->action(function ($record): void {
+                        $record->episodes()->update([
+                            'enabled' => true,
+                        ]);
+                    })->after(function ($livewire) {
+                        $livewire->dispatch('refreshRelation');
+                        Notification::make()
+                            ->success()
+                            ->title('Series episodes enabled')
+                            ->body('The series episodes have been enabled.')
+                            ->send();
+                    })
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-check-circle')
+                    ->modalIcon('heroicon-o-check-circle')
+                    ->modalDescription('Enable the series episodes now?')
+                    ->modalSubmitActionLabel('Yes, enable now'),
+                Action::make('disable')
+                    ->label('Disable all episodes')
+                    ->action(function ($record): void {
+                        $record->episodes()->update([
+                            'enabled' => false,
+                        ]);
+                    })->after(function ($livewire) {
+                        $livewire->dispatch('refreshRelation');
+                        Notification::make()
+                            ->success()
+                            ->title('Series episodes disabled')
+                            ->body('The series episodes have been disabled.')
+                            ->send();
+                    })
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-x-circle')
+                    ->modalIcon('heroicon-o-x-circle')
+                    ->modalDescription('Disable the series episodes now?')
+                    ->modalSubmitActionLabel('Yes, disable now'),
+
                 DeleteAction::make()
                     ->modalIcon('heroicon-o-trash')
                     ->modalDescription('Are you sure you want to delete this series? This will delete all episodes and seasons for this series. This action cannot be undone.')

@@ -29,6 +29,8 @@ class EpisodesRelationManager extends RelationManager
 {
     protected static string $relationship = 'episodes';
 
+    protected $listeners = ['refreshRelation' => '$refresh'];
+
     public function isReadOnly(): bool
     {
         return false;
