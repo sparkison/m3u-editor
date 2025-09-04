@@ -43,7 +43,8 @@ Route::get('/s/{shortUrlKey}/{path?}', function (Request $request, string $short
 /*
  * Logo proxy route - cache and serve remote logos
  */
-Route::get('/logos/{encodedUrl}', [LogoProxyController::class, 'serveLogo'])
+Route::get('/logo-proxy/{encodedUrl}', [LogoProxyController::class, 'serveLogo'])
+    ->where('encodedUrl', '[A-Za-z0-9\-_=]+')
     ->name('logo.proxy');
 
 /*

@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
@@ -28,7 +27,7 @@ class LogoProxyController extends Controller
 
             // Generate a cache key based on the original URL
             $cacheKey = 'logo_' . md5($originalUrl);
-            $cacheFile = "logos/{$cacheKey}";
+            $cacheFile = "cached-logos/{$cacheKey}";
 
             // Check if the logo is already cached
             if (Storage::disk('public')->exists($cacheFile)) {
@@ -66,7 +65,7 @@ class LogoProxyController extends Controller
         }
 
         $encodedUrl = base64_encode($originalUrl);
-        return url("/logos/{$encodedUrl}");
+        return url("/logo-proxy/{$encodedUrl}");
     }
 
     /**
@@ -194,7 +193,7 @@ class LogoProxyController extends Controller
     public function clearExpiredCache(): int
     {
         $cleared = 0;
-        $logoFiles = Storage::disk('public')->files('logos');
+        $logoFiles = Storage::disk('public')->files('cached-logos');
 
         foreach ($logoFiles as $file) {
             // Get file last modified timestamp
