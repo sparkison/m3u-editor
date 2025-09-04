@@ -312,9 +312,9 @@ class CustomPlaylistResource extends Resource
                         ->columnSpan(1)
                         ->hintIcon(
                             'heroicon-m-question-mark-circle',
-                            tooltip: 'Enter 0 to use to use provider defined value. This value is also used when generating the Xtream API user info response.'
+                            tooltip: 'This value is also used when generating the Xtream API user info response.'
                         )
-                        ->rules(['min:0'])
+                        ->rules(['min:1'])
                         ->type('number')
                         ->default(1) // Default to 1 stream
                         ->required(),
@@ -323,7 +323,7 @@ class CustomPlaylistResource extends Resource
                         ->hint('Set to 0 for unlimited streams.')
                         ->helperText('Number of streams available for this playlist (only applies to custom channels assigned to this Custom Playlist).')
                         ->columnSpan(1)
-                        ->rules(['min:1'])
+                        ->rules(['min:0'])
                         ->type('number')
                         ->default(0) // Default to 0 streams (for unlimted)
                         ->required()
