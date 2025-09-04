@@ -342,7 +342,7 @@ class Preferences extends SettingsPage
                                             ->numeric()
                                             ->helperText('If the current sync will have less channels than the current channel count (less this value), the sync will be invalidated and canceled.'),
                                     ]),
-                                Forms\Components\Section::make('Stream location file settings')
+                                Forms\Components\Section::make('Series stream location file settings')
                                     ->description('Generate .strm files and sync them to a local file path. Options can be overriden per Series on the Series edit page.')
                                     ->columnSpan('full')
                                     ->columns(1)
@@ -373,6 +373,32 @@ class Preferences extends SettingsPage
                                             ->maxLength(255)
                                             ->required()
                                             ->hidden(fn($get) => !$get('stream_file_sync_enabled'))
+                                            ->placeholder('/usr/local/bin/streamlink'),
+                                    ]),
+                                Forms\Components\Section::make('VOD stream location file settings')
+                                    ->description('Generate .strm files and sync them to a local file path. Options can be overriden per VOD in the VOD edit panel.')
+                                    ->columnSpan('full')
+                                    ->columns(1)
+                                    ->collapsible(false)
+                                    ->schema([
+                                        Forms\Components\Toggle::make('vod_stream_file_sync_enabled')
+                                            ->live()
+                                            ->label('Enable .strm file generation'),
+                                        Forms\Components\Toggle::make('vod_stream_file_sync_include_season')
+                                            ->label('Create group folders')
+                                            ->live()
+                                            ->default(true)
+                                            ->hidden(fn($get) => !$get('vod_stream_file_sync_enabled')),
+                                        Forms\Components\TextInput::make('vod_stream_file_sync_location')
+                                            ->label('VOD Sync Location')
+                                            ->live()
+                                            ->rules([new CheckIfUrlOrLocalPath(localOnly: true, isDirectory: true)])
+                                            ->helperText(
+                                                fn($get) => 'File location: ' . $get('vod_stream_file_sync_location') . ($get('vod_stream_file_sync_include_season') ?? false ? '/Group Name' : '') . '/VOD Title.strm'
+                                            )
+                                            ->maxLength(255)
+                                            ->required()
+                                            ->hidden(fn($get) => !$get('vod_stream_file_sync_enabled'))
                                             ->placeholder('/usr/local/bin/streamlink'),
                                     ])
                             ]),
