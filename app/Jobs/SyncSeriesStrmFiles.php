@@ -56,7 +56,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
             }
 
             // Get the series episodes
-            $episodes = $series->episodes;
+            $episodes = $series->enabled_episodes;
 
             // Check if there are any episodes
             if ($episodes->isEmpty()) {
