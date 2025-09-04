@@ -328,7 +328,7 @@ class AppServiceProvider extends ServiceProvider
         // Configure the API
         Scramble::configure()
             ->routes(function (Route $route) {
-                return !Str::startsWith($route->uri, 'playlist/v') && Str::startsWith($route->uri, [
+                return !Str::startsWith($route->uri, 'playlist/v/') && Str::startsWith($route->uri, [
                     'playlist/',
                     'epg/',
                     'user/',

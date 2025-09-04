@@ -55,6 +55,7 @@ use App\Models\CustomPlaylist;
 use App\Models\Epg;
 use App\Models\Group;
 use App\Models\Playlist;
+use App\Rules\CheckIfUrlOrLocalPath;
 use Filament\Forms;
 use Illuminate\Support\HtmlString;
 use Filament\Notifications\Notification;
@@ -1411,6 +1412,33 @@ class VodResource extends Resource
                         }),
 
                 ]),
+
+            Fieldset::make('Stream location file settings')
+                ->schema([
+                    Grid::make(1)
+                        ->schema([
+                            Toggle::make('sync_settings.enabled')
+                                ->live()
+                                ->label('Enable .strm file generation'),
+                            Toggle::make('sync_settings.include_season')
+                                ->label('Create group folder')
+                                ->live()
+                                ->default(true)
+                                ->hidden(fn($get) => !$get('sync_settings.enabled')),
+                            TextInput::make('sync_location')
+                                ->label('VOD Sync Location')
+                                ->live()
+                                ->rules([new CheckIfUrlOrLocalPath(localOnly: true, isDirectory: true)])
+                                ->helperText(
+                                    fn($get) => 'File location: ' . $get('sync_location') . ($get('sync_settings.include_season') ?? false ? '/Group Name' : '') . '/VOD Title.strm'
+                                )
+                                ->maxLength(255)
+                                ->required()
+                                ->hidden(fn($get) => !$get('sync_settings.enabled'))
+                                ->placeholder('/usr/local/bin/streamlink'),
+                        ]),
+                ]),
+
             Fieldset::make('Failover Channels')
                 ->schema([
                     Repeater::make('failovers')
