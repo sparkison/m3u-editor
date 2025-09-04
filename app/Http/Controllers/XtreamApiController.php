@@ -784,12 +784,12 @@ class XtreamApiController extends Controller
                         $orderedEpisodes = $season->episodes->sortBy('episode_num');
                         foreach ($orderedEpisodes as $episode) {
                             $containerExtension = $episode->container_extension ?? 'mp4';
-                            if ($episode->info['movie_image']) {
+                            if ($episode->info['movie_image'] ?? false) {
                                 $movieImage = $playlist->enable_proxy
                                     ? LogoProxyController::generateProxyUrl($episode->info['movie_image'])
                                     : $episode->info['movie_image'];
                             }
-                            if ($episode->info['cover_big']) {
+                            if ($episode->info['cover_big'] ?? false) {
                                 $movieImage = $playlist->enable_proxy
                                     ? LogoProxyController::generateProxyUrl($episode->info['cover_big'])
                                     : $episode->info['cover_big'];
