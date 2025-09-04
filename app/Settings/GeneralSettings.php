@@ -57,6 +57,12 @@ class GeneralSettings extends Settings
     public ?bool $stream_file_sync_include_season = false;
     public ?string $stream_file_sync_location = null;
 
+    // VOD stream file sync options
+    public ?bool $vod_stream_file_sync_enabled = false;
+    public ?bool $vod_stream_file_sync_include_series = false;
+    public ?bool $vod_stream_file_sync_include_season = false;
+    public ?string $vod_stream_file_sync_location = null;
+
     // Video player proxy options
     public ?bool $force_video_player_proxy = false;
 
