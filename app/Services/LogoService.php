@@ -40,8 +40,13 @@ class LogoService
             return $logoUrl;
         }
 
+        // Check if proxy is enabled
+        $playlist = $channel->playlist ?? $channel->customPlaylist ?? null;
+
         // Return proxied URL for remote images
-        return LogoProxyController::generateProxyUrl($logoUrl);
+        return $playlist?->enable_proxy
+            ? LogoProxyController::generateProxyUrl($logoUrl)
+            : $logoUrl;
     }
 
     /**
@@ -61,7 +66,31 @@ class LogoService
         }
 
         // Return proxied URL for remote images
-        return LogoProxyController::generateProxyUrl($logoUrl);
+        return $series->playlist?->enable_proxy
+            ? LogoProxyController::generateProxyUrl($logoUrl)
+            : $logoUrl;
+    }
+
+    /**
+     * Get the logo URL for a Series episode, using proxy if it's a remote URL
+     */
+    public static function getEpisodeLogoUrl($episode): string
+    {
+        if (!$episode || empty($episode->info)) {
+            return url('/episode-placeholder.png');
+        }
+
+        $logoUrl = $episode->info['movie_image'] ?? $episode->info['cover_big'] ?? '';
+
+        // If it's already a local URL, return as-is
+        if (!filter_var($logoUrl, FILTER_VALIDATE_URL) || str_starts_with($logoUrl, url('/'))) {
+            return $logoUrl;
+        }
+
+        // Return proxied URL for remote images
+        return $episode->playlist?->enable_proxy
+            ? LogoProxyController::generateProxyUrl($logoUrl)
+            : $logoUrl;
     }
 
     /**
