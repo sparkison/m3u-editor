@@ -102,7 +102,7 @@ class EpgGenerateController extends Controller
         $channelNumber = $playlist->auto_channel_increment ? $playlist->channel_start - 1 : 0;
         $idChannelBy = $playlist->id_channel_by;
         $dummyEpgEnabled = $playlist->dummy_epg;
-        $dummyEpgLength = (int)$playlist->dummy_epg_length ?? 120; // Default to 120 minutes if not set
+        $dummyEpgLength = (int)($playlist->dummy_epg_length ?? 120); // Default to 120 minutes if not set
 
         // Generate `<channel>` tags for each channel
         foreach ($channels as $channel) {
