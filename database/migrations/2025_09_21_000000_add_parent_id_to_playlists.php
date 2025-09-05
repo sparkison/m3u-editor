@@ -48,7 +48,7 @@ return new class extends Migration {
         });
 
         Schema::table('shared_streams', function (Blueprint $table) {
-            //
+            $table->string('format')->nullable()->default(null)->change();
         });
 
         Schema::table('playlists', function (Blueprint $table) {
