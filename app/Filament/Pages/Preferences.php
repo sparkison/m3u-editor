@@ -426,7 +426,7 @@ class Preferences extends SettingsPage
                                                 Forms\Components\TextInput::make('auto_backup_database_schedule')
                                                     ->label('Backup Schedule')
                                                     ->suffix(config('app.timezone'))
-                                                    ->helperText('Specify the CRON schedule for automatic backups, e.g. "* 3 * * *".'),
+                                                    ->helperText('Specify the CRON schedule for automatic backups, e.g. "0 3 * * *".'),
                                                 Forms\Components\TextInput::make('auto_backup_database_max_backups')
                                                     ->label('Max Backups')
                                                     ->type('number')
