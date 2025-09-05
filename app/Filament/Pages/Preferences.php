@@ -19,6 +19,7 @@ use Exception;
 use ReflectionClass;
 use ReflectionProperty;
 use App\Rules\CheckIfUrlOrLocalPath;
+use App\Rules\Cron;
 use App\Settings\GeneralSettings;
 use App\Services\FfmpegCodecService;
 use Filament\Forms;
@@ -439,6 +440,7 @@ class Preferences extends SettingsPage
                                                 TextInput::make('auto_backup_database_schedule')
                                                     ->label('Backup Schedule')
                                                     ->suffix(config('app.timezone'))
+                                                    ->rules([new Cron()])
                                                     ->helperText('Specify the CRON schedule for automatic backups, e.g. "0 3 * * *".'),
                                                 TextInput::make('auto_backup_database_max_backups')
                                                     ->label('Max Backups')
