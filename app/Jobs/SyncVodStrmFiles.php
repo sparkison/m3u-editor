@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Facades\ProxyFacade;
 use App\Models\Channel;
 use App\Models\Playlist;
 use App\Settings\GeneralSettings;
@@ -20,8 +21,8 @@ class SyncVodStrmFiles implements ShouldQueue
      */
     public function __construct(
         public bool $notify = true,
-        public ?Channel $channel,
-        public ?Collection $channels,
+        public ?Channel $channel = null,
+        public ?Collection $channels = null,
     ) {
         //
     }
@@ -85,7 +86,17 @@ class SyncVodStrmFiles implements ShouldQueue
                     $filePath = $path . '/' . $fileName;
                 }
 
+                // Get the url
                 $url = $channel->url_custom ?? $channel->url;
+                if ($playlist = $channel->getEffectivePlaylist()) {
+                    if ($playlist->enable_proxy) {
+                        $format = $channel->container_extension ?? $playlist->proxy_options['output'] ?? 'mkv';
+                        $url = ProxyFacade::getProxyUrlForChannel(
+                            id: $channel->id,
+                            format: $format
+                        );
+                    }
+                }
 
                 // Check if the file already exists
                 if (file_exists($filePath)) {
