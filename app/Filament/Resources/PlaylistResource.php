@@ -31,6 +31,7 @@ use App\Livewire\PlaylistEpgUrl;
 use App\Livewire\PlaylistInfo;
 use App\Livewire\PlaylistM3uUrl;
 use App\Livewire\XtreamApiInfo;
+use App\Models\Category;
 use App\Models\SourceGroup;
 use App\Services\EpgCacheService;
 use App\Jobs\SyncPlaylistChildren;
@@ -1012,9 +1013,10 @@ class PlaylistResource extends Resource
         ];
 
         $processingFields = [
-            Forms\Components\Grid::make()
-                ->columns(2)
+            Forms\Components\Section::make('Playlist Processing')
+                ->description('Processing settings for the playlist')
                 ->columnSpanFull()
+                ->columns(2)
                 ->schema([
                     Forms\Components\Toggle::make('import_prefs.preprocess')
                         ->label('Preprocess playlist')
@@ -1037,32 +1039,63 @@ class PlaylistResource extends Resource
                         ->default(false)
                         ->helperText('When enabled, groups will be included based on regex pattern match instead of prefix.')
                         ->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
-                    Forms\Components\Select::make('import_prefs.selected_groups')
-                        ->label('Groups to import')
-                        ->columnSpan(1)
-                        ->searchable()
-                        ->multiple()
-                        ->helperText('NOTE: If the list is empty, sync the playlist and check again once complete.')
-                        ->options(
-                            fn($record): array =>
-                            SourceGroup::where('playlist_id', $record->id)
-                                ->get()->pluck('name', 'name')->toArray()
-                        )
-                        ->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
-                    Forms\Components\TagsInput::make('import_prefs.included_group_prefixes')
-                        ->label(fn(Get $get) => !$get('import_prefs.use_regex') ? 'Group prefixes to import' : 'Regex patterns to import')
-                        ->helperText('Press [tab] or [return] to add item.')
-                        ->columnSpan(1)
-                        ->suggestions([
-                            'US -',
-                            'UK -',
-                            'CA -',
-                            '^(US|UK|CA)',
-                            'Sports.*HD$',
-                            '\[.*\]'
-                        ])
-                        ->splitKeys(['Tab', 'Return'])
-                        ->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
+
+                    Forms\Components\Fieldset::make('Channel & VOD processing')
+                        ->schema([
+                            Forms\Components\Select::make('import_prefs.selected_groups')
+                                ->label('Groups to import')
+                                ->columnSpan(1)
+                                ->searchable()
+                                ->multiple()
+                                ->helperText('NOTE: If the list is empty, sync the playlist and check again once complete.')
+                                ->options(
+                                    fn($record): array =>
+                                    SourceGroup::where('playlist_id', $record->id)
+                                        ->get()->pluck('name', 'name')->toArray()
+                                ),
+                            Forms\Components\TagsInput::make('import_prefs.included_group_prefixes')
+                                ->label(fn(Get $get) => !$get('import_prefs.use_regex') ? 'Group prefixes to import' : 'Regex patterns to import')
+                                ->helperText('Press [tab] or [return] to add item.')
+                                ->columnSpan(1)
+                                ->suggestions([
+                                    'US -',
+                                    'UK -',
+                                    'CA -',
+                                    '^(US|UK|CA)',
+                                    'Sports.*HD$',
+                                    '\[.*\]'
+                                ])
+                                ->splitKeys(['Tab', 'Return']),
+                        ])->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
+
+                    Forms\Components\Fieldset::make('Series processing')
+                        ->schema([
+                            Forms\Components\Select::make('import_prefs.selected_categories')
+                                ->label('Categories to import')
+                                ->columnSpan(1)
+                                ->searchable()
+                                ->multiple()
+                                ->helperText('NOTE: If the list is empty, sync the playlist and check again once complete.')
+                                ->options(
+                                    fn($record): array =>
+                                    Category::where('playlist_id', $record->id)
+                                        ->get()->pluck('name', 'name')->toArray()
+                                ),
+                            Forms\Components\TagsInput::make('import_prefs.included_category_prefixes')
+                                ->label(fn(Get $get) => !$get('import_prefs.use_regex') ? 'Category prefixes to import' : 'Regex patterns to import')
+                                ->helperText('Press [tab] or [return] to add item.')
+                                ->columnSpan(1)
+                                ->suggestions([
+                                    'US -',
+                                    'UK -',
+                                    'CA -',
+                                    '^(US|UK|CA)',
+                                    'Sports.*HD$',
+                                    '\[.*\]'
+                                ])
+                                ->splitKeys(['Tab', 'Return']),
+                        ])->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
+
                     Forms\Components\TagsInput::make('import_prefs.ignored_file_types')
                         ->label('Ignored file types')
                         ->helperText('Press [tab] or [return] to add item. You can ignore certain file types from being imported (.e.g.: ".mkv", ".mp4", etc.) This is useful for ignoring VOD or other unwanted content.')
@@ -1073,6 +1106,32 @@ class PlaylistResource extends Resource
                             '.mp4',
                         ])->splitKeys(['Tab', 'Return']),
                 ]),
+            Forms\Components\Section::make('Series Processing')
+                ->description('Processing options for playlist series')
+                ->columnSpanFull()
+                ->collapsible()
+                ->collapsed($creating)
+                ->columns(2)
+                ->schema([
+                    Forms\Components\Toggle::make('auto_fetch_series_metadata')
+                        ->label('Auto-fetch series metadata')
+                        ->inline(false)
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'Recommend leaving this disabled, unless you are including Series in the M3U output. When accessing via the Xtream API, metadata will be automatically fetched'
+                        )
+                        ->default(false)
+                        ->helperText('This will only fetch metadata for enabled series. When disabled, series metadata will be fetched automatically when access via the Xtream API for this playlist.'),
+                    Forms\Components\Toggle::make('include_series_in_m3u')
+                        ->label('Include series in M3U output')
+                        ->inline(false)
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'Enable this to output your enabled series in the M3U file. It is recommended to enable the "Auto-fetch series metadata" option when enabled, otherwise you will need to manually fetch metadata for each series.'
+                        )
+                        ->default(false)
+                        ->helperText('When enabled, series will be included in the M3U output. It is recommended to enable the "Auto-fetch series metadata" option when enabled.'),
+                ])->hidden(fn(Get $get): bool => !$get('xtream')),
         ];
 
         $outputFields = [
@@ -1227,7 +1286,7 @@ class PlaylistResource extends Resource
             if ($section === 'Name') {
                 $section = 'General';
             }
-            if ($section !== 'Output') {
+            if (!in_array($section, ['Processing', 'Output'])) {
                 // Wrap the fields in a section
                 $fields = [
                     Forms\Components\Section::make($section)

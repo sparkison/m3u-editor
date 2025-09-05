@@ -2,11 +2,13 @@
 
 namespace App\Jobs;
 
+use App\Facades\ProxyFacade;
 use App\Models\Series;
 use App\Settings\GeneralSettings;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Log;
 
 class SyncSeriesStrmFiles implements ShouldQueue
 {
@@ -17,6 +19,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
      */
     public function __construct(
         public Series $series,
+        public bool $notify = true
     ) {
         //
     }
@@ -28,6 +31,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
     {
         // Get all the series episodes
         $series = $this->series;
+        $playlist = $series->playlist;
         try {
             // Get playlist sync settings
             $sync_settings = $series->sync_settings;
@@ -45,38 +49,46 @@ class SyncSeriesStrmFiles implements ShouldQueue
 
             // Check if sync is enabled
             if (!$sync_settings['enabled'] ?? false) {
-                Notification::make()
-                    ->danger()
-                    ->title("Error sync .strm files for series \"{$series->name}\"")
-                    ->body("Sync is not enabled for this series.")
-                    ->broadcast($series->user)
-                    ->sendToDatabase($series->user);
+                if ($this->notify) {
+                    Notification::make()
+                        ->danger()
+                        ->title("Error sync .strm files for series \"{$series->name}\"")
+                        ->body("Sync is not enabled for this series.")
+                        ->broadcast($series->user)
+                        ->sendToDatabase($series->user);
+                }
                 return;
             }
 
             // Get the series episodes
-            $episodes = $series->episodes;
+            $episodes = $series->enabled_episodes;
 
             // Check if there are any episodes
             if ($episodes->isEmpty()) {
-                Notification::make()
-                    ->danger()
-                    ->title("Error sync .strm files for series \"{$series->name}\"")
-                    ->body("No episodes found for this series. Try processing it first.")
-                    ->broadcast($series->user)
-                    ->sendToDatabase($series->user);
+                if ($this->notify) {
+                    Notification::make()
+                        ->danger()
+                        ->title("Error sync .strm files for series \"{$series->name}\"")
+                        ->body("No episodes found for this series. Try processing it first.")
+                        ->broadcast($series->user)
+                        ->sendToDatabase($series->user);
+                }
                 return;
             }
 
             // Get the path info
             $path = rtrim($sync_settings['sync_location'], '/');
             if (!is_dir($path)) {
-                Notification::make()
-                    ->danger()
-                    ->title("Error sync .strm files for series \"{$series->name}\"")
-                    ->body("Sync location \"{$path}\" does not exist.")
-                    ->broadcast($series->user)
-                    ->sendToDatabase($series->user);
+                if ($this->notify) {
+                    Notification::make()
+                        ->danger()
+                        ->title("Error sync .strm files for series \"{$series->name}\"")
+                        ->body("Sync location \"{$path}\" does not exist.")
+                        ->broadcast($series->user)
+                        ->sendToDatabase($series->user);
+                } else {
+                    Log::error("Error sync .strm files for series \"{$series->name}\": Sync location \"{$path}\" does not exist.");
+                }
                 return;
             }
 
@@ -112,25 +124,37 @@ class SyncSeriesStrmFiles implements ShouldQueue
                     $filePath = $path . '/' . $fileName;
                 }
 
+                // Get the url
+                $url = $ep->url;
+                if ($playlist && $playlist->enable_proxy) {
+                    $format = $episode->container_extension ?? $playlist->proxy_options['output'] ?? 'mp4';
+                    $url = ProxyFacade::getProxyUrlForEpisode(
+                        id: $ep->id,
+                        format: $format
+                    );
+                }
+
                 // Check if the file already exists
                 if (file_exists($filePath)) {
                     // If the file exists, check if the URL is the same
                     $currentUrl = file_get_contents($filePath);
-                    if ($currentUrl === $ep->url) {
+                    if ($currentUrl === $url) {
                         // Skip if the URL is the same
                         continue;
                     }
                 }
-                file_put_contents($filePath, $ep->url);
+                file_put_contents($filePath, $url);
             }
 
             // Notify the user
-            Notification::make()
-                ->success()
-                ->title("Sync .strm files for series \"{$series->name}\"")
-                ->body("Sync completed for series \"{$series->name}\".")
-                ->broadcast($series->user)
-                ->sendToDatabase($series->user);
+            if ($this->notify) {
+                Notification::make()
+                    ->success()
+                    ->title("Sync .strm files for series \"{$series->name}\"")
+                    ->body("Sync completed for series \"{$series->name}\".")
+                    ->broadcast($series->user)
+                    ->sendToDatabase($series->user);
+            }
         } catch (\Exception $e) {
             Notification::make()
                 ->danger()

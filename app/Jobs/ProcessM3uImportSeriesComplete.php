@@ -23,7 +23,6 @@ class ProcessM3uImportSeriesComplete implements ShouldQueue
     public function __construct(
         public Playlist $playlist,
         public string   $batchNo,
-        public ?bool    $fetchedMeta = true,
     ) {}
 
     /**
@@ -39,9 +38,6 @@ class ProcessM3uImportSeriesComplete implements ShouldQueue
             'series_progress' => 100,
         ]);
         $message = "Series sync completed successfully for playlist \"{$this->playlist->name}\".";
-        if (!$this->fetchedMeta) {
-            $message = " Enable series to fetch metadata and new episodes on next playlist sync, or you can manually fetch metadata for any imported series.";
-        }
         Notification::make()
             ->success()
             ->title('Series Sync Completed')

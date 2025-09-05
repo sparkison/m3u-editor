@@ -321,7 +321,7 @@ class ProcessM3uImportComplete implements ShouldQueue
         }
 
         // Determine if syncing series metadata as well
-        if ($playlist->series()->where('enabled', true)->exists()) {
+        if ($playlist->auto_fetch_series_metadata && $playlist->series()->where('enabled', true)->exists()) {
             // Process series import
             dispatch(new ProcessM3uImportSeries(
                 playlist: $playlist,

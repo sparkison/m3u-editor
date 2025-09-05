@@ -102,7 +102,8 @@ class EpgGenerateController extends Controller
         $channelNumber = $playlist->auto_channel_increment ? $playlist->channel_start - 1 : 0;
         $idChannelBy = $playlist->id_channel_by;
         $dummyEpgEnabled = $playlist->dummy_epg;
-        $dummyEpgLength = (int)$playlist->dummy_epg_length ?? 120; // Default to 120 minutes if not set
+        $dummyEpgLength = (int)($playlist->dummy_epg_length ?? 120); // Default to 120 minutes if not set
+        $proxyEnabled = $playlist->enable_proxy;
 
         // Generate `<channel>` tags for each channel
         foreach ($channels as $channel) {
@@ -157,6 +158,9 @@ class EpgGenerateController extends Controller
                 if (empty($icon)) {
                     $icon = url('/placeholder.png');
                 }
+                if ($proxyEnabled) {
+                    $icon = LogoProxyController::generateProxyUrl($icon);
+                }
 
                 // Output the <channel> tag
                 echo '  <channel id="' . $tvgId . '">' . PHP_EOL;
@@ -175,6 +179,9 @@ class EpgGenerateController extends Controller
                     $icon = url('/placeholder.png');
                 }
                 $icon = htmlspecialchars($icon);
+                if ($proxyEnabled) {
+                    $icon = LogoProxyController::generateProxyUrl($icon);
+                }
 
                 // Keep track of which channels need a dummy EPG program
                 // Need this to output the <programme> tags later
@@ -275,7 +282,11 @@ class EpgGenerateController extends Controller
                                     echo '    <episode-num system="xmltv_ns">' . htmlspecialchars($programme['episode_num']) . '</episode-num>' . PHP_EOL;
                                 }
                                 if ($programme['icon']) {
-                                    echo '    <icon src="' . htmlspecialchars($programme['icon']) . '"/>' . PHP_EOL;
+                                    $icon = htmlspecialchars($programme['icon']);
+                                    if ($proxyEnabled) {
+                                        $icon = LogoProxyController::generateProxyUrl($icon);
+                                    }
+                                    echo '    <icon src="' . $icon . '"/>' . PHP_EOL;
                                 }
                                 if ($programme['rating']) {
                                     echo '    <rating><value>' . htmlspecialchars($programme['rating']) . '</value></rating>' . PHP_EOL;

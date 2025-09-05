@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources;
 
-use App\Enums\ChannelLogoType;
+use App\Facades\LogoFacade;
 use App\Facades\ProxyFacade;
 use App\Filament\Resources\VodResource\Pages;
 use App\Filament\Resources\VodResource\RelationManagers;
@@ -14,6 +14,7 @@ use App\Models\CustomPlaylist;
 use App\Models\Epg;
 use App\Models\Group;
 use App\Models\Playlist;
+use App\Rules\CheckIfUrlOrLocalPath;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -87,7 +88,7 @@ class VodResource extends Resource
                 return $action->button()->label('Filters');
             })
             ->modifyQueryUsing(function (Builder $query) {
-                $query->with(['epgChannel', 'playlist'])
+                $query->with(['epgChannel', 'playlist', 'customPlaylist'])
                     ->withCount(['failovers'])
                     ->where('is_vod', true);
             })
@@ -110,12 +111,7 @@ class VodResource extends Resource
                 ->extraImgAttributes(fn($record): array => [
                     'style' => 'width:80px; height:120px;', // VOD channel style
                 ])
-                ->getStateUsing(function ($record) {
-                    if ($record->logo_type === ChannelLogoType::Channel) {
-                        return $record->logo ?? $record->logo_internal;
-                    }
-                    return $record->epgChannel?->icon ?? $record->logo ?? $record->logo_internal;
-                })
+                ->getStateUsing(fn($record) => LogoFacade::getChannelLogoUrl($record))
                 ->toggleable(),
             Tables\Columns\TextColumn::make('info')
                 ->label('Info')
@@ -385,6 +381,26 @@ class VodResource extends Resource
                     ->modalIcon('heroicon-o-arrow-down-tray')
                     ->modalDescription('Fetch and process VOD metadata for the selected channel.')
                     ->modalSubmitActionLabel('Yes, process now'),
+                Tables\Actions\Action::make('sync')
+                    ->label('Sync VOD .strm file')
+                    ->action(function ($record) {
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new \App\Jobs\SyncVodStrmFiles(
+                                channel: $record,
+                            ));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('VOD .strm file is being synced now')
+                            ->body('You will be notified once complete.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->modalIcon('heroicon-o-document-arrow-down')
+                    ->modalDescription('Sync VOD .strm files now? This will generate .strm files for this VOD channel at the path set for this channel.')
+                    ->modalSubmitActionLabel('Yes, sync now'),
                 Tables\Actions\DeleteAction::make()->hidden(fn(Model $record) => !$record->is_custom),
             ])->button()->hiddenLabel()->size('sm'),
             Tables\Actions\ViewAction::make()
@@ -517,6 +533,28 @@ class VodResource extends Resource
                     ->modalIcon('heroicon-o-arrow-down-tray')
                     ->modalDescription('Fetch and process VOD metadata for the selected channels? Only VOD channels will be processed.')
                     ->modalSubmitActionLabel('Yes, process now'),
+                Tables\Actions\BulkAction::make('sync')
+                    ->label('Sync VOD .strm files')
+                    ->action(function ($records) {
+                        foreach ($records as $record) {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new \App\Jobs\SyncVodStrmFiles(
+                                    channel: $record
+                                ));
+                        }
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('.strm files are being synced for selected VOD channels')
+                            ->body('You will be notified once complete.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->modalIcon('heroicon-o-document-arrow-down')
+                    ->modalDescription('Sync selected VOD .strm files now? This will generate .strm files for the selected VOD channels at the path set for the channels.')
+                    ->modalSubmitActionLabel('Yes, sync now'),
                 Tables\Actions\BulkAction::make('map')
                     ->label('Map EPG to selected')
                     ->form(EpgMapResource::getForm(showPlaylist: false, showEpg: true))
@@ -1374,6 +1412,33 @@ class VodResource extends Resource
                         }),
 
                 ]),
+
+            Forms\Components\Fieldset::make('Stream location file settings')
+                ->schema([
+                    Forms\Components\Grid::make(1)
+                        ->schema([
+                            Forms\Components\Toggle::make('sync_settings.enabled')
+                                ->live()
+                                ->label('Enable .strm file generation'),
+                            Forms\Components\Toggle::make('sync_settings.include_season')
+                                ->label('Create group folder')
+                                ->live()
+                                ->default(true)
+                                ->hidden(fn($get) => !$get('sync_settings.enabled')),
+                            Forms\Components\TextInput::make('sync_location')
+                                ->label('VOD Sync Location')
+                                ->live()
+                                ->rules([new CheckIfUrlOrLocalPath(localOnly: true, isDirectory: true)])
+                                ->helperText(
+                                    fn($get) => 'File location: ' . $get('sync_location') . ($get('sync_settings.include_season') ?? false ? '/Group Name' : '') . '/VOD Title.strm'
+                                )
+                                ->maxLength(255)
+                                ->required()
+                                ->hidden(fn($get) => !$get('sync_settings.enabled'))
+                                ->placeholder('/usr/local/bin/streamlink'),
+                        ]),
+                ]),
+
             Forms\Components\Fieldset::make('Failover Channels')
                 ->schema([
                     Forms\Components\Repeater::make('failovers')

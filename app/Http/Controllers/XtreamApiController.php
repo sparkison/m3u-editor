@@ -493,6 +493,9 @@ class XtreamApiController extends Controller
                         $logo = $channel->logo ?? $channel->logo_internal ?? '';
                         $streamIcon = filter_var($logo, FILTER_VALIDATE_URL) ? $logo : url($logo);
                     }
+                    if ($playlist->enable_proxy) {
+                        $streamIcon = LogoProxyController::generateProxyUrl($streamIcon);
+                    }
 
                     // Determine category_id based on playlist type
                     $channelCategoryId = 'all';
@@ -600,6 +603,9 @@ class XtreamApiController extends Controller
                     } elseif ($channel->logo_type === ChannelLogoType::Channel && ($channel->logo || $channel->logo_internal)) {
                         $logo = $channel->logo ?? $channel->logo_internal ?? '';
                         $streamIcon = filter_var($logo, FILTER_VALIDATE_URL) ? $logo : url($logo);
+                    }
+                    if ($playlist->enable_proxy) {
+                        $streamIcon = LogoProxyController::generateProxyUrl($streamIcon);
                     }
 
                     // Determine category_id based on playlist type
@@ -740,10 +746,17 @@ class XtreamApiController extends Controller
                 $seriesItem->load('seasons.episodes', 'category');
             }
 
+            $cover = $seriesItem->cover ? (filter_var($seriesItem->cover, FILTER_VALIDATE_URL) ? $seriesItem->cover : url($seriesItem->cover)) : url('/placeholder.png');
+            $backdropPaths = $seriesItem->backdrop_path ?? [];
+            if ($playlist->enable_proxy) {
+                $cover = LogoProxyController::generateProxyUrl($cover);
+                $backdropPaths = array_map(fn($path) => LogoProxyController::generateProxyUrl($path), $backdropPaths);
+            }
+
             $now = Carbon::now();
             $seriesInfo = [
                 'name' => $seriesItem->name,
-                'cover' => $seriesItem->cover ? (filter_var($seriesItem->cover, FILTER_VALIDATE_URL) ? $seriesItem->cover : url($seriesItem->cover)) : url('/placeholder.png'),
+                'cover' => $cover,
                 'plot' => $seriesItem->plot ?? '',
                 'cast' => $seriesItem->cast ?? '',
                 'director' => $seriesItem->director ?? '',
@@ -752,7 +765,7 @@ class XtreamApiController extends Controller
                 'last_modified' => (string)($seriesItem->updated_at ? $seriesItem->updated_at->timestamp : $now->timestamp),
                 'rating' => (string)($seriesItem->rating ?? 0),
                 'rating_5based' => round((floatval($seriesItem->rating ?? 0)) / 2, 1),
-                'backdrop_path' => $seriesItem->backdrop_path ?? [],
+                'backdrop_path' => $backdropPaths,
                 'youtube_trailer' => $seriesItem->youtube_trailer ?? '',
                 'episode_run_time' => (string)($seriesItem->episode_run_time ?? 0),
                 'category_id' => (string)($seriesItem->category_id ?? ($seriesItem->category ? $seriesItem->category->id : 'all')),
@@ -767,12 +780,26 @@ class XtreamApiController extends Controller
                         $orderedEpisodes = $season->episodes->sortBy('episode_num');
                         foreach ($orderedEpisodes as $episode) {
                             $containerExtension = $episode->container_extension ?? 'mp4';
+                            if ($episode->info['movie_image'] ?? false) {
+                                $movieImage = $playlist->enable_proxy
+                                    ? LogoProxyController::generateProxyUrl($episode->info['movie_image'])
+                                    : $episode->info['movie_image'];
+                            }
+                            if ($episode->info['cover_big'] ?? false) {
+                                $movieImage = $playlist->enable_proxy
+                                    ? LogoProxyController::generateProxyUrl($episode->info['cover_big'])
+                                    : $episode->info['cover_big'];
+                            }
+
                             $seasonEpisodes[] = [
                                 'id' => (string)$episode->id,
                                 'episode_num' => $episode->episode_num,
                                 'title' => $episode->title ?? "Episode {$episode->episode_num}",
                                 'container_extension' => $containerExtension,
-                                'info' => $episode->info,
+                                'info' => array_merge($episode->info, [
+                                    'movie_image' => $movieImage ?? null,
+                                    'cover_big' => $coverBig ?? null,
+                                ]),
                                 'added' => $episode->added,
                                 'season' => $episode->season,
                                 'custom_sid' => $espisode->custom_sid ?? '',
@@ -969,8 +996,26 @@ class XtreamApiController extends Controller
                 return response()->json(['error' => 'VOD not found'], 404);
             }
 
+            // Check if VOD metadata has been fetched, and if so how recently
+            if (!$channel->last_metadata_fetch || $channel->last_metadata_fetch < now()->subDays(1)) {
+                // Either no metadata, or stale metadata
+                $results = $channel->fetchMetadata();
+                if ($results === false) {
+                    return response()->json(['error' => 'Failed to fetch VOD metadata'], 500);
+                }
+            }
+
             // Build info section - use channel's info field if available, otherwise build from channel data
             $info = $channel->info ?? [];
+
+            $cover = $info['cover_big'] ?? $channel->logo ?? $channel->logo_internal;
+            $movieImage = $info['movie_image'] ?? $channel->logo ?? $channel->logo_internal;
+            $backdropPaths = $info['backdrop_path'] ?? [];
+            if ($playlist->enable_proxy) {
+                $cover = LogoProxyController::generateProxyUrl($cover);
+                $movieImage = LogoProxyController::generateProxyUrl($movieImage);
+                $backdropPaths = array_map(fn($path) => LogoProxyController::generateProxyUrl($path), $backdropPaths);
+            }
 
             // Fill in missing info fields with channel data
             $defaultInfo = [
@@ -978,8 +1023,8 @@ class XtreamApiController extends Controller
                 'tmdb_id' => $info['tmdb_id'] ?? 0,
                 'name' => $info['name'] ?? $channel->name,
                 'o_name' => $info['o_name'] ?? $channel->name,
-                'cover_big' => $info['cover_big'] ?? $channel->logo ?? $channel->logo_internal,
-                'movie_image' => $info['movie_image'] ?? $channel->logo ?? $channel->logo_internal,
+                'cover_big' => $cover,
+                'movie_image' => $movieImage,
                 'release_date' => $info['release_date'] ?? $channel->year,
                 'episode_run_time' => $info['episode_run_time'] ?? 0,
                 'youtube_trailer' => $info['youtube_trailer'] ?? null,
@@ -993,7 +1038,7 @@ class XtreamApiController extends Controller
                 'rating_count_kinopoisk' => $info['rating_count_kinopoisk'] ?? 0,
                 'country' => $info['country'] ?? '',
                 'genre' => $info['genre'] ?? '',
-                'backdrop_path' => $info['backdrop_path'] ?? [],
+                'backdrop_path' => $backdropPaths,
                 'duration_secs' => $info['duration_secs'] ?? 0,
                 'duration' => $info['duration'] ?? '00:00:00',
                 'bitrate' => $info['bitrate'] ?? 0,

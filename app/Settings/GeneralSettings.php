@@ -57,12 +57,23 @@ class GeneralSettings extends Settings
     public ?bool $stream_file_sync_include_season = false;
     public ?string $stream_file_sync_location = null;
 
+    // VOD stream file sync options
+    public ?bool $vod_stream_file_sync_enabled = false;
+    public ?bool $vod_stream_file_sync_include_series = false;
+    public ?bool $vod_stream_file_sync_include_season = false;
+    public ?string $vod_stream_file_sync_location = null;
+
     // Video player proxy options
     public ?bool $force_video_player_proxy = false;
 
     // Sync options
     public ?bool $invalidate_import = false;
     public ?int $invalidate_import_threshold = 100;
+
+    // Backup options
+    public ?bool $auto_backup_database = false;
+    public ?string $auto_backup_database_schedule = null;
+    public ?int $auto_backup_database_max_backups = 5;
 
     public static function group(): string
     {

@@ -89,16 +89,7 @@ class ProcessVodChannels implements ShouldQueue
         }
         foreach ($channels as $index => $channel) {
             try {
-                $movieData = $xtream->getVodInfo($channel->source_id);
-                if ($movieData) {
-                    $channel->update([
-                        'info' => $movieData['info'] ?? null,
-                        'movie_data' => $movieData['movie_data'] ?? null,
-                    ]);
-                    Log::debug('Processed VOD data for channel ID ' . $channel->id);
-                } else {
-                    Log::warning('No VOD data found for channel ID ' . $channel->id);
-                }
+                $channel->fetchMetadata($xtream);
             } catch (\Exception $e) {
                 // Log the error and continue processing other channels
                 Log::error('Failed to process VOD data for channel ID ' . $channel->id . ': ' . $e->getMessage());

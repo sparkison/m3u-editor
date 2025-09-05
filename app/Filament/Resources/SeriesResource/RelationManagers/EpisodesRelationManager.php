@@ -2,21 +2,26 @@
 
 namespace App\Filament\Resources\SeriesResource\RelationManagers;
 
+use App\Facades\LogoFacade;
 use App\Infolists\Components\SeriesPreview;
 use App\Livewire\ChannelStreamStats;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
+use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class EpisodesRelationManager extends RelationManager
 {
     protected static string $relationship = 'episodes';
+
+    protected $listeners = ['refreshRelation' => '$refresh'];
 
     public function isReadOnly(): bool
     {
@@ -33,8 +38,9 @@ class EpisodesRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('title')
             ->modifyQueryUsing(function (Builder $query) {
-                $query->with(['season', 'series']);
+                $query->with(['season', 'series', 'playlist']);
             })
+            ->recordAction(null)
             ->defaultGroup('season')
             ->defaultSort('episode_num', 'asc')
             ->contentGrid([
@@ -45,18 +51,16 @@ class EpisodesRelationManager extends RelationManager
             ->paginated([12, 24, 48, 100])
             ->defaultPaginationPageOption(12)
             ->columns([
+                Tables\Columns\ToggleColumn::make('enabled')
+                    ->label('Enabled'),
                 Tables\Columns\Layout\Stack::make([
                     Tables\Columns\ImageColumn::make('info.movie_image')
                         ->label('')
                         ->height(200)
                         ->width('full')
-                        ->checkFileExistence(false)
-                        ->defaultImageUrl('/episode-placeholder.png')
                         ->extraImgAttributes(['class' => 'episode-placeholder rounded-t-lg object-cover w-full h-48'])
-                        ->getStateUsing(function ($record) {
-                            $info = $record->info ?? [];
-                            return $info['movie_image'] ?? $info['cover_big'] ?? url('/episode-placeholder.png');
-                        }),
+                        ->checkFileExistence(false)
+                        ->getStateUsing(fn($record) => LogoFacade::getEpisodeLogoUrl($record)),
 
                     Tables\Columns\Layout\Stack::make([
                         Tables\Columns\TextColumn::make('title')
@@ -143,6 +147,54 @@ class EpisodesRelationManager extends RelationManager
             ])
             ->bulkActions([
                 // @TODO - add download? Would need to generate streamlink files and compress then download...
+
+                // Enable/disable bulk options
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\BulkAction::make('enable')
+                        ->label('Enable selected')
+                        ->action(function (Collection $records): void {
+                            foreach ($records as $record) {
+                                $record->update([
+                                    'enabled' => true,
+                                ]);
+                            }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Selected episodes enabled')
+                                ->body('The selected episodes have been enabled.')
+                                ->send();
+                        })
+                        ->color('success')
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-check-circle')
+                        ->modalIcon('heroicon-o-check-circle')
+                        ->modalDescription('Enable the selected channel(s) now?')
+                        ->modalSubmitActionLabel('Yes, enable now'),
+                    Tables\Actions\BulkAction::make('disable')
+                        ->label('Disable selected')
+                        ->action(function (Collection $records): void {
+                            foreach ($records as $record) {
+                                $record->update([
+                                    'enabled' => false,
+                                ]);
+                            }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Selected episodes disabled')
+                                ->body('The selected episodes have been disabled.')
+                                ->send();
+                        })
+                        ->color('warning')
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-x-circle')
+                        ->modalIcon('heroicon-o-x-circle')
+                        ->modalDescription('Disable the selected channel(s) now?')
+                        ->modalSubmitActionLabel('Yes, disable now'),
+                ]),
             ]);
     }
 
