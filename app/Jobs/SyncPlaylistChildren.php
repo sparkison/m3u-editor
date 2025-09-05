@@ -91,250 +91,11 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
                             continue;
                         }
 
-                        $now = now();
+                        $this->syncGroups($parent, $child);
+                        $this->syncCategories($parent, $child);
+                        $this->syncUngroupedChannels($parent, $child);
+                        $this->syncUncategorizedSeries($parent, $child);
 
-                // ── Groups and grouped channels ───────────────────────────────
-                $parentGroupNames = [];
-                $parent->groups()->with('channels.failovers')->chunkById(100, function ($groups) use ($child, &$parentGroupNames) {
-                    $groupRows = [];
-                    foreach ($groups as $group) {
-                        $parentGroupNames[] = $group->name_internal;
-                        $groupRows[] = $group->only(['name', 'name_internal', 'sort_order', 'user_id', 'is_custom']) + [
-                            'playlist_id' => $child->id,
-                        ];
-                    }
-                    $child->groups()->upsert($groupRows, ['playlist_id', 'name_internal']);
-                    unset($groupRows);
-
-                    $names = $groups->pluck('name_internal');
-                    $childGroups = $child->groups()->whereIn('name_internal', $names)->get()->keyBy('name_internal');
-                    foreach ($groups as $group) {
-                        $childGroupId = $childGroups[$group->name_internal]->id;
-                        $channelSources = [];
-                        $failovers = [];
-                        $group->channels()->with('failovers')->chunkById(100, function ($channels) use ($child, $childGroupId, &$channelSources, &$failovers) {
-                            $channelRows = [];
-                            foreach ($channels as $channel) {
-                                $source = $channel->source_id ?? 'ch-' . $channel->id;
-                                $channelSources[] = $source;
-                                $channelRows[] = $channel->replicate(except: ['id', 'group_id', 'playlist_id', 'created_at', 'updated_at'])->toArray() + [
-                                    'playlist_id' => $child->id,
-                                    'group_id' => $childGroupId,
-                                    'source_id' => $source,
-                                ];
-                                $failovers[$source] = $channel->failovers;
-                            }
-                            $child->channels()->upsert($channelRows, ['playlist_id', 'source_id']);
-                            unset($channelRows);
-                        });
-
-                        $child->channels()->where('group_id', $childGroupId)->where(function ($q) use ($channelSources) {
-                            $q->whereNotIn('source_id', $channelSources)
-                                ->orWhereNull('source_id');
-                        })->delete();
-                        $childChannels = $child->channels()->where('group_id', $childGroupId)->whereIn('source_id', $channelSources)->get()->keyBy('source_id');
-                        foreach ($failovers as $source => $items) {
-                            $childChannel = $childChannels[$source];
-                            $childChannel->failovers()->delete();
-                            foreach ($items as $failover) {
-                                $newFailover = $failover->replicate(except: ['id', 'channel_id', 'created_at', 'updated_at']);
-                                $newFailover->channel_id = $childChannel->id;
-                                $newFailover->save();
-                            }
-                        }
-                        unset($channelSources, $failovers);
-                    }
-                });
-                $child->groups()->whereNotIn('name_internal', $parentGroupNames)->delete();
-
-                // ── Categories / Series / Seasons / Episodes ───────────────────
-                $parentCategoryIds = [];
-                $parent->categories()->chunkById(100, function ($categories) use ($child, &$parentCategoryIds) {
-                    $categoryRows = [];
-                    foreach ($categories as $category) {
-                        $categorySource = $category->source_category_id ?? 'cat-' . $category->id;
-                        $parentCategoryIds[] = $categorySource;
-                        $categoryRows[] = $category->replicate(except: ['id', 'playlist_id', 'created_at', 'updated_at'])->toArray() + [
-                            'playlist_id' => $child->id,
-                            'source_category_id' => $categorySource,
-                        ];
-                    }
-                    $child->categories()->upsert($categoryRows, Category::SOURCE_INDEX);
-                    unset($categoryRows);
-
-                    $sources = $categories->map(fn ($c) => $c->source_category_id ?? 'cat-' . $c->id);
-                    $childCategories = $child->categories()->whereIn('source_category_id', $sources)->get()->keyBy('source_category_id');
-                    foreach ($categories as $category) {
-                        $catSource = $category->source_category_id ?? 'cat-' . $category->id;
-                        $childCategoryId = $childCategories[$catSource]->id;
-                        $category->series()->chunkById(100, function ($seriesChunk) use ($child, $childCategoryId) {
-                            $seriesRows = [];
-                            $seriesSources = [];
-                            $seriesMap = [];
-                            foreach ($seriesChunk->load('seasons.episodes') as $series) {
-                                $seriesSource = $series->source_series_id ?? 'series-' . $series->id;
-                                $seriesSources[] = $seriesSource;
-                                $seriesRows[] = $series->replicate(except: ['id', 'category_id', 'playlist_id', 'created_at', 'updated_at'])->toArray() + [
-                                    'playlist_id' => $child->id,
-                                    'category_id' => $childCategoryId,
-                                    'source_series_id' => $seriesSource,
-                                ];
-                                $seriesMap[$seriesSource] = $series->seasons;
-                            }
-                            $child->series()->upsert($seriesRows, Series::SOURCE_INDEX);
-                            unset($seriesRows);
-                            $child->series()->where('category_id', $childCategoryId)->where(function ($q) use ($seriesSources) {
-                                $q->whereNotIn('source_series_id', $seriesSources)
-                                    ->orWhereNull('source_series_id');
-                            })->delete();
-                            $childSeries = $child->series()->where('category_id', $childCategoryId)->whereIn('source_series_id', $seriesSources)->get()->keyBy('source_series_id');
-                            foreach ($seriesMap as $seriesSource => $seasonsCollection) {
-                                $childSeriesId = $childSeries[$seriesSource]->id;
-                                foreach ($seasonsCollection->chunk(100) as $seasonChunk) {
-                                    $seasonRows = [];
-                                    $seasonSources = [];
-                                    $seasonMap = [];
-                                    foreach ($seasonChunk as $season) {
-                                        $seasonSource = $season->source_season_id ?? 'season-' . $season->id;
-                                        $seasonSources[] = $seasonSource;
-                                        $seasonRows[] = $season->replicate(except: ['id', 'series_id', 'category_id', 'playlist_id', 'created_at', 'updated_at'])->toArray() + [
-                                            'playlist_id' => $child->id,
-                                            'series_id' => $childSeriesId,
-                                            'category_id' => $childCategoryId,
-                                            'source_season_id' => $seasonSource,
-                                        ];
-                                        $seasonMap[$seasonSource] = $season->episodes;
-                                    }
-                                    $child->seasons()->upsert($seasonRows, Season::SOURCE_INDEX);
-                                    unset($seasonRows);
-                                    $child->seasons()->where('series_id', $childSeriesId)->whereNotIn('source_season_id', $seasonSources)->delete();
-                                    $childSeasons = $child->seasons()->where('series_id', $childSeriesId)->whereIn('source_season_id', $seasonSources)->get()->keyBy('source_season_id');
-                                    foreach ($seasonMap as $seasonSource => $episodesCollection) {
-                                        $childSeasonId = $childSeasons[$seasonSource]->id;
-                                        foreach ($episodesCollection->chunk(100) as $episodeChunk) {
-                                            $episodeRows = [];
-                                            $episodeSources = [];
-                                            foreach ($episodeChunk as $episode) {
-                                                $episodeSource = $episode->source_episode_id ?? 'ep-' . $episode->id;
-                                                $episodeSources[] = $episodeSource;
-                                                $episodeRows[] = $episode->replicate(except: ['id', 'season_id', 'series_id', 'playlist_id', 'created_at', 'updated_at'])->toArray() + [
-                                                    'playlist_id' => $child->id,
-                                                    'series_id' => $childSeriesId,
-                                                    'season_id' => $childSeasonId,
-                                                    'source_episode_id' => $episodeSource,
-                                                ];
-                                            }
-                                            $child->episodes()->upsert($episodeRows, ['playlist_id', 'source_episode_id']);
-                                            unset($episodeRows);
-                                            $child->episodes()->where('season_id', $childSeasonId)->whereNotIn('source_episode_id', $episodeSources)->delete();
-                                        }
-                                    }
-                                }
-                            }
-                        });
-                    }
-                });
-                $child->categories()->whereNotIn('source_category_id', $parentCategoryIds)->delete();
-
-                // ── Ungrouped channels ────────────────────────────────────────
-                $ungroupedSources = [];
-                $parent->channels()->whereNull('group_id')->with('failovers')->chunkById(100, function ($channels) use ($child, &$ungroupedSources) {
-                    $rows = [];
-                    $failovers = [];
-                    foreach ($channels as $channel) {
-                        $source = $channel->source_id ?? 'ch-' . $channel->id;
-                        $ungroupedSources[] = $source;
-                        $rows[] = $channel->replicate(except: ['id', 'group_id', 'playlist_id', 'created_at', 'updated_at'])->toArray() + [
-                            'playlist_id' => $child->id,
-                            'group_id' => null,
-                            'source_id' => $source,
-                        ];
-                        $failovers[$source] = $channel->failovers;
-                    }
-                    $child->channels()->upsert($rows, ['playlist_id', 'source_id']);
-                    unset($rows);
-                    $childChannels = $child->channels()->whereNull('group_id')->whereIn('source_id', array_keys($failovers))->get()->keyBy('source_id');
-                    foreach ($failovers as $source => $items) {
-                        $childChannel = $childChannels[$source];
-                        $childChannel->failovers()->delete();
-                        foreach ($items as $failover) {
-                            $newFailover = $failover->replicate(except: ['id', 'channel_id', 'created_at', 'updated_at']);
-                            $newFailover->channel_id = $childChannel->id;
-                            $newFailover->save();
-                        }
-                    }
-                });
-                $child->channels()->whereNull('group_id')->where(function ($q) use ($ungroupedSources) {
-                    $q->whereNotIn('source_id', $ungroupedSources)
-                        ->orWhereNull('source_id');
-                })->delete();
-
-                // ── Uncategorized series ─────────────────────────────────────
-                $uncatSeriesIds = [];
-                $parent->series()->whereNull('category_id')->chunkById(100, function ($seriesChunk) use ($child, &$uncatSeriesIds) {
-                    $rows = [];
-                    $seriesMap = [];
-                    foreach ($seriesChunk->load('seasons.episodes') as $series) {
-                        $seriesSource = $series->source_series_id ?? 'series-' . $series->id;
-                        $uncatSeriesIds[] = $seriesSource;
-                        $rows[] = $series->replicate(except: ['id', 'category_id', 'playlist_id', 'created_at', 'updated_at'])->toArray() + [
-                            'playlist_id' => $child->id,
-                            'category_id' => null,
-                            'source_series_id' => $seriesSource,
-                        ];
-                        $seriesMap[$seriesSource] = $series->seasons;
-                    }
-                    $child->series()->upsert($rows, Series::SOURCE_INDEX);
-                    unset($rows);
-                    $childSeries = $child->series()->whereNull('category_id')->whereIn('source_series_id', array_keys($seriesMap))->get()->keyBy('source_series_id');
-                    foreach ($seriesMap as $seriesSource => $seasonsCollection) {
-                        $childSeriesId = $childSeries[$seriesSource]->id;
-                        foreach ($seasonsCollection->chunk(100) as $seasonChunk) {
-                            $seasonRows = [];
-                            $seasonSources = [];
-                            $seasonMap = [];
-                            foreach ($seasonChunk as $season) {
-                                $seasonSource = $season->source_season_id ?? 'season-' . $season->id;
-                                $seasonSources[] = $seasonSource;
-                                $seasonRows[] = $season->replicate(except: ['id', 'series_id', 'category_id', 'playlist_id', 'created_at', 'updated_at'])->toArray() + [
-                                    'playlist_id' => $child->id,
-                                    'series_id' => $childSeriesId,
-                                    'category_id' => null,
-                                    'source_season_id' => $seasonSource,
-                                ];
-                                $seasonMap[$seasonSource] = $season->episodes;
-                            }
-                            $child->seasons()->upsert($seasonRows, Season::SOURCE_INDEX);
-                            unset($seasonRows);
-                            $child->seasons()->where('series_id', $childSeriesId)->whereNotIn('source_season_id', $seasonSources)->delete();
-                            $childSeasons = $child->seasons()->where('series_id', $childSeriesId)->whereIn('source_season_id', $seasonSources)->get()->keyBy('source_season_id');
-                            foreach ($seasonMap as $seasonSource => $episodesCollection) {
-                                $childSeasonId = $childSeasons[$seasonSource]->id;
-                                foreach ($episodesCollection->chunk(100) as $episodeChunk) {
-                                    $episodeRows = [];
-                                    $episodeSources = [];
-                                    foreach ($episodeChunk as $episode) {
-                                        $episodeSource = $episode->source_episode_id ?? 'ep-' . $episode->id;
-                                        $episodeSources[] = $episodeSource;
-                                        $episodeRows[] = $episode->replicate(except: ['id', 'season_id', 'series_id', 'playlist_id', 'created_at', 'updated_at'])->toArray() + [
-                                            'playlist_id' => $child->id,
-                                            'series_id' => $childSeriesId,
-                                            'season_id' => $childSeasonId,
-                                            'source_episode_id' => $episodeSource,
-                                        ];
-                                    }
-                                    $child->episodes()->upsert($episodeRows, ['playlist_id', 'source_episode_id']);
-                                    unset($episodeRows);
-                                    $child->episodes()->where('season_id', $childSeasonId)->whereNotIn('source_episode_id', $episodeSources)->delete();
-                                }
-                            }
-                        }
-                    }
-                });
-                $child->series()->whereNull('category_id')->where(function ($q) use ($uncatSeriesIds) {
-                    $q->whereNotIn('source_series_id', $uncatSeriesIds)
-                        ->orWhereNull('source_series_id');
-                })->delete();
 
                 if ($parent->uploads && Storage::disk('local')->exists($parent->uploads)) {
                     Storage::disk('local')->makeDirectory($child->folder_path);
@@ -371,6 +132,218 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
             // so new changes can dispatch another sync.
             Cache::forget("playlist-sync:{$parent->id}:queued");
         }
+    }
+
+    private function syncGroups(Playlist $parent, Playlist $child): void
+    {
+        $parentGroupNames = [];
+        $parent->groups()->with('channels.failovers')->chunkById(100, function ($groups) use ($child, &$parentGroupNames) {
+            $groupRows = [];
+            foreach ($groups as $group) {
+                $parentGroupNames[] = $group->name_internal;
+                $groupRows[] = $group->only(['name', 'name_internal', 'sort_order', 'user_id', 'is_custom']) + [
+                    'playlist_id' => $child->id,
+                ];
+            }
+            $child->groups()->upsert($groupRows, ['playlist_id', 'name_internal']);
+            unset($groupRows);
+
+            $names = $groups->pluck('name_internal');
+            $childGroups = $child->groups()->whereIn('name_internal', $names)->get()->keyBy('name_internal');
+            foreach ($groups as $group) {
+                $childGroupId = $childGroups[$group->name_internal]->id;
+                $channelSources = [];
+                $failovers = [];
+                $group->channels()->with('failovers')->chunkById(100, function ($channels) use ($child, $childGroupId, &$channelSources, &$failovers) {
+                    $channelRows = [];
+                    foreach ($channels as $channel) {
+                        $source = $channel->source_id ?? 'ch-' . $channel->id;
+                        $channelSources[] = $source;
+                        $channelRows[] = $channel->replicate(except: ['id', 'group_id', 'playlist_id', 'created_at', 'updated_at'])->toArray() + [
+                            'playlist_id' => $child->id,
+                            'group_id' => $childGroupId,
+                            'source_id' => $source,
+                        ];
+                        $failovers[$source] = $channel->failovers;
+                    }
+                    $child->channels()->upsert($channelRows, ['playlist_id', 'source_id']);
+                    unset($channelRows);
+                });
+
+                $child->channels()->where('group_id', $childGroupId)->where(function ($q) use ($channelSources) {
+                    $q->whereNotIn('source_id', $channelSources)
+                        ->orWhereNull('source_id');
+                })->delete();
+                $childChannels = $child->channels()->where('group_id', $childGroupId)->whereIn('source_id', $channelSources)->get()->keyBy('source_id');
+                foreach ($failovers as $source => $items) {
+                    $childChannel = $childChannels[$source];
+                    $childChannel->failovers()->delete();
+                    foreach ($items as $failover) {
+                        $newFailover = $failover->replicate(except: ['id', 'channel_id', 'created_at', 'updated_at']);
+                        $newFailover->channel_id = $childChannel->id;
+                        $newFailover->save();
+                    }
+                }
+                unset($channelSources, $failovers);
+            }
+        });
+        $child->groups()->whereNotIn('name_internal', $parentGroupNames)->delete();
+    }
+
+    private function syncCategories(Playlist $parent, Playlist $child): void
+    {
+        $parentCategoryIds = [];
+        $parent->categories()->chunkById(100, function ($categories) use ($child, &$parentCategoryIds) {
+            $categoryRows = [];
+            foreach ($categories as $category) {
+                $categorySource = $category->source_category_id ?? 'cat-' . $category->id;
+                $parentCategoryIds[] = $categorySource;
+                $categoryRows[] = $category->replicate(except: ['id', 'playlist_id', 'created_at', 'updated_at'])->toArray() + [
+                    'playlist_id' => $child->id,
+                    'source_category_id' => $categorySource,
+                ];
+            }
+            $child->categories()->upsert($categoryRows, Category::SOURCE_INDEX);
+            unset($categoryRows);
+
+            $sources = $categories->map(fn ($c) => $c->source_category_id ?? 'cat-' . $c->id);
+            $childCategories = $child->categories()->whereIn('source_category_id', $sources)->get()->keyBy('source_category_id');
+            foreach ($categories as $category) {
+                $catSource = $category->source_category_id ?? 'cat-' . $category->id;
+                $childCategoryId = $childCategories[$catSource]->id;
+                $category->series()->chunkById(100, function ($seriesChunk) use ($child, $childCategoryId) {
+                    $this->syncSeries($child, $seriesChunk->load('seasons.episodes'), $childCategoryId);
+                });
+            }
+        });
+        $child->categories()->whereNotIn('source_category_id', $parentCategoryIds)->delete();
+    }
+
+    private function syncSeries(Playlist $child, $seriesChunk, ?int $childCategoryId): array
+    {
+        $seriesRows = [];
+        $seriesSources = [];
+        $seriesMap = [];
+        foreach ($seriesChunk as $series) {
+            $seriesSource = $series->source_series_id ?? 'series-' . $series->id;
+            $seriesSources[] = $seriesSource;
+            $seriesRows[] = $series->replicate(except: ['id', 'category_id', 'playlist_id', 'created_at', 'updated_at'])->toArray() + [
+                'playlist_id' => $child->id,
+                'category_id' => $childCategoryId,
+                'source_series_id' => $seriesSource,
+            ];
+            $seriesMap[$seriesSource] = $series->seasons;
+        }
+        $child->series()->upsert($seriesRows, Series::SOURCE_INDEX);
+        unset($seriesRows);
+        $child->series()->where('category_id', $childCategoryId)->where(function ($q) use ($seriesSources) {
+            $q->whereNotIn('source_series_id', $seriesSources)
+                ->orWhereNull('source_series_id');
+        })->delete();
+        $childSeries = $child->series()->where('category_id', $childCategoryId)->whereIn('source_series_id', $seriesSources)->get()->keyBy('source_series_id');
+        foreach ($seriesMap as $seriesSource => $seasonsCollection) {
+            $childSeriesId = $childSeries[$seriesSource]->id;
+            $this->syncSeasons($child, $seasonsCollection, $childSeriesId, $childCategoryId);
+        }
+
+        return $seriesSources;
+    }
+
+    private function syncSeasons(Playlist $child, $seasonsCollection, int $childSeriesId, ?int $childCategoryId): void
+    {
+        foreach ($seasonsCollection->chunk(100) as $seasonChunk) {
+            $seasonRows = [];
+            $seasonSources = [];
+            $seasonMap = [];
+            foreach ($seasonChunk as $season) {
+                $seasonSource = $season->source_season_id ?? 'season-' . $season->id;
+                $seasonSources[] = $seasonSource;
+                $seasonRows[] = $season->replicate(except: ['id', 'series_id', 'category_id', 'playlist_id', 'created_at', 'updated_at'])->toArray() + [
+                    'playlist_id' => $child->id,
+                    'series_id' => $childSeriesId,
+                    'category_id' => $childCategoryId,
+                    'source_season_id' => $seasonSource,
+                ];
+                $seasonMap[$seasonSource] = $season->episodes;
+            }
+            $child->seasons()->upsert($seasonRows, Season::SOURCE_INDEX);
+            unset($seasonRows);
+            $child->seasons()->where('series_id', $childSeriesId)->whereNotIn('source_season_id', $seasonSources)->delete();
+            $childSeasons = $child->seasons()->where('series_id', $childSeriesId)->whereIn('source_season_id', $seasonSources)->get()->keyBy('source_season_id');
+            foreach ($seasonMap as $seasonSource => $episodesCollection) {
+                $childSeasonId = $childSeasons[$seasonSource]->id;
+                $this->syncEpisodes($child, $episodesCollection, $childSeriesId, $childSeasonId);
+            }
+        }
+    }
+
+    private function syncEpisodes(Playlist $child, $episodesCollection, int $childSeriesId, int $childSeasonId): void
+    {
+        foreach ($episodesCollection->chunk(100) as $episodeChunk) {
+            $episodeRows = [];
+            $episodeSources = [];
+            foreach ($episodeChunk as $episode) {
+                $episodeSource = $episode->source_episode_id ?? 'ep-' . $episode->id;
+                $episodeSources[] = $episodeSource;
+                $episodeRows[] = $episode->replicate(except: ['id', 'season_id', 'series_id', 'playlist_id', 'created_at', 'updated_at'])->toArray() + [
+                    'playlist_id' => $child->id,
+                    'series_id' => $childSeriesId,
+                    'season_id' => $childSeasonId,
+                    'source_episode_id' => $episodeSource,
+                ];
+            }
+            $child->episodes()->upsert($episodeRows, ['playlist_id', 'source_episode_id']);
+            unset($episodeRows);
+            $child->episodes()->where('season_id', $childSeasonId)->whereNotIn('source_episode_id', $episodeSources)->delete();
+        }
+    }
+
+    private function syncUngroupedChannels(Playlist $parent, Playlist $child): void
+    {
+        $ungroupedSources = [];
+        $parent->channels()->whereNull('group_id')->with('failovers')->chunkById(100, function ($channels) use ($child, &$ungroupedSources) {
+            $rows = [];
+            $failovers = [];
+            foreach ($channels as $channel) {
+                $source = $channel->source_id ?? 'ch-' . $channel->id;
+                $ungroupedSources[] = $source;
+                $rows[] = $channel->replicate(except: ['id', 'group_id', 'playlist_id', 'created_at', 'updated_at'])->toArray() + [
+                    'playlist_id' => $child->id,
+                    'group_id' => null,
+                    'source_id' => $source,
+                ];
+                $failovers[$source] = $channel->failovers;
+            }
+            $child->channels()->upsert($rows, ['playlist_id', 'source_id']);
+            unset($rows);
+            $childChannels = $child->channels()->whereNull('group_id')->whereIn('source_id', array_keys($failovers))->get()->keyBy('source_id');
+            foreach ($failovers as $source => $items) {
+                $childChannel = $childChannels[$source];
+                $childChannel->failovers()->delete();
+                foreach ($items as $failover) {
+                    $newFailover = $failover->replicate(except: ['id', 'channel_id', 'created_at', 'updated_at']);
+                    $newFailover->channel_id = $childChannel->id;
+                    $newFailover->save();
+                }
+            }
+        });
+        $child->channels()->whereNull('group_id')->where(function ($q) use ($ungroupedSources) {
+            $q->whereNotIn('source_id', $ungroupedSources)
+                ->orWhereNull('source_id');
+        })->delete();
+    }
+
+    private function syncUncategorizedSeries(Playlist $parent, Playlist $child): void
+    {
+        $uncatSeriesIds = [];
+        $parent->series()->whereNull('category_id')->chunkById(100, function ($seriesChunk) use ($child, &$uncatSeriesIds) {
+            $sources = $this->syncSeries($child, $seriesChunk->load('seasons.episodes'), null);
+            $uncatSeriesIds = array_merge($uncatSeriesIds, $sources);
+        });
+        $child->series()->whereNull('category_id')->where(function ($q) use ($uncatSeriesIds) {
+            $q->whereNotIn('source_series_id', $uncatSeriesIds)
+                ->orWhereNull('source_series_id');
+        })->delete();
     }
 
     /**
