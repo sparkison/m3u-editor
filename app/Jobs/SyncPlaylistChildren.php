@@ -24,6 +24,12 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
+     * Release the unique lock after an hour so a new sync can
+     * run if a previous job fails or never completes.
+     */
+    public $uniqueFor = 3600;
+
+    /**
      * @param  array<string, array<int, string>>  $changes
      */
     public function __construct(public Playlist $playlist, public array $changes = [])
