@@ -116,6 +116,7 @@ class ProcessM3uImport implements ShouldQueue
             'status' => Status::Processing,
             'errors' => null,
             'progress' => 0,
+            'series_progress' => 0,
         ]);
 
         // Determine if using Xtream API or M3U+
@@ -1021,8 +1022,7 @@ class ProcessM3uImport implements ShouldQueue
             // Add series processing to the chain
             $jobs[] = new ProcessM3uImportSeriesComplete(
                 playlist: $playlist,
-                batchNo: $batchNo,
-                fetchedMeta: false // flag as not fetching metadata (default is true)
+                batchNo: $batchNo
             );
         }
 
