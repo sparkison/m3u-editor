@@ -444,7 +444,7 @@ class Preferences extends SettingsPage
                                                     ->rules([new Cron()])
                                                     ->live()
                                                     ->helperText(fn($get) => CronExpression::isValidExpression($get('auto_backup_database_schedule'))
-                                                        ? 'Next schedules backup: ' . (new CronExpression($get('auto_backup_database_schedule')))->getNextRunDate()->format('Y-m-d H:i:s')
+                                                        ? 'Next scheduled backup: ' . (new CronExpression($get('auto_backup_database_schedule')))->getNextRunDate()->format('Y-m-d H:i:s')
                                                         : 'Specify the CRON schedule for automatic backups, e.g. "0 3 * * *".'),
                                                 TextInput::make('auto_backup_database_max_backups')
                                                     ->label('Max Backups')
