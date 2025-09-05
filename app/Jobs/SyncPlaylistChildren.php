@@ -24,6 +24,8 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    private const DEBOUNCE_TTL = 5;
+
     /**
      * @param  array<string, array<int, string>>  $changes
      */
@@ -52,13 +54,13 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
         foreach ($changes as $type => $ids) {
             $current[$type] = array_values(array_unique(array_merge($current[$type] ?? [], $ids)));
         }
-        Cache::put($key, $current, now()->addSeconds(5));
+        Cache::put($key, $current, now()->addSeconds(self::DEBOUNCE_TTL));
 
         // Prevent multiple jobs from being queued at once by reserving a
         // short window that matches the change-cache TTL. The flag is cleared
         // at the end of the job so subsequent edits can enqueue another sync.
-        if (Cache::add("{$key}:queued", true, 5)) {
-            self::dispatchAfterResponse($playlist)->delay(now()->addSecond());
+        if (Cache::add("{$key}:queued", true, self::DEBOUNCE_TTL)) {
+            self::dispatchAfterResponse($playlist)->delay(now()->addSeconds(self::DEBOUNCE_TTL));
         }
     }
 
