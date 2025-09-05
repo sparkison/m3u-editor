@@ -4,14 +4,15 @@ namespace App\Models;
 
 use App\Enums\ChannelLogoType;
 use App\Facades\ProxyFacade;
+use App\Models\Concerns\DispatchesPlaylistSync;
 use App\Services\XtreamService;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process as SymfonyProcess;
 use Spatie\Tags\HasTags;
@@ -20,6 +21,13 @@ class Channel extends Model
 {
     use HasFactory;
     use HasTags;
+    use DispatchesPlaylistSync;
+
+    protected function playlistSyncChanges(): array
+    {
+        $source = $this->source_id ?? 'ch-' . $this->id;
+        return ['channels' => [$source]];
+    }
 
     /**
      * The attributes that should be cast to native types.

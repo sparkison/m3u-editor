@@ -47,13 +47,15 @@ class VodResource extends Resource
     {
         return parent::getGlobalSearchEloquentQuery()
             ->where('user_id', auth()->id())
-            ->where('is_vod', true);
+            ->where('is_vod', true)
+            ->whereHas('playlist', fn (Builder $query) => $query->whereNull('parent_id'));
     }
 
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->where('is_vod', true);
+            ->where('is_vod', true)
+            ->whereHas('playlist', fn (Builder $query) => $query->whereNull('parent_id'));
     }
 
     protected static ?string $navigationGroup = 'Channels & VOD';
@@ -297,7 +299,7 @@ class VodResource extends Resource
     {
         return [
             Tables\Filters\SelectFilter::make('playlist')
-                ->relationship('playlist', 'name')
+                ->relationship('playlist', 'name', fn (Builder $query) => $query->whereNull('parent_id'))
                 ->hidden(fn() => !$showPlaylist)
                 ->multiple()
                 ->preload()

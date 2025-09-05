@@ -6,10 +6,20 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Concerns\DispatchesPlaylistSync;
 
 class Group extends Model
 {
     use HasFactory;
+    use DispatchesPlaylistSync;
+
+    protected function playlistSyncChanges(): array
+    {
+        return ['groups' => array_filter([
+            $this->name_internal,
+            $this->getOriginal('name_internal'),
+        ])];
+    }
 
     /**
      * The attributes that should be cast to native types.

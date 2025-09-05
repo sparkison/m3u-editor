@@ -6,6 +6,7 @@ use App\Filament\Resources\CategoryResource\Pages;
 use App\Filament\Resources\CategoryResource\RelationManagers;
 use App\Models\Category;
 use App\Models\CustomPlaylist;
+use App\Jobs\SyncPlaylistChildren;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -33,7 +34,14 @@ class CategoryResource extends Resource
     public static function getGlobalSearchEloquentQuery(): Builder
     {
         return parent::getGlobalSearchEloquentQuery()
-            ->where('user_id', auth()->id());
+            ->where('user_id', auth()->id())
+            ->whereHas('playlist', fn (Builder $query) => $query->whereNull('parent_id'));
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->whereHas('playlist', fn (Builder $query) => $query->whereNull('parent_id'));
     }
 
     protected static ?string $navigationGroup = 'Series';
@@ -97,7 +105,7 @@ class CategoryResource extends Resource
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('playlist')
-                    ->relationship('playlist', 'name')
+                    ->relationship('playlist', 'name', fn (Builder $query) => $query->whereNull('parent_id'))
                     ->multiple()
                     ->preload()
                     ->searchable(),
@@ -168,6 +176,7 @@ class CategoryResource extends Resource
                             $record->series()->update([
                                 'category_id' => $category->id,
                             ]);
+                            SyncPlaylistChildren::debounce($record->playlist, []);
                         })->after(function () {
                             Notification::make()
                                 ->success()
@@ -229,6 +238,7 @@ class CategoryResource extends Resource
                         ->label('Enable selected')
                         ->action(function ($record): void {
                             $record->series()->update(['enabled' => true]);
+                            SyncPlaylistChildren::debounce($record->playlist, []);
                         })->after(function () {
                             Notification::make()
                                 ->success()
@@ -247,6 +257,7 @@ class CategoryResource extends Resource
                         ->label('Disable selected')
                         ->action(function ($record): void {
                             $record->series()->update(['enabled' => false]);
+                            SyncPlaylistChildren::debounce($record->playlist, []);
                         })->after(function () {
                             Notification::make()
                                 ->success()
@@ -354,6 +365,7 @@ class CategoryResource extends Resource
                                 $record->series()->update([
                                     'category_id' => $category->id,
                                 ]);
+                                SyncPlaylistChildren::debounce($record->playlist, []);
                             }
                         })->after(function () {
                             Notification::make()
@@ -421,6 +433,7 @@ class CategoryResource extends Resource
                         ->action(function (Collection $records): void {
                             foreach ($records as $record) {
                                 $record->series()->update(['enabled' => true]);
+                                SyncPlaylistChildren::debounce($record->playlist, []);
                             }
                         })->after(function () {
                             Notification::make()
@@ -441,6 +454,7 @@ class CategoryResource extends Resource
                         ->action(function (Collection $records): void {
                             foreach ($records as $record) {
                                 $record->series()->update(['enabled' => false]);
+                                SyncPlaylistChildren::debounce($record->playlist, []);
                             }
                         })->after(function () {
                             Notification::make()

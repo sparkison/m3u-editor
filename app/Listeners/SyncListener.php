@@ -34,6 +34,10 @@ class SyncListener
                     $lastSync
                 ));
             });
+
+            if (!$event->model->parent_id && $event->model->children()->exists()) {
+                dispatch(new \App\Jobs\SyncPlaylistChildren($event->model));
+            }
         }
         if ($event->model instanceof \App\Models\Epg) {
             $event->model->postProcesses()->where([
