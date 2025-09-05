@@ -33,6 +33,7 @@ use App\Livewire\PlaylistM3uUrl;
 use App\Livewire\XtreamApiInfo;
 use App\Models\SourceGroup;
 use App\Services\EpgCacheService;
+use App\Jobs\SyncPlaylistChildren;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Illuminate\Contracts\Support\Htmlable;
@@ -96,7 +97,9 @@ class PlaylistResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->formatStateUsing(fn($state, Playlist $record) => $record->parent_id ? '↳ '.$state : $state)
+                    ->extraAttributes(fn(Playlist $record) => $record->parent_id ? ['class' => 'pl-6'] : []),
                 Tables\Columns\TextColumn::make('url')
                     ->label('Playlist URL')
                     ->wrap()
@@ -113,7 +116,8 @@ class PlaylistResource extends Resource
                     ->label('Groups')
                     ->counts('groups')
                     ->toggleable()
-                    ->sortable(),
+                    ->sortable()
+                    ->hidden(fn(Playlist $record): bool => $record->parent_id !== null),
                 // Tables\Columns\TextColumn::make('channels_count')
                 //     ->label('Channels')
                 //     ->counts('channels')
@@ -125,19 +129,22 @@ class PlaylistResource extends Resource
                     ->counts('live_channels')
                     ->description(fn(Playlist $record): string => "Enabled: {$record->enabled_live_channels_count}")
                     ->toggleable()
-                    ->sortable(),
+                    ->sortable()
+                    ->hidden(fn(Playlist $record): bool => $record->parent_id !== null),
                 Tables\Columns\TextColumn::make('vod_channels_count')
                     ->label('VOD')
                     ->counts('vod_channels')
                     ->description(fn(Playlist $record): string => "Enabled: {$record->enabled_vod_channels_count}")
                     ->toggleable()
-                    ->sortable(),
+                    ->sortable()
+                    ->hidden(fn(Playlist $record): bool => $record->parent_id !== null),
                 Tables\Columns\TextColumn::make('series_count')
                     ->label('Series')
                     ->counts('series')
                     ->description(fn(Playlist $record): string => "Enabled: {$record->enabled_series_count}")
                     ->toggleable()
-                    ->sortable(),
+                    ->sortable()
+                    ->hidden(fn(Playlist $record): bool => $record->parent_id !== null),
                 Tables\Columns\TextColumn::make('status')
                     ->sortable()
                     ->badge()
@@ -225,6 +232,7 @@ class PlaylistResource extends Resource
                                 ->send();
                         })
                         ->disabled(fn($record): bool => $record->status === Status::Processing)
+                        ->hidden(fn($record): bool => $record->parent_id !== null)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
@@ -249,7 +257,7 @@ class PlaylistResource extends Resource
                                 ->send();
                         })
                         ->disabled(fn($record): bool => $record->status === Status::Processing)
-                        ->hidden(fn($record): bool => !$record->xtream)
+                        ->hidden(fn($record): bool => !$record->xtream || $record->parent_id !== null)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-down-tray')
                         ->modalIcon('heroicon-o-arrow-down-tray')
@@ -274,7 +282,7 @@ class PlaylistResource extends Resource
                                 ->send();
                         })
                         ->disabled(fn($record): bool => $record->status === Status::Processing)
-                        ->hidden(fn($record): bool => !$record->xtream)
+                        ->hidden(fn($record): bool => !$record->xtream || $record->parent_id !== null)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-down-tray')
                         ->modalIcon('heroicon-o-arrow-down-tray')
@@ -315,6 +323,43 @@ class PlaylistResource extends Resource
                         ->modalIcon('heroicon-o-document-duplicate')
                         ->modalDescription('Duplicate playlist now?')
                         ->modalSubmitActionLabel('Yes, duplicate now'),
+                    Tables\Actions\Action::make('Duplicate with Sync')
+                        ->label('Duplicate with Sync')
+                        ->form([
+                            Forms\Components\TextInput::make('name')
+                                ->label('Playlist name')
+                                ->required()
+                                ->helperText('This will be the name of the duplicated playlist.'),
+                        ])
+                        ->action(function ($record, $data) {
+                            app('Illuminate\\Contracts\\Bus\\Dispatcher')
+                                ->dispatch(new \App\Jobs\DuplicatePlaylist($record, $data['name'], true));
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Playlist is being duplicated with sync')
+                                ->body('Playlist is being duplicated in the background. You will be notified on completion.')
+                                ->duration(3000)
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-link')
+                        ->modalIcon('heroicon-o-link')
+                        ->modalDescription('Duplicate playlist with sync now?')
+                        ->modalSubmitActionLabel('Yes, duplicate with sync')
+                        ->hidden(fn($record) => $record->parent_id !== null),
+                    Tables\Actions\Action::make('Unsync')
+                        ->label('Unsync')
+                        ->action(fn($record) => $record->update(['parent_id' => null]))
+                        ->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Playlist unsynced')
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-link-slash')
+                        ->hidden(fn($record) => $record->parent_id === null),
                     Tables\Actions\Action::make('Sync Logs')
                         ->label('View Sync Logs')
                         ->color('gray')
@@ -377,6 +422,7 @@ class PlaylistResource extends Resource
                         ->color('danger')
                         ->action(function ($record) {
                             $record->series()->delete();
+                            SyncPlaylistChildren::debounce($record, []);
                         })
                         ->requiresConfirmation()
                         ->icon('heroicon-s-trash')
@@ -533,6 +579,7 @@ class PlaylistResource extends Resource
                             ->send();
                     })
                     ->disabled(fn($record): bool => $record->status === Status::Processing)
+                    ->hidden(fn($record): bool => $record->parent_id !== null)
                     ->requiresConfirmation()
                     ->icon('heroicon-o-arrow-path')
                     ->modalIcon('heroicon-o-arrow-path')
@@ -557,7 +604,7 @@ class PlaylistResource extends Resource
                             ->send();
                     })
                     ->disabled(fn($record): bool => $record->status === Status::Processing)
-                    ->hidden(fn($record): bool => !$record->xtream)
+                    ->hidden(fn($record): bool => !$record->xtream || $record->parent_id !== null)
                     ->requiresConfirmation()
                     ->icon('heroicon-o-arrow-down-tray')
                     ->modalIcon('heroicon-o-arrow-down-tray')
@@ -582,7 +629,7 @@ class PlaylistResource extends Resource
                             ->send();
                     })
                     ->disabled(fn($record): bool => $record->status === Status::Processing)
-                    ->hidden(fn($record): bool => !$record->xtream)
+                    ->hidden(fn($record): bool => !$record->xtream || $record->parent_id !== null)
                     ->requiresConfirmation()
                     ->icon('heroicon-o-arrow-down-tray')
                     ->modalIcon('heroicon-o-arrow-down-tray')
@@ -623,6 +670,43 @@ class PlaylistResource extends Resource
                     ->modalIcon('heroicon-o-document-duplicate')
                     ->modalDescription('Duplicate playlist now?')
                     ->modalSubmitActionLabel('Yes, duplicate now'),
+                Actions\Action::make('Duplicate with Sync')
+                    ->label('Duplicate with Sync')
+                    ->form([
+                        Forms\Components\TextInput::make('name')
+                            ->label('Playlist name')
+                            ->required()
+                            ->helperText('This will be the name of the duplicated playlist.'),
+                    ])
+                    ->action(function ($record, $data) {
+                            app('Illuminate\\Contracts\\Bus\\Dispatcher')
+                            ->dispatch(new \App\Jobs\DuplicatePlaylist($record, $data['name'], true));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Playlist is being duplicated with sync')
+                            ->body('Playlist is being duplicated in the background. You will be notified on completion.')
+                            ->duration(3000)
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-link')
+                    ->modalIcon('heroicon-o-link')
+                    ->modalDescription('Duplicate playlist with sync now?')
+                    ->modalSubmitActionLabel('Yes, duplicate with sync')
+                    ->hidden(fn($record) => $record->parent_id !== null),
+                Actions\Action::make('Unsync')
+                    ->label('Unsync')
+                    ->action(fn($record) => $record->update(['parent_id' => null]))
+                    ->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Playlist unsynced')
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-link-slash')
+                    ->hidden(fn($record) => $record->parent_id === null),
                 Actions\Action::make('reset')
                     ->label('Reset status')
                     ->icon('heroicon-o-arrow-uturn-left')

@@ -39,7 +39,14 @@ class SeriesResource extends Resource
     public static function getGlobalSearchEloquentQuery(): Builder
     {
         return parent::getGlobalSearchEloquentQuery()
-            ->where('user_id', auth()->id());
+            ->where('user_id', auth()->id())
+            ->whereHas('playlist', fn (Builder $query) => $query->whereNull('parent_id'));
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->whereHas('playlist', fn (Builder $query) => $query->whereNull('parent_id'));
     }
 
     protected static ?string $navigationGroup = 'Series';
@@ -142,7 +149,7 @@ class SeriesResource extends Resource
     {
         return [
             Tables\Filters\SelectFilter::make('playlist')
-                ->relationship('playlist', 'name')
+                ->relationship('playlist', 'name', fn (Builder $query) => $query->whereNull('parent_id'))
                 ->multiple()
                 ->preload()
                 ->searchable()

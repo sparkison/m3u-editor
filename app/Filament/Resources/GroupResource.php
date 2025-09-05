@@ -7,6 +7,7 @@ use App\Filament\Resources\GroupResource\RelationManagers;
 use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Models\Playlist;
+use App\Jobs\SyncPlaylistChildren;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -34,7 +35,14 @@ class GroupResource extends Resource
     public static function getGlobalSearchEloquentQuery(): Builder
     {
         return parent::getGlobalSearchEloquentQuery()
-            ->where('user_id', auth()->id());
+            ->where('user_id', auth()->id())
+            ->whereHas('playlist', fn (Builder $query) => $query->whereNull('parent_id'));
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->whereHas('playlist', fn (Builder $query) => $query->whereNull('parent_id'));
     }
 
     protected static ?string $navigationGroup = 'Channels & VOD';
@@ -121,7 +129,7 @@ class GroupResource extends Resource
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('playlist')
-                    ->relationship('playlist', 'name')
+                    ->relationship('playlist', 'name', fn (Builder $query) => $query->whereNull('parent_id'))
                     ->multiple()
                     ->preload()
                     ->searchable(),
@@ -193,6 +201,7 @@ class GroupResource extends Resource
                                 'group' => $group->name,
                                 'group_id' => $group->id,
                             ]);
+                            SyncPlaylistChildren::debounce($record->playlist, []);
                         })->after(function () {
                             Notification::make()
                                 ->success()
@@ -212,6 +221,7 @@ class GroupResource extends Resource
                             $record->channels()->update([
                                 'enabled' => true,
                             ]);
+                            SyncPlaylistChildren::debounce($record->playlist, []);
                         })->after(function () {
                             Notification::make()
                                 ->success()
@@ -231,6 +241,7 @@ class GroupResource extends Resource
                             $record->channels()->update([
                                 'enabled' => false,
                             ]);
+                            SyncPlaylistChildren::debounce($record->playlist, []);
                         })->after(function () {
                             Notification::make()
                                 ->success()
@@ -341,6 +352,7 @@ class GroupResource extends Resource
                                     'group' => $group->name,
                                     'group_id' => $group->id,
                                 ]);
+                                SyncPlaylistChildren::debounce($record->playlist, []);
                             }
                         })->after(function () {
                             Notification::make()
@@ -361,6 +373,7 @@ class GroupResource extends Resource
                                 $record->channels()->update([
                                     'enabled' => true,
                                 ]);
+                                SyncPlaylistChildren::debounce($record->playlist, []);
                             }
                         })->after(function () {
                             Notification::make()
@@ -383,6 +396,7 @@ class GroupResource extends Resource
                                 $record->channels()->update([
                                     'enabled' => false,
                                 ]);
+                                SyncPlaylistChildren::debounce($record->playlist, []);
                             }
                         })->after(function () {
                             Notification::make()

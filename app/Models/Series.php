@@ -12,11 +12,21 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Log;
 use Spatie\Tags\HasTags;
 use Illuminate\Support\Str;
+use App\Models\Concerns\DispatchesPlaylistSync;
 
 class Series extends Model
 {
     use HasFactory;
     use HasTags;
+    use DispatchesPlaylistSync;
+
+    public const SOURCE_INDEX = ['playlist_id', 'source_series_id'];
+
+    protected function playlistSyncChanges(): array
+    {
+        $source = $this->source_series_id ?? 'series-' . $this->id;
+        return ['series' => [$source]];
+    }
 
     /**
      * The attributes that should be cast to native types.

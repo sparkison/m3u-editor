@@ -6,10 +6,20 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Concerns\DispatchesPlaylistSync;
 
 class Category extends Model
 {
     use HasFactory;
+    use DispatchesPlaylistSync;
+
+    public const SOURCE_INDEX = ['playlist_id', 'source_category_id'];
+
+    protected function playlistSyncChanges(): array
+    {
+        $source = $this->source_category_id ?? 'cat-' . $this->id;
+        return ['categories' => [$source]];
+    }
 
     /**
      * The attributes that should be cast to native types.

@@ -7,10 +7,18 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process as SymfonyProcess;
+use App\Models\Concerns\DispatchesPlaylistSync;
 
 class Episode extends Model
 {
     use HasFactory;
+    use DispatchesPlaylistSync;
+
+    protected function playlistSyncChanges(): array
+    {
+        $source = $this->source_episode_id ?? 'ep-' . $this->id;
+        return ['episodes' => [$source]];
+    }
 
     /**
      * The attributes that should be cast to native types.

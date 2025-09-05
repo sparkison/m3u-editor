@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\Channel;
 use App\Models\Playlist;
 use App\Services\XtreamService;
+use App\Events\SyncCompleted;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -150,5 +151,7 @@ class ProcessVodChannels implements ShouldQueue
                 ->broadcast($playlist->user)
                 ->sendToDatabase($playlist->user);
         }
+
+        event(new SyncCompleted($playlist));
     }
 }

@@ -5,6 +5,7 @@ namespace App\Filament\Resources\GroupResource\Pages;
 use App\Filament\Resources\GroupResource;
 use App\Models\CustomPlaylist;
 use App\Models\Group;
+use App\Jobs\SyncPlaylistChildren;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Forms\Get;
@@ -54,6 +55,7 @@ class ViewGroup extends ViewRecord
                         if ($data['category']) {
                             $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
                         }
+                        SyncPlaylistChildren::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
                         Notification::make()
@@ -84,6 +86,7 @@ class ViewGroup extends ViewRecord
                             'group' => $group->name,
                             'group_id' => $group->id,
                         ]);
+                        SyncPlaylistChildren::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
                         Notification::make()
@@ -104,6 +107,7 @@ class ViewGroup extends ViewRecord
                         $record->channels()->update([
                             'enabled' => true,
                         ]);
+                        SyncPlaylistChildren::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
                         Notification::make()
@@ -124,6 +128,7 @@ class ViewGroup extends ViewRecord
                         $record->channels()->update([
                             'enabled' => false,
                         ]);
+                        SyncPlaylistChildren::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
                         Notification::make()

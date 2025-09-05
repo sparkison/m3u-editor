@@ -4,7 +4,10 @@ namespace Tests\Unit;
 
 use App\Jobs\MergeChannels;
 use App\Models\Channel;
+use App\Models\Playlist;
 use App\Models\User;
+use PHPUnit\Framework\Attributes\Test;
+use Mockery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Tests\TestCase;
@@ -13,24 +16,23 @@ class MergeChannelsTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
-    public function it_does_not_merge_channels_with_empty_stream_ids()
+    #[Test]
+    public function it_does_not_merge_channels_with_empty_stream_ids(): void
     {
-        // Create a user
         $user = User::factory()->create();
+        $playlist = Playlist::factory()->create(['user_id' => $user->id]);
 
-        // Create channels
-        $channel1 = Channel::factory()->create(['stream_id' => 'stream1', 'user_id' => $user->id]);
-        $channel2 = Channel::factory()->create(['stream_id' => 'stream1', 'user_id' => $user->id]);
-        $channel3 = Channel::factory()->create(['stream_id' => '', 'user_id' => $user->id]);
-        $channel4 = Channel::factory()->create(['stream_id' => null, 'user_id' => $user->id]);
+        Channel::factory()->create(['stream_id' => 'stream1', 'user_id' => $user->id, 'playlist_id' => $playlist->id]);
+        Channel::factory()->create(['stream_id' => 'stream1', 'user_id' => $user->id, 'playlist_id' => $playlist->id]);
+        Channel::factory()->create(['stream_id' => '', 'user_id' => $user->id, 'playlist_id' => $playlist->id]);
+        Channel::factory()->create(['stream_id' => null, 'user_id' => $user->id, 'playlist_id' => $playlist->id]);
 
-        $channels = new Collection([$channel1, $channel2, $channel3, $channel4]);
+        $job = Mockery::mock(MergeChannels::class, [$user, new Collection([$playlist->id]), $playlist->id])
+            ->makePartial()
+            ->shouldAllowMockingProtectedMethods();
+        $job->shouldReceive('sendCompletionNotification');
+        $job->handle();
 
-        // Dispatch the job
-        MergeChannels::dispatch($channels, $user);
-
-        // Assert that only the channels with the same stream_id were merged
         $this->assertDatabaseCount('channel_failovers', 1);
     }
 }
