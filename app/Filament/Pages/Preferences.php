@@ -3,8 +3,10 @@
 namespace App\Filament\Pages;
 
 use App\Rules\CheckIfUrlOrLocalPath;
+use App\Rules\Cron;
 use App\Settings\GeneralSettings;
 use App\Services\FfmpegCodecService;
+use Cron\CronExpression;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -426,7 +428,11 @@ class Preferences extends SettingsPage
                                                 Forms\Components\TextInput::make('auto_backup_database_schedule')
                                                     ->label('Backup Schedule')
                                                     ->suffix(config('app.timezone'))
-                                                    ->helperText('Specify the CRON schedule for automatic backups, e.g. "0 3 * * *".'),
+                                                    ->rules([new Cron()])
+                                                    ->live()
+                                                    ->helperText(fn($get) => CronExpression::isValidExpression($get('auto_backup_database_schedule'))
+                                                        ? 'Next scheduled backup: ' . (new CronExpression($get('auto_backup_database_schedule')))->getNextRunDate()->format('Y-m-d H:i:s')
+                                                        : 'Specify the CRON schedule for automatic backups, e.g. "0 3 * * *".'),
                                                 Forms\Components\TextInput::make('auto_backup_database_max_backups')
                                                     ->label('Max Backups')
                                                     ->type('number')
