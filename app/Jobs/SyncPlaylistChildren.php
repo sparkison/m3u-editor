@@ -74,10 +74,13 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
 
             $parent->children()->chunkById(100, function ($children) use ($parent) {
                 foreach ($children as $child) {
-                    DB::transaction(function () use ($parent, $child) {
+                    DB::beginTransaction();
+                    $copiedFile = null;
+                    try {
                         if (! empty($this->changes)) {
                             $this->syncDelta($parent, $child, $this->changes);
-                            return;
+                            DB::commit();
+                            continue;
                         }
 
                         $now = now();
@@ -330,6 +333,7 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
                     if (! Storage::disk('local')->copy($parent->uploads, $child->file_path)) {
                         throw new \RuntimeException("Failed to copy uploaded file for child playlist {$child->id}");
                     }
+                    $copiedFile = $child->file_path;
                     $child->uploads = $child->file_path;
                 } elseif ($child->uploads) {
                     Storage::disk('local')->delete($child->uploads);
@@ -337,7 +341,14 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
                 }
 
                 $child->save();
-            });
+                DB::commit();
+            } catch (\Throwable $e) {
+                DB::rollBack();
+                if ($copiedFile && Storage::disk('local')->exists($copiedFile)) {
+                    Storage::disk('local')->delete($copiedFile);
+                }
+                throw $e;
+            }
         }
         });
 
