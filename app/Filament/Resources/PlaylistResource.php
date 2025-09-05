@@ -31,6 +31,7 @@ use App\Livewire\PlaylistEpgUrl;
 use App\Livewire\PlaylistInfo;
 use App\Livewire\PlaylistM3uUrl;
 use App\Livewire\XtreamApiInfo;
+use App\Models\Category;
 use App\Models\SourceGroup;
 use App\Services\EpgCacheService;
 use Filament\Infolists;
@@ -954,32 +955,63 @@ class PlaylistResource extends Resource
                         ->default(false)
                         ->helperText('When enabled, groups will be included based on regex pattern match instead of prefix.')
                         ->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
-                    Forms\Components\Select::make('import_prefs.selected_groups')
-                        ->label('Groups to import')
-                        ->columnSpan(1)
-                        ->searchable()
-                        ->multiple()
-                        ->helperText('NOTE: If the list is empty, sync the playlist and check again once complete.')
-                        ->options(
-                            fn($record): array =>
-                            SourceGroup::where('playlist_id', $record->id)
-                                ->get()->pluck('name', 'name')->toArray()
-                        )
-                        ->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
-                    Forms\Components\TagsInput::make('import_prefs.included_group_prefixes')
-                        ->label(fn(Get $get) => !$get('import_prefs.use_regex') ? 'Group prefixes to import' : 'Regex patterns to import')
-                        ->helperText('Press [tab] or [return] to add item.')
-                        ->columnSpan(1)
-                        ->suggestions([
-                            'US -',
-                            'UK -',
-                            'CA -',
-                            '^(US|UK|CA)',
-                            'Sports.*HD$',
-                            '\[.*\]'
-                        ])
-                        ->splitKeys(['Tab', 'Return'])
-                        ->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
+
+                    Forms\Components\Fieldset::make('Channel & VOD processing')
+                        ->schema([
+                            Forms\Components\Select::make('import_prefs.selected_groups')
+                                ->label('Groups to import')
+                                ->columnSpan(1)
+                                ->searchable()
+                                ->multiple()
+                                ->helperText('NOTE: If the list is empty, sync the playlist and check again once complete.')
+                                ->options(
+                                    fn($record): array =>
+                                    SourceGroup::where('playlist_id', $record->id)
+                                        ->get()->pluck('name', 'name')->toArray()
+                                ),
+                            Forms\Components\TagsInput::make('import_prefs.included_group_prefixes')
+                                ->label(fn(Get $get) => !$get('import_prefs.use_regex') ? 'Group prefixes to import' : 'Regex patterns to import')
+                                ->helperText('Press [tab] or [return] to add item.')
+                                ->columnSpan(1)
+                                ->suggestions([
+                                    'US -',
+                                    'UK -',
+                                    'CA -',
+                                    '^(US|UK|CA)',
+                                    'Sports.*HD$',
+                                    '\[.*\]'
+                                ])
+                                ->splitKeys(['Tab', 'Return']),
+                        ])->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
+
+                    Forms\Components\Fieldset::make('Series processing')
+                        ->schema([
+                            Forms\Components\Select::make('import_prefs.selected_categories')
+                                ->label('Categories to import')
+                                ->columnSpan(1)
+                                ->searchable()
+                                ->multiple()
+                                ->helperText('NOTE: If the list is empty, sync the playlist and check again once complete.')
+                                ->options(
+                                    fn($record): array =>
+                                    Category::where('playlist_id', $record->id)
+                                        ->get()->pluck('name', 'name')->toArray()
+                                ),
+                            Forms\Components\TagsInput::make('import_prefs.included_category_prefixes')
+                                ->label(fn(Get $get) => !$get('import_prefs.use_regex') ? 'Category prefixes to import' : 'Regex patterns to import')
+                                ->helperText('Press [tab] or [return] to add item.')
+                                ->columnSpan(1)
+                                ->suggestions([
+                                    'US -',
+                                    'UK -',
+                                    'CA -',
+                                    '^(US|UK|CA)',
+                                    'Sports.*HD$',
+                                    '\[.*\]'
+                                ])
+                                ->splitKeys(['Tab', 'Return']),
+                        ])->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
+
                     Forms\Components\TagsInput::make('import_prefs.ignored_file_types')
                         ->label('Ignored file types')
                         ->helperText('Press [tab] or [return] to add item. You can ignore certain file types from being imported (.e.g.: ".mkv", ".mp4", etc.) This is useful for ignoring VOD or other unwanted content.')
