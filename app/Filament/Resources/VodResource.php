@@ -379,6 +379,26 @@ class VodResource extends Resource
                     ->modalIcon('heroicon-o-arrow-down-tray')
                     ->modalDescription('Fetch and process VOD metadata for the selected channel.')
                     ->modalSubmitActionLabel('Yes, process now'),
+                Tables\Actions\Action::make('sync')
+                    ->label('Sync VOD .strm file')
+                    ->action(function ($record) {
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new \App\Jobs\SyncVodStrmFiles(
+                                channel: $record,
+                            ));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('VOD .strm file is being synced now')
+                            ->body('You will be notified once complete.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->modalIcon('heroicon-o-document-arrow-down')
+                    ->modalDescription('Sync VOD .strm files now? This will generate .strm files for this VOD channel at the path set for this channel.')
+                    ->modalSubmitActionLabel('Yes, sync now'),
                 Tables\Actions\DeleteAction::make()->hidden(fn(Model $record) => !$record->is_custom),
             ])->button()->hiddenLabel()->size('sm'),
             Tables\Actions\ViewAction::make()
@@ -511,6 +531,28 @@ class VodResource extends Resource
                     ->modalIcon('heroicon-o-arrow-down-tray')
                     ->modalDescription('Fetch and process VOD metadata for the selected channels? Only VOD channels will be processed.')
                     ->modalSubmitActionLabel('Yes, process now'),
+                Tables\Actions\BulkAction::make('sync')
+                    ->label('Sync VOD .strm files')
+                    ->action(function ($records) {
+                        foreach ($records as $record) {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new \App\Jobs\SyncVodStrmFiles(
+                                    channel: $record
+                                ));
+                        }
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('.strm files are being synced for selected VOD channels')
+                            ->body('You will be notified once complete.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->modalIcon('heroicon-o-document-arrow-down')
+                    ->modalDescription('Sync selected VOD .strm files now? This will generate .strm files for the selected VOD channels at the path set for the channels.')
+                    ->modalSubmitActionLabel('Yes, sync now'),
                 Tables\Actions\BulkAction::make('map')
                     ->label('Map EPG to selected')
                     ->form(EpgMapResource::getForm(showPlaylist: false, showEpg: true))
