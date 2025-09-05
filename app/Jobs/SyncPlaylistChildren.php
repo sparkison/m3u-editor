@@ -11,6 +11,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -64,6 +65,13 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
     public function handle(): void
     {
         $parent = $this->playlist->fresh();
+
+        if (! $parent) {
+            Log::warning("SyncPlaylistChildren: Parent playlist {$this->playlist->id} not found, clearing queued flag and aborting child sync.");
+            Cache::forget("playlist-sync:{$this->playlist->id}");
+            Cache::forget("playlist-sync:{$this->playlist->id}:queued");
+            return;
+        }
 
         try {
             if (empty($this->changes)) {
