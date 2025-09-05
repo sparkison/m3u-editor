@@ -6,6 +6,7 @@ use Throwable;
 use Exception;
 use App\Enums\Status;
 use App\Events\SyncCompleted;
+use App\Models\Category;
 use App\Models\Group;
 use App\Models\Job;
 use App\Models\Playlist;
@@ -62,6 +63,12 @@ class ProcessM3uImport implements ShouldQueue
     // Available groups for the playlist
     public array $groups = [];
 
+    // Selected categories for import
+    public array $selectedCategories;
+
+    // Included category prefixes for import
+    public array $includedCategoryPrefixes;
+
     // M3U Parser instance
     public $m3uParser = null;
 
@@ -80,6 +87,10 @@ class ProcessM3uImport implements ShouldQueue
         $this->useRegex = $playlist->import_prefs['use_regex'] ?? false;
         $this->selectedGroups = $playlist->import_prefs['selected_groups'] ?? [];
         $this->includedGroupPrefixes = $playlist->import_prefs['included_group_prefixes'] ?? [];
+
+        // Selected categories for import
+        $this->selectedCategories = $playlist->import_prefs['selected_categories'] ?? [];
+        $this->includedCategoryPrefixes = $playlist->import_prefs['included_category_prefixes'] ?? [];
     }
 
     /**
@@ -910,6 +921,25 @@ class ProcessM3uImport implements ShouldQueue
             );
         }
 
+        // Create the series categories (needed for pre-processing)
+        if ($seriesCategories && $seriesCategories->count() > 0) {
+            foreach ($seriesCategories as $category) {
+                $category = Category::where([
+                    'playlist_id' => $playlist->id,
+                    'source_category_id' => $category['category_id'],
+                ])->first();
+                if (!$category) {
+                    Category::create([
+                        'playlist_id' => $playlist->id,
+                        'name' => $category['category_name'],
+                        'name_internal' => $category['category_name'],
+                        'source_category_id' => $category['category_id'],
+                        'user_id' => $playlist->user_id,
+                    ]);
+                }
+            }
+        }
+
         // Check if preprocessing, and no prefixes or groups selected yet
         if ($preProcessing) {
             // Flag as complete and notify user
@@ -973,17 +1003,19 @@ class ProcessM3uImport implements ShouldQueue
         if ($seriesCategories) {
             $categoryCount = $seriesCategories->count();
             $seriesCategories->each(function ($category, $index) use (&$jobs, $playlistId, $batchNo, $categoryCount) {
-                // Create a job for each series category
-                $jobs[] = new ProcessM3uImportSeriesChunk(
-                    [
-                        'categoryId' => $category['category_id'],
-                        'categoryName' => $category['category_name'],
-                        'playlistId' => $playlistId,
-                    ],
-                    $categoryCount,
-                    $batchNo,
-                    $index,
-                );
+                if ($this->shouldIncludeSeries($category['category_name'] ?? '')) {
+                    // Create a job for each series category
+                    $jobs[] = new ProcessM3uImportSeriesChunk(
+                        [
+                            'categoryId' => $category['category_id'],
+                            'categoryName' => $category['category_name'],
+                            'playlistId' => $playlistId,
+                        ],
+                        $categoryCount,
+                        $batchNo,
+                        $index,
+                    );
+                }
             });
 
             // Add series processing to the chain
@@ -1052,6 +1084,43 @@ class ProcessM3uImport implements ShouldQueue
                 } else {
                     // Use simple string prefix matching
                     if (str_starts_with($groupName, $pattern)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Determine if the Series should be included
+     *
+     * @param string $categoryName
+     */
+    private function shouldIncludeSeries($categoryName): bool
+    {
+        // Check if category is selected...
+        if (in_array(
+            $categoryName,
+            $this->selectedCategories
+        )) {
+            // Category selected directly
+            return true;
+        } else {
+            // ...if category not selected, check if category starts with any of the included prefixes
+            // (only check if the category isn't directly included already)
+            foreach ($this->includedCategoryPrefixes as $pattern) {
+                if ($this->useRegex) {
+                    // Escape existing delimiters in user input
+                    $delimiter = '/';
+                    $escapedPattern = str_replace($delimiter, '\\' . $delimiter, $pattern);
+                    $finalPattern = $delimiter . $escapedPattern . $delimiter . 'u';
+                    if (preg_match($finalPattern, $categoryName)) {
+                        return true;
+                    }
+                } else {
+                    // Use simple string prefix matching
+                    if (str_starts_with($categoryName, $pattern)) {
                         return true;
                     }
                 }
