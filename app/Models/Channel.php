@@ -211,6 +211,9 @@ class Channel extends Model
                     ->sendToDatabase($playlist->user);
                 return;
             }
+            if (!$this->is_vod) {
+                return false;
+            }
             $movieData = $xtream->getVodInfo($this->source_id);
             $this->update([
                 'info' => $movieData['info'] ?? null,

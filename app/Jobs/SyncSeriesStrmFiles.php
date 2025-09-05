@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use Exception;
+use App\Facades\ProxyFacade;
 use App\Models\Series;
 use App\Settings\GeneralSettings;
 use Filament\Notifications\Notification;
@@ -31,6 +31,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
     {
         // Get all the series episodes
         $series = $this->series;
+        $playlist = $series->playlist;
         try {
             // Get playlist sync settings
             $sync_settings = $series->sync_settings;
@@ -123,16 +124,26 @@ class SyncSeriesStrmFiles implements ShouldQueue
                     $filePath = $path . '/' . $fileName;
                 }
 
+                // Get the url
+                $url = $ep->url;
+                if ($playlist && $playlist->enable_proxy) {
+                    $format = $episode->container_extension ?? $playlist->proxy_options['output'] ?? 'mp4';
+                    $url = ProxyFacade::getProxyUrlForEpisode(
+                        id: $ep->id,
+                        format: $format
+                    );
+                }
+
                 // Check if the file already exists
                 if (file_exists($filePath)) {
                     // If the file exists, check if the URL is the same
                     $currentUrl = file_get_contents($filePath);
-                    if ($currentUrl === $ep->url) {
+                    if ($currentUrl === $url) {
                         // Skip if the URL is the same
                         continue;
                     }
                 }
-                file_put_contents($filePath, $ep->url);
+                file_put_contents($filePath, $url);
             }
 
             // Notify the user
