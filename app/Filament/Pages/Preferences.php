@@ -24,6 +24,7 @@ use App\Services\FfmpegCodecService;
 use Filament\Forms;
 use Filament\Notifications\Notification;
 use Filament\Pages\SettingsPage;
+use Filament\Schemas\Components\Group;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Mail;
@@ -415,30 +416,39 @@ class Preferences extends SettingsPage
                                     ])
                             ]),
 
-                        Tab::make('API')
+                        Tab::make('Backups')
                             ->schema([
-                                Section::make('API Settings')
+                                Section::make('Automated backups')
                                     ->headerActions([
-                                        Action::make('manage_api_keys')
-                                            ->label('Manage API Tokens')
-                                            ->color('gray')
-                                            ->icon('heroicon-s-key')
-                                            ->iconPosition('before')
-                                            ->size('sm')
-                                            ->url('/personal-access-tokens'),
-                                        Action::make('view_api_docs')
-                                            ->label('API Docs')
+                                        Action::make('view_cron_example')
+                                            ->label('CRON Example')
                                             ->icon('heroicon-o-arrow-top-right-on-square')
                                             ->iconPosition('after')
                                             ->size('sm')
-                                            ->url('/docs/api')
+                                            ->url('https://crontab.guru')
                                             ->openUrlInNewTab(true),
                                     ])->schema([
-                                        Toggle::make('show_api_docs')
-                                            ->label('Allow access to API docs')
-                                            ->helperText('When enabled you can access the API documentation using the "API Docs" button. When disabled, the docs endpoint will return a 403 (Unauthorized). NOTE: The API will respond regardless of this setting. You do not need to enable it to use the API.'),
+                                        Toggle::make('auto_backup_database')
+                                            ->label('Enable Automatic Database Backups')
+                                            ->live()
+                                            ->helperText('When enabled, automatic database backups will be created based on the specified schedule.'),
+                                        Group::make()
+                                            ->columnSpanFull()
+                                            ->columns(2)
+                                            ->schema([
+                                                TextInput::make('auto_backup_database_schedule')
+                                                    ->label('Backup Schedule')
+                                                    ->suffix(config('app.timezone'))
+                                                    ->helperText('Specify the CRON schedule for automatic backups, e.g. "* 3 * * *".'),
+                                                TextInput::make('auto_backup_database_max_backups')
+                                                    ->label('Max Backups')
+                                                    ->type('number')
+                                                    ->minValue(0)
+                                                    ->helperText('Specify the maximum number of backups to keep. Enter 0 for no limit.'),
+                                            ])->hidden(fn($get) => !$get('auto_backup_database'))
                                     ])
                             ]),
+
                         Tab::make('SMTP')
                             ->columns(2)
                             ->schema([
@@ -544,6 +554,30 @@ class Preferences extends SettingsPage
                                             ->email()
                                             ->helperText('The "From" email address for outgoing emails. Defaults to no-reply@m3u-editor.dev.'),
                                     ]),
+                            ]),
+                        Tab::make('API')
+                            ->schema([
+                                Section::make('API Settings')
+                                    ->headerActions([
+                                        Action::make('manage_api_keys')
+                                            ->label('Manage API Tokens')
+                                            ->color('gray')
+                                            ->icon('heroicon-s-key')
+                                            ->iconPosition('before')
+                                            ->size('sm')
+                                            ->url('/personal-access-tokens'),
+                                        Action::make('view_api_docs')
+                                            ->label('API Docs')
+                                            ->icon('heroicon-o-arrow-top-right-on-square')
+                                            ->iconPosition('after')
+                                            ->size('sm')
+                                            ->url('/docs/api')
+                                            ->openUrlInNewTab(true),
+                                    ])->schema([
+                                        Toggle::make('show_api_docs')
+                                            ->label('Allow access to API docs')
+                                            ->helperText('When enabled you can access the API documentation using the "API Docs" button. When disabled, the docs endpoint will return a 403 (Unauthorized). NOTE: The API will respond regardless of this setting. You do not need to enable it to use the API.'),
+                                    ])
                             ]),
                         Tab::make('Debugging')
                             ->schema([
