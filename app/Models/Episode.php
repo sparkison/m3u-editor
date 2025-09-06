@@ -2,21 +2,22 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\DispatchesPlaylistSync;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process as SymfonyProcess;
-use App\Models\Concerns\DispatchesPlaylistSync;
 
 class Episode extends Model
 {
-    use HasFactory;
     use DispatchesPlaylistSync;
+    use HasFactory;
 
     protected function playlistSyncChanges(): array
     {
-        $source = $this->source_episode_id ?? 'ep-' . $this->id;
+        $source = $this->source_episode_id ?? 'ep-'.$this->id;
+
         return ['episodes' => [$source]];
     }
 
@@ -97,6 +98,7 @@ class Episode extends Model
             );
             if ($hasErrors) {
                 Log::error("Error running ffprobe for episode \"{$this->title}\": {$errors}");
+
                 return [];
             }
             $json = json_decode($output, true);
@@ -120,11 +122,13 @@ class Episode extends Model
                         ];
                     }
                 }
+
                 return $streamStats;
             }
         } catch (\Exception $e) {
             Log::error("Error running ffprobe for episode \"{$this->title}\": {$e->getMessage()}");
         }
+
         return [];
     }
 
@@ -133,7 +137,7 @@ class Episode extends Model
      */
     public function getAddedAttribute($value)
     {
-        if (!$value) {
+        if (! $value) {
             return null;
         }
 

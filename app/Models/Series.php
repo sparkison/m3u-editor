@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Jobs\SyncSeriesStrmFiles;
+use App\Models\Concerns\DispatchesPlaylistSync;
 use App\Services\XtreamService;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,21 +11,21 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Log;
-use Spatie\Tags\HasTags;
 use Illuminate\Support\Str;
-use App\Models\Concerns\DispatchesPlaylistSync;
+use Spatie\Tags\HasTags;
 
 class Series extends Model
 {
+    use DispatchesPlaylistSync;
     use HasFactory;
     use HasTags;
-    use DispatchesPlaylistSync;
 
     public const SOURCE_INDEX = ['playlist_id', 'source_series_id'];
 
     protected function playlistSyncChanges(): array
     {
-        $source = $this->source_series_id ?? 'series-' . $this->id;
+        $source = $this->source_series_id ?? 'series-'.$this->id;
+
         return ['series' => [$source]];
     }
 
@@ -47,7 +48,7 @@ class Series extends Model
         'backdrop_path' => 'array',
         'metadata' => 'array',
         'sync_settings' => 'array',
-        'last_metadata_fetch' => 'datetime'
+        'last_metadata_fetch' => 'datetime',
     ];
 
     public function user(): BelongsTo
@@ -86,13 +87,14 @@ class Series extends Model
             $playlist = $this->playlist;
             $xtream = XtreamService::make($playlist);
 
-            if (!$xtream) {
+            if (! $xtream) {
                 Notification::make()
                     ->danger()
                     ->title('Series metadata sync failed')
                     ->body('Unable to connect to Xtream API provider to get series info, unable to fetch metadata.')
                     ->broadcast($playlist->user)
                     ->sendToDatabase($playlist->user);
+
                 return;
             }
 
@@ -112,12 +114,12 @@ class Series extends Model
                         ->where('season_number', $season)
                         ->first();
 
-                    if (!$playlistSeason) {
+                    if (! $playlistSeason) {
                         // Create the season if it doesn't exist
                         $seasonInfo = $info['seasons'][$season] ?? [];
                         $playlistSeason = $this->seasons()->create([
                             'season_number' => $season,
-                            'name' => "Season " . str_pad($season, 2, '0', STR_PAD_LEFT),
+                            'name' => 'Season '.str_pad($season, 2, '0', STR_PAD_LEFT),
                             'source_season_id' => $seasonInfo['id'] ?? null,
                             'episode_count' => $seasonInfo['episode_count'] ?? 0,
                             'cover' => $seasonInfo['cover'] ?? null,
@@ -148,7 +150,7 @@ class Series extends Model
                         $episodeCount++;
                         $url = $xtream->buildSeriesUrl($ep['id'], $ep['container_extension']);
                         $title = preg_match('/S\d{2}E\d{2} - (.*)/', $ep['title'], $m) ? $m[1] : null;
-                        if (!$title) {
+                        if (! $title) {
                             $title = $ep['title'] ?? "Episode {$ep['episode_num']}";
                         }
                         $bulk[] = [
@@ -193,14 +195,14 @@ class Series extends Model
                             'added',
                             'season',
                             'url',
-                            'info'
+                            'info',
                         ]
                     );
                 }
 
                 // Update last fetched timestamp for the series
                 $this->update([
-                    'last_metadata_fetch' => now()
+                    'last_metadata_fetch' => now(),
                 ]);
 
                 // Dispatch the job to sync .strm files
@@ -209,8 +211,9 @@ class Series extends Model
                 return $episodeCount;
             }
         } catch (\Exception $e) {
-            Log::error('Failed to fetch metadata for series ' . $this->id, ['exception' => $e]);
+            Log::error('Failed to fetch metadata for series '.$this->id, ['exception' => $e]);
         }
+
         return false;
     }
 }
