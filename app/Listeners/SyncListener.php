@@ -36,6 +36,11 @@ class SyncListener
             });
 
             if (!$event->model->parent_id && $event->model->children()->exists()) {
+                $event->model->children()->update([
+                    'status' => Status::Pending,
+                    'processing' => false,
+                ]);
+
                 dispatch(new \App\Jobs\SyncPlaylistChildren($event->model));
             }
         }
