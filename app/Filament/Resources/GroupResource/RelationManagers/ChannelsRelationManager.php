@@ -27,7 +27,7 @@ class ChannelsRelationManager extends RelationManager
     {
         return false;
     }
-    
+
     public function form(Form $form): Form
     {
         return $form

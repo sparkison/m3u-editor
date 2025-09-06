@@ -55,6 +55,34 @@ class GroupsRelationManager extends RelationManager
             ->filters([
                 //
             ])
+            ->actions([
+                Tables\Actions\Action::make('view_channels')
+                    ->hiddenLabel()
+                    ->icon('heroicon-o-eye')
+                    ->modalHeading(fn($record) => 'Channels in "' . $record->name . '"')
+                    ->modalContent(function ($record) {
+                        $sort = request('sort');
+                        $direction = request('direction', 'asc');
+                        $allowedSorts = ['title', 'stream_id', 'enabled'];
+                        if (in_array($sort, $allowedSorts)) {
+                            $orderBy = $sort;
+                            $orderDirection = $direction === 'desc' ? 'desc' : 'asc';
+                        } else {
+                            $orderBy = 'sort';
+                            $orderDirection = 'asc';
+                        }
+                        $channels = \App\Models\Channel::withAnyTags([$record])
+                            ->where('is_vod', false)
+                            ->orderBy($orderBy, $orderDirection)
+                            ->get();
+                        if ($channels->isEmpty()) {
+                            return view('filament.custom-playlist.no-channels');
+                        }
+                        return view('filament.custom-playlist.group-channels-list', [
+                            'channels' => $channels,
+                        ]);
+                    }),
+                Tables\Actions\DeleteAction::make()->button()->hiddenLabel()], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->headerActions([
                 Tables\Actions\CreateAction::make()
                     ->using(function (array $data, string $model) use ($ownerRecord): Model {
@@ -71,10 +99,6 @@ class GroupsRelationManager extends RelationManager
                             ->body('You can now assign channels to this group from the Channels tab.'),
                     ),
             ])
-            ->actions([
-                Tables\Actions\DeleteAction::make()
-                    ->button()->hiddenLabel(true),
-            ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
