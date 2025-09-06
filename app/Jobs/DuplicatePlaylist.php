@@ -31,6 +31,8 @@ class DuplicatePlaylist implements ShouldQueue
     public function handle(): void
     {
         DB::beginTransaction();
+        $copiedPath = null;
+
         try {
             // Get the base playlist
             $playlist = $this->playlist;
@@ -214,7 +216,6 @@ class DuplicatePlaylist implements ShouldQueue
             // This prevents conflicts with the unique constraint.
 
             // Copy uploaded file
-            $copiedPath = null;
             if ($playlist->uploads && Storage::disk('local')->exists($playlist->uploads)) {
                 Storage::disk('local')->makeDirectory($newPlaylist->folder_path);
                 if (! Storage::disk('local')->copy($playlist->uploads, $newPlaylist->file_path)) {
