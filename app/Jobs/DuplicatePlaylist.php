@@ -38,9 +38,9 @@ class DuplicatePlaylist implements ShouldQueue
             // Get the base playlist
             $playlist = $this->playlist;
 
-            // Prevent creating nested child playlists
-            if ($this->withSync && $playlist->parent_id) {
-                throw new \InvalidArgumentException('Child playlists cannot be duplicated with sync.');
+            // Prevent duplicating child playlists altogether
+            if ($playlist->parent_id) {
+                throw new \InvalidArgumentException('Child playlists cannot be duplicated.');
             }
 
             // Current timestamp
