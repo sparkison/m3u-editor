@@ -89,7 +89,8 @@ class PlaylistResource extends Resource
             ->modifyQueryUsing(function (Builder $query) {
                 $query->withCount('enabled_live_channels')
                     ->withCount('enabled_vod_channels')
-                    ->withCount('enabled_series');
+                    ->withCount('enabled_series')
+                    ->orderByRaw('COALESCE(parent_id, id), parent_id IS NOT NULL, id');
             })
             ->columns([
                 Tables\Columns\TextColumn::make('id')
