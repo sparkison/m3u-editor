@@ -47,6 +47,7 @@ class ProcessM3uImportComplete implements ShouldQueue
         public Carbon $start,
         public bool $maxHit = false,
         public bool $isNew = false,
+        public bool $hasSeries = false,
     ) {
         // Set the invalidate import settings from config
         $this->invalidateImport = config('dev.invalidate_import', null);
@@ -273,13 +274,13 @@ class ProcessM3uImportComplete implements ShouldQueue
 
         // Update the playlist
         $playlist->update([
-            'status' => Status::Completed,
+            'status' => $this->hasSeries ? Status::Processing : Status::Completed,
             'channels' => 0, // not using...
             'synced' => now(),
             'errors' => null,
             'sync_time' => $completedIn,
             'progress' => 100,
-            'processing' => false
+            'processing' => $this->hasSeries,
         ]);
 
         // Send notification
@@ -338,8 +339,10 @@ class ProcessM3uImportComplete implements ShouldQueue
             return; // Exit early if series import is enabled, sync complete event will be fired after series import completes
         }
 
-        // Fire the playlist synced event
-        event(new SyncCompleted($playlist));
+        // Fire the playlist synced event only if series won't run
+        if (! $this->hasSeries) {
+            event(new SyncCompleted($playlist));
+        }
     }
 
     /**
