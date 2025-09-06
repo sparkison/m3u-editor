@@ -12,14 +12,16 @@ class LogoCacheCleanup extends Command
      *
      * @var string
      */
-    protected $signature = 'logo:cleanup {--force : Force cleanup without confirmation}';
+    protected $signature = 'app:logo-cleanup 
+                                {--force : Force cleanup without confirmation}
+                                {--all : Clear all, not just expired}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Clean up expired logo cache files';
+    protected $description = 'Clean up cached logo files';
 
     /**
      * Execute the console command.
@@ -32,12 +34,16 @@ class LogoCacheCleanup extends Command
         }
 
         $this->info('Cleaning up expired logo cache...');
-        
+
+        $all = $this->option('all') ?? false;
+
         $controller = new LogoProxyController();
-        $clearedCount = $controller->clearExpiredCache();
-        
-        $this->info("Cleared {$clearedCount} expired logo cache files.");
-        
+        $clearedCount = $all
+            ? $controller->clearCache()
+            : $controller->clearExpiredCache();
+
+        $this->info("Cleared {$clearedCount} logo cache files.");
+
         return Command::SUCCESS;
     }
 }

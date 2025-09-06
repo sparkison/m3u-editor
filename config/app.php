@@ -56,6 +56,8 @@ return [
 
     'port' => env('APP_PORT', 36400),
 
+    'logo_cache_expiry_days' => env('LOGO_CACHE_EXPIRY_DAYS', 30),
+
     'log' => [
         'dir' => env('LOG_DIR', storage_path('logs')),
     ],
