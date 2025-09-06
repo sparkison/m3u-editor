@@ -56,3 +56,8 @@ Schedule::command('app:epg-cache-health-check')
 Schedule::command('app:run-scheduled-backups')
     ->everyMinute()
     ->withoutOverlapping();
+
+// Cleanup logos
+Schedule::command('app:logo-cleanup --force')
+    ->daily()
+    ->withoutOverlapping();
