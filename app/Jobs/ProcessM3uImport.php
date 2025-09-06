@@ -928,11 +928,11 @@ class ProcessM3uImport implements ShouldQueue
         // Create the series categories (needed for pre-processing)
         if ($seriesCategories && $seriesCategories->count() > 0) {
             foreach ($seriesCategories as $category) {
-                $category = Category::where([
+                $sc = Category::where([
                     'playlist_id' => $playlist->id,
                     'source_category_id' => $category['category_id'],
                 ])->first();
-                if (!$category) {
+                if (!$sc) {
                     Category::create([
                         'playlist_id' => $playlist->id,
                         'name' => $category['category_name'],
@@ -1007,7 +1007,7 @@ class ProcessM3uImport implements ShouldQueue
         if ($seriesCategories) {
             $categoryCount = $seriesCategories->count();
             $seriesCategories->each(function ($category, $index) use (&$jobs, $playlistId, $batchNo, $categoryCount) {
-                if ($this->shouldIncludeSeries($category['category_name'] ?? '')) {
+                if (!$this->preprocess || $this->shouldIncludeSeries($category['category_name'] ?? '')) {
                     // Create a job for each series category
                     $jobs[] = new ProcessM3uImportSeriesChunk(
                         [
