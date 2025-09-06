@@ -40,6 +40,7 @@ use Filament\Infolists\Infolist;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Facades\Schema;
 use Filament\Actions;
 
 class PlaylistResource extends Resource
@@ -89,8 +90,13 @@ class PlaylistResource extends Resource
             ->modifyQueryUsing(function (Builder $query) {
                 $query->withCount('enabled_live_channels')
                     ->withCount('enabled_vod_channels')
-                    ->withCount('enabled_series')
-                    ->orderByRaw('COALESCE(parent_id, id), parent_id IS NOT NULL, id');
+                    ->withCount('enabled_series');
+
+                if (Schema::hasColumn('playlists', 'parent_id')) {
+                    $query->orderByRaw('COALESCE(parent_id, id), parent_id IS NOT NULL, id');
+                } else {
+                    $query->orderBy('id');
+                }
             })
             ->columns([
                 Tables\Columns\TextColumn::make('id')
