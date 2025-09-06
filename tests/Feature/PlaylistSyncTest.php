@@ -193,12 +193,12 @@ it('syncs multiple custom channels without source ids', function () {
     expect($child->channels()->where('name', 'Two')->exists())->toBeTrue();
 });
 
-it('prevents duplicating child playlist with sync', function () {
+it('prevents duplicating a child playlist', function () {
     $playlist = Playlist::factory()->create();
     (new DuplicatePlaylist($playlist, withSync: true))->handle();
     $child = Playlist::where('parent_id', $playlist->id)->first();
 
-    (new DuplicatePlaylist($child, withSync: true))->handle();
+    (new DuplicatePlaylist($child))->handle();
 })->throws(InvalidArgumentException::class);
 
 it('syncs uploaded files to child playlists', function () {

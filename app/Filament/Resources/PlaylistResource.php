@@ -321,6 +321,7 @@ class PlaylistResource extends Resource
                                 ->duration(3000)
                                 ->send();
                         })
+                        ->hidden(fn($record) => $record->parent_id !== null)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-document-duplicate')
                         ->modalIcon('heroicon-o-document-duplicate')
@@ -668,6 +669,7 @@ class PlaylistResource extends Resource
                             ->duration(3000)
                             ->send();
                     })
+                    ->hidden(fn($record) => $record->parent_id !== null)
                     ->requiresConfirmation()
                     ->icon('heroicon-o-document-duplicate')
                     ->modalIcon('heroicon-o-document-duplicate')
