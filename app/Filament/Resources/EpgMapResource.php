@@ -198,6 +198,15 @@ class EpgMapResource extends Resource
         $showPlaylist = true,
         $showEpg = true
     ): array {
+        $playlists = Playlist::where(['user_id' => auth()->id()])->get(['name', 'id', 'parent_id']);
+        $playlistOptions = $playlists->mapWithKeys(
+            fn(Playlist $playlist) => [
+                $playlist->id => $playlist->parent_id !== null
+                    ? $playlist->name . ' [child]'
+                    : $playlist->name,
+            ]
+        );
+
         return [
             Forms\Components\Select::make('epg_id')
                 ->required()
@@ -210,7 +219,10 @@ class EpgMapResource extends Resource
                 ->required()
                 ->label('Playlist')
                 ->helperText('Select the playlist you would like to map to.')
-                ->options(Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                ->options($playlistOptions)
+                ->disableOptionWhen(
+                    fn(string $value): bool => $playlists->firstWhere('id', $value)?->parent_id !== null
+                )
                 ->hidden(!$showPlaylist)
                 ->searchable(),
             Forms\Components\Toggle::make('override')
