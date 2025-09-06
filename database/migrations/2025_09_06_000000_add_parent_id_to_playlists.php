@@ -21,7 +21,10 @@ return new class extends Migration {
         });
 
         Schema::table('categories', function (Blueprint $table) {
-            $table->index(['playlist_id', 'source_category_id']);
+            $table->unique(
+                ['playlist_id', 'source_category_id'],
+                'categories_playlist_id_source_category_id_unique'
+            );
         });
 
         Schema::table('groups', function (Blueprint $table) {
@@ -52,7 +55,7 @@ return new class extends Migration {
         });
 
         Schema::table('categories', function (Blueprint $table) {
-            $table->dropIndex(['playlist_id', 'source_category_id']);
+            $table->dropUnique('categories_playlist_id_source_category_id_unique');
         });
 
         Schema::table('shared_streams', function (Blueprint $table) {
