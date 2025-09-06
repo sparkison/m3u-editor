@@ -2,6 +2,8 @@
 
 use App\Jobs\DuplicatePlaylist;
 use App\Jobs\SyncPlaylistChildren;
+use App\Jobs\ProcessM3uImportComplete;
+use App\Jobs\ProcessM3uImportSeriesComplete;
 use App\Models\Channel;
 use App\Models\Episode;
 use App\Models\Group;
@@ -15,6 +17,8 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use App\Events\SyncCompleted;
+use App\Enums\Status;
+use App\Settings\GeneralSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 
@@ -662,4 +666,40 @@ it('clears queued flag when sync job fails', function () {
     Queue::fake();
     SyncPlaylistChildren::debounce($parent, ['groups' => ['g']]);
     Queue::assertPushed(SyncPlaylistChildren::class, 1);
+});
+
+it('keeps child pending until series sync completes', function () {
+    Queue::fake();
+    Event::fake();
+
+    $parent = Playlist::factory()->create();
+    Playlist::factory()->create([
+        'parent_id' => $parent->id,
+    ]);
+
+    $parent->children()->update([
+        'status' => Status::Pending,
+        'processing' => true,
+    ]);
+
+    (new ProcessM3uImportComplete(
+        userId: $parent->user_id,
+        playlistId: $parent->id,
+        batchNo: 'batch',
+        start: now(),
+        hasSeries: true,
+    ))->handle(app(GeneralSettings::class));
+
+    Event::assertNothingDispatched();
+    Queue::assertNothingPushed();
+
+    $child = $parent->children()->first();
+    expect($child->refresh()->status)->toBe(Status::Pending);
+    expect($child->processing)->toBeTrue();
+
+    Event::forgetFakes();
+
+    (new ProcessM3uImportSeriesComplete($parent, 'batch'))->handle();
+
+    Queue::assertPushed(SyncPlaylistChildren::class, fn ($job) => $job->playlist->is($parent));
 });
