@@ -18,6 +18,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Schema;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
 
 class EpgMapResource extends Resource
@@ -198,10 +199,14 @@ class EpgMapResource extends Resource
         $showPlaylist = true,
         $showEpg = true
     ): array {
-        $playlists = Playlist::where(['user_id' => auth()->id()])->get(['name', 'id', 'parent_id']);
+        $hasParentId = Schema::hasColumn('playlists', 'parent_id');
+
+        $playlists = Playlist::where(['user_id' => auth()->id()])
+            ->get($hasParentId ? ['name', 'id', 'parent_id'] : ['name', 'id']);
+
         $playlistOptions = $playlists->mapWithKeys(
-            fn(Playlist $playlist) => [
-                $playlist->id => $playlist->parent_id !== null
+            fn (Playlist $playlist) => [
+                $playlist->id => $hasParentId && $playlist->parent_id !== null
                     ? $playlist->name . ' [child]'
                     : $playlist->name,
             ]
@@ -221,7 +226,7 @@ class EpgMapResource extends Resource
                 ->helperText('Select the playlist you would like to map to.')
                 ->options($playlistOptions)
                 ->disableOptionWhen(
-                    fn(string $value): bool => $playlists->firstWhere('id', $value)?->parent_id !== null
+                    fn (string $value): bool => $hasParentId && $playlists->firstWhere('id', $value)?->parent_id !== null
                 )
                 ->hidden(!$showPlaylist)
                 ->searchable(),
