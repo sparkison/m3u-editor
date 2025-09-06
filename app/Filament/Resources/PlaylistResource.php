@@ -99,8 +99,8 @@ class PlaylistResource extends Resource
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
                     ->sortable()
-                    ->formatStateUsing(fn($state, Playlist $record) => $record->parent_id ? '↳ '.$state : $state)
-                    ->extraAttributes(fn(Playlist $record) => $record->parent_id ? ['class' => 'pl-6'] : []),
+                    ->formatStateUsing(fn($state, ?Playlist $record) => $record?->parent_id ? '↳ '.$state : $state)
+                    ->extraAttributes(fn(?Playlist $record) => $record?->parent_id ? ['class' => 'pl-6'] : []),
                 Tables\Columns\TextColumn::make('url')
                     ->label('Playlist URL')
                     ->wrap()
@@ -111,14 +111,15 @@ class PlaylistResource extends Resource
                     ->toggleable()
                     ->formatStateUsing(fn(int $state): string => $state === 0 ? '∞' : (string)$state)
                     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
-                    ->description(fn(Playlist $record): string => "Active: " . (int) Redis::get("active_streams:{$record->id}") ?? 0)
+                    ->description(fn(?Playlist $record): string =>
+                        "Active: " . (int) ($record ? Redis::get("active_streams:{$record->id}") : 0))
                     ->sortable(),
                 Tables\Columns\TextColumn::make('groups_count')
                     ->label('Groups')
                     ->counts('groups')
                     ->toggleable()
                     ->sortable()
-                    ->hidden(fn(Playlist $record): bool => $record->parent_id !== null),
+                    ->hidden(fn(?Playlist $record): bool => $record?->parent_id !== null),
                 // Tables\Columns\TextColumn::make('channels_count')
                 //     ->label('Channels')
                 //     ->counts('channels')
@@ -128,24 +129,24 @@ class PlaylistResource extends Resource
                 Tables\Columns\TextColumn::make('live_channels_count')
                     ->label('Live')
                     ->counts('live_channels')
-                    ->description(fn(Playlist $record): string => "Enabled: {$record->enabled_live_channels_count}")
+                    ->description(fn(?Playlist $record): string => "Enabled: {$record?->enabled_live_channels_count}")
                     ->toggleable()
                     ->sortable()
-                    ->hidden(fn(Playlist $record): bool => $record->parent_id !== null),
+                    ->hidden(fn(?Playlist $record): bool => $record?->parent_id !== null),
                 Tables\Columns\TextColumn::make('vod_channels_count')
                     ->label('VOD')
                     ->counts('vod_channels')
-                    ->description(fn(Playlist $record): string => "Enabled: {$record->enabled_vod_channels_count}")
+                    ->description(fn(?Playlist $record): string => "Enabled: {$record?->enabled_vod_channels_count}")
                     ->toggleable()
                     ->sortable()
-                    ->hidden(fn(Playlist $record): bool => $record->parent_id !== null),
+                    ->hidden(fn(?Playlist $record): bool => $record?->parent_id !== null),
                 Tables\Columns\TextColumn::make('series_count')
                     ->label('Series')
                     ->counts('series')
-                    ->description(fn(Playlist $record): string => "Enabled: {$record->enabled_series_count}")
+                    ->description(fn(?Playlist $record): string => "Enabled: {$record?->enabled_series_count}")
                     ->toggleable()
                     ->sortable()
-                    ->hidden(fn(Playlist $record): bool => $record->parent_id !== null),
+                    ->hidden(fn(?Playlist $record): bool => $record?->parent_id !== null),
                 Tables\Columns\TextColumn::make('status')
                     ->sortable()
                     ->badge()
