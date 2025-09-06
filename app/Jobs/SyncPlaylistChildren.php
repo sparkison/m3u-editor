@@ -3,7 +3,10 @@
 namespace App\Jobs;
 
 use App\Enums\Status;
-use App\Models\{Category, Playlist, Season, Series};
+use App\Models\Category;
+use App\Models\Playlist;
+use App\Models\Season;
+use App\Models\Series;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -21,7 +24,7 @@ use Illuminate\Support\Facades\Storage;
  * Implements ShouldBeUnique so only one job per playlist may be queued or
  * running at a time, preventing concurrent syncs.
  */
-class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
+class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -79,6 +82,7 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
             Log::warning("SyncPlaylistChildren: Parent playlist {$this->playlist->id} not found, clearing queued flag and aborting child sync.");
             Cache::forget("playlist-sync:{$this->playlist->id}");
             Cache::forget("playlist-sync:{$this->playlist->id}:queued");
+
             return;
         }
 
@@ -177,13 +181,20 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
             $names = $groups->pluck('name_internal');
             $childGroups = $child->groups()->whereIn('name_internal', $names)->get()->keyBy('name_internal');
             foreach ($groups as $group) {
-                $childGroupId = $childGroups[$group->name_internal]->id;
+                $childGroup = $childGroups->get($group->name_internal);
+                if (! $childGroup) {
+                    Log::warning("SyncPlaylistChildren: Child group not found for key '{$group->name_internal}' on playlist {$child->id}");
+
+                    continue;
+                }
+
+                $childGroupId = $childGroup->id;
                 $channelSources = [];
                 $failovers = [];
                 $group->channels()->with('failovers')->chunkById(100, function ($channels) use ($child, $childGroupId, &$channelSources, &$failovers) {
                     $channelRows = [];
                     foreach ($channels as $channel) {
-                        $source = $channel->source_id ?? 'ch-' . $channel->id;
+                        $source = $channel->source_id ?? 'ch-'.$channel->id;
                         $channelSources[] = $source;
                         $channelRows[] = $channel->replicate(except: ['id', 'group_id', 'playlist_id', 'created_at', 'updated_at'])->getAttributes() + [
                             'playlist_id' => $child->id,
@@ -222,7 +233,7 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
         $parent->categories()->chunkById(100, function ($categories) use ($child, &$parentCategoryIds) {
             $categoryRows = [];
             foreach ($categories as $category) {
-                $categorySource = $category->source_category_id ?? 'cat-' . $category->id;
+                $categorySource = $category->source_category_id ?? 'cat-'.$category->id;
                 $parentCategoryIds[] = $categorySource;
                 $categoryRows[] = $category->replicate(except: ['id', 'playlist_id', 'created_at', 'updated_at'])->getAttributes() + [
                     'playlist_id' => $child->id,
@@ -232,10 +243,10 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
             $child->categories()->upsert($categoryRows, Category::SOURCE_INDEX);
             unset($categoryRows);
 
-            $sources = $categories->map(fn ($c) => $c->source_category_id ?? 'cat-' . $c->id);
+            $sources = $categories->map(fn ($c) => $c->source_category_id ?? 'cat-'.$c->id);
             $childCategories = $child->categories()->whereIn('source_category_id', $sources)->get()->keyBy('source_category_id');
             foreach ($categories as $category) {
-                $catSource = $category->source_category_id ?? 'cat-' . $category->id;
+                $catSource = $category->source_category_id ?? 'cat-'.$category->id;
                 $childCategoryId = $childCategories[$catSource]->id;
                 $category->series()->chunkById(100, function ($seriesChunk) use ($child, $childCategoryId) {
                     $this->syncSeries($child, $seriesChunk->load('seasons.episodes'), $childCategoryId);
@@ -251,7 +262,7 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
         $seriesSources = [];
         $seriesMap = [];
         foreach ($seriesChunk as $series) {
-            $seriesSource = $series->source_series_id ?? 'series-' . $series->id;
+            $seriesSource = $series->source_series_id ?? 'series-'.$series->id;
             $seriesSources[] = $seriesSource;
             $seriesRows[] = $series->replicate(except: ['id', 'category_id', 'playlist_id', 'created_at', 'updated_at'])->getAttributes() + [
                 'playlist_id' => $child->id,
@@ -282,7 +293,7 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
             $seasonSources = [];
             $seasonMap = [];
             foreach ($seasonChunk as $season) {
-                $seasonSource = $season->source_season_id ?? 'season-' . $season->id;
+                $seasonSource = $season->source_season_id ?? 'season-'.$season->id;
                 $seasonSources[] = $seasonSource;
                 $seasonRows[] = $season->replicate(except: ['id', 'series_id', 'category_id', 'playlist_id', 'created_at', 'updated_at'])->getAttributes() + [
                     'playlist_id' => $child->id,
@@ -309,7 +320,7 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
             $episodeRows = [];
             $episodeSources = [];
             foreach ($episodeChunk as $episode) {
-                $episodeSource = $episode->source_episode_id ?? 'ep-' . $episode->id;
+                $episodeSource = $episode->source_episode_id ?? 'ep-'.$episode->id;
                 $episodeSources[] = $episodeSource;
                 $episodeRows[] = $episode->replicate(except: ['id', 'season_id', 'series_id', 'playlist_id', 'created_at', 'updated_at'])->getAttributes() + [
                     'playlist_id' => $child->id,
@@ -331,7 +342,7 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
             $rows = [];
             $failovers = [];
             foreach ($channels as $channel) {
-                $source = $channel->source_id ?? 'ch-' . $channel->id;
+                $source = $channel->source_id ?? 'ch-'.$channel->id;
                 $ungroupedSources[] = $source;
                 $rows[] = $channel->replicate(except: ['id', 'group_id', 'playlist_id', 'created_at', 'updated_at'])->getAttributes() + [
                     'playlist_id' => $child->id,
@@ -463,7 +474,7 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
 
                 if ($series) {
                     $categorySource = $series->category?->source_category_id
-                        ?? ($series->category_id ? 'cat-' . $series->category_id : null);
+                        ?? ($series->category_id ? 'cat-'.$series->category_id : null);
                     if ($categorySource) {
                         $this->syncDelta($parent, $child, ['categories' => [$categorySource]]);
                         $childCategoryId = $child->categories()->where('source_category_id', $categorySource)->value('id');
@@ -494,7 +505,7 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
 
                 if ($season) {
                     $seriesSource = $season->series?->source_series_id
-                        ?? ($season->series_id ? 'series-' . $season->series_id : null);
+                        ?? ($season->series_id ? 'series-'.$season->series_id : null);
                     if ($seriesSource) {
                         $this->syncDelta($parent, $child, ['series' => [$seriesSource]]);
                         $childSeriesId = $child->series()->where('source_series_id', $seriesSource)->value('id');
@@ -526,7 +537,7 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
 
                 if ($episode) {
                     $seasonSource = $episode->season?->source_season_id
-                        ?? ($episode->season_id ? 'season-' . $episode->season_id : null);
+                        ?? ($episode->season_id ? 'season-'.$episode->season_id : null);
                     if ($seasonSource) {
                         $this->syncDelta($parent, $child, ['seasons' => [$seasonSource]]);
                         $childSeasonId = $child->seasons()->where('source_season_id', $seasonSource)->value('id');
