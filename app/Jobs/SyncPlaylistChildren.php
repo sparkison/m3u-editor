@@ -408,16 +408,25 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
 
         $channelSources = $changes['channels'] ?? [];
         if (! empty($channelSources)) {
+            $groupKeys = [];
             foreach ($channelSources as $source) {
                 $channel = str_starts_with($source, 'ch-')
-                    ? $parent->channels()->with('failovers')->find(substr($source, 3))
-                    : $parent->channels()->with('failovers')->where('source_id', $source)->first();
+                    ? $parent->channels()->with('failovers', 'group')->find(substr($source, 3))
+                    : $parent->channels()->with('failovers', 'group')->where('source_id', $source)->first();
 
                 if ($channel) {
                     $groupKey = $channel->group?->name_internal;
                     if ($groupKey) {
-                        $this->syncDelta($parent, $child, ['groups' => [$groupKey]]);
-                        $childGroupId = $child->groups()->where('name_internal', $groupKey)->value('id');
+                        $groupKeys[$groupKey] = true;
+                        $childGroup = $child->groups()->firstOrNew([
+                            'name_internal' => $groupKey,
+                        ]);
+                        if (! $childGroup->exists) {
+                            $childGroup->fill($channel->group->only(['name', 'name_internal', 'sort_order', 'user_id', 'is_custom']));
+                            $childGroup->playlist_id = $child->id;
+                            $childGroup->save();
+                        }
+                        $childGroupId = $childGroup->id;
                     } else {
                         $childGroupId = null;
                     }
@@ -441,6 +450,10 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
                 } else {
                     $child->channels()->where('source_id', $source)->delete();
                 }
+            }
+
+            foreach (array_keys($groupKeys) as $groupKey) {
+                $this->syncDelta($parent, $child, ['groups' => [$groupKey]]);
             }
         }
 
