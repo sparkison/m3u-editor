@@ -213,7 +213,13 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
                 })->delete();
                 $childChannels = $child->channels()->where('group_id', $childGroupId)->whereIn('source_id', $channelSources)->get()->keyBy('source_id');
                 foreach ($failovers as $source => $items) {
-                    $childChannel = $childChannels[$source];
+                    $childChannel = $childChannels->get($source);
+                    if (! $childChannel) {
+                        Log::info("SyncPlaylistChildren: Child channel not found for source '{$source}' on playlist {$child->id}");
+
+                        continue;
+                    }
+
                     $childChannel->failovers()->delete();
                     foreach ($items as $failover) {
                         $newFailover = $failover->replicate(except: ['id', 'channel_id', 'created_at', 'updated_at']);
