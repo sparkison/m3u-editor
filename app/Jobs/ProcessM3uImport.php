@@ -845,7 +845,7 @@ class ProcessM3uImport implements ShouldQueue
                         'name_internal' => $groupName ?? '',
                         'playlist_id' => $playlistId,
                         'user_id' => $userId,
-                        'custom' => false,
+                        'is_custom' => false,
                     ])->first();
                     if (!$group) {
                         $data = [

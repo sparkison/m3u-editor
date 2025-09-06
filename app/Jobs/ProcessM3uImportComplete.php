@@ -74,7 +74,7 @@ class ProcessM3uImportComplete implements ShouldQueue
 
         // Get the removed groups
         $removedGroups = Group::where([
-            ['custom', false],
+            ['is_custom', false],
             ['playlist_id', $playlist->id],
             ['import_batch_no', '!=', $this->batchNo],
         ]);
