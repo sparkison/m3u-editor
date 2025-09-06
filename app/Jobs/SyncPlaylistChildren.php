@@ -167,7 +167,7 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
     private function syncGroups(Playlist $parent, Playlist $child): void
     {
         $parentGroupNames = [];
-        $parent->groups()->with('channels.failovers')->chunkById(100, function ($groups) use ($child, &$parentGroupNames) {
+        $parent->groups()->chunkById(100, function ($groups) use ($child, &$parentGroupNames) {
             $groupRows = [];
             foreach ($groups as $group) {
                 $parentGroupNames[] = $group->name_internal;
