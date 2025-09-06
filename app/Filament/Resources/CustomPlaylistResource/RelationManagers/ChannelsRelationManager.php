@@ -119,6 +119,7 @@ class ChannelsRelationManager extends RelationManager
             ->persistFiltersInSession()
             ->persistSortInSession()
             ->recordTitleAttribute('title')
+            ->reorderable('sort') // Enable drag-and-drop sorting by 'sort' column
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })

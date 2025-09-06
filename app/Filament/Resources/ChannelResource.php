@@ -98,7 +98,8 @@ class ChannelResource extends Resource
             ->columns(self::getTableColumns(showGroup: !$relationId, showPlaylist: !$relationId))
             ->filters(self::getTableFilters(showPlaylist: !$relationId))
             ->actions(self::getTableActions(), position: Tables\Enums\ActionsPosition::BeforeCells)
-            ->bulkActions(self::getTableBulkActions());
+            ->bulkActions(self::getTableBulkActions())
+            ->reorderable('sort'); // Enable drag-and-drop sorting
     }
 
     public static function getTableColumns($showGroup = true, $showPlaylist = true): array
@@ -133,14 +134,9 @@ class ChannelResource extends Resource
                 })
                 ->extraAttributes(['style' => 'min-width: 350px;'])
                 ->toggleable(),
-            Tables\Columns\TextInputColumn::make('sort')
+            Tables\Columns\TextColumn::make('sort')
                 ->label('Sort Order')
-                ->rules(['min:0'])
-                ->type('number')
-                ->placeholder('Sort Order')
                 ->sortable()
-                ->tooltip(fn($record) => !$record->is_custom && $record->playlist?->auto_sort ? 'Playlist auto-sort enabled; disable to change' : 'Channel sort order')
-                ->disabled(fn($record) => !$record->is_custom && $record->playlist?->auto_sort)
                 ->toggleable(),
             Tables\Columns\TextColumn::make('failovers_count')
                 ->label('Failovers')
@@ -747,7 +743,7 @@ class ChannelResource extends Resource
     public static function getRelations(): array
     {
         return [
-            // 
+            //
         ];
     }
 
@@ -1140,9 +1136,9 @@ class ChannelResource extends Resource
 
     /**
      * Create a custom channel with the provided data.
-     * 
+     *
      * This method is used to create a channel with custom data, typically for a Custom Playlist.
-     * 
+     *
      * @param array $data The data for the channel.
      * @param string $model The model class to use for creating the channel.
      * @return Model The created channel model.

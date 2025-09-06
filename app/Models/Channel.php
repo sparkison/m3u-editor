@@ -104,7 +104,7 @@ class Channel extends Model
 
     /**
      * Check if the channel has metadata.
-     * 
+     *
      * @return bool
      */
     public function getHasMetadataAttribute(): bool

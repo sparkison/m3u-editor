@@ -30,3 +30,44 @@ document.addEventListener('error', event => {
         }
     }
 }, true);
+
+// Import SortableJS
+import Sortable from 'sortablejs';
+
+// Initialize SortableJS for channel reordering
+function initChannelSortable() {
+    const tbody = document.getElementById('channels-tbody');
+    console.log('Initializing channel sortable...', tbody);
+    if (tbody && !tbody.dataset.sortableInitialized) {
+        new Sortable(tbody, {
+            handle: '.cursor-move',
+            animation: 150,
+            onEnd: function () {
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                const ids = rows.map(row => row.getAttribute('data-id'));
+                fetch(window.channelReorderUrl || '/channels/reorder', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    },
+                    body: JSON.stringify({ ids })
+                }).then(response => {
+                    if (response.ok) {
+                        // Update the sort order column in the DOM
+                        rows.forEach((row, idx) => {
+                            // Find the correct cell for sort order (last cell)
+                            const sortCell = row.querySelectorAll('td')[row.querySelectorAll('td').length - 1];
+                            if (sortCell) {
+                                sortCell.textContent = (idx + 1).toString();
+                            }
+                        });
+                    }
+                });
+            }
+        });
+        tbody.dataset.sortableInitialized = '1';
+    }
+}
+
+window.initChannelSortable = initChannelSortable;

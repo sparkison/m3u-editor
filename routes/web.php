@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ChannelOrderController;
 use App\Http\Controllers\EpgFileController;
 use App\Http\Controllers\EpgGenerateController;
 use App\Http\Controllers\PlaylistGenerateController;
@@ -7,6 +8,7 @@ use App\Http\Controllers\XtreamApiController;
 use AshAllenDesign\ShortURL\Controllers\ShortURLController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\GroupChannelSortController;
 
 // Handle short URLs with optional path forwarding (e.g. /s/{key}/device.xml)
 Route::get('/s/{shortUrlKey}/{path?}', function (Request $request, string $shortUrlKey, string $path = null) {
@@ -173,3 +175,6 @@ Route::get('/series/{username}/{password}/{streamId}.{format}', [App\Http\Contro
 // Timeshift endpoints
 Route::get('/timeshift/{username}/{password}/{duration}/{date}/{streamId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleTimeshift'])
     ->name('xtream.stream.timeshift.root');
+
+// Channel reordering
+Route::post('/channels/reorder', [ChannelOrderController::class, 'reorder'])->name('channels.reorder');
