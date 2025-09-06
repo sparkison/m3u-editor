@@ -32,22 +32,28 @@ return new class extends Migration {
         });
 
         Schema::table('series', function (Blueprint $table) {
-            $table->index(['playlist_id', 'source_series_id']);
+            $table->unique(
+                ['playlist_id', 'source_series_id'],
+                'series_playlist_id_source_series_id_unique'
+            );
         });
 
         Schema::table('seasons', function (Blueprint $table) {
-            $table->index(['playlist_id', 'source_season_id']);
+            $table->unique(
+                ['playlist_id', 'source_season_id'],
+                'seasons_playlist_id_source_season_id_unique'
+            );
         });
     }
 
     public function down(): void
     {
         Schema::table('seasons', function (Blueprint $table) {
-            $table->dropIndex(['playlist_id', 'source_season_id']);
+            $table->dropUnique('seasons_playlist_id_source_season_id_unique');
         });
 
         Schema::table('series', function (Blueprint $table) {
-            $table->dropIndex(['playlist_id', 'source_series_id']);
+            $table->dropUnique('series_playlist_id_source_series_id_unique');
         });
 
         Schema::table('groups', function (Blueprint $table) {
