@@ -2,18 +2,21 @@
 
 namespace App\Filament\Pages;
 
+use App\Jobs\RestartQueue;
 use App\Rules\CheckIfUrlOrLocalPath;
 use App\Rules\Cron;
 use App\Settings\GeneralSettings;
 use App\Services\FfmpegCodecService;
 use Cron\CronExpression;
 use Filament\Forms;
+use Filament\Actions;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
 use Filament\Notifications\Notification;
 use Filament\Pages\SettingsPage;
 use Filament\Support\Enums\MaxWidth;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Mail;
@@ -27,6 +30,49 @@ class Preferences extends SettingsPage
     protected static ?string $navigationLabel = 'Settings';
 
     protected static ?string $title = 'Settings';
+
+    protected function getActions(): array
+    {
+        return [
+            Actions\Action::make('Reset Queue')
+                ->label('Reset Queue')
+                ->action(function () {
+                    app('Illuminate\Contracts\Bus\Dispatcher')
+                        ->dispatch(new RestartQueue());
+                })
+                ->after(function () {
+                    Notification::make()
+                        ->success()
+                        ->title('Queue reset')
+                        ->body('The queue workers have been restarted and any pending jobs flushed. You may need to manually sync any Playlists or EPGs that were in progress.')
+                        ->duration(10000)
+                        ->send();
+                })
+                ->color('gray')
+                ->requiresConfirmation()
+                ->icon('heroicon-o-exclamation-triangle')
+                ->modalIcon('heroicon-o-exclamation-triangle')
+                ->modalDescription('Resetting the queue will restart the queue workers and flush any pending jobs. Any syncs or background processes will be stopped and removed. Only perform this action if you are having sync issues.')
+                ->modalSubmitActionLabel('I understand, reset now'),
+            Actions\Action::make('Clear Logo Cache')
+                ->label('Clear Logo Cache')
+                ->action(fn() => Artisan::call('app:logo-cleanup --force --all'))
+                ->after(function () {
+                    Notification::make()
+                        ->success()
+                        ->title('Logo cache cleared')
+                        ->body('The logo cache has been cleared successfully.')
+                        ->duration(10000)
+                        ->send();
+                })
+                ->color('gray')
+                ->requiresConfirmation()
+                ->icon('heroicon-o-exclamation-triangle')
+                ->modalIcon('heroicon-o-exclamation-triangle')
+                ->modalDescription('Clearing the logo cache will remove all cached logo images. This action cannot be undone.')
+                ->modalSubmitActionLabel('I understand, clear logo cache now')
+        ];
+    }
 
     public function form(Form $form): Form
     {
