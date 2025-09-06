@@ -119,6 +119,16 @@ class ProcessM3uImport implements ShouldQueue
             'series_progress' => 0,
         ]);
 
+        // Mark child playlists as pending while the parent syncs
+        if (! $this->playlist->parent_id && $this->playlist->children()->exists()) {
+            $this->playlist->children()->update([
+                'status' => Status::Pending,
+                'processing' => true,
+                'progress' => 0,
+                'series_progress' => 0,
+            ]);
+        }
+
         // Determine if using Xtream API or M3U+
         if ($this->playlist->xtream) {
             $this->processXtreamApi();
