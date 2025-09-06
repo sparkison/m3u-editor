@@ -70,10 +70,11 @@ class SyncVodStrmFiles implements ShouldQueue
                 }
 
                 // Setup episode prefix
-                $group = $channel->group;
+                $group = preg_replace('/[^a-zA-Z0-9_\-]/', ' ', $channel->group);
 
                 // Create the .strm file
-                $fileName = "{$channel->title}.strm";
+                $title = preg_replace('/[^a-zA-Z0-9_\-]/', ' ', $channel->title);
+                $fileName = "{$title}.strm";
 
                 // Create the season folder
                 if ($sync_settings['include_season'] ?? true) {
