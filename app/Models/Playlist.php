@@ -241,7 +241,7 @@ class Playlist extends Model
 
             $lock = Cache::lock("sync-playlist-{$playlist->id}", 5);
             if ($lock->get()) {
-                SyncPlaylistChildren::dispatchAfterResponse($playlist);
+                SyncPlaylistChildren::dispatch($playlist);
             }
         });
     }

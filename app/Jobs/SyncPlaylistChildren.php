@@ -47,8 +47,8 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
 
     /**
      * Debounce child sync dispatches by caching change identifiers per playlist
-     * and queuing a single job after a short delay. Changes and the queued flag
-     * share a five‑second TTL so rapid edits merge into one job and only one
+     * and queuing a single job immediately. Changes and the queued flag
+     * share a short TTL so rapid edits merge into one job and only one
      * dispatch is scheduled at a time.
      *
      * @param  array<string, array<int, string>>  $changes
@@ -66,7 +66,7 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
         // short window that matches the change-cache TTL. The flag is cleared
         // at the end of the job so subsequent edits can enqueue another sync.
         if (Cache::add("{$key}:queued", true, self::DEBOUNCE_TTL)) {
-            self::dispatchAfterResponse($playlist)->delay(now()->addSeconds(self::DEBOUNCE_TTL));
+            self::dispatch($playlist);
         }
     }
 

@@ -31,6 +31,7 @@ class Group extends Model
         'user_id' => 'integer',
         'playlist_id' => 'integer',
         'sort_order' => 'integer',
+        'is_custom' => 'boolean',
     ];
 
     public function user(): BelongsTo
