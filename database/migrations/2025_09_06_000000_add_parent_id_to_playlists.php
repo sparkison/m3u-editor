@@ -24,6 +24,10 @@ return new class extends Migration {
             $table->index(['playlist_id', 'source_category_id']);
         });
 
+        Schema::table('groups', function (Blueprint $table) {
+            $table->unique(['playlist_id', 'name_internal'], 'groups_playlist_id_name_internal_unique');
+        });
+
         Schema::table('series', function (Blueprint $table) {
             $table->index(['playlist_id', 'source_series_id']);
         });
@@ -41,6 +45,10 @@ return new class extends Migration {
 
         Schema::table('series', function (Blueprint $table) {
             $table->dropIndex(['playlist_id', 'source_series_id']);
+        });
+
+        Schema::table('groups', function (Blueprint $table) {
+            $table->dropUnique('groups_playlist_id_name_internal_unique');
         });
 
         Schema::table('categories', function (Blueprint $table) {
