@@ -30,6 +30,7 @@ class DuplicatePlaylist implements ShouldQueue
      */
     public function handle(): void
     {
+        $copiedPath = null;
         DB::beginTransaction();
         $copiedPath = null;
 
