@@ -31,7 +31,7 @@ return [
         'reverb' => [
             'host' => env('REVERB_SERVER_HOST', '0.0.0.0'),
             'port' => env('REVERB_SERVER_PORT', 8080),
-            'hostname' => env('REVERB_HOST'),
+            'hostname' => env('REVERB_HOST', 'localhost'),
             'options' => [
                 'tls' => [],
             ],
@@ -75,12 +75,12 @@ return [
                 'secret' => env('REVERB_APP_SECRET'),
                 'app_id' => env('REVERB_APP_ID'),
                 'options' => [
-                    'host' => env('REVERB_HOST'),
-                    'port' => env('APP_ENV', 'production') === 'production' && env('REVERB_SCHEME', 'https') === 'https'
+                    'host' => env('REVERB_HOST', 'localhost'),
+                    'port' => env('APP_ENV', 'production') === 'production' && env('REVERB_SCHEME', 'http') === 'https'
                         ? 443 // force to 443 for https
-                        : env('REVERB_PORT', 443), // if not https, use the port specified
-                    'scheme' => env('REVERB_SCHEME', 'https'),
-                    'useTLS' => env('REVERB_SCHEME', 'https') === 'https',
+                        : env('REVERB_PORT', 36800), // if not https, use the port specified
+                    'scheme' => env('REVERB_SCHEME', 'http'),
+                    'useTLS' => env('REVERB_SCHEME', 'http') === 'https',
                 ],
                 'allowed_origins' => ['*'],
                 'ping_interval' => env('REVERB_APP_PING_INTERVAL', 60),
