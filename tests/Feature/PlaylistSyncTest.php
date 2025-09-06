@@ -546,6 +546,16 @@ it('dispatches child sync after parent provider sync', function () {
     Queue::assertPushed(SyncPlaylistChildren::class, 1);
 });
 
+it('dispatches child sync after child provider sync', function () {
+    $parent = Playlist::factory()->create();
+    (new DuplicatePlaylist($parent, withSync: true))->handle();
+    $child = Playlist::where('parent_id', $parent->id)->first();
+
+    Queue::fake();
+    event(new SyncCompleted($child));
+    Queue::assertPushed(SyncPlaylistChildren::class, fn ($job) => $job->playlist->is($parent));
+});
+
 it('dispatches a single sync job for rapid parent saves', function () {
     $playlist = Playlist::factory()->create();
     (new DuplicatePlaylist($playlist, withSync: true))->handle();
