@@ -145,7 +145,7 @@ class ViewGroup extends ViewRecord
                     ->modalSubmitActionLabel('Yes, disable now'),
 
                 Actions\DeleteAction::make()
-                    ->hidden(fn($record) => !$record->custom),
+                    ->hidden(fn($record) => !$record->is_custom),
             ])->button()->label('Actions'),
         ];
     }

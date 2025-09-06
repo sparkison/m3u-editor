@@ -21,7 +21,7 @@ class ListGroups extends ListRecords
             Actions\CreateAction::make()
                 ->using(function (array $data, string $model): Model {
                     $data['user_id'] = auth()->id();
-                    $data['custom'] = true;
+                    $data['is_custom'] = true;
                     return $model::create($data);
                 })
                 ->successNotification(

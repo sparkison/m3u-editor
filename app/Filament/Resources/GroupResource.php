@@ -107,7 +107,7 @@ class GroupResource extends Resource
                     ->numeric()
                     ->toggleable()
                     ->sortable(),
-                Tables\Columns\IconColumn::make('custom')
+                Tables\Columns\IconColumn::make('is_custom')
                     ->label('Custom')
                     ->icon(fn(string $state): string => match ($state) {
                         '1' => 'heroicon-o-check-circle',
@@ -257,7 +257,7 @@ class GroupResource extends Resource
                         ->modalSubmitActionLabel('Yes, disable now'),
 
                     Tables\Actions\DeleteAction::make()
-                        ->hidden(fn($record) => !$record->custom),
+                        ->hidden(fn($record) => !$record->is_custom),
                 ])->button()->hiddenLabel()->size('sm'),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
