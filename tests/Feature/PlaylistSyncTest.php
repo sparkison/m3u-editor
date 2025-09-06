@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Log;
 use App\Events\SyncCompleted;
 use App\Enums\Status;
 use App\Settings\GeneralSettings;
@@ -93,6 +94,37 @@ it('syncs grouped channels using batched upserts', function () {
     $child->refresh();
     expect($child->channels()->count())->toBe(1);
     expect($child->channels()->first()->name)->toBe('One Renamed');
+});
+
+it('syncs groups without internal names using fallback keys', function () {
+    $playlist = Playlist::factory()->create();
+    $group = Group::factory()->create([
+        'playlist_id' => $playlist->id,
+        'user_id' => $playlist->user_id,
+        'name' => 'Group Name',
+        'name_internal' => null,
+    ]);
+    Channel::factory()->create([
+        'playlist_id' => $playlist->id,
+        'user_id' => $playlist->user_id,
+        'group_id' => $group->id,
+        'name' => 'Chan',
+    ]);
+
+    $child = Playlist::factory()->create([
+        'parent_id' => $playlist->id,
+        'user_id' => $playlist->user_id,
+    ]);
+
+    config(['cache.default' => 'array']);
+    Log::spy();
+    Playlist::unguard();
+    (new SyncPlaylistChildren($playlist))->handle();
+    Playlist::reguard();
+
+    $child->refresh();
+    expect($child->groups()->count())->toBe(1);
+    Log::shouldNotHaveReceived('info', [\Mockery::on(fn ($msg) => str_contains($msg, 'Child group not found'))]);
 });
 
 it('syncs category and series updates via upsert', function () {

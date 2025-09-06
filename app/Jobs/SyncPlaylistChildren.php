@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /**
  * Synchronize child playlists with their parent.
@@ -169,21 +170,29 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
         $parentGroupNames = [];
         $parent->groups()->chunkById(100, function ($groups) use ($child, &$parentGroupNames) {
             $groupRows = [];
+            $groupKeys = [];
             foreach ($groups as $group) {
-                $parentGroupNames[] = $group->name_internal;
-                $groupRows[] = $group->only(['name', 'name_internal', 'sort_order', 'user_id', 'is_custom']) + [
+                $key = $group->name_internal;
+                if (! $key) {
+                    $key = Str::slug($group->name) ?: 'grp-' . $group->id;
+                }
+
+                $groupKeys[$group->id] = $key;
+                $parentGroupNames[] = $key;
+                $groupRows[] = $group->only(['name', 'sort_order', 'user_id', 'is_custom']) + [
                     'playlist_id' => $child->id,
+                    'name_internal' => $key,
                 ];
             }
             $child->groups()->upsert($groupRows, ['playlist_id', 'name_internal']);
             unset($groupRows);
 
-            $names = $groups->pluck('name_internal');
-            $childGroups = $child->groups()->whereIn('name_internal', $names)->get()->keyBy('name_internal');
+            $childGroups = $child->groups()->whereIn('name_internal', array_values($groupKeys))->get()->keyBy('name_internal');
             foreach ($groups as $group) {
-                $childGroup = $childGroups->get($group->name_internal);
+                $key = $groupKeys[$group->id];
+                $childGroup = $childGroups->get($key);
                 if (! $childGroup) {
-                    Log::info("SyncPlaylistChildren: Child group not found for key '{$group->name_internal}' on playlist {$child->id}");
+                    Log::info("SyncPlaylistChildren: Child group not found for key '{$key}' on playlist {$child->id}");
 
                     continue;
                 }
