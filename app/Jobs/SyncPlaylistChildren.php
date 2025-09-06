@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\Status;
 use App\Models\{Category, Playlist, Season, Series};
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -90,44 +91,61 @@ class SyncPlaylistChildren implements ShouldQueue, ShouldBeUnique
 
             $parent->children()->chunkById(100, function ($children) use ($parent) {
                 foreach ($children as $child) {
+                    $start = now();
+                    $child->update([
+                        'status' => Status::Processing,
+                        'processing' => true,
+                        'progress' => 0,
+                    ]);
+
                     DB::beginTransaction();
                     $copiedFile = null;
                     try {
                         if (! empty($this->changes)) {
                             $this->syncDelta($parent, $child, $this->changes);
-                            DB::commit();
-                            continue;
+                        } else {
+                            $this->syncGroups($parent, $child);
+                            $this->syncCategories($parent, $child);
+                            $this->syncUngroupedChannels($parent, $child);
+                            $this->syncUncategorizedSeries($parent, $child);
+
+                            if ($parent->uploads && Storage::disk('local')->exists($parent->uploads)) {
+                                Storage::disk('local')->makeDirectory($child->folder_path);
+                                if (! Storage::disk('local')->copy($parent->uploads, $child->file_path)) {
+                                    throw new \RuntimeException("Failed to copy uploaded file for child playlist {$child->id}");
+                                }
+                                $copiedFile = $child->file_path;
+                                $child->uploads = $child->file_path;
+                            } elseif ($child->uploads) {
+                                Storage::disk('local')->delete($child->uploads);
+                                $child->uploads = null;
+                            }
+
+                            $child->save();
                         }
 
-                        $this->syncGroups($parent, $child);
-                        $this->syncCategories($parent, $child);
-                        $this->syncUngroupedChannels($parent, $child);
-                        $this->syncUncategorizedSeries($parent, $child);
+                        DB::commit();
 
-
-                if ($parent->uploads && Storage::disk('local')->exists($parent->uploads)) {
-                    Storage::disk('local')->makeDirectory($child->folder_path);
-                    if (! Storage::disk('local')->copy($parent->uploads, $child->file_path)) {
-                        throw new \RuntimeException("Failed to copy uploaded file for child playlist {$child->id}");
+                        $child->update([
+                            'status' => Status::Completed,
+                            'synced' => now(),
+                            'sync_time' => $start->diffInSeconds(now()),
+                            'processing' => false,
+                            'progress' => 100,
+                        ]);
+                    } catch (\Throwable $e) {
+                        DB::rollBack();
+                        if ($copiedFile && Storage::disk('local')->exists($copiedFile)) {
+                            Storage::disk('local')->delete($copiedFile);
+                        }
+                        $child->update([
+                            'status' => Status::Failed,
+                            'processing' => false,
+                        ]);
+                        throw $e;
                     }
-                    $copiedFile = $child->file_path;
-                    $child->uploads = $child->file_path;
-                } elseif ($child->uploads) {
-                    Storage::disk('local')->delete($child->uploads);
-                    $child->uploads = null;
                 }
-
-                $child->save();
-                DB::commit();
-            } catch (\Throwable $e) {
-                DB::rollBack();
-                if ($copiedFile && Storage::disk('local')->exists($copiedFile)) {
-                    Storage::disk('local')->delete($copiedFile);
-                }
-                throw $e;
-            }
-        }
-        });
+            });
 
             // If additional changes were queued while this job was running,
             // schedule another sync so those edits aren't dropped.
