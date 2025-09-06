@@ -183,7 +183,7 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
             foreach ($groups as $group) {
                 $childGroup = $childGroups->get($group->name_internal);
                 if (! $childGroup) {
-                    Log::warning("SyncPlaylistChildren: Child group not found for key '{$group->name_internal}' on playlist {$child->id}");
+                    Log::info("SyncPlaylistChildren: Child group not found for key '{$group->name_internal}' on playlist {$child->id}");
 
                     continue;
                 }
