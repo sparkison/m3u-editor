@@ -84,7 +84,6 @@ class DuplicatePlaylist implements ShouldQueue
                     $newChannel->playlist_id = $newPlaylist->id;
                     $newChannel->created_at = $now;
                     $newChannel->updated_at = $now;
-                    $newChannel->source_id = $channel->source_id ?? 'ch-'.$channel->id;
                     $newChannel->save();
 
                     // Copy the channel failovers
@@ -110,7 +109,6 @@ class DuplicatePlaylist implements ShouldQueue
                 $newCategory->playlist_id = $newPlaylist->id;
                 $newCategory->created_at = $now;
                 $newCategory->updated_at = $now;
-                $newCategory->source_category_id = $category->source_category_id ?? 'cat-'.$category->id;
                 $newCategory->save();
 
                 // Copy the category series
@@ -124,7 +122,6 @@ class DuplicatePlaylist implements ShouldQueue
                     $newSeries->playlist_id = $newPlaylist->id;
                     $newSeries->created_at = $now;
                     $newSeries->updated_at = $now;
-                    $newSeries->source_series_id = $series->source_series_id ?? 'series-'.$series->id;
                     $newSeries->save();
 
                     // Copy the series seasons
@@ -140,7 +137,6 @@ class DuplicatePlaylist implements ShouldQueue
                         $newSeason->playlist_id = $newPlaylist->id;
                         $newSeason->created_at = $now;
                         $newSeason->updated_at = $now;
-                        $newSeason->source_season_id = $season->source_season_id ?? 'season-'.$season->id;
                         $newSeason->save();
 
                         // Copy the season episodes
@@ -156,7 +152,6 @@ class DuplicatePlaylist implements ShouldQueue
                             $newEpisode->playlist_id = $newPlaylist->id;
                             $newEpisode->created_at = $now;
                             $newEpisode->updated_at = $now;
-                            $newEpisode->source_episode_id = $episode->source_episode_id ?? 'ep-'.$episode->id;
                             $newEpisode->save();
                         }
                     }
@@ -174,7 +169,6 @@ class DuplicatePlaylist implements ShouldQueue
                 $newChannel->playlist_id = $newPlaylist->id;
                 $newChannel->created_at = $now;
                 $newChannel->updated_at = $now;
-                $newChannel->source_id = $channel->source_id ?? 'ch-'.$channel->id;
                 $newChannel->save();
 
                 foreach ($channel->failovers as $failover) {
@@ -193,7 +187,6 @@ class DuplicatePlaylist implements ShouldQueue
                 $newSeries->playlist_id = $newPlaylist->id;
                 $newSeries->created_at = $now;
                 $newSeries->updated_at = $now;
-                $newSeries->source_series_id = $series->source_series_id ?? 'series-'.$series->id;
                 $newSeries->save();
 
                 foreach ($series->seasons()->lazy() as $season) {
@@ -203,7 +196,6 @@ class DuplicatePlaylist implements ShouldQueue
                     $newSeason->playlist_id = $newPlaylist->id;
                     $newSeason->created_at = $now;
                     $newSeason->updated_at = $now;
-                    $newSeason->source_season_id = $season->source_season_id ?? 'season-'.$season->id;
                     $newSeason->save();
 
                     foreach ($season->episodes()->lazy() as $episode) {
@@ -213,7 +205,6 @@ class DuplicatePlaylist implements ShouldQueue
                         $newEpisode->playlist_id = $newPlaylist->id;
                         $newEpisode->created_at = $now;
                         $newEpisode->updated_at = $now;
-                        $newEpisode->source_episode_id = $episode->source_episode_id ?? 'ep-'.$episode->id;
                         $newEpisode->save();
                     }
                 }
@@ -239,11 +230,15 @@ class DuplicatePlaylist implements ShouldQueue
             DB::commit();
 
             // Send notification
-            Notification::make()
-                ->success()
-                ->title('Playlist Duplicated')
-                ->body("\"{$playlist->name}\" has been duplicated successfully.")
-                ->broadcast($playlist->user);
+            try {
+                Notification::make()
+                    ->success()
+                    ->title('Playlist Duplicated')
+                    ->body("\"{$playlist->name}\" has been duplicated successfully.")
+                    ->broadcast($playlist->user);
+            } catch (\Throwable $broadcastError) {
+                logger()->warning('Broadcast failed: '.$broadcastError->getMessage());
+            }
             Notification::make()
                 ->success()
                 ->title('Playlist Duplicated')
@@ -260,11 +255,15 @@ class DuplicatePlaylist implements ShouldQueue
             logger()->error("Error duplicating \"{$this->playlist->name}\": {$e->getMessage()}");
 
             // Send notification
-            Notification::make()
-                ->danger()
-                ->title("Error duplicating \"{$this->playlist->name}\"")
-                ->body('Please view your notifications for details.')
-                ->broadcast($this->playlist->user);
+            try {
+                Notification::make()
+                    ->danger()
+                    ->title("Error duplicating \"{$this->playlist->name}\"")
+                    ->body('Please view your notifications for details.')
+                    ->broadcast($this->playlist->user);
+            } catch (\Throwable $broadcastError) {
+                logger()->warning('Broadcast failed: '.$broadcastError->getMessage());
+            }
             Notification::make()
                 ->danger()
                 ->title("Error duplicating \"{$this->playlist->name}\"")
