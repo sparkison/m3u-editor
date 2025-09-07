@@ -60,7 +60,7 @@ trait HandlesSourcePlaylist
     protected static function getSourcePlaylistData(Collection $records, string $relation, string $sourceKey): array
     {
         $recordPlaylistIds = $records->pluck('playlist_id')->unique();
-        $recordSourceIds   = $records->pluck($sourceKey)->unique();
+        $recordSourceIds   = $records->pluck($sourceKey)->filter()->unique();
 
         $parentIds = Playlist::whereIn('id', $recordPlaylistIds)
             ->pluck('parent_id')
@@ -178,10 +178,58 @@ trait HandlesSourcePlaylist
         string $relation,
         string $sourceKey,
         string $itemLabel,
-        ?array &$sourcePlaylistData = null
+        ?array &$sourcePlaylistData = null,
+        ?Collection $grouped = null,
+        bool $allowDrilldown = true
     ): array {
         if ($sourcePlaylistData === null) {
-            $sourcePlaylistData = self::getSourcePlaylistData($records, $relation, $sourceKey);
+            if ($grouped) {
+                // Map each record and composite key to its parent group
+                $recordGroups    = [];
+                $compositeGroups = [];
+                foreach ($grouped as $groupEntry) {
+                    $groupId = $groupEntry['group']->id;
+                    foreach ($groupEntry['channels'] as $channel) {
+                        $recordGroups[$channel->id] = $groupId;
+                        $compositeGroups[$channel->playlist_id . ':' . $channel->$sourceKey] = $groupId;
+                    }
+                }
+
+                // Compute duplicate metadata once over the flattened records
+                $sourcePlaylistData = self::getSourcePlaylistData($records, $relation, $sourceKey);
+                [$dupGroups, $needsSourcePlaylist, $recordSourceIds, $sourceToGroup] = $sourcePlaylistData;
+
+                // Re-map duplicate groups back to their parent groups with unique keys
+                $groupedDuplicates = [];
+                foreach ($dupGroups as $pairKey => $group) {
+                    foreach ($group['records'] ?? [] as $record) {
+                        $gid = $recordGroups[$record['id']] ?? null;
+                        if ($gid === null) {
+                            continue;
+                        }
+
+                        $globalKey = $gid . '|' . $pairKey;
+                        $existing  = $groupedDuplicates[$globalKey] ?? array_merge($group, ['records' => []]);
+                        $existing['records'][$record['id']] = $record;
+                        $groupedDuplicates[$globalKey] = $existing;
+                    }
+                }
+
+                // Map composite keys to the new global pair keys
+                $globalSourceToGroup = $sourceToGroup->map(function ($pairKey, $composite) use ($compositeGroups) {
+                    $gid = $compositeGroups[$composite] ?? null;
+                    return $gid !== null ? $gid . '|' . $pairKey : $pairKey;
+                });
+
+                $sourcePlaylistData = [
+                    collect($groupedDuplicates),
+                    $needsSourcePlaylist,
+                    $recordSourceIds,
+                    $globalSourceToGroup,
+                ];
+            } else {
+                $sourcePlaylistData = self::getSourcePlaylistData($records, $relation, $sourceKey);
+            }
         }
 
         [$duplicateGroups, $needsSourcePlaylist] = $sourcePlaylistData;
@@ -190,38 +238,123 @@ trait HandlesSourcePlaylist
             return [];
         }
 
+        // When grouped records are provided, organise duplicate groups by parent group
+        if ($grouped) {
+            $byGroup = [];
+            foreach ($duplicateGroups as $key => $group) {
+                [$groupId, $pairKey] = explode('|', $key, 2);
+                $byGroup[$groupId][$pairKey] = $group;
+            }
+
+            $fields = [];
+            foreach ($grouped as $groupEntry) {
+                $groupModel = $groupEntry['group'];
+                $groupId    = (string) $groupModel->id;
+                if (! isset($byGroup[$groupId])) {
+                    continue;
+                }
+
+                $fields[] = Forms\Components\Fieldset::make('These items appear in synced playlists.')
+                    ->schema([
+                        Forms\Components\Fieldset::make($groupModel->name)
+                            ->schema(collect($byGroup[$groupId])->map(function ($group, $pairKey) use ($groupId, $itemLabel, $allowDrilldown) {
+                                $globalKey  = $groupId . '|' . $pairKey;
+                                $parentName = $group['playlists'][$group['parent_id']];
+                                $childName  = $group['playlists'][$group['child_id']];
+
+                                $schema = [
+                                    Forms\Components\Select::make("source_playlists.{$globalKey}")
+                                        ->label('Use items from:')
+                                        ->options($group['playlists']->toArray())
+                                        ->required()
+                                        ->searchable(),
+                                ];
+
+                                if ($allowDrilldown) {
+                                    $schema[] = Actions::make([
+                                        Action::make("view_channels_{$globalKey}")
+                                            ->label('View channels')
+                                            ->modalHeading("Channels in {$parentName} ↔ {$childName}")
+                                            ->statePath("source_playlists_items.{$globalKey}")
+                                            ->steps(self::buildChannelSteps(collect($group['records'] ?? []), $group['playlists'])),
+                                    ]);
+                                }
+
+                                return Forms\Components\Fieldset::make("{$parentName} ↔ {$childName}")
+                                    ->schema($schema);
+                            })->toArray()),
+                    ]);
+            }
+
+            return $fields;
+        }
+
+        // Default behaviour for ungrouped records
         $fields = [];
 
         foreach ($duplicateGroups as $pairKey => $group) {
             $parentName = $group['playlists'][$group['parent_id']];
             $childName  = $group['playlists'][$group['child_id']];
 
-            $fields[] = Forms\Components\Fieldset::make('These items appear in synced playlists.')
-                ->schema([
-                    Forms\Components\Select::make("source_playlists.{$pairKey}")
-                        ->label('Use items from:')
-                        ->options($group['playlists']->toArray())
-                        ->required()
-                        ->searchable(),
-                    Actions::make([
-                        Action::make("view_affected_{$pairKey}")
-                            ->label('View affected items')
-                            ->modalHeading("Items in {$parentName} ↔ {$childName}")
-                            ->statePath("source_playlists_items.{$pairKey}")
-                            ->form(
-                                collect($group['records'] ?? [])->map(fn ($record) =>
-                                    Forms\Components\Select::make((string) $record['id'])
-                                        ->label($record['title'])
-                                        ->options($group['playlists']->toArray())
-                                        ->placeholder('Use group selection')
-                                        ->searchable()
-                                )->toArray()
-                            ),
-                    ]),
+            $schema = [
+                Forms\Components\Select::make("source_playlists.{$pairKey}")
+                    ->label('Use items from:')
+                    ->options($group['playlists']->toArray())
+                    ->required()
+                    ->searchable(),
+            ];
+
+            if ($allowDrilldown) {
+                $schema[] = Actions::make([
+                    Action::make("view_affected_{$pairKey}")
+                        ->label('View affected items')
+                        ->modalHeading("Items in {$parentName} ↔ {$childName}")
+                        ->statePath("source_playlists_items.{$pairKey}")
+                        ->steps(self::buildChannelSteps(collect($group['records'] ?? []), $group['playlists'])),
                 ]);
+            }
+
+            $fields[] = Forms\Components\Fieldset::make('These items appear in synced playlists.')
+                ->schema($schema);
         }
 
         return $fields;
+    }
+
+    /**
+     * Build wizard steps to paginate channel overrides.
+     */
+    protected static function buildChannelSteps(Collection $records, Collection $playlists): array
+    {
+        $chunks = $records->chunk(10);
+        $steps = [];
+        foreach ($chunks as $index => $chunk) {
+            $steps[] = Forms\Components\Wizard\Step::make('Page ' . ($index + 1))
+                ->schema(
+                    $chunk->map(fn ($record) =>
+                        Forms\Components\Select::make((string) $record['id'])
+                            ->label($record['title'])
+                            ->options($playlists->toArray())
+                            ->placeholder('Use group selection')
+                            ->searchable()
+                    )->toArray()
+                );
+        }
+
+        return $steps;
+    }
+
+    /**
+     * Flatten grouped records into a single collection of models.
+     */
+    protected static function flattenRecords(Collection $records): Collection
+    {
+        $first = $records->first();
+        if ($first instanceof \Illuminate\Database\Eloquent\Model) {
+            return $records;
+        }
+
+        return $records->flatMap(fn ($group) => $group['channels']);
     }
 
     /**
@@ -324,13 +457,25 @@ trait HandlesSourcePlaylist
         string $sourceKey,
         string $itemLabel,
         string $tagType,
-        string $categoryLabel = 'Custom Group'
-    ): Tables\Actions\BulkAction {
+        string $categoryLabel = 'Custom Group',
+        ?callable $recordsResolver = null,
+        bool $allowDrilldown = true,
+        string $actionClass = \Filament\Tables\Actions\BulkAction::class,
+        bool $isBulk = true
+    ): \Filament\Actions\Action {
         $sourcePlaylistData = null;
 
-        return Tables\Actions\BulkAction::make('add')
+        /** @var \Filament\Actions\Action $action */
+        $action = $actionClass::make('add')
             ->label('Add to Custom Playlist')
-            ->form(function (Collection $records) use ($relation, $sourceKey, $itemLabel, $tagType, $categoryLabel, &$sourcePlaylistData): array {
+            ->form(function ($records) use ($relation, $sourceKey, $itemLabel, $tagType, $categoryLabel, &$sourcePlaylistData, $recordsResolver, $isBulk, $allowDrilldown): array {
+                $records = $isBulk ? $records : collect([$records]);
+                if ($recordsResolver) {
+                    $records = $recordsResolver($records);
+                }
+
+                $flatRecords = self::flattenRecords($records);
+
                 $form = [
                     Forms\Components\Select::make('playlist')
                         ->required()
@@ -358,15 +503,26 @@ trait HandlesSourcePlaylist
                         ->searchable(),
                 ];
 
+                $grouped = $records->first() instanceof \Illuminate\Database\Eloquent\Model ? null : $records;
                 $form = array_merge(
                     $form,
-                    self::buildSourcePlaylistForm($records, $relation, $sourceKey, $itemLabel, $sourcePlaylistData)
+                    self::buildSourcePlaylistForm($flatRecords, $relation, $sourceKey, $itemLabel, $sourcePlaylistData, $grouped, $allowDrilldown)
                 );
 
                 return $form;
             })
-            ->action(function (Collection $records, array $data) use ($modelClass, $relation, $sourceKey, &$sourcePlaylistData): void {
-                $records = self::mapRecordsToSourcePlaylist($records, $data, $relation, $sourceKey, $modelClass, $sourcePlaylistData);
+            ->action(function ($records, array $data) use ($modelClass, $relation, $sourceKey, &$sourcePlaylistData, $recordsResolver, $isBulk, $itemLabel, $allowDrilldown): void {
+                $records = $isBulk ? $records : collect([$records]);
+                if ($recordsResolver) {
+                    $records = $recordsResolver($records);
+                }
+
+                $flatRecords = self::flattenRecords($records);
+
+                $grouped = $records->first() instanceof \Illuminate\Database\Eloquent\Model ? null : $records;
+                self::buildSourcePlaylistForm($flatRecords, $relation, $sourceKey, $itemLabel, $sourcePlaylistData, $grouped, $allowDrilldown);
+
+                $records = self::mapRecordsToSourcePlaylist($flatRecords, $data, $relation, $sourceKey, $modelClass, $sourcePlaylistData);
 
                 $playlist = CustomPlaylist::findOrFail($data['playlist']);
                 $playlist->$relation()->syncWithoutDetaching($records->pluck('id'));
@@ -381,12 +537,17 @@ trait HandlesSourcePlaylist
                     ->body("The selected {$itemLabel} have been added to the chosen custom playlist.")
                     ->send();
             })
-            ->deselectRecordsAfterCompletion()
             ->requiresConfirmation()
             ->icon('heroicon-o-play')
             ->modalIcon('heroicon-o-play')
             ->modalDescription("Add the selected {$itemLabel} to the chosen custom playlist.")
             ->modalSubmitActionLabel('Add now');
+
+        if ($isBulk && method_exists($action, 'deselectRecordsAfterCompletion')) {
+            $action->deselectRecordsAfterCompletion();
+        }
+
+        return $action;
     }
 
     public static function addToCustomPlaylistBulkAction(
@@ -395,8 +556,46 @@ trait HandlesSourcePlaylist
         string $sourceKey,
         string $itemLabel,
         string $tagType,
-        string $categoryLabel = 'Custom Group'
+        string $categoryLabel = 'Custom Group',
+        ?callable $recordsResolver = null,
+        bool $allowDrilldown = true
     ): Tables\Actions\BulkAction {
-        return self::buildAddToCustomPlaylistAction($modelClass, $relation, $sourceKey, $itemLabel, $tagType, $categoryLabel);
+        return self::buildAddToCustomPlaylistAction(
+            $modelClass,
+            $relation,
+            $sourceKey,
+            $itemLabel,
+            $tagType,
+            $categoryLabel,
+            $recordsResolver,
+            $allowDrilldown,
+            \Filament\Tables\Actions\BulkAction::class,
+            true
+        );
+    }
+
+    public static function addToCustomPlaylistAction(
+        string $modelClass,
+        string $relation,
+        string $sourceKey,
+        string $itemLabel,
+        string $tagType,
+        string $categoryLabel = 'Custom Group',
+        ?callable $recordsResolver = null,
+        bool $allowDrilldown = true,
+        string $actionClass = \Filament\Tables\Actions\Action::class
+    ): \Filament\Actions\Action {
+        return self::buildAddToCustomPlaylistAction(
+            $modelClass,
+            $relation,
+            $sourceKey,
+            $itemLabel,
+            $tagType,
+            $categoryLabel,
+            $recordsResolver,
+            $allowDrilldown,
+            $actionClass,
+            false
+        );
     }
 }
