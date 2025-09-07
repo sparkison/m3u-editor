@@ -5,6 +5,7 @@ use App\Jobs\SyncPlaylistChildren;
 use App\Jobs\ProcessM3uImportComplete;
 use App\Jobs\ProcessM3uImportSeriesComplete;
 use App\Models\Channel;
+use App\Models\ChannelFailover;
 use App\Models\Episode;
 use App\Models\Group;
 use App\Models\Playlist;
@@ -409,6 +410,142 @@ it('renames groups on child playlists', function () {
 
     $childGroup = $child->groups()->first();
     expect($childGroup->name)->toBe('Renamed');
+});
+
+it('maps grouped channel failovers to child channels', function () {
+    $playlist = Playlist::factory()->create();
+    $group = Group::factory()->create([
+        'playlist_id' => $playlist->id,
+        'user_id' => $playlist->user_id,
+        'name_internal' => 'grp',
+    ]);
+    $chan1 = Channel::factory()->create([
+        'playlist_id' => $playlist->id,
+        'user_id' => $playlist->user_id,
+        'group_id' => $group->id,
+        'source_id' => 's1',
+    ]);
+    $chan2 = Channel::factory()->create([
+        'playlist_id' => $playlist->id,
+        'user_id' => $playlist->user_id,
+        'group_id' => $group->id,
+        'source_id' => 's2',
+    ]);
+    ChannelFailover::create([
+        'user_id' => $playlist->user_id,
+        'channel_id' => $chan1->id,
+        'channel_failover_id' => $chan2->id,
+        'sort' => 0,
+        'metadata' => [],
+    ]);
+
+    (new DuplicatePlaylist($playlist, withSync: true))->handle();
+    $child = Playlist::where('parent_id', $playlist->id)->first();
+
+    (new SyncPlaylistChildren($playlist))->handle();
+
+    $childChan1 = $child->channels()->where('source_id', 's1')->first();
+    $childChan2 = $child->channels()->where('source_id', 's2')->first();
+    expect($childChan1->failovers()->first()->channel_failover_id)->toBe($childChan2->id);
+});
+
+it('maps ungrouped channel failovers to child channels', function () {
+    $playlist = Playlist::factory()->create();
+    $chan1 = Channel::factory()->create([
+        'playlist_id' => $playlist->id,
+        'user_id' => $playlist->user_id,
+        'group_id' => null,
+        'source_id' => 'p1',
+    ]);
+    $chan2 = Channel::factory()->create([
+        'playlist_id' => $playlist->id,
+        'user_id' => $playlist->user_id,
+        'group_id' => null,
+        'source_id' => 'p2',
+    ]);
+    ChannelFailover::create([
+        'user_id' => $playlist->user_id,
+        'channel_id' => $chan1->id,
+        'channel_failover_id' => $chan2->id,
+        'sort' => 0,
+        'metadata' => [],
+    ]);
+
+    (new DuplicatePlaylist($playlist, withSync: true))->handle();
+    $child = Playlist::where('parent_id', $playlist->id)->first();
+
+    (new SyncPlaylistChildren($playlist))->handle();
+
+    $childChan1 = $child->channels()->where('source_id', 'p1')->first();
+    $childChan2 = $child->channels()->where('source_id', 'p2')->first();
+    expect($childChan1->failovers()->first()->channel_failover_id)->toBe($childChan2->id);
+});
+
+it('maps delta-synced failovers to child channels', function () {
+    $playlist = Playlist::factory()->create();
+    $chan1 = Channel::factory()->create([
+        'playlist_id' => $playlist->id,
+        'user_id' => $playlist->user_id,
+        'group_id' => null,
+        'source_id' => 'd1',
+    ]);
+    $chan2 = Channel::factory()->create([
+        'playlist_id' => $playlist->id,
+        'user_id' => $playlist->user_id,
+        'group_id' => null,
+        'source_id' => 'd2',
+    ]);
+
+    (new DuplicatePlaylist($playlist, withSync: true))->handle();
+    $child = Playlist::where('parent_id', $playlist->id)->first();
+
+    ChannelFailover::create([
+        'user_id' => $playlist->user_id,
+        'channel_id' => $chan1->id,
+        'channel_failover_id' => $chan2->id,
+        'sort' => 0,
+        'metadata' => [],
+    ]);
+
+    (new SyncPlaylistChildren($playlist, ['channels' => ['d1']]))->handle();
+
+    $childChan1 = $child->channels()->where('source_id', 'd1')->first();
+    $childChan2 = $child->channels()->where('source_id', 'd2')->first();
+    expect($childChan1->failovers()->first()->channel_failover_id)->toBe($childChan2->id);
+});
+
+it('preserves failover channels from external playlists', function () {
+    $parent = Playlist::factory()->create();
+    $external = Playlist::factory()->create();
+
+    $externalChannel = Channel::factory()->create([
+        'playlist_id' => $external->id,
+        'user_id' => $external->user_id,
+        'group_id' => null,
+        'name' => 'External',
+        'source_id' => 'ext',
+    ]);
+
+    $chan = Channel::factory()->create([
+        'playlist_id' => $parent->id,
+        'user_id' => $parent->user_id,
+        'group_id' => null,
+        'name' => 'Main',
+        'source_id' => 'main',
+    ]);
+
+    ChannelFailover::factory()->create([
+        'channel_id' => $chan->id,
+        'channel_failover_id' => $externalChannel->id,
+    ]);
+
+    (new DuplicatePlaylist($parent, withSync: true))->handle();
+    $child = Playlist::where('parent_id', $parent->id)->first();
+
+    (new SyncPlaylistChildren($parent))->handle();
+
+    $childChannel = $child->channels()->where('source_id', 'main')->first();
+    expect($childChannel->failovers()->first()->channel_failover_id)->toBe($externalChannel->id);
 });
 
 it('removes old group entry after parent rename', function () {
