@@ -8,6 +8,7 @@ use App\Filament\Resources\SeriesResource\RelationManagers;
 use App\Models\Category;
 use App\Models\Playlist;
 use App\Models\Series;
+use App\Jobs\SyncPlaylistChildren;
 use App\Filament\BulkActions\HandlesSourcePlaylist;
 use App\Rules\CheckIfUrlOrLocalPath;
 use App\Services\XtreamService;
@@ -297,6 +298,7 @@ class SeriesResource extends Resource
                                 'category_id' => $category->id,
                             ]);
                         }
+                        SyncPlaylistChildren::debounce($category->playlist, []);
                     })->after(function () {
                         Notification::make()
                             ->success()

@@ -2,6 +2,7 @@
 
 use App\Filament\BulkActions\HandlesSourcePlaylist;
 use App\Models\Channel;
+use App\Models\Series;
 use App\Models\Playlist;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -9,6 +10,12 @@ use Filament\Forms;
 use function Pest\Laravel\actingAs;
 
 uses(RefreshDatabase::class);
+
+dataset('mediaTypes', [
+    'channels' => [Channel::class, 'channels', 'source_id', 'channel', []],
+    'series'   => [Series::class, 'series', 'source_series_id', 'series', []],
+    'vod'      => [Channel::class, 'channels', 'source_id', 'channel', ['is_vod' => true]],
+]);
 
 function makeFormHandler() {
     return new class {
@@ -18,27 +25,24 @@ function makeFormHandler() {
     };
 }
 
-it('hides the source playlist selector when no duplicates exist', function () {
+it('hides the source playlist selector when no duplicates exist', function (string $modelClass, string $relation, string $sourceKey, string $label, array $extra) {
     $handler = makeFormHandler();
 
     $user = User::factory()->create();
     actingAs($user);
 
     $playlist = Playlist::factory()->for($user)->create();
-    $channel = Channel::factory()->for($user)->create([
+    $record = $modelClass::factory()->for($user)->create(array_merge($extra, [
         'playlist_id' => $playlist->id,
-        'source_id'   => 1,
-        'title'       => 'Channel 1',
-    ]);
+        $sourceKey    => 1,
+    ]));
 
-    $records = collect([$channel]);
-
-    $form = $handler::buildSourcePlaylistForm($records, 'channels', 'source_id', 'channel');
+    $form = $handler::buildSourcePlaylistForm(collect([$record]), $relation, $sourceKey, $label);
 
     expect($form)->toBeEmpty();
-});
+})->with('mediaTypes');
 
-it('renders one required selector for a single parent-child duplicate pair', function () {
+it('renders one required selector for a single parent-child duplicate pair', function (string $modelClass, string $relation, string $sourceKey, string $label, array $extra) {
     $handler = makeFormHandler();
 
     $user = User::factory()->create();
@@ -47,10 +51,17 @@ it('renders one required selector for a single parent-child duplicate pair', fun
     $parent = Playlist::factory()->for($user)->create();
     $child  = Playlist::factory()->for($user)->create(['parent_id' => $parent->id]);
 
-    Channel::factory()->for($user)->create(['playlist_id' => $parent->id, 'source_id' => 1, 'title' => 'A']);
-    $childChannel = Channel::factory()->for($user)->create(['playlist_id' => $child->id, 'source_id' => 1, 'title' => 'A']);
+    $modelClass::factory()->for($user)->create(array_merge($extra, [
+        'playlist_id' => $parent->id,
+        $sourceKey    => 1,
+    ]));
 
-    $form = $handler::buildSourcePlaylistForm(collect([$childChannel]), 'channels', 'source_id', 'channel');
+    $childRecord = $modelClass::factory()->for($user)->create(array_merge($extra, [
+        'playlist_id' => $child->id,
+        $sourceKey    => 1,
+    ]));
+
+    $form = $handler::buildSourcePlaylistForm(collect([$childRecord]), $relation, $sourceKey, $label);
 
     expect($form)->toHaveCount(1);
 
@@ -58,9 +69,9 @@ it('renders one required selector for a single parent-child duplicate pair', fun
 
     expect($select)->toBeInstanceOf(Forms\Components\Select::class);
     expect($select->isRequired())->toBeTrue();
-});
+})->with('mediaTypes');
 
-it('renders one selector per duplicated parent-child group', function () {
+it('renders one selector per duplicated parent-child group', function (string $modelClass, string $relation, string $sourceKey, string $label, array $extra) {
     $handler = makeFormHandler();
 
     $user = User::factory()->create();
@@ -70,11 +81,21 @@ it('renders one selector per duplicated parent-child group', function () {
     $childA = Playlist::factory()->for($user)->create(['parent_id' => $parent->id]);
     $childB = Playlist::factory()->for($user)->create(['parent_id' => $parent->id]);
 
-    Channel::factory()->for($user)->create(['playlist_id' => $parent->id, 'source_id' => 1, 'title' => 'A']);
-    $childChannelA = Channel::factory()->for($user)->create(['playlist_id' => $childA->id, 'source_id' => 1, 'title' => 'A']);
-    $childChannelB = Channel::factory()->for($user)->create(['playlist_id' => $childB->id, 'source_id' => 1, 'title' => 'A']);
+    $modelClass::factory()->for($user)->create(array_merge($extra, [
+        'playlist_id' => $parent->id,
+        $sourceKey    => 1,
+    ]));
 
-    $form = $handler::buildSourcePlaylistForm(collect([$childChannelA, $childChannelB]), 'channels', 'source_id', 'channel');
+    $childRecordA = $modelClass::factory()->for($user)->create(array_merge($extra, [
+        'playlist_id' => $childA->id,
+        $sourceKey    => 1,
+    ]));
+    $childRecordB = $modelClass::factory()->for($user)->create(array_merge($extra, [
+        'playlist_id' => $childB->id,
+        $sourceKey    => 1,
+    ]));
+
+    $form = $handler::buildSourcePlaylistForm(collect([$childRecordA, $childRecordB]), $relation, $sourceKey, $label);
 
     expect($form)->toHaveCount(2);
 
@@ -83,6 +104,4 @@ it('renders one selector per duplicated parent-child group', function () {
         expect($select)->toBeInstanceOf(Forms\Components\Select::class);
         expect($select->isRequired())->toBeTrue();
     }
-});
-
-
+})->with('mediaTypes');

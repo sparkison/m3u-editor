@@ -11,6 +11,7 @@ use App\Models\ChannelFailover;
 use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Models\Playlist;
+use App\Jobs\SyncPlaylistChildren;
 use App\Filament\BulkActions\HandlesSourcePlaylist;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -393,6 +394,7 @@ class ChannelResource extends Resource
                                 'group_id' => $group->id,
                             ]);
                         }
+                        SyncPlaylistChildren::debounce($group->playlist, []);
                     })->after(function () {
                         Notification::make()
                             ->success()
