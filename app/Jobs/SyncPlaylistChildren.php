@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Enums\Status;
+use App\Events\SyncCompleted;
 use App\Models\Category;
 use App\Models\Playlist;
 use App\Models\Season;
@@ -138,6 +139,7 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
                             'processing' => false,
                             'progress' => 100,
                         ]);
+                        event(new SyncCompleted($child));
                     } catch (\Throwable $e) {
                         DB::rollBack();
                         if ($copiedFile && Storage::disk('local')->exists($copiedFile)) {
@@ -147,6 +149,7 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
                             'status' => Status::Failed,
                             'processing' => false,
                         ]);
+                        event(new SyncCompleted($child));
                         throw $e;
                     }
                 }
