@@ -179,7 +179,7 @@ class PlaylistResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('sync_interval')
                     ->label('Interval')
-                    ->formatStateUsing(fn ($state, ?Playlist $record) => $record?->parent_id ? '' : $state)
+                    ->getStateUsing(fn (?Playlist $record) => $record?->parent_id ? '' : $record?->sync_interval)
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('sync_time')
@@ -965,7 +965,7 @@ class PlaylistResource extends Resource
             Forms\Components\Grid::make()
                 ->columns(2)
                 ->columnSpanFull()
-                ->hidden(fn (Get $get, ?Playlist $record) => ($record?->parent_id ?? $get('parent_id')) !== null)
+                ->hidden(fn (?Playlist $record) => $record?->parent_id !== null)
                 ->schema([
                     Forms\Components\Grid::make()
                         ->columns(3)
@@ -1298,7 +1298,7 @@ class PlaylistResource extends Resource
                 $fields = [
                     Forms\Components\Section::make($section)
                         ->schema($fields)
-                        ->hidden(fn (Get $get, ?Playlist $record) => $section === 'Scheduling' && (($record?->parent_id ?? $get('parent_id')) !== null)),
+                        ->hidden(fn (?Playlist $record) => $section === 'Scheduling' && $record?->parent_id !== null),
                 ];
 
                 // If general section, add AUTH management
@@ -1416,7 +1416,7 @@ class PlaylistResource extends Resource
         foreach (self::getFormSections(creating: true) as $step => $fields) {
             $wizard[] = Forms\Components\Wizard\Step::make($step)
                 ->schema($fields)
-                ->hidden(fn (Get $get, ?Playlist $record) => $step === 'Scheduling' && (($record?->parent_id ?? $get('parent_id')) !== null));
+                ->hidden(fn (?Playlist $record) => $step === 'Scheduling' && $record?->parent_id !== null);
 
             // Add auth after type step
             if ($step === 'Type') {
