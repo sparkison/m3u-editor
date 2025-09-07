@@ -110,7 +110,8 @@ it('renames a channel without touching others', function () {
     $oldUpdated = $childCh2->updated_at;
 
     $ch1->update(['name' => 'Uno']);
-    (new SyncPlaylistChildren($parent, ['channels' => ['ch-' . $ch1->id]]))->handle();
+    SyncPlaylistChildren::debounce($parent, ['channels' => ['ch-' . $ch1->id]]);
+    (new SyncPlaylistChildren($parent))->handle();
 
     expect($child->channels()->where('source_id', 'ch-' . $ch1->id)->first()->name)->toBe('Uno');
     $childCh2->refresh();
@@ -123,7 +124,8 @@ it('moves a channel to a different group', function () {
     $oldUpdated = $childCh2->updated_at;
 
     $ch1->update(['group_id' => $groupB->id]);
-    (new SyncPlaylistChildren($parent, ['channels' => ['ch-' . $ch1->id]]))->handle();
+    SyncPlaylistChildren::debounce($parent, ['channels' => ['ch-' . $ch1->id]]);
+    (new SyncPlaylistChildren($parent))->handle();
 
     $childGroupB = $child->groups()->where('name_internal', 'b')->first();
     expect($child->channels()->where('source_id', 'ch-' . $ch1->id)->first()->group_id)->toBe($childGroupB->id);
@@ -138,7 +140,8 @@ it('deletes a channel without touching others', function () {
 
     $source = 'ch-' . $ch1->id;
     $ch1->delete();
-    (new SyncPlaylistChildren($parent, ['channels' => [$source]]))->handle();
+    SyncPlaylistChildren::debounce($parent, ['channels' => [$source]]);
+    (new SyncPlaylistChildren($parent))->handle();
 
     expect($child->channels()->where('source_id', $source)->exists())->toBeFalse();
     $childCh2->refresh();
@@ -180,7 +183,8 @@ it('keeps child failover reference after a channel update', function () {
     $child = Playlist::where('parent_id', $playlist->id)->first();
 
     $chan1->update(['name' => 'Uno']);
-    (new SyncPlaylistChildren($playlist, ['channels' => ['ch-' . $chan1->id]]))->handle();
+    SyncPlaylistChildren::debounce($playlist, ['channels' => ['ch-' . $chan1->id]]);
+    (new SyncPlaylistChildren($playlist))->handle();
 
     $childChan1 = $child->channels()->where('source_id', 'ch-' . $chan1->id)->first();
     $childChan2 = $child->channels()->where('source_id', 'ch-' . $chan2->id)->first();
@@ -195,7 +199,8 @@ it('renames a category without touching others', function () {
     $oldUpdated = $childCatB->updated_at;
 
     $catA->update(['name' => 'CatOne']);
-    (new SyncPlaylistChildren($parent, ['categories' => ['cat-' . $catA->id]]))->handle();
+    SyncPlaylistChildren::debounce($parent, ['categories' => ['cat-' . $catA->id]]);
+    (new SyncPlaylistChildren($parent))->handle();
 
     expect($child->categories()->where('source_category_id', 'cat-' . $catA->id)->first()->name)->toBe('CatOne');
     $childCatB->refresh();
@@ -209,7 +214,8 @@ it('renames a series without touching others', function () {
     $oldUpdated = $childSeries2->updated_at;
 
     $series1->update(['name' => 'S1']);
-    (new SyncPlaylistChildren($parent, ['series' => ['series-' . $series1->id]]))->handle();
+    SyncPlaylistChildren::debounce($parent, ['series' => ['series-' . $series1->id]]);
+    (new SyncPlaylistChildren($parent))->handle();
 
     expect($child->series()->where('source_series_id', 'series-' . $series1->id)->first()->name)->toBe('S1');
     $childSeries2->refresh();
@@ -223,7 +229,8 @@ it('renames a season without touching its episodes', function () {
     $oldUpdated = $childEpisode->updated_at;
 
     $season->update(['name' => 'Season Uno']);
-    (new SyncPlaylistChildren($parent, ['seasons' => ['season-' . $season->id]]))->handle();
+    SyncPlaylistChildren::debounce($parent, ['seasons' => ['season-' . $season->id]]);
+    (new SyncPlaylistChildren($parent))->handle();
 
     expect($child->seasons()->where('source_season_id', 'season-' . $season->id)->first()->name)->toBe('Season Uno');
     $childEpisode->refresh();
@@ -237,7 +244,8 @@ it('renames an episode without touching its season', function () {
     $oldUpdated = $childSeason->updated_at;
 
     $episode->update(['title' => 'Episode Uno']);
-    (new SyncPlaylistChildren($parent, ['episodes' => ['ep-' . $episode->id]]))->handle();
+    SyncPlaylistChildren::debounce($parent, ['episodes' => ['ep-' . $episode->id]]);
+    (new SyncPlaylistChildren($parent))->handle();
 
     expect($child->episodes()->where('source_episode_id', 'ep-' . $episode->id)->first()->title)->toBe('Episode Uno');
     $childSeason->refresh();
