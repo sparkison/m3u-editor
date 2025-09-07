@@ -111,7 +111,8 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 $prefx = "S" . str_pad($season, 2, '0', STR_PAD_LEFT) . "E{$num}";
 
                 // Create the .strm file
-                $fileName = "{$prefx} - {$ep->title}.strm";
+                $fileName = preg_replace('/[^a-zA-Z0-9_\-]/', ' ', "{$prefx} - {$ep->title}");
+                $fileName = "{$fileName}.strm";
 
                 // Create the season folder
                 if ($sync_settings['include_season'] ?? true) {

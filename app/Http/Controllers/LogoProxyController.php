@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Http;
@@ -199,15 +200,50 @@ class LogoProxyController extends Controller
 
         foreach ($logoFiles as $file) {
             // Get file last modified timestamp
-            $lastModified = Storage::disk('local')->lastModified($file);
+            $lastModified = Carbon::createFromTimestamp(Storage::disk('local')->lastModified($file));
 
-            // If no metadata or file is older than 30 days, delete it
-            if (now()->diffInDays($lastModified) > 30) {
+            // If no metadata or file is older than X days, delete it
+            if (now()->diffInDays($lastModified) > config('app.logo_cache_expiry_days', 30)) {
                 Storage::disk('local')->delete($file);
                 $cleared++;
             }
         }
 
         return $cleared;
+    }
+
+    /**
+     * Clear the entire logo cache
+     */
+    public function clearCache(): int
+    {
+        $cleared = 0;
+        $logoFiles = Storage::disk('local')->files('cached-logos');
+        foreach ($logoFiles as $file) {
+            Storage::disk('local')->delete($file);
+            $cleared++;
+        }
+        return $cleared;
+    }
+
+    public static function getCacheSize(): string
+    {
+        $totalSize = 0;
+        $logoFiles = Storage::disk('local')->files('cached-logos');
+        foreach ($logoFiles as $file) {
+            $totalSize += Storage::disk('local')->size($file);
+        }
+        return self::humanFileSize($totalSize);
+    }
+
+    private static function humanFileSize(int $bytes): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $i = 0;
+        while ($bytes >= 1024 && $i < count($units) - 1) {
+            $bytes /= 1024;
+            $i++;
+        }
+        return round($bytes, 2) . ' ' . $units[$i];
     }
 }
