@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
@@ -21,6 +22,23 @@ return new class extends Migration {
         });
 
         if (! Schema::hasIndex('categories', 'categories_playlist_id_source_category_id_unique')) {
+            $duplicateIds = DB::table('categories')
+                ->select('id')
+                ->whereNotNull('playlist_id')
+                ->whereNotNull('source_category_id')
+                ->whereNotIn('id', function ($query) {
+                    $query->select(DB::raw('MIN(id)'))
+                        ->from('categories')
+                        ->whereNotNull('playlist_id')
+                        ->whereNotNull('source_category_id')
+                        ->groupBy('playlist_id', 'source_category_id');
+                })
+                ->pluck('id');
+
+            if ($duplicateIds->isNotEmpty()) {
+                DB::table('categories')->whereIn('id', $duplicateIds)->delete();
+            }
+
             Schema::table('categories', function (Blueprint $table) {
                 $table->unique(
                     ['playlist_id', 'source_category_id'],
@@ -30,12 +48,46 @@ return new class extends Migration {
         }
 
         if (! Schema::hasIndex('groups', 'groups_playlist_id_name_internal_unique')) {
+            $duplicateIds = DB::table('groups')
+                ->select('id')
+                ->whereNotNull('playlist_id')
+                ->whereNotNull('name_internal')
+                ->whereNotIn('id', function ($query) {
+                    $query->select(DB::raw('MIN(id)'))
+                        ->from('groups')
+                        ->whereNotNull('playlist_id')
+                        ->whereNotNull('name_internal')
+                        ->groupBy('playlist_id', 'name_internal');
+                })
+                ->pluck('id');
+
+            if ($duplicateIds->isNotEmpty()) {
+                DB::table('groups')->whereIn('id', $duplicateIds)->delete();
+            }
+
             Schema::table('groups', function (Blueprint $table) {
                 $table->unique(['playlist_id', 'name_internal'], 'groups_playlist_id_name_internal_unique');
             });
         }
 
         if (! Schema::hasIndex('series', 'series_playlist_id_source_series_id_unique')) {
+            $duplicateIds = DB::table('series')
+                ->select('id')
+                ->whereNotNull('playlist_id')
+                ->whereNotNull('source_series_id')
+                ->whereNotIn('id', function ($query) {
+                    $query->select(DB::raw('MIN(id)'))
+                        ->from('series')
+                        ->whereNotNull('playlist_id')
+                        ->whereNotNull('source_series_id')
+                        ->groupBy('playlist_id', 'source_series_id');
+                })
+                ->pluck('id');
+
+            if ($duplicateIds->isNotEmpty()) {
+                DB::table('series')->whereIn('id', $duplicateIds)->delete();
+            }
+
             Schema::table('series', function (Blueprint $table) {
                 $table->unique(
                     ['playlist_id', 'source_series_id'],
@@ -45,6 +97,23 @@ return new class extends Migration {
         }
 
         if (! Schema::hasIndex('seasons', 'seasons_playlist_id_source_season_id_unique')) {
+            $duplicateIds = DB::table('seasons')
+                ->select('id')
+                ->whereNotNull('playlist_id')
+                ->whereNotNull('source_season_id')
+                ->whereNotIn('id', function ($query) {
+                    $query->select(DB::raw('MIN(id)'))
+                        ->from('seasons')
+                        ->whereNotNull('playlist_id')
+                        ->whereNotNull('source_season_id')
+                        ->groupBy('playlist_id', 'source_season_id');
+                })
+                ->pluck('id');
+
+            if ($duplicateIds->isNotEmpty()) {
+                DB::table('seasons')->whereIn('id', $duplicateIds)->delete();
+            }
+
             Schema::table('seasons', function (Blueprint $table) {
                 $table->unique(
                     ['playlist_id', 'source_season_id'],
