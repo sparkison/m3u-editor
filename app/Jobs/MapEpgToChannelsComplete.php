@@ -23,6 +23,7 @@ class MapEpgToChannelsComplete implements ShouldQueue
      */
     public function __construct(
         public Epg $epg,
+        public ?Playlist $playlist,
         public int $batchCount,
         public int $channelCount,
         public int $mappedCount,
@@ -40,6 +41,14 @@ class MapEpgToChannelsComplete implements ShouldQueue
         // Calculate the time taken to complete the import
         $completedIn = $this->start->diffInSeconds(now());
         $completedInRounded = round($completedIn, 2);
+
+        // Gather mapped channel source IDs before clearing out the jobs
+        $mappedIds = Job::where('batch_no', $this->batchNo)
+            ->pluck('payload')
+            ->flatMap(fn ($payload) => collect($payload)->pluck('source_id'))
+            ->filter()
+            ->values()
+            ->all();
 
         // Clear out the jobs
         Job::where('batch_no', $this->batchNo)->delete();
@@ -69,5 +78,10 @@ class MapEpgToChannelsComplete implements ShouldQueue
             ->title($title)->body($body)
             ->broadcast($epg->user)
             ->sendToDatabase($epg->user);
+
+        // Fan out mapping changes to child playlists when applicable
+        if ($this->playlist && $this->playlist->children()->exists()) {
+            SyncPlaylistChildren::debounce($this->playlist, ['channels' => $mappedIds]);
+        }
     }
 }

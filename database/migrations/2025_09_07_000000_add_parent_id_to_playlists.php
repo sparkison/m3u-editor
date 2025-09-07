@@ -31,6 +31,16 @@ return new class extends Migration
             $table->string('format')->default('ts')->change();
         });
 
+        if (Schema::hasIndex('categories', 'categories_playlist_id_source_category_id_unique')) {
+            Schema::table('categories', function (Blueprint $table) {
+                $table->dropUnique('categories_playlist_id_source_category_id_unique');
+            });
+        }
+
+        Schema::table('categories', function (Blueprint $table) {
+            $table->string('source_category_id')->nullable()->change();
+        });
+
         if (! Schema::hasIndex('categories', 'categories_playlist_id_source_category_id_unique')) {
             $duplicateIds = DB::table('categories')
                 ->select('id')
@@ -80,6 +90,17 @@ return new class extends Migration
             });
         }
 
+        if (Schema::hasIndex('series', 'series_playlist_id_source_series_id_unique')) {
+            Schema::table('series', function (Blueprint $table) {
+                $table->dropUnique('series_playlist_id_source_series_id_unique');
+            });
+        }
+
+        Schema::table('series', function (Blueprint $table) {
+            $table->string('source_category_id')->nullable()->change();
+            $table->string('source_series_id')->nullable()->change();
+        });
+
         if (! Schema::hasIndex('series', 'series_playlist_id_source_series_id_unique')) {
             $duplicateIds = DB::table('series')
                 ->select('id')
@@ -106,6 +127,16 @@ return new class extends Migration
             });
         }
 
+        if (Schema::hasIndex('seasons', 'seasons_playlist_id_source_season_id_unique')) {
+            Schema::table('seasons', function (Blueprint $table) {
+                $table->dropUnique('seasons_playlist_id_source_season_id_unique');
+            });
+        }
+
+        Schema::table('seasons', function (Blueprint $table) {
+            $table->string('source_season_id')->nullable()->change();
+        });
+
         if (! Schema::hasIndex('seasons', 'seasons_playlist_id_source_season_id_unique')) {
             $duplicateIds = DB::table('seasons')
                 ->select('id')
@@ -128,6 +159,42 @@ return new class extends Migration
                 $table->unique(
                     ['playlist_id', 'source_season_id'],
                     'seasons_playlist_id_source_season_id_unique'
+                );
+            });
+        }
+
+        if (Schema::hasIndex('episodes', 'episodes_source_episode_id_playlist_id_unique')) {
+            Schema::table('episodes', function (Blueprint $table) {
+                $table->dropUnique('episodes_source_episode_id_playlist_id_unique');
+            });
+        }
+
+        Schema::table('episodes', function (Blueprint $table) {
+            $table->string('source_episode_id')->nullable()->change();
+        });
+
+        if (! Schema::hasIndex('episodes', 'episodes_source_episode_id_playlist_id_unique')) {
+            $duplicateIds = DB::table('episodes')
+                ->select('id')
+                ->whereNotNull('playlist_id')
+                ->whereNotNull('source_episode_id')
+                ->whereNotIn('id', function ($query) {
+                    $query->select(DB::raw('MIN(id)'))
+                        ->from('episodes')
+                        ->whereNotNull('playlist_id')
+                        ->whereNotNull('source_episode_id')
+                        ->groupBy('source_episode_id', 'playlist_id');
+                })
+                ->pluck('id');
+
+            if ($duplicateIds->isNotEmpty()) {
+                DB::table('episodes')->whereIn('id', $duplicateIds)->delete();
+            }
+
+            Schema::table('episodes', function (Blueprint $table) {
+                $table->unique(
+                    ['source_episode_id', 'playlist_id'],
+                    'episodes_source_episode_id_playlist_id_unique'
                 );
             });
         }
@@ -188,6 +255,23 @@ return new class extends Migration
                 $table->dropUnique('channel_failovers_channel_id_channel_failover_id_unique');
             });
         }
+
+        Schema::table('episodes', function (Blueprint $table) {
+            $table->unsignedInteger('source_episode_id')->nullable()->change();
+        });
+
+        Schema::table('seasons', function (Blueprint $table) {
+            $table->unsignedInteger('source_season_id')->nullable()->change();
+        });
+
+        Schema::table('series', function (Blueprint $table) {
+            $table->unsignedInteger('source_category_id')->nullable()->change();
+            $table->unsignedInteger('source_series_id')->nullable()->change();
+        });
+
+        Schema::table('categories', function (Blueprint $table) {
+            $table->unsignedInteger('source_category_id')->nullable()->change();
+        });
 
         Schema::table('shared_streams', function (Blueprint $table) {
             $table->string('format')->nullable()->default(null)->change();
