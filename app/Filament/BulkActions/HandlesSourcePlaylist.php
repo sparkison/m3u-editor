@@ -62,7 +62,15 @@ trait HandlesSourcePlaylist
     protected static function getSourcePlaylistData(Collection $records, string $relation, string $sourceKey): array
     {
         $recordPlaylistIds = $records->pluck('playlist_id')->unique();
+        // Use channel ID as a fallback when the source ID is missing
+        $recordSources = $records
+            ->map(fn ($record) => $record->$sourceKey ?? 'ch-' . $record->id)
+            ->unique();
         $recordSourceIds = $records->pluck($sourceKey)->filter()->unique();
+        $recordSourceNumericIds = $recordSources
+            ->filter(fn ($id) => is_string($id) && str_starts_with($id, 'ch-'))
+            ->map(fn ($id) => (int) substr($id, 3))
+            ->values();
 
         $parentIds = Playlist::whereIn('id', $recordPlaylistIds)
             ->pluck('parent_id')
@@ -80,11 +88,20 @@ trait HandlesSourcePlaylist
                     $query->orWhereIn('id', $parentIds);
                 }
             })
-            ->whereHas($relation, fn ($q) => $q->whereIn($sourceKey, $recordSourceIds))
+            ->whereHas($relation, function ($q) use ($sourceKey, $recordSourceIds, $recordSourceNumericIds) {
+                $q->whereIn($sourceKey, $recordSourceIds);
+                if ($recordSourceNumericIds->isNotEmpty()) {
+                    $q->orWhereIn('id', $recordSourceNumericIds);
+                }
+            })
             ->with([
-                $relation => fn ($q) => $q
-                    ->select('id', 'playlist_id', $sourceKey)
-                    ->whereIn($sourceKey, $recordSourceIds),
+                $relation => function ($q) use ($sourceKey, $recordSourceIds, $recordSourceNumericIds) {
+                    $q->select('id', 'playlist_id', $sourceKey)
+                        ->whereIn($sourceKey, $recordSourceIds);
+                    if ($recordSourceNumericIds->isNotEmpty()) {
+                        $q->orWhereIn('id', $recordSourceNumericIds);
+                    }
+                },
             ])
             ->get();
 
@@ -95,11 +112,11 @@ trait HandlesSourcePlaylist
         $playlists
             ->flatMap(fn ($playlist) => collect($playlist->$relation)
                 ->map(fn ($item) => [
-                    'source_id' => $item->$sourceKey,
+                    'source' => $item->$sourceKey ?? 'ch-' . $item->id,
                     'playlist_id' => $playlist->id,
                 ]))
-            ->groupBy('source_id')
-            ->each(function ($group, $sourceId) use (&$groups, $playlistMap) {
+            ->groupBy('source')
+            ->each(function ($group, $source) use (&$groups, $playlistMap) {
                 $ids = $group->pluck('playlist_id')->unique();
 
                 if ($ids->count() <= 1) {
@@ -122,9 +139,9 @@ trait HandlesSourcePlaylist
                             'composite_keys' => [],
                         ];
 
-                        $groups[$pairKey]['source_ids'][] = $sourceId;
-                        $groups[$pairKey]['composite_keys'][] = $id.':'.$sourceId;
-                        $groups[$pairKey]['composite_keys'][] = $playlist->parent_id.':'.$sourceId;
+                        $groups[$pairKey]['source_ids'][] = $source;
+                        $groups[$pairKey]['composite_keys'][] = $id.':'.$source;
+                        $groups[$pairKey]['composite_keys'][] = $playlist->parent_id.':'.$source;
                     }
                 }
             });
@@ -139,8 +156,8 @@ trait HandlesSourcePlaylist
 
         // Store the selected record details under their respective group
         foreach ($records as $record) {
-            $sourceId = $record->$sourceKey;
-            $composite = $record->playlist_id.':'.$sourceId;
+            $source = $record->$sourceKey ?? 'ch-' . $record->id;
+            $composite = $record->playlist_id.':'.$source;
 
             if (! $sourceToGroup->has($composite)) {
                 continue;
@@ -152,7 +169,7 @@ trait HandlesSourcePlaylist
             $group['records'][$record->id] = [
                 'id' => $record->id,
                 'title' => $record->title ?? $record->name ?? '',
-                'source_id' => $sourceId,
+                'source_id' => $source,
                 'playlist_id' => $record->playlist_id,
             ];
             $duplicateGroups[$pairKey] = $group;
@@ -160,7 +177,7 @@ trait HandlesSourcePlaylist
 
         $needsSourcePlaylist = $duplicateGroups->isNotEmpty();
 
-        return [$duplicateGroups, $needsSourcePlaylist, $recordSourceIds, $sourceToGroup];
+        return [$duplicateGroups, $needsSourcePlaylist, $recordSources, $sourceToGroup];
     }
 
     /**
@@ -194,13 +211,14 @@ trait HandlesSourcePlaylist
                     $groupId = $groupEntry['group']->id;
                     foreach ($groupEntry['channels'] as $channel) {
                         $recordGroups[$channel->id] = $groupId;
-                        $compositeGroups[$channel->playlist_id.':'.$channel->$sourceKey] = $groupId;
+                        $token = $channel->$sourceKey ?? 'ch-' . $channel->id;
+                        $compositeGroups[$channel->playlist_id.':'.$token] = $groupId;
                     }
                 }
 
                 // Compute duplicate metadata once over the flattened records
                 $sourcePlaylistData = self::getSourcePlaylistData($records, $relation, $sourceKey);
-                [$dupGroups, $needsSourcePlaylist, $recordSourceIds, $sourceToGroup] = $sourcePlaylistData;
+                [$dupGroups, $needsSourcePlaylist, $recordSources, $sourceToGroup] = $sourcePlaylistData;
 
                 // Re-map duplicate groups back to their parent groups with unique keys
                 $groupedDuplicates = [];
@@ -228,7 +246,7 @@ trait HandlesSourcePlaylist
                 $sourcePlaylistData = [
                     collect($groupedDuplicates),
                     $needsSourcePlaylist,
-                    $recordSourceIds,
+                    $recordSources,
                     $globalSourceToGroup,
                 ];
             } else {
@@ -391,7 +409,7 @@ trait HandlesSourcePlaylist
             $sourcePlaylistData = self::getSourcePlaylistData($records, $relation, $sourceKey);
         }
 
-        [$duplicateGroups, $needsSourcePlaylist, $recordSourceIds, $sourceToGroup] = $sourcePlaylistData;
+        [$duplicateGroups, $needsSourcePlaylist, $recordSources, $sourceToGroup] = $sourcePlaylistData;
 
         if ($needsSourcePlaylist) {
             $selected = collect($data['source_playlists'] ?? []);
@@ -414,25 +432,39 @@ trait HandlesSourcePlaylist
                 $itemSelected->flatMap(fn ($items) => collect($items)->filter()->values())
             )->unique();
 
+            $recordSourceNumericIds = $recordSources
+                ->filter(fn ($id) => is_string($id) && str_starts_with($id, 'ch-'))
+                ->map(fn ($id) => (int) substr($id, 3))
+                ->values();
+
             $sourceMaps = $modelClass::query()
                 ->whereIn('playlist_id', $playlistIds)
-                ->whereIn($sourceKey, $recordSourceIds)
+                ->where(function ($q) use ($sourceKey, $recordSources, $recordSourceNumericIds) {
+                    $q->whereIn($sourceKey, $recordSources);
+                    if ($recordSourceNumericIds->isNotEmpty()) {
+                        $q->orWhereIn('id', $recordSourceNumericIds);
+                    }
+                })
                 ->select('id', 'playlist_id', $sourceKey)
                 ->get()
+                ->map(function ($item) use ($sourceKey) {
+                    $item->composite_source = $item->$sourceKey ?? 'ch-' . $item->id;
+                    return $item;
+                })
                 ->groupBy('playlist_id')
-                ->map->keyBy($sourceKey);
+                ->map(fn ($group) => $group->keyBy('composite_source'));
 
             $records = $records->map(function ($record) use ($selected, $itemSelected, $sourceMaps, $sourceToGroup, $sourceKey) {
-                $sourceId = $record->$sourceKey;
-                $composite = $record->playlist_id.':'.$sourceId;
+                $source = $record->$sourceKey ?? 'ch-' . $record->id;
+                $composite = $record->playlist_id.':'.$source;
 
                 if ($sourceToGroup->has($composite)) {
                     $pairKey = $sourceToGroup[$composite];
                     $override = $itemSelected[$pairKey][$record->id] ?? null;
                     $playlistId = $override ?: ($selected[$pairKey] ?? null);
 
-                    return $playlistId && isset($sourceMaps[$playlistId][$sourceId])
-                        ? $sourceMaps[$playlistId][$sourceId]
+                    return $playlistId && isset($sourceMaps[$playlistId][$source])
+                        ? $sourceMaps[$playlistId][$source]
                         : $record;
                 }
 
