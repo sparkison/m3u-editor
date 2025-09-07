@@ -91,10 +91,11 @@ trait HandlesSourcePlaylist
         $groups = [];
 
         $playlists
-            ->flatMap(fn ($playlist) => $playlist->$relation->map(fn ($item) => [
-                'source_id' => $item->$sourceKey,
-                'playlist_id' => $playlist->id,
-            ]))
+            ->flatMap(fn ($playlist) => ($playlist->$relation ?? collect())
+                ->map(fn ($item) => [
+                    'source_id' => $item->$sourceKey,
+                    'playlist_id' => $playlist->id,
+                ]))
             ->groupBy('source_id')
             ->each(function ($group, $sourceId) use (&$groups, $playlistMap) {
                 $ids = $group->pluck('playlist_id')->unique();
