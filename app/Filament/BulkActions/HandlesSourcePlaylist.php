@@ -8,6 +8,7 @@ use Filament\Forms;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Tables\Actions\Action as TableAction;
+use Filament\Tables\Actions\BulkAction as TableBulkAction;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
 use Filament\Notifications\Notification;
@@ -356,7 +357,7 @@ trait HandlesSourcePlaylist
             return $records;
         }
 
-        return $records->flatMap(fn ($group) => $group['channels']);
+        return $records->flatMap(fn ($group) => collect($group['channels'] ?? []));
     }
 
     /**
@@ -471,7 +472,7 @@ trait HandlesSourcePlaylist
         /** @var Tables\Actions\Action|Tables\Actions\BulkAction $action */
         $action = $actionClass::make('add')
             ->label('Add to Custom Playlist')
-            ->form(function (TableAction $action) use ($relation, $sourceKey, $itemLabel, $tagType, $categoryLabel, &$sourcePlaylistData, $recordsResolver, $isBulk, $allowDrilldown): array {
+            ->form(function (TableAction|TableBulkAction $action) use ($relation, $sourceKey, $itemLabel, $tagType, $categoryLabel, &$sourcePlaylistData, $recordsResolver, $isBulk, $allowDrilldown): array {
                 $records = $isBulk ? $action->getRecords() : collect([$action->getRecord()]);
                 if ($recordsResolver) {
                     $records = $recordsResolver($records);
@@ -515,7 +516,7 @@ trait HandlesSourcePlaylist
 
                 return $form;
             })
-            ->action(function (TableAction $action, array $data) use ($modelClass, $relation, $sourceKey, &$sourcePlaylistData, $recordsResolver, $isBulk, $itemLabel, $allowDrilldown): void {
+            ->action(function (TableAction|TableBulkAction $action, array $data) use ($modelClass, $relation, $sourceKey, &$sourcePlaylistData, $recordsResolver, $isBulk, $itemLabel, $allowDrilldown): void {
                 $records = $isBulk ? $action->getRecords() : collect([$action->getRecord()]);
                 if ($recordsResolver) {
                     $records = $recordsResolver($records);
