@@ -29,7 +29,7 @@ class Category extends Model
      */
     protected $casts = [
         'id' => 'integer',
-        'source_category_id' => 'integer',
+        'source_category_id' => 'string',
         'user_id' => 'integer',
         'playlist_id' => 'integer',
     ];
