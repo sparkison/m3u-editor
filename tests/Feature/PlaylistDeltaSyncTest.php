@@ -11,13 +11,13 @@ use App\Models\Season;
 use App\Models\Episode;
 use App\Models\Playlist;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    Event::fake();
+    Playlist::unguard();
 });
 
 function createSyncedPair(): array {
@@ -106,10 +106,10 @@ function createSyncedPair(): array {
 it('renames a channel without touching others', function () {
     [$parent, $child, $groupA, $groupB, $ch1, $ch2] = createSyncedPair();
 
-    $childCh2 = $child->channels()->where('source_id', 'ch-' . $ch2->id)->first();
+    $childCh2 = $child->channels()->where('name', 'Two')->first();
     $oldUpdated = $childCh2->updated_at;
 
-    $ch1->update(['name' => 'Uno']);
+    $ch1->forceFill(['name' => 'Uno'])->save();
     SyncPlaylistChildren::debounce($parent, ['channels' => ['ch-' . $ch1->id]]);
     (new SyncPlaylistChildren($parent))->handle();
 
@@ -120,10 +120,10 @@ it('renames a channel without touching others', function () {
 
 it('moves a channel to a different group', function () {
     [$parent, $child, $groupA, $groupB, $ch1, $ch2] = createSyncedPair();
-    $childCh2 = $child->channels()->where('source_id', 'ch-' . $ch2->id)->first();
+    $childCh2 = $child->channels()->where('name', 'Two')->first();
     $oldUpdated = $childCh2->updated_at;
 
-    $ch1->update(['group_id' => $groupB->id]);
+    $ch1->forceFill(['group_id' => $groupB->id])->save();
     SyncPlaylistChildren::debounce($parent, ['channels' => ['ch-' . $ch1->id]]);
     (new SyncPlaylistChildren($parent))->handle();
 
@@ -135,7 +135,7 @@ it('moves a channel to a different group', function () {
 
 it('deletes a channel without touching others', function () {
     [$parent, $child, $groupA, $groupB, $ch1, $ch2] = createSyncedPair();
-    $childCh2 = $child->channels()->where('source_id', 'ch-' . $ch2->id)->first();
+    $childCh2 = $child->channels()->where('name', 'Two')->first();
     $oldUpdated = $childCh2->updated_at;
 
     $source = 'ch-' . $ch1->id;
@@ -195,10 +195,10 @@ it('keeps child failover reference after a channel update', function () {
 it('renames a category without touching others', function () {
     [$parent, $child, $groupA, $groupB, $ch1, $ch2, $catA, $catB] = createSyncedPair();
 
-    $childCatB = $child->categories()->where('source_category_id', 'cat-' . $catB->id)->first();
+    $childCatB = $child->categories()->where('name', 'CatB')->first();
     $oldUpdated = $childCatB->updated_at;
 
-    $catA->update(['name' => 'CatOne']);
+    $catA->forceFill(['name' => 'CatOne'])->save();
     SyncPlaylistChildren::debounce($parent, ['categories' => ['cat-' . $catA->id]]);
     (new SyncPlaylistChildren($parent))->handle();
 
@@ -207,13 +207,29 @@ it('renames a category without touching others', function () {
     expect($childCatB->updated_at)->toEqual($oldUpdated);
 });
 
+it('deletes a category without touching others', function () {
+    [$parent, $child, $groupA, $groupB, $ch1, $ch2, $catA, $catB] = createSyncedPair();
+
+    $childCatB = $child->categories()->where('name', 'CatB')->first();
+    $oldUpdated = $childCatB->updated_at;
+
+    $source = 'cat-' . $catA->id;
+    $catA->delete();
+    SyncPlaylistChildren::debounce($parent, ['categories' => [$source]]);
+    (new SyncPlaylistChildren($parent))->handle();
+
+    expect($child->categories()->where('source_category_id', $source)->exists())->toBeFalse();
+    $childCatB->refresh();
+    expect($childCatB->updated_at)->toEqual($oldUpdated);
+});
+
 it('renames a series without touching others', function () {
     [$parent, $child, $groupA, $groupB, $ch1, $ch2, $catA, $catB, $series1, $series2] = createSyncedPair();
 
-    $childSeries2 = $child->series()->where('source_series_id', 'series-' . $series2->id)->first();
+    $childSeries2 = $child->series()->where('name', 'Series2')->first();
     $oldUpdated = $childSeries2->updated_at;
 
-    $series1->update(['name' => 'S1']);
+    $series1->forceFill(['name' => 'S1'])->save();
     SyncPlaylistChildren::debounce($parent, ['series' => ['series-' . $series1->id]]);
     (new SyncPlaylistChildren($parent))->handle();
 
@@ -222,13 +238,29 @@ it('renames a series without touching others', function () {
     expect($childSeries2->updated_at)->toEqual($oldUpdated);
 });
 
+it('deletes a series without touching others', function () {
+    [$parent, $child, $groupA, $groupB, $ch1, $ch2, $catA, $catB, $series1, $series2, $season, $episode] = createSyncedPair();
+
+    $childSeries2 = $child->series()->where('name', 'Series2')->first();
+    $oldUpdated = $childSeries2->updated_at;
+
+    $source = 'series-' . $series1->id;
+    $series1->delete();
+    SyncPlaylistChildren::debounce($parent, ['series' => [$source]]);
+    (new SyncPlaylistChildren($parent))->handle();
+
+    expect($child->series()->where('source_series_id', $source)->exists())->toBeFalse();
+    $childSeries2->refresh();
+    expect($childSeries2->updated_at)->toEqual($oldUpdated);
+});
+
 it('renames a season without touching its episodes', function () {
     [$parent, $child, $groupA, $groupB, $ch1, $ch2, $catA, $catB, $series1, $series2, $season, $episode] = createSyncedPair();
 
-    $childEpisode = $child->episodes()->where('source_episode_id', 'ep-' . $episode->id)->first();
+    $childEpisode = $child->episodes()->where('title', 'Ep1')->first();
     $oldUpdated = $childEpisode->updated_at;
 
-    $season->update(['name' => 'Season Uno']);
+    $season->forceFill(['name' => 'Season Uno'])->save();
     SyncPlaylistChildren::debounce($parent, ['seasons' => ['season-' . $season->id]]);
     (new SyncPlaylistChildren($parent))->handle();
 
@@ -237,13 +269,25 @@ it('renames a season without touching its episodes', function () {
     expect($childEpisode->updated_at)->toEqual($oldUpdated);
 });
 
+it('deletes a season and its episodes', function () {
+    [$parent, $child, $groupA, $groupB, $ch1, $ch2, $catA, $catB, $series1, $series2, $season, $episode] = createSyncedPair();
+
+    $source = 'season-' . $season->id;
+    $season->delete();
+    SyncPlaylistChildren::debounce($parent, ['seasons' => [$source]]);
+    (new SyncPlaylistChildren($parent))->handle();
+
+    expect($child->seasons()->where('source_season_id', $source)->exists())->toBeFalse();
+    expect($child->episodes()->where('source_episode_id', 'ep-' . $episode->id)->exists())->toBeFalse();
+});
+
 it('renames an episode without touching its season', function () {
     [$parent, $child, $groupA, $groupB, $ch1, $ch2, $catA, $catB, $series1, $series2, $season, $episode] = createSyncedPair();
 
-    $childSeason = $child->seasons()->where('source_season_id', 'season-' . $season->id)->first();
+    $childSeason = $child->seasons()->where('name', 'Season1')->first();
     $oldUpdated = $childSeason->updated_at;
 
-    $episode->update(['title' => 'Episode Uno']);
+    $episode->forceFill(['title' => 'Episode Uno'])->save();
     SyncPlaylistChildren::debounce($parent, ['episodes' => ['ep-' . $episode->id]]);
     (new SyncPlaylistChildren($parent))->handle();
 
@@ -252,14 +296,30 @@ it('renames an episode without touching its season', function () {
     expect($childSeason->updated_at)->toEqual($oldUpdated);
 });
 
+it('deletes an episode without touching its season', function () {
+    [$parent, $child, $groupA, $groupB, $ch1, $ch2, $catA, $catB, $series1, $series2, $season, $episode] = createSyncedPair();
+
+    $childSeason = $child->seasons()->where('name', 'Season1')->first();
+    $oldUpdated = $childSeason->updated_at;
+
+    $source = 'ep-' . $episode->id;
+    $episode->delete();
+    SyncPlaylistChildren::debounce($parent, ['episodes' => [$source]]);
+    (new SyncPlaylistChildren($parent))->handle();
+
+    expect($child->episodes()->where('source_episode_id', $source)->exists())->toBeFalse();
+    $childSeason->refresh();
+    expect($childSeason->updated_at)->toEqual($oldUpdated);
+});
+
 it('coalesces multiple channel renames into one job', function () {
     [$parent, $child, $groupA, $groupB, $ch1, $ch2] = createSyncedPair();
-    Queue::fake();
+    Bus::fake();
 
-    $ch1->update(['name' => 'Uno']);
-    $ch2->update(['name' => 'Dos']);
+    $ch1->forceFill(['name' => 'Uno'])->save();
+    $ch2->forceFill(['name' => 'Dos'])->save();
 
-    Queue::assertPushed(SyncPlaylistChildren::class, 1);
+    Bus::assertDispatched(SyncPlaylistChildren::class, 1);
 
     (new SyncPlaylistChildren($parent))->handle();
 
@@ -269,12 +329,12 @@ it('coalesces multiple channel renames into one job', function () {
 
 it('coalesces multiple group renames into one job', function () {
     [$parent, $child, $groupA, $groupB] = createSyncedPair();
-    Queue::fake();
+    Bus::fake();
 
-    $groupA->update(['name' => 'Group A']);
-    $groupB->update(['name' => 'Group B']);
+    $groupA->forceFill(['name' => 'Group A'])->save();
+    $groupB->forceFill(['name' => 'Group B'])->save();
 
-    Queue::assertPushed(SyncPlaylistChildren::class, 1);
+    Bus::assertDispatched(SyncPlaylistChildren::class, 1);
 
     (new SyncPlaylistChildren($parent))->handle();
 
