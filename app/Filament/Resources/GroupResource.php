@@ -151,7 +151,6 @@ class GroupResource extends Resource
                             'group'    => $group,
                             'channels' => $group->channels()
                                 ->select('id', 'playlist_id', 'source_id', 'title')
-                                ->whereNotNull('source_id')
                                 ->get(),
                         ])
                     ),
@@ -244,7 +243,6 @@ class GroupResource extends Resource
                             'group'    => $group,
                             'channels' => $group->channels()
                                 ->select('id', 'playlist_id', 'source_id', 'title')
-                                ->whereNotNull('source_id')
                                 ->get(),
                         ])
                     ),
