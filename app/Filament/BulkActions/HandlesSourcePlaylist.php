@@ -7,6 +7,7 @@ use App\Models\Playlist;
 use Filament\Forms;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\Actions\Action;
+use Filament\Tables\Actions\Action as TableAction;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
 use Filament\Notifications\Notification;
@@ -470,8 +471,8 @@ trait HandlesSourcePlaylist
         /** @var Tables\Actions\Action|Tables\Actions\BulkAction $action */
         $action = $actionClass::make('add')
             ->label('Add to Custom Playlist')
-            ->form(function ($records) use ($relation, $sourceKey, $itemLabel, $tagType, $categoryLabel, &$sourcePlaylistData, $recordsResolver, $isBulk, $allowDrilldown): array {
-                $records = $isBulk ? $records : collect([$records]);
+            ->form(function (TableAction $action) use ($relation, $sourceKey, $itemLabel, $tagType, $categoryLabel, &$sourcePlaylistData, $recordsResolver, $isBulk, $allowDrilldown): array {
+                $records = $isBulk ? $action->getRecords() : collect([$action->getRecord()]);
                 if ($recordsResolver) {
                     $records = $recordsResolver($records);
                 }
@@ -514,8 +515,8 @@ trait HandlesSourcePlaylist
 
                 return $form;
             })
-            ->action(function ($records, array $data) use ($modelClass, $relation, $sourceKey, &$sourcePlaylistData, $recordsResolver, $isBulk, $itemLabel, $allowDrilldown): void {
-                $records = $isBulk ? $records : collect([$records]);
+            ->action(function (TableAction $action, array $data) use ($modelClass, $relation, $sourceKey, &$sourcePlaylistData, $recordsResolver, $isBulk, $itemLabel, $allowDrilldown): void {
+                $records = $isBulk ? $action->getRecords() : collect([$action->getRecord()]);
                 if ($recordsResolver) {
                     $records = $recordsResolver($records);
                 }
