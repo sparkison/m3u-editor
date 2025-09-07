@@ -16,11 +16,11 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
 /**
@@ -183,22 +183,6 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
         }
     }
 
-    private function findChildChannelId(Playlist $child, Channel $parentChannel): ?int
-    {
-        $source = $parentChannel->source_id ?? 'ch-' . $parentChannel->id;
-
-        if (isset($this->childChannelMap[$source])) {
-            return $this->childChannelMap[$source];
-        }
-
-        $id = $child->channels()->where('source_id', $source)->value('id');
-        if ($id) {
-            $this->childChannelMap[$source] = $id;
-        }
-
-        return $id;
-    }
-
     /**
      * @param  array<int, array{channel_id:int, attributes:array<string, mixed>, failover_playlist_id:?int, failover_source_id:?string}>  $pendingFailovers
      */
@@ -211,7 +195,7 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
             foreach ($groups as $group) {
                 $key = $group->name_internal;
                 if (! $key) {
-                    $key = Str::slug($group->name) ?: 'grp-' . $group->id;
+                    $key = Str::slug($group->name) ?: 'grp-'.$group->id;
                 }
 
                 $groupKeys[$group->id] = $key;
@@ -400,7 +384,7 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
             $rows = [];
             $failovers = [];
             foreach ($channels as $channel) {
-                $source = $channel->source_id ?? 'ch-' . $channel->id;
+                $source = $channel->source_id ?? 'ch-'.$channel->id;
                 $ungroupedSources[] = $source;
                 $rows[] = $channel->replicate(except: ['id', 'group_id', 'playlist_id', 'created_at', 'updated_at'])->getAttributes() + [
                     'playlist_id' => $child->id,
@@ -440,7 +424,7 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
             $childChannelId = $entry['channel_id'];
             $attributes = $entry['attributes'];
             $failoverPlaylistId = $entry['failover_playlist_id'];
-            $failoverSourceId = $entry['failover_source_id'] ?? ('ch-' . $attributes['channel_failover_id']);
+            $failoverSourceId = $entry['failover_source_id'] ?? ('ch-'.$attributes['channel_failover_id']);
 
             if ($failoverPlaylistId === null) {
                 Log::warning("SyncPlaylistChildren: Missing failover channel {$attributes['channel_failover_id']} on playlist {$child->id}, preserving original reference");
@@ -528,9 +512,9 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
             $groupKeys = [];
             $pendingFailovers = [];
             foreach ($channelSources as $source) {
-                    $channel = str_starts_with($source, 'ch-')
-                    ? $parent->channels()->with('failovers.channelFailover', 'group')->find(substr($source, 3))
-                    : $parent->channels()->with('failovers.channelFailover', 'group')->where('source_id', $source)->first();
+                $channel = str_starts_with($source, 'ch-')
+                ? $parent->channels()->with('failovers.channelFailover', 'group')->find(substr($source, 3))
+                : $parent->channels()->with('failovers.channelFailover', 'group')->where('source_id', $source)->first();
 
                 if ($channel) {
                     $groupKey = $channel->group?->name_internal;
