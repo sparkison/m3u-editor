@@ -60,6 +60,7 @@ class DuplicatePlaylist implements ShouldQueue
             $newPlaylist->updated_at = $now;
             if ($this->withSync) {
                 $newPlaylist->parent_id = $playlist->id;
+                $newPlaylist->auto_sync = false;
             }
             $newPlaylist->saveQuietly(); // Don't fire model events to prevent auto sync
 
@@ -177,6 +178,7 @@ class DuplicatePlaylist implements ShouldQueue
                     logger()->info('DuplicatePlaylist: missing child channel for failover copy', [
                         'channel_id' => $channel->id,
                     ]);
+
                     continue;
                 }
 
