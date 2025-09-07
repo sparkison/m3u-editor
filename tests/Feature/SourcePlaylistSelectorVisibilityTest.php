@@ -105,4 +105,3 @@ it('renders one selector per duplicated parent-child group', function (string $m
         expect($select->isRequired())->toBeTrue();
     }
 })->with('mediaTypes');
-

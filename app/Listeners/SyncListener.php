@@ -11,6 +11,7 @@ use App\Jobs\ProcessM3uImport;
 use App\Jobs\SyncPlaylistChildren;
 use App\Models\Epg;
 use App\Models\EpgMap;
+use Illuminate\Support\Facades\Cache;
 
 class SyncListener
 {
@@ -56,12 +57,19 @@ class SyncListener
                 });
             } elseif ($event->model->parent_id && ! $event->model->parent->processing) {
                 $parent = $event->model->parent;
-                $pending = $parent->children()
-                    ->whereIn('status', [Status::Processing, Status::Pending])
-                    ->exists();
+                $lock = Cache::lock("playlist-sync-children:{$parent->id}", 300);
 
-                if (! $pending) {
-                    dispatch(new SyncPlaylistChildren($parent));
+                if ($lock->get()) {
+                    $pending = $parent->children()
+                        ->where('status', '!=', Status::Completed)
+                        ->exists();
+
+                    if (! $pending) {
+                        dispatch(new SyncPlaylistChildren($parent));
+                        // Lock will be released by SyncPlaylistChildren once completed
+                    } else {
+                        $lock->release();
+                    }
                 }
             }
         }
