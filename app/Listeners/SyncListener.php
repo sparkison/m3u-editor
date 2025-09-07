@@ -2,18 +2,15 @@
 
 namespace App\Listeners;
 
-use Throwable;
 use App\Enums\Status;
 use App\Events\SyncCompleted;
 use App\Jobs\GenerateEpgCache;
 use App\Jobs\MapPlaylistChannelsToEpg;
 use App\Jobs\RunPostProcess;
+use App\Jobs\ProcessM3uImport;
+use App\Jobs\SyncPlaylistChildren;
 use App\Models\Epg;
 use App\Models\EpgMap;
-use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Bus;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Queue\InteractsWithQueue;
 
 class SyncListener
 {
@@ -52,14 +49,20 @@ class SyncListener
                     }
                 });
 
-            if (!$event->model->parent_id && $event->model->children()->exists()) {
-                $event->model->children()->update([
-                    'status' => Status::Pending,
-                    'processing' => false,
-                ]);
-                dispatch(new \App\Jobs\SyncPlaylistChildren($event->model));
+            if (! $event->model->parent_id && $event->model->children()->exists()) {
+                // Parent sync has finished; trigger provider sync for each child
+                $event->model->children()->get()->each(function ($child) {
+                    dispatch(new ProcessM3uImport($child, true));
+                });
             } elseif ($event->model->parent_id && ! $event->model->parent->processing) {
-                dispatch(new \App\Jobs\SyncPlaylistChildren($event->model->parent));
+                $parent = $event->model->parent;
+                $pending = $parent->children()
+                    ->whereIn('status', [Status::Processing, Status::Pending])
+                    ->exists();
+
+                if (! $pending) {
+                    dispatch(new SyncPlaylistChildren($parent));
+                }
             }
         }
         if ($event->model instanceof \App\Models\Epg) {

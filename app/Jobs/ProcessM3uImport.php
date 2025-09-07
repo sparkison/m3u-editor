@@ -123,7 +123,7 @@ class ProcessM3uImport implements ShouldQueue
         if (! $this->playlist->parent_id && $this->playlist->children()->exists()) {
             $this->playlist->children()->update([
                 'status' => Status::Pending,
-                'processing' => true,
+                'processing' => false,
                 'progress' => 0,
                 'series_progress' => 0,
             ]);
