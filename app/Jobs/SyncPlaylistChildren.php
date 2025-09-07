@@ -84,7 +84,7 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
                     ]],
                     ['playlist_id', 'change_type'],
                     [
-                        'item_ids' => DB::raw("(select jsonb_agg(distinct value) from jsonb_array_elements(coalesce(playlist_sync_changes.item_ids, '[]'::jsonb) || excluded.item_ids) as t(value))"),
+                        'item_ids' => DB::raw("(select jsonb_agg(distinct value) from jsonb_array_elements(coalesce(playlist_sync_changes.item_ids::jsonb, '[]'::jsonb) || excluded.item_ids::jsonb) as t(value))"),
                         'updated_at' => $now,
                     ]
                 );
