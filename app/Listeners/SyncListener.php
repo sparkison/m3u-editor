@@ -35,6 +35,23 @@ class SyncListener
                 ));
             });
 
+            // Automatically map playlist channels to the EPG if recurring
+            // mappings have been configured. Only run the mapping when the
+            // associated EPG has completed syncing to avoid unnecessary jobs.
+            $event->model->epgMaps()
+                ->with('epg')
+                ->where('recurring', true)
+                ->get()
+                ->each(function (EpgMap $map) {
+                    if ($map->epg && $map->epg->status === Status::Completed) {
+                        dispatch(new MapPlaylistChannelsToEpg(
+                            epg: $map->epg_id,
+                            playlist: $map->playlist_id,
+                            epgMapId: $map->id,
+                        ));
+                    }
+                });
+
             if (!$event->model->parent_id && $event->model->children()->exists()) {
                 $event->model->children()->update([
                     'status' => Status::Pending,
