@@ -667,7 +667,8 @@ it('maps delta-synced failovers to child channels', function () {
         'metadata' => [],
     ]);
 
-    (new SyncPlaylistChildren($playlist, ['channels' => ['d1']]))->handle();
+    SyncPlaylistChildren::debounce($playlist, ['channels' => ['d1']]);
+    (new SyncPlaylistChildren($playlist))->handle();
 
     $childChan1 = $child->channels()->where('source_id', 'd1')->first();
     $childChan2 = $child->channels()->where('source_id', 'd2')->first();
@@ -710,7 +711,8 @@ it('maps mutually referenced delta failovers to child channels', function () {
         'metadata' => [],
     ]);
 
-    (new SyncPlaylistChildren($playlist, ['channels' => ['dx1', 'dx2']]))->handle();
+    SyncPlaylistChildren::debounce($playlist, ['channels' => ['dx1', 'dx2']]);
+    (new SyncPlaylistChildren($playlist))->handle();
 
     $childChan1 = $child->channels()->where('source_id', 'dx1')->first();
     $childChan2 = $child->channels()->where('source_id', 'dx2')->first();
