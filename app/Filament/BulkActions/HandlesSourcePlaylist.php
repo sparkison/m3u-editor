@@ -441,7 +441,7 @@ trait HandlesSourcePlaylist
     }
 
     /**
-     * Construct a Filament bulk action that adds the selected records to a
+     * Construct a Filament table action that adds the selected records to a
      * custom playlist, including optional source playlist disambiguation.
      *
      * @param  string  $modelClass  Fully qualified model class for the records.
@@ -450,7 +450,7 @@ trait HandlesSourcePlaylist
      * @param  string  $itemLabel  Human-readable label for the record type.
      * @param  string  $tagType  Tag type used when assigning categories/groups.
      * @param  string  $categoryLabel  Label displayed for the category select.
-     * @return Tables\Actions\Action Configured action ready to attach to a Filament table.
+     * @return Tables\Actions\Action|Tables\Actions\BulkAction Configured action ready to attach to a Filament table.
      */
     protected static function buildAddToCustomPlaylistAction(
         string $modelClass,
@@ -463,10 +463,10 @@ trait HandlesSourcePlaylist
         bool $allowDrilldown = true,
         string $actionClass = \Filament\Tables\Actions\BulkAction::class,
         bool $isBulk = true
-    ): \Filament\Tables\Actions\Action {
+    ): Tables\Actions\Action|Tables\Actions\BulkAction {
         $sourcePlaylistData = null;
 
-        /** @var \Filament\Tables\Actions\Action $action */
+        /** @var Tables\Actions\Action|Tables\Actions\BulkAction $action */
         $action = $actionClass::make('add')
             ->label('Add to Custom Playlist')
             ->form(function ($records) use ($relation, $sourceKey, $itemLabel, $tagType, $categoryLabel, &$sourcePlaylistData, $recordsResolver, $isBulk, $allowDrilldown): array {
