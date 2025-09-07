@@ -30,7 +30,7 @@ class Season extends Model
     protected $casts = [
         'id' => 'integer',
         'new' => 'boolean',
-        'source_season_id' => 'integer',
+        'source_season_id' => 'string',
         'user_id' => 'integer',
         'playlist_id' => 'integer',
         'category_id' => 'integer',

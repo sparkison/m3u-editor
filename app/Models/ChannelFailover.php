@@ -5,13 +5,22 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 use Illuminate\Validation\ValidationException;
 
 use App\Models\Channel;
+use App\Models\Concerns\DispatchesPlaylistSync;
+use App\Models\Playlist;
 
 class ChannelFailover extends Model
 {
     use HasFactory;
+    use DispatchesPlaylistSync;
+
+    protected function playlistSyncChanges(): array
+    {
+        return ['channels' => [$this->channel?->source_id ?? 'ch-' . $this->channel_id]];
+    }
 
     protected $guarded = [];
 
@@ -68,6 +77,18 @@ class ChannelFailover extends Model
     public function channel(): BelongsTo
     {
         return $this->belongsTo(Channel::class);
+    }
+
+    public function playlist(): HasOneThrough
+    {
+        return $this->hasOneThrough(
+            Playlist::class,
+            Channel::class,
+            'id',
+            'id',
+            'channel_id',
+            'playlist_id'
+        );
     }
 
     public function channelFailover(): BelongsTo

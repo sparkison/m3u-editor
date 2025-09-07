@@ -186,14 +186,15 @@ it('syncs groups without internal names using fallback keys', function () {
         'user_id' => $playlist->user_id,
     ]);
 
-    config(['cache.default' => 'array']);
+    $expectedKey = Str::slug($group->name).'-'.$group->id;
+
     Log::spy();
-    Playlist::unguard();
-    (new SyncPlaylistChildren($playlist))->handle();
-    Playlist::reguard();
+    $pending = [];
+    invade(new SyncPlaylistChildren($playlist))->syncGroups($playlist, $child, $pending);
 
     $child->refresh();
     expect($child->groups()->count())->toBe(1);
+    expect($child->groups()->first()->name_internal)->toBe($expectedKey);
     Log::shouldNotHaveReceived('info', [\Mockery::on(fn ($msg) => str_contains($msg, 'Child group not found'))]);
 });
 
@@ -666,7 +667,8 @@ it('maps delta-synced failovers to child channels', function () {
         'metadata' => [],
     ]);
 
-    (new SyncPlaylistChildren($playlist, ['channels' => ['d1']]))->handle();
+    SyncPlaylistChildren::debounce($playlist, ['channels' => ['d1']]);
+    (new SyncPlaylistChildren($playlist))->handle();
 
     $childChan1 = $child->channels()->where('source_id', 'd1')->first();
     $childChan2 = $child->channels()->where('source_id', 'd2')->first();
@@ -709,7 +711,8 @@ it('maps mutually referenced delta failovers to child channels', function () {
         'metadata' => [],
     ]);
 
-    (new SyncPlaylistChildren($playlist, ['channels' => ['dx1', 'dx2']]))->handle();
+    SyncPlaylistChildren::debounce($playlist, ['channels' => ['dx1', 'dx2']]);
+    (new SyncPlaylistChildren($playlist))->handle();
 
     $childChan1 = $child->channels()->where('source_id', 'dx1')->first();
     $childChan2 = $child->channels()->where('source_id', 'dx2')->first();

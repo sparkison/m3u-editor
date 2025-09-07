@@ -37,8 +37,8 @@ class Series extends Model
     protected $casts = [
         'id' => 'integer',
         'new' => 'boolean',
-        'source_category_id' => 'integer',
-        'source_series_id' => 'integer',
+        'source_category_id' => 'string',
+        'source_series_id' => 'string',
         'user_id' => 'integer',
         'playlist_id' => 'integer',
         'category_id' => 'integer',
