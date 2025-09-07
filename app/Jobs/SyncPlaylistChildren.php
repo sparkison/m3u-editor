@@ -237,7 +237,7 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
             foreach ($groups as $group) {
                 $key = $group->name_internal;
                 if (! $key) {
-                    $key = Str::slug($group->name) ?: 'grp-'.$group->id;
+                    $key = (Str::slug($group->name) ?: 'grp').'-'.$group->id;
                 }
 
                 $groupKeys[$group->id] = $key;

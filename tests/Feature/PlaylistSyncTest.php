@@ -186,14 +186,15 @@ it('syncs groups without internal names using fallback keys', function () {
         'user_id' => $playlist->user_id,
     ]);
 
-    config(['cache.default' => 'array']);
+    $expectedKey = Str::slug($group->name).'-'.$group->id;
+
     Log::spy();
-    Playlist::unguard();
-    (new SyncPlaylistChildren($playlist))->handle();
-    Playlist::reguard();
+    $pending = [];
+    invade(new SyncPlaylistChildren($playlist))->syncGroups($playlist, $child, $pending);
 
     $child->refresh();
     expect($child->groups()->count())->toBe(1);
+    expect($child->groups()->first()->name_internal)->toBe($expectedKey);
     Log::shouldNotHaveReceived('info', [\Mockery::on(fn ($msg) => str_contains($msg, 'Child group not found'))]);
 });
 
