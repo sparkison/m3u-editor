@@ -91,7 +91,7 @@ trait HandlesSourcePlaylist
         $groups = [];
 
         $playlists
-            ->flatMap(fn ($playlist) => ($playlist->$relation ?? collect())
+            ->flatMap(fn ($playlist) => collect($playlist->$relation)
                 ->map(fn ($item) => [
                     'source_id' => $item->$sourceKey,
                     'playlist_id' => $playlist->id,
