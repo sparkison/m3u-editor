@@ -11,6 +11,8 @@ use App\Models\ChannelFailover;
 use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Models\Playlist;
+use App\Jobs\SyncPlaylistChildren;
+use App\Filament\BulkActions\HandlesSourcePlaylist;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -27,9 +29,11 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class ChannelResource extends Resource
 {
+    use HandlesSourcePlaylist;
     protected static ?string $model = Channel::class;
 
     protected static ?string $recordTitleAttribute = 'title';
@@ -438,6 +442,7 @@ class ChannelResource extends Resource
                                 'group_id' => $group->id,
                             ]);
                         }
+                        SyncPlaylistChildren::debounce($group->playlist, []);
                     })->after(function () {
                         Notification::make()
                             ->success()
