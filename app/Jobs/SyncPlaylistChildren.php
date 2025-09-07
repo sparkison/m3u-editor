@@ -94,6 +94,7 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
             Log::warning("SyncPlaylistChildren: Parent playlist {$this->playlist->id} not found, clearing queued flag and aborting child sync.");
             Cache::forget("playlist-sync:{$this->playlist->id}");
             Cache::forget("playlist-sync:{$this->playlist->id}:queued");
+            Cache::lock("playlist-sync-children:{$this->playlist->id}")->forceRelease();
 
             return;
         }
