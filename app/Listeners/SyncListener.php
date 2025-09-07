@@ -12,6 +12,7 @@ use App\Jobs\SyncPlaylistChildren;
 use App\Models\Epg;
 use App\Models\EpgMap;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Bus;
 
 class SyncListener
 {
@@ -33,43 +34,45 @@ class SyncListener
                 ));
             });
 
-            // Automatically map playlist channels to the EPG if recurring
-            // mappings have been configured. Only run the mapping when the
-            // associated EPG has completed syncing to avoid unnecessary jobs.
+            // Build mapping jobs for recurring configurations where the
+            // associated EPG has completed syncing.
+            $mappingJobs = [];
             $event->model->epgMaps()
                 ->with('epg')
                 ->where('recurring', true)
                 ->get()
-                ->each(function (EpgMap $map) {
+                ->each(function (EpgMap $map) use (&$mappingJobs) {
                     if ($map->epg && $map->epg->status === Status::Completed) {
-                        dispatch(new MapPlaylistChannelsToEpg(
+                        $mappingJobs[] = new MapPlaylistChannelsToEpg(
                             epg: $map->epg_id,
                             playlist: $map->playlist_id,
                             epgMapId: $map->id,
-                        ));
+                        );
                     }
                 });
 
             if (! $event->model->parent_id && $event->model->children()->exists()) {
-                // Parent sync has finished; trigger provider sync for each child
-                $event->model->children()->get()->each(function ($child) {
-                    dispatch(new ProcessM3uImport($child, true));
+                // Parent sync has finished; chain child imports, EPG mapping and
+                // final child synchronization.
+                $parent = $event->model;
+                $jobs = [];
+
+                $parent->children()->get()->each(function ($child) use (&$jobs) {
+                    $jobs[] = new ProcessM3uImport($child, true);
                 });
-            } elseif ($event->model->parent_id && ! $event->model->parent->processing) {
-                $parent = $event->model->parent;
+
+                $jobs = array_merge($jobs, $mappingJobs);
+                $jobs[] = new SyncPlaylistChildren($parent);
+
                 $lock = Cache::lock("playlist-sync-children:{$parent->id}", 300);
-
                 if ($lock->get()) {
-                    $pending = $parent->children()
-                        ->where('status', '!=', Status::Completed)
-                        ->exists();
-
-                    if (! $pending) {
-                        dispatch(new SyncPlaylistChildren($parent));
-                        // Lock will be released by SyncPlaylistChildren once completed
-                    } else {
-                        $lock->release();
-                    }
+                    Bus::chain($jobs)->dispatch();
+                    // Lock will be released by SyncPlaylistChildren once completed
+                }
+            } else {
+                // No children: dispatch mapping jobs immediately.
+                foreach ($mappingJobs as $job) {
+                    dispatch($job);
                 }
             }
         }
