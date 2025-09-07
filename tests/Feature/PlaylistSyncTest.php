@@ -186,7 +186,7 @@ it('syncs groups without internal names using fallback keys', function () {
         'user_id' => $playlist->user_id,
     ]);
 
-    $expectedKey = Str::slug($group->name).'-'.$group->id;
+    $expectedKey = Str::slug($group->name) ?: 'grp-'.$group->id;
 
     Log::spy();
     $pending = [];
@@ -480,6 +480,53 @@ it('renames groups on child playlists', function () {
 
     $childGroup = $child->groups()->first();
     expect($childGroup->name)->toBe('Renamed');
+});
+
+it('renames groups without internal names on child playlists', function () {
+    $playlist = Playlist::factory()->create();
+    $group = Group::factory()->create([
+        'playlist_id' => $playlist->id,
+        'user_id' => $playlist->user_id,
+        'name' => 'Original',
+        'name_internal' => null,
+    ]);
+
+    Notification::fake();
+    Config::set('cache.default', 'array');
+    (new DuplicatePlaylist($playlist, withSync: true))->handle();
+    $playlist->refreshChildPlaylistCache();
+    $child = Playlist::where('parent_id', $playlist->id)->first();
+
+    $group->forceFill(['name' => 'Updated', 'name_internal' => null])->save();
+    $pending = [];
+    invade(new SyncPlaylistChildren($playlist))->syncGroups($playlist, $child, $pending);
+
+    $child->refresh();
+    expect($child->groups()->where('name_internal', 'updated')->exists())->toBeTrue();
+    expect($child->groups()->where('name_internal', 'original')->exists())->toBeFalse();
+});
+
+it('deletes groups without internal names from child playlists', function () {
+    $playlist = Playlist::factory()->create();
+    $group = Group::factory()->create([
+        'playlist_id' => $playlist->id,
+        'user_id' => $playlist->user_id,
+        'name' => 'Delete Me',
+        'name_internal' => null,
+    ]);
+
+    Notification::fake();
+    Config::set('cache.default', 'array');
+    (new DuplicatePlaylist($playlist, withSync: true))->handle();
+    $playlist->refreshChildPlaylistCache();
+    $child = Playlist::where('parent_id', $playlist->id)->first();
+
+    $group->delete();
+    $pending = [];
+    invade(new SyncPlaylistChildren($playlist))->syncGroups($playlist, $child, $pending);
+
+    $child->refresh();
+    expect($child->groups()->count())->toBe(0);
 });
 
 it('maps grouped channel failovers to child channels', function () {
