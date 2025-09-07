@@ -1391,7 +1391,8 @@ class PlaylistResource extends Resource
             }
 
             $tabs[] = Forms\Components\Tabs\Tab::make($section)
-                ->schema($fields);
+                ->schema($fields)
+                ->hidden(fn (Get $get, ?Playlist $record) => $section === 'Scheduling' && (($record?->parent_id ?? $get('parent_id')) !== null));
         }
 
         // Compose the form with tabs and sections
