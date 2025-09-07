@@ -60,8 +60,13 @@ class Channel extends Model
 
     protected function playlistSyncChanges(): array
     {
-        $source = $this->source_id ?? 'ch-' . $this->id;
-        return ['channels' => [$source]];
+        $current = $this->source_id ?? 'ch-' . $this->id;
+        $original = $this->getOriginal('source_id') ?? 'ch-' . $this->id;
+
+        return ['channels' => array_unique(array_filter([
+            $current,
+            $original,
+        ]))];
     }
 
     /**

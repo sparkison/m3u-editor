@@ -17,9 +17,13 @@ class Season extends Model
 
     protected function playlistSyncChanges(): array
     {
-        $source = $this->source_season_id ?? 'season-'.$this->id;
+        $current = $this->source_season_id ?? 'season-' . $this->id;
+        $original = $this->getOriginal('source_season_id') ?? 'season-' . $this->id;
 
-        return ['seasons' => [$source]];
+        return ['seasons' => array_unique(array_filter([
+            $current,
+            $original,
+        ]))];
     }
 
     /**

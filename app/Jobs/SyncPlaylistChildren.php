@@ -561,9 +561,15 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
             $groupKeys = [];
             $pendingFailovers = [];
             foreach ($channelSources as $source) {
-                $channel = str_starts_with($source, 'ch-')
-                ? $parent->channels()->with('failovers.channelFailover', 'group')->find(substr($source, 3))
-                : $parent->channels()->with('failovers.channelFailover', 'group')->where('source_id', $source)->first();
+                $channel = null;
+                if (str_starts_with($source, 'ch-')) {
+                    $channel = $parent->channels()->with('failovers.channelFailover', 'group')->find(substr($source, 3));
+                    if ($channel && ($channel->source_id ?? 'ch-' . $channel->id) !== $source) {
+                        $channel = null;
+                    }
+                } else {
+                    $channel = $parent->channels()->with('failovers.channelFailover', 'group')->where('source_id', $source)->first();
+                }
 
                 if ($channel) {
                     $groupKey = $channel->group?->name_internal;
@@ -617,9 +623,15 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
         $categorySources = $changes['categories'] ?? [];
         if (! empty($categorySources)) {
             foreach ($categorySources as $source) {
-                $category = str_starts_with($source, 'cat-')
-                    ? $parent->categories()->find(substr($source, 4))
-                    : $parent->categories()->where('source_category_id', $source)->first();
+                $category = null;
+                if (str_starts_with($source, 'cat-')) {
+                    $category = $parent->categories()->find(substr($source, 4));
+                    if ($category && ($category->source_category_id ?? 'cat-' . $category->id) !== $source) {
+                        $category = null;
+                    }
+                } else {
+                    $category = $parent->categories()->where('source_category_id', $source)->first();
+                }
 
                 if ($category) {
                     $childCategory = $child->categories()->firstOrNew([
@@ -638,9 +650,15 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
         $seriesSources = $changes['series'] ?? [];
         if (! empty($seriesSources)) {
             foreach ($seriesSources as $source) {
-                $series = str_starts_with($source, 'series-')
-                    ? $parent->series()->find(substr($source, 7))
-                    : $parent->series()->where('source_series_id', $source)->first();
+                $series = null;
+                if (str_starts_with($source, 'series-')) {
+                    $series = $parent->series()->find(substr($source, 7));
+                    if ($series && ($series->source_series_id ?? 'series-' . $series->id) !== $source) {
+                        $series = null;
+                    }
+                } else {
+                    $series = $parent->series()->where('source_series_id', $source)->first();
+                }
 
                 if ($series) {
                     $categorySource = $series->category?->source_category_id
@@ -669,9 +687,15 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
         $seasonSources = $changes['seasons'] ?? [];
         if (! empty($seasonSources)) {
             foreach ($seasonSources as $source) {
-                $season = str_starts_with($source, 'season-')
-                    ? $parent->seasons()->find(substr($source, 7))
-                    : $parent->seasons()->where('source_season_id', $source)->first();
+                $season = null;
+                if (str_starts_with($source, 'season-')) {
+                    $season = $parent->seasons()->find(substr($source, 7));
+                    if ($season && ($season->source_season_id ?? 'season-' . $season->id) !== $source) {
+                        $season = null;
+                    }
+                } else {
+                    $season = $parent->seasons()->where('source_season_id', $source)->first();
+                }
 
                 if ($season) {
                     $seriesSource = $season->series?->source_series_id
@@ -701,9 +725,15 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
         $episodeSources = $changes['episodes'] ?? [];
         if (! empty($episodeSources)) {
             foreach ($episodeSources as $source) {
-                $episode = str_starts_with($source, 'ep-')
-                    ? $parent->episodes()->find(substr($source, 3))
-                    : $parent->episodes()->where('source_episode_id', $source)->first();
+                $episode = null;
+                if (str_starts_with($source, 'ep-')) {
+                    $episode = $parent->episodes()->find(substr($source, 3));
+                    if ($episode && ($episode->source_episode_id ?? 'ep-' . $episode->id) !== $source) {
+                        $episode = null;
+                    }
+                } else {
+                    $episode = $parent->episodes()->where('source_episode_id', $source)->first();
+                }
 
                 if ($episode) {
                     $seasonSource = $episode->season?->source_season_id

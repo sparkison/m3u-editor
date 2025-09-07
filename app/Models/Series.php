@@ -24,9 +24,13 @@ class Series extends Model
 
     protected function playlistSyncChanges(): array
     {
-        $source = $this->source_series_id ?? 'series-'.$this->id;
+        $current = $this->source_series_id ?? 'series-' . $this->id;
+        $original = $this->getOriginal('source_series_id') ?? 'series-' . $this->id;
 
-        return ['series' => [$source]];
+        return ['series' => array_unique(array_filter([
+            $current,
+            $original,
+        ]))];
     }
 
     /**
