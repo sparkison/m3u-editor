@@ -30,7 +30,10 @@ class ViewGroup extends ViewRecord
                     'channel',
                     '',
                     'Custom Group',
-                    fn ($records) => $records->first()->channels,
+                    fn ($records) => $records->first()->channels()
+                        ->select('id', 'playlist_id', 'source_id', 'title')
+                        ->whereNotNull('source_id')
+                        ->get(),
                     true,
                     Actions\Action::class
                 ),

@@ -113,7 +113,7 @@ class CategoryResource extends Resource
                     ->searchable(),
             ])
             ->actions([
-                Tables\Actions\BulkActionGroup::make([
+                Tables\Actions\ActionGroup::make([
                     Tables\Actions\ViewAction::make(),
                     self::addToCustomPlaylistAction(
                         Category::class,
