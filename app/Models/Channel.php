@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Enums\ChannelLogoType;
 use App\Facades\ProxyFacade;
 use App\Models\Concerns\DispatchesPlaylistSync;
+use App\Models\ChannelFailover;
+use App\Jobs\SyncPlaylistChildren;
 use App\Services\XtreamService;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -22,6 +24,24 @@ class Channel extends Model
     use HasFactory;
     use HasTags;
     use DispatchesPlaylistSync;
+
+    protected static function booted(): void
+    {
+        static::deleting(function (Channel $channel): void {
+            ChannelFailover::where('channel_failover_id', $channel->id)
+                ->get()
+                ->each(function (ChannelFailover $failover): void {
+                    $playlist = $failover->playlist;
+                    $source = $failover->channel?->source_id ?? 'ch-' . $failover->channel_id;
+
+                    $failover->deleteQuietly();
+
+                    if ($playlist) {
+                        SyncPlaylistChildren::debounce($playlist, ['channels' => [$source]]);
+                    }
+                });
+        });
+    }
 
     protected function playlistSyncChanges(): array
     {
