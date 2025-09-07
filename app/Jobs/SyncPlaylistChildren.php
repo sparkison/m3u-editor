@@ -165,6 +165,7 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
             // Clear the queued flag now that this job has finished (or failed)
             // so new changes can dispatch another sync.
             Cache::forget("playlist-sync:{$parent->id}:queued");
+            Cache::lock("playlist-sync-children:{$parent->id}")->forceRelease();
         }
     }
 
