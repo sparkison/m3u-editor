@@ -235,10 +235,8 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
             $groupRows = [];
             $groupKeys = [];
             foreach ($groups as $group) {
-                $key = $group->name_internal;
-                if (! $key) {
-                    $key = (Str::slug($group->name) ?: 'grp').'-'.$group->id;
-                }
+                $key = $group->name_internal
+                    ?? (Str::slug($group->name) ?: 'grp-' . $group->id);
 
                 $groupKeys[$group->id] = $key;
                 $parentGroupNames[] = $key;
@@ -534,12 +532,21 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
         $groupKeys = $changes['groups'] ?? [];
         if (! empty($groupKeys)) {
             $present = [];
-            foreach ($parent->groups()->whereIn('name_internal', $groupKeys)->lazy() as $group) {
-                $present[] = $group->name_internal;
-                $childGroup = $child->groups()->firstOrNew([
-                    'name_internal' => $group->name_internal,
-                ]);
-                $childGroup->fill($group->only(['name', 'name_internal', 'sort_order', 'user_id', 'is_custom']));
+            foreach ($parent->groups()->lazy() as $group) {
+                $key = $group->name_internal
+                    ?? (Str::slug($group->name) ?: 'grp-' . $group->id);
+
+                if (! in_array($key, $groupKeys, true)) {
+                    continue;
+                }
+
+                $present[] = $key;
+                $childGroup = $child->groups()->where('name_internal', $key)->first();
+                if (! $childGroup) {
+                    $childGroup = $child->groups()->newModelInstance();
+                    $childGroup->name_internal = $key;
+                }
+                $childGroup->forceFill($group->only(['name', 'name_internal', 'sort_order', 'user_id', 'is_custom']));
                 $childGroup->playlist_id = $child->id;
                 $childGroup->save();
             }
