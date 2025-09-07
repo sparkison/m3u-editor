@@ -148,6 +148,18 @@ it('deletes a channel without touching others', function () {
     expect($childCh2->updated_at)->toEqual($oldUpdated);
 });
 
+it('removes old channel entry when source id changes', function () {
+    [$parent, $child, $groupA, $groupB, $ch1, $ch2] = createSyncedPair();
+
+    $oldSource = 'ch-' . $ch1->id;
+    $ch1->forceFill(['source_id' => 'new-channel'])->save();
+    SyncPlaylistChildren::debounce($parent, ['channels' => ['new-channel', $oldSource]]);
+    (new SyncPlaylistChildren($parent))->handle();
+
+    expect($child->channels()->where('source_id', 'new-channel')->exists())->toBeTrue();
+    expect($child->channels()->where('source_id', $oldSource)->exists())->toBeFalse();
+});
+
 it('keeps child failover reference after a channel update', function () {
     $playlist = Playlist::factory()->create();
     $group = Group::factory()->create([
@@ -223,6 +235,18 @@ it('deletes a category without touching others', function () {
     expect($childCatB->updated_at)->toEqual($oldUpdated);
 });
 
+it('removes old category entry when source id changes', function () {
+    [$parent, $child, $groupA, $groupB, $ch1, $ch2, $catA, $catB] = createSyncedPair();
+
+    $oldSource = 'cat-' . $catA->id;
+    $catA->forceFill(['source_category_id' => 'new-category'])->save();
+    SyncPlaylistChildren::debounce($parent, ['categories' => ['new-category', $oldSource]]);
+    (new SyncPlaylistChildren($parent))->handle();
+
+    expect($child->categories()->where('source_category_id', 'new-category')->exists())->toBeTrue();
+    expect($child->categories()->where('source_category_id', $oldSource)->exists())->toBeFalse();
+});
+
 it('renames a series without touching others', function () {
     [$parent, $child, $groupA, $groupB, $ch1, $ch2, $catA, $catB, $series1, $series2] = createSyncedPair();
 
@@ -254,6 +278,18 @@ it('deletes a series without touching others', function () {
     expect($childSeries2->updated_at)->toEqual($oldUpdated);
 });
 
+it('removes old series entry when source id changes', function () {
+    [$parent, $child, $groupA, $groupB, $ch1, $ch2, $catA, $catB, $series1, $series2, $season, $episode] = createSyncedPair();
+
+    $oldSource = 'series-' . $series1->id;
+    $series1->forceFill(['source_series_id' => 'new-series'])->save();
+    SyncPlaylistChildren::debounce($parent, ['series' => ['new-series', $oldSource]]);
+    (new SyncPlaylistChildren($parent))->handle();
+
+    expect($child->series()->where('source_series_id', 'new-series')->exists())->toBeTrue();
+    expect($child->series()->where('source_series_id', $oldSource)->exists())->toBeFalse();
+});
+
 it('renames a season without touching its episodes', function () {
     [$parent, $child, $groupA, $groupB, $ch1, $ch2, $catA, $catB, $series1, $series2, $season, $episode] = createSyncedPair();
 
@@ -279,6 +315,18 @@ it('deletes a season and its episodes', function () {
 
     expect($child->seasons()->where('source_season_id', $source)->exists())->toBeFalse();
     expect($child->episodes()->where('source_episode_id', 'ep-' . $episode->id)->exists())->toBeFalse();
+});
+
+it('removes old season entry when source id changes', function () {
+    [$parent, $child, $groupA, $groupB, $ch1, $ch2, $catA, $catB, $series1, $series2, $season, $episode] = createSyncedPair();
+
+    $oldSource = 'season-' . $season->id;
+    $season->forceFill(['source_season_id' => 'new-season'])->save();
+    SyncPlaylistChildren::debounce($parent, ['seasons' => ['new-season', $oldSource]]);
+    (new SyncPlaylistChildren($parent))->handle();
+
+    expect($child->seasons()->where('source_season_id', 'new-season')->exists())->toBeTrue();
+    expect($child->seasons()->where('source_season_id', $oldSource)->exists())->toBeFalse();
 });
 
 it('renames an episode without touching its season', function () {
@@ -310,6 +358,18 @@ it('deletes an episode without touching its season', function () {
     expect($child->episodes()->where('source_episode_id', $source)->exists())->toBeFalse();
     $childSeason->refresh();
     expect($childSeason->updated_at)->toEqual($oldUpdated);
+});
+
+it('removes old episode entry when source id changes', function () {
+    [$parent, $child, $groupA, $groupB, $ch1, $ch2, $catA, $catB, $series1, $series2, $season, $episode] = createSyncedPair();
+
+    $oldSource = 'ep-' . $episode->id;
+    $episode->forceFill(['source_episode_id' => 'new-episode'])->save();
+    SyncPlaylistChildren::debounce($parent, ['episodes' => ['new-episode', $oldSource]]);
+    (new SyncPlaylistChildren($parent))->handle();
+
+    expect($child->episodes()->where('source_episode_id', 'new-episode')->exists())->toBeTrue();
+    expect($child->episodes()->where('source_episode_id', $oldSource)->exists())->toBeFalse();
 });
 
 it('coalesces multiple channel renames into one job', function () {
