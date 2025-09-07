@@ -40,6 +40,7 @@ class SyncListener
                     'status' => Status::Pending,
                     'processing' => false,
                 ]);
+                dispatch(new \App\Jobs\SyncPlaylistChildren($event->model));
             } elseif ($event->model->parent_id && ! $event->model->parent->processing) {
                 dispatch(new \App\Jobs\SyncPlaylistChildren($event->model->parent));
             }
