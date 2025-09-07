@@ -29,12 +29,27 @@ class Channel extends Model
     {
         static::deleting(function (Channel $channel): void {
             ChannelFailover::where('channel_failover_id', $channel->id)
+                ->with(['channel.user', 'playlist'])
                 ->get()
-                ->each(function (ChannelFailover $failover): void {
+                ->each(function (ChannelFailover $failover) use ($channel): void {
                     $playlist = $failover->playlist;
-                    $source = $failover->channel?->source_id ?? 'ch-' . $failover->channel_id;
+                    $sourceChannel = $failover->channel;
+                    $source = $sourceChannel?->source_id ?? 'ch-' . $failover->channel_id;
 
                     $failover->deleteQuietly();
+
+                    if ($sourceChannel?->user) {
+                        Notification::make()
+                            ->warning()
+                            ->title('Failover Removed')
+                            ->body("Channel \"{$channel->title}\" was deleted and removed as a failover for \"{$sourceChannel->title}\".")
+                            ->broadcast($sourceChannel->user);
+                        Notification::make()
+                            ->warning()
+                            ->title('Failover Removed')
+                            ->body("Channel \"{$channel->title}\" was deleted and removed as a failover for \"{$sourceChannel->title}\".")
+                            ->sendToDatabase($sourceChannel->user);
+                    }
 
                     if ($playlist) {
                         SyncPlaylistChildren::debounce($playlist, ['channels' => [$source]]);

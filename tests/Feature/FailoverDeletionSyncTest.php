@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Notification as NotificationFacade;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Cache\ArrayStore;
 
@@ -36,6 +37,7 @@ beforeEach(function () {
     Cache::flush();
     Model::unguard();
     Queue::fake();
+    NotificationFacade::fake();
 });
 
 it('removes failover links from child playlists when target channel is deleted', function () {
@@ -85,6 +87,16 @@ it('removes failover links from child playlists when target channel is deleted',
     $chan2->delete();
 
     Queue::assertPushed(SyncPlaylistChildren::class);
+
+    NotificationFacade::assertSentTo(
+        $user,
+        \Filament\Notifications\DatabaseNotification::class,
+        function ($notification) use ($chan1, $chan2) {
+            return ($notification->data['title'] ?? '') === 'Failover Removed'
+                && str_contains($notification->data['body'] ?? '', $chan2->title)
+                && str_contains($notification->data['body'] ?? '', $chan1->title);
+        }
+    );
 
     foreach (Queue::pushed(SyncPlaylistChildren::class) as $job) {
         $job->handle();
