@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Enums\Status;
 use App\Events\SyncCompleted;
 use App\Models\Category;
+use App\Models\Channel;
 use App\Models\Playlist;
 use App\Models\Season;
 use App\Models\Series;
@@ -169,10 +170,17 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
         }
     }
 
+    private function findChildChannelId(Playlist $child, Channel $parentChannel): ?int
+    {
+        $source = $parentChannel->source_id ?? 'ch-' . $parentChannel->id;
+
+        return $child->channels()->where('source_id', $source)->value('id');
+    }
+
     private function syncGroups(Playlist $parent, Playlist $child): void
     {
         $parentGroupNames = [];
-        $parent->groups()->chunkById(100, function ($groups) use ($child, &$parentGroupNames) {
+        $parent->groups()->chunkById(100, function ($groups) use ($parent, $child, &$parentGroupNames) {
             $groupRows = [];
             $groupKeys = [];
             foreach ($groups as $group) {
@@ -204,7 +212,7 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
                 $childGroupId = $childGroup->id;
                 $channelSources = [];
                 $failovers = [];
-                $group->channels()->with('failovers')->chunkById(100, function ($channels) use ($child, $childGroupId, &$channelSources, &$failovers) {
+                $group->channels()->with('failovers.channelFailover')->chunkById(100, function ($channels) use ($child, $childGroupId, &$channelSources, &$failovers) {
                     $channelRows = [];
                     foreach ($channels as $channel) {
                         $source = $channel->source_id ?? 'ch-'.$channel->id;
@@ -235,9 +243,33 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
 
                     $childChannel->failovers()->delete();
                     foreach ($items as $failover) {
-                        $newFailover = $failover->replicate(except: ['id', 'channel_id', 'created_at', 'updated_at']);
-                        $newFailover->channel_id = $childChannel->id;
-                        $newFailover->save();
+                        if (! $failover->channelFailover) {
+                            Log::info("SyncPlaylistChildren: Parent failover channel {$failover->channel_failover_id} missing on playlist {$child->id}");
+
+                            continue;
+                        }
+
+                        $childFailoverId = $this->findChildChannelId($child, $failover->channelFailover);
+                        if ($childFailoverId) {
+                            $newFailover = $failover->replicate(except: ['id', 'channel_id', 'created_at', 'updated_at']);
+                            $newFailover->channel_id = $childChannel->id;
+                            $newFailover->channel_failover_id = $childFailoverId;
+                            $newFailover->save();
+
+                            continue;
+                        }
+
+                        if ($failover->channelFailover->playlist_id !== $parent->id) {
+                            $newFailover = $failover->replicate(except: ['id', 'channel_id', 'created_at', 'updated_at']);
+                            $newFailover->channel_id = $childChannel->id;
+                            $newFailover->channel_failover_id = $failover->channel_failover_id;
+                            $newFailover->save();
+
+                            continue;
+                        }
+
+                        $failSource = $failover->channelFailover->source_id ?? 'ch-' . $failover->channelFailover->id;
+                        Log::info("SyncPlaylistChildren: Child channel not found for failover source '{$failSource}' on playlist {$child->id}");
                     }
                 }
                 unset($channelSources, $failovers);
@@ -357,7 +389,7 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
     private function syncUngroupedChannels(Playlist $parent, Playlist $child): void
     {
         $ungroupedSources = [];
-        $parent->channels()->whereNull('group_id')->with('failovers')->chunkById(100, function ($channels) use ($child, &$ungroupedSources) {
+        $parent->channels()->whereNull('group_id')->with('failovers.channelFailover')->chunkById(100, function ($channels) use ($parent, $child, &$ungroupedSources) {
             $rows = [];
             $failovers = [];
             foreach ($channels as $channel) {
@@ -377,9 +409,33 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
                 $childChannel = $childChannels[$source];
                 $childChannel->failovers()->delete();
                 foreach ($items as $failover) {
-                    $newFailover = $failover->replicate(except: ['id', 'channel_id', 'created_at', 'updated_at']);
-                    $newFailover->channel_id = $childChannel->id;
-                    $newFailover->save();
+                    if (! $failover->channelFailover) {
+                        Log::info("SyncPlaylistChildren: Parent failover channel {$failover->channel_failover_id} missing on playlist {$child->id}");
+
+                        continue;
+                    }
+
+                    $childFailoverId = $this->findChildChannelId($child, $failover->channelFailover);
+                    if ($childFailoverId) {
+                        $newFailover = $failover->replicate(except: ['id', 'channel_id', 'created_at', 'updated_at']);
+                        $newFailover->channel_id = $childChannel->id;
+                        $newFailover->channel_failover_id = $childFailoverId;
+                        $newFailover->save();
+
+                        continue;
+                    }
+
+                    if ($failover->channelFailover->playlist_id !== $parent->id) {
+                        $newFailover = $failover->replicate(except: ['id', 'channel_id', 'created_at', 'updated_at']);
+                        $newFailover->channel_id = $childChannel->id;
+                        $newFailover->channel_failover_id = $failover->channel_failover_id;
+                        $newFailover->save();
+
+                        continue;
+                    }
+
+                    $failSource = $failover->channelFailover->source_id ?? 'ch-' . $failover->channelFailover->id;
+                    Log::info("SyncPlaylistChildren: Child channel not found for failover source '{$failSource}' on playlist {$child->id}");
                 }
             }
         });
@@ -429,9 +485,9 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
         if (! empty($channelSources)) {
             $groupKeys = [];
             foreach ($channelSources as $source) {
-                $channel = str_starts_with($source, 'ch-')
-                    ? $parent->channels()->with('failovers', 'group')->find(substr($source, 3))
-                    : $parent->channels()->with('failovers', 'group')->where('source_id', $source)->first();
+                    $channel = str_starts_with($source, 'ch-')
+                    ? $parent->channels()->with('failovers.channelFailover', 'group')->find(substr($source, 3))
+                    : $parent->channels()->with('failovers.channelFailover', 'group')->where('source_id', $source)->first();
 
                 if ($channel) {
                     $groupKey = $channel->group?->name_internal;
@@ -462,9 +518,33 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
 
                     $childChannel->failovers()->delete();
                     foreach ($channel->failovers as $failover) {
-                        $newFailover = $failover->replicate(except: ['id', 'channel_id', 'created_at', 'updated_at']);
-                        $newFailover->channel_id = $childChannel->id;
-                        $newFailover->save();
+                        if (! $failover->channelFailover) {
+                            Log::info("SyncPlaylistChildren: Parent failover channel {$failover->channel_failover_id} missing on playlist {$child->id}");
+
+                            continue;
+                        }
+
+                        $childFailoverId = $this->findChildChannelId($child, $failover->channelFailover);
+                        if ($childFailoverId) {
+                            $newFailover = $failover->replicate(except: ['id', 'channel_id', 'created_at', 'updated_at']);
+                            $newFailover->channel_id = $childChannel->id;
+                            $newFailover->channel_failover_id = $childFailoverId;
+                            $newFailover->save();
+
+                            continue;
+                        }
+
+                        if ($failover->channelFailover->playlist_id !== $parent->id) {
+                            $newFailover = $failover->replicate(except: ['id', 'channel_id', 'created_at', 'updated_at']);
+                            $newFailover->channel_id = $childChannel->id;
+                            $newFailover->channel_failover_id = $failover->channel_failover_id;
+                            $newFailover->save();
+
+                            continue;
+                        }
+
+                        $failSource = $failover->channelFailover->source_id ?? 'ch-' . $failover->channelFailover->id;
+                        Log::info("SyncPlaylistChildren: Child channel not found for failover source '{$failSource}' on playlist {$child->id}");
                     }
                 } else {
                     $child->channels()->where('source_id', $source)->delete();
