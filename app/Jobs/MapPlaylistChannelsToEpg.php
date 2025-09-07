@@ -261,7 +261,6 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                         ->sendToDatabase($epg->user);
                     $map->update([
                         'status' => Status::Failed,
-                        'channels' => 0, // not using...
                         'errors' => $error,
                         'progress' => 100,
                         'processing' => false,
