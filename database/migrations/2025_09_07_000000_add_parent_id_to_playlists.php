@@ -5,9 +5,19 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
+        Schema::create('playlist_sync_changes', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('playlist_id')->constrained()->cascadeOnDelete();
+            $table->string('change_type');
+            $table->json('item_ids');
+            $table->timestamps();
+            $table->unique(['playlist_id', 'change_type']);
+        });
+
         Schema::table('playlists', function (Blueprint $table) {
             $table->foreignId('parent_id')
                 ->nullable()
@@ -214,11 +224,7 @@ return new class extends Migration {
 
     public function down(): void
     {
-        if (Schema::hasIndex('episodes', 'episodes_source_episode_id_playlist_id_unique')) {
-            Schema::table('episodes', function (Blueprint $table) {
-                $table->dropUnique('episodes_source_episode_id_playlist_id_unique');
-            });
-        }
+        Schema::dropIfExists('playlist_sync_changes');
 
         if (Schema::hasIndex('seasons', 'seasons_playlist_id_source_season_id_unique')) {
             Schema::table('seasons', function (Blueprint $table) {
