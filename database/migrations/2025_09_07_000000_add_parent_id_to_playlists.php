@@ -121,6 +121,28 @@ return new class extends Migration {
                 );
             });
         }
+
+        if (! Schema::hasIndex('channel_failovers', 'channel_failovers_channel_id_channel_failover_id_unique')) {
+            $duplicateIds = DB::table('channel_failovers')
+                ->select('id')
+                ->whereNotIn('id', function ($query) {
+                    $query->select(DB::raw('MIN(id)'))
+                        ->from('channel_failovers')
+                        ->groupBy('channel_id', 'channel_failover_id');
+                })
+                ->pluck('id');
+
+            if ($duplicateIds->isNotEmpty()) {
+                DB::table('channel_failovers')->whereIn('id', $duplicateIds)->delete();
+            }
+
+            Schema::table('channel_failovers', function (Blueprint $table) {
+                $table->unique(
+                    ['channel_id', 'channel_failover_id'],
+                    'channel_failovers_channel_id_channel_failover_id_unique'
+                );
+            });
+        }
     }
 
     public function down(): void
@@ -146,6 +168,12 @@ return new class extends Migration {
         if (Schema::hasIndex('categories', 'categories_playlist_id_source_category_id_unique')) {
             Schema::table('categories', function (Blueprint $table) {
                 $table->dropUnique('categories_playlist_id_source_category_id_unique');
+            });
+        }
+
+        if (Schema::hasIndex('channel_failovers', 'channel_failovers_channel_id_channel_failover_id_unique')) {
+            Schema::table('channel_failovers', function (Blueprint $table) {
+                $table->dropUnique('channel_failovers_channel_id_channel_failover_id_unique');
             });
         }
 

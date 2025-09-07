@@ -420,8 +420,56 @@ class VodResource extends Resource
     {
         return [
             Tables\Actions\BulkActionGroup::make([
-                self::addToCustomPlaylistBulkAction(Channel::class, 'channels', 'source_id', 'channel(s)', '')
-                    ->hidden(fn () => !$addToCustom),
+                Tables\Actions\BulkAction::make('add')
+                    ->label('Add to Custom Playlist')
+                    ->form([
+                        Forms\Components\Select::make('playlist')
+                            ->required()
+                            ->live()
+                            ->label('Custom Playlist')
+                            ->helperText('Select the custom playlist you would like to add the selected channel(s) to.')
+                            ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                            ->afterStateUpdated(function (Forms\Set $set, $state) {
+                                if ($state) {
+                                    $set('category', null);
+                                }
+                            })
+                            ->searchable(),
+                        Forms\Components\Select::make('category')
+                            ->label('Custom Group')
+                            ->disabled(fn (Get $get) => ! $get('playlist'))
+                            ->helperText(fn (Get $get) => ! $get('playlist') ? 'Select a custom playlist first.' : 'Select the group you would like to assign to the selected channel(s) to.')
+                            ->options(function ($get) {
+                                $customList = CustomPlaylist::find($get('playlist'));
+
+                                return $customList ? $customList->tags()
+                                    ->where('type', $customList->uuid)
+                                    ->get()
+                                    ->mapWithKeys(fn ($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
+                                    ->toArray() : [];
+                            })
+                            ->searchable(),
+                    ])
+                    ->action(function (Collection $records, array $data): void {
+                        $playlist = CustomPlaylist::findOrFail($data['playlist']);
+                        $playlist->channels()->syncWithoutDetaching($records->pluck('id'));
+                        if ($data['category']) {
+                            $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
+                        }
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Channels added to custom playlist')
+                            ->body('The selected channels have been added to the chosen custom playlist.')
+                            ->send();
+                    })
+                    ->hidden(fn () => ! $addToCustom)
+                    ->deselectRecordsAfterCompletion()
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-play')
+                    ->modalIcon('heroicon-o-play')
+                    ->modalDescription('Add the selected channel(s) to the chosen custom playlist.')
+                    ->modalSubmitActionLabel('Add now'),
                 Tables\Actions\BulkAction::make('move')
                     ->label('Move to Group')
                     ->form([
@@ -609,7 +657,7 @@ class VodResource extends Resource
                                 ->hidden(fn (Get $get) => $get('master_source') !== 'searched')
                                 ->getSearchResultsUsing(function (string $search) use ($existingFailoverIds) {
                                     $searchLower = strtolower($search);
-                                    $channels = Auth::user()->channels()
+                                    $channels = Channel::query()
                                         ->withoutEagerLoads()
                                         ->with('playlist')
                                         ->whereHas('playlist', fn ($q) => $q->whereNull('parent_id'))
@@ -1422,7 +1470,9 @@ class VodResource extends Resource
                                     if (! $state) {
                                         return [];
                                     }
-                                    $channel = \App\Models\Channel::find($state);
+                                    $channel = Channel::query()
+                                        ->whereHas('playlist', fn ($q) => $q->whereNull('parent_id'))
+                                        ->find($state);
                                     if (! $channel) {
                                         return [];
                                     }
@@ -1448,7 +1498,7 @@ class VodResource extends Resource
 
                                     // Always include the selected value if it exists
                                     $searchLower = strtolower($search);
-                                    $channels = Auth::user()->channels()
+                                    $channels = Channel::query()
                                         ->withoutEagerLoads()
                                         ->with('playlist')
                                         ->whereHas('playlist', fn ($q) => $q->whereNull('parent_id'))
@@ -1473,7 +1523,7 @@ class VodResource extends Resource
                                     }
 
                                     return $options;
-                                })->required()
+                                })->rule('different:channel_id')->required()
                         )
                         ->distinct()
                         ->columns(1)
