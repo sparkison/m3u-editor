@@ -30,7 +30,7 @@ class Episode extends Model
         'id' => 'integer',
         'new' => 'boolean',
         'enabled' => 'boolean',
-        'source_episode_id' => 'integer',
+        'source_episode_id' => 'string',
         'user_id' => 'integer',
         'playlist_id' => 'integer',
         'series_id' => 'integer',
