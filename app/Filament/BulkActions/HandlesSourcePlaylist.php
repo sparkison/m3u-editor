@@ -7,6 +7,8 @@ use App\Models\Playlist;
 use Filament\Forms;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\Actions\Action;
+use Filament\Tables\Actions\Action as TableAction;
+use Filament\Tables\Actions\BulkAction as TableBulkAction;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
 use Filament\Notifications\Notification;
@@ -91,7 +93,7 @@ trait HandlesSourcePlaylist
         $groups = [];
 
         $playlists
-            ->flatMap(fn ($playlist) => ($playlist->$relation ?? collect())
+            ->flatMap(fn ($playlist) => collect($playlist->$relation)
                 ->map(fn ($item) => [
                     'source_id' => $item->$sourceKey,
                     'playlist_id' => $playlist->id,
@@ -355,7 +357,7 @@ trait HandlesSourcePlaylist
             return $records;
         }
 
-        return $records->flatMap(fn ($group) => $group['channels']);
+        return $records->flatMap(fn ($group) => collect($group['channels'] ?? []));
     }
 
     /**
@@ -470,8 +472,8 @@ trait HandlesSourcePlaylist
         /** @var Tables\Actions\Action|Tables\Actions\BulkAction $action */
         $action = $actionClass::make('add')
             ->label('Add to Custom Playlist')
-            ->form(function ($records) use ($relation, $sourceKey, $itemLabel, $tagType, $categoryLabel, &$sourcePlaylistData, $recordsResolver, $isBulk, $allowDrilldown): array {
-                $records = $isBulk ? $records : collect([$records]);
+            ->form(function (TableAction|TableBulkAction $action) use ($relation, $sourceKey, $itemLabel, $tagType, $categoryLabel, &$sourcePlaylistData, $recordsResolver, $isBulk, $allowDrilldown): array {
+                $records = $isBulk ? $action->getRecords() : collect([$action->getRecord()]);
                 if ($recordsResolver) {
                     $records = $recordsResolver($records);
                 }
@@ -514,8 +516,8 @@ trait HandlesSourcePlaylist
 
                 return $form;
             })
-            ->action(function ($records, array $data) use ($modelClass, $relation, $sourceKey, &$sourcePlaylistData, $recordsResolver, $isBulk, $itemLabel, $allowDrilldown): void {
-                $records = $isBulk ? $records : collect([$records]);
+            ->action(function (TableAction|TableBulkAction $action, array $data) use ($modelClass, $relation, $sourceKey, &$sourcePlaylistData, $recordsResolver, $isBulk, $itemLabel, $allowDrilldown): void {
+                $records = $isBulk ? $action->getRecords() : collect([$action->getRecord()]);
                 if ($recordsResolver) {
                     $records = $recordsResolver($records);
                 }
