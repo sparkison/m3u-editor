@@ -4,17 +4,17 @@ namespace App\Filament\Resources\CategoryResource\Pages;
 
 use App\Filament\Resources\CategoryResource;
 use App\Models\Category;
-use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
-use App\Filament\BulkActions\HandlesSourcePlaylist as HandlesSourcePlaylistTrait;
+use App\Jobs\SyncPlaylistChildren;
+use App\Filament\BulkActions\HandlesSourcePlaylist;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Forms\Get;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewCategory extends ViewRecord
 {
-    use HandlesSourcePlaylistTrait;
+    use HandlesSourcePlaylist;
 
     protected static string $resource = CategoryResource::class;
 
@@ -56,7 +56,7 @@ class ViewCategory extends ViewRecord
                         $playlist->series()->syncWithoutDetaching($record->series()->pluck('id'));
                         SyncPlaylistChildrenJob::debounce($record->playlist, []);
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Series added to custom playlist')
                             ->body('The selected series have been added to the chosen custom playlist.')
@@ -85,7 +85,7 @@ class ViewCategory extends ViewRecord
                         ]);
                         SyncPlaylistChildrenJob::debounce($record->playlist, []);
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Series moved to category')
                             ->body('The series have been moved to the chosen category.')
@@ -107,7 +107,7 @@ class ViewCategory extends ViewRecord
                                 ));
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Series are being processed')
                             ->body('You will be notified once complete.')
@@ -129,7 +129,7 @@ class ViewCategory extends ViewRecord
                                 ));
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('.strm files are being synced for current category series. Only enabled series will be synced.')
                             ->body('You will be notified once complete.')
@@ -148,7 +148,7 @@ class ViewCategory extends ViewRecord
                         SyncPlaylistChildrenJob::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Current category series enabled')
                             ->body('The current category series have been enabled.')
@@ -167,7 +167,7 @@ class ViewCategory extends ViewRecord
                         SyncPlaylistChildrenJob::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Current category series disabled')
                             ->body('The current category series have been disabled.')

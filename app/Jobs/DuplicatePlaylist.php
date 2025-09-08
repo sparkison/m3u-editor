@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Playlist;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
@@ -244,7 +244,7 @@ class DuplicatePlaylist implements ShouldQueue
 
             // Send notification
             try {
-                Notification::make()
+                FilamentNotification::make()
                     ->success()
                     ->title('Playlist Duplicated')
                     ->body("\"{$playlist->name}\" has been duplicated successfully.")
@@ -252,7 +252,7 @@ class DuplicatePlaylist implements ShouldQueue
             } catch (\Throwable $broadcastError) {
                 logger()->warning('Broadcast failed: '.$broadcastError->getMessage());
             }
-            Notification::make()
+            FilamentNotification::make()
                 ->success()
                 ->title('Playlist Duplicated')
                 ->body("\"{$playlist->name}\" has been duplicated successfully, new playlist: \"{$newPlaylist->name}\"")
@@ -269,7 +269,7 @@ class DuplicatePlaylist implements ShouldQueue
 
             // Send notification
             try {
-                Notification::make()
+                FilamentNotification::make()
                     ->danger()
                     ->title("Error duplicating \"{$this->playlist->name}\"")
                     ->body('Please view your notifications for details.')
@@ -277,7 +277,7 @@ class DuplicatePlaylist implements ShouldQueue
             } catch (\Throwable $broadcastError) {
                 logger()->warning('Broadcast failed: '.$broadcastError->getMessage());
             }
-            Notification::make()
+            FilamentNotification::make()
                 ->danger()
                 ->title("Error duplicating \"{$this->playlist->name}\"")
                 ->body($e->getMessage())

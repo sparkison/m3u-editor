@@ -9,7 +9,7 @@ use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Tables;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
@@ -376,7 +376,7 @@ trait HandlesSourcePlaylist
                 }
             })
             ->after(function () use ($itemLabel) {
-                Notification::make()
+                FilamentNotification::make()
                     ->success()
                     ->title(ucfirst($itemLabel) . ' added to custom playlist')
                     ->body("The selected {$itemLabel} have been added to the chosen custom playlist.")

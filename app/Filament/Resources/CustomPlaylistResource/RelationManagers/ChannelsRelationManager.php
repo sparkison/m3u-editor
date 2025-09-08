@@ -10,7 +10,7 @@ use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Infolists\Infolist;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -248,7 +248,7 @@ class ChannelsRelationManager extends RelationManager
                             $record->syncTagsWithType([$data['group']], $ownerRecord->uuid);
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Added to group')
                             ->body('The selected channels have been added to the custom group.')

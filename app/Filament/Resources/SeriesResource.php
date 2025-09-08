@@ -8,16 +8,17 @@ use App\Filament\Resources\SeriesResource\RelationManagers;
 use App\Models\Category;
 use App\Models\Playlist;
 use App\Models\Series;
-use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
-use App\Filament\BulkActions\HandlesSourcePlaylist as HandlesSourcePlaylistTrait;
-use App\Rules\CheckIfUrlOrLocalPath as CheckIfUrlOrLocalPathRule;
+use App\Jobs\SyncPlaylistChildren;
+use App\Filament\BulkActions\HandlesSourcePlaylist;
+use App\Filament\Concerns\DisplaysPlaylistMembership;
+use App\Rules\CheckIfUrlOrLocalPath;
 use App\Services\XtreamService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -30,7 +31,8 @@ use Illuminate\Validation\ValidationException;
 
 class SeriesResource extends Resource
 {
-    use HandlesSourcePlaylistTrait;
+    use HandlesSourcePlaylist;
+    use DisplaysPlaylistMembership;
     protected static ?string $model = Series::class;
 
     protected static ?string $recordTitleAttribute = 'name';
@@ -140,9 +142,11 @@ class SeriesResource extends Resource
                 ->numeric()
                 ->sortable(),
             Tables\Columns\TextColumn::make('playlist.name')
-                ->numeric()
-                ->sortable()
-                ->hidden(fn() => !$showPlaylist),
+                ->label('Playlist')
+                ->hidden(fn() => !$showPlaylist)
+                ->formatStateUsing(fn($state, Series $record) => self::playlistDisplay($record, 'source_series_id'))
+                ->tooltip(fn(Series $record) => self::playlistTooltip($record, 'source_series_id'))
+                ->sortable(),
             Tables\Columns\TextColumn::make('created_at')
                 ->dateTime()
                 ->sortable()
@@ -195,7 +199,7 @@ class SeriesResource extends Resource
                             'category_id' => $category->id,
                         ]);
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Series moved to category')
                             ->body('The series has been moved to the chosen category.')
@@ -214,7 +218,7 @@ class SeriesResource extends Resource
                                 playlistSeries: $record,
                             ));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Series is being processed')
                             ->body('You will be notified once complete.')
@@ -234,7 +238,7 @@ class SeriesResource extends Resource
                                 series: $record,
                             ));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Series .strm files are being synced')
                             ->body('You will be notified once complete.')
@@ -286,7 +290,7 @@ class SeriesResource extends Resource
                             // This will change the category_id for the series in the database
                             // to reflect the new category
                             if ($category->playlist_id !== $record->playlist_id) {
-                                Notification::make()
+                                FilamentNotification::make()
                                     ->warning()
                                     ->title('Warning')
                                     ->body("Cannot move \"{$category->name}\" to \"{$record->name}\" as they belong to different playlists.")
@@ -298,9 +302,9 @@ class SeriesResource extends Resource
                                 'category_id' => $category->id,
                             ]);
                         }
-                        SyncPlaylistChildrenJob::debounce($category->playlist, []);
+                        SyncPlaylistChildren::debounce($category->playlist, []);
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Series moved to category')
                             ->body('The category series have been moved to the chosen category.')
@@ -322,7 +326,7 @@ class SeriesResource extends Resource
                                 ));
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Series are being processed')
                             ->body('You will be notified once complete.')
@@ -344,7 +348,7 @@ class SeriesResource extends Resource
                                 ));
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('.strm files are being synced for selected series')
                             ->body('You will be notified once complete.')
@@ -365,7 +369,7 @@ class SeriesResource extends Resource
                             ]);
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Selected series enabled')
                             ->body('The selected series have been enabled.')
@@ -387,7 +391,7 @@ class SeriesResource extends Resource
                             ]);
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Selected series disabled')
                             ->body('The selected series have been disabled.')

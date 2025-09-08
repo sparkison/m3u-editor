@@ -10,7 +10,7 @@ use App\Rules\CheckIfUrlOrLocalPath as CheckIfUrlOrLocalPathRule;
 use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Forms\Get;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\Column;
@@ -245,7 +245,7 @@ class PlaylistResource extends Resource
                             app('Illuminate\Contracts\Bus\Dispatcher')
                                 ->dispatch(new \App\Jobs\ProcessM3uImport($record, force: true));
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Playlist is processing')
                                 ->body('Playlist is being processed in the background. Depending on the size of your playlist, this may take a while. You will be notified on completion.')
@@ -270,7 +270,7 @@ class PlaylistResource extends Resource
                             app('Illuminate\Contracts\Bus\Dispatcher')
                                 ->dispatch(new \App\Jobs\ProcessM3uImportSeries($record, force: true));
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Playlist is fetching metadata for Series')
                                 ->body('Playlist Series are being processed in the background. Depending on the number of enabled Series, this may take a while. You will be notified on completion.')
@@ -295,7 +295,7 @@ class PlaylistResource extends Resource
                             app('Illuminate\Contracts\Bus\Dispatcher')
                                 ->dispatch(new \App\Jobs\ProcessVodChannels(playlist: $record));
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Playlist is fetching metadata for VOD channels')
                                 ->body('Playlist VOD channels are being processed in the background. Depending on the number of enabled VOD channels, this may take a while. You will be notified on completion.')
@@ -332,7 +332,7 @@ class PlaylistResource extends Resource
                             app('Illuminate\Contracts\Bus\Dispatcher')
                                 ->dispatch(new \App\Jobs\DuplicatePlaylist($record, $data['name']));
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Playlist is being duplicated')
                                 ->body('Playlist is being duplicated in the background. You will be notified on completion.')
@@ -357,7 +357,7 @@ class PlaylistResource extends Resource
                             app('Illuminate\\Contracts\\Bus\\Dispatcher')
                                 ->dispatch(new \App\Jobs\DuplicatePlaylist($record, $data['name'], true));
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Playlist is being duplicated with sync')
                                 ->body('Playlist is being duplicated in the background. You will be notified on completion.')
@@ -374,7 +374,7 @@ class PlaylistResource extends Resource
                         ->label('Unsync')
                         ->action(fn ($record) => $record->update(['parent_id' => null]))
                         ->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Playlist unsynced')
                                 ->send();
@@ -409,7 +409,7 @@ class PlaylistResource extends Resource
                                 'errors' => null,
                             ]);
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Playlist status reset')
                                 ->body('Playlist status has been reset.')
@@ -425,8 +425,8 @@ class PlaylistResource extends Resource
                         ->label('Reset active count')
                         ->icon('heroicon-o-numbered-list')
                         ->color('warning')
-                        ->action(fn ($record) => Redis::set("active_streams:{$record->id}", 0))->after(function () {
-                            Notification::make()
+                        ->action(fn($record) => Redis::set("active_streams:{$record->id}", 0))->after(function () {
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Active stream count reset')
                                 ->body('Playlist active stream count has been reset.')
@@ -472,7 +472,7 @@ class PlaylistResource extends Resource
                                     ->dispatch(new \App\Jobs\ProcessM3uImport($record, force: true));
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Selected playlists are processing')
                                 ->body('The selected playlists are being processed in the background. Depending on the size of your playlist, this may take a while.')
@@ -502,7 +502,7 @@ class PlaylistResource extends Resource
                                 ]);
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Playlist status reset')
                                 ->body('Status has been reset for the selected Playlists.')
@@ -523,7 +523,7 @@ class PlaylistResource extends Resource
                                 Redis::set("active_streams:{$record->id}", 0);
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Active stream count reset')
                                 ->body('Active stream count has been reset for the selected Playlists.')
@@ -593,7 +593,7 @@ class PlaylistResource extends Resource
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new \App\Jobs\ProcessM3uImport($record, force: true));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Playlist is processing')
                             ->body('Playlist is being processed in the background. Depending on the size of your playlist, this may take a while. You will be notified on completion.')
@@ -618,7 +618,7 @@ class PlaylistResource extends Resource
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new \App\Jobs\ProcessM3uImportSeries($record, force: true));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Playlist is fetching metadata for Series')
                             ->body('Playlist Series are being processed in the background. Depending on the number of enabled Series, this may take a while. You will be notified on completion.')
@@ -643,7 +643,7 @@ class PlaylistResource extends Resource
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new \App\Jobs\ProcessVodChannels(playlist: $record));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Playlist is fetching metadata for VOD channels')
                             ->body('Playlist VOD channels are being processed in the background. Depending on the number of enabled VOD channels, this may take a while. You will be notified on completion.')
@@ -680,7 +680,7 @@ class PlaylistResource extends Resource
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new \App\Jobs\DuplicatePlaylist($record, $data['name']));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Playlist is being duplicated')
                             ->body('Playlist is being duplicated in the background. You will be notified on completion.')
@@ -705,7 +705,7 @@ class PlaylistResource extends Resource
                         app('Illuminate\\Contracts\\Bus\\Dispatcher')
                             ->dispatch(new \App\Jobs\DuplicatePlaylist($record, $data['name'], true));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Playlist is being duplicated with sync')
                             ->body('Playlist is being duplicated in the background. You will be notified on completion.')
@@ -722,7 +722,7 @@ class PlaylistResource extends Resource
                     ->label('Unsync')
                     ->action(fn ($record) => $record->update(['parent_id' => null]))
                     ->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Playlist unsynced')
                             ->send();
@@ -745,7 +745,7 @@ class PlaylistResource extends Resource
                             'errors' => null,
                         ]);
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Playlist status reset')
                             ->body('Playlist status has been reset.')
@@ -761,8 +761,8 @@ class PlaylistResource extends Resource
                     ->label('Reset active count')
                     ->icon('heroicon-o-numbered-list')
                     ->color('warning')
-                    ->action(fn ($record) => Redis::set("active_streams:{$record->id}", 0))->after(function () {
-                        Notification::make()
+                    ->action(fn($record) => Redis::set("active_streams:{$record->id}", 0))->after(function () {
+                        FilamentNotification::make()
                             ->success()
                             ->title('Active stream count reset')
                             ->body('Playlist active stream count has been reset.')

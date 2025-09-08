@@ -7,7 +7,7 @@ use App\Models\Series;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Infolists\Infolist;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Columns\SpatieTagsColumn;
@@ -221,7 +221,7 @@ class SeriesRelationManager extends RelationManager
                             $record->syncTagsWithType([$data['category']], $ownerRecord->uuid . '-category');
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Added to category')
                             ->body('The selected series have been added to the custom category.')
