@@ -13,7 +13,6 @@ use App\Models\ChannelFailover;
 use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Models\Playlist;
-use App\Jobs\SyncPlaylistChildren;
 use App\Filament\BulkActions\HandlesSourcePlaylist;
 use App\Filament\Concerns\DisplaysPlaylistMembership;
 use Filament\Forms;
