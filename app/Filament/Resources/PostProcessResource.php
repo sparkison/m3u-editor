@@ -5,7 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\PostProcessResource\Pages;
 use App\Filament\Resources\PostProcessResource\RelationManagers;
 use App\Models\PostProcess;
-use App\Rules\CheckIfUrlOrLocalPath;
+use App\Rules\CheckIfUrlOrLocalPath as CheckIfUrlOrLocalPathRule;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -191,7 +191,7 @@ class PostProcessResource extends Resource
                 ->rules(fn(Get $get) => $get('metadata.local') === 'email' ? [
                     'email',
                 ] : [
-                    new CheckIfUrlOrLocalPath(
+                    new CheckIfUrlOrLocalPathRule(
                         urlOnly: $get('metadata.local') === 'url',
                         localOnly: $get('metadata.local') === 'path',
                     ),

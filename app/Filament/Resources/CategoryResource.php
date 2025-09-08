@@ -117,7 +117,7 @@ class CategoryResource extends Resource
                     ->searchable(),
             ])
             ->actions([
-                Tables\Actions\BulkActionGroup::make([
+                Tables\Actions\ActionGroup::make([
                     Tables\Actions\ViewAction::make(),
                     Tables\Actions\Action::make('add')
                         ->label('Add to Custom Playlist')
@@ -182,7 +182,7 @@ class CategoryResource extends Resource
                             $record->series()->update([
                                 'category_id' => $category->id,
                             ]);
-                            SyncPlaylistChildren::debounce($record->playlist, []);
+                            SyncPlaylistChildrenJob::debounce($record->playlist, []);
                         })->after(function () {
                             FilamentNotification::make()
                                 ->success()
@@ -244,7 +244,7 @@ class CategoryResource extends Resource
                         ->label('Enable selected')
                         ->action(function ($record): void {
                             $record->series()->update(['enabled' => true]);
-                            SyncPlaylistChildren::debounce($record->playlist, []);
+                            SyncPlaylistChildrenJob::debounce($record->playlist, []);
                         })->after(function () {
                             FilamentNotification::make()
                                 ->success()
@@ -263,7 +263,7 @@ class CategoryResource extends Resource
                         ->label('Disable selected')
                         ->action(function ($record): void {
                             $record->series()->update(['enabled' => false]);
-                            SyncPlaylistChildren::debounce($record->playlist, []);
+                            SyncPlaylistChildrenJob::debounce($record->playlist, []);
                         })->after(function () {
                             FilamentNotification::make()
                                 ->success()
@@ -371,7 +371,7 @@ class CategoryResource extends Resource
                                 $record->series()->update([
                                     'category_id' => $category->id,
                                 ]);
-                                SyncPlaylistChildren::debounce($record->playlist, []);
+                                SyncPlaylistChildrenJob::debounce($record->playlist, []);
                             }
                         })->after(function () {
                             FilamentNotification::make()
@@ -439,7 +439,7 @@ class CategoryResource extends Resource
                         ->action(function (Collection $records): void {
                             foreach ($records as $record) {
                                 $record->series()->update(['enabled' => true]);
-                                SyncPlaylistChildren::debounce($record->playlist, []);
+                                SyncPlaylistChildrenJob::debounce($record->playlist, []);
                             }
                         })->after(function () {
                             FilamentNotification::make()
@@ -460,7 +460,7 @@ class CategoryResource extends Resource
                         ->action(function (Collection $records): void {
                             foreach ($records as $record) {
                                 $record->series()->update(['enabled' => false]);
-                                SyncPlaylistChildren::debounce($record->playlist, []);
+                                SyncPlaylistChildrenJob::debounce($record->playlist, []);
                             }
                         })->after(function () {
                             FilamentNotification::make()

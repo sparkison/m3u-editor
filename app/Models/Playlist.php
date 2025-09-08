@@ -6,7 +6,6 @@ use App\Enums\PlaylistChannelId;
 use App\Enums\Status;
 use App\Jobs\SyncPlaylistChildren;
 use App\Traits\ShortUrlTrait;
-use AshAllenDesign\ShortURL\Models\ShortURL;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -52,7 +51,7 @@ class Playlist extends Model
         'auto_fetch_series_metadata' => 'boolean',
         'parent_id' => 'integer',
         'status' => Status::class,
-        'id_channel_by' => PlaylistChannelId::class
+        'id_channel_by' => PlaylistChannelId::class,
     ];
 
     public function getFolderPathAttribute(): string
@@ -204,6 +203,12 @@ class Playlist extends Model
 
     protected static function booted()
     {
+        static::creating(function (Playlist $playlist) {
+            if ($playlist->parent_id !== null) {
+                $playlist->auto_sync = false;
+            }
+        });
+
         static::saved(function (Playlist $playlist) {
             if ($playlist->wasChanged('parent_id')) {
                 if ($original = $playlist->getOriginal('parent_id')) {
