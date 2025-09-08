@@ -11,7 +11,7 @@ use App\Models\ChannelFailover;
 use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Models\Playlist;
-use App\Jobs\SyncPlaylistChildren;
+use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
 use App\Filament\BulkActions\HandlesSourcePlaylist;
 use App\Rules\CheckIfUrlOrLocalPath;
 use Filament\Forms;
@@ -453,7 +453,7 @@ class VodResource extends Resource
                                 'group_id' => $group->id,
                             ]);
                         }
-                        SyncPlaylistChildren::debounce($group->playlist, []);
+                        SyncPlaylistChildrenJob::debounce($group->playlist, []);
                     })->after(function () {
                         Notification::make()
                             ->success()

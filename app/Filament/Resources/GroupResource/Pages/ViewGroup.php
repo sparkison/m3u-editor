@@ -4,9 +4,7 @@ namespace App\Filament\Resources\GroupResource\Pages;
 
 use App\Filament\Resources\GroupResource;
 use App\Models\Group;
-use App\Models\Channel;
-use App\Jobs\SyncPlaylistChildren;
-use App\Filament\BulkActions\HandlesSourcePlaylist;
+use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Forms\Get;
@@ -23,19 +21,55 @@ class ViewGroup extends ViewRecord
     {
         return [
             Actions\ActionGroup::make([
-                self::addToCustomPlaylistAction(
-                    Channel::class,
-                    'channels',
-                    'source_id',
-                    'channel',
-                    '',
-                    'Custom Group',
-                    fn ($records) => $records->first()->channels()
-                        ->select('id', 'playlist_id', 'source_id', 'title')
-                        ->get(),
-                    true,
-                    Actions\Action::class
-                ),
+                Actions\Action::make('add')
+                    ->label('Add to Custom Playlist')
+                    ->form([
+                        Forms\Components\Select::make('playlist')
+                            ->required()
+                            ->live()
+                            ->label('Custom Playlist')
+                            ->helperText('Select the custom playlist you would like to add group channels to.')
+                            ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                            ->afterStateUpdated(function (Forms\Set $set, $state) {
+                                if ($state) {
+                                    $set('category', null);
+                                }
+                            })
+                            ->searchable(),
+                        Forms\Components\Select::make('category')
+                            ->label('Custom Group')
+                            ->disabled(fn(Get $get) => !$get('playlist'))
+                            ->helperText(fn(Get $get) => !$get('playlist') ? 'Select a custom playlist first.' : 'Select the group you would like to assign to the channels to.')
+                            ->options(function ($get) {
+                                $customList = CustomPlaylist::find($get('playlist'));
+                                return $customList ? $customList->tags()
+                                    ->where('type', $customList->uuid)
+                                    ->get()
+                                    ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
+                                    ->toArray() : [];
+                            })
+                            ->searchable(),
+                    ])
+                    ->action(function ($record, array $data): void {
+                        $playlist = CustomPlaylist::findOrFail($data['playlist']);
+                        $playlist->channels()->syncWithoutDetaching($record->channels()->pluck('id'));
+                        if ($data['category']) {
+                            $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
+                        }
+                        SyncPlaylistChildrenJob::debounce($record->playlist, []);
+                    })->after(function ($livewire) {
+                        $livewire->dispatch('refreshRelation');
+                        Notification::make()
+                            ->success()
+                            ->title('Group channels added to custom playlist')
+                            ->body('The groups channels have been added to the chosen custom playlist.')
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-play')
+                    ->modalIcon('heroicon-o-play')
+                    ->modalDescription('Add the group channels to the chosen custom playlist.')
+                    ->modalSubmitActionLabel('Add now'),
                 Actions\Action::make('move')
                     ->label('Move to Group')
                     ->form([
@@ -53,7 +87,7 @@ class ViewGroup extends ViewRecord
                             'group' => $group->name,
                             'group_id' => $group->id,
                         ]);
-                        SyncPlaylistChildren::debounce($record->playlist, []);
+                        SyncPlaylistChildrenJob::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
                         Notification::make()
@@ -74,7 +108,7 @@ class ViewGroup extends ViewRecord
                         $record->channels()->update([
                             'enabled' => true,
                         ]);
-                        SyncPlaylistChildren::debounce($record->playlist, []);
+                        SyncPlaylistChildrenJob::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
                         Notification::make()
@@ -95,7 +129,7 @@ class ViewGroup extends ViewRecord
                         $record->channels()->update([
                             'enabled' => false,
                         ]);
-                        SyncPlaylistChildren::debounce($record->playlist, []);
+                        SyncPlaylistChildrenJob::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
                         Notification::make()
