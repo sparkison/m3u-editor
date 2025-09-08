@@ -7,7 +7,7 @@ use App\Filament\Resources\GroupResource\RelationManagers;
 use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Models\Playlist;
-use App\Jobs\SyncPlaylistChildren;
+use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -201,7 +201,7 @@ class GroupResource extends Resource
                                 'group' => $group->name,
                                 'group_id' => $group->id,
                             ]);
-                            SyncPlaylistChildren::debounce($record->playlist, []);
+                            SyncPlaylistChildrenJob::debounce($record->playlist, []);
                         })->after(function () {
                             Notification::make()
                                 ->success()
@@ -221,7 +221,7 @@ class GroupResource extends Resource
                             $record->channels()->update([
                                 'enabled' => true,
                             ]);
-                            SyncPlaylistChildren::debounce($record->playlist, []);
+                            SyncPlaylistChildrenJob::debounce($record->playlist, []);
                         })->after(function () {
                             Notification::make()
                                 ->success()
@@ -241,7 +241,7 @@ class GroupResource extends Resource
                             $record->channels()->update([
                                 'enabled' => false,
                             ]);
-                            SyncPlaylistChildren::debounce($record->playlist, []);
+                            SyncPlaylistChildrenJob::debounce($record->playlist, []);
                         })->after(function () {
                             Notification::make()
                                 ->success()
@@ -352,7 +352,7 @@ class GroupResource extends Resource
                                     'group' => $group->name,
                                     'group_id' => $group->id,
                                 ]);
-                                SyncPlaylistChildren::debounce($record->playlist, []);
+                                SyncPlaylistChildrenJob::debounce($record->playlist, []);
                             }
                         })->after(function () {
                             Notification::make()
@@ -373,7 +373,7 @@ class GroupResource extends Resource
                                 $record->channels()->update([
                                     'enabled' => true,
                                 ]);
-                                SyncPlaylistChildren::debounce($record->playlist, []);
+                                SyncPlaylistChildrenJob::debounce($record->playlist, []);
                             }
                         })->after(function () {
                             Notification::make()
@@ -396,7 +396,7 @@ class GroupResource extends Resource
                                 $record->channels()->update([
                                     'enabled' => false,
                                 ]);
-                                SyncPlaylistChildren::debounce($record->playlist, []);
+                                SyncPlaylistChildrenJob::debounce($record->playlist, []);
                             }
                         })->after(function () {
                             Notification::make()
