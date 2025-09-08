@@ -3,13 +3,12 @@
 namespace App\Filament\Resources;
 
 use App\Enums\Status;
-use App\Filament\Resources\PlaylistResource\Pages;
+use App\Filament\Resources\PlaylistResource\Pages as PlaylistPages;
 use App\Filament\Resources\PlaylistResource\RelationManagers;
 use App\Models\Playlist;
 use App\Rules\CheckIfUrlOrLocalPath;
 use Carbon\Carbon;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
@@ -34,7 +33,7 @@ use App\Livewire\XtreamApiInfo;
 use App\Models\Category;
 use App\Models\SourceGroup;
 use App\Services\EpgCacheService;
-use App\Jobs\SyncPlaylistChildren;
+use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Illuminate\Contracts\Support\Htmlable;
@@ -72,10 +71,9 @@ class PlaylistResource extends Resource
         return 0;
     }
 
-    public static function form(Form $form): Form
+    public static function form(Forms\Form $form): Forms\Form
     {
-        return $form
-            ->schema(self::getForm());
+        return $form->schema(self::getForm());
     }
 
     public static function table(Table $table): Table
@@ -432,7 +430,7 @@ class PlaylistResource extends Resource
                         ->color('danger')
                         ->action(function ($record) {
                             $record->series()->delete();
-                            SyncPlaylistChildren::debounce($record, []);
+                            SyncPlaylistChildrenJob::debounce($record, []);
                         })
                         ->requiresConfirmation()
                         ->icon('heroicon-s-trash')
@@ -541,10 +539,10 @@ class PlaylistResource extends Resource
     {
         return [
             // Playlists
-            'index' => Pages\ListPlaylists::route('/'),
-            'create' => Pages\CreatePlaylist::route('/create'),
-            'view' => Pages\ViewPlaylist::route('/{record}'),
-            'edit' => Pages\EditPlaylist::route('/{record}/edit'),
+            'index' => PlaylistPages\ListPlaylists::route('/'),
+            'create' => PlaylistPages\CreatePlaylist::route('/create'),
+            'view' => PlaylistPages\ViewPlaylist::route('/{record}'),
+            'edit' => PlaylistPages\EditPlaylist::route('/{record}/edit'),
 
             // Playlist Sync Statuses
             'playlist-sync-statuses.index' => ListPlaylistSyncStatuses::route('/{parent}/syncs'),
