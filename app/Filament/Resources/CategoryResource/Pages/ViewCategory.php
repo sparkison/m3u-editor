@@ -5,7 +5,7 @@ namespace App\Filament\Resources\CategoryResource\Pages;
 use App\Filament\Resources\CategoryResource;
 use App\Models\CustomPlaylist;
 use App\Models\Category;
-use App\Jobs\SyncPlaylistChildren;
+use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Forms\Get;
@@ -52,7 +52,7 @@ class ViewCategory extends ViewRecord
                     ->action(function ($record, array $data): void {
                         $playlist = CustomPlaylist::findOrFail($data['playlist']);
                         $playlist->series()->syncWithoutDetaching($record->series()->pluck('id'));
-                        SyncPlaylistChildren::debounce($record->playlist, []);
+                        SyncPlaylistChildrenJob::debounce($record->playlist, []);
                     })->after(function () {
                         Notification::make()
                             ->success()
@@ -81,7 +81,7 @@ class ViewCategory extends ViewRecord
                         $record->series()->update([
                             'category_id' => $category->id,
                         ]);
-                        SyncPlaylistChildren::debounce($record->playlist, []);
+                        SyncPlaylistChildrenJob::debounce($record->playlist, []);
                     })->after(function () {
                         Notification::make()
                             ->success()
@@ -143,7 +143,7 @@ class ViewCategory extends ViewRecord
                     ->label('Enable category series')
                     ->action(function ($record): void {
                         $record->series()->update(['enabled' => true]);
-                        SyncPlaylistChildren::debounce($record->playlist, []);
+                        SyncPlaylistChildrenJob::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
                         Notification::make()
@@ -162,7 +162,7 @@ class ViewCategory extends ViewRecord
                     ->label('Disable category series')
                     ->action(function ($record): void {
                         $record->series()->update(['enabled' => false]);
-                        SyncPlaylistChildren::debounce($record->playlist, []);
+                        SyncPlaylistChildrenJob::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
                         Notification::make()
