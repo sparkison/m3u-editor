@@ -11,7 +11,7 @@ use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Forms\Get;
 use Filament\Notifications\Notification as FilamentNotification;
-use Filament\Resources\Resource;
+use Filament\Resources\Resource as FilamentResource;
 use Filament\Tables;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Table;
@@ -51,7 +51,7 @@ use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Schema;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
 
-class PlaylistResource extends Resource
+class PlaylistResource extends FilamentResource
 {
     protected static ?string $model = PlaylistModel::class;
 

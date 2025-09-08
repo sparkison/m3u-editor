@@ -13,7 +13,7 @@ use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Notifications\Notification as FilamentNotification;
-use Filament\Resources\Resource;
+use Filament\Resources\Resource as FilamentResource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -21,7 +21,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Schema;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
 
-class EpgMapResource extends Resource
+class EpgMapResource extends FilamentResource
 {
     protected static ?string $model = EpgMap::class;
 
