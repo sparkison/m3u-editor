@@ -3,7 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Jobs\RestartQueue;
-use App\Rules\CheckIfUrlOrLocalPath;
+use App\Rules\CheckIfUrlOrLocalPath as CheckIfUrlOrLocalPathRule;
 use App\Rules\Cron;
 use App\Settings\GeneralSettings;
 use App\Services\FfmpegCodecService;
@@ -412,7 +412,7 @@ class Preferences extends SettingsPage
                                         Forms\Components\TextInput::make('stream_file_sync_location')
                                             ->label('Series Sync Location')
                                             ->live()
-                                            ->rules([new CheckIfUrlOrLocalPath(localOnly: true, isDirectory: true)])
+                                            ->rules([new CheckIfUrlOrLocalPathRule(localOnly: true, isDirectory: true)])
                                             ->helperText(
                                                 fn($get) => !$get('stream_file_sync_include_series')
                                                     ? 'File location: ' . $get('stream_file_sync_location') . ($get('stream_file_sync_include_season') ?? false ? '/Season 01' : '') . '/S01E01 - Episode Title.strm'
@@ -440,7 +440,7 @@ class Preferences extends SettingsPage
                                         Forms\Components\TextInput::make('vod_stream_file_sync_location')
                                             ->label('VOD Sync Location')
                                             ->live()
-                                            ->rules([new CheckIfUrlOrLocalPath(localOnly: true, isDirectory: true)])
+                                            ->rules([new CheckIfUrlOrLocalPathRule(localOnly: true, isDirectory: true)])
                                             ->helperText(
                                                 fn($get) => 'File location: ' . $get('vod_stream_file_sync_location') . ($get('vod_stream_file_sync_include_season') ?? false ? '/Group Name' : '') . '/VOD Title.strm'
                                             )
