@@ -13,7 +13,7 @@ use App\Models\Group;
 use App\Models\Playlist;
 use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
 use App\Filament\BulkActions\HandlesSourcePlaylist as HandlesSourcePlaylistTrait;
-use App\Rules\CheckIfUrlOrLocalPath;
+use App\Rules\CheckIfUrlOrLocalPath as CheckIfUrlOrLocalPathRule;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -1395,7 +1395,7 @@ class VodResource extends Resource
                             Forms\Components\TextInput::make('sync_location')
                                 ->label('VOD Sync Location')
                                 ->live()
-                                ->rules([new CheckIfUrlOrLocalPath(localOnly: true, isDirectory: true)])
+                                ->rules([new CheckIfUrlOrLocalPathRule(localOnly: true, isDirectory: true)])
                                 ->helperText(
                                     fn ($get) => 'File location: '.$get('sync_location').($get('sync_settings.include_season') ?? false ? '/Group Name' : '').'/VOD Title.strm'
                                 )

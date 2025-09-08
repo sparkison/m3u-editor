@@ -6,7 +6,7 @@ use App\Enums\Status;
 use App\Filament\Resources\PlaylistResource\Pages as PlaylistPages;
 use App\Filament\Resources\PlaylistResource\RelationManagers;
 use App\Models\Playlist as PlaylistModel;
-use App\Rules\CheckIfUrlOrLocalPath;
+use App\Rules\CheckIfUrlOrLocalPath as CheckIfUrlOrLocalPathRule;
 use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Forms\Get;
@@ -944,7 +944,7 @@ class PlaylistResource extends Resource
                         ->prefixIcon('heroicon-m-globe-alt')
                         ->helperText('Enter the URL of the playlist file. If this is a local file, you can enter a full or relative path. If changing URL, the playlist will be re-imported. Use with caution as this could lead to data loss if the new playlist differs from the old one.')
                         ->requiredWithout('uploads')
-                        ->rules([new CheckIfUrlOrLocalPath])
+                        ->rules([new CheckIfUrlOrLocalPathRule()])
                         ->maxLength(255)
                         ->hidden(fn (Get $get): bool => (bool) $get('xtream')),
                     Forms\Components\FileUpload::make('uploads')
