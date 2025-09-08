@@ -3,7 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Enums\Status;
-use App\Filament\Resources\PlaylistResource\Pages;
+use App\Filament\Resources\PlaylistResource\Pages as PlaylistPages;
 use App\Filament\Resources\PlaylistResource\RelationManagers;
 use App\Models\Playlist;
 use App\Rules\CheckIfUrlOrLocalPath;
@@ -548,10 +548,10 @@ class PlaylistResource extends Resource
     {
         return [
             // Playlists
-            'index' => Pages\ListPlaylists::route('/'),
-            'create' => Pages\CreatePlaylist::route('/create'),
-            'view' => Pages\ViewPlaylist::route('/{record}'),
-            'edit' => Pages\EditPlaylist::route('/{record}/edit'),
+            'index' => PlaylistPages\ListPlaylists::route('/'),
+            'create' => PlaylistPages\CreatePlaylist::route('/create'),
+            'view' => PlaylistPages\ViewPlaylist::route('/{record}'),
+            'edit' => PlaylistPages\EditPlaylist::route('/{record}/edit'),
 
             // Playlist Sync Statuses
             'playlist-sync-statuses.index' => ListPlaylistSyncStatuses::route('/{parent}/syncs'),
