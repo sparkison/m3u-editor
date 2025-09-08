@@ -9,7 +9,7 @@ use App\Models\Epg;
 use App\Models\PostProcess;
 use App\Models\PostProcessLog;
 use App\Settings\GeneralSettings;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Queue\Queueable;
@@ -154,7 +154,7 @@ class RunPostProcess implements ShouldQueue
                     'status' => 'success',
                     'message' => $body,
                 ]);
-                Notification::make()
+                FilamentNotification::make()
                     ->success()
                     ->title($title)
                     ->body($body)
@@ -196,7 +196,7 @@ class RunPostProcess implements ShouldQueue
                         'status' => 'success',
                         'message' => $body,
                     ]);
-                    Notification::make()
+                    FilamentNotification::make()
                         ->success()
                         ->title($title)
                         ->body($body)
@@ -212,7 +212,7 @@ class RunPostProcess implements ShouldQueue
                         'status' => 'error',
                         'message' => $body,
                     ]);
-                    Notification::make()
+                    FilamentNotification::make()
                         ->danger()
                         ->title($title)
                         ->body($body)
@@ -272,7 +272,7 @@ class RunPostProcess implements ShouldQueue
                         'status' => 'success',
                         'message' => $body,
                     ]);
-                    Notification::make()
+                    FilamentNotification::make()
                         ->success()
                         ->title($title)
                         ->body($body)
@@ -289,7 +289,7 @@ class RunPostProcess implements ShouldQueue
                         'status' => 'error',
                         'message' => $body,
                     ]);
-                    Notification::make()
+                    FilamentNotification::make()
                         ->danger()
                         ->title($title)
                         ->body($body)
@@ -308,12 +308,12 @@ class RunPostProcess implements ShouldQueue
                 'status' => 'error',
                 'message' => $error,
             ]);
-            Notification::make()
+            FilamentNotification::make()
                 ->danger()
                 ->title("Error running post processing for \"$name\"")
                 ->body('Please view your notifications for details.')
                 ->broadcast($user);
-            Notification::make()
+            FilamentNotification::make()
                 ->danger()
                 ->title("Error running post processing for \"$name\"")
                 ->body($error)
