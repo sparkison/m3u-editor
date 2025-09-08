@@ -34,7 +34,7 @@ use App\Livewire\XtreamApiInfo;
 use App\Models\Category;
 use App\Models\SourceGroup;
 use App\Services\EpgCacheService;
-use App\Jobs\SyncPlaylistChildren;
+use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Illuminate\Contracts\Support\Htmlable;
@@ -432,7 +432,7 @@ class PlaylistResource extends Resource
                         ->color('danger')
                         ->action(function ($record) {
                             $record->series()->delete();
-                            SyncPlaylistChildren::debounce($record, []);
+                            SyncPlaylistChildrenJob::debounce($record, []);
                         })
                         ->requiresConfirmation()
                         ->icon('heroicon-s-trash')
