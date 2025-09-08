@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\GroupResource\Pages;
 
 use App\Filament\Resources\GroupResource;
-use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Filament\BulkActions\HandlesSourcePlaylist as HandlesSourcePlaylistTrait;
 use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
