@@ -137,7 +137,7 @@ class PlaylistResource extends FilamentResource
                 // Tables\Columns\TextColumn::make('channels_count')
                 //     ->label('Channels')
                 //     ->counts('channels')
-                //     ->description(fn(Playlist $record): string => "Enabled: {$record->enabled_channels_count}")
+                //     ->description(fn(PlaylistModel $record): string => "Enabled: {$record->enabled_channels_count}")
                 //     ->toggleable()
                 //     ->sortable(),
                 Tables\Columns\TextColumn::make('live_channels_count')

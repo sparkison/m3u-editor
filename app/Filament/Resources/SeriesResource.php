@@ -9,7 +9,7 @@ use App\Models\Category;
 use App\Models\Playlist;
 use App\Models\Series;
 use App\Filament\Concerns\DisplaysPlaylistMembership;
-use App\Rules\CheckIfUrlOrLocalPath;
+use App\Rules\CheckIfUrlOrLocalPath as CheckIfUrlOrLocalPathRule;
 use App\Services\XtreamService;
 use Filament\Forms;
 use Filament\Forms\Form;

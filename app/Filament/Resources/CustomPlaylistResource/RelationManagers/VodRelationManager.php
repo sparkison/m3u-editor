@@ -21,7 +21,6 @@ use Illuminate\Database\Eloquent\Model;
 use Filament\Tables\Columns\SpatieTagsColumn;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\HtmlString;
 use Spatie\Tags\Tag;
 
 class VodRelationManager extends RelationManager
