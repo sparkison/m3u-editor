@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\CategoryResource\Pages;
 
 use App\Filament\Resources\CategoryResource;
-use App\Models\CustomPlaylist;
 use App\Models\Category;
 use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
 use App\Filament\BulkActions\HandlesSourcePlaylist;

@@ -114,55 +114,18 @@ class CategoryResource extends Resource
                     ->searchable(),
             ])
             ->actions([
-                Tables\Actions\BulkActionGroup::make([
+                Tables\Actions\ActionGroup::make([
                     Tables\Actions\ViewAction::make(),
-                    Tables\Actions\Action::make('add')
-                        ->label('Add to Custom Playlist')
-                        ->form([
-                            Forms\Components\Select::make('playlist')
-                                ->required()
-                                ->live()
-                                ->label('Custom Playlist')
-                                ->helperText('Select the custom playlist you would like to add the selected series to.')
-                                ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                                ->afterStateUpdated(function (Forms\Set $set, $state) {
-                                    if ($state) {
-                                        $set('category', null);
-                                    }
-                                })
-                                ->searchable(),
-                            Forms\Components\Select::make('category')
-                                ->label('Custom Category')
-                                ->disabled(fn(Get $get) => !$get('playlist'))
-                                ->helperText(fn(Get $get) => !$get('playlist') ? 'Select a custom playlist first.' : 'Select the category you would like to assign to the selected series to.')
-                                ->options(function ($get) {
-                                    $customList = CustomPlaylist::find($get('playlist'));
-                                    return $customList ? $customList->tags()
-                                        ->where('type', $customList->uuid . '-category')
-                                        ->get()
-                                        ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
-                                        ->toArray() : [];
-                                })
-                                ->searchable(),
-                        ])
-                        ->action(function ($record, array $data): void {
-                            $playlist = CustomPlaylist::findOrFail($data['playlist']);
-                            $playlist->series()->syncWithoutDetaching($record->series()->pluck('id'));
-                            if ($data['category']) {
-                                $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
-                            }
-                        })->after(function () {
-                            Notification::make()
-                                ->success()
-                                ->title('Series added to custom playlist')
-                                ->body('The selected series have been added to the chosen custom playlist.')
-                                ->send();
-                        })
-                        ->requiresConfirmation()
-                        ->icon('heroicon-o-play')
-                        ->modalIcon('heroicon-o-play')
-                        ->modalDescription('Add the selected series to the chosen custom playlist.')
-                        ->modalSubmitActionLabel('Add now'),
+                    self::addToCustomPlaylistAction(
+                        Category::class,
+                        'categories',
+                        'source_category_id',
+                        'category',
+                        '-category',
+                        'Custom Category',
+                        null,
+                        false
+                    ),
                     Tables\Actions\Action::make('move')
                         ->label('Move Series to Category')
                         ->form([
@@ -279,58 +242,16 @@ class CategoryResource extends Resource
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\BulkAction::make('add')
-                        ->label('Add to Custom Playlist')
-                        ->form([
-                            Forms\Components\Select::make('playlist')
-                                ->required()
-                                ->live()
-                                ->label('Custom Playlist')
-                                ->helperText('Select the custom playlist you would like to add the selected category series to.')
-                                ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                                ->afterStateUpdated(function (Forms\Set $set, $state) {
-                                    if ($state) {
-                                        $set('category', null);
-                                    }
-                                })
-                                ->searchable(),
-                            Forms\Components\Select::make('category')
-                                ->label('Custom Category')
-                                ->disabled(fn(Get $get) => !$get('playlist'))
-                                ->helperText(fn(Get $get) => !$get('playlist') ? 'Select a custom playlist first.' : 'Select the category you would like to assign to the selected series to.')
-                                ->options(function ($get) {
-                                    $customList = CustomPlaylist::find($get('playlist'));
-                                    return $customList ? $customList->tags()
-                                        ->where('type', $customList->uuid . '-category')
-                                        ->get()
-                                        ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
-                                        ->toArray() : [];
-                                })
-                                ->searchable(),
-                        ])
-                        ->action(function (Collection $records, array $data): void {
-                            $playlist = CustomPlaylist::findOrFail($data['playlist']);
-                            foreach ($records as $record) {
-                                // Sync the series to the custom playlist
-                                // This will add the series to the playlist without detaching existing ones
-                                // Prevents duplicates in the playlist
-                                $playlist->series()->syncWithoutDetaching($record->series()->pluck('id'));
-                                if ($data['category']) {
-                                    $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
-                                }
-                            }
-                        })->after(function () {
-                            Notification::make()
-                                ->success()
-                                ->title('Category series added to custom playlist')
-                                ->body('The selected category series have been added to the chosen custom playlist.')
-                                ->send();
-                        })
-                        ->requiresConfirmation()
-                        ->icon('heroicon-o-play')
-                        ->modalIcon('heroicon-o-play')
-                        ->modalDescription('Add the selected category series to the chosen custom playlist.')
-                        ->modalSubmitActionLabel('Add now'),
+                    self::addToCustomPlaylistBulkAction(
+                        Category::class,
+                        'categories',
+                        'source_category_id',
+                        'category',
+                        '-category',
+                        'Custom Category',
+                        null,
+                        false
+                    ),
                     Tables\Actions\BulkAction::make('move')
                         ->label('Move Series to Category')
                         ->form([

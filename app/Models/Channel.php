@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Enums\ChannelLogoType;
 use App\Facades\ProxyFacade;
 use App\Models\Concerns\DispatchesPlaylistSync;
+use App\Models\ChannelFailover;
+use App\Jobs\SyncPlaylistChildren;
 use App\Services\XtreamService;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -23,10 +25,48 @@ class Channel extends Model
     use HasTags;
     use DispatchesPlaylistSync;
 
+    protected static function booted(): void
+    {
+        static::deleting(function (Channel $channel): void {
+            ChannelFailover::where('channel_failover_id', $channel->id)
+                ->with(['channel.user', 'playlist'])
+                ->get()
+                ->each(function (ChannelFailover $failover) use ($channel): void {
+                    $playlist = $failover->playlist;
+                    $sourceChannel = $failover->channel;
+                    $source = $sourceChannel?->source_id ?? 'ch-' . $failover->channel_id;
+
+                    $failover->deleteQuietly();
+
+                    if ($sourceChannel?->user) {
+                        Notification::make()
+                            ->warning()
+                            ->title('Failover Removed')
+                            ->body("Channel \"{$channel->title}\" was deleted and removed as a failover for \"{$sourceChannel->title}\".")
+                            ->broadcast($sourceChannel->user);
+                        Notification::make()
+                            ->warning()
+                            ->title('Failover Removed')
+                            ->body("Channel \"{$channel->title}\" was deleted and removed as a failover for \"{$sourceChannel->title}\".")
+                            ->sendToDatabase($sourceChannel->user);
+                    }
+
+                    if ($playlist) {
+                        SyncPlaylistChildren::debounce($playlist, ['channels' => [$source]]);
+                    }
+                });
+        });
+    }
+
     protected function playlistSyncChanges(): array
     {
-        $source = $this->source_id ?? 'ch-' . $this->id;
-        return ['channels' => [$source]];
+        $current = $this->source_id ?? 'ch-' . $this->id;
+        $original = $this->getOriginal('source_id') ?? 'ch-' . $this->id;
+
+        return ['channels' => array_unique(array_filter([
+            $current,
+            $original,
+        ]))];
     }
 
     /**

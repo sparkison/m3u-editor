@@ -17,9 +17,13 @@ class Category extends Model
 
     protected function playlistSyncChanges(): array
     {
-        $source = $this->source_category_id ?? 'cat-'.$this->id;
+        $current = $this->source_category_id ?? 'cat-' . $this->id;
+        $original = $this->getOriginal('source_category_id') ?? 'cat-' . $this->id;
 
-        return ['categories' => [$source]];
+        return ['categories' => array_unique(array_filter([
+            $current,
+            $original,
+        ]))];
     }
 
     /**
@@ -29,7 +33,7 @@ class Category extends Model
      */
     protected $casts = [
         'id' => 'integer',
-        'source_category_id' => 'integer',
+        'source_category_id' => 'string',
         'user_id' => 'integer',
         'playlist_id' => 'integer',
     ];
