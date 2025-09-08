@@ -6,9 +6,10 @@ use App\Facades\LogoFacade;
 use App\Filament\Resources\SeriesResource\Pages;
 use App\Filament\Resources\SeriesResource\RelationManagers;
 use App\Models\Category;
-use App\Models\CustomPlaylist;
 use App\Models\Playlist;
 use App\Models\Series;
+use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
+use App\Filament\BulkActions\HandlesSourcePlaylist as HandlesSourcePlaylistTrait;
 use App\Rules\CheckIfUrlOrLocalPath;
 use App\Services\XtreamService;
 use Filament\Forms;
@@ -25,9 +26,11 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 
 class SeriesResource extends Resource
 {
+    use HandlesSourcePlaylistTrait;
     protected static ?string $model = Series::class;
 
     protected static ?string $recordTitleAttribute = 'name';
@@ -255,55 +258,8 @@ class SeriesResource extends Resource
     {
         return [
             Tables\Actions\BulkActionGroup::make([
-                Tables\Actions\BulkAction::make('add')
-                    ->label('Add to Custom Playlist')
-                    ->form([
-                        Forms\Components\Select::make('playlist')
-                            ->required()
-                            ->live()
-                            ->label('Custom Playlist')
-                            ->helperText('Select the custom playlist you would like to add the selected series to.')
-                            ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                            ->afterStateUpdated(function (Forms\Set $set, $state) {
-                                if ($state) {
-                                    $set('category', null);
-                                }
-                            })
-                            ->searchable(),
-                        Forms\Components\Select::make('category')
-                            ->label('Custom Category')
-                            ->disabled(fn(Get $get) => !$get('playlist'))
-                            ->helperText(fn(Get $get) => !$get('playlist') ? 'Select a custom playlist first.' : 'Select the category you would like to assign to the selected series to.')
-                            ->options(function ($get) {
-                                $customList = CustomPlaylist::find($get('playlist'));
-                                return $customList ? $customList->tags()
-                                    ->where('type', $customList->uuid . '-category')
-                                    ->get()
-                                    ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
-                                    ->toArray() : [];
-                            })
-                            ->searchable(),
-                    ])
-                    ->action(function (Collection $records, array $data): void {
-                        $playlist = CustomPlaylist::findOrFail($data['playlist']);
-                        $playlist->series()->syncWithoutDetaching($records->pluck('id'));
-                        if ($data['category']) {
-                            $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
-                        }
-                    })->after(function () {
-                        Notification::make()
-                            ->success()
-                            ->title('Series added to custom playlist')
-                            ->body('The selected series have been added to the chosen custom playlist.')
-                            ->send();
-                    })
-                    ->hidden(fn() => !$addToCustom)
-                    ->deselectRecordsAfterCompletion()
-                    ->requiresConfirmation()
-                    ->icon('heroicon-o-play')
-                    ->modalIcon('heroicon-o-play')
-                    ->modalDescription('Add the selected series to the chosen custom playlist.')
-                    ->modalSubmitActionLabel('Add now'),
+                self::addToCustomPlaylistBulkAction(Series::class, 'series', 'source_series_id', 'series', '-category', 'Custom Category')
+                    ->hidden(fn () => !$addToCustom),
                 Tables\Actions\BulkAction::make('move')
                     ->label('Move Series to Category')
                     ->form([
@@ -342,6 +298,7 @@ class SeriesResource extends Resource
                                 'category_id' => $category->id,
                             ]);
                         }
+                        SyncPlaylistChildrenJob::debounce($category->playlist, []);
                     })->after(function () {
                         Notification::make()
                             ->success()
