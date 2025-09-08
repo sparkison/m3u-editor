@@ -5,7 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\Status;
 use App\Filament\Resources\PlaylistResource\Pages as PlaylistPages;
 use App\Filament\Resources\PlaylistResource\RelationManagers;
-use App\Models\Playlist;
+use App\Models\Playlist as PlaylistModel;
 use App\Rules\CheckIfUrlOrLocalPath;
 use Carbon\Carbon;
 use Filament\Forms;
@@ -54,7 +54,7 @@ use RyanChandler\FilamentProgressColumn\ProgressColumn;
 
 class PlaylistResource extends Resource
 {
-    protected static ?string $model = Playlist::class;
+    protected static ?string $model = PlaylistModel::class;
 
     protected static ?string $recordTitleAttribute = 'name';
 
@@ -114,8 +114,8 @@ class PlaylistResource extends Resource
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
                     ->sortable()
-                    ->formatStateUsing(fn ($state, ?Playlist $record) => $record?->parent_id ? '↳ '.$state : $state)
-                    ->extraAttributes(fn (?Playlist $record) => $record?->parent_id ? ['class' => 'pl-6'] : []),
+                    ->formatStateUsing(fn($state, ?PlaylistModel $record) => $record?->parent_id ? '↳ '.$state : $state)
+                    ->extraAttributes(fn(?PlaylistModel $record) => $record?->parent_id ? ['class' => 'pl-6'] : []),
                 Tables\Columns\TextColumn::make('url')
                     ->label('Playlist URL')
                     ->wrap()
@@ -126,13 +126,15 @@ class PlaylistResource extends Resource
                     ->toggleable()
                     ->formatStateUsing(fn (int $state): string => $state === 0 ? '∞' : (string) $state)
                     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
-                    ->description(fn (?Playlist $record): string => 'Active: '.(int) ($record ? Redis::get("active_streams:{$record->id}") : 0))
+                    ->description(fn(?PlaylistModel $record): string =>
+                        "Active: " . (int) ($record ? Redis::get("active_streams:{$record->id}") : 0))
                     ->sortable(),
                 Tables\Columns\TextColumn::make('groups_count')
                     ->label('Groups')
                     ->counts('groups')
                     ->toggleable()
-                    ->sortable(),
+                    ->sortable()
+                    ->hidden(fn(?PlaylistModel $record): bool => $record?->parent_id !== null),
                 // Tables\Columns\TextColumn::make('channels_count')
                 //     ->label('Channels')
                 //     ->counts('channels')
@@ -142,21 +144,24 @@ class PlaylistResource extends Resource
                 Tables\Columns\TextColumn::make('live_channels_count')
                     ->label('Live')
                     ->counts('live_channels')
-                    ->description(fn (?Playlist $record): string => "Enabled: {$record?->enabled_live_channels_count}")
+                    ->description(fn(?PlaylistModel $record): string => "Enabled: {$record?->enabled_live_channels_count}")
                     ->toggleable()
-                    ->sortable(),
+                    ->sortable()
+                    ->hidden(fn(?PlaylistModel $record): bool => $record?->parent_id !== null),
                 Tables\Columns\TextColumn::make('vod_channels_count')
                     ->label('VOD')
                     ->counts('vod_channels')
-                    ->description(fn (?Playlist $record): string => "Enabled: {$record?->enabled_vod_channels_count}")
+                    ->description(fn(?PlaylistModel $record): string => "Enabled: {$record?->enabled_vod_channels_count}")
                     ->toggleable()
-                    ->sortable(),
+                    ->sortable()
+                    ->hidden(fn(?PlaylistModel $record): bool => $record?->parent_id !== null),
                 Tables\Columns\TextColumn::make('series_count')
                     ->label('Series')
                     ->counts('series')
-                    ->description(fn (?Playlist $record): string => "Enabled: {$record?->enabled_series_count}")
+                    ->description(fn(?PlaylistModel $record): string => "Enabled: {$record?->enabled_series_count}")
                     ->toggleable()
-                    ->sortable(),
+                    ->sortable()
+                    ->hidden(fn(?PlaylistModel $record): bool => $record?->parent_id !== null),
                 Tables\Columns\TextColumn::make('status')
                     ->sortable()
                     ->badge()
@@ -382,7 +387,7 @@ class PlaylistResource extends Resource
                         ->color('gray')
                         ->icon('heroicon-m-arrows-right-left')
                         ->url(
-                            fn (Playlist $record): string => PlaylistResource::getUrl(
+                            fn(PlaylistModel $record): string => PlaylistResource::getUrl(
                                 name: 'playlist-sync-statuses.index',
                                 parameters: [
                                     'parent' => $record->id,
@@ -569,7 +574,7 @@ class PlaylistResource extends Resource
                 ->color('gray')
                 ->icon('heroicon-m-arrows-right-left')
                 ->url(
-                    fn (Playlist $record): string => PlaylistResource::getUrl(
+                    fn(PlaylistModel $record): string => PlaylistResource::getUrl(
                         name: 'playlist-sync-statuses.index',
                         parameters: [
                             'parent' => $record->id,
