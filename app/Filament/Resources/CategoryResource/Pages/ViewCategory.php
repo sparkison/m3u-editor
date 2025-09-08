@@ -3,9 +3,9 @@
 namespace App\Filament\Resources\CategoryResource\Pages;
 
 use App\Filament\Resources\CategoryResource;
-use App\Models\CustomPlaylist;
 use App\Models\Category;
 use App\Jobs\SyncPlaylistChildren;
+use App\Filament\BulkActions\HandlesSourcePlaylist;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Forms\Get;
@@ -14,57 +14,25 @@ use Filament\Resources\Pages\ViewRecord;
 
 class ViewCategory extends ViewRecord
 {
+    use HandlesSourcePlaylist;
+
     protected static string $resource = CategoryResource::class;
 
     protected function getHeaderActions(): array
     {
         return [
             Actions\ActionGroup::make([
-                Actions\Action::make('add')
-                    ->label('Add to Custom Playlist')
-                    ->form([
-                        Forms\Components\Select::make('playlist')
-                            ->required()
-                            ->live()
-                            ->label('Custom Playlist')
-                            ->helperText('Select the custom playlist you would like to add the category series to.')
-                            ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                            ->afterStateUpdated(function (Forms\Set $set, $state) {
-                                if ($state) {
-                                    $set('category', null);
-                                }
-                            })
-                            ->searchable(),
-                        Forms\Components\Select::make('category')
-                            ->label('Custom Category')
-                            ->disabled(fn(Get $get) => !$get('playlist'))
-                            ->helperText(fn(Get $get) => !$get('playlist') ? 'Select a custom playlist first.' : 'Select the category you would like to assign to the series to.')
-                            ->options(function ($get) {
-                                $customList = CustomPlaylist::find($get('playlist'));
-                                return $customList ? $customList->tags()
-                                    ->where('type', $customList->uuid . '-category')
-                                    ->get()
-                                    ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
-                                    ->toArray() : [];
-                            })
-                            ->searchable(),
-                    ])
-                    ->action(function ($record, array $data): void {
-                        $playlist = CustomPlaylist::findOrFail($data['playlist']);
-                        $playlist->series()->syncWithoutDetaching($record->series()->pluck('id'));
-                        SyncPlaylistChildren::debounce($record->playlist, []);
-                    })->after(function () {
-                        Notification::make()
-                            ->success()
-                            ->title('Series added to custom playlist')
-                            ->body('The selected series have been added to the chosen custom playlist.')
-                            ->send();
-                    })
-                    ->requiresConfirmation()
-                    ->icon('heroicon-o-play')
-                    ->modalIcon('heroicon-o-play')
-                    ->modalDescription('Add the selected series to the chosen custom playlist.')
-                    ->modalSubmitActionLabel('Add now'),
+                self::addToCustomPlaylistAction(
+                    Category::class,
+                    'categories',
+                    'source_category_id',
+                    'category',
+                    '-category',
+                    'Custom Category',
+                    null,
+                    false,
+                    Actions\Action::class
+                ),
                 Actions\Action::make('move')
                     ->label('Move Series to Category')
                     ->form([

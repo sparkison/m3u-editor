@@ -241,7 +241,7 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
             });
 
             // Last job in the batch
-            $jobs[] = new MapEpgToChannelsComplete($epg, $batchCount, $channelCount, $mappedCount, $batchNo, $start);
+            $jobs[] = new MapEpgToChannelsComplete($epg, $playlist, $batchCount, $channelCount, $mappedCount, $batchNo, $start);
 
             // Dispatch the batch
             Bus::chain($jobs)
@@ -261,7 +261,6 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                         ->sendToDatabase($epg->user);
                     $map->update([
                         'status' => Status::Failed,
-                        'channels' => 0, // not using...
                         'errors' => $error,
                         'progress' => 100,
                         'processing' => false,
