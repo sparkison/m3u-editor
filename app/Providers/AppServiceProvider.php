@@ -170,6 +170,9 @@ class AppServiceProvider extends ServiceProvider
                 return $playlist;
             });
             Playlist::deleting(function (Playlist $playlist) {
+                // Detach any child playlists so they become standalone playlists
+                $playlist->children()->update(['parent_id' => null]);
+
                 Storage::disk('local')->deleteDirectory($playlist->folder_path);
                 if ($playlist->uploads && Storage::disk('local')->exists($playlist->uploads)) {
                     Storage::disk('local')->delete($playlist->uploads);
