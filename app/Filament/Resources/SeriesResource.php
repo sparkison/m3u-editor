@@ -535,7 +535,7 @@ class SeriesResource extends Resource
                                     Forms\Components\TextInput::make('sync_location')
                                         ->label('Series Sync Location')
                                         ->live()
-                                        ->rules([new CheckIfUrlOrLocalPath(localOnly: true, isDirectory: true)])
+                                        ->rules([new CheckIfUrlOrLocalPathRule(localOnly: true, isDirectory: true)])
                                         ->helperText(
                                             fn($get) => !$get('sync_settings.include_series')
                                                 ? 'File location: ' . $get('sync_location') . ($get('sync_settings.include_season') ?? false ? '/Season 01' : '') . '/S01E01 - Episode Title.strm'
