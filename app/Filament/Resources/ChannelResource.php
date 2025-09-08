@@ -13,7 +13,6 @@ use App\Models\ChannelFailover;
 use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Models\Playlist;
-use App\Filament\BulkActions\HandlesSourcePlaylist;
 use App\Filament\Concerns\DisplaysPlaylistMembership;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -38,7 +37,7 @@ use Illuminate\Validation\ValidationException;
 
 class ChannelResource extends Resource
 {
-    use HandlesSourcePlaylist;
+    use \App\Filament\BulkActions\HandlesSourcePlaylist;
     use DisplaysPlaylistMembership;
     protected static ?string $model = Channel::class;
 

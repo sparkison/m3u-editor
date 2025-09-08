@@ -7,7 +7,6 @@ use App\Filament\Resources\GroupResource\RelationManagers;
 use App\Models\Group;
 use App\Models\Playlist;
 use App\Jobs\SyncPlaylistChildren;
-use App\Filament\BulkActions\HandlesSourcePlaylist;
 use App\Filament\Concerns\DisplaysPlaylistMembership;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -24,7 +23,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class GroupResource extends Resource
 {
-    use HandlesSourcePlaylist;
+    use \App\Filament\BulkActions\HandlesSourcePlaylist;
     use DisplaysPlaylistMembership;
     protected static ?string $model = Group::class;
 

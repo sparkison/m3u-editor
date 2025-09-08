@@ -14,7 +14,7 @@ use Filament\Resources\Pages\ViewRecord;
 
 class ViewGroup extends ViewRecord
 {
-    use HandlesSourcePlaylist;
+    use \App\Filament\BulkActions\HandlesSourcePlaylist;
 
     protected static string $resource = GroupResource::class;
 

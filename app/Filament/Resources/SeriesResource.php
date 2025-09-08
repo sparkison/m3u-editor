@@ -9,7 +9,6 @@ use App\Models\Category;
 use App\Models\Playlist;
 use App\Models\Series;
 use App\Jobs\SyncPlaylistChildren;
-use App\Filament\BulkActions\HandlesSourcePlaylist;
 use App\Filament\Concerns\DisplaysPlaylistMembership;
 use App\Rules\CheckIfUrlOrLocalPath;
 use App\Services\XtreamService;
@@ -31,7 +30,7 @@ use Illuminate\Validation\ValidationException;
 
 class SeriesResource extends Resource
 {
-    use HandlesSourcePlaylist;
+    use \App\Filament\BulkActions\HandlesSourcePlaylist;
     use DisplaysPlaylistMembership;
     protected static ?string $model = Series::class;
 

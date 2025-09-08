@@ -12,7 +12,6 @@ use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Models\Playlist;
 use App\Jobs\SyncPlaylistChildren;
-use App\Filament\BulkActions\HandlesSourcePlaylist;
 use App\Filament\Concerns\DisplaysPlaylistMembership;
 use App\Rules\CheckIfUrlOrLocalPath;
 use Filament\Forms;
@@ -38,7 +37,7 @@ use Illuminate\Validation\ValidationException;
 
 class VodResource extends Resource
 {
-    use HandlesSourcePlaylist;
+    use \App\Filament\BulkActions\HandlesSourcePlaylist;
     use DisplaysPlaylistMembership;
     protected static ?string $model = Channel::class;
 

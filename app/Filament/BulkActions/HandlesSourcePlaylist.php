@@ -22,11 +22,9 @@ use Illuminate\Validation\ValidationException;
  * Example usage:
  *
  * ```php
- * use App\Filament\BulkActions\HandlesSourcePlaylist;
- *
  * class ChannelResource extends Resource
  * {
- *     use HandlesSourcePlaylist;
+ *     use \App\Filament\BulkActions\HandlesSourcePlaylist;
  *
  *     public static function getTableBulkActions(): array
  *     {

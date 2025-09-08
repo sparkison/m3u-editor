@@ -14,7 +14,7 @@ use Filament\Resources\Pages\ViewRecord;
 
 class ViewCategory extends ViewRecord
 {
-    use HandlesSourcePlaylist;
+    use \App\Filament\BulkActions\HandlesSourcePlaylist;
 
     protected static string $resource = CategoryResource::class;
 
