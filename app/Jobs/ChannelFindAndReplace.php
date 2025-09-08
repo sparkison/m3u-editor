@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Channel;
 use App\Models\User;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Database\Eloquent\Collection;
@@ -76,12 +76,12 @@ class ChannelFindAndReplace implements ShouldQueue
         $user = User::find($this->user_id);
 
         // Send notification
-        Notification::make()
+        FilamentNotification::make()
             ->success()
             ->title('Find & Replace completed')
             ->body("Channel find & replace has completed successfully. {$updated} channels updated.")
             ->broadcast($user);
-        Notification::make()
+        FilamentNotification::make()
             ->success()
             ->title('Find & Replace completed')
             ->body("Channel find & replace has completed successfully. Operation completed in {$completedInRounded} seconds and updated {$updated} channels.")

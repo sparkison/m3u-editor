@@ -16,7 +16,7 @@ use Filament\Actions\Contracts\HasActions;
 use Filament\Actions\EditAction;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use Illuminate\Support\Str;
@@ -70,7 +70,7 @@ class EpgViewer extends Component implements HasForms, HasActions
                 if ($record) {
                     $record->update($data);
 
-                    Notification::make()
+                    FilamentNotification::make()
                         ->success()
                         ->title('Channel updated')
                         ->body('The channel has been successfully updated.')

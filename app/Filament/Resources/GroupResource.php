@@ -8,12 +8,14 @@ use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Models\Playlist;
 use App\Jobs\SyncPlaylistChildren;
+use App\Filament\BulkActions\HandlesSourcePlaylist;
+use App\Filament\Concerns\DisplaysPlaylistMembership;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -23,6 +25,8 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class GroupResource extends Resource
 {
+    use HandlesSourcePlaylist;
+    use DisplaysPlaylistMembership;
     protected static ?string $model = Group::class;
 
     protected static ?string $recordTitleAttribute = 'name';
@@ -104,7 +108,9 @@ class GroupResource extends Resource
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('playlist.name')
-                    ->numeric()
+                    ->label('Playlist')
+                    ->formatStateUsing(fn($state, Group $record) => self::playlistDisplay($record, 'name_internal'))
+                    ->tooltip(fn(Group $record) => self::playlistTooltip($record, 'name_internal'))
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\IconColumn::make('is_custom')
@@ -173,7 +179,7 @@ class GroupResource extends Resource
                                 $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Group channels added to custom playlist')
                                 ->body('The groups channels have been added to the chosen custom playlist.')
@@ -203,7 +209,7 @@ class GroupResource extends Resource
                             ]);
                             SyncPlaylistChildren::debounce($record->playlist, []);
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Channels moved to group')
                                 ->body('The group channels have been moved to the chosen group.')
@@ -223,7 +229,7 @@ class GroupResource extends Resource
                             ]);
                             SyncPlaylistChildren::debounce($record->playlist, []);
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Group channels enabled')
                                 ->body('The group channels have been enabled.')
@@ -243,7 +249,7 @@ class GroupResource extends Resource
                             ]);
                             SyncPlaylistChildren::debounce($record->playlist, []);
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Group channels disabled')
                                 ->body('The groups channels have been disabled.')
@@ -303,7 +309,7 @@ class GroupResource extends Resource
                                 }
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Group channels added to custom playlist')
                                 ->body('The groups channels have been added to the chosen custom playlist.')
@@ -340,7 +346,7 @@ class GroupResource extends Resource
                                 // This will change the group and group_id for the channels in the database
                                 // to reflect the new group
                                 if ($group->playlist_id !== $record->playlist_id) {
-                                    Notification::make()
+                                    FilamentNotification::make()
                                         ->warning()
                                         ->title('Warning')
                                         ->body("Cannot move \"{$group->name}\" to \"{$record->name}\" as they belong to different playlists.")
@@ -355,7 +361,7 @@ class GroupResource extends Resource
                                 SyncPlaylistChildren::debounce($record->playlist, []);
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Channels moved to group')
                                 ->body('The group channels have been moved to the chosen group.')
@@ -376,7 +382,7 @@ class GroupResource extends Resource
                                 SyncPlaylistChildren::debounce($record->playlist, []);
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Selected group channels enabled')
                                 ->body('The selected group channels have been enabled.')
@@ -399,7 +405,7 @@ class GroupResource extends Resource
                                 SyncPlaylistChildren::debounce($record->playlist, []);
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Selected group channels disabled')
                                 ->body('The selected groups channels have been disabled.')

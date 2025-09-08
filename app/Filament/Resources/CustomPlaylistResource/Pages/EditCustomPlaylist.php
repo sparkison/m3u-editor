@@ -5,7 +5,7 @@ namespace App\Filament\Resources\CustomPlaylistResource\Pages;
 use App\Filament\Resources\CustomPlaylistResource;
 use App\Services\EpgCacheService;
 use Filament\Actions;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\Pages\EditRecord;
 
 class EditCustomPlaylist extends EditRecord
@@ -23,13 +23,13 @@ class EditCustomPlaylist extends EditRecord
     {
         $cleared = EpgCacheService::clearPlaylistEpgCacheFile($this->record);
         if ($cleared) {
-            Notification::make()
+            FilamentNotification::make()
                 ->title('EPG File Cache Cleared')
                 ->body('The EPG file cache has been successfully cleared.')
                 ->success()
                 ->send();
         } else {
-            Notification::make()
+            FilamentNotification::make()
                 ->title('EPG File Cache Not Found')
                 ->body('No EPG cache files found.')
                 ->warning()
