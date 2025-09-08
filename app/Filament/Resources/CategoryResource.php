@@ -7,6 +7,7 @@ use App\Filament\Resources\CategoryResource\RelationManagers;
 use App\Models\Category;
 use App\Models\CustomPlaylist;
 use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
+use App\Filament\BulkActions\HandlesSourcePlaylist;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
