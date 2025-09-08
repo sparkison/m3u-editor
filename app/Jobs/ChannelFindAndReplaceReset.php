@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Channel;
 use App\Models\User;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Database\Eloquent\Collection;
@@ -98,12 +98,12 @@ class ChannelFindAndReplaceReset implements ShouldQueue
         $completedInRounded = round($completedIn, 2);
         $user = User::find($this->user_id);
 
-        Notification::make()
+        FilamentNotification::make()
             ->success()
             ->title('Find & Replace reset')
             ->body("Channel find & replace reset has completed successfully. {$totalUpdated} channels updated.")
             ->broadcast($user);
-        Notification::make()
+        FilamentNotification::make()
             ->success()
             ->title('Find & Replace reset completed')
             ->body("Channel find & replace reset has completed successfully. {$totalUpdated} channels updated in {$completedInRounded} seconds")

@@ -7,12 +7,13 @@ use App\Filament\Resources\CategoryResource\RelationManagers;
 use App\Models\Category;
 use App\Models\CustomPlaylist;
 use App\Jobs\SyncPlaylistChildren;
+use App\Filament\Concerns\DisplaysPlaylistMembership;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -22,6 +23,9 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class CategoryResource extends Resource
 {
+    use \App\Filament\BulkActions\HandlesSourcePlaylist;
+    use DisplaysPlaylistMembership;
+
     protected static ?string $model = Category::class;
 
     protected static ?string $recordTitleAttribute = 'name';
@@ -91,7 +95,9 @@ class CategoryResource extends Resource
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('playlist.name')
-                    ->numeric()
+                    ->label('Playlist')
+                    ->formatStateUsing(fn($state, Category $record) => self::playlistDisplay($record, 'source_category_id'))
+                    ->tooltip(fn(Category $record) => self::playlistTooltip($record, 'source_category_id'))
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
@@ -149,7 +155,7 @@ class CategoryResource extends Resource
                                 $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Series added to custom playlist')
                                 ->body('The selected series have been added to the chosen custom playlist.')
@@ -178,7 +184,7 @@ class CategoryResource extends Resource
                             ]);
                             SyncPlaylistChildren::debounce($record->playlist, []);
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Series moved to category')
                                 ->body('The series have been moved to the chosen category.')
@@ -200,7 +206,7 @@ class CategoryResource extends Resource
                                     ));
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Series are being processed')
                                 ->body('You will be notified once complete.')
@@ -222,7 +228,7 @@ class CategoryResource extends Resource
                                     ));
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('.strm files are being synced for selected category series. Only enabled series will be synced.')
                                 ->body('You will be notified once complete.')
@@ -240,7 +246,7 @@ class CategoryResource extends Resource
                             $record->series()->update(['enabled' => true]);
                             SyncPlaylistChildren::debounce($record->playlist, []);
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Selected category series enabled')
                                 ->body('The selected category series have been enabled.')
@@ -259,7 +265,7 @@ class CategoryResource extends Resource
                             $record->series()->update(['enabled' => false]);
                             SyncPlaylistChildren::debounce($record->playlist, []);
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Selected category series disabled')
                                 ->body('The selected category series have been disabled.')
@@ -317,7 +323,7 @@ class CategoryResource extends Resource
                                 }
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Category series added to custom playlist')
                                 ->body('The selected category series have been added to the chosen custom playlist.')
@@ -354,7 +360,7 @@ class CategoryResource extends Resource
                                 // This will change the category_id for the series in the database
                                 // to reflect the new category
                                 if ($category->playlist_id !== $record->playlist_id) {
-                                    Notification::make()
+                                    FilamentNotification::make()
                                         ->warning()
                                         ->title('Warning')
                                         ->body("Cannot move \"{$category->name}\" to \"{$record->name}\" as they belong to different playlists.")
@@ -368,7 +374,7 @@ class CategoryResource extends Resource
                                 SyncPlaylistChildren::debounce($record->playlist, []);
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Series moved to category')
                                 ->body('The category series have been moved to the chosen category.')
@@ -392,7 +398,7 @@ class CategoryResource extends Resource
                                 }
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Series are being processed')
                                 ->body('You will be notified once complete.')
@@ -416,7 +422,7 @@ class CategoryResource extends Resource
                                 }
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('.strm files are being synced for selected category series. Only enabled series will be synced.')
                                 ->body('You will be notified once complete.')
@@ -436,7 +442,7 @@ class CategoryResource extends Resource
                                 SyncPlaylistChildren::debounce($record->playlist, []);
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Selected category series enabled')
                                 ->body('The selected category series have been enabled.')
@@ -457,7 +463,7 @@ class CategoryResource extends Resource
                                 SyncPlaylistChildren::debounce($record->playlist, []);
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Selected category series disabled')
                                 ->body('The selected category series have been disabled.')
