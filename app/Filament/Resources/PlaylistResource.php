@@ -3,6 +3,22 @@
 namespace App\Filament\Resources;
 
 use App\Enums\Status;
+use App\Filament\Resources\PlaylistResource\Pages;
+use App\Filament\Resources\PlaylistResource\RelationManagers;
+use App\Models\Playlist;
+use App\Rules\CheckIfUrlOrLocalPath;
+use Carbon\Carbon;
+use Filament\Forms;
+use Filament\Forms\Get;
+use Filament\Notifications\Notification;
+use Filament\Resources\Resource;
+use Filament\Tables;
+use Filament\Tables\Columns\Column;
+use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
+use RyanChandler\FilamentProgressColumn\ProgressColumn;
 use App\Facades\PlaylistUrlFacade;
 use App\Filament\Resources\PlaylistResource\Pages;
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\CreatePlaylistSyncStatus;
@@ -65,10 +81,9 @@ class PlaylistResource extends Resource
         return 0;
     }
 
-    public static function form(Form $form): Form
+    public static function form(Forms\Form $form): Forms\Form
     {
-        return $form
-            ->schema(self::getForm());
+        return $form->schema(self::getForm());
     }
 
     public static function table(Table $table): Table
