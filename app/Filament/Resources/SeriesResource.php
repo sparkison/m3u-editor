@@ -9,7 +9,7 @@ use App\Models\Category;
 use App\Models\Playlist;
 use App\Models\Series;
 use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
-use App\Filament\BulkActions\HandlesSourcePlaylist;
+use App\Filament\BulkActions\HandlesSourcePlaylist as HandlesSourcePlaylistTrait;
 use App\Rules\CheckIfUrlOrLocalPath;
 use App\Services\XtreamService;
 use Filament\Forms;
@@ -30,7 +30,7 @@ use Illuminate\Validation\ValidationException;
 
 class SeriesResource extends Resource
 {
-    use HandlesSourcePlaylist;
+    use HandlesSourcePlaylistTrait;
     protected static ?string $model = Series::class;
 
     protected static ?string $recordTitleAttribute = 'name';

@@ -7,7 +7,7 @@ use App\Filament\Resources\CategoryResource\RelationManagers;
 use App\Models\Category;
 use App\Models\CustomPlaylist;
 use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
-use App\Filament\BulkActions\HandlesSourcePlaylist;
+use App\Filament\BulkActions\HandlesSourcePlaylist as HandlesSourcePlaylistTrait;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -23,7 +23,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class CategoryResource extends Resource
 {
-    use HandlesSourcePlaylist;
+    use HandlesSourcePlaylistTrait;
 
     protected static ?string $model = Category::class;
 

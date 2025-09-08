@@ -14,7 +14,7 @@ use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Models\Playlist;
 use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
-use App\Filament\BulkActions\HandlesSourcePlaylist;
+use App\Filament\BulkActions\HandlesSourcePlaylist as HandlesSourcePlaylistTrait;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -35,7 +35,7 @@ use Illuminate\Validation\ValidationException;
 
 class ChannelResource extends Resource
 {
-    use HandlesSourcePlaylist;
+    use HandlesSourcePlaylistTrait;
     protected static ?string $model = Channel::class;
 
     protected static ?string $recordTitleAttribute = 'title';

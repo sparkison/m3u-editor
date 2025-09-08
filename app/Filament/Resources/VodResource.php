@@ -12,7 +12,7 @@ use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Models\Playlist;
 use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
-use App\Filament\BulkActions\HandlesSourcePlaylist;
+use App\Filament\BulkActions\HandlesSourcePlaylist as HandlesSourcePlaylistTrait;
 use App\Rules\CheckIfUrlOrLocalPath;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -34,7 +34,7 @@ use Illuminate\Validation\ValidationException;
 
 class VodResource extends Resource
 {
-    use HandlesSourcePlaylist;
+    use HandlesSourcePlaylistTrait;
     protected static ?string $model = Channel::class;
 
     protected static ?string $recordTitleAttribute = 'title';
