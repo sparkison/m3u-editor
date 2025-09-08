@@ -5,15 +5,18 @@ namespace App\Filament\Resources\GroupResource\Pages;
 use App\Filament\Resources\GroupResource;
 use App\Models\CustomPlaylist;
 use App\Models\Group;
+use App\Filament\BulkActions\HandlesSourcePlaylist;
 use App\Jobs\SyncPlaylistChildren;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Forms\Get;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewGroup extends ViewRecord
 {
+    use HandlesSourcePlaylist;
+
     protected static string $resource = GroupResource::class;
 
     protected function getHeaderActions(): array
@@ -58,7 +61,7 @@ class ViewGroup extends ViewRecord
                         SyncPlaylistChildren::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Group channels added to custom playlist')
                             ->body('The groups channels have been added to the chosen custom playlist.')
@@ -89,7 +92,7 @@ class ViewGroup extends ViewRecord
                         SyncPlaylistChildren::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Channels moved to group')
                             ->body('The group channels have been moved to the chosen group.')
@@ -110,7 +113,7 @@ class ViewGroup extends ViewRecord
                         SyncPlaylistChildren::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Group channels enabled')
                             ->body('The group channels have been enabled.')
@@ -131,7 +134,7 @@ class ViewGroup extends ViewRecord
                         SyncPlaylistChildren::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Group channels disabled')
                             ->body('The groups channels have been disabled.')

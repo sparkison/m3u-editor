@@ -3,7 +3,7 @@
 namespace App\Livewire;
 
 use App\Services\EpgCacheService;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Livewire\Component;
 use Illuminate\Database\Eloquent\Model;
 
@@ -26,13 +26,13 @@ class PlaylistEpgUrl extends Component
     {
         $cleared = EpgCacheService::clearPlaylistEpgCacheFile($this->record);
         if ($cleared) {
-            Notification::make()
+            FilamentNotification::make()
                 ->title('EPG File Cache Cleared')
                 ->body('The EPG file cache has been successfully cleared.')
                 ->success()
                 ->send();
         } else {
-            Notification::make()
+            FilamentNotification::make()
                 ->title('EPG File Cache Not Found')
                 ->body('No EPG cache files found.')
                 ->warning()

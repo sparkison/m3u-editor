@@ -6,9 +6,11 @@ use App\Facades\LogoFacade;
 use App\Filament\Resources\SeriesResource\Pages;
 use App\Filament\Resources\SeriesResource\RelationManagers;
 use App\Models\Category;
-use App\Models\CustomPlaylist;
 use App\Models\Playlist;
 use App\Models\Series;
+use App\Jobs\SyncPlaylistChildren;
+use App\Filament\BulkActions\HandlesSourcePlaylist;
+use App\Filament\Concerns\DisplaysPlaylistMembership;
 use App\Rules\CheckIfUrlOrLocalPath;
 use App\Services\XtreamService;
 use Filament\Forms;
@@ -16,7 +18,7 @@ use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -25,9 +27,12 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 
 class SeriesResource extends Resource
 {
+    use HandlesSourcePlaylist;
+    use DisplaysPlaylistMembership;
     protected static ?string $model = Series::class;
 
     protected static ?string $recordTitleAttribute = 'name';
@@ -137,9 +142,11 @@ class SeriesResource extends Resource
                 ->numeric()
                 ->sortable(),
             Tables\Columns\TextColumn::make('playlist.name')
-                ->numeric()
-                ->sortable()
-                ->hidden(fn() => !$showPlaylist),
+                ->label('Playlist')
+                ->hidden(fn() => !$showPlaylist)
+                ->formatStateUsing(fn($state, Series $record) => self::playlistDisplay($record, 'source_series_id'))
+                ->tooltip(fn(Series $record) => self::playlistTooltip($record, 'source_series_id'))
+                ->sortable(),
             Tables\Columns\TextColumn::make('created_at')
                 ->dateTime()
                 ->sortable()
@@ -192,7 +199,7 @@ class SeriesResource extends Resource
                             'category_id' => $category->id,
                         ]);
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Series moved to category')
                             ->body('The series has been moved to the chosen category.')
@@ -211,7 +218,7 @@ class SeriesResource extends Resource
                                 playlistSeries: $record,
                             ));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Series is being processed')
                             ->body('You will be notified once complete.')
@@ -231,7 +238,7 @@ class SeriesResource extends Resource
                                 series: $record,
                             ));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Series .strm files are being synced')
                             ->body('You will be notified once complete.')
@@ -255,55 +262,8 @@ class SeriesResource extends Resource
     {
         return [
             Tables\Actions\BulkActionGroup::make([
-                Tables\Actions\BulkAction::make('add')
-                    ->label('Add to Custom Playlist')
-                    ->form([
-                        Forms\Components\Select::make('playlist')
-                            ->required()
-                            ->live()
-                            ->label('Custom Playlist')
-                            ->helperText('Select the custom playlist you would like to add the selected series to.')
-                            ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                            ->afterStateUpdated(function (Forms\Set $set, $state) {
-                                if ($state) {
-                                    $set('category', null);
-                                }
-                            })
-                            ->searchable(),
-                        Forms\Components\Select::make('category')
-                            ->label('Custom Category')
-                            ->disabled(fn(Get $get) => !$get('playlist'))
-                            ->helperText(fn(Get $get) => !$get('playlist') ? 'Select a custom playlist first.' : 'Select the category you would like to assign to the selected series to.')
-                            ->options(function ($get) {
-                                $customList = CustomPlaylist::find($get('playlist'));
-                                return $customList ? $customList->tags()
-                                    ->where('type', $customList->uuid . '-category')
-                                    ->get()
-                                    ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
-                                    ->toArray() : [];
-                            })
-                            ->searchable(),
-                    ])
-                    ->action(function (Collection $records, array $data): void {
-                        $playlist = CustomPlaylist::findOrFail($data['playlist']);
-                        $playlist->series()->syncWithoutDetaching($records->pluck('id'));
-                        if ($data['category']) {
-                            $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
-                        }
-                    })->after(function () {
-                        Notification::make()
-                            ->success()
-                            ->title('Series added to custom playlist')
-                            ->body('The selected series have been added to the chosen custom playlist.')
-                            ->send();
-                    })
-                    ->hidden(fn() => !$addToCustom)
-                    ->deselectRecordsAfterCompletion()
-                    ->requiresConfirmation()
-                    ->icon('heroicon-o-play')
-                    ->modalIcon('heroicon-o-play')
-                    ->modalDescription('Add the selected series to the chosen custom playlist.')
-                    ->modalSubmitActionLabel('Add now'),
+                self::addToCustomPlaylistBulkAction(Series::class, 'series', 'source_series_id', 'series', '-category', 'Custom Category')
+                    ->hidden(fn () => !$addToCustom),
                 Tables\Actions\BulkAction::make('move')
                     ->label('Move Series to Category')
                     ->form([
@@ -330,7 +290,7 @@ class SeriesResource extends Resource
                             // This will change the category_id for the series in the database
                             // to reflect the new category
                             if ($category->playlist_id !== $record->playlist_id) {
-                                Notification::make()
+                                FilamentNotification::make()
                                     ->warning()
                                     ->title('Warning')
                                     ->body("Cannot move \"{$category->name}\" to \"{$record->name}\" as they belong to different playlists.")
@@ -342,8 +302,9 @@ class SeriesResource extends Resource
                                 'category_id' => $category->id,
                             ]);
                         }
+                        SyncPlaylistChildren::debounce($category->playlist, []);
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Series moved to category')
                             ->body('The category series have been moved to the chosen category.')
@@ -365,7 +326,7 @@ class SeriesResource extends Resource
                                 ));
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Series are being processed')
                             ->body('You will be notified once complete.')
@@ -387,7 +348,7 @@ class SeriesResource extends Resource
                                 ));
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('.strm files are being synced for selected series')
                             ->body('You will be notified once complete.')
@@ -408,7 +369,7 @@ class SeriesResource extends Resource
                             ]);
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Selected series enabled')
                             ->body('The selected series have been enabled.')
@@ -430,7 +391,7 @@ class SeriesResource extends Resource
                             ]);
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Selected series disabled')
                             ->body('The selected series have been disabled.')

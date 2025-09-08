@@ -8,7 +8,7 @@ use App\Models\EpgChannel;
 use App\Models\Job;
 use App\Models\User;
 use Carbon\Carbon;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -43,12 +43,12 @@ class ProcessEpgImportComplete implements ShouldQueue
         $epg = $user->epgs()->find($this->epgId);
 
         // Send notification
-        Notification::make()
+        FilamentNotification::make()
             ->success()
             ->title('EPG Synced')
             ->body("\"{$epg->name}\" has been synced successfully.")
             ->broadcast($epg->user);
-        Notification::make()
+        FilamentNotification::make()
             ->success()
             ->title('EPG Synced')
             ->body("\"{$epg->name}\" has been synced successfully. Import completed in {$completedInRounded} seconds.")

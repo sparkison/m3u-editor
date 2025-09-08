@@ -10,7 +10,7 @@ use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Infolists\Infolist;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -115,6 +115,11 @@ class VodRelationManager extends RelationManager
         // Inject the custom group column after the group column
         array_splice($defaultColumns, 13, 0, [$groupColumn]);
 
+        $defaultColumns[] = Tables\Columns\TextColumn::make('playlist.parent.name')
+            ->label('Parent Playlist')
+            ->toggleable()
+            ->sortable();
+
         return $table->persistFiltersInSession()
             ->persistFiltersInSession()
             ->persistSortInSession()
@@ -123,7 +128,7 @@ class VodRelationManager extends RelationManager
                 return $action->button()->label('Filters');
             })
             ->modifyQueryUsing(function (Builder $query) {
-                $query->with(['tags', 'epgChannel', 'playlist'])
+                $query->with(['tags', 'epgChannel', 'playlist.parent'])
                     ->withCount(['failovers'])
                     ->where('is_vod', true); // Only show VOD content
             })
@@ -235,7 +240,7 @@ class VodRelationManager extends RelationManager
                             $record->syncTagsWithType([$data['group']], $ownerRecord->uuid);
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Added to group')
                             ->body('The selected VOD have been added to the custom group.')
