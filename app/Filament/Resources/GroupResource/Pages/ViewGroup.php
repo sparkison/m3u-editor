@@ -5,7 +5,8 @@ namespace App\Filament\Resources\GroupResource\Pages;
 use App\Filament\Resources\GroupResource;
 use App\Models\CustomPlaylist;
 use App\Models\Group;
-use App\Jobs\SyncPlaylistChildren;
+use App\Filament\BulkActions\HandlesSourcePlaylist as HandlesSourcePlaylistTrait;
+use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Forms\Get;
@@ -14,6 +15,8 @@ use Filament\Resources\Pages\ViewRecord;
 
 class ViewGroup extends ViewRecord
 {
+    use HandlesSourcePlaylistTrait;
+
     protected static string $resource = GroupResource::class;
 
     protected function getHeaderActions(): array
@@ -55,7 +58,7 @@ class ViewGroup extends ViewRecord
                         if ($data['category']) {
                             $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
                         }
-                        SyncPlaylistChildren::debounce($record->playlist, []);
+                        SyncPlaylistChildrenJob::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
                         Notification::make()
@@ -86,7 +89,7 @@ class ViewGroup extends ViewRecord
                             'group' => $group->name,
                             'group_id' => $group->id,
                         ]);
-                        SyncPlaylistChildren::debounce($record->playlist, []);
+                        SyncPlaylistChildrenJob::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
                         Notification::make()
@@ -107,7 +110,7 @@ class ViewGroup extends ViewRecord
                         $record->channels()->update([
                             'enabled' => true,
                         ]);
-                        SyncPlaylistChildren::debounce($record->playlist, []);
+                        SyncPlaylistChildrenJob::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
                         Notification::make()
@@ -128,7 +131,7 @@ class ViewGroup extends ViewRecord
                         $record->channels()->update([
                             'enabled' => false,
                         ]);
-                        SyncPlaylistChildren::debounce($record->playlist, []);
+                        SyncPlaylistChildrenJob::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
                         Notification::make()
