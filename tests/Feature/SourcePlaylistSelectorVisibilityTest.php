@@ -71,6 +71,32 @@ it('renders one required selector for a single parent-child duplicate pair', fun
     expect($select->isRequired())->toBeTrue();
 })->with('mediaTypes');
 
+it('renders selector when selecting the parent item of a duplicate pair', function (string $modelClass, string $relation, string $sourceKey, string $label, array $extra) {
+    $handler = makeFormHandler();
+
+    $user = User::factory()->create();
+    actingAs($user);
+
+    $parent = Playlist::factory()->for($user)->create();
+    $child  = Playlist::factory()->for($user)->create(['parent_id' => $parent->id]);
+
+    $parentRecord = $modelClass::factory()->for($user)->create(array_merge($extra, [
+        'playlist_id' => $parent->id,
+        $sourceKey    => 1,
+    ]));
+    $modelClass::factory()->for($user)->create(array_merge($extra, [
+        'playlist_id' => $child->id,
+        $sourceKey    => 1,
+    ]));
+
+    $form = $handler::buildSourcePlaylistForm(collect([$parentRecord]), $relation, $sourceKey, $label);
+
+    expect($form)->toHaveCount(1);
+    $select = $form[0]->getChildComponents()[0];
+    expect($select)->toBeInstanceOf(Forms\Components\Select::class);
+    expect($select->isRequired())->toBeTrue();
+})->with('mediaTypes');
+
 it('renders one selector per duplicated parent-child group', function (string $modelClass, string $relation, string $sourceKey, string $label, array $extra) {
     $handler = makeFormHandler();
 

@@ -420,14 +420,8 @@ class VodResource extends Resource
     {
         return [
             Tables\Actions\BulkActionGroup::make([
-                self::addToCustomPlaylistBulkAction(
-                    Channel::class,
-                    'channels',
-                    'source_id',
-                    'channel',
-                    '',
-                    'Custom Group'
-                )->hidden(fn () => ! $addToCustom),
+                self::addToCustomPlaylistBulkAction(Channel::class, 'channels', 'source_id', 'channel(s)', '')
+                    ->hidden(fn () => !$addToCustom),
                 Tables\Actions\BulkAction::make('move')
                     ->label('Move to Group')
                     ->form([
