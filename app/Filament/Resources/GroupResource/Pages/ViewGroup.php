@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\GroupResource\Pages;
 
 use App\Filament\Resources\GroupResource;
-use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
 use Filament\Actions;
@@ -14,6 +13,8 @@ use Filament\Resources\Pages\ViewRecord;
 
 class ViewGroup extends ViewRecord
 {
+    use HandlesSourcePlaylist;
+
     protected static string $resource = GroupResource::class;
 
     protected function getHeaderActions(): array

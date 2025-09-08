@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\CategoryResource\Pages;
 
 use App\Filament\Resources\CategoryResource;
-use App\Models\CustomPlaylist;
 use App\Models\Category;
 use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
 use Filament\Actions;
@@ -14,6 +13,8 @@ use Filament\Resources\Pages\ViewRecord;
 
 class ViewCategory extends ViewRecord
 {
+    use HandlesSourcePlaylist;
+
     protected static string $resource = CategoryResource::class;
 
     protected function getHeaderActions(): array
