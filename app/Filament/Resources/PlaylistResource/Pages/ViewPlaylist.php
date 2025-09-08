@@ -7,7 +7,7 @@ use App\Filament\Resources\PlaylistResource\Widgets;
 use App\Models\Playlist;
 use Filament\Actions;
 use Filament\Infolists\Infolist;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewPlaylist extends ViewRecord
