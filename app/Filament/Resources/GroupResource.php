@@ -4,7 +4,6 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\GroupResource\Pages;
 use App\Filament\Resources\GroupResource\RelationManagers;
-use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Models\Playlist;
 use App\Filament\Concerns\DisplaysPlaylistMembership;
@@ -141,34 +140,18 @@ class GroupResource extends FilamentResource
             ->actions([
                 Tables\Actions\ActionGroup::make([
                     Tables\Actions\ViewAction::make(),
-                    Tables\Actions\Action::make('add')
-                        ->label('Add to Custom Playlist')
-                        ->form([
-                            Forms\Components\Select::make('playlist')
-                                ->required()
-                                ->live()
-                                ->label('Custom Playlist')
-                                ->helperText('Select the custom playlist you would like to add the selected channel(s) to.')
-                                ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                                ->afterStateUpdated(function (Forms\Set $set, $state) {
-                                    if ($state) {
-                                        $set('category', null);
-                                    }
-                                })
-                                ->searchable(),
-                            Forms\Components\Select::make('category')
-                                ->label('Custom Group')
-                                ->disabled(fn(Get $get) => !$get('playlist'))
-                                ->helperText(fn(Get $get) => !$get('playlist') ? 'Select a custom playlist first.' : 'Select the group you would like to assign to the selected channel(s) to.')
-                                ->options(function ($get) {
-                                    $customList = CustomPlaylist::find($get('playlist'));
-                                    return $customList ? $customList->tags()
-                                        ->where('type', $customList->uuid)
-                                        ->get()
-                                        ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
-                                        ->toArray() : [];
-                                })
-                                ->searchable(),
+                    self::addToCustomPlaylistAction(
+                        Channel::class,
+                        'channels',
+                        'source_id',
+                        'channel',
+                        '',
+                        'Custom Group',
+                        fn ($records) => $records->map(fn ($group) => [
+                            'group'    => $group,
+                            'channels' => $group->channels()
+                                ->select('id', 'playlist_id', 'source_id', 'title')
+                                ->get(),
                         ])
                         ->action(function ($record, array $data): void {
                             $playlist = CustomPlaylist::findOrFail($data['playlist']);
@@ -266,34 +249,18 @@ class GroupResource extends FilamentResource
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\BulkAction::make('add')
-                        ->label('Add to Custom Playlist')
-                        ->form([
-                            Forms\Components\Select::make('playlist')
-                                ->required()
-                                ->live()
-                                ->label('Custom Playlist')
-                                ->helperText('Select the custom playlist you would like to add the selected group channel(s) to.')
-                                ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                                ->afterStateUpdated(function (Forms\Set $set, $state) {
-                                    if ($state) {
-                                        $set('category', null);
-                                    }
-                                })
-                                ->searchable(),
-                            Forms\Components\Select::make('category')
-                                ->label('Custom Group')
-                                ->disabled(fn(Get $get) => !$get('playlist'))
-                                ->helperText(fn(Get $get) => !$get('playlist') ? 'Select a custom playlist first.' : 'Select the group you would like to assign to the selected channel(s) to.')
-                                ->options(function ($get) {
-                                    $customList = CustomPlaylist::find($get('playlist'));
-                                    return $customList ? $customList->tags()
-                                        ->where('type', $customList->uuid)
-                                        ->get()
-                                        ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
-                                        ->toArray() : [];
-                                })
-                                ->searchable(),
+                    self::addToCustomPlaylistBulkAction(
+                        Channel::class,
+                        'channels',
+                        'source_id',
+                        'channel',
+                        '',
+                        'Custom Group',
+                        fn ($records) => $records->map(fn ($group) => [
+                            'group'    => $group,
+                            'channels' => $group->channels()
+                                ->select('id', 'playlist_id', 'source_id', 'title')
+                                ->get(),
                         ])
                         ->action(function (Collection $records, array $data): void {
                             $playlist = CustomPlaylist::findOrFail($data['playlist']);
