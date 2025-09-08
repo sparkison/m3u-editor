@@ -24,7 +24,6 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 class GroupResource extends Resource
 {
     use HandlesSourcePlaylistTrait;
-  
     protected static ?string $model = Group::class;
 
     protected static ?string $recordTitleAttribute = 'name';

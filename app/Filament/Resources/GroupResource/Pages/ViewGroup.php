@@ -4,6 +4,7 @@ namespace App\Filament\Resources\GroupResource\Pages;
 
 use App\Filament\Resources\GroupResource;
 use App\Models\Group;
+use App\Filament\BulkActions\HandlesSourcePlaylist as HandlesSourcePlaylistTrait;
 use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
 use Filament\Actions;
 use Filament\Forms;
@@ -13,7 +14,7 @@ use Filament\Resources\Pages\ViewRecord;
 
 class ViewGroup extends ViewRecord
 {
-    use HandlesSourcePlaylist;
+    use HandlesSourcePlaylistTrait;
 
     protected static string $resource = GroupResource::class;
 
