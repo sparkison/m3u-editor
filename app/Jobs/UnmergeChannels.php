@@ -10,7 +10,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 
 class UnmergeChannels implements ShouldQueue
 {
@@ -59,7 +59,7 @@ class UnmergeChannels implements ShouldQueue
 
     protected function sendCompletionNotification()
     {
-        Notification::make()
+        FilamentNotification::make()
             ->title('Unmerge complete')
             ->body('All channels have been unmerged successfully.')
             ->success()

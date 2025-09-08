@@ -12,7 +12,7 @@ use App\Models\Playlist;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -130,7 +130,7 @@ class EpgMapResource extends Resource
                                 epgMapId: $record->id,
                             ));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('EPG mapping started')
                             ->body('The EPG mapping process has been initiated.')
@@ -167,7 +167,7 @@ class EpgMapResource extends Resource
                                     ));
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('EPG mapping started')
                                 ->body('The EPG mapping process has been initiated for the selected mappings.')
