@@ -6,7 +6,7 @@ use App\Filament\Resources\CategoryResource;
 use App\Models\CustomPlaylist;
 use App\Models\Category;
 use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
-use App\Filament\BulkActions\HandlesSourcePlaylist;
+use App\Filament\BulkActions\HandlesSourcePlaylist as HandlesSourcePlaylistTrait;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Forms\Get;
@@ -15,7 +15,7 @@ use Filament\Resources\Pages\ViewRecord;
 
 class ViewCategory extends ViewRecord
 {
-    use HandlesSourcePlaylist;
+    use HandlesSourcePlaylistTrait;
 
     protected static string $resource = CategoryResource::class;
 
