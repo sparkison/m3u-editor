@@ -4,8 +4,6 @@ namespace App\Filament\Resources\GroupResource\Pages;
 
 use App\Filament\Resources\GroupResource;
 use App\Models\Group;
-use App\Filament\BulkActions\HandlesSourcePlaylist;
-use App\Jobs\SyncPlaylistChildren;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Forms\Get;
@@ -57,7 +55,7 @@ class ViewGroup extends ViewRecord
                         if ($data['category']) {
                             $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
                         }
-                        SyncPlaylistChildrenJob::debounce($record->playlist, []);
+                        \App\Jobs\SyncPlaylistChildren::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
                         FilamentNotification::make()
@@ -88,7 +86,7 @@ class ViewGroup extends ViewRecord
                             'group' => $group->name,
                             'group_id' => $group->id,
                         ]);
-                        SyncPlaylistChildrenJob::debounce($record->playlist, []);
+                        \App\Jobs\SyncPlaylistChildren::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
                         FilamentNotification::make()
@@ -109,7 +107,7 @@ class ViewGroup extends ViewRecord
                         $record->channels()->update([
                             'enabled' => true,
                         ]);
-                        SyncPlaylistChildrenJob::debounce($record->playlist, []);
+                        \App\Jobs\SyncPlaylistChildren::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
                         FilamentNotification::make()
@@ -130,7 +128,7 @@ class ViewGroup extends ViewRecord
                         $record->channels()->update([
                             'enabled' => false,
                         ]);
-                        SyncPlaylistChildrenJob::debounce($record->playlist, []);
+                        \App\Jobs\SyncPlaylistChildren::debounce($record->playlist, []);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
                         FilamentNotification::make()

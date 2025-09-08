@@ -37,7 +37,6 @@ use App\Models\Playlist;
 use App\Models\SourceGroup;
 use App\Rules\CheckIfUrlOrLocalPath;
 use App\Services\EpgCacheService;
-use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
@@ -444,7 +443,7 @@ class PlaylistResource extends Resource
                         ->color('danger')
                         ->action(function ($record) {
                             $record->series()->delete();
-                            SyncPlaylistChildrenJob::debounce($record, []);
+                            \App\Jobs\SyncPlaylistChildren::debounce($record, []);
                         })
                         ->requiresConfirmation()
                         ->icon('heroicon-s-trash')
