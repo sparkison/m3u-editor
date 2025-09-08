@@ -7,7 +7,7 @@ use App\Enums\Status;
 use App\Filament\Resources\EpgResource\Pages;
 use App\Filament\Resources\EpgResource\RelationManagers;
 use App\Models\Epg;
-use App\Rules\CheckIfUrlOrLocalPath;
+use App\Rules\CheckIfUrlOrLocalPath as CheckIfUrlOrLocalPathRule;
 use App\Services\SchedulesDirectService;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -624,7 +624,7 @@ class EpgResource extends FilamentResource
                         ->helperText('Enter the URL of the XMLTV guide data. If this is a local file, you can enter a full or relative path. If changing URL, the guide data will be re-imported. Use with caution as this could lead to data loss if the new guide differs from the old one.')
                         ->requiredWithout('uploads')
                         ->required(fn(Get $get): bool => $get('source_type') === EpgSourceType::URL->value && !$get('uploads'))
-                        ->rules([new CheckIfUrlOrLocalPath()])
+                        ->rules([new CheckIfUrlOrLocalPathRule()])
                         ->maxLength(255),
                     Forms\Components\FileUpload::make('uploads')
                         ->label('File')
