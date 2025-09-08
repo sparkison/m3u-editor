@@ -105,6 +105,11 @@ class SeriesRelationManager extends RelationManager
         // Inject the custom group column after the group column
         array_splice($defaultColumns, 6, 0, [$groupColumn]);
 
+        $defaultColumns[] = Tables\Columns\TextColumn::make('playlist.parent.name')
+            ->label('Parent Playlist')
+            ->toggleable()
+            ->sortable();
+
         return $table->persistFiltersInSession()
             ->persistFiltersInSession()
             ->persistSortInSession()
@@ -112,6 +117,7 @@ class SeriesRelationManager extends RelationManager
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
+            ->modifyQueryUsing(fn (Builder $query) => $query->with('playlist.parent'))
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
             ->columns($defaultColumns)
