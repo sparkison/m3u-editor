@@ -5,6 +5,7 @@ namespace App\Filament\Resources\CategoryResource\Pages;
 use App\Filament\Resources\CategoryResource;
 use App\Models\Category;
 use App\Jobs\SyncPlaylistChildren as SyncPlaylistChildrenJob;
+use App\Filament\BulkActions\HandlesSourcePlaylist;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Forms\Get;
