@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Series;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -47,7 +47,7 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
             } else {
                 $body .= " .strm file sync is not enabled.";
             }
-            Notification::make()
+            FilamentNotification::make()
                 ->success()
                 ->title('Series Sync Completed')
                 ->body($body)

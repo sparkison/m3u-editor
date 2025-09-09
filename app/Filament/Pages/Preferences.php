@@ -3,7 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Jobs\RestartQueue;
-use App\Rules\CheckIfUrlOrLocalPath;
+use App\Rules\CheckIfUrlOrLocalPath as CheckIfUrlOrLocalPathRule;
 use App\Rules\Cron;
 use App\Settings\GeneralSettings;
 use App\Services\FfmpegCodecService;
@@ -13,7 +13,7 @@ use Filament\Actions;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Pages\SettingsPage;
 use Filament\Support\Enums\MaxWidth;
 use Illuminate\Support\Facades\Artisan;
@@ -41,7 +41,7 @@ class Preferences extends SettingsPage
                         ->dispatch(new RestartQueue());
                 })
                 ->after(function () {
-                    Notification::make()
+                    FilamentNotification::make()
                         ->success()
                         ->title('Queue reset')
                         ->body('The queue workers have been restarted and any pending jobs flushed. You may need to manually sync any Playlists or EPGs that were in progress.')
@@ -58,7 +58,7 @@ class Preferences extends SettingsPage
                 ->label('Clear Logo Cache')
                 ->action(fn() => Artisan::call('app:logo-cleanup --force --all'))
                 ->after(function () {
-                    Notification::make()
+                    FilamentNotification::make()
                         ->success()
                         ->title('Logo cache cleared')
                         ->body('The logo cache has been cleared successfully.')
@@ -412,7 +412,7 @@ class Preferences extends SettingsPage
                                         Forms\Components\TextInput::make('stream_file_sync_location')
                                             ->label('Series Sync Location')
                                             ->live()
-                                            ->rules([new CheckIfUrlOrLocalPath(localOnly: true, isDirectory: true)])
+                                            ->rules([new CheckIfUrlOrLocalPathRule(localOnly: true, isDirectory: true)])
                                             ->helperText(
                                                 fn($get) => !$get('stream_file_sync_include_series')
                                                     ? 'File location: ' . $get('stream_file_sync_location') . ($get('stream_file_sync_include_season') ?? false ? '/Season 01' : '') . '/S01E01 - Episode Title.strm'
@@ -440,7 +440,7 @@ class Preferences extends SettingsPage
                                         Forms\Components\TextInput::make('vod_stream_file_sync_location')
                                             ->label('VOD Sync Location')
                                             ->live()
-                                            ->rules([new CheckIfUrlOrLocalPath(localOnly: true, isDirectory: true)])
+                                            ->rules([new CheckIfUrlOrLocalPathRule(localOnly: true, isDirectory: true)])
                                             ->helperText(
                                                 fn($get) => 'File location: ' . $get('vod_stream_file_sync_location') . ($get('vod_stream_file_sync_include_season') ?? false ? '/Group Name' : '') . '/VOD Title.strm'
                                             )
@@ -518,7 +518,7 @@ class Preferences extends SettingsPage
 
                                                     // Make sure all required fields are present
                                                     if (empty($formState['smtp_host']) || empty($formState['smtp_port']) || empty($formState['smtp_username']) || empty($formState['smtp_password'])) {
-                                                        Notification::make()
+                                                        FilamentNotification::make()
                                                             ->danger()
                                                             ->title('Missing SMTP Fields')
                                                             ->body('Please fill in all required SMTP fields before sending a test email.')
@@ -541,13 +541,13 @@ class Preferences extends SettingsPage
                                                             ->subject('Test Email from m3u editor');
                                                     });
 
-                                                    Notification::make()
+                                                    FilamentNotification::make()
                                                         ->success()
                                                         ->title('Test Email Sent')
                                                         ->body('Test email sent successfully to ' . $data['to_email'])
                                                         ->send();
                                                 } catch (\Exception $e) {
-                                                    Notification::make()
+                                                    FilamentNotification::make()
                                                         ->danger()
                                                         ->title('Error Sending Test Email')
                                                         ->body($e->getMessage())
@@ -636,7 +636,7 @@ class Preferences extends SettingsPage
                                                     ->helperText('This message will be sent to the WebSocket server, and displayed as a pop-up notification. If you do not see a notification shortly after sending, there is likely an issue with your WebSocket configuration.'),
                                             ])
                                             ->action(function (array $data): void {
-                                                Notification::make()
+                                                FilamentNotification::make()
                                                     ->success()
                                                     ->title("WebSocket Connection Test")
                                                     ->body($data['message'])

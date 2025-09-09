@@ -6,7 +6,7 @@ use App\Facades\ProxyFacade;
 use App\Models\Channel;
 use App\Models\Playlist;
 use App\Settings\GeneralSettings;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Collection;
@@ -57,7 +57,7 @@ class SyncVodStrmFiles implements ShouldQueue
                 $path = rtrim($sync_settings['sync_location'], '/');
                 if (!is_dir($path)) {
                     if ($this->notify) {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->danger()
                             ->title("Error sync .strm files for VOD channel \"{$channel->title}\"")
                             ->body("Sync location \"{$path}\" does not exist.")
