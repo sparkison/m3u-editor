@@ -6,7 +6,7 @@ use App\Enums\Status;
 use App\Models\Category;
 use App\Models\Playlist;
 use App\Models\Series;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Http;
@@ -64,7 +64,7 @@ class ProcessM3uImportSeriesChunk implements ShouldQueue
         // This is to ensure that the series progress is reset for each import
         if ($this->index === 0) {
             // Notify the user that series import is starting
-            Notification::make()
+            FilamentNotification::make()
                 ->info()
                 ->title('Syncing Series')
                 ->body('Syncing series now. This may take a while depending on the number of series your provider offers.')

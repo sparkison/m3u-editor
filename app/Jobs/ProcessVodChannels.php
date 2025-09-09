@@ -6,7 +6,7 @@ use App\Models\Channel;
 use App\Models\Playlist;
 use App\Services\XtreamService;
 use App\Events\SyncCompleted;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -93,7 +93,7 @@ class ProcessVodChannels implements ShouldQueue
             } catch (\Exception $e) {
                 // Log the error and continue processing other channels
                 Log::error('Failed to process VOD data for channel ID ' . $channel->id . ': ' . $e->getMessage());
-                Notification::make()
+                FilamentNotification::make()
                     ->title('VOD Processing Error')
                     ->body('Failed to process VOD data for channel: ' . $channel->name . '. Error: ' . $e->getMessage())
                     ->danger()
@@ -127,7 +127,7 @@ class ProcessVodChannels implements ShouldQueue
                 'errors' => null,
             ]);
             Log::info('Completed processing VOD channels for playlist ID ' . $playlist->id);
-            Notification::make()
+            FilamentNotification::make()
                 ->title('VOD Channels Processed')
                 ->body('Successfully processed VOD channels for playlist: ' . $playlist->name)
                 ->success()
@@ -135,7 +135,7 @@ class ProcessVodChannels implements ShouldQueue
                 ->sendToDatabase($playlist->user);
         } else {
             Log::info('Completed processing VOD data for channel ID ' . $this->channel->id);
-            Notification::make()
+            FilamentNotification::make()
                 ->title('VOD Channel Processed')
                 ->body('Successfully processed VOD data for channel: ' . $this->channel->name)
                 ->success()
