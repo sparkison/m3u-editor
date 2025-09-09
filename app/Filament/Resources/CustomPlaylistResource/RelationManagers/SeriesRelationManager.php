@@ -209,16 +209,12 @@ class SeriesRelationManager extends RelationManager
                     ->label('Add to custom category')
                     ->form([
                         Forms\Components\Select::make('category')
-                            ->label('Select group')
+                            ->label('Select category')
                             ->options(
-                                Tag::query()
-                                    ->where('type', $ownerRecord->uuid . '-category')
-                                    ->get()
-                                    ->map(fn($name) => [
-                                        'id' => $name->getAttributeValue('name'),
-                                        'name' => $name->getAttributeValue('name')
-                                    ])->pluck('id', 'name')
-                            )->required(),
+                                Tag::where('type', $ownerRecord->uuid . '-category')
+                                    ->pluck('name', 'name')
+                            )
+                            ->required(),
                     ])
                     ->action(function (Collection $records, $data) use ($ownerRecord): void {
                         foreach ($records as $record) {
