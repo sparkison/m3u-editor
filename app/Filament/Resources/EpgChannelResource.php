@@ -59,6 +59,7 @@ class EpgChannelResource extends Resource
             ->deferLoading()
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
+            ->recordAction(null)
             ->columns([
                 Tables\Columns\ImageColumn::make('icon')
                     ->checkFileExistence(false)
