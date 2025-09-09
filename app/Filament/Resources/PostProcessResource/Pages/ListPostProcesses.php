@@ -4,7 +4,7 @@ namespace App\Filament\Resources\PostProcessResource\Pages;
 
 use App\Filament\Resources\PostProcessResource;
 use Filament\Actions;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -26,7 +26,7 @@ class ListPostProcesses extends ListRecords
                 })
                 ->slideOver()
                 ->successNotification(
-                    Notification::make()
+                    FilamentNotification::make()
                         ->success()
                         ->title('Post Process created')
                         ->body('You can now assign Playlists or EPGs.'),

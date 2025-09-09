@@ -4,7 +4,7 @@ namespace App\Filament\Resources\SeriesResource\Pages;
 
 use App\Filament\Resources\SeriesResource;
 use Filament\Actions;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -32,7 +32,7 @@ class ListSeries extends ListRecords
                             importAll: $data['import_all'] ?? false,
                         ));
                 })->after(function () {
-                    Notification::make()
+                    FilamentNotification::make()
                         ->success()
                         ->title('Series have been added and are being processed.')
                         ->body('You will be notified when the process is complete.')
