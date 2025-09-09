@@ -4,7 +4,7 @@ namespace App\Filament\Resources\CustomPlaylistResource\RelationManagers;
 
 use Filament\Forms;
 use Filament\Forms\Form;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -65,7 +65,7 @@ class GroupsRelationManager extends RelationManager
                     })
                     ->modalWidth('md')
                     ->successNotification(
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Group created')
                             ->body('You can now assign channels to this group from the Channels tab.'),
