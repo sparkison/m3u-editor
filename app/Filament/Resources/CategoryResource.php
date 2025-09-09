@@ -116,7 +116,7 @@ class CategoryResource extends FilamentResource
                     ->searchable(),
             ])
             ->actions([
-                Tables\Actions\BulkActionGroup::make([
+                Tables\Actions\ActionGroup::make([
                     Tables\Actions\ViewAction::make(),
                     Tables\Actions\Action::make('add')
                         ->label('Add to Custom Playlist')
