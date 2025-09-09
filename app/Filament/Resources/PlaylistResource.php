@@ -35,21 +35,13 @@ use App\Livewire\XtreamApiInfo;
 use App\Models\Category;
 use App\Models\Playlist;
 use App\Models\SourceGroup;
-use App\Rules\CheckIfUrlOrLocalPath;
 use App\Services\EpgCacheService;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
-use Filament\Notifications\Notification;
-use Filament\Resources\Resource;
-use Filament\Tables;
-use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Schema;
-use RyanChandler\FilamentProgressColumn\ProgressColumn;
 
 class PlaylistResource extends FilamentResource
 {

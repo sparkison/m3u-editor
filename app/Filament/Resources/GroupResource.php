@@ -153,6 +153,7 @@ class GroupResource extends FilamentResource
                                 ->select('id', 'playlist_id', 'source_id', 'title')
                                 ->get(),
                         ])
+                    )
                         ->action(function ($record, array $data): void {
                             $playlist = CustomPlaylist::findOrFail($data['playlist']);
                             $playlist->channels()->syncWithoutDetaching($record->channels()->pluck('id'));
@@ -262,6 +263,7 @@ class GroupResource extends FilamentResource
                                 ->select('id', 'playlist_id', 'source_id', 'title')
                                 ->get(),
                         ])
+                    )
                         ->action(function (Collection $records, array $data): void {
                             $playlist = CustomPlaylist::findOrFail($data['playlist']);
                             foreach ($records as $record) {
