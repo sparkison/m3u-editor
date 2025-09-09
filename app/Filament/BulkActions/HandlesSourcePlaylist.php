@@ -160,38 +160,44 @@ trait HandlesSourcePlaylist
 
             $fields[] = Forms\Components\Fieldset::make('These items appear in synced playlists.')
                 ->schema([
-                    Forms\Components\Select::make("source_playlists.{$pairKey}")
-                        ->label('Use items from:')
-                        ->options($group['playlists']->toArray())
-                        ->required()
-                        ->searchable(),
-                    Actions::make([
-                        Action::make("view_affected_{$pairKey}")
-                            ->label('View affected items')
-                            ->modalHeading("Items in {$parentName} ↔ {$childName}")
-                            ->form(function () use ($group, $modelClass, $sourceKey, $selectedIds) {
-                                $records = $modelClass::query()
-                                    ->whereIn('id', $selectedIds)
-                                    ->whereIn('playlist_id', [$group['parent_id'], $group['child_id']])
-                                    ->whereIn($sourceKey, $group['source_ids'])
-                                    ->select('id', 'title', 'name')
-                                    ->get();
+                    Forms\Components\Grid::make(3)
+                        ->schema([
+                            Forms\Components\Select::make("source_playlists.{$pairKey}")
+                                ->label('Use items from:')
+                                ->options($group['playlists']->toArray())
+                                ->required()
+                                ->searchable()
+                                ->columnSpan(2),
+                            Actions::make([
+                                Action::make("view_affected_{$pairKey}")
+                                    ->label('View affected items')
+                                    ->modalHeading("Items in {$parentName} ↔ {$childName}")
+                                    ->form(function () use ($group, $pairKey, $modelClass, $sourceKey, $selectedIds) {
+                                        $records = $modelClass::query()
+                                            ->whereIn('id', $selectedIds)
+                                            ->whereIn('playlist_id', [$group['parent_id'], $group['child_id']])
+                                            ->whereIn($sourceKey, $group['source_ids'])
+                                            ->select('id', 'title', 'name')
+                                            ->get();
 
-                                return [
-                                    Forms\Components\Group::make()
-                                        ->statePath("source_playlists_items.{$pairKey}")
-                                        ->schema(
-                                            $records->map(fn ($record) =>
-                                                Forms\Components\Select::make((string) $record->id)
-                                                    ->label($record->title ?? $record->name ?? '')
-                                                    ->options($group['playlists']->toArray())
-                                                    ->placeholder('Use group selection')
-                                                    ->searchable()
-                                            )->toArray()
-                                        ),
-                                ];
-                            }),
-                    ]),
+                                        return [
+                                            Forms\Components\Group::make()
+                                                ->statePath("source_playlists_items.{$pairKey}")
+                                                ->schema(
+                                                    $records->map(fn ($record) =>
+                                                        Forms\Components\Select::make((string) $record->id)
+                                                            ->label($record->title ?? $record->name ?? '')
+                                                            ->options($group['playlists']->toArray())
+                                                            ->placeholder('Use group selection')
+                                                            ->searchable()
+                                                    )->toArray()
+                                                ),
+                                        ];
+                                    }),
+                            ])
+                                ->columnSpan(1)
+                                ->alignEnd(),
+                        ]),
                 ]);
         }
 
