@@ -266,7 +266,6 @@ class GroupResource extends FilamentResource
                             $playlist = CustomPlaylist::findOrFail($data['playlist']);
                             foreach ($records as $record) {
                                 // Sync the channels to the custom playlist
-                                // This will add the channels to the playlist without detaching existing ones
                                 // Prevents duplicates in the playlist
                                 $playlist->channels()->syncWithoutDetaching($record->channels()->pluck('id'));
                                 if ($data['category']) {
@@ -308,8 +307,6 @@ class GroupResource extends FilamentResource
                             $group = Group::findOrFail($data['group']);
                             foreach ($records as $record) {
                                 // Update the channels to the new group
-                                // This will change the group and group_id for the channels in the database
-                                // to reflect the new group
                                 if ($group->playlist_id !== $record->playlist_id) {
                                     FilamentNotification::make()
                                         ->warning()
