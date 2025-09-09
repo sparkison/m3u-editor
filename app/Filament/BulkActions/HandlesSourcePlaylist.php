@@ -307,9 +307,19 @@ trait HandlesSourcePlaylist
     ): Tables\Actions\BulkAction {
         $sourcePlaylistData = null;
 
+        $modelClassName = $modelClass;
+
         return Tables\Actions\BulkAction::make('add')
             ->label('Add to Custom Playlist')
-            ->form(function (Collection $records) use ($relation, $sourceKey, $itemLabel, $tagType, $categoryLabel, &$sourcePlaylistData, $modelClass): array {
+            ->form(function (Collection $records) use (
+                $relation,
+                $sourceKey,
+                $itemLabel,
+                $tagType,
+                $categoryLabel,
+                &$sourcePlaylistData,
+                $modelClassName
+            ): array {
                 $form = [
                     Forms\Components\Select::make('playlist')
                         ->required()
@@ -339,13 +349,32 @@ trait HandlesSourcePlaylist
 
                 $form = array_merge(
                     $form,
-                    self::buildSourcePlaylistForm($records, $relation, $sourceKey, $itemLabel, $modelClass, $sourcePlaylistData)
+                    self::buildSourcePlaylistForm(
+                        $records,
+                        $relation,
+                        $sourceKey,
+                        $itemLabel,
+                        $modelClassName,
+                        $sourcePlaylistData
+                    )
                 );
 
                 return $form;
             })
-            ->action(function (Collection $records, array $data) use ($modelClass, $relation, $sourceKey, &$sourcePlaylistData): void {
-                $records = self::mapRecordsToSourcePlaylist($records, $data, $relation, $sourceKey, $modelClass, $sourcePlaylistData);
+            ->action(function (Collection $records, array $data) use (
+                $modelClassName,
+                $relation,
+                $sourceKey,
+                &$sourcePlaylistData
+            ): void {
+                $records = self::mapRecordsToSourcePlaylist(
+                    $records,
+                    $data,
+                    $relation,
+                    $sourceKey,
+                    $modelClassName,
+                    $sourcePlaylistData
+                );
 
                 $playlist = CustomPlaylist::findOrFail($data['playlist']);
                 $playlist->$relation()->syncWithoutDetaching($records->pluck('id'));
