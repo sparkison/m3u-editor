@@ -60,8 +60,8 @@ trait HandlesSourcePlaylist
     {
         $recordSourceIds = $records->pluck($sourceKey)->unique();
 
-        $rows = DB::table('playlist_' . $relation)
-            ->join('playlists', 'playlist_id', '=', 'playlists.id')
+        $rows = DB::table($relation)
+            ->join('playlists', $relation . '.playlist_id', '=', 'playlists.id')
             ->where('playlists.user_id', auth()->id())
             ->whereIn($sourceKey, $recordSourceIds)
             ->select('playlist_id', 'parent_id', $sourceKey . ' as source_id')
