@@ -13,7 +13,7 @@ use App\Models\Playlist;
 use App\Models\SourceGroup;
 use Carbon\Carbon;
 use M3uParser\M3uParser;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Collection;
@@ -148,12 +148,12 @@ class ProcessM3uImport implements ShouldQueue
         logger()->error("Error processing \"{$this->playlist->name}\": $error");
 
         // Send notification
-        Notification::make()
+        FilamentNotification::make()
             ->danger()
             ->title("Error processing \"{$this->playlist->name}\"")
             ->body($message)
             ->broadcast($this->playlist->user);
-        Notification::make()
+        FilamentNotification::make()
             ->danger()
             ->title("Error processing \"{$this->playlist->name}\"")
             ->body($message)
@@ -476,12 +476,12 @@ class ProcessM3uImport implements ShouldQueue
             logger()->error("Error processing \"{$this->playlist->name}\": {$e->getMessage()}");
 
             // Send notification
-            Notification::make()
+            FilamentNotification::make()
                 ->danger()
                 ->title("Error processing \"{$this->playlist->name}\"")
                 ->body('Please view your notifications for details.')
                 ->broadcast($this->playlist->user);
-            Notification::make()
+            FilamentNotification::make()
                 ->danger()
                 ->title("Error processing \"{$this->playlist->name}\"")
                 ->body($e->getMessage())
@@ -762,12 +762,12 @@ class ProcessM3uImport implements ShouldQueue
 
                 // Send notification
                 $error = "Invalid playlist file. Unable to read or download your playlist file. Please check the URL or uploaded file and try again.";
-                Notification::make()
+                FilamentNotification::make()
                     ->danger()
                     ->title("Error processing \"{$playlist->name}\"")
                     ->body('Please view your notifications for details.')
                     ->broadcast($playlist->user);
-                Notification::make()
+                FilamentNotification::make()
                     ->danger()
                     ->title("Error processing \"{$playlist->name}\"")
                     ->body($error)
@@ -792,12 +792,12 @@ class ProcessM3uImport implements ShouldQueue
             logger()->error("Error processing \"{$this->playlist->name}\": {$e->getMessage()}");
 
             // Send notification
-            Notification::make()
+            FilamentNotification::make()
                 ->danger()
                 ->title("Error processing \"{$this->playlist->name}\"")
                 ->body('Please view your notifications for details.')
                 ->broadcast($this->playlist->user);
-            Notification::make()
+            FilamentNotification::make()
                 ->danger()
                 ->title("Error processing \"{$this->playlist->name}\"")
                 ->body($e->getMessage())
@@ -903,12 +903,12 @@ class ProcessM3uImport implements ShouldQueue
         if ($this->m3uParser) {
             $errors = $this->m3uParser->getParseErrors();
             if (count($errors) > 0) {
-                Notification::make()
+                FilamentNotification::make()
                     ->warning()
                     ->title('Error(s) detected during parsing')
                     ->body("While parsing the playlist, please check your notifications for details.")
                     ->broadcast($playlist->user);
-                Notification::make()
+                FilamentNotification::make()
                     ->warning()
                     ->title('Error(s) detected during parsing')
                     ->body("There were issues with the following lines, and they will not be imported due to formatting issues: " . implode('; ', $errors))
@@ -968,12 +968,12 @@ class ProcessM3uImport implements ShouldQueue
 
             // Send notification
             $message = "\"{$playlist->name}\" has been preprocessed successfully. You can now select the groups you would like to import and process the playlist again to import your selected groups. Preprocessing completed in {$completedInRounded} seconds.";
-            Notification::make()
+            FilamentNotification::make()
                 ->success()
                 ->title('Playlist Preprocessing Completed')
                 ->body($message)
                 ->broadcast($playlist->user);
-            Notification::make()
+            FilamentNotification::make()
                 ->success()
                 ->title('Playlist Preprocessing Completed')
                 ->body($message)
@@ -1044,12 +1044,12 @@ class ProcessM3uImport implements ShouldQueue
             ->catch(function (Throwable $e) use ($playlist) {
                 $error = "Error processing \"{$playlist->name}\": {$e->getMessage()}";
                 Log::error($error);
-                Notification::make()
+                FilamentNotification::make()
                     ->danger()
                     ->title("Error processing \"{$playlist->name}\"")
                     ->body('Please view your notifications for details.')
                     ->broadcast($playlist->user);
-                Notification::make()
+                FilamentNotification::make()
                     ->danger()
                     ->title("Error processing \"{$playlist->name}\"")
                     ->body($error)

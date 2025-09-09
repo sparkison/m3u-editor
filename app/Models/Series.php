@@ -5,7 +5,7 @@ namespace App\Models;
 use App\Jobs\SyncSeriesStrmFiles;
 use App\Models\Concerns\DispatchesPlaylistSync;
 use App\Services\XtreamService;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -88,7 +88,7 @@ class Series extends Model
             $xtream = XtreamService::make($playlist);
 
             if (! $xtream) {
-                Notification::make()
+                FilamentNotification::make()
                     ->danger()
                     ->title('Series metadata sync failed')
                     ->body('Unable to connect to Xtream API provider to get series info, unable to fetch metadata.')
