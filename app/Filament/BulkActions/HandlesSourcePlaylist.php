@@ -4,6 +4,7 @@ namespace App\Filament\BulkActions;
 
 use App\Models\CustomPlaylist;
 use App\Models\Playlist;
+use Illuminate\Support\Facades\DB;
 use Filament\Forms;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\Actions\Action;
@@ -57,70 +58,50 @@ trait HandlesSourcePlaylist
     */
     protected static function getSourcePlaylistData(Collection $records, string $relation, string $sourceKey): array
     {
-        $recordPlaylistIds = $records->pluck('playlist_id')->unique();
-        $recordSourceIds   = $records->pluck($sourceKey)->unique();
+        $recordSourceIds = $records->pluck($sourceKey)->unique();
 
-        $parentIds = Playlist::whereIn('id', $recordPlaylistIds)
-            ->pluck('parent_id')
-            ->filter()
-            ->unique()
-            ->all();
-
-        $playlists = Playlist::where('user_id', auth()->id())
-            ->select('id', 'parent_id', 'name')
-            ->where(function ($query) use ($recordPlaylistIds, $parentIds) {
-                $query->whereIn('id', $recordPlaylistIds)
-                    ->orWhereIn('parent_id', $recordPlaylistIds);
-
-                if (! empty($parentIds)) {
-                    $query->orWhereIn('id', $parentIds)
-                        ->orWhereIn('parent_id', $parentIds);
-                }
-            })
-            ->whereHas($relation, fn ($q) => $q->whereIn($sourceKey, $recordSourceIds))
-            ->with([
-                $relation => fn ($q) => $q
-                    ->select('id', 'playlist_id', $sourceKey)
-                    ->whereIn($sourceKey, $recordSourceIds),
-            ])
+        $rows = DB::table('playlist_' . $relation)
+            ->join('playlists', 'playlist_id', '=', 'playlists.id')
+            ->where('playlists.user_id', auth()->id())
+            ->whereIn($sourceKey, $recordSourceIds)
+            ->select('playlist_id', 'parent_id', $sourceKey . ' as source_id')
             ->get();
 
-        $playlistMap = $playlists->keyBy('id');
+        $playlistIds = $rows->pluck('playlist_id')
+            ->merge($rows->pluck('parent_id'))
+            ->filter()
+            ->unique();
+
+        $playlistNames = Playlist::whereIn('id', $playlistIds)->pluck('name', 'id');
 
         $groups = [];
 
-        $playlists
-            ->flatMap(fn ($playlist) => ($playlist->$relation ?? collect())->map(fn ($item) => [
-                'source_id'   => $item->$sourceKey,
-                'playlist_id' => $playlist->id,
-            ]))
-            ->groupBy('source_id')
-            ->each(function ($group, $sourceId) use (&$groups, $playlistMap) {
-                $ids = $group->pluck('playlist_id')->unique();
+        $rows->groupBy('source_id')
+            ->each(function ($group, $sourceId) use (&$groups, $playlistNames) {
+                $ids        = $group->pluck('playlist_id')->unique();
+                $parentMap  = $group->mapWithKeys(fn ($row) => [$row->playlist_id => $row->parent_id]);
 
                 if ($ids->count() <= 1) {
                     return;
                 }
 
                 foreach ($ids as $id) {
-                    $playlist = $playlistMap[$id];
+                    $parentId = $parentMap[$id] ?? null;
 
-                    if ($playlist->parent_id && $ids->contains($playlist->parent_id)) {
-                        $pairKey = $playlist->parent_id . '-' . $id;
+                    if ($parentId && $ids->contains($parentId)) {
+                        $pairKey = $parentId . '-' . $id;
 
                         $groups[$pairKey] ??= [
-                            'parent_id'     => $playlist->parent_id,
-                            'child_id'      => $id,
-                            'playlists'     => $playlistMap
-                                ->only([$playlist->parent_id, $id])
-                                ->map->name,
-                            'source_ids'    => [],
-                            'composite_keys'=> [],
+                            'parent_id'      => $parentId,
+                            'child_id'       => $id,
+                            'playlists'      => collect($playlistNames->only([$parentId, $id])),
+                            'source_ids'     => [],
+                            'composite_keys' => [],
                         ];
 
                         $groups[$pairKey]['source_ids'][]     = $sourceId;
                         $groups[$pairKey]['composite_keys'][] = $id . ':' . $sourceId;
-                        $groups[$pairKey]['composite_keys'][] = $playlist->parent_id . ':' . $sourceId;
+                        $groups[$pairKey]['composite_keys'][] = $parentId . ':' . $sourceId;
                     }
                 }
             });
@@ -132,27 +113,6 @@ trait HandlesSourcePlaylist
             ->flatMap(fn ($group, $pairKey) => collect($group['composite_keys'])
                 ->unique()
                 ->mapWithKeys(fn ($key) => [$key => $pairKey]));
-
-        // Store the selected record details under their respective group
-        foreach ($records as $record) {
-            $sourceId  = $record->$sourceKey;
-            $composite = $record->playlist_id . ':' . $sourceId;
-
-            if (! $sourceToGroup->has($composite)) {
-                continue;
-            }
-
-            $pairKey = $sourceToGroup[$composite];
-
-            $group = $duplicateGroups[$pairKey];
-            $group['records'][$record->id] = [
-                'id'          => $record->id,
-                'title'       => $record->title ?? $record->name ?? '',
-                'source_id'   => $sourceId,
-                'playlist_id' => $record->playlist_id,
-            ];
-            $duplicateGroups[$pairKey] = $group;
-        }
 
         $needsSourcePlaylist = $duplicateGroups->isNotEmpty();
 
@@ -168,6 +128,7 @@ trait HandlesSourcePlaylist
      * @param string          $relation           Relationship name used to fetch playlist items.
      * @param string          $sourceKey          Column containing the source ID on the related model.
      * @param string          $itemLabel          Human-readable label for the record type (channel, series, etc.).
+     * @param string          $modelClass         Fully qualified model class for querying record details.
      * @param array|null      $sourcePlaylistData Cached metadata returned from {@see getSourcePlaylistData}.
      *                                           Passed by reference so callers can reuse the computed data.
      * @return array                             Array of Filament form components for inclusion in the bulk action.
@@ -177,6 +138,7 @@ trait HandlesSourcePlaylist
         string $relation,
         string $sourceKey,
         string $itemLabel,
+        string $modelClass,
         ?array &$sourcePlaylistData = null
     ): array {
         if ($sourcePlaylistData === null) {
@@ -189,7 +151,8 @@ trait HandlesSourcePlaylist
             return [];
         }
 
-        $fields = [];
+        $fields      = [];
+        $selectedIds = $records->pluck('id');
 
         foreach ($duplicateGroups as $pairKey => $group) {
             $parentName = $group['playlists'][$group['parent_id']];
@@ -207,15 +170,22 @@ trait HandlesSourcePlaylist
                             ->label('View affected items')
                             ->modalHeading("Items in {$parentName} ↔ {$childName}")
                             ->statePath("source_playlists_items.{$pairKey}")
-                            ->form(
-                                collect($group['records'] ?? [])->map(fn ($record) =>
-                                    Forms\Components\Select::make((string) $record['id'])
-                                        ->label($record['title'])
+                            ->form(function () use ($group, $modelClass, $sourceKey, $selectedIds) {
+                                $records = $modelClass::query()
+                                    ->whereIn('id', $selectedIds)
+                                    ->whereIn('playlist_id', [$group['parent_id'], $group['child_id']])
+                                    ->whereIn($sourceKey, $group['source_ids'])
+                                    ->select('id', 'title', 'name')
+                                    ->get();
+
+                                return $records->map(fn ($record) =>
+                                    Forms\Components\Select::make((string) $record->id)
+                                        ->label($record->title ?? $record->name ?? '')
                                         ->options($group['playlists']->toArray())
                                         ->placeholder('Use group selection')
                                         ->searchable()
-                                )->toArray()
-                            ),
+                                )->toArray();
+                            }),
                     ]),
                 ]);
         }
@@ -259,10 +229,20 @@ trait HandlesSourcePlaylist
             $selected     = collect($data['source_playlists'] ?? []);
             $itemSelected = collect($data['source_playlists_items'] ?? []);
 
+            $groupCounts = [];
+            foreach ($records as $record) {
+                $sourceId  = $record->$sourceKey;
+                $composite = $record->playlist_id . ':' . $sourceId;
+                if ($sourceToGroup->has($composite)) {
+                    $pairKey = $sourceToGroup[$composite];
+                    $groupCounts[$pairKey] = ($groupCounts[$pairKey] ?? 0) + 1;
+                }
+            }
+
             foreach ($duplicateGroups as $pairKey => $group) {
-                $bulk   = $selected[$pairKey] ?? null;
-                $items  = collect($itemSelected[$pairKey] ?? [])->filter();
-                $count  = count($group['records'] ?? []);
+                $bulk  = $selected[$pairKey] ?? null;
+                $items = collect($itemSelected[$pairKey] ?? [])->filter();
+                $count = $groupCounts[$pairKey] ?? 0;
 
                 if (! $bulk && $items->count() !== $count) {
                     throw ValidationException::withMessages([
@@ -359,7 +339,7 @@ trait HandlesSourcePlaylist
 
                 $form = array_merge(
                     $form,
-                    self::buildSourcePlaylistForm($records, $relation, $sourceKey, $itemLabel, $sourcePlaylistData)
+                    self::buildSourcePlaylistForm($records, $relation, $sourceKey, $itemLabel, $modelClass, $sourcePlaylistData)
                 );
 
                 return $form;
