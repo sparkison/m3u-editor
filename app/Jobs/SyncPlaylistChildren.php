@@ -5,15 +5,20 @@ namespace App\Jobs;
 use App\Enums\Status;
 use App\Events\SyncCompleted;
 use App\Models\Category;
+use App\Models\Channel;
+use App\Models\ChannelFailover;
 use App\Models\Playlist;
+use App\Models\PlaylistSyncChange;
 use App\Models\Season;
 use App\Models\Series;
 use Illuminate\Bus\Queueable;
+use Illuminate\Bus\UniqueLock;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -30,8 +35,6 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    private const DEBOUNCE_TTL = 5;
-
     /**
      * Release the unique lock after an hour so a new sync can
      * run if a previous job fails or never completes.
@@ -39,9 +42,13 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
     public $uniqueFor = 3600;
 
     /**
-     * @param  array<string, array<int, string>>  $changes
+     * Map of child channel source IDs to their database IDs.
+     *
+     * @var array<string, int>
      */
-    public function __construct(public Playlist $playlist, public array $changes = [])
+    private array $childChannelMap = [];
+
+    public function __construct(public Playlist $playlist)
     {
         //
     }
@@ -52,28 +59,66 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * Debounce child sync dispatches by caching change identifiers per playlist
-     * and queuing a single job immediately. Changes and the queued flag
-     * share a short TTL so rapid edits merge into one job and only one
-     * dispatch is scheduled at a time.
+     * Record pending changes and queue a unique sync job.
      *
      * @param  array<string, array<int, string>>  $changes
      */
     public static function debounce(Playlist $playlist, array $changes): void
     {
-        $key = "playlist-sync:{$playlist->id}";
-        $current = Cache::get($key, []);
-        foreach ($changes as $type => $ids) {
-            $current[$type] = array_values(array_unique(array_merge($current[$type] ?? [], $ids)));
-        }
-        Cache::put($key, $current, now()->addSeconds(self::DEBOUNCE_TTL));
+        $driver = DB::connection()->getDriverName();
 
-        // Prevent multiple jobs from being queued at once by reserving a
-        // short window that matches the change-cache TTL. The flag is cleared
-        // at the end of the job so subsequent edits can enqueue another sync.
-        if (Cache::add("{$key}:queued", true, self::DEBOUNCE_TTL)) {
-            self::dispatch($playlist);
+        foreach ($changes as $type => $ids) {
+            $ids = array_values(array_unique($ids));
+            $payload = json_encode($ids);
+            $escaped = str_replace("'", "''", $payload);
+            $now = now();
+
+            if ($driver === 'pgsql') {
+                DB::table('playlist_sync_changes')->upsert(
+                    [[
+                        'playlist_id' => $playlist->id,
+                        'change_type' => $type,
+                        'item_ids' => DB::raw("'{$escaped}'::jsonb"),
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]],
+                    ['playlist_id', 'change_type'],
+                    [
+                        'item_ids' => DB::raw("(select jsonb_agg(distinct value) from jsonb_array_elements(coalesce(playlist_sync_changes.item_ids::jsonb, '[]'::jsonb) || excluded.item_ids::jsonb) as t(value))"),
+                        'updated_at' => $now,
+                    ]
+                );
+            } elseif ($driver === 'sqlite') {
+                DB::table('playlist_sync_changes')->upsert(
+                    [[
+                        'playlist_id' => $playlist->id,
+                        'change_type' => $type,
+                        'item_ids' => $payload,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]],
+                    ['playlist_id', 'change_type'],
+                    [
+                        'item_ids' => DB::raw("(select json_group_array(value) from (select distinct value from (select value from json_each(coalesce(playlist_sync_changes.item_ids, json('[]'))) union all select value from json_each(json('{$escaped}')))))"),
+                        'updated_at' => $now,
+                    ]
+                );
+            } else {
+                DB::table('playlist_sync_changes')->upsert(
+                    [[
+                        'playlist_id' => $playlist->id,
+                        'change_type' => $type,
+                        'item_ids' => $payload,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]],
+                    ['playlist_id', 'change_type'],
+                    ['item_ids', 'updated_at']
+                );
+            }
         }
+
+        self::dispatch($playlist);
     }
 
     public function handle(): void
@@ -81,21 +126,39 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
         $parent = $this->playlist->fresh();
 
         if (! $parent) {
-            Log::warning("SyncPlaylistChildren: Parent playlist {$this->playlist->id} not found, clearing queued flag and aborting child sync.");
-            Cache::forget("playlist-sync:{$this->playlist->id}");
-            Cache::forget("playlist-sync:{$this->playlist->id}:queued");
+            Log::warning("SyncPlaylistChildren: Parent playlist {$this->playlist->id} not found, aborting child sync.");
 
             return;
         }
 
-        try {
-            if (empty($this->changes)) {
-                $this->changes = Cache::pull("playlist-sync:{$parent->id}", []);
-            } else {
-                Cache::forget("playlist-sync:{$parent->id}");
+        while (true) {
+            $changes = [];
+            $processed = 0;
+
+            PlaylistSyncChange::where('playlist_id', $parent->id)
+                ->orderBy('id')
+                ->chunkById(100, function ($records) use (&$changes, &$processed) {
+                    $processed += $records->count();
+
+                    foreach ($records as $record) {
+                        $changes[$record->change_type] = $record->item_ids;
+                    }
+
+                    PlaylistSyncChange::whereIn('id', $records->pluck('id'))
+                        ->delete();
+                });
+
+            if ($processed === 0) {
+                sleep(1);
+
+                if (! PlaylistSyncChange::where('playlist_id', $parent->id)->exists()) {
+                    break;
+                }
+
+                continue;
             }
 
-            $parent->children()->chunkById(100, function ($children) use ($parent) {
+            $parent->children()->chunkById(100, function ($children) use ($parent, $changes) {
                 foreach ($children as $child) {
                     $start = now();
                     $child->update([
@@ -107,28 +170,8 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
                     DB::beginTransaction();
                     $copiedFile = null;
                     try {
-                        if (! empty($this->changes)) {
-                            $this->syncDelta($parent, $child, $this->changes);
-                        } else {
-                            $this->syncGroups($parent, $child);
-                            $this->syncCategories($parent, $child);
-                            $this->syncUngroupedChannels($parent, $child);
-                            $this->syncUncategorizedSeries($parent, $child);
-
-                            if ($parent->uploads && Storage::disk('local')->exists($parent->uploads)) {
-                                Storage::disk('local')->makeDirectory($child->folder_path);
-                                if (! Storage::disk('local')->copy($parent->uploads, $child->file_path)) {
-                                    throw new \RuntimeException("Failed to copy uploaded file for child playlist {$child->id}");
-                                }
-                                $copiedFile = $child->file_path;
-                                $child->uploads = $child->file_path;
-                            } elseif ($child->uploads) {
-                                Storage::disk('local')->delete($child->uploads);
-                                $child->uploads = null;
-                            }
-
-                            $child->save();
-                        }
+                        $this->childChannelMap = $child->channels()->pluck('id', 'source_id')->all();
+                        $this->syncDelta($parent, $child, $changes);
 
                         DB::commit();
 
@@ -154,31 +197,46 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
                     }
                 }
             });
+        }
 
-            // If additional changes were queued while this job was running,
-            // schedule another sync so those edits aren't dropped.
-            $remaining = Cache::pull("playlist-sync:{$parent->id}", []);
-            if (! empty($remaining)) {
-                self::dispatch($parent, $remaining);
-            }
-        } finally {
-            // Clear the queued flag now that this job has finished (or failed)
-            // so new changes can dispatch another sync.
-            Cache::forget("playlist-sync:{$parent->id}:queued");
+        (new UniqueLock(Cache::driver()))->release($this);
+
+        // Allow a brief window for any late-arriving changes to be written
+        sleep(1);
+
+        if (PlaylistSyncChange::where('playlist_id', $parent->id)->exists()) {
+            self::dispatch($parent);
         }
     }
 
-    private function syncGroups(Playlist $parent, Playlist $child): void
+    private function findChildChannelId(Playlist $child, Channel $parentChannel): ?int
+    {
+        $source = $parentChannel->source_id ?? 'ch-'.$parentChannel->id;
+
+        if (isset($this->childChannelMap[$source])) {
+            return $this->childChannelMap[$source];
+        }
+
+        $id = $child->channels()->where('source_id', $source)->value('id');
+        if ($id) {
+            $this->childChannelMap[$source] = $id;
+        }
+
+        return $id;
+    }
+
+    /**
+     * @param  array<int, array{channel_id:int, attributes:array<string, mixed>, failover_playlist_id:?int, failover_source_id:?string}>  $pendingFailovers
+     */
+    private function syncGroups(Playlist $parent, Playlist $child, array &$pendingFailovers): void
     {
         $parentGroupNames = [];
-        $parent->groups()->chunkById(100, function ($groups) use ($child, &$parentGroupNames) {
+        $parent->groups()->chunkById(100, function ($groups) use ($child, &$parentGroupNames, &$pendingFailovers) {
             $groupRows = [];
             $groupKeys = [];
             foreach ($groups as $group) {
-                $key = $group->name_internal;
-                if (! $key) {
-                    $key = Str::slug($group->name) ?: 'grp-' . $group->id;
-                }
+                $key = $group->name_internal
+                    ?? (Str::slug($group->name) ?: 'grp-' . $group->id);
 
                 $groupKeys[$group->id] = $key;
                 $parentGroupNames[] = $key;
@@ -203,7 +261,7 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
                 $childGroupId = $childGroup->id;
                 $channelSources = [];
                 $failovers = [];
-                $group->channels()->with('failovers')->chunkById(100, function ($channels) use ($child, $childGroupId, &$channelSources, &$failovers) {
+                $group->channels()->with('failovers.channelFailover')->chunkById(100, function ($channels) use ($child, $childGroupId, &$channelSources, &$failovers) {
                     $channelRows = [];
                     foreach ($channels as $channel) {
                         $source = $channel->source_id ?? 'ch-'.$channel->id;
@@ -234,9 +292,12 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
 
                     $childChannel->failovers()->delete();
                     foreach ($items as $failover) {
-                        $newFailover = $failover->replicate(except: ['id', 'channel_id', 'created_at', 'updated_at']);
-                        $newFailover->channel_id = $childChannel->id;
-                        $newFailover->save();
+                        $pendingFailovers[] = [
+                            'channel_id' => $childChannel->id,
+                            'attributes' => Arr::except($failover->getAttributes(), ['id', 'channel_id', 'created_at', 'updated_at']),
+                            'failover_playlist_id' => $failover->channelFailover?->playlist_id,
+                            'failover_source_id' => $failover->channelFailover?->source_id,
+                        ];
                     }
                 }
                 unset($channelSources, $failovers);
@@ -353,10 +414,13 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
         }
     }
 
-    private function syncUngroupedChannels(Playlist $parent, Playlist $child): void
+    /**
+     * @param  array<int, array{channel_id:int, attributes:array<string, mixed>, failover_playlist_id:?int, failover_source_id:?string}>  $pendingFailovers
+     */
+    private function syncUngroupedChannels(Playlist $parent, Playlist $child, array &$pendingFailovers): void
     {
         $ungroupedSources = [];
-        $parent->channels()->whereNull('group_id')->with('failovers')->chunkById(100, function ($channels) use ($child, &$ungroupedSources) {
+        $parent->channels()->whereNull('group_id')->with('failovers.channelFailover')->chunkById(100, function ($channels) use ($child, &$ungroupedSources, &$pendingFailovers) {
             $rows = [];
             $failovers = [];
             foreach ($channels as $channel) {
@@ -376,9 +440,12 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
                 $childChannel = $childChannels[$source];
                 $childChannel->failovers()->delete();
                 foreach ($items as $failover) {
-                    $newFailover = $failover->replicate(except: ['id', 'channel_id', 'created_at', 'updated_at']);
-                    $newFailover->channel_id = $childChannel->id;
-                    $newFailover->save();
+                    $pendingFailovers[] = [
+                        'channel_id' => $childChannel->id,
+                        'attributes' => Arr::except($failover->getAttributes(), ['id', 'channel_id', 'created_at', 'updated_at']),
+                        'failover_playlist_id' => $failover->channelFailover?->playlist_id,
+                        'failover_source_id' => $failover->channelFailover?->source_id,
+                    ];
                 }
             }
         });
@@ -386,6 +453,62 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
             $q->whereNotIn('source_id', $ungroupedSources)
                 ->orWhereNull('source_id');
         })->delete();
+    }
+
+    /**
+     * @param  array<int, array{channel_id:int, attributes:array<string, mixed>, failover_playlist_id:?int, failover_source_id:?string}>  $pendingFailovers
+     */
+    private function applyFailovers(Playlist $parent, Playlist $child, array $pendingFailovers): void
+    {
+        foreach ($pendingFailovers as $entry) {
+            $childChannelId = $entry['channel_id'];
+            $attributes = $entry['attributes'];
+            $failoverPlaylistId = $entry['failover_playlist_id'];
+            $failoverSourceId = $entry['failover_source_id'] ?? ('ch-'.$attributes['channel_failover_id']);
+
+            if ($failoverPlaylistId === null) {
+                Log::warning("SyncPlaylistChildren: Missing failover channel {$attributes['channel_failover_id']} on playlist {$child->id}, preserving original reference");
+
+                $newFailover = new ChannelFailover(Arr::except($attributes, ['id', 'channel_id', 'created_at', 'updated_at']));
+                $newFailover->channel_id = $childChannelId;
+                $newFailover->external = true;
+                $newFailover->save();
+
+                continue;
+            }
+
+            if ($failoverPlaylistId !== $parent->id) {
+                $newFailover = new ChannelFailover(Arr::except($attributes, ['id', 'channel_id', 'created_at', 'updated_at']));
+                $newFailover->channel_id = $childChannelId;
+                $newFailover->external = true;
+                $newFailover->save();
+
+                continue;
+            }
+
+            if ($failoverPlaylistId === $parent->id) {
+                $childFailoverId = $this->childChannelMap[$failoverSourceId] ?? null;
+
+                $newFailover = new ChannelFailover(Arr::except($attributes, ['id', 'channel_id', 'created_at', 'updated_at']));
+                $newFailover->channel_id = $childChannelId;
+
+                if ($childFailoverId) {
+                    $newFailover->channel_failover_id = $childFailoverId;
+                } else {
+                    Log::warning("SyncPlaylistChildren: Child channel not found for failover source '{$failoverSourceId}' on playlist {$child->id}, preserving parent reference");
+                }
+
+                $newFailover->external = true;
+                $newFailover->save();
+
+                continue;
+            }
+
+            $newFailover = new ChannelFailover(Arr::except($attributes, ['id', 'channel_id', 'created_at', 'updated_at']));
+            $newFailover->channel_id = $childChannelId;
+            $newFailover->external = true;
+            $newFailover->save();
+        }
     }
 
     private function syncUncategorizedSeries(Playlist $parent, Playlist $child): void
@@ -409,12 +532,21 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
         $groupKeys = $changes['groups'] ?? [];
         if (! empty($groupKeys)) {
             $present = [];
-            foreach ($parent->groups()->whereIn('name_internal', $groupKeys)->lazy() as $group) {
-                $present[] = $group->name_internal;
-                $childGroup = $child->groups()->firstOrNew([
-                    'name_internal' => $group->name_internal,
-                ]);
-                $childGroup->fill($group->only(['name', 'name_internal', 'sort_order', 'user_id', 'is_custom']));
+            foreach ($parent->groups()->lazy() as $group) {
+                $key = $group->name_internal
+                    ?? (Str::slug($group->name) ?: 'grp-' . $group->id);
+
+                if (! in_array($key, $groupKeys, true)) {
+                    continue;
+                }
+
+                $present[] = $key;
+                $childGroup = $child->groups()->where('name_internal', $key)->first();
+                if (! $childGroup) {
+                    $childGroup = $child->groups()->newModelInstance();
+                    $childGroup->name_internal = $key;
+                }
+                $childGroup->forceFill($group->only(['name', 'name_internal', 'sort_order', 'user_id', 'is_custom']));
                 $childGroup->playlist_id = $child->id;
                 $childGroup->save();
             }
@@ -427,10 +559,17 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
         $channelSources = $changes['channels'] ?? [];
         if (! empty($channelSources)) {
             $groupKeys = [];
+            $pendingFailovers = [];
             foreach ($channelSources as $source) {
-                $channel = str_starts_with($source, 'ch-')
-                    ? $parent->channels()->with('failovers', 'group')->find(substr($source, 3))
-                    : $parent->channels()->with('failovers', 'group')->where('source_id', $source)->first();
+                $channel = null;
+                if (str_starts_with($source, 'ch-')) {
+                    $channel = $parent->channels()->with('failovers.channelFailover', 'group')->find(substr($source, 3));
+                    if ($channel && ($channel->source_id ?? 'ch-' . $channel->id) !== $source) {
+                        $channel = null;
+                    }
+                } else {
+                    $channel = $parent->channels()->with('failovers.channelFailover', 'group')->where('source_id', $source)->first();
+                }
 
                 if ($channel) {
                     $groupKey = $channel->group?->name_internal;
@@ -458,17 +597,23 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
                     $childChannel->group_id = $childGroupId;
                     $childChannel->source_id = $source;
                     $childChannel->save();
+                    $this->childChannelMap[$source] = $childChannel->id;
 
                     $childChannel->failovers()->delete();
                     foreach ($channel->failovers as $failover) {
-                        $newFailover = $failover->replicate(except: ['id', 'channel_id', 'created_at', 'updated_at']);
-                        $newFailover->channel_id = $childChannel->id;
-                        $newFailover->save();
+                        $pendingFailovers[] = [
+                            'channel_id' => $childChannel->id,
+                            'attributes' => Arr::except($failover->getAttributes(), ['id', 'channel_id', 'created_at', 'updated_at']),
+                            'failover_playlist_id' => $failover->channelFailover?->playlist_id,
+                            'failover_source_id' => $failover->channelFailover?->source_id,
+                        ];
                     }
                 } else {
                     $child->channels()->where('source_id', $source)->delete();
                 }
             }
+
+            $this->applyFailovers($parent, $child, $pendingFailovers);
 
             foreach (array_keys($groupKeys) as $groupKey) {
                 $this->syncDelta($parent, $child, ['groups' => [$groupKey]]);
@@ -478,9 +623,15 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
         $categorySources = $changes['categories'] ?? [];
         if (! empty($categorySources)) {
             foreach ($categorySources as $source) {
-                $category = str_starts_with($source, 'cat-')
-                    ? $parent->categories()->find(substr($source, 4))
-                    : $parent->categories()->where('source_category_id', $source)->first();
+                $category = null;
+                if (str_starts_with($source, 'cat-')) {
+                    $category = $parent->categories()->find(substr($source, 4));
+                    if ($category && ($category->source_category_id ?? 'cat-' . $category->id) !== $source) {
+                        $category = null;
+                    }
+                } else {
+                    $category = $parent->categories()->where('source_category_id', $source)->first();
+                }
 
                 if ($category) {
                     $childCategory = $child->categories()->firstOrNew([
@@ -499,9 +650,15 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
         $seriesSources = $changes['series'] ?? [];
         if (! empty($seriesSources)) {
             foreach ($seriesSources as $source) {
-                $series = str_starts_with($source, 'series-')
-                    ? $parent->series()->find(substr($source, 7))
-                    : $parent->series()->where('source_series_id', $source)->first();
+                $series = null;
+                if (str_starts_with($source, 'series-')) {
+                    $series = $parent->series()->find(substr($source, 7));
+                    if ($series && ($series->source_series_id ?? 'series-' . $series->id) !== $source) {
+                        $series = null;
+                    }
+                } else {
+                    $series = $parent->series()->where('source_series_id', $source)->first();
+                }
 
                 if ($series) {
                     $categorySource = $series->category?->source_category_id
@@ -530,9 +687,15 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
         $seasonSources = $changes['seasons'] ?? [];
         if (! empty($seasonSources)) {
             foreach ($seasonSources as $source) {
-                $season = str_starts_with($source, 'season-')
-                    ? $parent->seasons()->find(substr($source, 7))
-                    : $parent->seasons()->where('source_season_id', $source)->first();
+                $season = null;
+                if (str_starts_with($source, 'season-')) {
+                    $season = $parent->seasons()->find(substr($source, 7));
+                    if ($season && ($season->source_season_id ?? 'season-' . $season->id) !== $source) {
+                        $season = null;
+                    }
+                } else {
+                    $season = $parent->seasons()->where('source_season_id', $source)->first();
+                }
 
                 if ($season) {
                     $seriesSource = $season->series?->source_series_id
@@ -562,9 +725,15 @@ class SyncPlaylistChildren implements ShouldBeUnique, ShouldQueue
         $episodeSources = $changes['episodes'] ?? [];
         if (! empty($episodeSources)) {
             foreach ($episodeSources as $source) {
-                $episode = str_starts_with($source, 'ep-')
-                    ? $parent->episodes()->find(substr($source, 3))
-                    : $parent->episodes()->where('source_episode_id', $source)->first();
+                $episode = null;
+                if (str_starts_with($source, 'ep-')) {
+                    $episode = $parent->episodes()->find(substr($source, 3));
+                    if ($episode && ($episode->source_episode_id ?? 'ep-' . $episode->id) !== $source) {
+                        $episode = null;
+                    }
+                } else {
+                    $episode = $parent->episodes()->where('source_episode_id', $source)->first();
+                }
 
                 if ($episode) {
                     $seasonSource = $episode->season?->source_season_id
