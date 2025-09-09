@@ -7,7 +7,7 @@ use App\Filament\Resources\PlaylistSyncStatusResource\RelationManagers;
 use App\Models\PlaylistSyncStatus;
 use Filament\Forms;
 use Filament\Forms\Form;
-use Filament\Resources\Resource;
+use Filament\Resources\Resource as FilamentResource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
 
-class PlaylistSyncStatusResource extends Resource
+class PlaylistSyncStatusResource extends FilamentResource
 {
     protected static ?string $model = PlaylistSyncStatus::class;
     protected static ?string $label = 'Sync logs';

@@ -5,17 +5,17 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\PostProcessResource\Pages;
 use App\Filament\Resources\PostProcessResource\RelationManagers;
 use App\Models\PostProcess;
-use App\Rules\CheckIfUrlOrLocalPath;
+use App\Rules\CheckIfUrlOrLocalPath as CheckIfUrlOrLocalPathRule;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
-use Filament\Resources\Resource;
+use Filament\Resources\Resource as FilamentResource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
-class PostProcessResource extends Resource
+class PostProcessResource extends FilamentResource
 {
     protected static ?string $model = PostProcess::class;
 
@@ -191,7 +191,7 @@ class PostProcessResource extends Resource
                 ->rules(fn(Get $get) => $get('metadata.local') === 'email' ? [
                     'email',
                 ] : [
-                    new CheckIfUrlOrLocalPath(
+                    new CheckIfUrlOrLocalPathRule(
                         urlOnly: $get('metadata.local') === 'url',
                         localOnly: $get('metadata.local') === 'path',
                     ),
