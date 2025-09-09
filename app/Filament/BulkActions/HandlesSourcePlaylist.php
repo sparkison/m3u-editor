@@ -145,7 +145,7 @@ trait HandlesSourcePlaylist
             $sourcePlaylistData = self::getSourcePlaylistData($records, $relation, $sourceKey);
         }
 
-        [$duplicateGroups, $needsSourcePlaylist] = $sourcePlaylistData;
+        [$duplicateGroups, $needsSourcePlaylist, , $sourceToGroup] = $sourcePlaylistData;
 
         if (! $needsSourcePlaylist) {
             return [];
@@ -154,9 +154,23 @@ trait HandlesSourcePlaylist
         $fields      = [];
         $selectedIds = $records->pluck('id');
 
+        // Count how many selected records belong to each parent-child pair so we can
+        // require a bulk selection unless every record in the group has an override.
+        $groupCounts = [];
+        foreach ($records as $record) {
+            $sourceId  = $record->$sourceKey;
+            $composite = $record->playlist_id . ':' . $sourceId;
+            if ($sourceToGroup->has($composite)) {
+                $pairKey = $sourceToGroup[$composite];
+                $groupCounts[$pairKey] = ($groupCounts[$pairKey] ?? 0) + 1;
+            }
+        }
+
         foreach ($duplicateGroups as $pairKey => $group) {
             $parentName = $group['playlists'][$group['parent_id']];
             $childName  = $group['playlists'][$group['child_id']];
+
+            $recordCount = $groupCounts[$pairKey] ?? 0;
 
             $fields[] = Forms\Components\Fieldset::make('These items appear in synced playlists.')
                 ->schema([
@@ -165,8 +179,9 @@ trait HandlesSourcePlaylist
                             Forms\Components\Select::make("source_playlists.{$pairKey}")
                                 ->label('Use items from:')
                                 ->options($group['playlists']->toArray())
-                                ->required()
+                                ->placeholder('Choose source playlist')
                                 ->searchable()
+                                ->required(fn (Get $get) => count($get("source_playlists_items.{$pairKey}") ?? []) < $recordCount)
                                 ->columnSpan(2),
                             Actions::make([
                                 Action::make("view_affected_{$pairKey}")
@@ -187,6 +202,7 @@ trait HandlesSourcePlaylist
                                                     $records->map(fn ($record) =>
                                                         Forms\Components\Select::make((string) $record->id)
                                                             ->label($record->title ?? $record->name ?? '')
+                                                            ->inlineLabel()
                                                             ->options($group['playlists']->toArray())
                                                             ->placeholder('Use group selection')
                                                             ->searchable()
