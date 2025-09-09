@@ -246,7 +246,7 @@ class GroupResource extends FilamentResource
                     Tables\Actions\DeleteAction::make()
                         ->hidden(fn($record) => !$record->is_custom),
                 ])->button()->hiddenLabel()->size('sm'),
-            ], position: Tables\Enums\ActionsPosition::BeforeCells)
+            ], Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     self::addToCustomPlaylistBulkAction(
