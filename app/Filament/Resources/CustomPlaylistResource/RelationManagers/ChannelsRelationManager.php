@@ -237,14 +237,10 @@ class ChannelsRelationManager extends RelationManager
                         Forms\Components\Select::make('group')
                             ->label('Select group')
                             ->options(
-                                Tag::query()
-                                    ->where('type', $ownerRecord->uuid)
-                                    ->get()
-                                    ->map(fn($name) => [
-                                        'id' => $name->getAttributeValue('name'),
-                                        'name' => $name->getAttributeValue('name')
-                                    ])->pluck('id', 'name')
-                            )->required(),
+                                Tag::where('type', $ownerRecord->uuid)
+                                    ->pluck('name', 'name')
+                            )
+                            ->required(),
                     ])
                     ->action(function (Collection $records, $data) use ($ownerRecord): void {
                         foreach ($records as $record) {
