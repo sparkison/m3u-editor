@@ -309,7 +309,7 @@ trait HandlesSourcePlaylist
 
         return Tables\Actions\BulkAction::make('add')
             ->label('Add to Custom Playlist')
-            ->form(function (Collection $records) use ($relation, $sourceKey, $itemLabel, $tagType, $categoryLabel, &$sourcePlaylistData): array {
+            ->form(function (Collection $records) use ($relation, $sourceKey, $itemLabel, $tagType, $categoryLabel, &$sourcePlaylistData, $modelClass): array {
                 $form = [
                     Forms\Components\Select::make('playlist')
                         ->required()
