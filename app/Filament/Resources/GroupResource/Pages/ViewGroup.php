@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\GroupResource\Pages;
 
 use App\Filament\Resources\GroupResource;
-use App\Models\CustomPlaylist;
 use App\Models\Group;
 use Filament\Actions;
 use Filament\Forms;

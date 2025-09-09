@@ -8,6 +8,7 @@ use App\Filament\Resources\PlaylistResource\RelationManagers;
 use App\Models\Playlist as PlaylistModel;
 use App\Rules\CheckIfUrlOrLocalPath as CheckIfUrlOrLocalPathRule;
 use Carbon\Carbon;
+use Filament\Actions;
 use Filament\Forms;
 use Filament\Forms\Get;
 use Filament\Notifications\Notification as FilamentNotification;
@@ -24,6 +25,7 @@ use App\Filament\Resources\PlaylistSyncStatusResource\Pages\CreatePlaylistSyncSt
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\EditPlaylistSyncStatus;
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ListPlaylistSyncStatuses;
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ViewPlaylistSyncStatus;
+use App\Jobs\SyncPlaylistChildren;
 use App\Livewire\EpgViewer;
 use App\Livewire\MediaFlowProxyUrl;
 use App\Livewire\PlaylistEpgUrl;
@@ -31,6 +33,7 @@ use App\Livewire\PlaylistInfo;
 use App\Livewire\PlaylistM3uUrl;
 use App\Livewire\XtreamApiInfo;
 use App\Models\Category;
+use App\Models\Playlist;
 use App\Models\SourceGroup;
 use App\Services\EpgCacheService;
 use Filament\Infolists;
@@ -39,7 +42,6 @@ use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Schema;
-use Filament\Actions;
 
 class PlaylistResource extends FilamentResource
 {
@@ -113,7 +115,7 @@ class PlaylistResource extends FilamentResource
                 Tables\Columns\TextColumn::make('available_streams')
                     ->label('Streams')
                     ->toggleable()
-                    ->formatStateUsing(fn(int $state): string => $state === 0 ? '∞' : (string)$state)
+                    ->formatStateUsing(fn (int $state): string => $state === 0 ? '∞' : (string) $state)
                     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
                     ->description(fn(?PlaylistModel $record): string =>
                         "Active: " . (int) ($record ? Redis::get("active_streams:{$record->id}") : 0))
@@ -155,16 +157,16 @@ class PlaylistResource extends FilamentResource
                     ->sortable()
                     ->badge()
                     ->toggleable()
-                    ->color(fn(Status $state) => $state->getColor()),
+                    ->color(fn (Status $state) => $state->getColor()),
                 ProgressColumn::make('progress')
                     ->label('Channel Sync')
                     ->sortable()
-                    ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
+                    ->poll(fn ($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
                     ->toggleable(),
                 ProgressColumn::make('series_progress')
                     ->label('Series Sync')
                     ->sortable()
-                    ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
+                    ->poll(fn ($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
                     ->toggleable(),
                 Tables\Columns\ToggleColumn::make('enable_proxy')
                     ->label('Proxy')
@@ -175,6 +177,7 @@ class PlaylistResource extends FilamentResource
                     ->label('Auto Sync')
                     ->toggleable()
                     ->tooltip('Toggle auto-sync status')
+                    ->disabled(fn (?Playlist $record) => $record?->parent_id !== null)
                     ->sortable(),
                 Tables\Columns\TextColumn::make('synced')
                     ->label('Last Synced')
@@ -183,11 +186,12 @@ class PlaylistResource extends FilamentResource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('sync_interval')
                     ->label('Interval')
+                    ->getStateUsing(fn (?Playlist $record) => $record?->parent_id ? '' : $record?->sync_interval)
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('sync_time')
                     ->label('Sync Time')
-                    ->formatStateUsing(fn(string $state): string => gmdate('H:i:s', (int)$state))
+                    ->formatStateUsing(fn (string $state): string => gmdate('H:i:s', (int) $state))
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('exp_date')
@@ -197,11 +201,13 @@ class PlaylistResource extends FilamentResource
                             try {
                                 if ($record->xtream_status['user_info']['exp_date'] ?? false) {
                                     $expires = Carbon::createFromTimestamp($record->xtream_status['user_info']['exp_date']);
+
                                     return $expires->toDayDateTimeString();
                                 }
                             } catch (\Exception $e) {
                             }
                         }
+
                         return 'N/A';
                     })
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -237,8 +243,8 @@ class PlaylistResource extends FilamentResource
                                 ->duration(10000)
                                 ->send();
                         })
-                        ->disabled(fn($record): bool => $record->status === Status::Processing)
-                        ->hidden(fn($record): bool => $record->parent_id !== null)
+                        ->disabled(fn ($record): bool => $record->status === Status::Processing)
+                        ->hidden(fn ($record): bool => $record->parent_id !== null)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
@@ -262,8 +268,8 @@ class PlaylistResource extends FilamentResource
                                 ->duration(10000)
                                 ->send();
                         })
-                        ->disabled(fn($record): bool => $record->status === Status::Processing)
-                        ->hidden(fn($record): bool => !$record->xtream || $record->parent_id !== null)
+                        ->disabled(fn ($record): bool => $record->status === Status::Processing)
+                        ->hidden(fn ($record): bool => ! $record->xtream || $record->parent_id !== null)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-down-tray')
                         ->modalIcon('heroicon-o-arrow-down-tray')
@@ -287,8 +293,8 @@ class PlaylistResource extends FilamentResource
                                 ->duration(10000)
                                 ->send();
                         })
-                        ->disabled(fn($record): bool => $record->status === Status::Processing)
-                        ->hidden(fn($record): bool => !$record->xtream || $record->parent_id !== null)
+                        ->disabled(fn ($record): bool => $record->status === Status::Processing)
+                        ->hidden(fn ($record): bool => ! $record->xtream || $record->parent_id !== null)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-down-tray')
                         ->modalIcon('heroicon-o-arrow-down-tray')
@@ -297,13 +303,13 @@ class PlaylistResource extends FilamentResource
                     Tables\Actions\Action::make('Download M3U')
                         ->label('Download M3U')
                         ->icon('heroicon-o-arrow-down-tray')
-                        ->url(fn($record) => PlaylistUrlFacade::getUrls($record)['m3u'])
+                        ->url(fn ($record) => PlaylistUrlFacade::getUrls($record)['m3u'])
                         ->openUrlInNewTab(),
                     EpgCacheService::getEpgTableAction(),
                     Tables\Actions\Action::make('HDHomeRun URL')
                         ->label('HDHomeRun URL')
                         ->icon('heroicon-o-arrow-top-right-on-square')
-                        ->url(fn($record) => PlaylistUrlFacade::getUrls($record)['hdhr'])
+                        ->url(fn ($record) => PlaylistUrlFacade::getUrls($record)['hdhr'])
                         ->openUrlInNewTab(),
                     Tables\Actions\Action::make('Duplicate')
                         ->label('Duplicate')
@@ -324,7 +330,7 @@ class PlaylistResource extends FilamentResource
                                 ->duration(3000)
                                 ->send();
                         })
-                        ->hidden(fn($record) => $record->parent_id !== null)
+                        ->hidden(fn ($record) => $record->parent_id !== null)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-document-duplicate')
                         ->modalIcon('heroicon-o-document-duplicate')
@@ -354,10 +360,10 @@ class PlaylistResource extends FilamentResource
                         ->modalIcon('heroicon-o-link')
                         ->modalDescription('Duplicate playlist with sync now?')
                         ->modalSubmitActionLabel('Yes, duplicate with sync')
-                        ->hidden(fn($record) => $record->parent_id !== null),
+                        ->hidden(fn ($record) => $record->parent_id !== null),
                     Tables\Actions\Action::make('Unsync')
                         ->label('Unsync')
-                        ->action(fn($record) => $record->update(['parent_id' => null]))
+                        ->action(fn ($record) => $record->update(['parent_id' => null]))
                         ->after(function () {
                             FilamentNotification::make()
                                 ->success()
@@ -366,7 +372,7 @@ class PlaylistResource extends FilamentResource
                         })
                         ->requiresConfirmation()
                         ->icon('heroicon-o-link-slash')
-                        ->hidden(fn($record) => $record->parent_id === null),
+                        ->hidden(fn ($record) => $record->parent_id === null),
                     Tables\Actions\Action::make('Sync Logs')
                         ->label('View Sync Logs')
                         ->color('gray')
@@ -436,7 +442,7 @@ class PlaylistResource extends FilamentResource
                         ->modalIcon('heroicon-s-trash')
                         ->modalDescription('This action will permanently delete all series associated with the playlist. Proceed with caution.')
                         ->modalSubmitActionLabel('Purge now')
-                        ->hidden(fn($record): bool => !$record->xtream),
+                        ->hidden(fn ($record): bool => ! $record->xtream),
                     Tables\Actions\DeleteAction::make(),
                 ])->button()->hiddenLabel()->size('sm'),
                 Tables\Actions\EditAction::make()->button()->hiddenLabel()->size('sm'),
@@ -523,7 +529,7 @@ class PlaylistResource extends FilamentResource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])->checkIfRecordIsSelectableUsing(
-                fn($record): bool => $record->status !== Status::Processing,
+                fn ($record): bool => $record->status !== Status::Processing,
             );
     }
 
@@ -545,9 +551,9 @@ class PlaylistResource extends FilamentResource
 
             // Playlist Sync Statuses
             'playlist-sync-statuses.index' => ListPlaylistSyncStatuses::route('/{parent}/syncs'),
-            //'playlist-sync-statuses.create' => CreatePlaylistSyncStatus::route('/{parent}/syncs/create'),
+            // 'playlist-sync-statuses.create' => CreatePlaylistSyncStatus::route('/{parent}/syncs/create'),
             'playlist-sync-statuses.view' => ViewPlaylistSyncStatus::route('/{parent}/syncs/{record}'),
-            //'playlist-sync-statuses.edit' => EditPlaylistSyncStatus::route('/{parent}/syncs/{record}/edit'),
+            // 'playlist-sync-statuses.edit' => EditPlaylistSyncStatus::route('/{parent}/syncs/{record}/edit'),
         ];
     }
 
@@ -585,8 +591,8 @@ class PlaylistResource extends FilamentResource
                             ->duration(10000)
                             ->send();
                     })
-                    ->disabled(fn($record): bool => $record->status === Status::Processing)
-                    ->hidden(fn($record): bool => $record->parent_id !== null)
+                    ->disabled(fn ($record): bool => $record->status === Status::Processing)
+                    ->hidden(fn ($record): bool => $record->parent_id !== null)
                     ->requiresConfirmation()
                     ->icon('heroicon-o-arrow-path')
                     ->modalIcon('heroicon-o-arrow-path')
@@ -610,8 +616,8 @@ class PlaylistResource extends FilamentResource
                             ->duration(10000)
                             ->send();
                     })
-                    ->disabled(fn($record): bool => $record->status === Status::Processing)
-                    ->hidden(fn($record): bool => !$record->xtream || $record->parent_id !== null)
+                    ->disabled(fn ($record): bool => $record->status === Status::Processing)
+                    ->hidden(fn ($record): bool => ! $record->xtream || $record->parent_id !== null)
                     ->requiresConfirmation()
                     ->icon('heroicon-o-arrow-down-tray')
                     ->modalIcon('heroicon-o-arrow-down-tray')
@@ -635,8 +641,8 @@ class PlaylistResource extends FilamentResource
                             ->duration(10000)
                             ->send();
                     })
-                    ->disabled(fn($record): bool => $record->status === Status::Processing)
-                    ->hidden(fn($record): bool => !$record->xtream || $record->parent_id !== null)
+                    ->disabled(fn ($record): bool => $record->status === Status::Processing)
+                    ->hidden(fn ($record): bool => ! $record->xtream || $record->parent_id !== null)
                     ->requiresConfirmation()
                     ->icon('heroicon-o-arrow-down-tray')
                     ->modalIcon('heroicon-o-arrow-down-tray')
@@ -645,13 +651,13 @@ class PlaylistResource extends FilamentResource
                 Actions\Action::make('Download M3U')
                     ->label('Download M3U')
                     ->icon('heroicon-o-arrow-down-tray')
-                    ->url(fn($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['m3u'])
+                    ->url(fn ($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['m3u'])
                     ->openUrlInNewTab(),
                 EpgCacheService::getEpgPlaylistAction(),
                 Actions\Action::make('HDHomeRun URL')
                     ->label('HDHomeRun URL')
                     ->icon('heroicon-o-arrow-top-right-on-square')
-                    ->url(fn($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['hdhr'])
+                    ->url(fn ($record) => \App\Facades\PlaylistUrlFacade::getUrls($record)['hdhr'])
                     ->openUrlInNewTab(),
                 Actions\Action::make('Duplicate')
                     ->label('Duplicate')
@@ -672,7 +678,7 @@ class PlaylistResource extends FilamentResource
                             ->duration(3000)
                             ->send();
                     })
-                    ->hidden(fn($record) => $record->parent_id !== null)
+                    ->hidden(fn ($record) => $record->parent_id !== null)
                     ->requiresConfirmation()
                     ->icon('heroicon-o-document-duplicate')
                     ->modalIcon('heroicon-o-document-duplicate')
@@ -687,7 +693,7 @@ class PlaylistResource extends FilamentResource
                             ->helperText('This will be the name of the duplicated playlist.'),
                     ])
                     ->action(function ($record, $data) {
-                            app('Illuminate\\Contracts\\Bus\\Dispatcher')
+                        app('Illuminate\\Contracts\\Bus\\Dispatcher')
                             ->dispatch(new \App\Jobs\DuplicatePlaylist($record, $data['name'], true));
                     })->after(function () {
                         FilamentNotification::make()
@@ -702,10 +708,10 @@ class PlaylistResource extends FilamentResource
                     ->modalIcon('heroicon-o-link')
                     ->modalDescription('Duplicate playlist with sync now?')
                     ->modalSubmitActionLabel('Yes, duplicate with sync')
-                    ->hidden(fn($record) => $record->parent_id !== null),
+                    ->hidden(fn ($record) => $record->parent_id !== null),
                 Actions\Action::make('Unsync')
                     ->label('Unsync')
-                    ->action(fn($record) => $record->update(['parent_id' => null]))
+                    ->action(fn ($record) => $record->update(['parent_id' => null]))
                     ->after(function () {
                         FilamentNotification::make()
                             ->success()
@@ -714,7 +720,7 @@ class PlaylistResource extends FilamentResource
                     })
                     ->requiresConfirmation()
                     ->icon('heroicon-o-link-slash')
-                    ->hidden(fn($record) => $record->parent_id === null),
+                    ->hidden(fn ($record) => $record->parent_id === null),
                 Actions\Action::make('reset')
                     ->label('Reset status')
                     ->icon('heroicon-o-arrow-uturn-left')
@@ -772,7 +778,8 @@ class PlaylistResource extends FilamentResource
         ];
         if (PlaylistUrlFacade::mediaFlowProxyEnabled()) {
             $links[] = Infolists\Components\Livewire::make(MediaFlowProxyUrl::class);
-        };
+        }
+
         return $infolist
             ->schema([
                 Infolists\Components\Tabs::make()
@@ -789,7 +796,7 @@ class PlaylistResource extends FilamentResource
                             ->schema([
                                 Infolists\Components\Section::make()
                                     ->columns(2)
-                                    ->schema($links)
+                                    ->schema($links),
                             ]),
                         Infolists\Components\Tabs\Tab::make('Xtream API')
                             ->icon('heroicon-m-bolt')
@@ -797,8 +804,8 @@ class PlaylistResource extends FilamentResource
                                 Infolists\Components\Section::make()
                                     ->columns(1)
                                     ->schema([
-                                        Infolists\Components\Livewire::make(XtreamApiInfo::class)
-                                    ])
+                                        Infolists\Components\Livewire::make(XtreamApiInfo::class),
+                                    ]),
                             ]),
                     ])->contained(false),
                 Infolists\Components\Livewire::make(EpgViewer::class)
@@ -846,7 +853,7 @@ class PlaylistResource extends FilamentResource
                             'heroicon-m-exclamation-triangle',
                             tooltip: 'Be careful changing this value as this will change the URLs for the Playlist, its EPG, and HDHR.'
                         )
-                        ->hidden(fn($get): bool => !$get('edit_uuid'))
+                        ->hidden(fn ($get): bool => ! $get('edit_uuid'))
                         ->required(),
                 ])->hiddenOn('create'),
         ];
@@ -878,7 +885,7 @@ class PlaylistResource extends FilamentResource
                         ->url()
                         ->columnSpan(2)
                         ->required()
-                        ->hidden(fn(Get $get): bool => !$get('xtream')),
+                        ->hidden(fn (Get $get): bool => ! $get('xtream')),
                     Forms\Components\Grid::make()
                         ->columnSpanFull()
                         ->schema([
@@ -921,7 +928,7 @@ class PlaylistResource extends FilamentResource
                                         ->inline(false)
                                         ->default(true),
                                 ]),
-                        ])->hidden(fn(Get $get): bool => !$get('xtream')),
+                        ])->hidden(fn (Get $get): bool => ! $get('xtream')),
                     Forms\Components\TextInput::make('url')
                         ->label('URL or Local file path')
                         ->columnSpan(2)
@@ -930,7 +937,7 @@ class PlaylistResource extends FilamentResource
                         ->requiredWithout('uploads')
                         ->rules([new CheckIfUrlOrLocalPathRule()])
                         ->maxLength(255)
-                        ->hidden(fn(Get $get): bool => !!$get('xtream')),
+                        ->hidden(fn (Get $get): bool => (bool) $get('xtream')),
                     Forms\Components\FileUpload::make('uploads')
                         ->label('File')
                         ->columnSpan(2)
@@ -939,7 +946,7 @@ class PlaylistResource extends FilamentResource
                         ->helperText('Upload the playlist file. This will be used to import groups and channels.')
                         ->rules(['file'])
                         ->requiredWithout('url')
-                        ->hidden(fn(Get $get): bool => !!$get('xtream')),
+                        ->hidden(fn (Get $get): bool => (bool) $get('xtream')),
                 ]),
 
             Forms\Components\Grid::make()
@@ -958,13 +965,14 @@ class PlaylistResource extends FilamentResource
                         ->onColor('danger')
                         ->inline(false)
                         ->default(false),
-                ])
+                ]),
         ];
 
         $schedulingFields = [
             Forms\Components\Grid::make()
                 ->columns(2)
                 ->columnSpanFull()
+                ->hidden(fn (?Playlist $record) => $record?->parent_id !== null)
                 ->schema([
                     Forms\Components\Grid::make()
                         ->columns(3)
@@ -976,7 +984,8 @@ class PlaylistResource extends FilamentResource
                                 ->live()
                                 ->columnSpan(2)
                                 ->inline(false)
-                                ->default(true),
+                                ->default(true)
+                                ->disabled(fn (?Playlist $record) => $record?->parent_id !== null),
                             Forms\Components\Select::make('sync_interval')
                                 ->label('Sync Every')
                                 ->helperText('Default is every 24hr if left empty.')
@@ -1000,7 +1009,7 @@ class PlaylistResource extends FilamentResource
                                     '1 week' => '1 week',
                                     '2 weeks' => '2 weeks',
                                     '1 month' => '1 month',
-                                ])->hidden(fn(Get $get): bool => !$get('auto_sync')),
+                                ])->hidden(fn (Get $get): bool => ! $get('auto_sync')),
                             Forms\Components\Toggle::make('backup_before_sync')
                                 ->label('Backup Before Sync')
                                 ->helperText('When enabled, a backup will be created before syncing.')
@@ -1014,9 +1023,9 @@ class PlaylistResource extends FilamentResource
                         ->suffix(config('app.timezone'))
                         ->native(false)
                         ->label('Last Synced')
-                        ->hidden(fn(Get $get, string $operation): bool => !$get('auto_sync') || $operation === 'create')
+                        ->hidden(fn (Get $get, string $operation): bool => ! $get('auto_sync') || $operation === 'create')
                         ->helperText('Playlist will be synced at the specified interval. Timestamp is automatically updated after each sync. Set to any time in the past (or future) and the next sync will run when the defined interval has passed since the time set.'),
-                ])
+                ]),
         ];
 
         $processingFields = [
@@ -1045,7 +1054,7 @@ class PlaylistResource extends FilamentResource
                         ->live()
                         ->default(false)
                         ->helperText('When enabled, groups will be included based on regex pattern match instead of prefix.')
-                        ->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
+                        ->hidden(fn (Get $get): bool => ! $get('import_prefs.preprocess') || ! $get('status')),
 
                     Forms\Components\Fieldset::make('Channel & VOD processing')
                         ->schema([
@@ -1056,12 +1065,11 @@ class PlaylistResource extends FilamentResource
                                 ->multiple()
                                 ->helperText('NOTE: If the list is empty, sync the playlist and check again once complete.')
                                 ->options(
-                                    fn($record): array =>
-                                    SourceGroup::where('playlist_id', $record->id)
+                                    fn ($record): array => SourceGroup::where('playlist_id', $record->id)
                                         ->get()->pluck('name', 'name')->toArray()
                                 ),
                             Forms\Components\TagsInput::make('import_prefs.included_group_prefixes')
-                                ->label(fn(Get $get) => !$get('import_prefs.use_regex') ? 'Group prefixes to import' : 'Regex patterns to import')
+                                ->label(fn (Get $get) => ! $get('import_prefs.use_regex') ? 'Group prefixes to import' : 'Regex patterns to import')
                                 ->helperText('Press [tab] or [return] to add item.')
                                 ->columnSpan(1)
                                 ->suggestions([
@@ -1070,10 +1078,10 @@ class PlaylistResource extends FilamentResource
                                     'CA -',
                                     '^(US|UK|CA)',
                                     'Sports.*HD$',
-                                    '\[.*\]'
+                                    '\[.*\]',
                                 ])
                                 ->splitKeys(['Tab', 'Return']),
-                        ])->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
+                        ])->hidden(fn (Get $get): bool => ! $get('import_prefs.preprocess') || ! $get('status')),
 
                     Forms\Components\Fieldset::make('Series processing')
                         ->schema([
@@ -1084,12 +1092,11 @@ class PlaylistResource extends FilamentResource
                                 ->multiple()
                                 ->helperText('NOTE: If the list is empty, sync the playlist and check again once complete.')
                                 ->options(
-                                    fn($record): array =>
-                                    Category::where('playlist_id', $record->id)
+                                    fn ($record): array => Category::where('playlist_id', $record->id)
                                         ->get()->pluck('name', 'name')->toArray()
                                 ),
                             Forms\Components\TagsInput::make('import_prefs.included_category_prefixes')
-                                ->label(fn(Get $get) => !$get('import_prefs.use_regex') ? 'Category prefixes to import' : 'Regex patterns to import')
+                                ->label(fn (Get $get) => ! $get('import_prefs.use_regex') ? 'Category prefixes to import' : 'Regex patterns to import')
                                 ->helperText('Press [tab] or [return] to add item.')
                                 ->columnSpan(1)
                                 ->suggestions([
@@ -1098,10 +1105,10 @@ class PlaylistResource extends FilamentResource
                                     'CA -',
                                     '^(US|UK|CA)',
                                     'Sports.*HD$',
-                                    '\[.*\]'
+                                    '\[.*\]',
                                 ])
                                 ->splitKeys(['Tab', 'Return']),
-                        ])->hidden(fn(Get $get): bool => !$get('import_prefs.preprocess') || !$get('status')),
+                        ])->hidden(fn (Get $get): bool => ! $get('import_prefs.preprocess') || ! $get('status')),
 
                     Forms\Components\TagsInput::make('import_prefs.ignored_file_types')
                         ->label('Ignored file types')
@@ -1138,7 +1145,7 @@ class PlaylistResource extends FilamentResource
                         )
                         ->default(false)
                         ->helperText('When enabled, series will be included in the M3U output. It is recommended to enable the "Auto-fetch series metadata" option when enabled.'),
-                ])->hidden(fn(Get $get): bool => !$get('xtream')),
+                ])->hidden(fn (Get $get): bool => ! $get('xtream')),
         ];
 
         $outputFields = [
@@ -1155,9 +1162,9 @@ class PlaylistResource extends FilamentResource
                         ->inline(false)
                         ->live()
                         ->default(true)
-                        ->disabled(fn(Get $get): bool => config('dev.disable_sync_logs', false))
-                        ->hint(fn(Get $get): string => config('dev.disable_sync_logs', false) ? 'Sync logs disabled globally in settings' : '')
-                        ->hintIcon(fn(Get $get): string => config('dev.disable_sync_logs', false) ? 'heroicon-m-lock-closed' : '')
+                        ->disabled(fn (Get $get): bool => config('dev.disable_sync_logs', false))
+                        ->hint(fn (Get $get): string => config('dev.disable_sync_logs', false) ? 'Sync logs disabled globally in settings' : '')
+                        ->hintIcon(fn (Get $get): string => config('dev.disable_sync_logs', false) ? 'heroicon-m-lock-closed' : '')
                         ->helperText('Retain logs of playlist syncs. This is useful for debugging and tracking changes to the playlist. This can lead to increased sync time and storage usage depending on the size of the playlist.'),
                     Forms\Components\Toggle::make('auto_sort')
                         ->label('Automatically assign sort number based on playlist order')
@@ -1177,7 +1184,7 @@ class PlaylistResource extends FilamentResource
                         ->columnSpan(1)
                         ->rules(['min:1'])
                         ->type('number')
-                        ->hidden(fn(Get $get): bool => !$get('auto_channel_increment'))
+                        ->hidden(fn (Get $get): bool => ! $get('auto_channel_increment'))
                         ->required(),
                 ]),
             Forms\Components\Section::make('Streaming Output')
@@ -1189,8 +1196,8 @@ class PlaylistResource extends FilamentResource
                 ->schema([
                     Forms\Components\Toggle::make('enable_proxy')
                         ->label('Enable Proxy')
-                        ->hint(fn(Get $get): string => $get('enable_proxy') ? 'Proxied' : 'Not proxied')
-                        ->hintIcon(fn(Get $get): string => !$get('enable_proxy') ? 'heroicon-m-lock-open' : 'heroicon-m-lock-closed')
+                        ->hint(fn (Get $get): string => $get('enable_proxy') ? 'Proxied' : 'Not proxied')
+                        ->hintIcon(fn (Get $get): string => ! $get('enable_proxy') ? 'heroicon-m-lock-open' : 'heroicon-m-lock-closed')
                         ->live()
                         ->helperText('When enabled, all streams will be proxied through the application. This allows for better compatibility with various clients and enables features such as stream limiting and output format selection.')
                         ->inline(false)
@@ -1216,7 +1223,7 @@ class PlaylistResource extends FilamentResource
                         ->type('number')
                         ->default(0) // Default to 0 streams (for unlimted)
                         ->required()
-                        ->hidden(fn(Get $get): bool => !$get('enable_proxy')),
+                        ->hidden(fn (Get $get): bool => ! $get('enable_proxy')),
                     Forms\Components\Select::make('proxy_options.output')
                         ->label('Proxy Output Format')
                         ->required()
@@ -1225,13 +1232,13 @@ class PlaylistResource extends FilamentResource
                             'hls' => 'HLS (.m3u8)',
                         ])
                         ->default('ts')
-                        ->helperText(fn() => config('proxy.shared_streaming.enabled') ? '' : 'NOTE: Only HLS streaming supports multiple connections per stream. MPEG-TS creates a new stream for each connection.')
-                        ->hidden(fn(Get $get): bool => !$get('enable_proxy')),
+                        ->helperText(fn () => config('proxy.shared_streaming.enabled') ? '' : 'NOTE: Only HLS streaming supports multiple connections per stream. MPEG-TS creates a new stream for each connection.')
+                        ->hidden(fn (Get $get): bool => ! $get('enable_proxy')),
                     Forms\Components\TextInput::make('server_timezone')
                         ->label('Provider Timezone')
                         ->helperText('The portal/provider timezone (DST-aware). Needed to correctly use timeshift functionality when playlist proxy is enabled.')
                         ->placeholder('Etc/UTC')
-                        ->hidden(fn(Get $get): bool => !$get('enable_proxy')),
+                        ->hidden(fn (Get $get): bool => ! $get('enable_proxy')),
                 ]),
             Forms\Components\Section::make('EPG Output')
                 ->description('EPG output options')
@@ -1265,14 +1272,14 @@ class PlaylistResource extends FilamentResource
                         ->inline(false)
                         ->default(false)
                         ->helperText('When enabled, the channel group will be assigned to the dummy EPG as a <category> tag.')
-                        ->hidden(fn(Get $get): bool => !$get('dummy_epg')),
+                        ->hidden(fn (Get $get): bool => ! $get('dummy_epg')),
                     Forms\Components\TextInput::make('dummy_epg_length')
                         ->label('Dummy program length (in minutes)')
                         ->columnSpan(1)
                         ->rules(['min:1'])
                         ->type('number')
                         ->default(120)
-                        ->hidden(fn(Get $get): bool => !$get('dummy_epg')),
+                        ->hidden(fn (Get $get): bool => ! $get('dummy_epg')),
                 ]),
         ];
 
@@ -1293,11 +1300,12 @@ class PlaylistResource extends FilamentResource
             if ($section === 'Name') {
                 $section = 'General';
             }
-            if (!in_array($section, ['Processing', 'Output'])) {
+            if (! in_array($section, ['Processing', 'Output'])) {
                 // Wrap the fields in a section
                 $fields = [
                     Forms\Components\Section::make($section)
-                        ->schema($fields),
+                        ->schema($fields)
+                        ->hidden(fn (?Playlist $record) => $section === 'Scheduling' && $record?->parent_id !== null),
                 ];
 
                 // If general section, add AUTH management
@@ -1321,7 +1329,7 @@ class PlaylistResource extends FilamentResource
                                             if ($record) {
                                                 $currentAuths = $record->playlistAuths()->get();
                                                 foreach ($currentAuths as $auth) {
-                                                    $options[$auth->id] = $auth->name . ' (currently assigned)';
+                                                    $options[$auth->id] = $auth->name.' (currently assigned)';
                                                 }
                                             }
 
@@ -1343,6 +1351,7 @@ class PlaylistResource extends FilamentResource
                                             if ($record) {
                                                 return $record->playlistAuths()->pluck('playlist_auths.id')->toArray();
                                             }
+
                                             return [];
                                         })
                                         ->afterStateHydrated(function ($component, $state, $record) {
@@ -1357,7 +1366,9 @@ class PlaylistResource extends FilamentResource
                                         )
                                         ->helperText('Simple authentication for playlist access.')
                                         ->afterStateUpdated(function ($state, $record) {
-                                            if (!$record) return;
+                                            if (! $record) {
+                                                return;
+                                            }
 
                                             $currentAuthIds = $record->playlistAuths()->pluck('playlist_auths.id')->toArray();
                                             $newAuthIds = $state ? (is_array($state) ? $state : [$state]) : [];
@@ -1383,11 +1394,12 @@ class PlaylistResource extends FilamentResource
                                         ->dehydrated(false), // Don't save this field directly
                                 ]),
                         ]);
-                };
+                }
             }
 
             $tabs[] = Forms\Components\Tabs\Tab::make($section)
-                ->schema($fields);
+                ->schema($fields)
+                ->hidden(fn (Get $get, ?Playlist $record) => $section === 'Scheduling' && (($record?->parent_id ?? $get('parent_id')) !== null));
         }
 
         // Compose the form with tabs and sections
@@ -1410,7 +1422,8 @@ class PlaylistResource extends FilamentResource
         $wizard = [];
         foreach (self::getFormSections(creating: true) as $step => $fields) {
             $wizard[] = Forms\Components\Wizard\Step::make($step)
-                ->schema($fields);
+                ->schema($fields)
+                ->hidden(fn (?Playlist $record) => $step === 'Scheduling' && $record?->parent_id !== null);
 
             // Add auth after type step
             if ($step === 'Type') {
@@ -1447,7 +1460,7 @@ class PlaylistResource extends FilamentResource
                             ->searchable()
                             ->placeholder('Select an auth to assign')
                             ->columnSpanFull()
-                            ->visible(fn(Forms\Get $get): bool => $get('auth_option') === 'existing'),
+                            ->visible(fn (Forms\Get $get): bool => $get('auth_option') === 'existing'),
 
                         // Create New Auth Fields
                         Forms\Components\Grid::make(2)
@@ -1473,10 +1486,11 @@ class PlaylistResource extends FilamentResource
                                     ->required()
                                     ->columnSpan(1),
                             ])
-                            ->visible(fn(Forms\Get $get): bool => $get('auth_option') === 'create'),
+                            ->visible(fn (Forms\Get $get): bool => $get('auth_option') === 'create'),
                     ]);
             }
         }
+
         return $wizard;
     }
 }
