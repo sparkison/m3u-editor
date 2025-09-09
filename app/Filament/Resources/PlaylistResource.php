@@ -8,6 +8,7 @@ use App\Filament\Resources\PlaylistResource\RelationManagers;
 use App\Models\Playlist as PlaylistModel;
 use App\Rules\CheckIfUrlOrLocalPath as CheckIfUrlOrLocalPathRule;
 use Carbon\Carbon;
+use Filament\Actions;
 use Filament\Forms;
 use Filament\Forms\Get;
 use Filament\Notifications\Notification as FilamentNotification;
@@ -20,7 +21,6 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
 use App\Facades\PlaylistUrlFacade;
-use App\Filament\Resources\PlaylistResource\Pages;
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\CreatePlaylistSyncStatus;
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\EditPlaylistSyncStatus;
 use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ListPlaylistSyncStatuses;
@@ -35,21 +35,13 @@ use App\Livewire\XtreamApiInfo;
 use App\Models\Category;
 use App\Models\Playlist;
 use App\Models\SourceGroup;
-use App\Rules\CheckIfUrlOrLocalPath;
 use App\Services\EpgCacheService;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
-use Filament\Notifications\Notification;
-use Filament\Resources\Resource;
-use Filament\Tables;
-use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Schema;
-use RyanChandler\FilamentProgressColumn\ProgressColumn;
 
 class PlaylistResource extends FilamentResource
 {
