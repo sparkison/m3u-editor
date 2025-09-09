@@ -4,7 +4,7 @@ namespace App\Filament\Resources\SeriesResource\Pages;
 
 use App\Filament\Resources\SeriesResource;
 use Filament\Actions;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\Pages\EditRecord;
 
 class EditSeries extends EditRecord
@@ -24,7 +24,7 @@ class EditSeries extends EditRecord
                                 playlistSeries: $record,
                             ));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Series is being processed')
                             ->body('You will be notified once complete.')
@@ -44,7 +44,7 @@ class EditSeries extends EditRecord
                                 series: $record,
                             ));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Series .strm files are being synced')
                             ->body('You will be notified once complete.')
@@ -65,7 +65,7 @@ class EditSeries extends EditRecord
                         ]);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Series episodes enabled')
                             ->body('The series episodes have been enabled.')
@@ -85,7 +85,7 @@ class EditSeries extends EditRecord
                         ]);
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Series episodes disabled')
                             ->body('The series episodes have been disabled.')
