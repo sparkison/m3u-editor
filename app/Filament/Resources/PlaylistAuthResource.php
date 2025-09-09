@@ -8,12 +8,12 @@ use App\Models\PlaylistAuth;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
-use Filament\Resources\Resource;
+use Filament\Resources\Resource as FilamentResource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
-class PlaylistAuthResource extends Resource
+class PlaylistAuthResource extends FilamentResource
 {
     protected static ?string $model = PlaylistAuth::class;
 

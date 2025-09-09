@@ -7,7 +7,7 @@ use App\Models\Series;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Infolists\Infolist;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Columns\SpatieTagsColumn;
@@ -105,6 +105,11 @@ class SeriesRelationManager extends RelationManager
         // Inject the custom group column after the group column
         array_splice($defaultColumns, 6, 0, [$groupColumn]);
 
+        $defaultColumns[] = Tables\Columns\TextColumn::make('playlist.parent.name')
+            ->label('Parent Playlist')
+            ->toggleable()
+            ->sortable();
+
         return $table->persistFiltersInSession()
             ->persistFiltersInSession()
             ->persistSortInSession()
@@ -112,6 +117,7 @@ class SeriesRelationManager extends RelationManager
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
+            ->modifyQueryUsing(fn (Builder $query) => $query->with('playlist.parent'))
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
             ->columns($defaultColumns)
@@ -219,7 +225,7 @@ class SeriesRelationManager extends RelationManager
                             $record->syncTagsWithType([$data['category']], $ownerRecord->uuid . '-category');
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Added to category')
                             ->body('The selected series have been added to the custom category.')
