@@ -169,7 +169,6 @@ trait HandlesSourcePlaylist
                         Action::make("view_affected_{$pairKey}")
                             ->label('View affected items')
                             ->modalHeading("Items in {$parentName} ↔ {$childName}")
-                            ->statePath("source_playlists_items.{$pairKey}")
                             ->form(function () use ($group, $modelClass, $sourceKey, $selectedIds) {
                                 $records = $modelClass::query()
                                     ->whereIn('id', $selectedIds)
@@ -178,13 +177,19 @@ trait HandlesSourcePlaylist
                                     ->select('id', 'title', 'name')
                                     ->get();
 
-                                return $records->map(fn ($record) =>
-                                    Forms\Components\Select::make((string) $record->id)
-                                        ->label($record->title ?? $record->name ?? '')
-                                        ->options($group['playlists']->toArray())
-                                        ->placeholder('Use group selection')
-                                        ->searchable()
-                                )->toArray();
+                                return [
+                                    Forms\Components\Group::make()
+                                        ->statePath("source_playlists_items.{$pairKey}")
+                                        ->schema(
+                                            $records->map(fn ($record) =>
+                                                Forms\Components\Select::make((string) $record->id)
+                                                    ->label($record->title ?? $record->name ?? '')
+                                                    ->options($group['playlists']->toArray())
+                                                    ->placeholder('Use group selection')
+                                                    ->searchable()
+                                            )->toArray()
+                                        ),
+                                ];
                             }),
                     ]),
                 ]);
