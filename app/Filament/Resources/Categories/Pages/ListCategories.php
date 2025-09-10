@@ -3,8 +3,10 @@
 namespace App\Filament\Resources\Categories\Pages;
 
 use App\Filament\Resources\Categories\CategoryResource;
+use App\Models\Playlist;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
+use Filament\Schemas\Components\Tabs\Tab;
 use Illuminate\Database\Eloquent\Builder;
 
 class ListCategories extends ListRecords
@@ -25,5 +27,29 @@ class ListCategories extends ListRecords
     {
         return static::getResource()::getEloquentQuery()
             ->where('user_id', auth()->id());
+    }
+
+    public function getTabs(): array
+    {
+        return self::setupTabs();
+    }
+
+    public static function setupTabs($relationId = null): array
+    {
+        $where = [
+            ['user_id', auth()->id()],
+        ];
+
+        // Fetch all the playlists for the current user, these will be our grouping tabs
+        $playlists = Playlist::where($where)
+            ->orderBy('name')
+            ->get();
+
+        // Return tabs
+        return $playlists->mapWithKeys(fn($playlist) => [
+            $playlist->id => Tab::make($playlist->name)
+                ->modifyQueryUsing(fn($query) => $query->where('playlist_id', $playlist->id))
+                ->badge($playlist->series()->count())
+        ])->toArray();
     }
 }

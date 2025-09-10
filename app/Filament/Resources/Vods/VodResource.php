@@ -172,8 +172,7 @@ class VodResource extends Resource
                 ->type('number')
                 ->placeholder('Sort Order')
                 ->sortable()
-                ->tooltip(fn($record) => !$record->is_custom && $record->playlist?->auto_sort ? 'Playlist auto-sort enabled; disable to change' : 'Channel sort order')
-                ->disabled(fn($record) => !$record->is_custom && $record->playlist?->auto_sort)
+                ->tooltip(fn($record) => !$record->is_custom && $record->playlist?->auto_sort ? 'Playlist auto-sort enabled; any changes will be overwritten on next sync' : 'Channel sort order')
                 ->toggleable(),
             TextColumn::make('failovers_count')
                 ->label('Failovers')
@@ -241,6 +240,7 @@ class VodResource extends Resource
                 ->sortable(),
             TextColumn::make('group')
                 ->hidden(fn() => !$showGroup)
+                ->badge()
                 ->toggleable()
                 ->searchable(query: function ($query, string $search): Builder {
                     $connection = $query->getConnection();

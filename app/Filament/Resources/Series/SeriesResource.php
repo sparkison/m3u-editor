@@ -51,6 +51,7 @@ use Filament\Infolists;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Columns\TextInputColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Builder;
@@ -128,6 +129,14 @@ class SeriesResource extends Resource
                 ->searchable(query: function (Builder $query, string $search): Builder {
                     return $query->orWhereRaw('LOWER(series.name) LIKE ?', ['%' . strtolower($search) . '%']);
                 }),
+            TextInputColumn::make('sort')
+                ->label('Sort Order')
+                ->rules(['min:0'])
+                ->type('number')
+                ->placeholder('Sort Order')
+                ->sortable()
+                ->tooltip(fn($record) => !$record->is_custom && $record->playlist?->auto_sort ? 'Playlist auto-sort enabled; any changes will be overwritten on next sync' : 'Channel sort order')
+                ->toggleable(),
             ToggleColumn::make('enabled')
                 ->toggleable()
                 ->tooltip('Toggle series status')

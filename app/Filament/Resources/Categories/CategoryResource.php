@@ -114,11 +114,11 @@ class CategoryResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                SelectFilter::make('playlist')
-                    ->relationship('playlist', 'name')
-                    ->multiple()
-                    ->preload()
-                    ->searchable(),
+                // SelectFilter::make('playlist')
+                //     ->relationship('playlist', 'name')
+                //     ->multiple()
+                //     ->preload()
+                //     ->searchable(),
             ])
             ->recordActions([
                 BulkActionGroup::make([

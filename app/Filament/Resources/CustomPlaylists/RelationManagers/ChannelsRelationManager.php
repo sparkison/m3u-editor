@@ -118,7 +118,7 @@ class ChannelsRelationManager extends RelationManager
         $defaultColumns = ChannelResource::getTableColumns(showGroup: true, showPlaylist: true);
 
         // Inject the custom group column after the group column
-        array_splice($defaultColumns, 13, 0, [$groupColumn]);
+        array_splice($defaultColumns, 12, 0, [$groupColumn]);
 
         return $table->persistFiltersInSession()
             ->persistFiltersInSession()
@@ -126,6 +126,9 @@ class ChannelsRelationManager extends RelationManager
             ->recordTitleAttribute('title')
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
+            })
+            ->reorderRecordsTriggerAction(function ($action) {
+                return $action->button()->label('Sort');
             })
             ->modifyQueryUsing(function (Builder $query) use ($ownerRecord) {
                 $query->with(['tags' => function ($tagQuery) use ($ownerRecord) {
@@ -148,10 +151,21 @@ class ChannelsRelationManager extends RelationManager
                         $groupName = $record->getCustomGroupName($ownerRecord->uuid);
                         return $groupName ? strtolower($groupName) : 'uncategorized';
                     })
-                    ->orderQueryUsing(function (Builder $query, string $direction) {
-                        // Since we're using custom grouping, we need to provide ordering
-                        // For now, just order by the channel sort field to avoid column errors
-                        return $query->orderBy('channels.sort', $direction);
+                    ->orderQueryUsing(function (Builder $query, string $direction) use ($ownerRecord) {
+                        // Order by the tag order_column from the tags table
+                        // This controls the order of the groups themselves
+                        return $query
+                            ->leftJoin('taggables as group_taggables', function ($join) {
+                                $join->on('channels.id', '=', 'group_taggables.taggable_id')
+                                    ->where('group_taggables.taggable_type', '=', Channel::class);
+                            })
+                            ->leftJoin('tags as group_tags', function ($join) use ($ownerRecord) {
+                                $join->on('group_taggables.tag_id', '=', 'group_tags.id')
+                                    ->where('group_tags.type', '=', $ownerRecord->uuid);
+                            })
+                            ->orderBy('group_tags.order_column', $direction)
+                            ->orderBy('channels.sort', 'asc') // Secondary sort within groups
+                            ->select('channels.*');
                     })
                     ->scopeQueryByKeyUsing(function (Builder $query, string $key) use ($ownerRecord) {
                         if ($key === 'uncategorized') {
@@ -178,8 +192,7 @@ class ChannelsRelationManager extends RelationManager
                         }
                     }),
             ])
-            // Remove defaultGroup for now to test if it's causing issues
-            // ->defaultGroup('custom_group_name')
+            ->defaultGroup('playlist_tags')
             ->defaultSort('sort', 'asc')
             ->reorderable('sort')
             ->columns($defaultColumns)

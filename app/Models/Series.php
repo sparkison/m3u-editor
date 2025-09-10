@@ -203,4 +203,16 @@ class Series extends Model
         }
         return false;
     }
+
+    /**
+     * Get the custom group name for a specific custom playlist
+     */
+    public function getCustomCategoryName(string $customPlaylistUuid): string
+    {
+        $tag = $this->tags()
+            ->where('type', $customPlaylistUuid . '-category')
+            ->first();
+
+        return $tag ? $tag->getAttributeValue('name') : 'Uncategorized';
+    }
 }

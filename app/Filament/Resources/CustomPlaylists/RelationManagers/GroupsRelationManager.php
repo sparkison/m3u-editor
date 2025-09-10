@@ -49,6 +49,9 @@ class GroupsRelationManager extends RelationManager
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
+            ->reorderRecordsTriggerAction(function ($action) {
+                return $action->button()->label('Sort');
+            })
             ->modifyQueryUsing(function (Builder $query) use ($ownerRecord) {
                 $query->where('type', $ownerRecord->uuid);
             })

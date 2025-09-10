@@ -35,6 +35,9 @@ class SeriesRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
+        $table = $table->reorderRecordsTriggerAction(function ($action) {
+            return $action->button()->label('Sort');
+        })->defaultSort('sort', 'asc')->reorderable('sort');
         return SeriesResource::setupTable($table, $this->ownerRecord->id);
     }
 }

@@ -83,8 +83,13 @@ class GroupResource extends Resource
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
+            ->reorderRecordsTriggerAction(function ($action) {
+                return $action->button()->label('Sort');
+            })
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
+            ->defaultSort('sort_order', 'asc')
+            ->reorderable('sort_order')
             ->columns([
                 TextInputColumn::make('name')
                     ->label('Name')
@@ -98,8 +103,7 @@ class GroupResource extends Resource
                     ->type('number')
                     ->placeholder('Sort Order')
                     ->sortable()
-                    ->tooltip(fn($record) => $record->playlist->auto_sort ? 'Playlist auto-sort enabled; disable to change' : 'Group sort order')
-                    ->disabled(fn($record) => $record->playlist->auto_sort)
+                    ->tooltip(fn($record) => $record->playlist->auto_sort ? 'Playlist auto-sort enabled; any changes will be overwritten on next sync' : 'Group sort order')
                     ->toggleable(),
                 TextColumn::make('name_internal')
                     ->label('Default name')
@@ -140,11 +144,11 @@ class GroupResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                SelectFilter::make('playlist')
-                    ->relationship('playlist', 'name')
-                    ->multiple()
-                    ->preload()
-                    ->searchable(),
+                // SelectFilter::make('playlist')
+                //     ->relationship('playlist', 'name')
+                //     ->multiple()
+                //     ->preload()
+                //     ->searchable(),
             ])
             ->recordActions([
                 ActionGroup::make([

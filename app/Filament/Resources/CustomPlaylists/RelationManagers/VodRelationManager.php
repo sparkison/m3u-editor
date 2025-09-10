@@ -26,6 +26,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Database\Eloquent\Model;
 use Filament\Tables\Columns\SpatieTagsColumn;
+use Filament\Tables\Grouping\Group;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\HtmlString;
@@ -129,6 +130,9 @@ class VodRelationManager extends RelationManager
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
+            ->reorderRecordsTriggerAction(function ($action) {
+                return $action->button()->label('Sort');
+            })
             ->modifyQueryUsing(function (Builder $query) {
                 $query->with(['tags', 'epgChannel', 'playlist'])
                     ->withCount(['failovers'])
@@ -136,6 +140,62 @@ class VodRelationManager extends RelationManager
             })
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
+            ->groups([
+                Group::make('playlist_tags')
+                    ->label('Playlist Group')
+                    ->collapsible()
+                    ->getTitleFromRecordUsing(function ($record) use ($ownerRecord) {
+                        $groupName = $record->getCustomGroupName($ownerRecord->uuid);
+                        return $groupName ?: 'Uncategorized';
+                    })
+                    ->getKeyFromRecordUsing(function ($record) use ($ownerRecord) {
+                        $groupName = $record->getCustomGroupName($ownerRecord->uuid);
+                        return $groupName ? strtolower($groupName) : 'uncategorized';
+                    })
+                    ->orderQueryUsing(function (Builder $query, string $direction) use ($ownerRecord) {
+                        // Order by the tag order_column from the tags table
+                        // This controls the order of the groups themselves
+                        return $query
+                            ->leftJoin('taggables as group_taggables', function ($join) {
+                                $join->on('channels.id', '=', 'group_taggables.taggable_id')
+                                    ->where('group_taggables.taggable_type', '=', Channel::class);
+                            })
+                            ->leftJoin('tags as group_tags', function ($join) use ($ownerRecord) {
+                                $join->on('group_taggables.tag_id', '=', 'group_tags.id')
+                                    ->where('group_tags.type', '=', $ownerRecord->uuid);
+                            })
+                            ->orderBy('group_tags.order_column', $direction)
+                            ->orderBy('channels.sort', 'asc') // Secondary sort within groups
+                            ->select('channels.*');
+                    })
+                    ->scopeQueryByKeyUsing(function (Builder $query, string $key) use ($ownerRecord) {
+                        if ($key === 'uncategorized') {
+                            // Show channels without any tags of this type
+                            return $query->whereDoesntHave('tags', function ($tagQuery) use ($ownerRecord) {
+                                $tagQuery->where('type', $ownerRecord->uuid);
+                            });
+                        } else {
+                            // Show channels with the specific tag
+                            return $query->whereHas('tags', function ($tagQuery) use ($key, $ownerRecord) {
+                                $connection = $tagQuery->getConnection();
+                                $driver = $connection->getDriverName();
+
+                                // Build the WHERE clause based on database type
+                                $whereClause = match ($driver) {
+                                    'pgsql' => 'LOWER(tags.name->>\'$\') = ?',
+                                    'mysql' => 'LOWER(JSON_UNQUOTE(JSON_EXTRACT(tags.name, \'$\'))) = ?',
+                                    'sqlite' => 'LOWER(json_extract(tags.name, \'$\')) = ?',
+                                    default => 'LOWER(CAST(tags.name AS TEXT)) = ?'
+                                };
+                                $tagQuery->where('type', $ownerRecord->uuid)
+                                    ->whereRaw($whereClause, [strtolower($key)]);
+                            });
+                        }
+                    }),
+            ])
+            ->defaultGroup('playlist_tags')
+            ->defaultSort('sort', 'asc')
+            ->reorderable('sort')
             ->columns($defaultColumns)
             ->filters([
                 ...VodResource::getTableFilters(showPlaylist: true),
