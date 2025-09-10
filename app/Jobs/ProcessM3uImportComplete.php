@@ -13,7 +13,7 @@ use App\Models\User;
 use App\Services\EpgCacheService;
 use App\Settings\GeneralSettings;
 use Carbon\Carbon;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -168,7 +168,7 @@ class ProcessM3uImportComplete implements ShouldQueue
                         Job::where('batch_no', $this->batchNo)->delete();
 
                         // Notify the user
-                        Notification::make()
+                        FilamentNotification::make()
                             ->danger()
                             ->title('Playlist Sync Invalidated')
                             ->body($message)
@@ -245,7 +245,7 @@ class ProcessM3uImportComplete implements ShouldQueue
                             'user_agent' => $playlist->user_agent
                         ]);
                         $msg = "\"{$playlist->name}\" EPG was created and is syncing now.";
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('EPG found for Playlist')
                             ->body($msg)
@@ -253,7 +253,7 @@ class ProcessM3uImportComplete implements ShouldQueue
                             ->sendToDatabase($playlist->user);
                     } else {
                         $msg = "\"{$playlist->name}\" EPG not found. Playlist was configured to auto-download EPG but no EPG was found using at the following url: \"$epgUrl\"";
-                        Notification::make()
+                        FilamentNotification::make()
                             ->warning()
                             ->title('No EPG found for Playlist')
                             ->body($msg)
@@ -263,7 +263,7 @@ class ProcessM3uImportComplete implements ShouldQueue
                 }
             } catch (\Exception $e) {
                 // Handle any exceptions that occur during EPG creation
-                Notification::make()
+                FilamentNotification::make()
                     ->danger()
                     ->title('EPG Creation Failed')
                     ->body("Failed to create EPG for \"{$playlist->name}\". Error: {$e->getMessage()}")
@@ -286,23 +286,23 @@ class ProcessM3uImportComplete implements ShouldQueue
         // Send notification
         if ($this->maxHit) {
             $limit = config('dev.max_channels');
-            Notification::make()
+            FilamentNotification::make()
                 ->warning()
                 ->title('Playlist Synced with Limit Reached')
                 ->body("\"{$playlist->name}\" has been synced successfully, but the maximum import limit of {$limit} channels was reached.")
                 ->broadcast($playlist->user);
-            Notification::make()
+            FilamentNotification::make()
                 ->warning()
                 ->title('Playlist Synced with Limit Reached')
                 ->body("\"{$playlist->name}\" has been synced successfully, but the maximum import limit of {$limit} channels was reached. Some channels may not have been imported. Import completed in {$completedInRounded} seconds.")
                 ->sendToDatabase($playlist->user);
         } else {
-            Notification::make()
+            FilamentNotification::make()
                 ->success()
                 ->title('Playlist Synced')
                 ->body("\"{$playlist->name}\" has been synced successfully.")
                 ->broadcast($playlist->user);
-            Notification::make()
+            FilamentNotification::make()
                 ->success()
                 ->title('Playlist Synced')
                 ->body("\"{$playlist->name}\" has been synced successfully. Import completed in {$completedInRounded} seconds.")
@@ -330,7 +330,7 @@ class ProcessM3uImportComplete implements ShouldQueue
                 isNew: $this->isNew,
                 batchNo: $this->batchNo,
             ));
-            Notification::make()
+            FilamentNotification::make()
                 ->info()
                 ->title('Fetching Series Metadata')
                 ->body('Fetching series metadata now. This may take a while depending on how many series you have enabled. Please check back later.')
