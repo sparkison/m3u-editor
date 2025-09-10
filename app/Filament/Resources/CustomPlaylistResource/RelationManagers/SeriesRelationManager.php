@@ -177,9 +177,8 @@ class SeriesRelationManager extends RelationManager
                                 return $options;
                             })
                             ->getOptionLabelFromRecordUsing(function ($record) {
-                                $displayTitle = $record->title_custom ?: $record->title;
+                                $displayTitle = $record->name;
                                 $playlistName = $record->getEffectivePlaylist()->name ?? 'Unknown';
-                                $options[$record->id] = "{$displayTitle} [{$playlistName}]";
 
                                 return "{$displayTitle} [{$playlistName}]";
                             }),
