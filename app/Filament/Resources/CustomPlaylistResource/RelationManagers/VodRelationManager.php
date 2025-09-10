@@ -2,23 +2,19 @@
 
 namespace App\Filament\Resources\CustomPlaylistResource\RelationManagers;
 
-use App\Enums\ChannelLogoType;
 use App\Filament\Resources\VodResource;
 use App\Models\Channel;
-use App\Models\ChannelFailover;
 use Filament\Forms;
 use Filament\Forms\Form;
-use Filament\Forms\Get;
 use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
+use Filament\Tables\Columns\SpatieTagsColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Database\Eloquent\Model;
-use Filament\Tables\Columns\SpatieTagsColumn;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Spatie\Tags\Tag;
@@ -28,9 +24,11 @@ class VodRelationManager extends RelationManager
     protected static string $relationship = 'channels';
 
     protected static ?string $label = 'VOD Channels';
+
     protected static ?string $pluralLabel = 'VOD Channels';
 
     protected static ?string $title = 'VOD Channels';
+
     protected static ?string $navigationLabel = 'VOD Channels';
 
     public function isReadOnly(): bool
@@ -67,19 +65,19 @@ class VodRelationManager extends RelationManager
                     switch ($driver) {
                         case 'pgsql':
                             // PostgreSQL uses ->> operator for JSON
-                            $query->whereRaw('LOWER(tags.name->>\'$\') LIKE ?', ['%' . strtolower($search) . '%']);
+                            $query->whereRaw('LOWER(tags.name->>\'$\') LIKE ?', ['%'.strtolower($search).'%']);
                             break;
                         case 'mysql':
                             // MySQL uses JSON_EXTRACT
-                            $query->whereRaw('LOWER(JSON_EXTRACT(tags.name, "$")) LIKE ?', ['%' . strtolower($search) . '%']);
+                            $query->whereRaw('LOWER(JSON_EXTRACT(tags.name, "$")) LIKE ?', ['%'.strtolower($search).'%']);
                             break;
                         case 'sqlite':
                             // SQLite uses json_extract
-                            $query->whereRaw('LOWER(json_extract(tags.name, "$")) LIKE ?', ['%' . strtolower($search) . '%']);
+                            $query->whereRaw('LOWER(json_extract(tags.name, "$")) LIKE ?', ['%'.strtolower($search).'%']);
                             break;
                         default:
                             // Fallback - try to search the JSON as text
-                            $query->where(DB::raw('LOWER(CAST(tags.name AS TEXT))'), 'LIKE', '%' . strtolower($search) . '%');
+                            $query->where(DB::raw('LOWER(CAST(tags.name AS TEXT))'), 'LIKE', '%'.strtolower($search).'%');
                             break;
                     }
                 });
@@ -109,13 +107,33 @@ class VodRelationManager extends RelationManager
                     ->select('channels.*', DB::raw("{$orderByClause} as tag_name_sort"))
                     ->distinct();
             });
-        $defaultColumns = VodResource::getTableColumns(showGroup: true, showPlaylist: true);
+        $defaultColumns = VodResource::getTableColumns(showGroup: true, showPlaylist: false);
 
         // Inject the custom group column after the group column
         array_splice($defaultColumns, 13, 0, [$groupColumn]);
 
-        $defaultColumns[] = Tables\Columns\TextColumn::make('playlist.parent.name')
-            ->label('Parent Playlist')
+        $defaultColumns[] = Tables\Columns\SelectColumn::make('playlist_id')
+            ->label('Playlist')
+            ->options(function (Channel $record) {
+                if (empty($record->source_id)) {
+                    return $record->playlist_id
+                        ? [$record->playlist_id => $record->playlist?->name]
+                        : [];
+                }
+
+                return Channel::query()
+                    ->where('user_id', $record->user_id)
+                    ->where('source_id', $record->source_id)
+                    ->with('playlist')
+                    ->get()
+                    ->unique('playlist_id')
+                    ->mapWithKeys(fn (Channel $channel) => [$channel->playlist_id => $channel->playlist?->name])
+                    ->filter()
+                    ->toArray();
+            })
+            ->formatStateUsing(fn ($state, Channel $record) => VodResource::playlistDisplay($record, 'source_id'))
+            ->tooltip(fn (Channel $record) => VodResource::playlistTooltip($record, 'source_id'))
+            ->searchable()
             ->toggleable()
             ->sortable();
 
@@ -127,7 +145,7 @@ class VodRelationManager extends RelationManager
                 return $action->button()->label('Filters');
             })
             ->modifyQueryUsing(function (Builder $query) {
-                $query->with(['tags', 'epgChannel', 'playlist.parent'])
+                $query->with(['tags', 'epgChannel', 'playlist'])
                     ->withCount(['failovers'])
                     ->where('is_vod', true); // Only show VOD content
             })
@@ -142,7 +160,7 @@ class VodRelationManager extends RelationManager
                         return $ownerRecord->tags()
                             ->where('type', $ownerRecord->uuid)
                             ->get()
-                            ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
+                            ->mapWithKeys(fn ($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
                             ->toArray();
                     })
                     ->query(function (Builder $query, array $data) use ($ownerRecord): Builder {
@@ -168,13 +186,13 @@ class VodRelationManager extends RelationManager
                     ->form(VodResource::getForm(customPlaylist: $ownerRecord))
                     ->modalHeading('New Custom VOD')
                     ->modalDescription('NOTE: Custom VOD need to be associated with a Playlist or Custom Playlist.')
-                    ->using(fn(array $data, string $model): Model => VodResource::createCustomChannel(
+                    ->using(fn (array $data, string $model): Model => VodResource::createCustomChannel(
                         data: $data,
                         model: $model,
                     ))
                     ->slideOver(),
                 Tables\Actions\AttachAction::make()
-                    ->form(fn(Tables\Actions\AttachAction $action): array => [
+                    ->form(fn (Tables\Actions\AttachAction $action): array => [
                         $action
                             ->getRecordSelect()
                             ->getSearchResultsUsing(function (string $search) {
@@ -208,9 +226,10 @@ class VodRelationManager extends RelationManager
                                 $displayTitle = $record->title_custom ?: $record->title;
                                 $playlistName = $record->getEffectivePlaylist()->name ?? 'Unknown';
                                 $options[$record->id] = "{$displayTitle} [{$playlistName}]";
+
                                 return "{$displayTitle} [{$playlistName}]";
-                            })
-                    ])
+                            }),
+                    ]),
             ])
             ->actions([
                 Tables\Actions\DetachAction::make()
