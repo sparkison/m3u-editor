@@ -203,7 +203,7 @@ trait HandlesSourcePlaylist
             $fields[] = Forms\Components\Fieldset::make($label)
                 ->schema([
                     Forms\Components\Select::make("source_playlists.{$groupKey}")
-                        ->label('Which playlist do you want to add from?')
+                        ->label('Which playlist do you want to select from?')
                         ->inlineLabel()
                         ->columnSpanFull()
                         ->options(fn (Get $get) => self::availablePlaylistsForGroup(
@@ -213,6 +213,7 @@ trait HandlesSourcePlaylist
                             $sourceKey
                         )->toArray())
                         ->placeholder('Choose playlist')
+                        ->required()
                         ->searchable()
                         ->live()
                         ->reactive()
@@ -241,7 +242,10 @@ trait HandlesSourcePlaylist
                                 ->action(function (array $formData, Set $set) use ($groupKey) {
                                     $set("source_playlist_items.{$groupKey}", $formData['items'] ?? []);
                                 })
+                                ->disabled(fn (Get $get) => blank($get("source_playlists.{$groupKey}")))
                         ),
+                    Forms\Components\Hidden::make("source_playlist_items.{$groupKey}")
+                        ->default([]),
                 ]);
         }
 

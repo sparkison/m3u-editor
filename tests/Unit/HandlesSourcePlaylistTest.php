@@ -255,6 +255,96 @@ it('filters playlists already used in the custom playlist', function () {
     expect($options->keys()->all())->toEqual([$child->id]);
 });
 
+it('maps records using item-level overrides from the modal', function () {
+    $user = User::factory()->create();
+    auth()->setUser($user);
+
+    $parent = Playlist::factory()->for($user)->create();
+    $child  = Playlist::factory()->for($user)->create(['parent_id' => $parent->id]);
+
+    $gParent = Group::factory()->for($user)->for($parent)->createQuietly();
+    $gChild  = Group::factory()->for($user)->for($child)->createQuietly();
+
+    $src1 = 'src-1';
+    $src2 = 'src-2';
+
+    $parent1 = TestChannel::create([
+        'name'       => 'p1',
+        'enabled'    => true,
+        'shift'      => 0,
+        'user_id'    => $user->id,
+        'playlist_id'=> $parent->id,
+        'group_id'   => $gParent->id,
+        'source_id'  => $src1,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $child1 = TestChannel::create([
+        'name'       => 'c1',
+        'enabled'    => true,
+        'shift'      => 0,
+        'user_id'    => $user->id,
+        'playlist_id'=> $child->id,
+        'group_id'   => $gChild->id,
+        'source_id'  => $src1,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    TestChannel::create([
+        'name'       => 'p2',
+        'enabled'    => true,
+        'shift'      => 0,
+        'user_id'    => $user->id,
+        'playlist_id'=> $parent->id,
+        'group_id'   => $gParent->id,
+        'source_id'  => $src2,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    TestChannel::create([
+        'name'       => 'c2',
+        'enabled'    => true,
+        'shift'      => 0,
+        'user_id'    => $user->id,
+        'playlist_id'=> $child->id,
+        'group_id'   => $gChild->id,
+        'source_id'  => $src2,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $records = TestChannel::where('playlist_id', $parent->id)->get();
+    $sourcePlaylistData = HandlesSourcePlaylistTestClass::data($records, 'channels', 'source_id');
+    [$groups] = $sourcePlaylistData;
+    $groupKey = $groups->keys()->first();
+
+    $data = [
+        'source_playlists' => [
+            $groupKey => $parent->id,
+        ],
+        'source_playlist_items' => [
+            $groupKey => [
+                $src1 => $child->id,
+            ],
+        ],
+    ];
+
+    $mapped = HandlesSourcePlaylistTestClass::map(
+        $records,
+        $data,
+        'channels',
+        'source_id',
+        TestChannel::class,
+        $sourcePlaylistData
+    );
+
+    expect($mapped->pluck('playlist_id', 'source_id')->all())->toEqual([
+        $src1 => $child->id,
+        $src2 => $parent->id,
+    ]);
+    expect($mapped->firstWhere('source_id', $src1)->id)->toBe($child1->id);
+});
+
 it('throws when a playlist outside the group is selected at the group level', function () {
     $user = User::factory()->create();
     auth()->setUser($user);
