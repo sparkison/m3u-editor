@@ -217,6 +217,10 @@ class Playlist extends Model
 
                 if ($playlist->parent) {
                     $playlist->parent->refreshChildPlaylistCache();
+                    $lock = Cache::lock("sync-playlist-{$playlist->parent->id}", 5);
+                    if ($lock->get()) {
+                        SyncPlaylistChildren::dispatch($playlist->parent);
+                    }
                 }
             } elseif ($playlist->parent) {
                 $playlist->parent->refreshChildPlaylistCache();
