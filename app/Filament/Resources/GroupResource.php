@@ -7,22 +7,24 @@ use App\Filament\Resources\GroupResource\RelationManagers;
 use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Models\Playlist;
-use App\Jobs\SyncPlaylistChildren;
+use App\Filament\Concerns\DisplaysPlaylistMembership;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
-use Filament\Notifications\Notification;
-use Filament\Resources\Resource;
+use Filament\Notifications\Notification as FilamentNotification;
+use Filament\Resources\Resource as FilamentResource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
-class GroupResource extends Resource
+class GroupResource extends FilamentResource
 {
+    use DisplaysPlaylistMembership;
+    use \App\Filament\BulkActions\HandlesSourcePlaylist;
     protected static ?string $model = Group::class;
 
     protected static ?string $recordTitleAttribute = 'name';
@@ -104,7 +106,9 @@ class GroupResource extends Resource
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('playlist.name')
-                    ->numeric()
+                    ->label('Playlist')
+                    ->formatStateUsing(fn($state, Group $record) => self::playlistDisplay($record, 'name_internal'))
+                    ->tooltip(fn(Group $record) => self::playlistTooltip($record, 'name_internal'))
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\IconColumn::make('is_custom')
@@ -173,7 +177,7 @@ class GroupResource extends Resource
                                 $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Group channels added to custom playlist')
                                 ->body('The groups channels have been added to the chosen custom playlist.')
@@ -201,9 +205,9 @@ class GroupResource extends Resource
                                 'group' => $group->name,
                                 'group_id' => $group->id,
                             ]);
-                            SyncPlaylistChildren::debounce($record->playlist, []);
+                            \App\Jobs\SyncPlaylistChildren::debounce($record->playlist, []);
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Channels moved to group')
                                 ->body('The group channels have been moved to the chosen group.')
@@ -221,9 +225,9 @@ class GroupResource extends Resource
                             $record->channels()->update([
                                 'enabled' => true,
                             ]);
-                            SyncPlaylistChildren::debounce($record->playlist, []);
+                            \App\Jobs\SyncPlaylistChildren::debounce($record->playlist, []);
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Group channels enabled')
                                 ->body('The group channels have been enabled.')
@@ -241,9 +245,9 @@ class GroupResource extends Resource
                             $record->channels()->update([
                                 'enabled' => false,
                             ]);
-                            SyncPlaylistChildren::debounce($record->playlist, []);
+                            \App\Jobs\SyncPlaylistChildren::debounce($record->playlist, []);
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Group channels disabled')
                                 ->body('The groups channels have been disabled.')
@@ -259,61 +263,10 @@ class GroupResource extends Resource
                     Tables\Actions\DeleteAction::make()
                         ->hidden(fn($record) => !$record->is_custom),
                 ])->button()->hiddenLabel()->size('sm'),
-            ], position: Tables\Enums\ActionsPosition::BeforeCells)
+            ], Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\BulkAction::make('add')
-                        ->label('Add to Custom Playlist')
-                        ->form([
-                            Forms\Components\Select::make('playlist')
-                                ->required()
-                                ->live()
-                                ->label('Custom Playlist')
-                                ->helperText('Select the custom playlist you would like to add the selected group channel(s) to.')
-                                ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                                ->afterStateUpdated(function (Forms\Set $set, $state) {
-                                    if ($state) {
-                                        $set('category', null);
-                                    }
-                                })
-                                ->searchable(),
-                            Forms\Components\Select::make('category')
-                                ->label('Custom Group')
-                                ->disabled(fn(Get $get) => !$get('playlist'))
-                                ->helperText(fn(Get $get) => !$get('playlist') ? 'Select a custom playlist first.' : 'Select the group you would like to assign to the selected channel(s) to.')
-                                ->options(function ($get) {
-                                    $customList = CustomPlaylist::find($get('playlist'));
-                                    return $customList ? $customList->tags()
-                                        ->where('type', $customList->uuid)
-                                        ->get()
-                                        ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
-                                        ->toArray() : [];
-                                })
-                                ->searchable(),
-                        ])
-                        ->action(function (Collection $records, array $data): void {
-                            $playlist = CustomPlaylist::findOrFail($data['playlist']);
-                            foreach ($records as $record) {
-                                // Sync the channels to the custom playlist
-                                // This will add the channels to the playlist without detaching existing ones
-                                // Prevents duplicates in the playlist
-                                $playlist->channels()->syncWithoutDetaching($record->channels()->pluck('id'));
-                                if ($data['category']) {
-                                    $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
-                                }
-                            }
-                        })->after(function () {
-                            Notification::make()
-                                ->success()
-                                ->title('Group channels added to custom playlist')
-                                ->body('The groups channels have been added to the chosen custom playlist.')
-                                ->send();
-                        })
-                        ->requiresConfirmation()
-                        ->icon('heroicon-o-play')
-                        ->modalIcon('heroicon-o-play')
-                        ->modalDescription('Add the group channels to the chosen custom playlist.')
-                        ->modalSubmitActionLabel('Add now'),
+                    self::addToCustomPlaylistAction(),
                     Tables\Actions\BulkAction::make('move')
                         ->label('Move Channels to Group')
                         ->form([
@@ -337,10 +290,8 @@ class GroupResource extends Resource
                             $group = Group::findOrFail($data['group']);
                             foreach ($records as $record) {
                                 // Update the channels to the new group
-                                // This will change the group and group_id for the channels in the database
-                                // to reflect the new group
                                 if ($group->playlist_id !== $record->playlist_id) {
-                                    Notification::make()
+                                    FilamentNotification::make()
                                         ->warning()
                                         ->title('Warning')
                                         ->body("Cannot move \"{$group->name}\" to \"{$record->name}\" as they belong to different playlists.")
@@ -352,10 +303,10 @@ class GroupResource extends Resource
                                     'group' => $group->name,
                                     'group_id' => $group->id,
                                 ]);
-                                SyncPlaylistChildren::debounce($record->playlist, []);
+                                \App\Jobs\SyncPlaylistChildren::debounce($record->playlist, []);
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Channels moved to group')
                                 ->body('The group channels have been moved to the chosen group.')
@@ -366,17 +317,17 @@ class GroupResource extends Resource
                         ->modalIcon('heroicon-o-arrows-right-left')
                         ->modalDescription('Move the group channels to the another group.')
                         ->modalSubmitActionLabel('Move now'),
-                    Tables\Actions\BulkAction::make('enable')
-                        ->label('Enable group channels')
-                        ->action(function (Collection $records): void {
+                Tables\Actions\BulkAction::make('enable')
+                    ->label('Enable group channels')
+                    ->action(function (Collection $records): void {
                             foreach ($records as $record) {
                                 $record->channels()->update([
                                     'enabled' => true,
                                 ]);
-                                SyncPlaylistChildren::debounce($record->playlist, []);
+                                \App\Jobs\SyncPlaylistChildren::debounce($record->playlist, []);
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Selected group channels enabled')
                                 ->body('The selected group channels have been enabled.')
@@ -396,10 +347,10 @@ class GroupResource extends Resource
                                 $record->channels()->update([
                                     'enabled' => false,
                                 ]);
-                                SyncPlaylistChildren::debounce($record->playlist, []);
+                                \App\Jobs\SyncPlaylistChildren::debounce($record->playlist, []);
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Selected group channels disabled')
                                 ->body('The selected groups channels have been disabled.')
@@ -414,6 +365,83 @@ class GroupResource extends Resource
                         ->modalSubmitActionLabel('Yes, disable now')
                 ]),
             ]);
+    }
+
+    protected static function addToCustomPlaylistAction(): Tables\Actions\BulkAction
+    {
+        $sourcePlaylistData = null;
+
+        return Tables\Actions\BulkAction::make('add')
+            ->label('Add to Custom Playlist')
+            ->form(function (Collection $records) use (&$sourcePlaylistData): array {
+                $form = [
+                    Forms\Components\Select::make('playlist')
+                        ->required()
+                        ->live()
+                        ->label('Custom Playlist')
+                        ->helperText('Select the custom playlist you would like to add the selected group channel(s) to.')
+                        ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                        ->afterStateUpdated(fn (Forms\Set $set, $state) => $state ? $set('category', null) : null)
+                        ->searchable(),
+                    Forms\Components\Select::make('category')
+                        ->label('Custom Group')
+                        ->disabled(fn (Get $get) => ! $get('playlist'))
+                        ->helperText(fn (Get $get) => ! $get('playlist')
+                            ? 'Select a custom playlist first.'
+                            : 'Select the group you would like to assign to the selected channel(s) to.')
+                        ->options(function ($get) {
+                            $customList = CustomPlaylist::find($get('playlist'));
+                            return $customList ? $customList->tags()
+                                ->where('type', $customList->uuid)
+                                ->get()
+                                ->mapWithKeys(fn ($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
+                                ->toArray() : [];
+                        })
+                        ->searchable(),
+                ];
+
+                return array_merge(
+                    $form,
+                    self::buildSourcePlaylistForm(
+                        $records,
+                        'groups',
+                        'name_internal',
+                        'group(s)',
+                        Group::class,
+                        $sourcePlaylistData
+                    )
+                );
+            })
+            ->action(function (Collection $records, array $data) use (&$sourcePlaylistData): void {
+                $records = self::mapRecordsToSourcePlaylist(
+                    $records,
+                    $data,
+                    'groups',
+                    'name_internal',
+                    Group::class,
+                    $sourcePlaylistData
+                );
+
+                $playlist = CustomPlaylist::findOrFail($data['playlist']);
+                foreach ($records as $record) {
+                    $playlist->channels()->syncWithoutDetaching($record->channels()->pluck('id'));
+                    if ($data['category']) {
+                        $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
+                    }
+                }
+            })
+            ->after(function () {
+                FilamentNotification::make()
+                    ->success()
+                    ->title('Group channels added to custom playlist')
+                    ->body('The groups channels have been added to the chosen custom playlist.')
+                    ->send();
+            })
+            ->requiresConfirmation()
+            ->icon('heroicon-o-play')
+            ->modalIcon('heroicon-o-play')
+            ->modalDescription('Add the group channels to the chosen custom playlist.')
+            ->modalSubmitActionLabel('Add now');
     }
 
     public static function getRelations(): array

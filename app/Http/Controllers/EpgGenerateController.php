@@ -12,7 +12,7 @@ use App\Models\MergedPlaylist;
 use App\Models\Playlist;
 use App\Services\EpgCacheService;
 use Carbon\Carbon;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -534,12 +534,12 @@ class EpgGenerateController extends Controller
         if (!$filePath) {
             // Send notification
             $error = "Invalid EPG file. Unable to read or download an associated EPG file. Please check the URL or uploaded file and try again.";
-            Notification::make()
+            FilamentNotification::make()
                 ->danger()
                 ->title("Error generating epg data for playlist \"{$playlist->name}\" using EPG \"{$epg->name}\"")
                 ->body($error)
                 ->broadcast($epg->user);
-            Notification::make()
+            FilamentNotification::make()
                 ->danger()
                 ->title("Error generating epg data for playlist \"{$playlist->name}\" using EPG \"{$epg->name}\"")
                 ->body($error)
