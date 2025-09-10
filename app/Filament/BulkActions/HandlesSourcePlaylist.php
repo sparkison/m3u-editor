@@ -191,6 +191,11 @@ trait HandlesSourcePlaylist
 
         $fields = [];
 
+        $sourceLabels = $records
+            ->mapWithKeys(fn ($record) => [
+                $record->$sourceKey => $record->title ?? $record->name ?? $record->$sourceKey,
+            ]);
+
         foreach ($duplicateGroups as $groupKey => $group) {
             $parentName = $group['playlists'][$group['parent_id']];
             $childNames = $group['playlists']->except($group['parent_id'])->values()->implode(', ');
@@ -203,7 +208,7 @@ trait HandlesSourcePlaylist
                     $relation,
                     $sourceKey
                 )->isNotEmpty())
-                ->schema(function (Get $get) use ($group, $groupKey, $relation, $sourceKey) {
+                ->schema(function (Get $get) use ($group, $groupKey, $relation, $sourceKey, $sourceLabels) {
                     $available = self::availablePlaylistsForGroup(
                         $get('playlist'),
                         $group,
@@ -228,13 +233,14 @@ trait HandlesSourcePlaylist
                         Actions::make([
                             Action::make("items_{$groupKey}")
                                 ->label('View Affected Items')
-                                ->form(function (Get $get) use ($group, $groupKey, $options) {
+                                ->form(function (Get $get) use ($group, $groupKey, $options, $sourceLabels) {
                                     $existing = $get("source_playlist_items.{$groupKey}") ?? [];
                                     $default = $get("source_playlists.{$groupKey}");
 
-                                    return collect($group['source_ids'])->map(function ($sourceId) use ($existing, $default, $options) {
+                                    return collect($group['source_ids'])->map(function ($sourceId) use ($existing, $default, $options, $sourceLabels) {
                                         return Forms\Components\Select::make("items.{$sourceId}")
-                                            ->label((string) $sourceId)
+                                            ->label($sourceLabels[$sourceId] ?? (string) $sourceId)
+                                            ->inlineLabel()
                                             ->options($options)
                                             ->placeholder('Choose playlist')
                                             ->default($existing[$sourceId] ?? $default)
