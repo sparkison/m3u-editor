@@ -232,7 +232,9 @@ trait HandlesSourcePlaylist
                                 ->color('primary')
                                 ->button()
                                 ->extraAttributes(['class' => 'whitespace-nowrap'])
-                                ->arguments(fn (Get $get) => ['playlist' => $get('playlist')])
+                                ->arguments([
+                                    'playlist' => fn (Get $get) => $get('playlist'),
+                                ])
                                 ->form(function (Get $get, array $arguments) use ($group, $groupKey, $relation, $sourceKey, $labels) {
                                     $existing = $get("source_playlist_items.{$groupKey}") ?? [];
                                     $default = $get("source_playlists.{$groupKey}");
