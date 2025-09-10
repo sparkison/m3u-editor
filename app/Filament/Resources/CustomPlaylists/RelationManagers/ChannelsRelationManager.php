@@ -182,13 +182,25 @@ class ChannelsRelationManager extends RelationManager
                         } else {
                             // Show channels with the specific tag
                             return $query->whereHas('tags', function ($tagQuery) use ($key, $ownerRecord) {
+                                $connection = $tagQuery->getConnection();
+                                $driver = $connection->getDriverName();
+
+                                // Build the WHERE clause based on database type
+                                $whereClause = match ($driver) {
+                                    'pgsql' => 'LOWER(tags.name->>\'$\') = ?',
+                                    'mysql' => 'LOWER(JSON_UNQUOTE(JSON_EXTRACT(tags.name, \'$\'))) = ?',
+                                    'sqlite' => 'LOWER(json_extract(tags.name, \'$\')) = ?',
+                                    default => 'LOWER(CAST(tags.name AS TEXT)) = ?'
+                                };
                                 $tagQuery->where('type', $ownerRecord->uuid)
-                                    ->whereRaw('LOWER(tags.name->>\'$\') = ?', [strtolower($key)]);
+                                    ->whereRaw($whereClause, [strtolower($key)]);
                             });
                         }
                     }),
             ])
             ->defaultGroup('custom_group_name')
+            // ->defaultSort('tags.order_column', 'asc')
+            ->reorderable('sort')
             ->columns($defaultColumns)
             ->filters([
                 ...ChannelResource::getTableFilters(showPlaylist: true),
