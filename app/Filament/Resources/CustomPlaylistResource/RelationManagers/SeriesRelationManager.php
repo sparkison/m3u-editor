@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\CustomPlaylistResource\RelationManagers;
 
 use App\Filament\Resources\SeriesResource;
-use App\Filament\Concerns\DisplaysPlaylistMembership;
+use App\Filament\BulkActions\HandlesSourcePlaylist;
 use App\Models\Series;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -12,6 +12,7 @@ use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Columns\SpatieTagsColumn;
+use Filament\Tables\Columns\SelectColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -21,7 +22,7 @@ use Spatie\Tags\Tag;
 
 class SeriesRelationManager extends RelationManager
 {
-    use DisplaysPlaylistMembership;
+    use HandlesSourcePlaylist;
     protected static string $relationship = 'series';
 
     public function isReadOnly(): bool
@@ -105,13 +106,12 @@ class SeriesRelationManager extends RelationManager
         // Inject the custom group column after the group column
         array_splice($defaultColumns, 6, 0, [$groupColumn]);
 
-        $defaultColumns[] = Tables\Columns\TextColumn::make('playlist.name')
+        $defaultColumns[] = SelectColumn::make('playlist_id')
             ->label('Parent Playlist')
-            ->formatStateUsing(function ($state, Series $record) {
-                $display = self::playlistDisplay($record, 'source_series_id');
-                return $display !== '' ? $display : ($record->playlist?->name ?? $state);
-            })
-            ->tooltip(fn (Series $record) => self::playlistTooltip($record, 'source_series_id'))
+            ->options(fn (Series $record) => $this->playlistOptions($record))
+            ->disabled(fn (Series $record) => count($this->playlistOptions($record)) <= 1)
+            ->updateStateUsing(fn (Series $record, $state) => $record->playlist_id)
+            ->afterStateUpdated(fn ($state, Series $record) => $this->changeSourcePlaylist($record, (int) $state))
             ->toggleable()
             ->sortable();
 
@@ -237,7 +237,51 @@ class SeriesRelationManager extends RelationManager
                     ->icon('heroicon-o-squares-plus')
                     ->modalIcon('heroicon-o-squares-plus')
                     ->modalDescription('Add to category')
-                    ->modalSubmitActionLabel('Yes, add to category'),
+            ->modalSubmitActionLabel('Yes, add to category'),
             ]);
+    }
+
+    protected function playlistOptions(Series $record): array
+    {
+        [$groups] = self::getSourcePlaylistData(collect([$record]), 'series', 'source_series_id');
+
+        if ($groups->isEmpty()) {
+            return [$record->playlist_id => $record->playlist?->name];
+        }
+
+        $group = $groups->first();
+        $options = self::availablePlaylistsForGroup($this->ownerRecord->id, $group, 'series', 'source_series_id');
+
+        return $options->put($record->playlist_id, $record->playlist?->name)->toArray();
+    }
+
+    protected function changeSourcePlaylist(Series $record, int $playlistId): void
+    {
+        if ($playlistId === $record->playlist_id) {
+            return;
+        }
+
+        $replacement = Series::where('playlist_id', $playlistId)
+            ->where('source_series_id', $record->source_series_id)
+            ->first();
+
+        if (! $replacement) {
+            FilamentNotification::make()
+                ->title('Series not found in selected playlist')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->ownerRecord->series()->detach($record->id);
+        $this->ownerRecord->series()->attach($replacement->id);
+
+        FilamentNotification::make()
+            ->title('Parent playlist updated')
+            ->success()
+            ->send();
+
+        $this->dispatch('refresh');
     }
 }
