@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use Exception;
 use App\Enums\ChannelLogoType;
 use App\Facades\ProxyFacade;
 use App\Services\XtreamService;
+use Exception;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,8 +14,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use Symfony\Component\Process\Process as SymfonyProcess;
 use Spatie\Tags\HasTags;
+use Symfony\Component\Process\Process as SymfonyProcess;
 
 class Channel extends Model
 {
@@ -105,13 +105,11 @@ class Channel extends Model
 
     /**
      * Check if the channel has metadata.
-     * 
-     * @return bool
      */
     public function getHasMetadataAttribute(): bool
     {
         // Check if the channel has metadata (info or movie_data)
-        return !empty($this->info) || !empty($this->movie_data);
+        return ! empty($this->info) || ! empty($this->movie_data);
     }
 
     /**
@@ -122,6 +120,7 @@ class Channel extends Model
     public function getProxyUrlAttribute(): string
     {
         $effectivePlaylist = $this->getEffectivePlaylist();
+
         return ProxyFacade::getProxyUrlForChannel(
             $this->id,
             $effectivePlaylist->proxy_options['output'] ?? 'ts'
@@ -161,6 +160,7 @@ class Channel extends Model
             );
             if ($hasErrors) {
                 Log::error("Error running ffprobe for channel \"{$this->title}\": {$errors}");
+
                 return [];
             }
             $json = json_decode($output, true);
@@ -187,43 +187,60 @@ class Channel extends Model
 
                 // Cache the result for 5 minutes
                 Cache::put("channel_stream_stats_{$this->id}", $streamStats, now()->addMinutes(5));
+
                 return $streamStats;
             }
         } catch (Exception $e) {
             Log::error("Error running ffprobe for channel \"{$this->title}\": {$e->getMessage()}");
         }
+
         return [];
     }
 
     public function fetchMetadata($xtream = null)
     {
         try {
-            if (!$xtream) {
+            if (! $xtream) {
                 $playlist = $this->playlist;
                 $xtream = XtreamService::make($playlist);
             }
-            if (!$xtream) {
+            if (! $xtream) {
                 Notification::make()
                     ->danger()
                     ->title('VOD metadata sync failed')
                     ->body('Unable to connect to Xtream API provider to get VOD info, unable to fetch metadata.')
                     ->broadcast($playlist->user)
                     ->sendToDatabase($playlist->user);
+
                 return;
             }
-            if (!$this->is_vod) {
+            if (! $this->is_vod) {
                 return false;
             }
             $movieData = $xtream->getVodInfo($this->source_id);
             $this->update([
                 'info' => $movieData['info'] ?? null,
                 'movie_data' => $movieData['movie_data'] ?? null,
-                'last_metadata_fetch' => now()
+                'last_metadata_fetch' => now(),
             ]);
+
             return true;
         } catch (\Exception $e) {
             Log::error('Failed to fetch metadata for VOD ' . $this->id, ['exception' => $e]);
         }
+
         return false;
+    }
+
+    /**
+     * Get the custom group name for a specific custom playlist
+     */
+    public function getCustomGroupName(string $customPlaylistUuid): string
+    {
+        $tag = $this->tags()
+            ->where('type', $customPlaylistUuid)
+            ->first();
+
+        return $tag ? $tag->getAttributeValue('name') : 'Uncategorized';
     }
 }

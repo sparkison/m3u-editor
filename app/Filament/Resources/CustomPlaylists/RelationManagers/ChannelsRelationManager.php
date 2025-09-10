@@ -2,33 +2,29 @@
 
 namespace App\Filament\Resources\CustomPlaylists\RelationManagers;
 
-use Filament\Schemas\Schema;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Actions\CreateAction;
-use Filament\Actions\AttachAction;
-use Filament\Actions\DetachAction;
-use Filament\Tables\Enums\RecordActionsPosition;
-use Filament\Actions\DetachBulkAction;
-use Filament\Actions\BulkAction;
-use Filament\Forms\Components\Select;
-use App\Enums\ChannelLogoType;
 use App\Filament\Resources\Channels\ChannelResource;
 use App\Models\Channel;
-use App\Models\ChannelFailover;
+use Filament\Actions\AttachAction;
+use Filament\Actions\BulkAction;
+use Filament\Actions\CreateAction;
+use Filament\Actions\DetachAction;
+use Filament\Actions\DetachBulkAction;
 use Filament\Forms;
-use Filament\Forms\Get;
+use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Schemas\Schema;
 use Filament\Tables;
+use Filament\Tables\Columns\SpatieTagsColumn;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Database\Eloquent\Model;
-use Filament\Tables\Columns\SpatieTagsColumn;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\HtmlString;
 use Spatie\Tags\Tag;
 
 class ChannelsRelationManager extends RelationManager
@@ -36,9 +32,11 @@ class ChannelsRelationManager extends RelationManager
     protected static string $relationship = 'channels';
 
     protected static ?string $label = 'Live Channels';
+
     protected static ?string $pluralLabel = 'Live Channels';
 
     protected static ?string $title = 'Live Channels';
+
     protected static ?string $navigationLabel = 'Live Channels';
 
     public function isReadOnly(): bool
@@ -129,13 +127,67 @@ class ChannelsRelationManager extends RelationManager
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
-            ->modifyQueryUsing(function (Builder $query) {
-                $query->with(['tags', 'epgChannel', 'playlist'])
+            ->modifyQueryUsing(function (Builder $query) use ($ownerRecord) {
+                $query->with(['tags' => function ($tagQuery) use ($ownerRecord) {
+                    $tagQuery->where('type', $ownerRecord->uuid);
+                }, 'epgChannel', 'playlist'])
                     ->withCount(['failovers'])
                     ->where('is_vod', false); // Only show live channels
             })
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
+            ->groups([
+                Group::make('custom_group_name')
+                    ->label('Custom Group')
+                    ->collapsible()
+                    ->getTitleFromRecordUsing(function ($record) use ($ownerRecord) {
+                        return $record->getCustomGroupName($ownerRecord->uuid);
+                    })
+                    ->getKeyFromRecordUsing(function ($record) use ($ownerRecord) {
+                        return strtolower($record->getCustomGroupName($ownerRecord->uuid));
+                    })
+                    ->orderQueryUsing(function (Builder $query, string $direction) use ($ownerRecord) {
+                        $connection = $query->getConnection();
+                        $driver = $connection->getDriverName();
+
+                        // Build the ORDER BY clause based on database type
+                        $orderByClause = match ($driver) {
+                            'pgsql' => 'COALESCE(tags.name->>\'$\', \'Uncategorized\')',
+                            'mysql' => 'COALESCE(JSON_EXTRACT(tags.name, "$"), "Uncategorized")',
+                            'sqlite' => 'COALESCE(json_extract(tags.name, "$"), "Uncategorized")',
+                            default => 'COALESCE(CAST(tags.name AS TEXT), "Uncategorized")'
+                        };
+
+                        return $query
+                            ->leftJoin('taggables as group_taggables', function ($join) {
+                                $join->on('channels.id', '=', 'group_taggables.taggable_id')
+                                    ->where('group_taggables.taggable_type', '=', Channel::class);
+                            })
+                            ->leftJoin('tags', function ($join) use ($ownerRecord) {
+                                $join->on('group_taggables.tag_id', '=', 'tags.id')
+                                    ->where('tags.type', '=', $ownerRecord->uuid);
+                            })
+                            ->orderByRaw("{$orderByClause} {$direction}")
+                            ->select('channels.*', DB::raw("{$orderByClause} as group_sort_field"))
+                            ->distinct();
+                    })
+                    ->scopeQueryByKeyUsing(function (Builder $query, string $key) use ($ownerRecord) {
+                        if ($key === 'uncategorized') {
+                            // Show channels without any tags of this type
+                            return $query->whereDoesntHave('tags', function ($tagQuery) use ($ownerRecord) {
+                                $tagQuery->where('type', $ownerRecord->uuid);
+                            });
+                        } else {
+                            // Show channels with the specific tag
+                            return $query->whereHas('tags', function ($tagQuery) use ($key, $ownerRecord) {
+                                $tagQuery->where('type', $ownerRecord->uuid)
+                                    ->whereRaw('LOWER(tags.name->>\'$\') = ?', [strtolower($key)]);
+                            });
+                        }
+                    }),
+                'group'
+            ])
+            ->defaultGroup('custom_group_name')
             ->columns($defaultColumns)
             ->filters([
                 ...ChannelResource::getTableFilters(showPlaylist: true),
@@ -211,9 +263,10 @@ class ChannelsRelationManager extends RelationManager
                                 $displayTitle = $record->title_custom ?: $record->title;
                                 $playlistName = $record->getEffectivePlaylist()->name ?? 'Unknown';
                                 $options[$record->id] = "{$displayTitle} [{$playlistName}]";
+
                                 return "{$displayTitle} [{$playlistName}]";
-                            })
-                    ])
+                            }),
+                    ]),
 
                 // Advanced attach when adding pivot values:
                 // Tables\Actions\AttachAction::make()->schema(fn(Tables\Actions\AttachAction $action): array => [
@@ -245,7 +298,7 @@ class ChannelsRelationManager extends RelationManager
                                     ->get()
                                     ->map(fn($name) => [
                                         'id' => $name->getAttributeValue('name'),
-                                        'name' => $name->getAttributeValue('name')
+                                        'name' => $name->getAttributeValue('name'),
                                     ])->pluck('id', 'name')
                             )->required(),
                     ])
