@@ -24,7 +24,6 @@ use Spatie\Tags\Tag;
 class ChannelsRelationManager extends RelationManager
 {
     use HandlesSourcePlaylist;
-
     protected static string $relationship = 'channels';
 
     protected static ?string $label = 'Live Channels';

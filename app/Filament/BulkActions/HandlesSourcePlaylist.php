@@ -204,7 +204,6 @@ trait HandlesSourcePlaylist
                 ->schema([
                     Forms\Components\Select::make("source_playlists.{$groupKey}")
                         ->label('Which playlist do you want to select from?')
-                        ->inlineLabel()
                         ->columnSpanFull()
                         ->options(fn (Get $get) => self::availablePlaylistsForGroup(
                             $get('playlist'),
