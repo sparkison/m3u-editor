@@ -16,9 +16,13 @@ class Episode extends Model
 
     protected function playlistSyncChanges(): array
     {
-        $source = $this->source_episode_id ?? 'ep-'.$this->id;
+        $current = $this->source_episode_id ?? 'ep-' . $this->id;
+        $original = $this->getOriginal('source_episode_id') ?? 'ep-' . $this->id;
 
-        return ['episodes' => [$source]];
+        return ['episodes' => array_unique(array_filter([
+            $current,
+            $original,
+        ]))];
     }
 
     /**
@@ -30,7 +34,7 @@ class Episode extends Model
         'id' => 'integer',
         'new' => 'boolean',
         'enabled' => 'boolean',
-        'source_episode_id' => 'integer',
+        'source_episode_id' => 'string',
         'user_id' => 'integer',
         'playlist_id' => 'integer',
         'series_id' => 'integer',
