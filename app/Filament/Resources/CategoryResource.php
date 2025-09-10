@@ -6,6 +6,7 @@ use App\Filament\Resources\CategoryResource\Pages;
 use App\Filament\Resources\CategoryResource\RelationManagers;
 use App\Models\Category;
 use App\Models\CustomPlaylist;
+use App\Models\Series;
 use App\Filament\Concerns\DisplaysPlaylistMembership;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -120,36 +121,67 @@ class CategoryResource extends FilamentResource
                     Tables\Actions\ViewAction::make(),
                     Tables\Actions\Action::make('add')
                         ->label('Add to Custom Playlist')
-                        ->form([
-                            Forms\Components\Select::make('playlist')
-                                ->required()
-                                ->live()
-                                ->label('Custom Playlist')
-                                ->helperText('Select the custom playlist you would like to add the selected series to.')
-                                ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                                ->afterStateUpdated(function (Forms\Set $set, $state) {
-                                    if ($state) {
-                                        $set('category', null);
-                                    }
-                                })
-                                ->searchable(),
-                            Forms\Components\Select::make('category')
-                                ->label('Custom Category')
-                                ->disabled(fn(Get $get) => !$get('playlist'))
-                                ->helperText(fn(Get $get) => !$get('playlist') ? 'Select a custom playlist first.' : 'Select the category you would like to assign to the selected series to.')
-                                ->options(function ($get) {
-                                    $customList = CustomPlaylist::find($get('playlist'));
-                                    return $customList ? $customList->tags()
-                                        ->where('type', $customList->uuid . '-category')
-                                        ->get()
-                                        ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
-                                        ->toArray() : [];
-                                })
-                                ->searchable(),
-                        ])
-                        ->action(function ($record, array $data): void {
+                        ->form(function (Category $record) use (&$sourcePlaylistData) {
+                            $seriesRecords = $record->series()
+                                ->select('id', 'playlist_id', 'source_series_id', 'title', 'name')
+                                ->get();
+
+                            $form = [
+                                Forms\Components\Select::make('playlist')
+                                    ->required()
+                                    ->live()
+                                    ->label('Custom Playlist')
+                                    ->helperText('Select the custom playlist you would like to add the selected series to.')
+                                    ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                                    ->afterStateUpdated(fn (Forms\Set $set, $state) => $state ? $set('category', null) : null)
+                                    ->searchable(),
+                                Forms\Components\Select::make('category')
+                                    ->label('Custom Category')
+                                    ->disabled(fn (Get $get) => ! $get('playlist'))
+                                    ->helperText(fn (Get $get) => ! $get('playlist')
+                                        ? 'Select a custom playlist first.'
+                                        : 'Select the category you would like to assign to the selected series to.')
+                                    ->options(function ($get) {
+                                        $customList = CustomPlaylist::find($get('playlist'));
+                                        return $customList ? $customList->tags()
+                                            ->where('type', $customList->uuid . '-category')
+                                            ->get()
+                                            ->mapWithKeys(fn ($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
+                                            ->toArray() : [];
+                                    })
+                                    ->searchable(),
+                            ];
+
+                            $form = array_merge(
+                                $form,
+                                self::buildSourcePlaylistForm(
+                                    $seriesRecords,
+                                    'series',
+                                    'source_series_id',
+                                    'series',
+                                    Series::class,
+                                    $sourcePlaylistData
+                                )
+                            );
+
+                            return $form;
+                        })
+                        ->action(function (Category $record, array $data) use (&$sourcePlaylistData): void {
+                            $seriesRecords = $record->series()
+                                ->select('id', 'playlist_id', 'source_series_id', 'title', 'name')
+                                ->get();
+
+                            $seriesRecords = self::mapRecordsToSourcePlaylist(
+                                $seriesRecords,
+                                $data,
+                                'series',
+                                'source_series_id',
+                                Series::class,
+                                $sourcePlaylistData
+                            );
+
                             $playlist = CustomPlaylist::findOrFail($data['playlist']);
-                            $playlist->series()->syncWithoutDetaching($record->series()->pluck('id'));
+                            $playlist->series()->syncWithoutDetaching($seriesRecords->pluck('id'));
                             if ($data['category']) {
                                 $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
                             }
@@ -283,43 +315,69 @@ class CategoryResource extends FilamentResource
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\BulkAction::make('add')
                         ->label('Add to Custom Playlist')
-                        ->form([
-                            Forms\Components\Select::make('playlist')
-                                ->required()
-                                ->live()
-                                ->label('Custom Playlist')
-                                ->helperText('Select the custom playlist you would like to add the selected category series to.')
-                                ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                                ->afterStateUpdated(function (Forms\Set $set, $state) {
-                                    if ($state) {
-                                        $set('category', null);
-                                    }
-                                })
-                                ->searchable(),
-                            Forms\Components\Select::make('category')
-                                ->label('Custom Category')
-                                ->disabled(fn(Get $get) => !$get('playlist'))
-                                ->helperText(fn(Get $get) => !$get('playlist') ? 'Select a custom playlist first.' : 'Select the category you would like to assign to the selected series to.')
-                                ->options(function ($get) {
-                                    $customList = CustomPlaylist::find($get('playlist'));
-                                    return $customList ? $customList->tags()
-                                        ->where('type', $customList->uuid . '-category')
-                                        ->get()
-                                        ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
-                                        ->toArray() : [];
-                                })
-                                ->searchable(),
-                        ])
-                        ->action(function (Collection $records, array $data): void {
+                        ->form(function (Collection $records) use (&$sourcePlaylistData) {
+                            $seriesRecords = Series::query()
+                                ->whereIn('category_id', $records->pluck('id'))
+                                ->select('id', 'playlist_id', 'source_series_id', 'title', 'name')
+                                ->get();
+
+                            $form = [
+                                Forms\Components\Select::make('playlist')
+                                    ->required()
+                                    ->live()
+                                    ->label('Custom Playlist')
+                                    ->helperText('Select the custom playlist you would like to add the selected category series to.')
+                                    ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                                    ->afterStateUpdated(fn (Forms\Set $set, $state) => $state ? $set('category', null) : null)
+                                    ->searchable(),
+                                Forms\Components\Select::make('category')
+                                    ->label('Custom Category')
+                                    ->disabled(fn (Get $get) => ! $get('playlist'))
+                                    ->helperText(fn (Get $get) => ! $get('playlist') ? 'Select a custom playlist first.' : 'Select the category you would like to assign to the selected series to.')
+                                    ->options(function ($get) {
+                                        $customList = CustomPlaylist::find($get('playlist'));
+                                        return $customList ? $customList->tags()
+                                            ->where('type', $customList->uuid . '-category')
+                                            ->get()
+                                            ->mapWithKeys(fn ($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
+                                            ->toArray() : [];
+                                    })
+                                    ->searchable(),
+                            ];
+
+                            $form = array_merge(
+                                $form,
+                                self::buildSourcePlaylistForm(
+                                    $seriesRecords,
+                                    'series',
+                                    'source_series_id',
+                                    'series',
+                                    Series::class,
+                                    $sourcePlaylistData
+                                )
+                            );
+
+                            return $form;
+                        })
+                        ->action(function (Collection $records, array $data) use (&$sourcePlaylistData): void {
+                            $seriesRecords = Series::query()
+                                ->whereIn('category_id', $records->pluck('id'))
+                                ->select('id', 'playlist_id', 'source_series_id', 'title', 'name')
+                                ->get();
+
+                            $seriesRecords = self::mapRecordsToSourcePlaylist(
+                                $seriesRecords,
+                                $data,
+                                'series',
+                                'source_series_id',
+                                Series::class,
+                                $sourcePlaylistData
+                            );
+
                             $playlist = CustomPlaylist::findOrFail($data['playlist']);
-                            foreach ($records as $record) {
-                                // Sync the series to the custom playlist
-                                // This will add the series to the playlist without detaching existing ones
-                                // Prevents duplicates in the playlist
-                                $playlist->series()->syncWithoutDetaching($record->series()->pluck('id'));
-                                if ($data['category']) {
-                                    $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
-                                }
+                            $playlist->series()->syncWithoutDetaching($seriesRecords->pluck('id'));
+                            if ($data['category']) {
+                                $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
                             }
                         })->after(function () {
                             FilamentNotification::make()
