@@ -13,9 +13,12 @@ use App\Models\ChannelFailover;
 use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Models\Playlist;
+use App\Filament\Concerns\DisplaysPlaylistMembership;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
+use Filament\Notifications\Notification as FilamentNotification;
+use Filament\Resources\Resource as FilamentResource;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
@@ -29,11 +32,12 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
-class ChannelResource extends Resource
+class ChannelResource extends FilamentResource
 {
-    use HandlesSourcePlaylist;
-
+    use \App\Filament\BulkActions\HandlesSourcePlaylist;
+    use DisplaysPlaylistMembership;
     protected static ?string $model = Channel::class;
 
     protected static ?string $recordTitleAttribute = 'title';
@@ -251,8 +255,10 @@ class ChannelResource extends Resource
                 ->toggleable(isToggledHiddenByDefault: true)
                 ->sortable(),
             Tables\Columns\TextColumn::make('playlist.name')
-                ->hidden(fn () => ! $showPlaylist)
-                ->numeric()
+                ->label('Playlist')
+                ->hidden(fn() => !$showPlaylist)
+                ->formatStateUsing(fn($state, Channel $record) => self::playlistDisplay($record, 'source_id'))
+                ->tooltip(fn(Channel $record) => self::playlistTooltip($record, 'source_id'))
                 ->toggleable()
                 ->sortable(),
 
@@ -361,14 +367,8 @@ class ChannelResource extends Resource
     {
         return [
             Tables\Actions\BulkActionGroup::make([
-                self::addToCustomPlaylistBulkAction(
-                    Channel::class,
-                    'channels',
-                    'source_id',
-                    'channel',
-                    '',
-                    'Custom Group'
-                )->hidden(fn () => ! $addToCustom),
+                self::addToCustomPlaylistBulkAction(Channel::class, 'channels', 'source_id', 'channel(s)', '')
+                    ->hidden(fn () => !$addToCustom),
                 Tables\Actions\BulkAction::make('move')
                     ->label('Move to Group')
                     ->form([
@@ -402,7 +402,7 @@ class ChannelResource extends Resource
                         }
                         SyncPlaylistChildren::debounce($group->playlist, []);
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Channels moved to group')
                             ->body('The selected channels have been moved to the chosen group.')
@@ -426,7 +426,7 @@ class ChannelResource extends Resource
                                 settings: $data['settings'] ?? [],
                             ));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('EPG to Channel mapping')
                             ->body('Mapping started, you will be notified when the process is complete.')
@@ -457,7 +457,7 @@ class ChannelResource extends Resource
                                 'logo_type' => $data['logo_type'],
                             ]);
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Preferred icon updated')
                             ->body('The preferred icon has been updated.')
@@ -554,7 +554,7 @@ class ChannelResource extends Resource
                             ]);
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Channels as failover')
                             ->body('The selected channels have been added as failovers.')
@@ -611,7 +611,7 @@ class ChannelResource extends Resource
                                 channels: $records
                             ));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Find & Replace started')
                             ->body('Find & Replace working in the background. You will be notified once the process is complete.')
@@ -645,7 +645,7 @@ class ChannelResource extends Resource
                                 channels: $records
                             ));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Find & Replace reset started')
                             ->body('Find & Replace reset working in the background. You will be notified once the process is complete.')
@@ -666,7 +666,7 @@ class ChannelResource extends Resource
                             ]);
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Selected channels enabled')
                             ->body('The selected channels have been enabled.')
@@ -688,7 +688,7 @@ class ChannelResource extends Resource
                             ]);
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Selected channels disabled')
                             ->body('The selected channels have been disabled.')

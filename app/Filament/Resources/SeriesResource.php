@@ -8,17 +8,16 @@ use App\Filament\Resources\SeriesResource\RelationManagers;
 use App\Models\Category;
 use App\Models\Playlist;
 use App\Models\Series;
-use App\Jobs\SyncPlaylistChildren;
-use App\Filament\BulkActions\HandlesSourcePlaylist;
-use App\Rules\CheckIfUrlOrLocalPath;
+use App\Filament\Concerns\DisplaysPlaylistMembership;
+use App\Rules\CheckIfUrlOrLocalPath as CheckIfUrlOrLocalPathRule;
 use App\Services\XtreamService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
-use Filament\Notifications\Notification;
-use Filament\Resources\Resource;
+use Filament\Notifications\Notification as FilamentNotification;
+use Filament\Resources\Resource as FilamentResource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Str;
@@ -28,9 +27,10 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 
-class SeriesResource extends Resource
+class SeriesResource extends FilamentResource
 {
-    use HandlesSourcePlaylist;
+    use \App\Filament\BulkActions\HandlesSourcePlaylist;
+    use DisplaysPlaylistMembership;
     protected static ?string $model = Series::class;
 
     protected static ?string $recordTitleAttribute = 'name';
@@ -140,9 +140,11 @@ class SeriesResource extends Resource
                 ->numeric()
                 ->sortable(),
             Tables\Columns\TextColumn::make('playlist.name')
-                ->numeric()
-                ->sortable()
-                ->hidden(fn() => !$showPlaylist),
+                ->label('Playlist')
+                ->hidden(fn() => !$showPlaylist)
+                ->formatStateUsing(fn($state, Series $record) => self::playlistDisplay($record, 'source_series_id'))
+                ->tooltip(fn(Series $record) => self::playlistTooltip($record, 'source_series_id'))
+                ->sortable(),
             Tables\Columns\TextColumn::make('created_at')
                 ->dateTime()
                 ->sortable()
@@ -195,7 +197,7 @@ class SeriesResource extends Resource
                             'category_id' => $category->id,
                         ]);
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Series moved to category')
                             ->body('The series has been moved to the chosen category.')
@@ -214,7 +216,7 @@ class SeriesResource extends Resource
                                 playlistSeries: $record,
                             ));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Series is being processed')
                             ->body('You will be notified once complete.')
@@ -234,7 +236,7 @@ class SeriesResource extends Resource
                                 series: $record,
                             ));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Series .strm files are being synced')
                             ->body('You will be notified once complete.')
@@ -286,7 +288,7 @@ class SeriesResource extends Resource
                             // This will change the category_id for the series in the database
                             // to reflect the new category
                             if ($category->playlist_id !== $record->playlist_id) {
-                                Notification::make()
+                                FilamentNotification::make()
                                     ->warning()
                                     ->title('Warning')
                                     ->body("Cannot move \"{$category->name}\" to \"{$record->name}\" as they belong to different playlists.")
@@ -298,9 +300,9 @@ class SeriesResource extends Resource
                                 'category_id' => $category->id,
                             ]);
                         }
-                        SyncPlaylistChildren::debounce($category->playlist, []);
+                        \App\Jobs\SyncPlaylistChildren::debounce($category->playlist, []);
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Series moved to category')
                             ->body('The category series have been moved to the chosen category.')
@@ -322,7 +324,7 @@ class SeriesResource extends Resource
                                 ));
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Series are being processed')
                             ->body('You will be notified once complete.')
@@ -344,7 +346,7 @@ class SeriesResource extends Resource
                                 ));
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('.strm files are being synced for selected series')
                             ->body('You will be notified once complete.')
@@ -365,7 +367,7 @@ class SeriesResource extends Resource
                             ]);
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Selected series enabled')
                             ->body('The selected series have been enabled.')
@@ -387,7 +389,7 @@ class SeriesResource extends Resource
                             ]);
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Selected series disabled')
                             ->body('The selected series have been disabled.')
@@ -533,7 +535,7 @@ class SeriesResource extends Resource
                                     Forms\Components\TextInput::make('sync_location')
                                         ->label('Series Sync Location')
                                         ->live()
-                                        ->rules([new CheckIfUrlOrLocalPath(localOnly: true, isDirectory: true)])
+                                        ->rules([new CheckIfUrlOrLocalPathRule(localOnly: true, isDirectory: true)])
                                         ->helperText(
                                             fn($get) => !$get('sync_settings.include_series')
                                                 ? 'File location: ' . $get('sync_location') . ($get('sync_settings.include_season') ?? false ? '/Season 01' : '') . '/S01E01 - Episode Title.strm'

@@ -8,7 +8,7 @@ use App\Models\EpgMap;
 use App\Models\Job;
 use App\Models\Playlist;
 use Carbon\Carbon;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -73,7 +73,7 @@ class MapEpgToChannelsComplete implements ShouldQueue
         $epg = $this->epg;
         $title = "Completed processing EPG channel mapping";
         $body = "EPG \"{$epg->name}\" channel mapping completed. Mapping took {$completedInRounded} seconds.";
-        Notification::make()
+        FilamentNotification::make()
             ->success()
             ->title($title)->body($body)
             ->broadcast($epg->user)

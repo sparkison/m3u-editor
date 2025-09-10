@@ -11,12 +11,13 @@ use App\Models\ChannelFailover;
 use App\Models\CustomPlaylist;
 use App\Models\Group;
 use App\Models\Playlist;
-use App\Jobs\SyncPlaylistChildren;
-use App\Filament\BulkActions\HandlesSourcePlaylist;
-use App\Rules\CheckIfUrlOrLocalPath;
+use App\Filament\Concerns\DisplaysPlaylistMembership;
+use App\Rules\CheckIfUrlOrLocalPath as CheckIfUrlOrLocalPathRule;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
+use Filament\Notifications\Notification as FilamentNotification;
+use Filament\Resources\Resource as FilamentResource;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
@@ -32,9 +33,10 @@ use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
-class VodResource extends Resource
+class VodResource extends FilamentResource
 {
-    use HandlesSourcePlaylist;
+    use \App\Filament\BulkActions\HandlesSourcePlaylist;
+    use DisplaysPlaylistMembership;
     protected static ?string $model = Channel::class;
 
     protected static ?string $recordTitleAttribute = 'title';
@@ -262,8 +264,10 @@ class VodResource extends Resource
                 ->toggleable(isToggledHiddenByDefault: true)
                 ->sortable(),
             Tables\Columns\TextColumn::make('playlist.name')
-                ->hidden(fn () => ! $showPlaylist)
-                ->numeric()
+                ->label('Playlist')
+                ->hidden(fn() => !$showPlaylist)
+                ->formatStateUsing(fn($state, Channel $record) => self::playlistDisplay($record, 'source_id'))
+                ->tooltip(fn(Channel $record) => self::playlistTooltip($record, 'source_id'))
                 ->toggleable()
                 ->sortable(),
 
@@ -375,7 +379,7 @@ class VodResource extends Resource
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new \App\Jobs\ProcessVodChannels(channel: $record));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Fetching VOD metadata for channel')
                             ->body('The VOD metadata fetching and processing has been started. You will be notified when it is complete.')
@@ -395,7 +399,7 @@ class VodResource extends Resource
                                 channel: $record,
                             ));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('VOD .strm file is being synced now')
                             ->body('You will be notified once complete.')
@@ -420,14 +424,8 @@ class VodResource extends Resource
     {
         return [
             Tables\Actions\BulkActionGroup::make([
-                self::addToCustomPlaylistBulkAction(
-                    Channel::class,
-                    'channels',
-                    'source_id',
-                    'channel',
-                    '',
-                    'Custom Group'
-                )->hidden(fn () => ! $addToCustom),
+                self::addToCustomPlaylistBulkAction(Channel::class, 'channels', 'source_id', 'channel(s)', '')
+                    ->hidden(fn () => !$addToCustom),
                 Tables\Actions\BulkAction::make('move')
                     ->label('Move to Group')
                     ->form([
@@ -459,9 +457,9 @@ class VodResource extends Resource
                                 'group_id' => $group->id,
                             ]);
                         }
-                        SyncPlaylistChildren::debounce($group->playlist, []);
+                        \App\Jobs\SyncPlaylistChildren::debounce($group->playlist, []);
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Channels moved to group')
                             ->body('The selected channels have been moved to the chosen group.')
@@ -486,7 +484,7 @@ class VodResource extends Resource
                             }
                         }
 
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title("Fetching VOD metadata for {$count} channel(s)")
                             ->body('The VOD metadata fetching and processing has been started. You will be notified when it is complete.')
@@ -509,7 +507,7 @@ class VodResource extends Resource
                                 ));
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('.strm files are being synced for selected VOD channels')
                             ->body('You will be notified once complete.')
@@ -533,7 +531,7 @@ class VodResource extends Resource
                                 settings: $data['settings'] ?? [],
                             ));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('EPG to Channel mapping')
                             ->body('Mapping started, you will be notified when the process is complete.')
@@ -564,7 +562,7 @@ class VodResource extends Resource
                                 'logo_type' => $data['logo_type'],
                             ]);
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Preferred icon updated')
                             ->body('The preferred icon has been updated.')
@@ -661,7 +659,7 @@ class VodResource extends Resource
                             ]);
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Channels as failover')
                             ->body('The selected channels have been added as failovers.')
@@ -718,7 +716,7 @@ class VodResource extends Resource
                                 channels: $records
                             ));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Find & Replace started')
                             ->body('Find & Replace working in the background. You will be notified once the process is complete.')
@@ -752,7 +750,7 @@ class VodResource extends Resource
                                 channels: $records
                             ));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Find & Replace reset started')
                             ->body('Find & Replace reset working in the background. You will be notified once the process is complete.')
@@ -773,7 +771,7 @@ class VodResource extends Resource
                             ]);
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Selected channels enabled')
                             ->body('The selected channels have been enabled.')
@@ -795,7 +793,7 @@ class VodResource extends Resource
                             ]);
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Selected channels disabled')
                             ->body('The selected channels have been disabled.')
@@ -1401,7 +1399,7 @@ class VodResource extends Resource
                             Forms\Components\TextInput::make('sync_location')
                                 ->label('VOD Sync Location')
                                 ->live()
-                                ->rules([new CheckIfUrlOrLocalPath(localOnly: true, isDirectory: true)])
+                                ->rules([new CheckIfUrlOrLocalPathRule(localOnly: true, isDirectory: true)])
                                 ->helperText(
                                     fn ($get) => 'File location: '.$get('sync_location').($get('sync_settings.include_season') ?? false ? '/Group Name' : '').'/VOD Title.strm'
                                 )
