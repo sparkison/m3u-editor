@@ -4,14 +4,14 @@ namespace App\Filament\BulkActions;
 
 use App\Models\CustomPlaylist;
 use App\Models\Playlist;
-use Illuminate\Support\Facades\DB;
 use Filament\Forms;
 use Filament\Forms\Components\Actions\Action;
-use Filament\Forms\Set;
 use Filament\Forms\Get;
+use Filament\Forms\Set;
 use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Tables;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -46,24 +46,24 @@ trait HandlesSourcePlaylist
     /**
      * Build duplicate playlist metadata for the given records.
      *
-     * @param Collection $records   Selected records from the bulk action.
-     * @param string     $relation  Relationship name used to query playlist items (channels, series, etc.).
-     * @param string     $sourceKey Source identifier column on the related model.
+     * @param  Collection  $records  Selected records from the bulk action.
+     * @param  string  $relation  Relationship name used to query playlist items (channels, series, etc.).
+     * @param  string  $sourceKey  Source identifier column on the related model.
      * @return array{0: Collection, 1: bool, 2: Collection, 3: Collection} Tuple containing
-     *                                             duplicate groups, whether a source playlist is
-     *                                             needed, the source IDs of the records, and a
-     *                                             map of composite playlist/source keys to their
-     *                                             parent-child group key.
-    */
+     *                                                                     duplicate groups, whether a source playlist is
+     *                                                                     needed, the source IDs of the records, and a
+     *                                                                     map of composite playlist/source keys to their
+     *                                                                     parent-child group key.
+     */
     protected static function getSourcePlaylistData(Collection $records, string $relation, string $sourceKey): array
     {
         $recordSourceIds = $records->pluck($sourceKey)->unique();
 
         $rows = DB::table($relation)
-            ->join('playlists', $relation . '.playlist_id', '=', 'playlists.id')
+            ->join('playlists', $relation.'.playlist_id', '=', 'playlists.id')
             ->where('playlists.user_id', auth()->id())
             ->whereIn($sourceKey, $recordSourceIds)
-            ->select('playlist_id', 'parent_id', $sourceKey . ' as source_id')
+            ->select('playlist_id', 'parent_id', $sourceKey.' as source_id')
             ->get();
 
         $playlistIds = $rows->pluck('playlist_id')
@@ -99,20 +99,20 @@ trait HandlesSourcePlaylist
                     }
 
                     $childKey = $childIds->sort()->join('-');
-                    $groupKey = $parentId . '-' . $childKey;
+                    $groupKey = $parentId.'-'.$childKey;
 
                     $groups[$groupKey] ??= [
-                        'parent_id'      => $parentId,
-                        'child_ids'      => $childIds->values()->all(),
-                        'playlists'      => collect($playlistNames->only(array_merge([$parentId], $childIds->all()))),
-                        'source_ids'     => [],
+                        'parent_id' => $parentId,
+                        'child_ids' => $childIds->values()->all(),
+                        'playlists' => collect($playlistNames->only(array_merge([$parentId], $childIds->all()))),
+                        'source_ids' => [],
                         'composite_keys' => [],
                     ];
 
                     $groups[$groupKey]['source_ids'][] = $sourceId;
 
                     foreach (array_merge([$parentId], $childIds->all()) as $id) {
-                        $groups[$groupKey]['composite_keys'][] = $id . ':' . $sourceId;
+                        $groups[$groupKey]['composite_keys'][] = $id.':'.$sourceId;
                     }
                 });
             });
@@ -161,14 +161,14 @@ trait HandlesSourcePlaylist
      * duplicate parent/child groups and optionally override individual
      * records within those groups.
      *
-     * @param Collection      $records            Records selected in the bulk action.
-     * @param string          $relation           Relationship name used to fetch playlist items.
-     * @param string          $sourceKey          Column containing the source ID on the related model.
-     * @param string          $itemLabel          Human-readable label for the record type (channel, series, etc.).
-     * @param string          $modelClass         Fully qualified model class for querying record details.
-     * @param array|null      $sourcePlaylistData Cached metadata returned from {@see getSourcePlaylistData}.
-     *                                           Passed by reference so callers can reuse the computed data.
-     * @return array                             Array of Filament form components for inclusion in the bulk action.
+     * @param  Collection  $records  Records selected in the bulk action.
+     * @param  string  $relation  Relationship name used to fetch playlist items.
+     * @param  string  $sourceKey  Column containing the source ID on the related model.
+     * @param  string  $itemLabel  Human-readable label for the record type (channel, series, etc.).
+     * @param  string  $modelClass  Fully qualified model class for querying record details.
+     * @param  array|null  $sourcePlaylistData  Cached metadata returned from {@see getSourcePlaylistData}.
+     *                                          Passed by reference so callers can reuse the computed data.
+     * @return array Array of Filament form components for inclusion in the bulk action.
      */
     protected static function buildSourcePlaylistForm(
         Collection $records,
@@ -199,10 +199,15 @@ trait HandlesSourcePlaylist
 
         $fields = [];
 
+        $sourceLabels = $records
+            ->mapWithKeys(fn ($record) => [
+                $record->$sourceKey => $record->title ?? $record->name ?? $record->$sourceKey,
+            ]);
+
         foreach ($duplicateGroups as $groupKey => $group) {
             $parentName = $group['playlists'][$group['parent_id']];
             $childNames = $group['playlists']->except($group['parent_id'])->values()->implode(', ');
-            $label      = $childNames ? "{$parentName} / {$childNames}" : $parentName;
+            $label = $childNames ? "{$parentName} / {$childNames}" : $parentName;
 
             $fields[] = Forms\Components\Fieldset::make($label)
                 ->schema([
@@ -267,15 +272,16 @@ trait HandlesSourcePlaylist
      * source playlist chosen, and replaces records with their counterpart from
      * the selected source playlist.
      *
-     * @param Collection $records           Records originally selected in the bulk action.
-     * @param array      $data              Form data submitted by the user.
-     * @param string     $relation          Relationship name used to fetch playlist items.
-     * @param string     $sourceKey         Source identifier column on the related model.
-     * @param string     $modelClass        Fully qualified model class name for the records.
-     * @param array|null $sourcePlaylistData Cached metadata from {@see getSourcePlaylistData}.
-     *                                       Passed by reference to avoid recomputation.
-     * @return Collection                    Collection of records mapped to their chosen source playlist.
-     * @throws ValidationException           If any duplicate group lacks a source selection.
+     * @param  Collection  $records  Records originally selected in the bulk action.
+     * @param  array  $data  Form data submitted by the user.
+     * @param  string  $relation  Relationship name used to fetch playlist items.
+     * @param  string  $sourceKey  Source identifier column on the related model.
+     * @param  string  $modelClass  Fully qualified model class name for the records.
+     * @param  array|null  $sourcePlaylistData  Cached metadata from {@see getSourcePlaylistData}.
+     *                                          Passed by reference to avoid recomputation.
+     * @return Collection Collection of records mapped to their chosen source playlist.
+     *
+     * @throws ValidationException If any duplicate group lacks a source selection.
      */
     protected static function mapRecordsToSourcePlaylist(
         Collection $records,
@@ -293,22 +299,33 @@ trait HandlesSourcePlaylist
 
         if ($needsSourcePlaylist) {
             $groupSelections = collect($data['source_playlists'] ?? []);
-            $itemSelections  = collect($data['source_playlist_items'] ?? []);
+            $itemSelections = collect($data['source_playlist_items'] ?? []);
 
             $sourceAssignments = collect();
 
             foreach ($duplicateGroups as $groupKey => $group) {
-                $groupChoice = $groupSelections->get($groupKey);
-                $items       = collect($itemSelections->get($groupKey) ?? []);
+                $available = self::availablePlaylistsForGroup(
+                    $data['playlist'] ?? null,
+                    $group,
+                    $relation,
+                    $sourceKey
+                );
 
-                if ($groupChoice && ! $group['playlists']->has($groupChoice)) {
+                if ($available->isEmpty()) {
+                    continue;
+                }
+
+                $groupChoice = $groupSelections->get($groupKey);
+                $items = collect($itemSelections->get($groupKey) ?? []);
+
+                if ($groupChoice && ! $available->has($groupChoice)) {
                     throw ValidationException::withMessages([
                         'source_playlists' => 'Invalid playlist selection.',
                     ]);
                 }
 
                 foreach ($items as $playlistId) {
-                    if ($playlistId && ! $group['playlists']->has($playlistId)) {
+                    if ($playlistId && ! $available->has($playlistId)) {
                         throw ValidationException::withMessages([
                             'source_playlists' => 'Invalid playlist selection.',
                         ]);
@@ -353,8 +370,8 @@ trait HandlesSourcePlaylist
                 ->map->keyBy($sourceKey);
 
             $records = $records->map(function ($record) use ($sourceAssignments, $sourceMaps, $sourceToGroup, $sourceKey) {
-                $sourceId  = $record->$sourceKey;
-                $composite = $record->playlist_id . ':' . $sourceId;
+                $sourceId = $record->$sourceKey;
+                $composite = $record->playlist_id.':'.$sourceId;
 
                 if (! $sourceToGroup->has($composite)) {
                     return $record;
@@ -375,12 +392,12 @@ trait HandlesSourcePlaylist
      * Construct a Filament bulk action that adds the selected records to a
      * custom playlist, including optional source playlist disambiguation.
      *
-     * @param string $modelClass    Fully qualified model class for the records.
-     * @param string $relation      Relationship name used by the custom playlist (channels, series, vods).
-     * @param string $sourceKey     Column containing the source ID on the related model.
-     * @param string $itemLabel     Human-readable label for the record type.
-     * @param string $tagType       Tag type used when assigning categories/groups.
-     * @param string $categoryLabel Label displayed for the category select.
+     * @param  string  $modelClass  Fully qualified model class for the records.
+     * @param  string  $relation  Relationship name used by the custom playlist (channels, series, vods).
+     * @param  string  $sourceKey  Column containing the source ID on the related model.
+     * @param  string  $itemLabel  Human-readable label for the record type.
+     * @param  string  $tagType  Tag type used when assigning categories/groups.
+     * @param  string  $categoryLabel  Label displayed for the category select.
      * @return Tables\Actions\BulkAction Configured bulk action ready to attach to a Filament table.
      */
     protected static function buildAddToCustomPlaylistAction(
@@ -427,12 +444,13 @@ trait HandlesSourcePlaylist
                         ->disabled(fn (Get $get) => ! $get('playlist'))
                         ->helperText(fn (Get $get) => ! $get('playlist')
                             ? 'Select a custom playlist first.'
-                            : 'Select the ' . ($categoryLabel === 'Custom Group' ? 'group' : 'category') .
-                                ' you would like to assign to the selected ' . $itemLabel . ' to.')
+                            : 'Select the '.($categoryLabel === 'Custom Group' ? 'group' : 'category').
+                                ' you would like to assign to the selected '.$itemLabel.' to.')
                         ->options(function ($get) use ($tagType) {
                             $customList = CustomPlaylist::find($get('playlist'));
+
                             return $customList ? $customList->tags()
-                                ->where('type', $customList->uuid . $tagType)
+                                ->where('type', $customList->uuid.$tagType)
                                 ->get()
                                 ->mapWithKeys(fn ($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
                                 ->toArray() : [];
@@ -478,7 +496,7 @@ trait HandlesSourcePlaylist
             ->after(function () use ($itemLabel) {
                 FilamentNotification::make()
                     ->success()
-                    ->title(ucfirst($itemLabel) . ' added to custom playlist')
+                    ->title(ucfirst($itemLabel).' added to custom playlist')
                     ->body("The selected {$itemLabel} have been added to the chosen custom playlist.")
                     ->send();
             })
