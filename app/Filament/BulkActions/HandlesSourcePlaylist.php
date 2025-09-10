@@ -78,41 +78,53 @@ trait HandlesSourcePlaylist
 
         $rows->groupBy('source_id')
             ->each(function ($group, $sourceId) use (&$groups, $playlistNames) {
-                $ids        = $group->pluck('playlist_id')->unique();
-                $parentMap  = $group->mapWithKeys(fn ($row) => [$row->playlist_id => $row->parent_id]);
+                // Map playlist IDs to their parent IDs for this source
+                $parentMap = $group->mapWithKeys(fn ($row) => [$row->playlist_id => $row->parent_id]);
 
-                if ($ids->count() <= 1) {
-                    return;
-                }
-
-                foreach ($ids as $id) {
-                    $parentId = $parentMap[$id] ?? null;
-
-                    if ($parentId && $ids->contains($parentId)) {
-                        $pairKey = $parentId . '-' . $id;
-
-                        $groups[$pairKey] ??= [
-                            'parent_id'      => $parentId,
-                            'child_id'       => $id,
-                            'playlists'      => collect($playlistNames->only([$parentId, $id])),
-                            'source_ids'     => [],
-                            'composite_keys' => [],
-                        ];
-
-                        $groups[$pairKey]['source_ids'][]     = $sourceId;
-                        $groups[$pairKey]['composite_keys'][] = $id . ':' . $sourceId;
-                        $groups[$pairKey]['composite_keys'][] = $parentId . ':' . $sourceId;
+                // Identify parent playlists that also contain the source alongside any children
+                $parentMap->unique()->filter()->each(function ($parentId) use ($parentMap, $sourceId, &$groups, $playlistNames) {
+                    // Parent must itself contain the source
+                    if (! $parentMap->has($parentId)) {
+                        return;
                     }
-                }
+
+                    // Collect all children of this parent containing the source
+                    $childIds = $parentMap
+                        ->filter(fn ($pid) => $pid === $parentId)
+                        ->keys()
+                        ->reject(fn ($id) => $id === $parentId)
+                        ->unique();
+
+                    if ($childIds->isEmpty()) {
+                        return;
+                    }
+
+                    $childKey = $childIds->sort()->join('-');
+                    $groupKey = $parentId . '-' . $childKey;
+
+                    $groups[$groupKey] ??= [
+                        'parent_id'      => $parentId,
+                        'child_ids'      => $childIds->values()->all(),
+                        'playlists'      => collect($playlistNames->only(array_merge([$parentId], $childIds->all()))),
+                        'source_ids'     => [],
+                        'composite_keys' => [],
+                    ];
+
+                    $groups[$groupKey]['source_ids'][] = $sourceId;
+
+                    foreach (array_merge([$parentId], $childIds->all()) as $id) {
+                        $groups[$groupKey]['composite_keys'][] = $id . ':' . $sourceId;
+                    }
+                });
             });
 
         $duplicateGroups = collect($groups);
 
         // Map composite playlist & source IDs to their parent-child pair
         $sourceToGroup = $duplicateGroups
-            ->flatMap(fn ($group, $pairKey) => collect($group['composite_keys'])
+            ->flatMap(fn ($group, $groupKey) => collect($group['composite_keys'])
                 ->unique()
-                ->mapWithKeys(fn ($key) => [$key => $pairKey]));
+                ->mapWithKeys(fn ($key) => [$key => $groupKey]));
 
         $needsSourcePlaylist = $duplicateGroups->isNotEmpty();
 
@@ -179,18 +191,51 @@ trait HandlesSourcePlaylist
 
         $fields = [];
 
-        foreach ($duplicateGroups as $pairKey => $group) {
+        foreach ($duplicateGroups as $groupKey => $group) {
             $parentName = $group['playlists'][$group['parent_id']];
-            $childName  = $group['playlists'][$group['child_id']];
+            $childNames = $group['playlists']->except($group['parent_id'])->values()->implode(', ');
+            $label      = $childNames ? "{$parentName} / {$childNames}" : $parentName;
 
-            $fields[] = Forms\Components\Fieldset::make('These items appear in synced playlists.')
+            $fields[] = Forms\Components\Fieldset::make($label)
                 ->schema([
-                    Forms\Components\Select::make("source_playlists.{$pairKey}")
-                        ->label('Use items from:')
-                        ->options($group['playlists']->toArray())
-                        ->placeholder('Choose source playlist')
+                    Forms\Components\Select::make("source_playlists.{$groupKey}")
+                        ->label('Which playlist do you want to add from?')
+                        ->options(fn (Get $get) => self::availablePlaylistsForGroup(
+                            $get('playlist'),
+                            $group,
+                            $relation,
+                            $sourceKey
+                        )->toArray())
+                        ->placeholder('Choose playlist')
                         ->searchable()
-                        ->required(),
+                        ->live()
+                        ->reactive(),
+                    Actions::make([
+                        Action::make("items_{$groupKey}")
+                            ->label('View Affected Items')
+                            ->form(function (Get $get) use ($group, $groupKey, $relation, $sourceKey) {
+                                $existing = $get("source_playlist_items.{$groupKey}") ?? [];
+                                $default  = $get("source_playlists.{$groupKey}");
+
+                                return collect($group['source_ids'])->map(function ($sourceId) use ($group, $existing, $default, $relation, $sourceKey) {
+                                    return Forms\Components\Select::make("items.{$sourceId}")
+                                        ->label((string) $sourceId)
+                                        ->options(fn (Get $get) => self::availablePlaylistsForGroup(
+                                            $get('playlist'),
+                                            $group,
+                                            $relation,
+                                            $sourceKey
+                                        )->toArray())
+                                        ->placeholder('Choose playlist')
+                                        ->default($existing[$sourceId] ?? $default)
+                                        ->searchable()
+                                        ->reactive();
+                                })->toArray();
+                            })
+                            ->action(function (array $formData, Set $set) use ($groupKey) {
+                                $set("source_playlist_items.{$groupKey}", $formData['items'] ?? []);
+                            }),
+                    ])->columnSpanFull(),
                 ]);
         }
 
@@ -230,25 +275,67 @@ trait HandlesSourcePlaylist
         [$duplicateGroups, $needsSourcePlaylist, $recordSourceIds, $sourceToGroup] = $sourcePlaylistData;
 
         if ($needsSourcePlaylist) {
-            $selected = collect($data['source_playlists'] ?? []);
+            $groupSelections = collect($data['source_playlists'] ?? []);
+            $itemSelections  = collect($data['source_playlist_items'] ?? []);
 
-            foreach ($duplicateGroups as $pairKey => $group) {
-                if (! $selected->has($pairKey)) {
+            $sourceAssignments = collect();
+
+            foreach ($duplicateGroups as $groupKey => $group) {
+                $groupChoice = $groupSelections->get($groupKey);
+                $items       = collect($itemSelections->get($groupKey) ?? []);
+
+                if ($groupChoice && ! $group['playlists']->has($groupChoice)) {
                     throw ValidationException::withMessages([
-                        'source_playlists' => 'Please select a source playlist for each duplicated group.',
+                        'source_playlists' => 'Invalid playlist selection.',
                     ]);
+                }
+
+                foreach ($items as $playlistId) {
+                    if ($playlistId && ! $group['playlists']->has($playlistId)) {
+                        throw ValidationException::withMessages([
+                            'source_playlists' => 'Invalid playlist selection.',
+                        ]);
+                    }
+                }
+
+                if (! $groupChoice && $items->filter()->count() !== count($group['source_ids'])) {
+                    throw ValidationException::withMessages([
+                        'source_playlists' => 'Please select a playlist for each item or choose one at the group level.',
+                    ]);
+                }
+
+                foreach ($group['source_ids'] as $sourceId) {
+                    $chosen = $items[$sourceId] ?? $groupChoice;
+
+                    if ($sourceAssignments->has($sourceId)) {
+                        $existing = $sourceAssignments[$sourceId];
+
+                        if ($chosen && $existing && $chosen !== $existing) {
+                            throw ValidationException::withMessages([
+                                'source_playlists' => 'Conflicting playlist selections were provided for the same item.',
+                            ]);
+                        }
+
+                        if ($chosen) {
+                            $sourceAssignments[$sourceId] = $chosen;
+                        }
+                    } else {
+                        $sourceAssignments[$sourceId] = $chosen;
+                    }
                 }
             }
 
+            $playlistIds = $sourceAssignments->values()->filter()->unique();
+
             $sourceMaps = $modelClass::query()
-                ->whereIn('playlist_id', $selected->values())
+                ->whereIn('playlist_id', $playlistIds)
                 ->whereIn($sourceKey, $recordSourceIds)
                 ->select('id', 'playlist_id', $sourceKey)
                 ->get()
                 ->groupBy('playlist_id')
                 ->map->keyBy($sourceKey);
 
-            $records = $records->map(function ($record) use ($selected, $sourceMaps, $sourceToGroup, $sourceKey) {
+            $records = $records->map(function ($record) use ($sourceAssignments, $sourceMaps, $sourceToGroup, $sourceKey) {
                 $sourceId  = $record->$sourceKey;
                 $composite = $record->playlist_id . ':' . $sourceId;
 
@@ -256,8 +343,7 @@ trait HandlesSourcePlaylist
                     return $record;
                 }
 
-                $pairKey    = $sourceToGroup[$composite];
-                $playlistId = $selected[$pairKey] ?? null;
+                $playlistId = $sourceAssignments[$sourceId] ?? null;
 
                 return $playlistId && isset($sourceMaps[$playlistId][$sourceId])
                     ? $sourceMaps[$playlistId][$sourceId]
