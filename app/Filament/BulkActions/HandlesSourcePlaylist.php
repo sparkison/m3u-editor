@@ -237,18 +237,23 @@ trait HandlesSourcePlaylist
                                     $default  = $get("source_playlists.{$groupKey}");
 
                                     return collect($group['source_ids'])->map(function ($sourceId) use ($group, $existing, $default, $relation, $sourceKey, $labels) {
-                                        return Forms\Components\Select::make("items.{$sourceId}")
-                                            ->label($labels[$sourceId] ?? (string) $sourceId)
-                                            ->options(fn (Get $get) => self::availablePlaylistsForGroup(
-                                                $get('playlist'),
-                                                $group,
-                                                $relation,
-                                                $sourceKey
-                                            )->toArray())
-                                            ->placeholder('Choose playlist')
-                                            ->default($existing[$sourceId] ?? $default)
-                                            ->searchable()
-                                            ->reactive();
+                                        return Forms\Components\Grid::make(2)
+                                            ->schema([
+                                                Forms\Components\Select::make("items.{$sourceId}")
+                                                    ->label($labels[$sourceId] ?? (string) $sourceId)
+                                                    ->options(fn (Get $get) => self::availablePlaylistsForGroup(
+                                                        $get('playlist'),
+                                                        $group,
+                                                        $relation,
+                                                        $sourceKey
+                                                    )->toArray())
+                                                    ->placeholder('Choose playlist')
+                                                    ->default($existing[$sourceId] ?? $default)
+                                                    ->searchable()
+                                                    ->reactive()
+                                                    ->inlineLabel()
+                                                    ->columnSpan(1),
+                                            ]);
                                     })->toArray();
                                 })
                                 ->action(function (array $formData, Set $set) use ($groupKey) {
