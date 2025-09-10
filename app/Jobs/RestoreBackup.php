@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Job;
 use App\Models\User;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Artisan;
@@ -56,12 +56,12 @@ class RestoreBackup implements ShouldQueue
             $user = User::whereIn('email', config('dev.admin_emails'))->first();
             if ($user) {
                 $message = "Backup restored successfully - restored: \"$this->backupPath\"";
-                Notification::make()
+                FilamentNotification::make()
                     ->success()
                     ->title("Backup restored successfully")
                     ->body($message)
                     ->broadcast($user);
-                Notification::make()
+                FilamentNotification::make()
                     ->success()
                     ->title("Backup restored successfully")
                     ->body($message)
@@ -75,12 +75,12 @@ class RestoreBackup implements ShouldQueue
             $user = User::whereIn('email', config('dev.admin_emails'))->first();
             if ($user) {
                 $message = "Backup restore (\"$this->backupPath\") failed: {$e->getMessage()}";
-                Notification::make()
+                FilamentNotification::make()
                     ->danger()
                     ->title("Backup restore failed")
                     ->body($message)
                     ->broadcast($user);
-                Notification::make()
+                FilamentNotification::make()
                     ->danger()
                     ->title("Backup restore failed")
                     ->body($message)

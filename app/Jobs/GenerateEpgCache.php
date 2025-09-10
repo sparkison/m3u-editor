@@ -5,7 +5,7 @@ namespace App\Jobs;
 use App\Enums\Status;
 use App\Models\Epg;
 use App\Services\EpgCacheService;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -59,7 +59,7 @@ class GenerateEpgCache implements ShouldQueue
         if ($result) {
             if ($this->notify) {
                 $msg = "Cache generated successfully in " . round($duration, 2) . " seconds";
-                Notification::make()
+                FilamentNotification::make()
                     ->success()
                     ->title("EPG cache created for \"{$epg->name}\"")
                     ->body($msg)
@@ -68,7 +68,7 @@ class GenerateEpgCache implements ShouldQueue
             }
         } else {
             $error = "Failed to generate cache. You can try to run the cache generation again manually from the EPG management page.";
-            Notification::make()
+            FilamentNotification::make()
                 ->danger()
                 ->title("Error creating cache for \"{$epg->name}\"")
                 ->body($error)
