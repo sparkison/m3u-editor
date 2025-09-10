@@ -4,6 +4,7 @@ namespace App\Filament\Concerns;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 trait DisplaysPlaylistMembership
 {
@@ -15,11 +16,22 @@ trait DisplaysPlaylistMembership
             return collect([$record->playlist?->name])->filter();
         }
 
-        return $record->newQuery()
-            ->where('user_id', $userId)
-            ->where($sourceKey, $record->{$sourceKey})
-            ->with('playlist')
-            ->get()
+        $table = $record->getTable();
+
+        $query = $record->newQuery()
+            ->select("{$table}.*")
+            ->where("{$table}.user_id", $record->user_id)
+            ->where("{$table}.{$sourceKey}", $record->{$sourceKey})
+            ->with('playlist');
+
+        if (Schema::hasColumn('playlists', 'parent_id')) {
+            $query->join('playlists', "{$table}.playlist_id", '=', 'playlists.id')
+                ->orderByRaw('COALESCE(playlists.parent_id, playlists.id), playlists.parent_id IS NOT NULL, playlists.id');
+        } else {
+            $query->orderBy("{$table}.playlist_id");
+        }
+
+        return $query->get()
             ->pluck('playlist.name')
             ->filter();
     }
