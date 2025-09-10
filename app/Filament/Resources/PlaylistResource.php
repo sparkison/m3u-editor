@@ -170,7 +170,7 @@ class PlaylistResource extends FilamentResource
                     ->label('Auto Sync')
                     ->toggleable()
                     ->tooltip('Toggle auto-sync status')
-                    ->disabled(fn (?Playlist $record) => $record?->parent_id !== null)
+                    ->disabled(fn (?PlaylistModel $record) => $record?->parent_id !== null)
                     ->sortable(),
                 Tables\Columns\TextColumn::make('synced')
                     ->label('Last Synced')
@@ -179,7 +179,7 @@ class PlaylistResource extends FilamentResource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('sync_interval')
                     ->label('Interval')
-                    ->formatStateUsing(fn ($state, ?Playlist $record) => $record?->parent_id ? '' : $state)
+                    ->formatStateUsing(fn ($state, ?PlaylistModel $record) => $record?->parent_id ? '' : $state)
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('sync_time')
@@ -965,7 +965,7 @@ class PlaylistResource extends FilamentResource
             Forms\Components\Grid::make()
                 ->columns(2)
                 ->columnSpanFull()
-                ->hidden(fn (Get $get, ?Playlist $record) => ($record?->parent_id ?? $get('parent_id')) !== null)
+                ->hidden(fn (Get $get, ?PlaylistModel $record) => ($record?->parent_id ?? $get('parent_id')) !== null)
                 ->schema([
                     Forms\Components\Grid::make()
                         ->columns(3)
@@ -978,7 +978,7 @@ class PlaylistResource extends FilamentResource
                                 ->columnSpan(2)
                                 ->inline(false)
                                 ->default(true)
-                                ->disabled(fn (?Playlist $record) => $record?->parent_id !== null),
+                                ->disabled(fn (?PlaylistModel $record) => $record?->parent_id !== null),
                             Forms\Components\Select::make('sync_interval')
                                 ->label('Sync Every')
                                 ->helperText('Default is every 24hr if left empty.')
@@ -1298,7 +1298,7 @@ class PlaylistResource extends FilamentResource
                 $fields = [
                     Forms\Components\Section::make($section)
                         ->schema($fields)
-                        ->hidden(fn (Get $get, ?Playlist $record) => $section === 'Scheduling' && (($record?->parent_id ?? $get('parent_id')) !== null)),
+                        ->hidden(fn (Get $get, ?PlaylistModel $record) => $section === 'Scheduling' && (($record?->parent_id ?? $get('parent_id')) !== null)),
                 ];
 
                 // If general section, add AUTH management
@@ -1392,7 +1392,7 @@ class PlaylistResource extends FilamentResource
 
             $tabs[] = Forms\Components\Tabs\Tab::make($section)
                 ->schema($fields)
-                ->hidden(fn (Get $get, ?Playlist $record) => $section === 'Scheduling' && (($record?->parent_id ?? $get('parent_id')) !== null));
+                ->hidden(fn (Get $get, ?PlaylistModel $record) => $section === 'Scheduling' && (($record?->parent_id ?? $get('parent_id')) !== null));
         }
 
         // Compose the form with tabs and sections
@@ -1416,7 +1416,7 @@ class PlaylistResource extends FilamentResource
         foreach (self::getFormSections(creating: true) as $step => $fields) {
             $wizard[] = Forms\Components\Wizard\Step::make($step)
                 ->schema($fields)
-                ->hidden(fn (Get $get, ?Playlist $record) => $step === 'Scheduling' && (($record?->parent_id ?? $get('parent_id')) !== null));
+                ->hidden(fn (Get $get, ?PlaylistModel $record) => $step === 'Scheduling' && (($record?->parent_id ?? $get('parent_id')) !== null));
 
             // Add auth after type step
             if ($step === 'Type') {
