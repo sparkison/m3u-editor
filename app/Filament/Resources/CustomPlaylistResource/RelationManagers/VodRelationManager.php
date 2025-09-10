@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\CustomPlaylistResource\RelationManagers;
 
 use App\Filament\Resources\VodResource;
+use App\Filament\BulkActions\HandlesSourcePlaylist;
 use App\Models\Channel;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -11,6 +12,7 @@ use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Columns\SpatieTagsColumn;
+use Filament\Tables\Columns\SelectColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -21,6 +23,7 @@ use Spatie\Tags\Tag;
 
 class VodRelationManager extends RelationManager
 {
+    use HandlesSourcePlaylist;
     protected static string $relationship = 'channels';
 
     protected static ?string $label = 'VOD Channels';
@@ -112,8 +115,12 @@ class VodRelationManager extends RelationManager
         // Inject the custom group column after the group column
         array_splice($defaultColumns, 13, 0, [$groupColumn]);
 
-        $defaultColumns[] = Tables\Columns\TextColumn::make('playlist.parent.name')
+        $defaultColumns[] = SelectColumn::make('playlist_id')
             ->label('Parent Playlist')
+            ->options(fn (Channel $record) => $this->playlistOptions($record))
+            ->disabled(fn (Channel $record) => count($this->playlistOptions($record)) <= 1)
+            ->updateStateUsing(fn (Channel $record, $state) => $record->playlist_id)
+            ->afterStateUpdated(fn ($state, Channel $record) => $this->changeSourcePlaylist($record, (int) $state))
             ->toggleable()
             ->sortable();
 
@@ -125,7 +132,7 @@ class VodRelationManager extends RelationManager
                 return $action->button()->label('Filters');
             })
             ->modifyQueryUsing(function (Builder $query) {
-                $query->with(['tags', 'epgChannel', 'playlist.parent'])
+                $query->with(['tags', 'epgChannel', 'playlist'])
                     ->withCount(['failovers'])
                     ->where('is_vod', true); // Only show VOD content
             })
@@ -249,7 +256,51 @@ class VodRelationManager extends RelationManager
                     ->icon('heroicon-o-squares-plus')
                     ->modalIcon('heroicon-o-squares-plus')
                     ->modalDescription('Add to group')
-                    ->modalSubmitActionLabel('Yes, add to group'),
+            ->modalSubmitActionLabel('Yes, add to group'),
             ]);
+    }
+
+    protected function playlistOptions(Channel $record): array
+    {
+        [$groups] = self::getSourcePlaylistData(collect([$record]), 'channels', 'source_id');
+
+        if ($groups->isEmpty()) {
+            return [$record->playlist_id => $record->playlist?->name];
+        }
+
+        $group = $groups->first();
+        $options = self::availablePlaylistsForGroup($this->ownerRecord->id, $group, 'channels', 'source_id');
+
+        return $options->put($record->playlist_id, $record->playlist?->name)->toArray();
+    }
+
+    protected function changeSourcePlaylist(Channel $record, int $playlistId): void
+    {
+        if ($playlistId === $record->playlist_id) {
+            return;
+        }
+
+        $replacement = Channel::where('playlist_id', $playlistId)
+            ->where('source_id', $record->source_id)
+            ->first();
+
+        if (! $replacement) {
+            FilamentNotification::make()
+                ->title('Channel not found in selected playlist')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->ownerRecord->channels()->detach($record->id);
+        $this->ownerRecord->channels()->attach($replacement->id);
+
+        FilamentNotification::make()
+            ->title('Parent playlist updated')
+            ->success()
+            ->send();
+
+        $this->dispatch('refresh');
     }
 }
