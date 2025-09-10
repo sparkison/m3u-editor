@@ -138,7 +138,7 @@ class ChannelsRelationManager extends RelationManager
             ->defaultPaginationPageOption(25)
             ->groups([
                 Group::make('custom_group_name')
-                    ->label('Custom Group')
+                    ->label('Playlist Group')
                     ->collapsible()
                     ->getTitleFromRecordUsing(function ($record) use ($ownerRecord) {
                         $groupName = $record->getCustomGroupName($ownerRecord->uuid);
@@ -187,7 +187,22 @@ class ChannelsRelationManager extends RelationManager
                             });
                         }
                     }),
-                'group'
+                Group::make('group')
+                    ->label('Default Group')
+                    ->collapsible()
+                    ->getTitleFromRecordUsing(function ($record) {
+                        return $record->group ?: 'No Group';
+                    })
+                    ->getKeyFromRecordUsing(function ($record) {
+                        return $record->group ? strtolower($record->group) : 'no_group';
+                    })
+                    ->scopeQueryByKeyUsing(function (Builder $query, string $key) {
+                        if ($key === 'no_group') {
+                            return $query->whereNull('group');
+                        } else {
+                            return $query->whereRaw('LOWER(group) = ?', [strtolower($key)]);
+                        }
+                    }),
             ])
             ->defaultGroup('custom_group_name')
             ->columns($defaultColumns)
