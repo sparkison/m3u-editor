@@ -240,6 +240,7 @@ trait HandlesSourcePlaylist
                                     return collect($group['source_ids'])->map(function ($sourceId) use ($existing, $default, $options, $sourceLabels) {
                                         return Forms\Components\Select::make("items.{$sourceId}")
                                             ->label($sourceLabels[$sourceId] ?? (string) $sourceId)
+                                            ->inlineLabel()
                                             ->options($options)
                                             ->placeholder('Choose playlist')
                                             ->default($existing[$sourceId] ?? $default)
