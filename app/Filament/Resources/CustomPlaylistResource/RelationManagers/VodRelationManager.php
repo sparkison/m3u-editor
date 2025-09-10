@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\CustomPlaylistResource\RelationManagers;
 
 use App\Filament\Resources\VodResource;
+use App\Filament\Concerns\DisplaysPlaylistMembership;
 use App\Models\Channel;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -21,6 +22,7 @@ use Spatie\Tags\Tag;
 
 class VodRelationManager extends RelationManager
 {
+    use DisplaysPlaylistMembership;
     protected static string $relationship = 'channels';
 
     protected static ?string $label = 'VOD Channels';
@@ -112,8 +114,13 @@ class VodRelationManager extends RelationManager
         // Inject the custom group column after the group column
         array_splice($defaultColumns, 13, 0, [$groupColumn]);
 
-        $defaultColumns[] = Tables\Columns\TextColumn::make('playlist.parent.name')
+        $defaultColumns[] = Tables\Columns\TextColumn::make('playlist.name')
             ->label('Parent Playlist')
+            ->formatStateUsing(function ($state, Channel $record) {
+                $display = self::playlistDisplay($record, 'source_id');
+                return $display !== '' ? $display : ($record->playlist?->name ?? $state);
+            })
+            ->tooltip(fn (Channel $record) => self::playlistTooltip($record, 'source_id'))
             ->toggleable()
             ->sortable();
 
@@ -125,7 +132,7 @@ class VodRelationManager extends RelationManager
                 return $action->button()->label('Filters');
             })
             ->modifyQueryUsing(function (Builder $query) {
-                $query->with(['tags', 'epgChannel', 'playlist.parent'])
+                $query->with(['tags', 'epgChannel', 'playlist'])
                     ->withCount(['failovers'])
                     ->where('is_vod', true); // Only show VOD content
             })

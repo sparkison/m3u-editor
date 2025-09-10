@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\CustomPlaylistResource\RelationManagers;
 
 use App\Filament\Resources\SeriesResource;
+use App\Filament\Concerns\DisplaysPlaylistMembership;
 use App\Models\Series;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -20,6 +21,7 @@ use Spatie\Tags\Tag;
 
 class SeriesRelationManager extends RelationManager
 {
+    use DisplaysPlaylistMembership;
     protected static string $relationship = 'series';
 
     public function isReadOnly(): bool
@@ -103,8 +105,13 @@ class SeriesRelationManager extends RelationManager
         // Inject the custom group column after the group column
         array_splice($defaultColumns, 6, 0, [$groupColumn]);
 
-        $defaultColumns[] = Tables\Columns\TextColumn::make('playlist.parent.name')
+        $defaultColumns[] = Tables\Columns\TextColumn::make('playlist.name')
             ->label('Parent Playlist')
+            ->formatStateUsing(function ($state, Series $record) {
+                $display = self::playlistDisplay($record, 'source_series_id');
+                return $display !== '' ? $display : ($record->playlist?->name ?? $state);
+            })
+            ->tooltip(fn (Series $record) => self::playlistTooltip($record, 'source_series_id'))
             ->toggleable()
             ->sortable();
 
@@ -115,7 +122,7 @@ class SeriesRelationManager extends RelationManager
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
-            ->modifyQueryUsing(fn (Builder $query) => $query->with('playlist.parent'))
+            ->modifyQueryUsing(fn (Builder $query) => $query->with('playlist'))
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
             ->columns($defaultColumns)
