@@ -16,6 +16,7 @@ pest()->extend(Tests\TestCase::class);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use App\Jobs\SyncPlaylistChildren;
 
@@ -24,8 +25,10 @@ uses(RefreshDatabase::class)->in('Feature', 'Unit');
 beforeEach(function () {
     Bus::fake();
     Queue::fake();
+    Event::fake();
     Config::set('cache.default', 'array');
     Config::set('queue.default', 'sync');
+    Config::set('broadcasting.default', 'null');
     // Prevent static debounce dispatches from running
     if (! class_exists('\Mockery')) {
         return;
