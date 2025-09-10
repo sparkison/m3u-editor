@@ -9,12 +9,14 @@ trait DisplaysPlaylistMembership
 {
     protected static function getPlaylistNames(Model $record, string $sourceKey): Collection
     {
+        $userId = $record->user_id ?? auth()->id();
+
         if (empty($record->{$sourceKey})) {
             return collect([$record->playlist?->name])->filter();
         }
 
         return $record->newQuery()
-            ->where('user_id', $record->user_id)
+            ->where('user_id', $userId)
             ->where($sourceKey, $record->{$sourceKey})
             ->with('playlist')
             ->get()
@@ -27,7 +29,7 @@ trait DisplaysPlaylistMembership
         $names = self::getPlaylistNames($record, $sourceKey);
         $first = $names->first() ?? '';
         $count = $names->count() - 1;
-        return $count > 0 ? sprintf('%s +%d', $first, $count) : $first;
+        return $count > 0 ? sprintf('%s +%d', $first, $count) : '';
     }
 
     protected static function playlistTooltip(Model $record, string $sourceKey): ?string

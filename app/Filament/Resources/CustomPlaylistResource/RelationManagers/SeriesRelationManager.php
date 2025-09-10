@@ -103,27 +103,8 @@ class SeriesRelationManager extends RelationManager
         // Inject the custom group column after the group column
         array_splice($defaultColumns, 6, 0, [$groupColumn]);
 
-        $defaultColumns[] = Tables\Columns\SelectColumn::make('playlist_id')
-            ->label('Playlist')
-            ->options(function (Series $record) {
-                if (empty($record->source_series_id)) {
-                    return $record->playlist_id
-                        ? [$record->playlist_id => $record->playlist?->name]
-                        : [];
-                }
-
-                return Series::query()
-                    ->where('user_id', $record->user_id)
-                    ->where('source_series_id', $record->source_series_id)
-                    ->with('playlist')
-                    ->get()
-                    ->unique('playlist_id')
-                    ->mapWithKeys(fn (Series $series) => [$series->playlist_id => $series->playlist?->name])
-                    ->filter()
-                    ->toArray();
-            })
-            ->tooltip(fn (Series $record) => SeriesResource::playlistTooltip($record, 'source_series_id'))
-            ->searchable()
+        $defaultColumns[] = Tables\Columns\TextColumn::make('playlist.parent.name')
+            ->label('Parent Playlist')
             ->toggleable()
             ->sortable();
 
@@ -134,7 +115,7 @@ class SeriesRelationManager extends RelationManager
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
-            ->modifyQueryUsing(fn (Builder $query) => $query->with('playlist'))
+            ->modifyQueryUsing(fn (Builder $query) => $query->with('playlist.parent'))
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
             ->columns($defaultColumns)

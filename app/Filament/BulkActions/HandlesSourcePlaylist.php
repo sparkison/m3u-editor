@@ -5,7 +5,6 @@ namespace App\Filament\BulkActions;
 use App\Models\CustomPlaylist;
 use App\Models\Playlist;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Filament\Forms;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\Actions\Action;
@@ -189,22 +188,11 @@ trait HandlesSourcePlaylist
                                     ->label('View affected items')
                                     ->modalHeading("Items in {$parentName} ↔ {$childName}")
                                     ->form(function () use ($group, $pairKey, $modelClass, $sourceKey, $selectedIds) {
-                                        $instance = new $modelClass();
-                                        $table = $instance->getTable();
-
-                                        $select = ['id'];
-                                        if (Schema::hasColumn($table, 'title')) {
-                                            $select[] = 'title';
-                                        }
-                                        if (Schema::hasColumn($table, 'name')) {
-                                            $select[] = 'name';
-                                        }
-
                                         $records = $modelClass::query()
                                             ->whereIn('id', $selectedIds)
                                             ->whereIn('playlist_id', [$group['parent_id'], $group['child_id']])
                                             ->whereIn($sourceKey, $group['source_ids'])
-                                            ->select($select)
+                                            ->select('id', 'title', 'name')
                                             ->get();
 
                                         return [

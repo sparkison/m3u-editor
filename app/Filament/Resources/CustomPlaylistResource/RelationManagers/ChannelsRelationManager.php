@@ -112,27 +112,8 @@ class ChannelsRelationManager extends RelationManager
         // Inject the custom group column after the group column
         array_splice($defaultColumns, 13, 0, [$groupColumn]);
 
-        $defaultColumns[] = Tables\Columns\SelectColumn::make('playlist_id')
-            ->label('Playlist')
-            ->options(function (Channel $record) {
-                if (empty($record->source_id)) {
-                    return $record->playlist_id
-                        ? [$record->playlist_id => $record->playlist?->name]
-                        : [];
-                }
-
-                return Channel::query()
-                    ->where('user_id', $record->user_id)
-                    ->where('source_id', $record->source_id)
-                    ->with('playlist')
-                    ->get()
-                    ->unique('playlist_id')
-                    ->mapWithKeys(fn (Channel $channel) => [$channel->playlist_id => $channel->playlist?->name])
-                    ->filter()
-                    ->toArray();
-            })
-            ->tooltip(fn (Channel $record) => ChannelResource::playlistTooltip($record, 'source_id'))
-            ->searchable()
+        $defaultColumns[] = Tables\Columns\TextColumn::make('playlist.parent.name')
+            ->label('Parent Playlist')
             ->toggleable()
             ->sortable();
 
@@ -144,7 +125,7 @@ class ChannelsRelationManager extends RelationManager
                 return $action->button()->label('Filters');
             })
             ->modifyQueryUsing(function (Builder $query) {
-                $query->with(['tags', 'epgChannel', 'playlist'])
+                $query->with(['tags', 'epgChannel', 'playlist.parent'])
                     ->withCount(['failovers'])
                     ->where('is_vod', false); // Only show live channels
             })
