@@ -213,13 +213,22 @@ trait HandlesSourcePlaylist
                     Actions::make([
                         Action::make("items_{$groupKey}")
                             ->label('View Affected Items')
-                            ->form(function (Get $get) use ($group, $groupKey, $relation, $sourceKey) {
+                            ->form(function (Get $get) use ($group, $groupKey, $relation, $sourceKey, $modelClass) {
                                 $existing = $get("source_playlist_items.{$groupKey}") ?? [];
                                 $default  = $get("source_playlists.{$groupKey}");
 
-                                return collect($group['source_ids'])->map(function ($sourceId) use ($group, $existing, $default, $relation, $sourceKey) {
+                                $labels = $modelClass::whereIn($sourceKey, $group['source_ids'])
+                                    ->get()
+                                    ->mapWithKeys(fn ($record) => [
+                                        $record->{$sourceKey} => $record->title
+                                            ?? $record->name
+                                            ?? (string) $record->{$sourceKey},
+                                    ]);
+
+                                return collect($group['source_ids'])->map(function ($sourceId) use ($group, $existing, $default, $relation, $sourceKey, $labels) {
                                     return Forms\Components\Select::make("items.{$sourceId}")
-                                        ->label((string) $sourceId)
+                                        ->label($labels[$sourceId] ?? (string) $sourceId)
+                                        ->inlineLabel()
                                         ->options(fn (Get $get) => self::availablePlaylistsForGroup(
                                             $get('playlist'),
                                             $group,
