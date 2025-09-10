@@ -232,18 +232,17 @@ trait HandlesSourcePlaylist
                                 ->color('primary')
                                 ->button()
                                 ->extraAttributes(['class' => 'whitespace-nowrap'])
-                                ->arguments(fn (Get $get) => ['playlist' => $get('playlist')])
-                                ->form(function (Get $get, array $arguments) use ($group, $groupKey, $relation, $sourceKey, $labels) {
+                                ->form(function (Get $get) use ($group, $groupKey, $relation, $sourceKey, $labels) {
                                     $existing = $get("source_playlist_items.{$groupKey}") ?? [];
                                     $default = $get("source_playlists.{$groupKey}");
 
-                                    return collect($group['source_ids'])->map(function ($sourceId) use ($group, $existing, $default, $relation, $sourceKey, $labels, $arguments) {
+                                    return collect($group['source_ids'])->map(function ($sourceId) use ($group, $existing, $default, $relation, $sourceKey, $labels, $get) {
                                         return Forms\Components\Grid::make(2)
                                             ->schema([
                                                 Forms\Components\Select::make("items.{$sourceId}")
                                                     ->label($labels[$sourceId] ?? (string) $sourceId)
                                                     ->options(fn () => self::availablePlaylistsForGroup(
-                                                        $arguments['playlist'] ?? null,
+                                                        $get('playlist'),
                                                         $group,
                                                         $relation,
                                                         $sourceKey
