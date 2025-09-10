@@ -234,25 +234,30 @@ trait HandlesSourcePlaylist
                                 ->extraAttributes(['class' => 'whitespace-nowrap'])
                                 ->form(function (Get $get) use ($group, $groupKey, $relation, $sourceKey, $labels) {
                                     $existing = $get("source_playlist_items.{$groupKey}") ?? [];
-                                    $default  = $get("source_playlists.{$groupKey}");
+                                    $default = $get("source_playlists.{$groupKey}");
 
                                     return collect($group['source_ids'])->map(function ($sourceId) use ($group, $existing, $default, $relation, $sourceKey, $labels) {
-                                        return Forms\Components\Select::make("items.{$sourceId}")
-                                            ->label($labels[$sourceId] ?? (string) $sourceId)
-                                            ->options(fn (Get $get) => self::availablePlaylistsForGroup(
-                                                $get('playlist'),
-                                                $group,
-                                                $relation,
-                                                $sourceKey
-                                            )->toArray())
-                                            ->placeholder('Choose playlist')
-                                            ->default($existing[$sourceId] ?? $default)
-                                            ->searchable()
-                                            ->reactive();
+                                        return Forms\Components\Grid::make(2)
+                                            ->schema([
+                                                Forms\Components\Select::make("items.{$sourceId}")
+                                                    ->label($labels[$sourceId] ?? (string) $sourceId)
+                                                    ->options(fn (Get $get) => self::availablePlaylistsForGroup(
+                                                        $get('playlist'),
+                                                        $group,
+                                                        $relation,
+                                                        $sourceKey
+                                                    )->toArray())
+                                                    ->placeholder('Choose playlist')
+                                                    ->default($existing[$sourceId] ?? $default)
+                                                    ->searchable()
+                                                    ->reactive()
+                                                    ->inlineLabel()
+                                                    ->columnSpan(1),
+                                            ]);
                                     })->toArray();
                                 })
-                                ->action(function (array $formData, Set $set) use ($groupKey) {
-                                    $set("source_playlist_items.{$groupKey}", $formData['items'] ?? []);
+                                ->action(function (array $data, Set $set) use ($groupKey) {
+                                    $set("source_playlist_items.{$groupKey}", $data['items'] ?? []);
                                 })
                                 ->disabled(fn (Get $get) => blank($get("source_playlists.{$groupKey}")))
                         ),
