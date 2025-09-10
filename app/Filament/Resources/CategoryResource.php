@@ -123,7 +123,7 @@ class CategoryResource extends FilamentResource
                         ->label('Add to Custom Playlist')
                         ->form(function (Category $record) use (&$sourcePlaylistData) {
                             $seriesRecords = $record->series()
-                                ->select('id', 'playlist_id', 'source_series_id', 'title', 'name')
+                                ->select('id', 'playlist_id', 'source_series_id', 'name')
                                 ->get();
 
                             $form = [
@@ -168,7 +168,7 @@ class CategoryResource extends FilamentResource
                         })
                         ->action(function (Category $record, array $data) use (&$sourcePlaylistData): void {
                             $seriesRecords = $record->series()
-                                ->select('id', 'playlist_id', 'source_series_id', 'title', 'name')
+                                ->select('id', 'playlist_id', 'source_series_id', 'name')
                                 ->get();
 
                             $seriesRecords = self::mapRecordsToSourcePlaylist(
@@ -318,7 +318,7 @@ class CategoryResource extends FilamentResource
                         ->form(function (Collection $records) use (&$sourcePlaylistData) {
                             $seriesRecords = Series::query()
                                 ->whereIn('category_id', $records->pluck('id'))
-                                ->select('id', 'playlist_id', 'source_series_id', 'title', 'name')
+                                ->select('id', 'playlist_id', 'source_series_id', 'name')
                                 ->get();
 
                             $form = [
@@ -362,7 +362,7 @@ class CategoryResource extends FilamentResource
                         ->action(function (Collection $records, array $data) use (&$sourcePlaylistData): void {
                             $seriesRecords = Series::query()
                                 ->whereIn('category_id', $records->pluck('id'))
-                                ->select('id', 'playlist_id', 'source_series_id', 'title', 'name')
+                                ->select('id', 'playlist_id', 'source_series_id', 'name')
                                 ->get();
 
                             $seriesRecords = self::mapRecordsToSourcePlaylist(
