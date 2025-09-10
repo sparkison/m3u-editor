@@ -14,8 +14,6 @@ use Filament\Tables\Columns\SpatieTagsColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Spatie\Tags\Tag;
@@ -46,10 +44,10 @@ class SeriesRelationManager extends RelationManager
 
         $groupColumn = SpatieTagsColumn::make('tags')
             ->label('Playlist Category')
-            ->type($ownerRecord->uuid . '-category')
+            ->type($ownerRecord->uuid.'-category')
             ->toggleable()->searchable(query: function (Builder $query, string $search) use ($ownerRecord): Builder {
                 return $query->whereHas('tags', function (Builder $query) use ($search, $ownerRecord) {
-                    $query->where('tags.type', $ownerRecord->uuid . '-category');
+                    $query->where('tags.type', $ownerRecord->uuid.'-category');
 
                     // Cross-database compatible JSON search
                     $connection = $query->getConnection();
@@ -58,19 +56,19 @@ class SeriesRelationManager extends RelationManager
                     switch ($driver) {
                         case 'pgsql':
                             // PostgreSQL uses ->> operator for JSON
-                            $query->whereRaw('LOWER(tags.name->>\'$\') LIKE ?', ['%' . strtolower($search) . '%']);
+                            $query->whereRaw('LOWER(tags.name->>\'$\') LIKE ?', ['%'.strtolower($search).'%']);
                             break;
                         case 'mysql':
                             // MySQL uses JSON_EXTRACT
-                            $query->whereRaw('LOWER(JSON_EXTRACT(tags.name, "$")) LIKE ?', ['%' . strtolower($search) . '%']);
+                            $query->whereRaw('LOWER(JSON_EXTRACT(tags.name, "$")) LIKE ?', ['%'.strtolower($search).'%']);
                             break;
                         case 'sqlite':
                             // SQLite uses json_extract
-                            $query->whereRaw('LOWER(json_extract(tags.name, "$")) LIKE ?', ['%' . strtolower($search) . '%']);
+                            $query->whereRaw('LOWER(json_extract(tags.name, "$")) LIKE ?', ['%'.strtolower($search).'%']);
                             break;
                         default:
                             // Fallback - try to search the JSON as text
-                            $query->where(DB::raw('LOWER(CAST(tags.name AS TEXT))'), 'LIKE', '%' . strtolower($search) . '%');
+                            $query->where(DB::raw('LOWER(CAST(tags.name AS TEXT))'), 'LIKE', '%'.strtolower($search).'%');
                             break;
                     }
                 });
@@ -94,19 +92,39 @@ class SeriesRelationManager extends RelationManager
                     })
                     ->leftJoin('tags', function ($join) use ($ownerRecord) {
                         $join->on('taggables.tag_id', '=', 'tags.id')
-                            ->where('tags.type', '=', $ownerRecord->uuid . '-category');
+                            ->where('tags.type', '=', $ownerRecord->uuid.'-category');
                     })
                     ->orderByRaw("{$orderByClause} {$direction}")
                     ->select('series.*', DB::raw("{$orderByClause} as tag_name_sort"))
                     ->distinct();
             });
-        $defaultColumns = SeriesResource::getTableColumns(showCategory: true, showPlaylist: true);
+        $defaultColumns = SeriesResource::getTableColumns(showCategory: true, showPlaylist: false);
 
         // Inject the custom group column after the group column
         array_splice($defaultColumns, 6, 0, [$groupColumn]);
 
-        $defaultColumns[] = Tables\Columns\TextColumn::make('playlist.parent.name')
-            ->label('Parent Playlist')
+        $defaultColumns[] = Tables\Columns\SelectColumn::make('playlist_id')
+            ->label('Playlist')
+            ->options(function (Series $record) {
+                if (empty($record->source_series_id)) {
+                    return $record->playlist_id
+                        ? [$record->playlist_id => $record->playlist?->name]
+                        : [];
+                }
+
+                return Series::query()
+                    ->where('user_id', $record->user_id)
+                    ->where('source_series_id', $record->source_series_id)
+                    ->with('playlist')
+                    ->get()
+                    ->unique('playlist_id')
+                    ->mapWithKeys(fn (Series $series) => [$series->playlist_id => $series->playlist?->name])
+                    ->filter()
+                    ->toArray();
+            })
+            ->formatStateUsing(fn ($state, Series $record) => SeriesResource::playlistDisplay($record, 'source_series_id'))
+            ->tooltip(fn (Series $record) => SeriesResource::playlistTooltip($record, 'source_series_id'))
+            ->searchable()
             ->toggleable()
             ->sortable();
 
@@ -117,7 +135,7 @@ class SeriesRelationManager extends RelationManager
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
             })
-            ->modifyQueryUsing(fn (Builder $query) => $query->with('playlist.parent'))
+            ->modifyQueryUsing(fn (Builder $query) => $query->with('playlist'))
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
             ->columns($defaultColumns)
@@ -127,9 +145,9 @@ class SeriesRelationManager extends RelationManager
                     ->label('Custom Category')
                     ->options(function () use ($ownerRecord) {
                         return $ownerRecord->tags()
-                            ->where('type', $ownerRecord->uuid . '-category')
+                            ->where('type', $ownerRecord->uuid.'-category')
                             ->get()
-                            ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
+                            ->mapWithKeys(fn ($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
                             ->toArray();
                     })
                     ->query(function (Builder $query, array $data) use ($ownerRecord): Builder {
@@ -140,7 +158,7 @@ class SeriesRelationManager extends RelationManager
                         return $query->where(function ($query) use ($data, $ownerRecord) {
                             foreach ($data['values'] as $categoryName) {
                                 $query->orWhereHas('tags', function ($tagQuery) use ($categoryName, $ownerRecord) {
-                                    $tagQuery->where('type', $ownerRecord->uuid . '-category')
+                                    $tagQuery->where('type', $ownerRecord->uuid.'-category')
                                         ->where('name->en', $categoryName);
                                 });
                             }
@@ -151,7 +169,7 @@ class SeriesRelationManager extends RelationManager
             ])
             ->headerActions([
                 Tables\Actions\AttachAction::make()
-                    ->form(fn(Tables\Actions\AttachAction $action): array => [
+                    ->form(fn (Tables\Actions\AttachAction $action): array => [
                         $action
                             ->getRecordSelect()
                             ->getSearchResultsUsing(function (string $search) {
@@ -182,9 +200,10 @@ class SeriesRelationManager extends RelationManager
                                 $displayTitle = $record->title_custom ?: $record->title;
                                 $playlistName = $record->getEffectivePlaylist()->name ?? 'Unknown';
                                 $options[$record->id] = "{$displayTitle} [{$playlistName}]";
+
                                 return "{$displayTitle} [{$playlistName}]";
-                            })
-                    ])
+                            }),
+                    ]),
 
                 // Advanced attach when adding pivot values:
                 // Tables\Actions\AttachAction::make()->form(fn(Tables\Actions\AttachAction $action): array => [
@@ -211,14 +230,14 @@ class SeriesRelationManager extends RelationManager
                         Forms\Components\Select::make('category')
                             ->label('Select category')
                             ->options(
-                                Tag::where('type', $ownerRecord->uuid . '-category')
+                                Tag::where('type', $ownerRecord->uuid.'-category')
                                     ->pluck('name', 'name')
                             )
                             ->required(),
                     ])
                     ->action(function (Collection $records, $data) use ($ownerRecord): void {
                         foreach ($records as $record) {
-                            $record->syncTagsWithType([$data['category']], $ownerRecord->uuid . '-category');
+                            $record->syncTagsWithType([$data['category']], $ownerRecord->uuid.'-category');
                         }
                     })->after(function () {
                         FilamentNotification::make()
