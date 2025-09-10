@@ -396,7 +396,14 @@ trait HandlesSourcePlaylist
                         ->label('Custom Playlist')
                         ->helperText("Select the custom playlist you would like to add the selected {$itemLabel} to.")
                         ->options(CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                        ->afterStateUpdated(fn (Set $set, $state) => $state ? $set('category', null) : null)
+                        ->afterStateUpdated(function (Set $set, $state) {
+                            $set('source_playlists', []);
+                            $set('source_playlist_items', []);
+
+                            if ($state) {
+                                $set('category', null);
+                            }
+                        })
                         ->searchable(),
                     Forms\Components\Select::make('category')
                         ->label($categoryLabel)
