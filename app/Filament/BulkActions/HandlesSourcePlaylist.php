@@ -5,7 +5,6 @@ namespace App\Filament\BulkActions;
 use App\Models\CustomPlaylist;
 use App\Models\Playlist;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Filament\Forms;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\Actions\Action;
@@ -188,39 +187,35 @@ trait HandlesSourcePlaylist
                                 Action::make("view_affected_{$pairKey}")
                                     ->label('View affected items')
                                     ->modalHeading("Items in {$parentName} ↔ {$childName}")
-                                    ->form(function () use ($group, $pairKey, $modelClass, $sourceKey, $selectedIds) {
-                                        $instance = new $modelClass();
-                                        $table = $instance->getTable();
-
-                                        $select = ['id'];
-                                        if (Schema::hasColumn($table, 'title')) {
-                                            $select[] = 'title';
-                                        }
-                                        if (Schema::hasColumn($table, 'name')) {
-                                            $select[] = 'name';
-                                        }
-
-                                        $records = $modelClass::query()
-                                            ->whereIn('id', $selectedIds)
-                                            ->whereIn('playlist_id', [$group['parent_id'], $group['child_id']])
-                                            ->whereIn($sourceKey, $group['source_ids'])
-                                            ->select($select)
-                                            ->get();
-
-                                        return [
-                                            Forms\Components\Group::make()
-                                                ->statePath("source_playlists_items.{$pairKey}")
-                                                ->schema(
-                                                    $records->map(fn ($record) =>
-                                                        Forms\Components\Select::make((string) $record->id)
-                                                            ->label($record->title ?? $record->name ?? '')
-                                                            ->inlineLabel()
-                                                            ->options($group['playlists']->toArray())
-                                                            ->placeholder('Use group selection')
-                                                            ->searchable()
-                                                    )->toArray()
-                                                ),
-                                        ];
+                                    ->modalSubmitActionLabel('Close')
+                                    ->table(function (Tables\Table $table) use ($group, $pairKey, $modelClass, $sourceKey, $selectedIds) {
+                                        return $table
+                                            ->query(
+                                                $modelClass::query()
+                                                    ->whereIn('id', $selectedIds)
+                                                    ->whereIn('playlist_id', [$group['parent_id'], $group['child_id']])
+                                                    ->whereIn($sourceKey, $group['source_ids'])
+                                                    ->select('id', 'playlist_id', 'title', 'name')
+                                            )
+                                            ->columns([
+                                                Tables\Columns\TextColumn::make('title')
+                                                    ->label('Item')
+                                                    ->formatStateUsing(fn ($record) => $record->title ?? $record->name ?? ''),
+                                                Tables\Columns\SelectColumn::make('override')
+                                                    ->label('Use items from')
+                                                    ->options($group['playlists']->toArray())
+                                                    ->placeholder('Use group selection')
+                                                    ->getStateUsing(function ($record, $livewire) use ($pairKey) {
+                                                        $index = array_key_last($livewire->mountedFormComponentActionsData);
+                                                        return data_get($livewire->mountedFormComponentActionsData[$index] ?? [], "source_playlists_items.{$pairKey}.{$record->id}");
+                                                    })
+                                                    ->updateStateUsing(function ($state, $record, $livewire) use ($pairKey) {
+                                                        $index = array_key_last($livewire->mountedFormComponentActionsData);
+                                                        data_set($livewire->mountedFormComponentActionsData[$index], "source_playlists_items.{$pairKey}.{$record->id}", $state);
+                                                        return $state;
+                                                    }),
+                                            ])
+                                            ->paginationPageOptions([5, 10, 25]);
                                     }),
                             ])
                                 ->columnSpan(1)
