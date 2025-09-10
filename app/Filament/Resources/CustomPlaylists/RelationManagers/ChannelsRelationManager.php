@@ -141,10 +141,12 @@ class ChannelsRelationManager extends RelationManager
                     ->label('Custom Group')
                     ->collapsible()
                     ->getTitleFromRecordUsing(function ($record) use ($ownerRecord) {
-                        return $record->getCustomGroupName($ownerRecord->uuid);
+                        $groupName = $record->getCustomGroupName($ownerRecord->uuid);
+                        return $groupName ?: 'Uncategorized';
                     })
                     ->getKeyFromRecordUsing(function ($record) use ($ownerRecord) {
-                        return strtolower($record->getCustomGroupName($ownerRecord->uuid));
+                        $groupName = $record->getCustomGroupName($ownerRecord->uuid);
+                        return $groupName ? strtolower($groupName) : 'uncategorized';
                     })
                     ->orderQueryUsing(function (Builder $query, string $direction) use ($ownerRecord) {
                         $connection = $query->getConnection();
