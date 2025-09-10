@@ -53,6 +53,8 @@ class DuplicatePlaylist implements ShouldQueue
                 'uuid',
                 'short_urls_enabled',
                 'short_urls',
+                'synced',
+                'sync_time',
             ]);
             $newPlaylist->name = $this->name ?? $playlist->name.' (Copy)';
             $newPlaylist->uuid = Str::orderedUuid()->toString();
