@@ -188,6 +188,15 @@ trait HandlesSourcePlaylist
             return [];
         }
 
+        $labels = $records->mapWithKeys(function ($record) use ($sourceKey) {
+            $label = $record->title_custom
+                ?? $record->title
+                ?? $record->name
+                ?? $record->$sourceKey;
+
+            return [$record->$sourceKey => $label];
+        })->all();
+
         $fields = [];
 
         $sourceLabels = $records
@@ -219,13 +228,17 @@ trait HandlesSourcePlaylist
                         ->suffixAction(
                             Action::make("items_{$groupKey}")
                                 ->label('View Affected Items')
-                                ->form(function (Get $get) use ($group, $groupKey, $relation, $sourceKey) {
+                                ->icon('heroicon-o-eye')
+                                ->color('primary')
+                                ->button()
+                                ->extraAttributes(['class' => 'whitespace-nowrap'])
+                                ->form(function (Get $get) use ($group, $groupKey, $relation, $sourceKey, $labels) {
                                     $existing = $get("source_playlist_items.{$groupKey}") ?? [];
                                     $default  = $get("source_playlists.{$groupKey}");
 
-                                    return collect($group['source_ids'])->map(function ($sourceId) use ($group, $existing, $default, $relation, $sourceKey) {
+                                    return collect($group['source_ids'])->map(function ($sourceId) use ($group, $existing, $default, $relation, $sourceKey, $labels) {
                                         return Forms\Components\Select::make("items.{$sourceId}")
-                                            ->label((string) $sourceId)
+                                            ->label($labels[$sourceId] ?? (string) $sourceId)
                                             ->options(fn (Get $get) => self::availablePlaylistsForGroup(
                                                 $get('playlist'),
                                                 $group,

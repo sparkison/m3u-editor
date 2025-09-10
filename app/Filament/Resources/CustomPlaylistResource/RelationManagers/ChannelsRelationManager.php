@@ -117,9 +117,11 @@ class ChannelsRelationManager extends RelationManager
 
         $defaultColumns[] = SelectColumn::make('playlist_id')
             ->label('Parent Playlist')
+            ->getStateUsing(fn (Channel $record) => $record->playlist_id)
             ->options(fn (Channel $record) => $this->playlistOptions($record))
             ->disabled(fn (Channel $record) => count($this->playlistOptions($record)) <= 1)
-            ->updateStateUsing(fn (Channel $record, $state) => $record->playlist_id)
+            ->selectablePlaceholder(false)
+            ->updateStateUsing(fn ($state) => $state)
             ->afterStateUpdated(fn ($state, Channel $record) => $this->changeSourcePlaylist($record, (int) $state))
             ->toggleable()
             ->sortable();

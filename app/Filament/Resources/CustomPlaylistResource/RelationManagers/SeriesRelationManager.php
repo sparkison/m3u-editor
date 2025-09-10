@@ -108,9 +108,11 @@ class SeriesRelationManager extends RelationManager
 
         $defaultColumns[] = SelectColumn::make('playlist_id')
             ->label('Parent Playlist')
+            ->getStateUsing(fn (Series $record) => $record->playlist_id)
             ->options(fn (Series $record) => $this->playlistOptions($record))
             ->disabled(fn (Series $record) => count($this->playlistOptions($record)) <= 1)
-            ->updateStateUsing(fn (Series $record, $state) => $record->playlist_id)
+            ->selectablePlaceholder(false)
+            ->updateStateUsing(fn ($state) => $state)
             ->afterStateUpdated(fn ($state, Series $record) => $this->changeSourcePlaylist($record, (int) $state))
             ->toggleable()
             ->sortable();
