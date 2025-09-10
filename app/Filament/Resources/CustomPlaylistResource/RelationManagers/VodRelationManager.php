@@ -131,7 +131,6 @@ class VodRelationManager extends RelationManager
                     ->filter()
                     ->toArray();
             })
-            ->formatStateUsing(fn ($state, Channel $record) => VodResource::playlistDisplay($record, 'source_id'))
             ->tooltip(fn (Channel $record) => VodResource::playlistTooltip($record, 'source_id'))
             ->searchable()
             ->toggleable()

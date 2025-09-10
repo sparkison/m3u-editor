@@ -131,7 +131,6 @@ class ChannelsRelationManager extends RelationManager
                     ->filter()
                     ->toArray();
             })
-            ->formatStateUsing(fn ($state, Channel $record) => ChannelResource::playlistDisplay($record, 'source_id'))
             ->tooltip(fn (Channel $record) => ChannelResource::playlistTooltip($record, 'source_id'))
             ->searchable()
             ->toggleable()

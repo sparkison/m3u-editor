@@ -122,7 +122,6 @@ class SeriesRelationManager extends RelationManager
                     ->filter()
                     ->toArray();
             })
-            ->formatStateUsing(fn ($state, Series $record) => SeriesResource::playlistDisplay($record, 'source_series_id'))
             ->tooltip(fn (Series $record) => SeriesResource::playlistTooltip($record, 'source_series_id'))
             ->searchable()
             ->toggleable()
