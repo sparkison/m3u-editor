@@ -226,7 +226,7 @@ trait HandlesSourcePlaylist
                         ->live()
                         ->reactive()
                         ->suffixAction(
-                            Action::make("items_{$groupKey}")
+                            fn () => Action::make("items_{$groupKey}")
                                 ->label('View Affected Items')
                                 ->icon('heroicon-o-eye')
                                 ->color('primary')
