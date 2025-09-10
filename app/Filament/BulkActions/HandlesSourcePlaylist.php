@@ -120,6 +120,32 @@ trait HandlesSourcePlaylist
     }
 
     /**
+     * Determine which playlists remain available for a duplicate group,
+     * excluding any already used within the chosen custom playlist.
+     */
+    protected static function availablePlaylistsForGroup(?int $customPlaylistId, array $group, string $relation, string $sourceKey): Collection
+    {
+        $options = $group['playlists']->collect();
+
+        if (! $customPlaylistId) {
+            return $options;
+        }
+
+        $playlist = CustomPlaylist::find($customPlaylistId);
+
+        if (! $playlist) {
+            return $options;
+        }
+
+        $used = $playlist->$relation()
+            ->whereIn($sourceKey, $group['source_ids'])
+            ->pluck('playlist_id')
+            ->unique();
+
+        return $options->except($used);
+    }
+
+    /**
      * Build form fields allowing users to choose the source playlist for
      * duplicate parent/child groups and optionally override individual
      * records within those groups.

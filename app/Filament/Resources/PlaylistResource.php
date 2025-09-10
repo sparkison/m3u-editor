@@ -3,24 +3,22 @@
 namespace App\Filament\Resources;
 
 use App\Enums\Status;
-use App\Facades\PlaylistUrlFacade;
 use App\Filament\Resources\PlaylistResource\Pages as PlaylistPages;
-use App\Filament\Resources\PlaylistSyncStatusResource\Pages\CreatePlaylistSyncStatus;
-use App\Filament\Resources\PlaylistSyncStatusResource\Pages\EditPlaylistSyncStatus;
-use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ListPlaylistSyncStatuses;
-use App\Filament\Resources\PlaylistSyncStatusResource\Pages\ViewPlaylistSyncStatus;
-use App\Livewire\EpgViewer;
-use App\Livewire\MediaFlowProxyUrl;
-use App\Livewire\PlaylistEpgUrl;
-use App\Livewire\PlaylistInfo;
-use App\Livewire\PlaylistM3uUrl;
-use App\Livewire\XtreamApiInfo;
-use App\Models\Category;
-use App\Models\Playlist;
+use App\Filament\Resources\PlaylistResource\RelationManagers;
 use App\Models\Playlist as PlaylistModel;
-use App\Models\SourceGroup;
 use App\Rules\CheckIfUrlOrLocalPath as CheckIfUrlOrLocalPathRule;
-use App\Services\EpgCacheService;
+use Carbon\Carbon;
+use Filament\Forms;
+use Filament\Forms\Get;
+use Filament\Notifications\Notification as FilamentNotification;
+use Filament\Resources\Resource as FilamentResource;
+use Filament\Tables;
+use Filament\Tables\Columns\Column;
+use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
+use RyanChandler\FilamentProgressColumn\ProgressColumn;
 use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Forms\Get;
@@ -100,8 +98,8 @@ class PlaylistResource extends FilamentResource
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
                     ->sortable()
-                    ->formatStateUsing(fn ($state, ?PlaylistModel $record) => $record?->parent_id ? '↳ '.$state : $state)
-                    ->extraAttributes(fn (?PlaylistModel $record) => $record?->parent_id ? ['class' => 'pl-6'] : []),
+                    ->formatStateUsing(fn($state, ?PlaylistModel $record) => $record?->parent_id ? '↳ '.$state : $state)
+                    ->extraAttributes(fn(?PlaylistModel $record) => $record?->parent_id ? ['class' => 'pl-6'] : []),
                 Tables\Columns\TextColumn::make('url')
                     ->label('Playlist URL')
                     ->wrap()
@@ -112,14 +110,15 @@ class PlaylistResource extends FilamentResource
                     ->toggleable()
                     ->formatStateUsing(fn (int $state): string => $state === 0 ? '∞' : (string) $state)
                     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
-                    ->description(fn (?PlaylistModel $record): string => 'Active: '.(int) ($record ? Redis::get("active_streams:{$record->id}") : 0))
+                    ->description(fn(?PlaylistModel $record): string =>
+                        "Active: " . (int) ($record ? Redis::get("active_streams:{$record->id}") : 0))
                     ->sortable(),
                 Tables\Columns\TextColumn::make('groups_count')
                     ->label('Groups')
                     ->counts('groups')
                     ->toggleable()
                     ->sortable()
-                    ->hidden(fn (?PlaylistModel $record): bool => $record?->parent_id !== null),
+                    ->hidden(fn(?PlaylistModel $record): bool => $record?->parent_id !== null),
                 // Tables\Columns\TextColumn::make('channels_count')
                 //     ->label('Channels')
                 //     ->counts('channels')
@@ -129,24 +128,24 @@ class PlaylistResource extends FilamentResource
                 Tables\Columns\TextColumn::make('live_channels_count')
                     ->label('Live')
                     ->counts('live_channels')
-                    ->description(fn (?PlaylistModel $record): string => "Enabled: {$record?->enabled_live_channels_count}")
+                    ->description(fn(?PlaylistModel $record): string => "Enabled: {$record?->enabled_live_channels_count}")
                     ->toggleable()
                     ->sortable()
-                    ->hidden(fn (?PlaylistModel $record): bool => $record?->parent_id !== null),
+                    ->hidden(fn(?PlaylistModel $record): bool => $record?->parent_id !== null),
                 Tables\Columns\TextColumn::make('vod_channels_count')
                     ->label('VOD')
                     ->counts('vod_channels')
-                    ->description(fn (?PlaylistModel $record): string => "Enabled: {$record?->enabled_vod_channels_count}")
+                    ->description(fn(?PlaylistModel $record): string => "Enabled: {$record?->enabled_vod_channels_count}")
                     ->toggleable()
                     ->sortable()
-                    ->hidden(fn (?PlaylistModel $record): bool => $record?->parent_id !== null),
+                    ->hidden(fn(?PlaylistModel $record): bool => $record?->parent_id !== null),
                 Tables\Columns\TextColumn::make('series_count')
                     ->label('Series')
                     ->counts('series')
-                    ->description(fn (?PlaylistModel $record): string => "Enabled: {$record?->enabled_series_count}")
+                    ->description(fn(?PlaylistModel $record): string => "Enabled: {$record?->enabled_series_count}")
                     ->toggleable()
                     ->sortable()
-                    ->hidden(fn (?PlaylistModel $record): bool => $record?->parent_id !== null),
+                    ->hidden(fn(?PlaylistModel $record): bool => $record?->parent_id !== null),
                 Tables\Columns\TextColumn::make('status')
                     ->sortable()
                     ->badge()
@@ -372,7 +371,7 @@ class PlaylistResource extends FilamentResource
                         ->color('gray')
                         ->icon('heroicon-m-arrows-right-left')
                         ->url(
-                            fn (PlaylistModel $record): string => PlaylistResource::getUrl(
+                            fn(PlaylistModel $record): string => PlaylistResource::getUrl(
                                 name: 'playlist-sync-statuses.index',
                                 parameters: [
                                     'parent' => $record->id,
@@ -410,7 +409,7 @@ class PlaylistResource extends FilamentResource
                         ->label('Reset active count')
                         ->icon('heroicon-o-numbered-list')
                         ->color('warning')
-                        ->action(fn ($record) => Redis::set("active_streams:{$record->id}", 0))->after(function () {
+                        ->action(fn($record) => Redis::set("active_streams:{$record->id}", 0))->after(function () {
                             FilamentNotification::make()
                                 ->success()
                                 ->title('Active stream count reset')
@@ -559,7 +558,7 @@ class PlaylistResource extends FilamentResource
                 ->color('gray')
                 ->icon('heroicon-m-arrows-right-left')
                 ->url(
-                    fn (PlaylistModel $record): string => PlaylistResource::getUrl(
+                    fn(PlaylistModel $record): string => PlaylistResource::getUrl(
                         name: 'playlist-sync-statuses.index',
                         parameters: [
                             'parent' => $record->id,
@@ -746,7 +745,7 @@ class PlaylistResource extends FilamentResource
                     ->label('Reset active count')
                     ->icon('heroicon-o-numbered-list')
                     ->color('warning')
-                    ->action(fn ($record) => Redis::set("active_streams:{$record->id}", 0))->after(function () {
+                    ->action(fn($record) => Redis::set("active_streams:{$record->id}", 0))->after(function () {
                         FilamentNotification::make()
                             ->success()
                             ->title('Active stream count reset')
@@ -929,7 +928,7 @@ class PlaylistResource extends FilamentResource
                         ->prefixIcon('heroicon-m-globe-alt')
                         ->helperText('Enter the URL of the playlist file. If this is a local file, you can enter a full or relative path. If changing URL, the playlist will be re-imported. Use with caution as this could lead to data loss if the new playlist differs from the old one.')
                         ->requiredWithout('uploads')
-                        ->rules([new CheckIfUrlOrLocalPathRule])
+                        ->rules([new CheckIfUrlOrLocalPathRule()])
                         ->maxLength(255)
                         ->hidden(fn (Get $get): bool => (bool) $get('xtream')),
                     Forms\Components\FileUpload::make('uploads')

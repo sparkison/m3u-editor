@@ -112,10 +112,8 @@ class VodRelationManager extends RelationManager
         // Inject the custom group column after the group column
         array_splice($defaultColumns, 13, 0, [$groupColumn]);
 
-        $defaultColumns[] = Tables\Columns\SelectColumn::make('custom_playlist_id')
-            ->label('Playlist')
-            ->options(fn (Channel $record) => $record->customPlaylists->pluck('name', 'id'))
-            ->disabled(fn (Channel $record): bool => $record->customPlaylists->count() <= 1)
+        $defaultColumns[] = Tables\Columns\TextColumn::make('playlist.parent.name')
+            ->label('Parent Playlist')
             ->toggleable()
             ->sortable();
 
@@ -127,7 +125,7 @@ class VodRelationManager extends RelationManager
                 return $action->button()->label('Filters');
             })
             ->modifyQueryUsing(function (Builder $query) {
-                $query->with(['tags', 'epgChannel', 'playlist.parent', 'customPlaylists'])
+                $query->with(['tags', 'epgChannel', 'playlist.parent'])
                     ->withCount(['failovers'])
                     ->where('is_vod', true); // Only show VOD content
             })

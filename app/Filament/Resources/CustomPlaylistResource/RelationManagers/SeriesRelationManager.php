@@ -104,7 +104,7 @@ class SeriesRelationManager extends RelationManager
         array_splice($defaultColumns, 6, 0, [$groupColumn]);
 
         $defaultColumns[] = Tables\Columns\TextColumn::make('playlist.parent.name')
-            ->label('Playlist')
+            ->label('Parent Playlist')
             ->toggleable()
             ->sortable();
 
