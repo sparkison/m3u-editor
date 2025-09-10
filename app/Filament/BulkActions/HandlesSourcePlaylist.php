@@ -6,7 +6,6 @@ use App\Models\CustomPlaylist;
 use App\Models\Playlist;
 use Illuminate\Support\Facades\DB;
 use Filament\Forms;
-use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Set;
 use Filament\Forms\Get;
@@ -189,6 +188,15 @@ trait HandlesSourcePlaylist
             return [];
         }
 
+        $labels = $records->mapWithKeys(function ($record) use ($sourceKey) {
+            $label = $record->title_custom
+                ?? $record->title
+                ?? $record->name
+                ?? $record->$sourceKey;
+
+            return [$record->$sourceKey => $label];
+        })->all();
+
         $fields = [];
 
         foreach ($duplicateGroups as $groupKey => $group) {
@@ -199,7 +207,8 @@ trait HandlesSourcePlaylist
             $fields[] = Forms\Components\Fieldset::make($label)
                 ->schema([
                     Forms\Components\Select::make("source_playlists.{$groupKey}")
-                        ->label('Which playlist do you want to add from?')
+                        ->label('Which playlist do you want to select from?')
+                        ->columnSpanFull()
                         ->options(fn (Get $get) => self::availablePlaylistsForGroup(
                             $get('playlist'),
                             $group,
@@ -207,35 +216,43 @@ trait HandlesSourcePlaylist
                             $sourceKey
                         )->toArray())
                         ->placeholder('Choose playlist')
+                        ->required()
                         ->searchable()
                         ->live()
-                        ->reactive(),
-                    Actions::make([
-                        Action::make("items_{$groupKey}")
-                            ->label('View Affected Items')
-                            ->form(function (Get $get) use ($group, $groupKey, $relation, $sourceKey) {
-                                $existing = $get("source_playlist_items.{$groupKey}") ?? [];
-                                $default  = $get("source_playlists.{$groupKey}");
+                        ->reactive()
+                        ->suffixAction(
+                            Action::make("items_{$groupKey}")
+                                ->label('View Affected Items')
+                                ->icon('heroicon-o-eye')
+                                ->color('primary')
+                                ->button()
+                                ->extraAttributes(['class' => 'whitespace-nowrap'])
+                                ->form(function (Get $get) use ($group, $groupKey, $relation, $sourceKey, $labels) {
+                                    $existing = $get("source_playlist_items.{$groupKey}") ?? [];
+                                    $default  = $get("source_playlists.{$groupKey}");
 
-                                return collect($group['source_ids'])->map(function ($sourceId) use ($group, $existing, $default, $relation, $sourceKey) {
-                                    return Forms\Components\Select::make("items.{$sourceId}")
-                                        ->label((string) $sourceId)
-                                        ->options(fn (Get $get) => self::availablePlaylistsForGroup(
-                                            $get('playlist'),
-                                            $group,
-                                            $relation,
-                                            $sourceKey
-                                        )->toArray())
-                                        ->placeholder('Choose playlist')
-                                        ->default($existing[$sourceId] ?? $default)
-                                        ->searchable()
-                                        ->reactive();
-                                })->toArray();
-                            })
-                            ->action(function (array $formData, Set $set) use ($groupKey) {
-                                $set("source_playlist_items.{$groupKey}", $formData['items'] ?? []);
-                            }),
-                    ])->columnSpanFull(),
+                                    return collect($group['source_ids'])->map(function ($sourceId) use ($group, $existing, $default, $relation, $sourceKey, $labels) {
+                                        return Forms\Components\Select::make("items.{$sourceId}")
+                                            ->label($labels[$sourceId] ?? (string) $sourceId)
+                                            ->options(fn (Get $get) => self::availablePlaylistsForGroup(
+                                                $get('playlist'),
+                                                $group,
+                                                $relation,
+                                                $sourceKey
+                                            )->toArray())
+                                            ->placeholder('Choose playlist')
+                                            ->default($existing[$sourceId] ?? $default)
+                                            ->searchable()
+                                            ->reactive();
+                                    })->toArray();
+                                })
+                                ->action(function (array $formData, Set $set) use ($groupKey) {
+                                    $set("source_playlist_items.{$groupKey}", $formData['items'] ?? []);
+                                })
+                                ->disabled(fn (Get $get) => blank($get("source_playlists.{$groupKey}")))
+                        ),
+                    Forms\Components\Hidden::make("source_playlist_items.{$groupKey}")
+                        ->default([]),
                 ]);
         }
 
