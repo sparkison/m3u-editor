@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\DB;
 use Filament\Forms;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\Actions\Action;
-use Filament\Forms\Get;
 use Filament\Forms\Set;
 use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Tables;
@@ -177,76 +176,20 @@ trait HandlesSourcePlaylist
             return [];
         }
 
-        $fields      = [];
-        $selectedIds = $records->pluck('id');
-
-        // Count how many selected records belong to each parent-child pair so we can
-        // require a bulk selection unless every record in the group has an override.
-        $groupCounts = [];
-        foreach ($records as $record) {
-            $sourceId  = $record->$sourceKey;
-            $composite = $record->playlist_id . ':' . $sourceId;
-            if ($sourceToGroup->has($composite)) {
-                $pairKey = $sourceToGroup[$composite];
-                $groupCounts[$pairKey] = ($groupCounts[$pairKey] ?? 0) + 1;
-            }
-        }
+        $fields = [];
 
         foreach ($duplicateGroups as $pairKey => $group) {
             $parentName = $group['playlists'][$group['parent_id']];
             $childName  = $group['playlists'][$group['child_id']];
 
-            $recordCount = $groupCounts[$pairKey] ?? 0;
-
             $fields[] = Forms\Components\Fieldset::make('These items appear in synced playlists.')
                 ->schema([
-                    Forms\Components\Grid::make(3)
-                        ->schema([
-                            Forms\Components\Select::make("source_playlists.{$pairKey}")
-                                ->label('Use items from:')
-                                ->options($group['playlists']->toArray())
-                                ->placeholder('Choose source playlist')
-                                ->searchable()
-                                ->required(fn (Get $get) => count($get("source_playlists_items.{$pairKey}") ?? []) < $recordCount)
-                                ->columnSpan(2),
-                            Actions::make([
-                                Action::make("view_affected_{$pairKey}")
-                                    ->label('View affected items')
-                                    ->modalHeading("Items in {$parentName} ↔ {$childName}")
-                                    ->modalSubmitActionLabel('Close')
-                                    ->table(function (Tables\Table $table) use ($group, $pairKey, $modelClass, $sourceKey, $selectedIds) {
-                                        return $table
-                                            ->query(
-                                                $modelClass::query()
-                                                    ->whereIn('id', $selectedIds)
-                                                    ->whereIn('playlist_id', [$group['parent_id'], $group['child_id']])
-                                                    ->whereIn($sourceKey, $group['source_ids'])
-                                                    ->select('id', 'playlist_id', 'title', 'name')
-                                            )
-                                            ->columns([
-                                                Tables\Columns\TextColumn::make('title')
-                                                    ->label('Item')
-                                                    ->formatStateUsing(fn ($record) => $record->title ?? $record->name ?? ''),
-                                                Tables\Columns\SelectColumn::make('override')
-                                                    ->label('Use items from')
-                                                    ->options($group['playlists']->toArray())
-                                                    ->placeholder('Use group selection')
-                                                    ->getStateUsing(function ($record, $livewire) use ($pairKey) {
-                                                        $index = array_key_last($livewire->mountedFormComponentActionsData);
-                                                        return data_get($livewire->mountedFormComponentActionsData[$index] ?? [], "source_playlists_items.{$pairKey}.{$record->id}");
-                                                    })
-                                                    ->updateStateUsing(function ($state, $record, $livewire) use ($pairKey) {
-                                                        $index = array_key_last($livewire->mountedFormComponentActionsData);
-                                                        data_set($livewire->mountedFormComponentActionsData[$index], "source_playlists_items.{$pairKey}.{$record->id}", $state);
-                                                        return $state;
-                                                    }),
-                                            ])
-                                            ->paginationPageOptions([5, 10, 25]);
-                                    }),
-                            ])
-                                ->columnSpan(1)
-                                ->alignEnd(),
-                        ]),
+                    Forms\Components\Select::make("source_playlists.{$pairKey}")
+                        ->label('Use items from:')
+                        ->options($group['playlists']->toArray())
+                        ->placeholder('Choose source playlist')
+                        ->searchable()
+                        ->required(),
                 ]);
         }
 
@@ -286,59 +229,38 @@ trait HandlesSourcePlaylist
         [$duplicateGroups, $needsSourcePlaylist, $recordSourceIds, $sourceToGroup] = $sourcePlaylistData;
 
         if ($needsSourcePlaylist) {
-            $selected     = collect($data['source_playlists'] ?? []);
-            $itemSelected = collect($data['source_playlists_items'] ?? []);
-
-            $groupCounts = [];
-            foreach ($records as $record) {
-                $sourceId  = $record->$sourceKey;
-                $composite = $record->playlist_id . ':' . $sourceId;
-                if ($sourceToGroup->has($composite)) {
-                    $pairKey = $sourceToGroup[$composite];
-                    $groupCounts[$pairKey] = ($groupCounts[$pairKey] ?? 0) + 1;
-                }
-            }
+            $selected = collect($data['source_playlists'] ?? []);
 
             foreach ($duplicateGroups as $pairKey => $group) {
-                $bulk  = $selected[$pairKey] ?? null;
-                $items = collect($itemSelected[$pairKey] ?? [])->filter();
-                $count = $groupCounts[$pairKey] ?? 0;
-
-                if (! $bulk && $items->count() !== $count) {
+                if (! $selected->has($pairKey)) {
                     throw ValidationException::withMessages([
                         'source_playlists' => 'Please select a source playlist for each duplicated group.',
                     ]);
                 }
             }
 
-            $playlistIds = $selected->filter()->values();
-            $playlistIds = $playlistIds->merge(
-                $itemSelected->flatMap(fn ($items) => collect($items)->filter()->values())
-            )->unique();
-
             $sourceMaps = $modelClass::query()
-                ->whereIn('playlist_id', $playlistIds)
+                ->whereIn('playlist_id', $selected->values())
                 ->whereIn($sourceKey, $recordSourceIds)
                 ->select('id', 'playlist_id', $sourceKey)
                 ->get()
                 ->groupBy('playlist_id')
                 ->map->keyBy($sourceKey);
 
-            $records = $records->map(function ($record) use ($selected, $itemSelected, $sourceMaps, $sourceToGroup, $sourceKey) {
+            $records = $records->map(function ($record) use ($selected, $sourceMaps, $sourceToGroup, $sourceKey) {
                 $sourceId  = $record->$sourceKey;
                 $composite = $record->playlist_id . ':' . $sourceId;
 
-                if ($sourceToGroup->has($composite)) {
-                    $pairKey    = $sourceToGroup[$composite];
-                    $override   = $itemSelected[$pairKey][$record->id] ?? null;
-                    $playlistId = $override ?: ($selected[$pairKey] ?? null);
-
-                    return $playlistId && isset($sourceMaps[$playlistId][$sourceId])
-                        ? $sourceMaps[$playlistId][$sourceId]
-                        : $record;
+                if (! $sourceToGroup->has($composite)) {
+                    return $record;
                 }
 
-                return $record;
+                $pairKey    = $sourceToGroup[$composite];
+                $playlistId = $selected[$pairKey] ?? null;
+
+                return $playlistId && isset($sourceMaps[$playlistId][$sourceId])
+                    ? $sourceMaps[$playlistId][$sourceId]
+                    : $record;
             });
         }
 
