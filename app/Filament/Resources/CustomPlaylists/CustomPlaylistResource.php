@@ -166,8 +166,8 @@ class CustomPlaylistResource extends Resource
         return [
             ChannelsRelationManager::class,
             VodRelationManager::class,
-            GroupsRelationManager::class,
             SeriesRelationManager::class,
+            GroupsRelationManager::class,
             CategoriesRelationManager::class,
         ];
     }

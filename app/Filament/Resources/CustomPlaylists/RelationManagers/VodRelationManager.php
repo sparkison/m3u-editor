@@ -12,6 +12,7 @@ use Filament\Actions\DetachBulkAction;
 use Filament\Actions\BulkAction;
 use Filament\Forms\Components\Select;
 use App\Enums\ChannelLogoType;
+use App\Filament\Resources\Vods\Pages\ListVod;
 use App\Filament\Resources\Vods\VodResource;
 use App\Models\Channel;
 use App\Models\ChannelFailover;
@@ -19,6 +20,7 @@ use Filament\Forms;
 use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -140,60 +142,6 @@ class VodRelationManager extends RelationManager
             })
             ->paginated([10, 25, 50, 100])
             ->defaultPaginationPageOption(25)
-            ->groups([
-                Group::make('playlist_tags')
-                    ->label('Playlist Group')
-                    ->collapsible()
-                    ->getTitleFromRecordUsing(function ($record) use ($ownerRecord) {
-                        $groupName = $record->getCustomGroupName($ownerRecord->uuid);
-                        return $groupName ?: 'Uncategorized';
-                    })
-                    ->getKeyFromRecordUsing(function ($record) use ($ownerRecord) {
-                        $groupName = $record->getCustomGroupName($ownerRecord->uuid);
-                        return $groupName ? strtolower($groupName) : 'uncategorized';
-                    })
-                    ->orderQueryUsing(function (Builder $query, string $direction) use ($ownerRecord) {
-                        // Order by the tag order_column from the tags table
-                        // This controls the order of the groups themselves
-                        return $query
-                            ->leftJoin('taggables as group_taggables', function ($join) {
-                                $join->on('channels.id', '=', 'group_taggables.taggable_id')
-                                    ->where('group_taggables.taggable_type', '=', Channel::class);
-                            })
-                            ->leftJoin('tags as group_tags', function ($join) use ($ownerRecord) {
-                                $join->on('group_taggables.tag_id', '=', 'group_tags.id')
-                                    ->where('group_tags.type', '=', $ownerRecord->uuid);
-                            })
-                            ->orderBy('group_tags.order_column', $direction)
-                            ->orderBy('channels.sort', 'asc') // Secondary sort within groups
-                            ->select('channels.*');
-                    })
-                    ->scopeQueryByKeyUsing(function (Builder $query, string $key) use ($ownerRecord) {
-                        if ($key === 'uncategorized') {
-                            // Show channels without any tags of this type
-                            return $query->whereDoesntHave('tags', function ($tagQuery) use ($ownerRecord) {
-                                $tagQuery->where('type', $ownerRecord->uuid);
-                            });
-                        } else {
-                            // Show channels with the specific tag
-                            return $query->whereHas('tags', function ($tagQuery) use ($key, $ownerRecord) {
-                                $connection = $tagQuery->getConnection();
-                                $driver = $connection->getDriverName();
-
-                                // Build the WHERE clause based on database type
-                                $whereClause = match ($driver) {
-                                    'pgsql' => 'LOWER(tags.name->>\'$\') = ?',
-                                    'mysql' => 'LOWER(JSON_UNQUOTE(JSON_EXTRACT(tags.name, \'$\'))) = ?',
-                                    'sqlite' => 'LOWER(json_extract(tags.name, \'$\')) = ?',
-                                    default => 'LOWER(CAST(tags.name AS TEXT)) = ?'
-                                };
-                                $tagQuery->where('type', $ownerRecord->uuid)
-                                    ->whereRaw($whereClause, [strtolower($key)]);
-                            });
-                        }
-                    }),
-            ])
-            ->defaultGroup('playlist_tags')
             ->defaultSort('sort', 'asc')
             ->reorderable('sort')
             ->columns($defaultColumns)
@@ -315,5 +263,33 @@ class VodRelationManager extends RelationManager
                     ->modalDescription('Add to group')
                     ->modalSubmitActionLabel('Yes, add to group'),
             ]);
+    }
+
+    public function getTabs(): array
+    {
+        // Lets group the tabs by Custom Playlist tags
+        $ownerRecord = $this->ownerRecord;
+        $tags = $ownerRecord->tags()->where('type', $ownerRecord->uuid)->get();
+        $tabs = $tags->map(
+            fn($tag) => Tab::make($tag->name)
+                ->modifyQueryUsing(fn($query) => $query->where('is_vod', true)->whereHas('tags', function ($tagQuery) use ($tag) {
+                    $tagQuery->where('type', $tag->type)
+                        ->where('name->en', $tag->name);
+                }))
+                ->badge($ownerRecord->channels()->where('is_vod', true)->withAnyTags([$tag], $tag->type)->count())
+        )->toArray();
+
+        // Add an "All" tab to show all channels
+        array_push(
+            $tabs,
+            Tab::make('Uncategorized')
+                ->modifyQueryUsing(fn($query) => $query->where('is_vod', true)->whereDoesntHave('tags', function ($tagQuery) use ($ownerRecord) {
+                    $tagQuery->where('type', $ownerRecord->uuid);
+                }))
+                ->badge($ownerRecord->channels()->where('is_vod', true)->whereDoesntHave('tags', function ($tagQuery) use ($ownerRecord) {
+                    $tagQuery->where('type', $ownerRecord->uuid);
+                })->count())
+        );
+        return $tabs;
     }
 }
