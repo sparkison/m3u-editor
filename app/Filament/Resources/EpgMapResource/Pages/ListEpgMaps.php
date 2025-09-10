@@ -7,7 +7,7 @@ use App\Models\Epg;
 use App\Models\Playlist;
 use Filament\Actions;
 use Filament\Forms;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -34,7 +34,7 @@ class ListEpgMaps extends ListRecords
                             settings: $data['settings'] ?? [],
                         ));
                 })->after(function () {
-                    Notification::make()
+                    FilamentNotification::make()
                         ->success()
                         ->title('EPG to Channel mapping')
                         ->body('Channel mapping started, you will be notified when the process is complete.')

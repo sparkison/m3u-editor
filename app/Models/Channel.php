@@ -6,7 +6,7 @@ use App\Enums\ChannelLogoType;
 use App\Facades\ProxyFacade;
 use App\Models\Concerns\DispatchesPlaylistSync;
 use App\Services\XtreamService;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Database\Eloquent\Model;
@@ -210,7 +210,7 @@ class Channel extends Model
                 $xtream = XtreamService::make($playlist);
             }
             if (!$xtream) {
-                Notification::make()
+                FilamentNotification::make()
                     ->danger()
                     ->title('VOD metadata sync failed')
                     ->body('Unable to connect to Xtream API provider to get VOD info, unable to fetch metadata.')

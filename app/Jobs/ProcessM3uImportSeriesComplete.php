@@ -6,7 +6,7 @@ use App\Enums\Status;
 use App\Events\SyncCompleted;
 use App\Models\Job;
 use App\Models\Playlist;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -38,7 +38,7 @@ class ProcessM3uImportSeriesComplete implements ShouldQueue
             'series_progress' => 100,
         ]);
         $message = "Series sync completed successfully for playlist \"{$this->playlist->name}\".";
-        Notification::make()
+        FilamentNotification::make()
             ->success()
             ->title('Series Sync Completed')
             ->body($message)
