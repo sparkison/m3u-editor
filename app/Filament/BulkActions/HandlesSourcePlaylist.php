@@ -248,8 +248,8 @@ trait HandlesSourcePlaylist
                                             ->reactive();
                                     })->toArray();
                                 })
-                                ->action(function (array $formData, Set $set) use ($groupKey) {
-                                    $set("source_playlist_items.{$groupKey}", $formData['items'] ?? []);
+                                ->action(function (array $data, Set $set) use ($groupKey) {
+                                    $set("source_playlist_items.{$groupKey}", $data['items'] ?? []);
                                 }),
                         ])->columnSpanFull(),
                     ];
