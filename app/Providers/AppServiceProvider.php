@@ -171,7 +171,11 @@ class AppServiceProvider extends ServiceProvider
             });
             Playlist::deleting(function (Playlist $playlist) {
                 // Detach any child playlists so they become standalone playlists
-                $playlist->children()->update(['parent_id' => null]);
+                // and restore their default auto-sync behaviour
+                $playlist->children()->update([
+                    'parent_id' => null,
+                    'auto_sync' => true,
+                ]);
 
                 Storage::disk('local')->deleteDirectory($playlist->folder_path);
                 if ($playlist->uploads && Storage::disk('local')->exists($playlist->uploads)) {
