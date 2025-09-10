@@ -126,7 +126,7 @@ class StreamingChannelStats extends Page
                 $model = Episode::find($actualStreamingModelId);
                 $itemLogo = $model ? ($model->cover ?? null) : null;
                 if ($model && $model->series) {
-                    $itemName = $model->series->title . " - S" . $model->season_num . "E" . $model->episode_num . " - " . $model->title;
+                    $itemName = $model->series->name . " - S" . $model->season_num . "E" . $model->episode_num . " - " . $model->title;
                 } elseif ($model) {
                     $itemName = "Ep. " . $model->title;
                 } else {

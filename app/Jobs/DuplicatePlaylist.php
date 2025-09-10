@@ -53,6 +53,8 @@ class DuplicatePlaylist implements ShouldQueue
                 'uuid',
                 'short_urls_enabled',
                 'short_urls',
+                'synced',
+                'sync_time',
             ]);
             $newPlaylist->name = $this->name ?? $playlist->name.' (Copy)';
             $newPlaylist->uuid = Str::orderedUuid()->toString();
@@ -60,8 +62,12 @@ class DuplicatePlaylist implements ShouldQueue
             $newPlaylist->updated_at = $now;
             if ($this->withSync) {
                 $newPlaylist->parent_id = $playlist->id;
+                $newPlaylist->auto_sync = false;
             }
             $newPlaylist->saveQuietly(); // Don't fire model events to prevent auto sync
+
+            // Map of original channel IDs to their duplicated counterparts
+            $channelIdMap = [];
 
             // Copy the groups
             foreach ($playlist->groups()->lazy() as $group) {
@@ -87,17 +93,8 @@ class DuplicatePlaylist implements ShouldQueue
                     $newChannel->updated_at = $now;
                     $newChannel->save();
 
-                    // Copy the channel failovers
-                    foreach ($channel->failovers as $failover) {
-                        $newFailover = $failover->replicate(except: [
-                            'id',
-                            'channel_id',
-                        ]);
-                        $newFailover->channel_id = $newChannel->id; // Link to the new channel
-                        $newFailover->created_at = $now;
-                        $newFailover->updated_at = $now;
-                        $newFailover->save();
-                    }
+                    // Track ID mapping for later failover translation
+                    $channelIdMap[$channel->id] = $newChannel->id;
                 }
             }
 
@@ -172,11 +169,28 @@ class DuplicatePlaylist implements ShouldQueue
                 $newChannel->updated_at = $now;
                 $newChannel->save();
 
+                // Track mapping for failover translation
+                $channelIdMap[$channel->id] = $newChannel->id;
+            }
+
+            // After all channels have been copied, replicate failovers
+            foreach ($playlist->channels()->with('failovers')->lazy() as $channel) {
+                $newChannelId = $channelIdMap[$channel->id] ?? null;
+                if (! $newChannelId) {
+                    logger()->info('DuplicatePlaylist: missing child channel for failover copy', [
+                        'channel_id' => $channel->id,
+                    ]);
+
+                    continue;
+                }
+
                 foreach ($channel->failovers as $failover) {
                     $newFailover = $failover->replicate(except: ['id', 'channel_id']);
-                    $newFailover->channel_id = $newChannel->id;
+                    $newFailover->channel_id = $newChannelId;
+                    $newFailover->channel_failover_id = $channelIdMap[$failover->channel_failover_id] ?? $failover->channel_failover_id;
                     $newFailover->created_at = $now;
                     $newFailover->updated_at = $now;
+                    $newFailover->external = true;
                     $newFailover->save();
                 }
             }
