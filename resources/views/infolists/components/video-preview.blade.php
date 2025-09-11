@@ -1,15 +1,24 @@
 <x-dynamic-component :component="$getEntryWrapperView()" :entry="$entry">
-    @php($record = $getRecord())
-    @php($settings = app(\App\Settings\GeneralSettings::class))
-    @php($playlist = App\Models\Playlist::find($record->playlist_id) ?? null)
-    @php($proxyEnabled = $settings->force_video_player_proxy || $playlist->enable_proxy)
-    @php($url = $record->url_custom ?? $record->url)
-    @php($format = pathinfo($record->url, PATHINFO_EXTENSION))
-    @if($proxyEnabled)
-        @php($url = App\Facades\ProxyFacade::getProxyUrlForChannel(id: $record->id, format: $format, preview: true))
-    @endif
-    @php($playerId = "channel_{$record->id}_preview")
-
+@php
+$record = $getRecord();
+$settings = app(\App\Settings\GeneralSettings::class);
+$playlist = App\Models\Playlist::find($record->playlist_id) ?? null;
+$proxyEnabled = $settings->force_video_player_proxy || $playlist->enable_proxy;
+$url = $record->url_custom ?? $record->url;
+if ($proxyEnabled) {
+    $format = $playlist->proxy_options['output'] ?? 'ts';
+    $url = App\Facades\ProxyFacade::getProxyUrlForChannel(id: $record->id, format: $format, preview: true);
+} else {
+    if (\Illuminate\Support\Str::endsWith($url, '.m3u8')) {
+        $format = 'hls';
+    } elseif (\Illuminate\Support\Str::endsWith($url, '.ts')) {
+        $format = 'ts';
+    } else {
+        $format = $record->container_extension ?? 'ts';
+    }
+}
+$playerId = "channel_{$record->id}_preview";
+@endphp
     <div 
         x-data="{ 
             player: null,
