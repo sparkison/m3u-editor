@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\DispatchesPlaylistSync;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,7 +10,21 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Season extends Model
 {
+    use DispatchesPlaylistSync;
     use HasFactory;
+
+    public const SOURCE_INDEX = ['playlist_id', 'source_season_id'];
+
+    protected function playlistSyncChanges(): array
+    {
+        $current = $this->source_season_id ?? 'season-' . $this->id;
+        $original = $this->getOriginal('source_season_id') ?? 'season-' . $this->id;
+
+        return ['seasons' => array_unique(array_filter([
+            $current,
+            $original,
+        ]))];
+    }
 
     /**
      * The attributes that should be cast to native types.
@@ -19,7 +34,7 @@ class Season extends Model
     protected $casts = [
         'id' => 'integer',
         'new' => 'boolean',
-        'source_season_id' => 'integer',
+        'source_season_id' => 'string',
         'user_id' => 'integer',
         'playlist_id' => 'integer',
         'category_id' => 'integer',

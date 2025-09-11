@@ -14,7 +14,7 @@ use JsonMachine\Items;
 use JsonMachine\JsonDecoder\ExtJsonDecoder;
 use Filament\Forms;
 use Filament\Actions;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Tables;
 use XMLReader;
 
@@ -842,12 +842,12 @@ class EpgCacheService
                                 ->action(function ($record, $state) {
                                     $status = self::clearPlaylistEpgCacheFile($record);
                                     if ($status) {
-                                        Notification::make()
+                                        FilamentNotification::make()
                                             ->title('Cache Cleared')
                                             ->success()
                                             ->send();
                                     } else {
-                                        Notification::make()
+                                        FilamentNotification::make()
                                             ->title('File not yet cached')
                                             ->warning()
                                             ->send();
@@ -867,7 +867,7 @@ class EpgCacheService
                 if ($url) {
                     redirect($url);
                 } else {
-                    Notification::make()
+                    FilamentNotification::make()
                         ->title('Download URL not available')
                         ->danger()
                         ->send();
@@ -916,12 +916,12 @@ class EpgCacheService
                                 ->action(function ($record, $state) {
                                     $status = self::clearPlaylistEpgCacheFile($record);
                                     if ($status) {
-                                        Notification::make()
+                                        FilamentNotification::make()
                                             ->title('Cache Cleared')
                                             ->success()
                                             ->send();
                                     } else {
-                                        Notification::make()
+                                        FilamentNotification::make()
                                             ->title('File not yet cached')
                                             ->warning()
                                             ->send();
@@ -941,7 +941,7 @@ class EpgCacheService
                 if ($url) {
                     redirect($url);
                 } else {
-                    Notification::make()
+                    FilamentNotification::make()
                         ->title('Download URL not available')
                         ->danger()
                         ->send();

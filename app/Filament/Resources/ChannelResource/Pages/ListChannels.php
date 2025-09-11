@@ -12,7 +12,7 @@ use App\Models\Playlist;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Forms\Get;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\Components\Tab;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
@@ -93,7 +93,7 @@ class ListChannels extends ListRecords
                                 checkResolution: $data['by_resolution'] ?? false, // Sort failovers by resolution, or by playlist (default behavior)
                             ));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Channel merge started')
                             ->body('Merging channels in the background. You will be notified once the process is complete.')
@@ -121,7 +121,7 @@ class ListChannels extends ListRecords
                                 playlistId: $data['playlist_id'] ?? null
                             ));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Channel unmerge started')
                             ->body('Unmerging channels in the background. You will be notified once the process is complete.')
@@ -146,7 +146,7 @@ class ListChannels extends ListRecords
                                 settings: $data['settings'] ?? [],
                             ));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('EPG to Channel mapping')
                             ->body('Channel mapping started, you will be notified when the process is complete.')
@@ -217,7 +217,7 @@ class ListChannels extends ListRecords
                                 replace_with: $data['replace_with'] ?? ''
                             ));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Find & Replace started')
                             ->body('Find & Replace working in the background. You will be notified once the process is complete.')
@@ -265,7 +265,7 @@ class ListChannels extends ListRecords
                                 column: $data['column'] ?? 'title',
                             ));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Find & Replace reset started')
                             ->body('Find & Replace reset working in the background. You will be notified once the process is complete.')

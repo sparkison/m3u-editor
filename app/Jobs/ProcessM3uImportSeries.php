@@ -6,7 +6,7 @@ use Exception;
 use App\Enums\Status;
 use App\Events\SyncCompleted;
 use App\Models\Playlist;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Support\Str;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -89,12 +89,12 @@ class ProcessM3uImportSeries implements ShouldQueue
                 ->catch(function (Throwable $e) use ($playlist) {
                     $error = "Error processing series sync on \"{$playlist->name}\": {$e->getMessage()}";
                     Log::error($error);
-                    Notification::make()
+                    FilamentNotification::make()
                         ->danger()
                         ->title("Error processing series sync on \"{$playlist->name}\"")
                         ->body('Please view your notifications for details.')
                         ->broadcast($playlist->user);
-                    Notification::make()
+                    FilamentNotification::make()
                         ->danger()
                         ->title("Error processing series sync on \"{$playlist->name}\"")
                         ->body($error)
@@ -119,7 +119,7 @@ class ProcessM3uImportSeries implements ShouldQueue
                 'errors' => $error,
                 'series_progress' => 0,
             ]);
-            Notification::make()
+            FilamentNotification::make()
                 ->danger()
                 ->title('Series Sync Failed')
                 ->body("Playlist series sync failed for \"{$this->playlist->name}\". Error: {$error}")

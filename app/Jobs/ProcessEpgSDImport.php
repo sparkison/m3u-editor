@@ -6,7 +6,7 @@ use App\Models\Epg;
 use App\Services\SchedulesDirectService;
 use Carbon\Carbon;
 use Exception;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Storage;
@@ -42,7 +42,7 @@ class ProcessEpgSDImport implements ShouldQueue
         $start = now();
         try {
             // Notify user we're starting the sync...
-            Notification::make()
+            FilamentNotification::make()
                 ->info()
                 ->title('Starting Schedules Direct Data Sync')
                 ->body("Schedules Direct Data Sync started for EPG \"{$epg->name}\".")
@@ -73,7 +73,7 @@ class ProcessEpgSDImport implements ShouldQueue
             $completedInRounded = round($completedIn, 2);
 
             // Notify user of success
-            Notification::make()
+            FilamentNotification::make()
                 ->success()
                 ->title('Schedules Direct Data Synced')
                 ->body("Schedules Direct Data Synced successfully for EPG \"{$epg->name}\". Completed in {$completedInRounded} seconds. Now parsing data and generating EPG cache...")
@@ -87,12 +87,12 @@ class ProcessEpgSDImport implements ShouldQueue
 
             // Send notification
             $error = "Error: " . $e->getMessage();
-            Notification::make()
+            FilamentNotification::make()
                 ->danger()
                 ->title("Error processing Schedules Direct Data for EPG \"{$this->epg->name}\"")
                 ->body('Please view your notifications for details.')
                 ->broadcast($this->epg->user);
-            Notification::make()
+            FilamentNotification::make()
                 ->danger()
                 ->title("Error processing Schedules Direct Data for EPG \"{$this->epg->name}\"")
                 ->body($error)

@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\User;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Artisan;
@@ -43,12 +43,12 @@ class CreateBackup implements ShouldQueue
             $user = User::whereIn('email', config('dev.admin_emails'))->first();
             if ($user) {
                 $message = "Backup created successfully";
-                Notification::make()
+                FilamentNotification::make()
                     ->success()
                     ->title("Backup created")
                     ->body($message)
                     ->broadcast($user);
-                Notification::make()
+                FilamentNotification::make()
                     ->success()
                     ->title("Backup created")
                     ->body($message)
@@ -62,12 +62,12 @@ class CreateBackup implements ShouldQueue
             $user = User::whereIn('email', config('dev.admin_emails'))->first();
             if ($user) {
                 $message = "Backup create failed: {$e->getMessage()}";
-                Notification::make()
+                FilamentNotification::make()
                     ->danger()
                     ->title("Backup create failed")
                     ->body("Backup create failed, please check the error logs for details")
                     ->broadcast($user);
-                Notification::make()
+                FilamentNotification::make()
                     ->danger()
                     ->title("Backup create failed")
                     ->body(Str::limit($message, 500))

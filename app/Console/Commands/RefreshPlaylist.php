@@ -32,18 +32,24 @@ class RefreshPlaylist extends Command
         $playlistId = $this->argument('playlist');
         if ($playlistId) {
             $force = $this->argument('force') ?? false;
-            $this->info("Refreshing playlist with ID: {$playlistId}");
             $playlist = Playlist::findOrFail($playlistId);
-            dispatch(new ProcessM3uImport($playlist, (bool)$force));
+
+            if ($playlist->parent_id) {
+                $this->error('Child playlists cannot be refreshed manually');
+                return self::FAILURE;
+            }
+
+            $this->info("Refreshing playlist with ID: {$playlistId}");
+            dispatch(new ProcessM3uImport($playlist, (bool) $force));
             $this->info('Dispatched playlist for refresh');
         } else {
             $this->info('Refreshing all playlists');
-            // Get all playlists that are not currently processing
-            $playlists = Playlist::query()->where(
-                'status',
-                '!=',
-                Status::Processing,
-            )->whereNotNull('synced');
+            // Get all playlists that are not currently processing and
+            // have no parent (i.e. skip child playlists)
+            $playlists = Playlist::query()
+                ->where('status', '!=', Status::Processing)
+                ->whereNull('parent_id')
+                ->whereNotNull('synced');
             
             $totalPlaylists = $playlists->count();
             if ($totalPlaylists === 0) {

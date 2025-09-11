@@ -7,14 +7,14 @@ use App\Enums\Status;
 use App\Filament\Resources\EpgResource\Pages;
 use App\Filament\Resources\EpgResource\RelationManagers;
 use App\Models\Epg;
-use App\Rules\CheckIfUrlOrLocalPath;
+use App\Rules\CheckIfUrlOrLocalPath as CheckIfUrlOrLocalPathRule;
 use App\Services\SchedulesDirectService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
-use Filament\Notifications\Notification;
-use Filament\Resources\Resource;
+use Filament\Notifications\Notification as FilamentNotification;
+use Filament\Resources\Resource as FilamentResource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,7 +23,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
 
-class EpgResource extends Resource
+class EpgResource extends FilamentResource
 {
     protected static ?string $model = Epg::class;
 
@@ -155,7 +155,7 @@ class EpgResource extends Resource
                             app('Illuminate\Contracts\Bus\Dispatcher')
                                 ->dispatch(new \App\Jobs\ProcessEpgImport($record, force: true));
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('EPG is processing')
                                 ->body('EPG is being processed in the background. Depending on the size of the guide data, this may take a while. You will be notified on completion.')
@@ -179,7 +179,7 @@ class EpgResource extends Resource
                             app('Illuminate\Contracts\Bus\Dispatcher')
                                 ->dispatch(new \App\Jobs\GenerateEpgCache($record->uuid, notify: true));
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('EPG Cache is being generated')
                                 ->body('EPG Cache is being generated in the background. You will be notified when complete.')
@@ -210,7 +210,7 @@ class EpgResource extends Resource
                                 'errors' => null,
                             ]);
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('EPG status reset')
                                 ->body('EPG status has been reset.')
@@ -246,7 +246,7 @@ class EpgResource extends Resource
                                     ->dispatch(new \App\Jobs\ProcessEpgImport($record, force: true));
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Selected EPGs are processing')
                                 ->body('The selected EPGs are being processed in the background. Depending on the size of the guide data, this may take a while.')
@@ -273,7 +273,7 @@ class EpgResource extends Resource
                                     ->dispatch(new \App\Jobs\GenerateEpgCache($record->uuid, notify: true));
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('EPG Cache is being generated for selected EPGs')
                                 ->body('EPG Cache is being generated in the background for the selected EPGs. You will be notified when complete.')
@@ -485,7 +485,7 @@ class EpgResource extends Resource
                                         $password = $get('sd_password');
 
                                         if (!$username || !$password) {
-                                            Notification::make()
+                                            FilamentNotification::make()
                                                 ->danger()
                                                 ->title('Missing credentials')
                                                 ->body('Please enter username and password first')
@@ -496,13 +496,13 @@ class EpgResource extends Resource
                                         try {
                                             $authData = $service->authenticate($username, $password);
 
-                                            Notification::make()
+                                            FilamentNotification::make()
                                                 ->success()
                                                 ->title('Connection successful!')
                                                 ->body("Token expires: " . date('Y-m-d H:i:s', $authData['expires']))
                                                 ->send();
                                         } catch (\Exception $e) {
-                                            Notification::make()
+                                            FilamentNotification::make()
                                                 ->danger()
                                                 ->title('Connection failed')
                                                 ->body($e->getMessage())
@@ -520,7 +520,7 @@ class EpgResource extends Resource
                                         $password = $get('sd_password');
 
                                         if (!$country || !$postalCode || !$username || !$password) {
-                                            Notification::make()
+                                            FilamentNotification::make()
                                                 ->warning()
                                                 ->title('Missing information')
                                                 ->body('Please fill in all required fields first')
@@ -550,14 +550,14 @@ class EpgResource extends Resource
                                                 }
                                             }
 
-                                            Notification::make()
+                                            FilamentNotification::make()
                                                 ->success()
                                                 ->title("Found {$lineupCount} available lineups")
                                                 ->body($lineupList ?: 'No lineups found for your location')
                                                 ->persistent()
                                                 ->send();
                                         } catch (\Exception $e) {
-                                            Notification::make()
+                                            FilamentNotification::make()
                                                 ->danger()
                                                 ->title('Failed to fetch lineups')
                                                 ->body($e->getMessage())
@@ -574,7 +574,7 @@ class EpgResource extends Resource
                                 //         $lineupId = $get('sd_lineup_id');
 
                                 //         if (!$username || !$password || !$lineupId) {
-                                //             Notification::make()
+                                //             FilamentNotification::make()
                                 //                 ->warning()
                                 //                 ->title('Missing information')
                                 //                 ->body('Please enter credentials and select a lineup first')
@@ -586,13 +586,13 @@ class EpgResource extends Resource
                                 //             $authData = $service->authenticate($username, $password);
                                 //             $result = $service->addLineup($authData['token'], $lineupId);
 
-                                //             Notification::make()
+                                //             FilamentNotification::make()
                                 //                 ->success()
                                 //                 ->title('Lineup added successfully!')
                                 //                 ->body("Lineup {$lineupId} has been added to your Schedules Direct account")
                                 //                 ->send();
                                 //         } catch (\Exception $e) {
-                                //             Notification::make()
+                                //             FilamentNotification::make()
                                 //                 ->danger()
                                 //                 ->title('Failed to add lineup')
                                 //                 ->body($e->getMessage())
@@ -624,7 +624,7 @@ class EpgResource extends Resource
                         ->helperText('Enter the URL of the XMLTV guide data. If this is a local file, you can enter a full or relative path. If changing URL, the guide data will be re-imported. Use with caution as this could lead to data loss if the new guide differs from the old one.')
                         ->requiredWithout('uploads')
                         ->required(fn(Get $get): bool => $get('source_type') === EpgSourceType::URL->value && !$get('uploads'))
-                        ->rules([new CheckIfUrlOrLocalPath()])
+                        ->rules([new CheckIfUrlOrLocalPathRule()])
                         ->maxLength(255),
                     Forms\Components\FileUpload::make('uploads')
                         ->label('File')

@@ -2,36 +2,36 @@
 
 namespace App\Filament\Resources\CustomPlaylistResource\RelationManagers;
 
-use App\Enums\ChannelLogoType;
 use App\Filament\Resources\ChannelResource;
+use App\Filament\BulkActions\HandlesSourcePlaylist;
 use App\Models\Channel;
-use App\Models\ChannelFailover;
 use Filament\Forms;
 use Filament\Forms\Form;
-use Filament\Forms\Get;
 use Filament\Infolists\Infolist;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
+use Filament\Tables\Columns\SpatieTagsColumn;
+use Filament\Tables\Columns\SelectColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Database\Eloquent\Model;
-use Filament\Tables\Columns\SpatieTagsColumn;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\HtmlString;
 use Spatie\Tags\Tag;
 
 class ChannelsRelationManager extends RelationManager
 {
+    use HandlesSourcePlaylist;
     protected static string $relationship = 'channels';
 
     protected static ?string $label = 'Live Channels';
+
     protected static ?string $pluralLabel = 'Live Channels';
 
     protected static ?string $title = 'Live Channels';
+
     protected static ?string $navigationLabel = 'Live Channels';
 
     public function isReadOnly(): bool
@@ -68,19 +68,19 @@ class ChannelsRelationManager extends RelationManager
                     switch ($driver) {
                         case 'pgsql':
                             // PostgreSQL uses ->> operator for JSON
-                            $query->whereRaw('LOWER(tags.name->>\'$\') LIKE ?', ['%' . strtolower($search) . '%']);
+                            $query->whereRaw('LOWER(tags.name->>\'$\') LIKE ?', ['%'.strtolower($search).'%']);
                             break;
                         case 'mysql':
                             // MySQL uses JSON_EXTRACT
-                            $query->whereRaw('LOWER(JSON_EXTRACT(tags.name, "$")) LIKE ?', ['%' . strtolower($search) . '%']);
+                            $query->whereRaw('LOWER(JSON_EXTRACT(tags.name, "$")) LIKE ?', ['%'.strtolower($search).'%']);
                             break;
                         case 'sqlite':
                             // SQLite uses json_extract
-                            $query->whereRaw('LOWER(json_extract(tags.name, "$")) LIKE ?', ['%' . strtolower($search) . '%']);
+                            $query->whereRaw('LOWER(json_extract(tags.name, "$")) LIKE ?', ['%'.strtolower($search).'%']);
                             break;
                         default:
                             // Fallback - try to search the JSON as text
-                            $query->where(DB::raw('LOWER(CAST(tags.name AS TEXT))'), 'LIKE', '%' . strtolower($search) . '%');
+                            $query->where(DB::raw('LOWER(CAST(tags.name AS TEXT))'), 'LIKE', '%'.strtolower($search).'%');
                             break;
                     }
                 });
@@ -110,10 +110,21 @@ class ChannelsRelationManager extends RelationManager
                     ->select('channels.*', DB::raw("{$orderByClause} as tag_name_sort"))
                     ->distinct();
             });
-        $defaultColumns = ChannelResource::getTableColumns(showGroup: true, showPlaylist: true);
+        $defaultColumns = ChannelResource::getTableColumns(showGroup: true, showPlaylist: false);
 
         // Inject the custom group column after the group column
         array_splice($defaultColumns, 13, 0, [$groupColumn]);
+
+        $defaultColumns[] = SelectColumn::make('playlist_id')
+            ->label('Parent Playlist')
+            ->getStateUsing(fn (Channel $record) => $record->playlist_id)
+            ->options(fn (Channel $record) => $this->playlistOptions($record))
+            ->disabled(fn (Channel $record) => count($this->playlistOptions($record)) <= 1)
+            ->selectablePlaceholder(false)
+            ->updateStateUsing(fn ($state) => $state)
+            ->afterStateUpdated(fn ($state, Channel $record) => $this->changeSourcePlaylist($record, (int) $state))
+            ->toggleable()
+            ->sortable();
 
         return $table->persistFiltersInSession()
             ->persistFiltersInSession()
@@ -138,7 +149,7 @@ class ChannelsRelationManager extends RelationManager
                         return $ownerRecord->tags()
                             ->where('type', $ownerRecord->uuid)
                             ->get()
-                            ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
+                            ->mapWithKeys(fn ($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
                             ->toArray();
                     })
                     ->query(function (Builder $query, array $data) use ($ownerRecord): Builder {
@@ -164,13 +175,13 @@ class ChannelsRelationManager extends RelationManager
                     ->form(ChannelResource::getForm(customPlaylist: $ownerRecord))
                     ->modalHeading('New Custom Channel')
                     ->modalDescription('NOTE: Custom channels need to be associated with a Playlist or Custom Playlist.')
-                    ->using(fn(array $data, string $model): Model => ChannelResource::createCustomChannel(
+                    ->using(fn (array $data, string $model): Model => ChannelResource::createCustomChannel(
                         data: $data,
                         model: $model,
                     ))
                     ->slideOver(),
                 Tables\Actions\AttachAction::make()
-                    ->form(fn(Tables\Actions\AttachAction $action): array => [
+                    ->form(fn (Tables\Actions\AttachAction $action): array => [
                         $action
                             ->getRecordSelect()
                             ->getSearchResultsUsing(function (string $search) {
@@ -204,9 +215,10 @@ class ChannelsRelationManager extends RelationManager
                                 $displayTitle = $record->title_custom ?: $record->title;
                                 $playlistName = $record->getEffectivePlaylist()->name ?? 'Unknown';
                                 $options[$record->id] = "{$displayTitle} [{$playlistName}]";
+
                                 return "{$displayTitle} [{$playlistName}]";
-                            })
-                    ])
+                            }),
+                    ]),
 
                 // Advanced attach when adding pivot values:
                 // Tables\Actions\AttachAction::make()->form(fn(Tables\Actions\AttachAction $action): array => [
@@ -233,21 +245,17 @@ class ChannelsRelationManager extends RelationManager
                         Forms\Components\Select::make('group')
                             ->label('Select group')
                             ->options(
-                                Tag::query()
-                                    ->where('type', $ownerRecord->uuid)
-                                    ->get()
-                                    ->map(fn($name) => [
-                                        'id' => $name->getAttributeValue('name'),
-                                        'name' => $name->getAttributeValue('name')
-                                    ])->pluck('id', 'name')
-                            )->required(),
+                                Tag::where('type', $ownerRecord->uuid)
+                                    ->pluck('name', 'name')
+                            )
+                            ->required(),
                     ])
                     ->action(function (Collection $records, $data) use ($ownerRecord): void {
                         foreach ($records as $record) {
                             $record->syncTagsWithType([$data['group']], $ownerRecord->uuid);
                         }
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Added to group')
                             ->body('The selected channels have been added to the custom group.')
@@ -258,7 +266,93 @@ class ChannelsRelationManager extends RelationManager
                     ->icon('heroicon-o-squares-plus')
                     ->modalIcon('heroicon-o-squares-plus')
                     ->modalDescription('Add to group')
-                    ->modalSubmitActionLabel('Yes, add to group'),
+            ->modalSubmitActionLabel('Yes, add to group'),
+                Tables\Actions\BulkAction::make('change_parent_playlist')
+                    ->label('Change parent playlist')
+                    ->form(function (Collection $records) use ($ownerRecord): array {
+                        [$groups] = self::getSourcePlaylistData($records, 'channels', 'source_id');
+
+                        $playlists = $groups->flatMap(fn ($group) => self::availablePlaylistsForGroup(
+                            $ownerRecord->id,
+                            $group,
+                            'channels',
+                            'source_id',
+                        ));
+
+                        return [
+                            Forms\Components\Select::make('playlist')
+                                ->label('Parent Playlist')
+                                ->options($playlists->unique()->toArray())
+                                ->required(),
+                        ];
+                    })
+                    ->action(function (Collection $records, array $data): void {
+                        foreach ($records as $record) {
+                            $exists = Channel::where('playlist_id', (int) $data['playlist'])
+                                ->where('source_id', $record->source_id)
+                                ->exists();
+
+                            if ($exists) {
+                                $this->changeSourcePlaylist($record, (int) $data['playlist']);
+                            }
+                        }
+                    })->after(function () {
+                        FilamentNotification::make()
+                            ->success()
+                            ->title('Parent playlist updated')
+                            ->body('The parent playlist has been updated where applicable.')
+                            ->send();
+                    })
+                    ->deselectRecordsAfterCompletion()
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrows-right-left')
+                    ->modalIcon('heroicon-o-arrows-right-left')
+                    ->modalDescription('Change the parent playlist for the selected channels.')
+                    ->modalSubmitActionLabel('Yes, change parent playlist'),
             ]);
+    }
+
+    protected function playlistOptions(Channel $record): array
+    {
+        [$groups] = self::getSourcePlaylistData(collect([$record]), 'channels', 'source_id');
+
+        if ($groups->isEmpty()) {
+            return [$record->playlist_id => $record->playlist?->name];
+        }
+
+        $group = $groups->first();
+        $options = self::availablePlaylistsForGroup($this->ownerRecord->id, $group, 'channels', 'source_id');
+
+        return $options->put($record->playlist_id, $record->playlist?->name)->toArray();
+    }
+
+    protected function changeSourcePlaylist(Channel $record, int $playlistId): void
+    {
+        if ($playlistId === $record->playlist_id) {
+            return;
+        }
+
+        $replacement = Channel::where('playlist_id', $playlistId)
+            ->where('source_id', $record->source_id)
+            ->first();
+
+        if (! $replacement) {
+            FilamentNotification::make()
+                ->title('Channel not found in selected playlist')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->ownerRecord->channels()->detach($record->id);
+        $this->ownerRecord->channels()->attach($replacement->id);
+
+        FilamentNotification::make()
+            ->title('Parent playlist updated')
+            ->success()
+            ->send();
+
+        $this->dispatch('refresh');
     }
 }

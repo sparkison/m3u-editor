@@ -4,7 +4,7 @@ namespace App\Filament\Resources\GroupResource\Pages;
 
 use App\Filament\Resources\GroupResource;
 use Filament\Actions;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -21,11 +21,11 @@ class ListGroups extends ListRecords
             Actions\CreateAction::make()
                 ->using(function (array $data, string $model): Model {
                     $data['user_id'] = auth()->id();
-                    $data['custom'] = true;
+                    $data['is_custom'] = true;
                     return $model::create($data);
                 })
                 ->successNotification(
-                    Notification::make()
+                    FilamentNotification::make()
                         ->success()
                         ->title('Group created')
                         ->body('You can now assign channels to this group from the Channels section.'),

@@ -10,7 +10,7 @@ use App\Services\SharedStreamService;
 use App\Services\StreamMonitorService;
 use Carbon\Carbon;
 use Filament\Actions;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Pages\Page;
 use Filament\Support\Enums\ActionSize;
 use Filament\Support\Enums\IconPosition;
@@ -97,7 +97,7 @@ class SharedStreamMonitor extends Page
         $this->sharedStreamService->cleanupInactiveStreams();
         $this->refreshData();
 
-        Notification::make()
+        FilamentNotification::make()
             ->title('Cleanup completed successfully.')
             ->success()
             ->send();
@@ -108,12 +108,12 @@ class SharedStreamMonitor extends Page
         $success = $this->sharedStreamService->stopStream($streamId);
 
         if ($success) {
-            Notification::make()
+            FilamentNotification::make()
                 ->title("Stream {$streamId} stopped successfully.")
                 ->success()
                 ->send();
         } else {
-            Notification::make()
+            FilamentNotification::make()
                 ->title("Failed to stop stream {$streamId}.")
                 ->danger()
                 ->send();
@@ -247,7 +247,7 @@ class SharedStreamMonitor extends Page
 
         $this->refreshInterval = $data['refresh_interval'];
 
-        Notification::make()
+        FilamentNotification::make()
             ->title('Settings saved successfully.')
             ->success()
             ->send();

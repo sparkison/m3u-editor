@@ -8,7 +8,7 @@ use Cron\CronExpression;
 use Illuminate\Console\Command;
 use ShuvroRoy\FilamentSpatieLaravelBackup\FilamentSpatieLaravelBackup;
 use Spatie\Backup\BackupDestination\Backup;
-use Spatie\Backup\BackupDestination\BackupDestination as SpatieBackupDestination;
+use Spatie\Backup\BackupDestination\BackupDestination;
 
 class RunScheduledBackups extends Command
 {
@@ -51,7 +51,7 @@ class RunScheduledBackups extends Command
                         $toDelete = $data->slice($max - 1);
                         foreach ($toDelete as $record) {
                             $this->info("Deleting old backup: {$record['path']}");
-                            SpatieBackupDestination::create($record['disk'], config('backup.backup.name'))
+                            BackupDestination::create($record['disk'], config('backup.backup.name'))
                                 ->backups()
                                 ->first(function (Backup $backup) use ($record) {
                                     return $backup->path() === $record['path'];

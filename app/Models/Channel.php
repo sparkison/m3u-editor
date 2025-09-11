@@ -4,14 +4,17 @@ namespace App\Models;
 
 use App\Enums\ChannelLogoType;
 use App\Facades\ProxyFacade;
+use App\Models\Concerns\DispatchesPlaylistSync;
+use App\Models\ChannelFailover;
+use App\Jobs\SyncPlaylistChildren;
 use App\Services\XtreamService;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process as SymfonyProcess;
 use Spatie\Tags\HasTags;
@@ -20,6 +23,51 @@ class Channel extends Model
 {
     use HasFactory;
     use HasTags;
+    use DispatchesPlaylistSync;
+
+    protected static function booted(): void
+    {
+        static::deleting(function (Channel $channel): void {
+            ChannelFailover::where('channel_failover_id', $channel->id)
+                ->with(['channel.user', 'playlist'])
+                ->get()
+                ->each(function (ChannelFailover $failover) use ($channel): void {
+                    $playlist = $failover->playlist;
+                    $sourceChannel = $failover->channel;
+                    $source = $sourceChannel?->source_id ?? 'ch-' . $failover->channel_id;
+
+                    $failover->deleteQuietly();
+
+                    if ($sourceChannel?->user) {
+                        Notification::make()
+                            ->warning()
+                            ->title('Failover Removed')
+                            ->body("Channel \"{$channel->title}\" was deleted and removed as a failover for \"{$sourceChannel->title}\".")
+                            ->broadcast($sourceChannel->user);
+                        Notification::make()
+                            ->warning()
+                            ->title('Failover Removed')
+                            ->body("Channel \"{$channel->title}\" was deleted and removed as a failover for \"{$sourceChannel->title}\".")
+                            ->sendToDatabase($sourceChannel->user);
+                    }
+
+                    if ($playlist) {
+                        SyncPlaylistChildren::debounce($playlist, ['channels' => [$source]]);
+                    }
+                });
+        });
+    }
+
+    protected function playlistSyncChanges(): array
+    {
+        $current = $this->source_id ?? 'ch-' . $this->id;
+        $original = $this->getOriginal('source_id') ?? 'ch-' . $this->id;
+
+        return ['channels' => array_unique(array_filter([
+            $current,
+            $original,
+        ]))];
+    }
 
     /**
      * The attributes that should be cast to native types.
@@ -202,7 +250,7 @@ class Channel extends Model
                 $xtream = XtreamService::make($playlist);
             }
             if (!$xtream) {
-                Notification::make()
+                FilamentNotification::make()
                     ->danger()
                     ->title('VOD metadata sync failed')
                     ->body('Unable to connect to Xtream API provider to get VOD info, unable to fetch metadata.')

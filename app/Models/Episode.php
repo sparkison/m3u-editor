@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\DispatchesPlaylistSync;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,7 +11,19 @@ use Symfony\Component\Process\Process as SymfonyProcess;
 
 class Episode extends Model
 {
+    use DispatchesPlaylistSync;
     use HasFactory;
+
+    protected function playlistSyncChanges(): array
+    {
+        $current = $this->source_episode_id ?? 'ep-' . $this->id;
+        $original = $this->getOriginal('source_episode_id') ?? 'ep-' . $this->id;
+
+        return ['episodes' => array_unique(array_filter([
+            $current,
+            $original,
+        ]))];
+    }
 
     /**
      * The attributes that should be cast to native types.
@@ -21,7 +34,7 @@ class Episode extends Model
         'id' => 'integer',
         'new' => 'boolean',
         'enabled' => 'boolean',
-        'source_episode_id' => 'integer',
+        'source_episode_id' => 'string',
         'user_id' => 'integer',
         'playlist_id' => 'integer',
         'series_id' => 'integer',
@@ -89,6 +102,7 @@ class Episode extends Model
             );
             if ($hasErrors) {
                 Log::error("Error running ffprobe for episode \"{$this->title}\": {$errors}");
+
                 return [];
             }
             $json = json_decode($output, true);
@@ -112,11 +126,13 @@ class Episode extends Model
                         ];
                     }
                 }
+
                 return $streamStats;
             }
         } catch (\Exception $e) {
             Log::error("Error running ffprobe for episode \"{$this->title}\": {$e->getMessage()}");
         }
+
         return [];
     }
 
@@ -125,7 +141,7 @@ class Episode extends Model
      */
     public function getAddedAttribute($value)
     {
-        if (!$value) {
+        if (! $value) {
             return null;
         }
 

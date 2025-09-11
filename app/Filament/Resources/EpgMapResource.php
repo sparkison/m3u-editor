@@ -12,15 +12,16 @@ use App\Models\Playlist;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
-use Filament\Notifications\Notification;
-use Filament\Resources\Resource;
+use Filament\Notifications\Notification as FilamentNotification;
+use Filament\Resources\Resource as FilamentResource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Schema;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
 
-class EpgMapResource extends Resource
+class EpgMapResource extends FilamentResource
 {
     protected static ?string $model = EpgMap::class;
 
@@ -129,7 +130,7 @@ class EpgMapResource extends Resource
                                 epgMapId: $record->id,
                             ));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('EPG mapping started')
                             ->body('The EPG mapping process has been initiated.')
@@ -166,7 +167,7 @@ class EpgMapResource extends Resource
                                     ));
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('EPG mapping started')
                                 ->body('The EPG mapping process has been initiated for the selected mappings.')
@@ -198,6 +199,19 @@ class EpgMapResource extends Resource
         $showPlaylist = true,
         $showEpg = true
     ): array {
+        $hasParentId = Schema::hasColumn('playlists', 'parent_id');
+
+        $playlists = Playlist::where(['user_id' => auth()->id()])
+            ->get($hasParentId ? ['name', 'id', 'parent_id'] : ['name', 'id']);
+
+        $playlistOptions = $playlists->mapWithKeys(
+            fn (Playlist $playlist) => [
+                $playlist->id => $hasParentId && $playlist->parent_id !== null
+                    ? $playlist->name . ' [child]'
+                    : $playlist->name,
+            ]
+        );
+
         return [
             Forms\Components\Select::make('epg_id')
                 ->required()
@@ -210,7 +224,10 @@ class EpgMapResource extends Resource
                 ->required()
                 ->label('Playlist')
                 ->helperText('Select the playlist you would like to map to.')
-                ->options(Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                ->options($playlistOptions)
+                ->disableOptionWhen(
+                    fn (string $value): bool => $hasParentId && $playlists->firstWhere('id', $value)?->parent_id !== null
+                )
                 ->hidden(!$showPlaylist)
                 ->searchable(),
             Forms\Components\Toggle::make('override')

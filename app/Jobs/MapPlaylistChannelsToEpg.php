@@ -12,7 +12,7 @@ use App\Models\EpgChannel;
 use App\Models\EpgMap;
 use App\Models\Job;
 use App\Models\Playlist;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Bus;
@@ -241,7 +241,7 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
             });
 
             // Last job in the batch
-            $jobs[] = new MapEpgToChannelsComplete($epg, $batchCount, $channelCount, $mappedCount, $batchNo, $start);
+            $jobs[] = new MapEpgToChannelsComplete($epg, $playlist, $batchCount, $channelCount, $mappedCount, $batchNo, $start);
 
             // Dispatch the batch
             Bus::chain($jobs)
@@ -249,19 +249,18 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                 ->onQueue('import')
                 ->catch(function (Throwable $e) use ($epg, $map) {
                     $error = "Error processing \"{$epg->name}\" mapping: {$e->getMessage()}";
-                    Notification::make()
+                    FilamentNotification::make()
                         ->danger()
                         ->title("Error processing \"{$epg->name}\" mapping")
                         ->body('Please view your notifications for details.')
                         ->broadcast($epg->user);
-                    Notification::make()
+                    FilamentNotification::make()
                         ->danger()
                         ->title("Error processing \"{$epg->name}\" mapping")
                         ->body($error)
                         ->sendToDatabase($epg->user);
                     $map->update([
                         'status' => Status::Failed,
-                        'channels' => 0, // not using...
                         'errors' => $error,
                         'progress' => 100,
                         'processing' => false,
@@ -272,12 +271,12 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
             logger()->error("Error processing \"{$epg->name}\" mapping: {$e->getMessage()}");
 
             // Send notification
-            Notification::make()
+            FilamentNotification::make()
                 ->danger()
                 ->title("Error processing \"{$epg->name}\" mapping")
                 ->body('Please view your notifications for details.')
                 ->broadcast($epg->user);
-            Notification::make()
+            FilamentNotification::make()
                 ->danger()
                 ->title("Error processing \"{$epg->name}\" mapping")
                 ->body($e->getMessage())

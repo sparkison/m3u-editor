@@ -32,13 +32,13 @@ use Illuminate\Support\Facades\Storage;
 use Opcodes\LogViewer\Facades\LogViewer;
 use Filament\Support\Facades\FilamentView;
 use Filament\View\PanelsRenderHook;
-use Illuminate\Support\HtmlString;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecurityScheme;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
@@ -170,6 +170,13 @@ class AppServiceProvider extends ServiceProvider
                 return $playlist;
             });
             Playlist::deleting(function (Playlist $playlist) {
+                // Detach any child playlists so they become standalone playlists
+                // and restore their default auto-sync behaviour
+                $playlist->children()->update([
+                    'parent_id' => null,
+                    'auto_sync' => true,
+                ]);
+
                 Storage::disk('local')->deleteDirectory($playlist->folder_path);
                 if ($playlist->uploads && Storage::disk('local')->exists($playlist->uploads)) {
                     Storage::disk('local')->delete($playlist->uploads);

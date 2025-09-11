@@ -9,7 +9,7 @@ use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -159,7 +159,7 @@ class EpisodesRelationManager extends RelationManager
                                 ]);
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Selected episodes enabled')
                                 ->body('The selected episodes have been enabled.')
@@ -181,7 +181,7 @@ class EpisodesRelationManager extends RelationManager
                                 ]);
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->success()
                                 ->title('Selected episodes disabled')
                                 ->body('The selected episodes have been disabled.')

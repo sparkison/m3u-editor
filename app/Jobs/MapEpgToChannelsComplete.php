@@ -8,7 +8,7 @@ use App\Models\EpgMap;
 use App\Models\Job;
 use App\Models\Playlist;
 use Carbon\Carbon;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -23,6 +23,7 @@ class MapEpgToChannelsComplete implements ShouldQueue
      */
     public function __construct(
         public Epg $epg,
+        public ?Playlist $playlist,
         public int $batchCount,
         public int $channelCount,
         public int $mappedCount,
@@ -40,6 +41,14 @@ class MapEpgToChannelsComplete implements ShouldQueue
         // Calculate the time taken to complete the import
         $completedIn = $this->start->diffInSeconds(now());
         $completedInRounded = round($completedIn, 2);
+
+        // Gather mapped channel source IDs before clearing out the jobs
+        $mappedIds = Job::where('batch_no', $this->batchNo)
+            ->pluck('payload')
+            ->flatMap(fn ($payload) => collect($payload)->pluck('source_id'))
+            ->filter()
+            ->values()
+            ->all();
 
         // Clear out the jobs
         Job::where('batch_no', $this->batchNo)->delete();
@@ -64,10 +73,15 @@ class MapEpgToChannelsComplete implements ShouldQueue
         $epg = $this->epg;
         $title = "Completed processing EPG channel mapping";
         $body = "EPG \"{$epg->name}\" channel mapping completed. Mapping took {$completedInRounded} seconds.";
-        Notification::make()
+        FilamentNotification::make()
             ->success()
             ->title($title)->body($body)
             ->broadcast($epg->user)
             ->sendToDatabase($epg->user);
+
+        // Fan out mapping changes to child playlists when applicable
+        if ($this->playlist && $this->playlist->children()->exists()) {
+            SyncPlaylistChildren::debounce($this->playlist, ['channels' => $mappedIds]);
+        }
     }
 }

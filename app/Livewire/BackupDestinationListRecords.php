@@ -4,7 +4,7 @@ namespace App\Livewire;
 
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Tables;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -83,7 +83,7 @@ class BackupDestinationListRecords extends Component implements HasForms, HasTab
                             })
                             ->delete();
 
-                        Notification::make()
+                        FilamentNotification::make()
                             ->title(__('filament-spatie-backup::backup.pages.backups.messages.backup_delete_success'))
                             ->success()
                             ->send();
@@ -109,7 +109,7 @@ class BackupDestinationListRecords extends Component implements HasForms, HasTab
                                     ->delete();
                             }
                         })->after(function () {
-                            Notification::make()
+                            FilamentNotification::make()
                                 ->title('Selected backups deleted successfully')
                                 ->success()
                                 ->send();

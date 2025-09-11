@@ -9,7 +9,7 @@ use App\Livewire\EpgViewer;
 use Filament\Actions;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewEpg extends ViewRecord
@@ -41,7 +41,7 @@ class ViewEpg extends ViewRecord
                     app('Illuminate\Contracts\Bus\Dispatcher')
                         ->dispatch(new \App\Jobs\ProcessEpgImport($record, force: true));
                 })->after(function () {
-                    Notification::make()
+                    FilamentNotification::make()
                         ->success()
                         ->title('EPG is processing')
                         ->body('EPG is being processed in the background. The view will update when complete.')
@@ -66,7 +66,7 @@ class ViewEpg extends ViewRecord
                     app('Illuminate\Contracts\Bus\Dispatcher')
                         ->dispatch(new \App\Jobs\GenerateEpgCache($record->uuid, notify: true));
                 })->after(function () {
-                    Notification::make()
+                    FilamentNotification::make()
                         ->success()
                         ->title('EPG Cache is being generated')
                         ->body('EPG Cache is being generated in the background. You will be notified when complete.')

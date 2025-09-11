@@ -6,7 +6,7 @@ use App\Models\SharedStream;
 use App\Services\SharedStreamService;
 use App\Services\StreamMonitorService;
 use Filament\Widgets\Widget;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 
 class QuickActionsWidget extends Widget
 {
@@ -20,14 +20,14 @@ class QuickActionsWidget extends Widget
             $sharedStreamService = app(SharedStreamService::class);
             $result = $sharedStreamService->cleanupInactiveStreams();
             
-            Notification::make()
+            FilamentNotification::make()
                 ->title('Cleanup Completed')
                 ->body("Cleaned up {$result['cleaned_streams']} streams and {$result['cleaned_clients']} clients")
                 ->success()
                 ->send();
                 
         } catch (\Exception $e) {
-            Notification::make()
+            FilamentNotification::make()
                 ->title('Cleanup Failed')
                 ->body($e->getMessage())
                 ->danger()

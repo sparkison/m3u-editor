@@ -5,7 +5,7 @@ namespace App\Jobs;
 use App\Facades\ProxyFacade;
 use App\Models\Series;
 use App\Settings\GeneralSettings;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -50,7 +50,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
             // Check if sync is enabled
             if (!$sync_settings['enabled'] ?? false) {
                 if ($this->notify) {
-                    Notification::make()
+                    FilamentNotification::make()
                         ->danger()
                         ->title("Error sync .strm files for series \"{$series->name}\"")
                         ->body("Sync is not enabled for this series.")
@@ -66,7 +66,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
             // Check if there are any episodes
             if ($episodes->isEmpty()) {
                 if ($this->notify) {
-                    Notification::make()
+                    FilamentNotification::make()
                         ->danger()
                         ->title("Error sync .strm files for series \"{$series->name}\"")
                         ->body("No episodes found for this series. Try processing it first.")
@@ -80,7 +80,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
             $path = rtrim($sync_settings['sync_location'], '/');
             if (!is_dir($path)) {
                 if ($this->notify) {
-                    Notification::make()
+                    FilamentNotification::make()
                         ->danger()
                         ->title("Error sync .strm files for series \"{$series->name}\"")
                         ->body("Sync location \"{$path}\" does not exist.")
@@ -149,7 +149,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
 
             // Notify the user
             if ($this->notify) {
-                Notification::make()
+                FilamentNotification::make()
                     ->success()
                     ->title("Sync .strm files for series \"{$series->name}\"")
                     ->body("Sync completed for series \"{$series->name}\".")
@@ -157,7 +157,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                     ->sendToDatabase($series->user);
             }
         } catch (\Exception $e) {
-            Notification::make()
+            FilamentNotification::make()
                 ->danger()
                 ->title("Error sync .strm files for series \"{$series->name}\"")
                 ->body("Error: {$e->getMessage()}")

@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Playlist;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
@@ -39,7 +39,7 @@ class CopyPlaylist implements ShouldQueue
                 $copied = $this->copyPlaylistToPlaylist($copy);
             } else {
                 $this->failed[] = $playlistId;
-                Notification::make()
+                FilamentNotification::make()
                     ->title('Playlist Copy Error')
                     ->body('A Playlist was not found, it may have been removed before the copy was able to complete.')
                     ->danger()
@@ -48,12 +48,12 @@ class CopyPlaylist implements ShouldQueue
         }
 
         // Send notification
-        Notification::make()
+        FilamentNotification::make()
             ->success()
             ->title('Playlist Copied')
             ->body("\"{$playlist->name}\" has been copied successfully.")
             ->broadcast($playlist->user);
-        Notification::make()
+        FilamentNotification::make()
             ->success()
             ->title('Playlist Copied')
             ->body("\"{$playlist->name}\" has been copied successfully to the following playlists: " . implode(', ', $this->copied))

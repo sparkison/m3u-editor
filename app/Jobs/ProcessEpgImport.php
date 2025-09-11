@@ -12,7 +12,7 @@ use App\Models\Epg;
 use App\Models\Job;
 use App\Services\SchedulesDirectService;
 use Carbon\Carbon;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Str;
@@ -98,12 +98,12 @@ class ProcessEpgImport implements ShouldQueue
 
                     // Send notification
                     $error = "Invalid Schedules Direct credentials. Unable to get results from the API. Please check the credentials and try again.";
-                    Notification::make()
+                    FilamentNotification::make()
                         ->danger()
                         ->title("Error processing \"{$this->epg->name}\"")
                         ->body('Please view your notifications for details.')
                         ->broadcast($this->epg->user);
-                    Notification::make()
+                    FilamentNotification::make()
                         ->danger()
                         ->title("Error processing \"{$this->epg->name}\"")
                         ->body($error)
@@ -124,7 +124,7 @@ class ProcessEpgImport implements ShouldQueue
                 } else {
                     // Sync the EPG data from Schedules Direct
                     // Notify user we're starting the sync...
-                    Notification::make()
+                    FilamentNotification::make()
                         ->info()
                         ->title('Starting Schedules Direct Data Sync')
                         ->body("Schedules Direct Data Sync started for EPG \"{$epg->name}\".")
@@ -155,7 +155,7 @@ class ProcessEpgImport implements ShouldQueue
                     $completedInRounded = round($completedIn, 2);
 
                     // Notify user of success
-                    Notification::make()
+                    FilamentNotification::make()
                         ->success()
                         ->title('Schedules Direct Data Synced')
                         ->body("Schedules Direct Data Synced successfully for EPG \"{$epg->name}\". Completed in {$completedInRounded} seconds. Now parsing data and generating EPG cache...")
@@ -220,12 +220,12 @@ class ProcessEpgImport implements ShouldQueue
 
                 // Send notification
                 $error = "Invalid EPG file. Unable to read or download your EPG file. Please check the URL or uploaded file and try again.";
-                Notification::make()
+                FilamentNotification::make()
                     ->danger()
                     ->title("Error processing \"{$this->epg->name}\"")
                     ->body('Please view your notifications for details.')
                     ->broadcast($this->epg->user);
-                Notification::make()
+                FilamentNotification::make()
                     ->danger()
                     ->title("Error processing \"{$this->epg->name}\"")
                     ->body($error)
@@ -369,12 +369,12 @@ class ProcessEpgImport implements ShouldQueue
                     ->onQueue('import')
                     ->catch(function (Throwable $e) use ($epg) {
                         $error = "Error processing \"{$epg->name}\": {$e->getMessage()}";
-                        Notification::make()
+                        FilamentNotification::make()
                             ->danger()
                             ->title("Error processing \"{$epg->name}\"")
                             ->body('Please view your notifications for details.')
                             ->broadcast($epg->user);
-                        Notification::make()
+                        FilamentNotification::make()
                             ->danger()
                             ->title("Error processing \"{$epg->name}\"")
                             ->body($error)
@@ -394,12 +394,12 @@ class ProcessEpgImport implements ShouldQueue
 
                 // Send notification
                 $error = "Invalid EPG file. Unable to read or download your EPG file. Please check the URL or uploaded file and try again.";
-                Notification::make()
+                FilamentNotification::make()
                     ->danger()
                     ->title("Error processing \"{$this->epg->name}\"")
                     ->body('Please view your notifications for details.')
                     ->broadcast($this->epg->user);
-                Notification::make()
+                FilamentNotification::make()
                     ->danger()
                     ->title("Error processing \"{$this->epg->name}\"")
                     ->body($error)
@@ -422,12 +422,12 @@ class ProcessEpgImport implements ShouldQueue
             logger()->error("Error processing \"{$this->epg->name}\": {$e->getMessage()}");
 
             // Send notification
-            Notification::make()
+            FilamentNotification::make()
                 ->danger()
                 ->title("Error processing \"{$this->epg->name}\"")
                 ->body('Please view your notifications for details.')
                 ->broadcast($this->epg->user);
-            Notification::make()
+            FilamentNotification::make()
                 ->danger()
                 ->title("Error processing \"{$this->epg->name}\"")
                 ->body($e->getMessage())

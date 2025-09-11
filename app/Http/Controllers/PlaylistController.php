@@ -42,6 +42,10 @@ class PlaylistController extends Controller
             $playlist = CustomPlaylist::where('uuid', $uuid)->firstOrFail();
         }
 
+        if ($playlist instanceof Playlist && $playlist->parent_id !== null) {
+            abort(403, 'Cannot sync child playlist');
+        }
+
         // Refresh the playlist
         dispatch(new ProcessM3uImport($playlist, $request->force ?? true));
 

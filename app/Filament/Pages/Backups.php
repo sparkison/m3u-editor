@@ -7,7 +7,7 @@ use App\Jobs\RestoreBackup;
 use App\Models\Epg;
 use App\Models\Playlist;
 use Filament\Actions;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\File;
@@ -57,7 +57,7 @@ class Backups extends BaseBackups
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new RestoreBackup($data['backup']));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Backup is being restored')
                             ->body('Backup is being restored in the background. Depending on the size of the backup, this could take a while.')
@@ -88,7 +88,7 @@ class Backups extends BaseBackups
                             ]),
                     ])
                     ->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Backup has been uploaded')
                             ->body('Backup file has been uploaded, you can now restore it if needed.')
@@ -110,7 +110,7 @@ class Backups extends BaseBackups
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new CreateBackup($data['include_files'] ?? false));
                     })->after(function () {
-                        Notification::make()
+                        FilamentNotification::make()
                             ->success()
                             ->title('Backup is being created')
                             ->body('Backup is being created in the background. Depending on the size of your database and files, this could take a while.')

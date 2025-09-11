@@ -8,7 +8,7 @@ use App\Filament\Resources\PlaylistResource\Widgets\ImportProgress;
 use App\Models\Playlist;
 use Filament\Actions;
 use Filament\Forms;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Support\Facades\Redis;
 

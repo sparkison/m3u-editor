@@ -4,7 +4,7 @@ namespace App\Filament\Pages;
 
 use Filament\Pages\Dashboard;
 use Filament\Actions;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 
 class CustomDashboard extends Dashboard
 {

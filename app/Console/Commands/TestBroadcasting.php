@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\User;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Console\Command;
 
 class TestBroadcasting extends Command
@@ -40,7 +40,7 @@ class TestBroadcasting extends Command
         }
 
         $this->info('Testing broadcasting...');
-        Notification::make()
+        FilamentNotification::make()
             ->success()
             ->title("Broadcast testing")
             ->body('Testing system broadcasting')

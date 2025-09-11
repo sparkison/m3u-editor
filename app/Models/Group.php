@@ -6,10 +6,27 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
+use App\Models\Concerns\DispatchesPlaylistSync;
 
 class Group extends Model
 {
     use HasFactory;
+    use DispatchesPlaylistSync;
+
+    protected function playlistSyncChanges(): array
+    {
+        $current = $this->name_internal
+            ?? (Str::slug((string) $this->name) ?: 'grp-' . $this->id);
+
+        $original = $this->getOriginal('name_internal')
+            ?? (Str::slug((string) $this->getOriginal('name')) ?: 'grp-' . $this->id);
+
+        return ['groups' => array_unique(array_filter([
+            $current,
+            $original,
+        ]))];
+    }
 
     /**
      * The attributes that should be cast to native types.
@@ -21,6 +38,7 @@ class Group extends Model
         'user_id' => 'integer',
         'playlist_id' => 'integer',
         'sort_order' => 'integer',
+        'is_custom' => 'boolean',
     ];
 
     public function user(): BelongsTo

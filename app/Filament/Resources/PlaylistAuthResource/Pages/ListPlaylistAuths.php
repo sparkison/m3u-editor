@@ -4,7 +4,7 @@ namespace App\Filament\Resources\PlaylistAuthResource\Pages;
 
 use App\Filament\Resources\PlaylistAuthResource;
 use Filament\Actions;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -24,7 +24,7 @@ class ListPlaylistAuths extends ListRecords
                     return $model::create($data);
                 })
                 ->successNotification(
-                    Notification::make()
+                    FilamentNotification::make()
                         ->success()
                         ->title('Playlist Auth created')
                         ->body('You can now assign Playlists to this Auth.'),

@@ -10,7 +10,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
-use Filament\Notifications\Notification;
+use Filament\Notifications\Notification as FilamentNotification;
 
 class MergeChannels implements ShouldQueue
 {
@@ -148,7 +148,7 @@ class MergeChannels implements ShouldQueue
     {
         $body = $processed > 0 ? "Merged {$processed} channels successfully." : 'No channels were merged.';
 
-        Notification::make()
+        FilamentNotification::make()
             ->title('Merge complete')
             ->body($body)
             ->success()
