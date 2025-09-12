@@ -407,6 +407,17 @@ class XtreamApiController extends Controller
             $activeConnections = SharedStream::active()
                 ->where('stream_info->options->playlist_id', $playlist->id)
                 ->count();
+
+            $outputFormats = ['m3u8', 'ts'];
+            if ($playlist->enable_proxy) {
+                $proxyOutput = $playlist->proxy_options['output'] ?? 'ts';
+                if ($proxyOutput === 'hls') {
+                    $outputFormats = ['m3u8'];
+                } else {
+                    $outputFormats = [$proxyOutput];
+                }
+            }
+
             $userInfo = [
                 // 'playlist_id' => (string)$playlist->id, // Debugging
                 'username' => $username,
@@ -419,7 +430,7 @@ class XtreamApiController extends Controller
                 'active_cons' => (string)$activeConnections,
                 'created_at' => (string)($playlist->user ? $playlist->user->created_at->timestamp : $now->timestamp),
                 'max_connections' => (string)$streams,
-                'allowed_output_formats' => ['m3u8', 'ts'],
+                'allowed_output_formats' => $outputFormats,
             ];
 
             $scheme = $request->getScheme();
