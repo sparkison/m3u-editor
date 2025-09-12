@@ -49,7 +49,7 @@ class ListCategories extends ListRecords
         return $playlists->mapWithKeys(fn($playlist) => [
             $playlist->id => Tab::make($playlist->name)
                 ->modifyQueryUsing(fn($query) => $query->where('playlist_id', $playlist->id))
-                ->badge($playlist->series()->count())
+                ->badge($playlist->categories()->count())
         ])->toArray();
     }
 }
