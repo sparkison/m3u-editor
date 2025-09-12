@@ -70,36 +70,7 @@ class PlaylistInfo extends Component
 
     private function getXtreamStats(Playlist $playlist): array
     {
-        $cacheKey = "xtream_stats:{$playlist->id}";
-        $xtreamInfo = Cache::get($cacheKey, null);
-        if (!$xtreamInfo) {
-            try {
-                // If no cache, initialize XtreamService
-                $xtream = XtreamService::make($playlist);
-                if (!$xtream) {
-                    // Try and fetch from the playlist data directly if unable to initialize XtreamService
-                    $xtreamInfo = $playlist->xtream_status;
-                } else {
-                    // Prefer live data from XtreamService
-                    $xtreamInfo = $xtream->userInfo();
-                }
-                if (!$xtreamInfo) {
-                    return [];
-                }
-                Cache::put($cacheKey, $xtreamInfo, now()->addSeconds(10)); // Cache for 10 seconds
-            } catch (Exception $e) {
-                // Log the error and return empty array
-                Log::error("Failed to fetch Xtream stats for playlist {$playlist->id}: " . $e->getMessage());
-                return [];
-            }
-        }
-
-        // If xtream_status is not set in the playlist, update it
-        if (!$playlist->xtream_status) {
-            $playlist->update([
-                'xtream_status' => $xtreamInfo,
-            ]);
-        }
+        $xtreamInfo = $playlist->xtream_status;
 
         $maxConnections = $xtreamInfo['user_info']['max_connections'] ?? 1;
         $activeConnections = $xtreamInfo['user_info']['active_cons'] ?? 0;
