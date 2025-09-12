@@ -491,7 +491,10 @@ class XtreamApiController extends Controller
                 $channelNumber = $playlist->auto_channel_increment ? $playlist->channel_start - 1 : 0;
                 foreach ($enabledChannels as $index => $channel) {
                     $streamIcon = url('/placeholder.png');
-                    if ($channel->logo_type === ChannelLogoType::Epg && $channel->epgChannel && $channel->epgChannel->icon) {
+                    if ($channel->logo) {
+                        // Logo override takes precedence
+                        $streamIcon = $channel->logo;
+                    } elseif ($channel->logo_type === ChannelLogoType::Epg && $channel->epgChannel && $channel->epgChannel->icon) {
                         $streamIcon = $channel->epgChannel->icon;
                     } elseif ($channel->logo_type === ChannelLogoType::Channel && ($channel->logo || $channel->logo_internal)) {
                         $logo = $channel->logo ?? $channel->logo_internal ?? '';
@@ -602,7 +605,10 @@ class XtreamApiController extends Controller
             if ($enabledVodChannels instanceof Collection) {
                 foreach ($enabledVodChannels as $index => $channel) {
                     $streamIcon = url('/placeholder.png');
-                    if ($channel->logo_type === ChannelLogoType::Epg && $channel->epgChannel && $channel->epgChannel->icon) {
+                    if ($channel->logo) {
+                        // Logo override takes precedence
+                        $streamIcon = $channel->logo;
+                    } elseif ($channel->logo_type === ChannelLogoType::Epg && $channel->epgChannel && $channel->epgChannel->icon) {
                         $streamIcon = $channel->epgChannel->icon;
                     } elseif ($channel->logo_type === ChannelLogoType::Channel && ($channel->logo || $channel->logo_internal)) {
                         $logo = $channel->logo ?? $channel->logo_internal ?? '';

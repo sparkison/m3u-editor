@@ -19,8 +19,11 @@ class LogoService
         $logoUrl = '';
 
         // Determine logo based on logo_type preference
-        if ($channel->logo_type === ChannelLogoType::Channel) {
-            $logoUrl = $channel->logo ?? $channel->logo_internal;
+        if ($channel->logo) {
+            // Logo override takes precedence
+            $logoUrl = $channel->logo;
+        } elseif ($channel->logo_type === ChannelLogoType::Channel) {
+            $logoUrl = $channel->logo_internal;
         } else {
             $logoUrl = $channel->epgChannel?->icon ?? $channel->logo ?? $channel->logo_internal;
         }

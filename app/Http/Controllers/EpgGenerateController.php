@@ -151,7 +151,10 @@ class EpgGenerateController extends Controller
 
                 // Get the icon
                 $icon = '';
-                if ($channel->logo_type === ChannelLogoType::Epg) {
+                if ($channel->logo) {
+                    // Logo override takes precedence
+                    $icon = $channel->logo;
+                } elseif ($channel->logo_type === ChannelLogoType::Epg) {
                     $icon = $epgData->icon ?? '';
                 } elseif ($channel->logo_type === ChannelLogoType::Channel) {
                     $icon =  $channel->logo ?? $channel->logo_internal ?? '';
