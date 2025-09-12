@@ -135,8 +135,23 @@ class PlaylistResource extends Resource
                     ->wrap()
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->searchable(),
+                TextColumn::make('user_info')
+                    ->label('Provider Streams')
+                    ->getStateUsing(function ($record) {
+                        if ($record->xtream) {
+                            try {
+                                if ($record->xtream_status['user_info'] ?? false) {
+                                    return $record->xtream_status['user_info']['max_connections'];
+                                }
+                            } catch (Exception $e) {
+                            }
+                        }
+                        return 'N/A';
+                    })
+                    ->description(fn(Playlist $record): string => $record->xtream ? "Active: " . $record->xtream_status['user_info']['active_cons'] ?? 0 : '')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('available_streams')
-                    ->label('Streams')
+                    ->label('Proxy Streams')
                     ->toggleable()
                     ->formatStateUsing(fn(int $state): string => $state === 0 ? '∞' : (string)$state)
                     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
@@ -213,7 +228,7 @@ class PlaylistResource extends Resource
                 TextColumn::make('exp_date')
                     ->label('Expiry Date')
                     ->getStateUsing(function ($record) {
-                        if ($record->xtream_status) {
+                        if ($record->xtream) {
                             try {
                                 if ($record->xtream_status['user_info']['exp_date'] ?? false) {
                                     $expires = Carbon::createFromTimestamp($record->xtream_status['user_info']['exp_date']);
