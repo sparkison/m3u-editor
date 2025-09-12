@@ -4,14 +4,18 @@ namespace App\Models;
 
 use App\Enums\PlaylistChannelId;
 use App\Enums\Status;
+use App\Services\XtreamService;
 use App\Traits\ShortUrlTrait;
 use AshAllenDesign\ShortURL\Models\ShortURL;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class Playlist extends Model
 {
@@ -161,5 +165,33 @@ class Playlist extends Model
     public function episodes(): HasMany
     {
         return $this->hasMany(Episode::class);
+    }
+
+    public function xtreamStatus(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value, $attributes) {
+                // This value is live, cache for 5s at a time, then fetch again
+                $results = $value;
+                try {
+                    $xtream = XtreamService::make($this);
+                    if ($xtream) {
+                        $results = Cache::remember(
+                            "playlist:{$attributes['id']}:xtream_status",
+                            5, // cache for 5 seconds
+                            function () use ($xtream) {
+                                $userInfo = $xtream->userInfo();
+                                return $userInfo ?: [];
+                            }
+                        );
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Failed to fetch metadata for Xtream playlist ' . $this->id, ['exception' => $e]);
+                }
+                return is_string($results)
+                    ? json_decode($results, true)
+                    : $results;
+            }
+        );
     }
 }
