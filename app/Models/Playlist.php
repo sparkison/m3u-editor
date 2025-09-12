@@ -171,22 +171,24 @@ class Playlist extends Model
     {
         return Attribute::make(
             get: function ($value, $attributes) {
-                // This value is live, cache for 5s at a time, then fetch again
                 $results = $value;
-                try {
-                    $xtream = XtreamService::make($this);
-                    if ($xtream) {
-                        $results = Cache::remember(
-                            "playlist:{$attributes['id']}:xtream_status",
-                            5, // cache for 5 seconds
-                            function () use ($xtream) {
-                                $userInfo = $xtream->userInfo();
-                                return $userInfo ?: [];
-                            }
-                        );
+                if ($this->xtream) {
+                    // This value is live, cache for 5s at a time, then fetch again
+                    try {
+                        $xtream = XtreamService::make($this);
+                        if ($xtream) {
+                            $results = Cache::remember(
+                                "playlist:{$attributes['id']}:xtream_status",
+                                5, // cache for 5 seconds
+                                function () use ($xtream) {
+                                    $userInfo = $xtream->userInfo();
+                                    return $userInfo ?: [];
+                                }
+                            );
+                        }
+                    } catch (\Exception $e) {
+                        Log::error('Failed to fetch metadata for Xtream playlist ' . $this->id, ['exception' => $e]);
                     }
-                } catch (\Exception $e) {
-                    Log::error('Failed to fetch metadata for Xtream playlist ' . $this->id, ['exception' => $e]);
                 }
                 return is_string($results)
                     ? json_decode($results, true)
