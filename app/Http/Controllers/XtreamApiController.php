@@ -478,7 +478,8 @@ class XtreamApiController extends Controller
             }
 
             $proxyEnabled = $playlist->enable_proxy;
-            $defaultFormat = $playlist->proxy_options['output'] ?? 'ts';
+            $defaultExtension = $playlist->proxy_options['output'] ?? 'ts';
+            $defaultExtension = $defaultExtension === 'hls' ? 'm3u8' : $defaultExtension;
             $enabledChannels = $channelsQuery
                 ->orderBy('groups.sort_order')
                 ->orderBy('channels.sort')
@@ -543,16 +544,11 @@ class XtreamApiController extends Controller
                     }
 
                     if ($proxyEnabled) {
-                        $extension = $defaultFormat;
+                        $extension = $defaultExtension;
                     } else {
+                        // Get the file extension from the URL
                         $url = $channel->url_custom ?? $channel->url;
-                        if (\Illuminate\Support\Str::endsWith($url, '.m3u8')) {
-                            $extension = 'hls';
-                        } elseif (\Illuminate\Support\Str::endsWith($url, '.ts')) {
-                            $extension = 'ts';
-                        } else {
-                            $extension = $record->container_extension ?? 'ts';
-                        }
+                        $extension = pathinfo($url, PATHINFO_EXTENSION);
                     }
                     $liveStreams[] = [
                         'num' => $channelNo,
