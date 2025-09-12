@@ -7,7 +7,7 @@ use Illuminate\Http\Response;
 use Illuminate\Http\RedirectResponse;
 use App\Enums\ChannelLogoType;
 use App\Enums\PlaylistChannelId;
-use App\Facades\PlaylistFacade;
+use App\Facades\ProxyFacade;
 use App\Models\Channel;
 use App\Models\CustomPlaylist;
 use App\Models\Epg;
@@ -480,6 +480,8 @@ class XtreamApiController extends Controller
                 }
             }
 
+            $proxyEnabled = $playlist->enable_proxy;
+            $defaultFormat = $playlist->proxy_options['output'] ?? 'ts';
             $enabledChannels = $channelsQuery
                 ->orderBy('groups.sort_order')
                 ->orderBy('channels.sort')
@@ -543,6 +545,18 @@ class XtreamApiController extends Controller
                             break;
                     }
 
+                    if ($proxyEnabled) {
+                        $extension = $defaultFormat;
+                    } else {
+                        $url = $channel->url_custom ?? $channel->url;
+                        if (\Illuminate\Support\Str::endsWith($url, '.m3u8')) {
+                            $extension = 'hls';
+                        } elseif (\Illuminate\Support\Str::endsWith($url, '.ts')) {
+                            $extension = 'ts';
+                        } else {
+                            $extension = $record->container_extension ?? 'ts';
+                        }
+                    }
                     $liveStreams[] = [
                         'num' => $channelNo,
                         'name' => $channel->title_custom ?? $channel->title,
@@ -557,7 +571,7 @@ class XtreamApiController extends Controller
                         'tv_archive_duration' => $channel->shift ?? 0,
                         'custom_sid' => '',
                         'thumbnail' => '',
-                        'direct_source' => url("/live/{$username}/{$password}/" . $channel->id . ".ts"),
+                        'direct_source' => url("/live/{$username}/{$password}/" . $channel->id . "." . $extension),
                     ];
                 }
             }
