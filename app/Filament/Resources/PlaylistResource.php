@@ -34,6 +34,7 @@ use App\Livewire\XtreamApiInfo;
 use App\Models\Category;
 use App\Models\SourceGroup;
 use App\Services\EpgCacheService;
+use Exception;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Illuminate\Contracts\Support\Htmlable;
@@ -103,8 +104,23 @@ class PlaylistResource extends Resource
                     ->wrap()
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->searchable(),
+                Tables\Columns\TextColumn::make('user_info')
+                    ->label('Provider Streams')
+                    ->getStateUsing(function ($record) {
+                        if ($record->xtream) {
+                            try {
+                                if ($record->xtream_status['user_info'] ?? false) {
+                                    return $record->xtream_status['user_info']['max_connections'];
+                                }
+                            } catch (Exception $e) {
+                            }
+                        }
+                        return 'N/A';
+                    })
+                    ->description(fn(Playlist $record): string => $record->xtream ? "Active: " . $record->xtream_status['user_info']['active_cons'] ?? 0 : '')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('available_streams')
-                    ->label('Streams')
+                    ->label('Proxy Streams')
                     ->toggleable()
                     ->formatStateUsing(fn(int $state): string => $state === 0 ? '∞' : (string)$state)
                     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
