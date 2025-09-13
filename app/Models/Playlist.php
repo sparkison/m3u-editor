@@ -175,7 +175,7 @@ class Playlist extends Model
                 if ($this->xtream) {
                     // This value is live, cache for 5s at a time, then fetch again
                     try {
-                        $xtream = XtreamService::make($this);
+                        $xtream = XtreamService::make(xtream_config: $this->xtream_config);
                         if ($xtream) {
                             $results = Cache::remember(
                                 "playlist:{$attributes['id']}:xtream_status",

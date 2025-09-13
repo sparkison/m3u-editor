@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Playlist;
 use App\Models\MergedPlaylist;
 use App\Models\CustomPlaylist;
+use App\Models\PlaylistAlias;
 use App\Models\PlaylistAuth;
 use App\Settings\GeneralSettings;
 use Exception;
@@ -166,7 +167,44 @@ class PlaylistService
         if (!$playlist) {
             $playlist = CustomPlaylist::where('uuid', $uuid)->first();
         }
+
+        // @TODO: Support PlaylistAlias resolution in the future
+        // $alias = PlaylistAlias::where('uuid', $uuid)->first();
+        // if ($alias && $alias->enabled) {
+        //     $playlist = $alias->playlist; // Is this what we want?
+        // }
+
         return $playlist;
+    }
+
+    public static function getChannelBaseUrl(Playlist|PlaylistAlias $source, $channelId): string
+    {
+        $config = $source instanceof PlaylistAlias ? $source->xtream_config : $source->xtream_config;
+
+        if (!$config) {
+            return '';
+        }
+
+        $baseUrl = rtrim($config['url'], '/');
+        $username = $config['username'];
+        $password = $config['password'];
+
+        return "{$baseUrl}/live/{$username}/{$password}/{$channelId}";
+    }
+
+    public static function getSeriesBaseUrl(Playlist|PlaylistAlias $source, $seriesId): string
+    {
+        $config = $source instanceof PlaylistAlias ? $source->xtream_config : $source->xtream_config;
+
+        if (!$config) {
+            return '';
+        }
+
+        $baseUrl = rtrim($config['url'], '/');
+        $username = $config['username'];
+        $password = $config['password'];
+
+        return "{$baseUrl}/series/{$username}/{$password}/{$seriesId}";
     }
 
     /**

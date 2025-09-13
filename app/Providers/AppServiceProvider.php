@@ -19,6 +19,7 @@ use App\Models\MergedPlaylist;
 use App\Models\Epg;
 use App\Models\Group;
 use App\Models\Playlist;
+use App\Models\PlaylistAlias;
 use App\Models\User;
 use App\Services\EpgCacheService;
 use App\Services\FfmpegCodecService;
@@ -283,6 +284,16 @@ class AppServiceProvider extends ServiceProvider
                 }
                 return $channelFailover;
             });
+
+            // PlayslistAlias
+            PlaylistAlias::creating(function (PlaylistAlias $playlistAlias) {
+                if (!$playlistAlias->user_id) {
+                    $playlistAlias->user_id = auth()->id();
+                }
+                $playlistAlias->uuid = Str::orderedUuid()->toString();
+                return $playlistAlias;
+            });
+
         } catch (Throwable $e) {
             // Log the error
             report($e);
