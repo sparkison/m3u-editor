@@ -30,6 +30,7 @@ class PlaylistGenerateController extends Controller
 
         // Check auth
         $auths = $playlist->playlistAuths()->where('enabled', true)->get();
+        $usedAuth = null;
         if ($auths->isNotEmpty()) {
             $authenticated = false;
             foreach ($auths as $auth) {
@@ -38,6 +39,7 @@ class PlaylistGenerateController extends Controller
                     $request->get('password') === $auth->password
                 ) {
                     $authenticated = true;
+                    $usedAuth = $auth;
                     break;
                 }
             }
@@ -59,10 +61,11 @@ class PlaylistGenerateController extends Controller
 
         // Check the proxy format
         $format = $playlist->proxy_options['output'] ?? 'ts';
+        $defaultExtension = $format === 'hls' ? 'm3u8' : 'ts';
 
-        // Get ll active channels
+        // Get all active channels
         return response()->stream(
-            function () use ($playlist, $proxyEnabled, $type, $format) {
+            function () use ($playlist, $proxyEnabled, $type, $usedAuth, $defaultExtension) {
                 // Get all active channels
                 $channels = $playlist->channels()
                     ->leftJoin('groups', 'channels.group_id', '=', 'groups.id')
@@ -74,6 +77,15 @@ class PlaylistGenerateController extends Controller
                     ->orderBy('channels.title')
                     ->select('channels.*')
                     ->get();
+
+                // Set the auth details
+                if ($usedAuth) {
+                    $username = $usedAuth->username;
+                    $password = $usedAuth->password;
+                } else {
+                    $username = $playlist->user->name;
+                    $password = $playlist->uuid;
+                }
 
                 // Output the enabled channels
                 echo "#EXTM3U\n";
@@ -133,12 +145,17 @@ class PlaylistGenerateController extends Controller
                     }
 
                     if ($proxyEnabled) {
-                        $url = ProxyFacade::getProxyUrlForChannel(
-                            id: $channel->id,
-                            format: $format
-                        );
+                        $extension = $defaultExtension;
                         $icon = LogoProxyController::generateProxyUrl($icon);
+                    } else {
+                        $extension = pathinfo($url, PATHINFO_EXTENSION);
                     }
+
+                    $urlPath = '/live';
+                    if ($channel->is_vod) {
+                        $urlPath = '/vod';
+                    }
+                    $url = url("{$urlPath}/{$username}/{$password}/" . $channel->id . "." . $extension);
 
                     // Make sure TVG ID only contains characters and numbers
                     $tvgId = preg_replace(config('dev.tvgid.regex'), '', $tvgId);
@@ -203,14 +220,11 @@ class PlaylistGenerateController extends Controller
                                 $icon = url('/placeholder.png');
                             }
 
-                            $url = $episode->url;
                             if ($proxyEnabled) {
-                                $url = ProxyFacade::getProxyUrlForEpisode(
-                                    id: $episode->id,
-                                    format: $episode->container_extension
-                                );
                                 $icon = LogoProxyController::generateProxyUrl($icon);
                             }
+                            $containerExtension = $episode->container_extension ?? 'mp4';
+                            $url = url("/series/{$username}/{$password}/" . $episode->id . ".{$containerExtension}");
 
                             // Get the TVG ID
                             switch ($idChannelBy) {
@@ -351,6 +365,10 @@ class PlaylistGenerateController extends Controller
             ->select('channels.*')
             ->get();
 
+        // Set the auth details
+        $username = $playlist->user->name;
+        $password = $playlist->uuid;
+
         // Check if proxy enabled
         $proxyEnabled = $playlist->enable_proxy;
         $idChannelBy = $playlist->id_channel_by;
@@ -359,15 +377,20 @@ class PlaylistGenerateController extends Controller
 
         // Check the proxy format
         $format = $playlist->proxy_options['output'] ?? 'ts';
+        $defaultExtension = $format === 'hls' ? 'm3u8' : 'ts';
 
-        return response()->json($channels->transform(function (Channel $channel) use ($proxyEnabled, $format, $idChannelBy, $autoIncrement, &$channelNumber) {
+        return response()->json($channels->transform(function (Channel $channel) use ($proxyEnabled, $defaultExtension, $username, $password, $idChannelBy, $autoIncrement, &$channelNumber) {
             $url = $channel->url_custom ?? $channel->url;
             if ($proxyEnabled) {
-                $url = ProxyFacade::getProxyUrlForChannel(
-                    id: $channel->id,
-                    format: $format
-                );
+                $extension = $defaultExtension;
+            } else {
+                $extension = pathinfo($url, PATHINFO_EXTENSION);
             }
+            $urlPath = '/live';
+            if ($channel->is_vod) {
+                $urlPath = '/vod';
+            }
+            $url = url("{$urlPath}/{$username}/{$password}/" . $channel->id . "." . $extension);
             $channelNo = $channel->channel;
             if (!$channelNo && $autoIncrement) {
                 $channelNo = ++$channelNumber;
