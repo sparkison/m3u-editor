@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\ChannelLogoType;
 use App\Enums\PlaylistChannelId;
+use App\Facades\PlaylistFacade;
 use App\Facades\ProxyFacade;
 use App\Models\Channel;
 use App\Models\Playlist;
@@ -17,15 +18,23 @@ class PlaylistGenerateController extends Controller
     public function __invoke(Request $request, string $uuid)
     {
         // Fetch the playlist
-        $type = 'standard';
-        $playlist = Playlist::where('uuid', $uuid)->first();
+        $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
         if (!$playlist) {
-            $type = 'merged';
-            $playlist = MergedPlaylist::where('uuid', $uuid)->first();
+            return response()->json(['Error' => 'Playlist Not Found'], 404);
         }
-        if (!$playlist) {
-            $type = 'custom';
-            $playlist = CustomPlaylist::where('uuid', $uuid)->firstOrFail();
+
+        switch (class_basename($playlist)) {
+            case 'Playlist':
+                $type = 'standard';
+                break;
+            case 'MergedPlaylist':
+                $type = 'merged';
+                break;
+            case 'CustomPlaylist':
+                $type = 'custom';
+                break;
+            default:
+                return response()->json(['Error' => 'Invalid Playlist Type'], 400);
         }
 
         // Check auth
@@ -153,7 +162,8 @@ class PlaylistGenerateController extends Controller
 
                     $urlPath = '/live';
                     if ($channel->is_vod) {
-                        $urlPath = '/vod';
+                        $urlPath = '/movie';
+                        $extension = $channel->container_extension ?? 'mkv';
                     }
                     $url = url("{$urlPath}/{$username}/{$password}/" . $channel->id . "." . $extension);
 
@@ -263,15 +273,7 @@ class PlaylistGenerateController extends Controller
     public function hdhr(string $uuid)
     {
         // Fetch the playlist so we can send a 404 if not found
-        $playlist = Playlist::where('uuid', $uuid)->first();
-        if (!$playlist) {
-            $playlist = MergedPlaylist::where('uuid', $uuid)->first();
-        }
-        if (!$playlist) {
-            $playlist = CustomPlaylist::where('uuid', $uuid)->first();
-        }
-
-        // Check if playlist exists
+        $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
         if (!$playlist) {
             return response()->json(['Error' => 'Playlist Not Found'], 404);
         }
@@ -290,12 +292,9 @@ class PlaylistGenerateController extends Controller
     public function hdhrOverview(Request $request, string $uuid)
     {
         // Fetch the playlist so we can send a 404 if not found
-        $playlist = Playlist::where('uuid', $uuid)->first();
+        $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
         if (!$playlist) {
-            $playlist = MergedPlaylist::where('uuid', $uuid)->first();
-        }
-        if (!$playlist) {
-            $playlist = CustomPlaylist::where('uuid', $uuid)->first();
+            return response()->json(['Error' => 'Playlist Not Found'], 404);
         }
 
         // Check auth
@@ -325,15 +324,7 @@ class PlaylistGenerateController extends Controller
     public function hdhrDiscover(string $uuid)
     {
         // Fetch the playlist so we can send a 404 if not found
-        $playlist = Playlist::where('uuid', $uuid)->first();
-        if (!$playlist) {
-            $playlist = MergedPlaylist::where('uuid', $uuid)->first();
-        }
-        if (!$playlist) {
-            $playlist = CustomPlaylist::where('uuid', $uuid)->first();
-        }
-
-        // Check if playlist exists
+        $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
         if (!$playlist) {
             return response()->json(['Error' => 'Playlist Not Found'], 404);
         }
@@ -345,12 +336,9 @@ class PlaylistGenerateController extends Controller
     public function hdhrLineup(string $uuid)
     {
         // Fetch the playlist
-        $playlist = Playlist::where('uuid', $uuid)->first();
+        $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
         if (!$playlist) {
-            $playlist = MergedPlaylist::where('uuid', $uuid)->first();
-        }
-        if (!$playlist) {
-            $playlist = CustomPlaylist::where('uuid', $uuid)->firstOrFail();
+            return response()->json(['Error' => 'Playlist Not Found'], 404);
         }
 
         // Get all active channels
@@ -388,7 +376,8 @@ class PlaylistGenerateController extends Controller
             }
             $urlPath = '/live';
             if ($channel->is_vod) {
-                $urlPath = '/vod';
+                $urlPath = '/movie';
+                $extension = $channel->container_extension ?? 'mkv';
             }
             $url = url("{$urlPath}/{$username}/{$password}/" . $channel->id . "." . $extension);
             $channelNo = $channel->channel;

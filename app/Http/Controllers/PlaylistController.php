@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Facades\PlaylistFacade;
 use Illuminate\Http\JsonResponse;
 use App\Jobs\ProcessM3uImport;
 use App\Models\Channel;
@@ -35,12 +36,9 @@ class PlaylistController extends Controller
         ]);
 
         // Fetch the playlist
-        $playlist = Playlist::where('uuid', $uuid)->first();
+        $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
         if (!$playlist) {
-            $playlist = MergedPlaylist::where('uuid', $uuid)->first();
-        }
-        if (!$playlist) {
-            $playlist = CustomPlaylist::where('uuid', $uuid)->firstOrFail();
+            return response()->json(['Error' => 'Playlist Not Found'], 404);
         }
 
         // Refresh the playlist

@@ -6,6 +6,7 @@ use Exception;
 use Illuminate\Http\JsonResponse;
 use App\Enums\ChannelLogoType;
 use App\Enums\PlaylistChannelId;
+use App\Facades\PlaylistFacade;
 use App\Facades\ProxyFacade;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\LogoProxyController;
@@ -152,16 +153,11 @@ class EpgApiController extends Controller
     public function getDataForPlaylist(string $uuid, Request $request)
     {
         // Find the playlist
-        $playlist = Playlist::where('uuid', $uuid)->first();
+        $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
         if (!$playlist) {
-            $playlist = MergedPlaylist::where('uuid', $uuid)->first();
+            return response()->json(['Error' => 'Playlist Not Found'], 404);
         }
-        if (!$playlist) {
-            $playlist = CustomPlaylist::where('uuid', $uuid)->first();
-        }
-        if (!$playlist) {
-            return response()->json(['error' => 'Playlist not found'], 404);
-        }
+
         $cacheService = new EpgCacheService();
         $settings = app(GeneralSettings::class);
         $forceProxy = $settings->force_video_player_proxy ?? false;

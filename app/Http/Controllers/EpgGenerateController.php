@@ -8,6 +8,7 @@ use DOMDocument;
 use XMLReader;
 use App\Enums\ChannelLogoType;
 use App\Enums\PlaylistChannelId;
+use App\Facades\PlaylistFacade;
 use App\Models\CustomPlaylist;
 use App\Models\Epg;
 use App\Models\MergedPlaylist;
@@ -34,12 +35,9 @@ class EpgGenerateController extends Controller
     public function __invoke(string $uuid)
     {
         // Fetch the playlist
-        $playlist = Playlist::where('uuid', $uuid)->first();
+        $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
         if (!$playlist) {
-            $playlist = MergedPlaylist::where('uuid', $uuid)->first();
-        }
-        if (!$playlist) {
-            $playlist = CustomPlaylist::where('uuid', $uuid)->firstOrFail();
+            return response()->json(['Error' => 'Playlist Not Found'], 404);
         }
 
         // Check if we have a valid cached file
@@ -60,12 +58,9 @@ class EpgGenerateController extends Controller
     public function compressed(string $uuid)
     {
         // Fetch the playlist
-        $playlist = Playlist::where('uuid', $uuid)->first();
+        $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
         if (!$playlist) {
-            $playlist = MergedPlaylist::where('uuid', $uuid)->first();
-        }
-        if (!$playlist) {
-            $playlist = CustomPlaylist::where('uuid', $uuid)->firstOrFail();
+            return response()->json(['Error' => 'Playlist Not Found'], 404);
         }
 
         // Check if we have a valid cached file
