@@ -22,7 +22,7 @@ class PlaylistAlias extends Model
     ];
 
     // Always eager load the related playlist or custom playlist
-    protected $with = ['playlist', 'customPlaylist'];
+    // protected $with = ['playlist', 'customPlaylist'];
 
     public function user(): BelongsTo
     {
@@ -45,6 +45,15 @@ class PlaylistAlias extends Model
      */
     public function getEffectivePlaylist()
     {
+        // Load relationships if not already loaded
+        if (!$this->relationLoaded('playlist') && $this->playlist_id) {
+            $this->load('playlist');
+        }
+
+        if (!$this->relationLoaded('customPlaylist') && $this->custom_playlist_id) {
+            $this->load('customPlaylist');
+        }
+
         return $this->playlist ?? $this->customPlaylist;
     }
 
@@ -56,8 +65,19 @@ class PlaylistAlias extends Model
             return parent::__get($key);
         }
 
-        // Otherwise, delegate to the primary playlist
-        return $this->getEffectivePlaylist()->{$key};
+        // Handle relationship access directly
+        if (in_array($key, ['playlist', 'customPlaylist', 'user'])) {
+            return parent::__get($key);
+        }
+
+        // Get the effective playlist and delegate if it exists
+        $effectivePlaylist = $this->getEffectivePlaylist();
+        if ($effectivePlaylist && $effectivePlaylist->hasAttribute($key)) {
+            return $effectivePlaylist->{$key};
+        }
+
+        // Fall back to parent behavior
+        return parent::__get($key);
     }
 
     public function xtreamStatus(): Attribute
