@@ -125,9 +125,9 @@ class StreamController extends Controller
                 continue;
             }
 
-            $activeStreams = $this->incrementActiveStreams($playlist->id);
-            if ($format !== 'mp4' && $this->wouldExceedStreamLimit($playlist->id, $playlist->available_streams, $activeStreams)) {
-                $this->decrementActiveStreams($playlist->id);
+            $activeStreams = $this->incrementActiveStreams($playlist->uuid);
+            if ($format !== 'mp4' && $this->wouldExceedStreamLimit($playlist->uuid, $playlist->available_streams, $activeStreams)) {
+                $this->decrementActiveStreams($playlist->uuid);
                 Log::channel('ffmpeg')->debug("Max streams reached for playlist {$playlist->name} ({$playlist->id}). Skipping channel {$title}.");
                 // If headers are already sent, we can't abort with a new error page.
                 // This situation should ideally be rare if stream limits are checked before header sending.
@@ -166,7 +166,7 @@ class StreamController extends Controller
                     contentType: $contentType,
                     userAgent: $playlist->user_agent ?? null,
                     failoverSupport: $doFfprobePrecheck, // Only do full ffprobe if headers not yet sent
-                    playlistId: $playlist->id,
+                    playlistId: $playlist->uuid,
                     headersHaveBeenSent: $headersSentInfo
                 );
                 // If startStream completes without throwing an exception, it means streaming occurred
@@ -182,7 +182,7 @@ class StreamController extends Controller
                 return; // Should ideally be unreachable if startStream handles its exit properly when headersSent.
 
             } catch (SourceNotResponding $e) {
-                $this->decrementActiveStreams($playlist->id);
+                $this->decrementActiveStreams($playlist->uuid);
                 Log::channel('ffmpeg')->error("Source not responding for channel {$title} (URL: {$streamUrl}): " . $e->getMessage());
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, "SourceNotResponding: " . $e->getMessage());
                 // If headers were already sent.
@@ -198,7 +198,7 @@ class StreamController extends Controller
                 }
                 continue; // Try next stream
             } catch (MaxRetriesReachedException $e) {
-                $this->decrementActiveStreams($playlist->id);
+                $this->decrementActiveStreams($playlist->uuid);
                 Log::channel('ffmpeg')->error("Max retries reached mid-stream for channel {$title} (URL: {$streamUrl}): " . $e->getMessage() . ". Attempting next failover stream.");
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, "MaxRetriesReached: " . $e->getMessage());
                 // If headers were already sent.
@@ -214,7 +214,7 @@ class StreamController extends Controller
                 }
                 continue; // Try next stream
             } catch (Exception $e) {
-                $this->decrementActiveStreams($playlist->id);
+                $this->decrementActiveStreams($playlist->uuid);
                 Log::channel('ffmpeg')->error("Generic error streaming channel {$title} (URL: {$streamUrl}): " . $e->getMessage());
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, "GenericError: " . $e->getMessage());
                 // If headers were already sent.
@@ -290,9 +290,9 @@ class StreamController extends Controller
         $playlist = $episode->getEffectivePlaylist();
 
         // Active stream and limit checking
-        $activeStreams = $this->incrementActiveStreams($playlist->id);
-        if ($format !== 'mp4' && $this->wouldExceedStreamLimit($playlist->id, $playlist->available_streams, $activeStreams)) {
-            $this->decrementActiveStreams($playlist->id);
+        $activeStreams = $this->incrementActiveStreams($playlist->uuid);
+        if ($format !== 'mp4' && $this->wouldExceedStreamLimit($playlist->uuid, $playlist->available_streams, $activeStreams)) {
+            $this->decrementActiveStreams($playlist->uuid);
             Log::channel('ffmpeg')->debug("Max streams reached for playlist {$playlist->name} ({$playlist->id}). Aborting episode {$title}.");
             abort(503, 'Max streams reached for this playlist.');
         }
@@ -317,7 +317,7 @@ class StreamController extends Controller
                 contentType: $contentType,
                 userAgent: $playlist->user_agent ?? null,
                 failoverSupport: true, // Enable ffprobe pre-check for episodes
-                playlistId: $playlist->id,
+                playlistId: $playlist->uuid,
                 headersHaveBeenSent: $headersSentInfo
             );
             // If startStream completes, the request is done. startStream should handle exit if it sent headers.
@@ -329,7 +329,7 @@ class StreamController extends Controller
             return; // Should be unreachable if startStream exits properly.
 
         } catch (SourceNotResponding $e) {
-            $this->decrementActiveStreams($playlist->id);
+            $this->decrementActiveStreams($playlist->uuid);
             Log::channel('ffmpeg')->error("Source not responding for episode {$title} (URL: {$streamUrl}): " . $e->getMessage());
             if ($headersSentInfo['value']) { // Should be false if SourceNotResponding is from pre-check
                 Log::channel('ffmpeg')->error("SourceNotResponding for episode {$title} but headers already sent. Terminating.");
@@ -337,7 +337,7 @@ class StreamController extends Controller
             }
             abort(503, "Episode source not responding: " . $e->getMessage());
         } catch (MaxRetriesReachedException $e) {
-            $this->decrementActiveStreams($playlist->id);
+            $this->decrementActiveStreams($playlist->uuid);
             Log::channel('ffmpeg')->error("Max retries reached for episode {$title} (URL: {$streamUrl}): " . $e->getMessage());
             if ($headersSentInfo['value']) { // Failure happened after this stream started sending data
                 Log::channel('ffmpeg')->error("MaxRetriesReachedException for episode {$title} but headers already sent by this stream. Terminating.");
@@ -346,7 +346,7 @@ class StreamController extends Controller
             // If headers not sent, means all retries for the episode URL failed before output
             abort(503, "Episode stream failed after multiple retries: " . $e->getMessage());
         } catch (Exception $e) {
-            $this->decrementActiveStreams($playlist->id);
+            $this->decrementActiveStreams($playlist->uuid);
             Log::channel('ffmpeg')->error("Generic error streaming episode {$title} (URL: {$streamUrl}): " . $e->getMessage());
             if ($headersSentInfo['value']) {
                 Log::channel('ffmpeg')->error("Generic error for episode {$title} but headers already sent. Terminating.");
@@ -369,7 +369,7 @@ class StreamController extends Controller
      * @param string $contentType
      * @param string|null $userAgent
      * @param bool $failoverSupport Whether to support failover streams
-     * @param int|null $playlistId Optional playlist ID for tracking active streams
+     * @param string|null $playlistId Optional playlist ID for tracking active streams
      * @param array $headersHaveBeenSent Passed by reference wrapper to track header status
      *
      * @throws SourceNotResponding
@@ -386,7 +386,7 @@ class StreamController extends Controller
         string $contentType,
         ?string $userAgent,
         bool $failoverSupport = false,
-        ?int $playlistId = null,
+        ?string $playlistId = null,
         array &$headersHaveBeenSent // Pass as array ['value' => false] to modify by reference
     ): void {
         // Prevent timeouts, etc.

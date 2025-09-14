@@ -201,7 +201,7 @@ class StreamMonitorService
         $stats = [];
 
         foreach ($playlists as $playlist) {
-            $activeStreamsKey = "active_streams:{$playlist->id}";
+            $activeStreamsKey = "active_streams:{$playlist->uuid}";
             $activeCount = (int) Redis::get($activeStreamsKey) ?? 0;
             $maxStreams = $playlist->available_streams;
 

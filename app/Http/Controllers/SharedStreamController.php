@@ -127,7 +127,7 @@ class SharedStreamController extends Controller
                 $clientId,
                 [
                     'user_agent' => $userAgent,
-                    'playlist_id' => $playlist->id,
+                    'playlist_id' => $playlist->uuid,
                 ],
                 $model // Pass the full model for failover support
             );

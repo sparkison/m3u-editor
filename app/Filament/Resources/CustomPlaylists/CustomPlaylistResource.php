@@ -103,7 +103,7 @@ class CustomPlaylistResource extends Resource
                     ->toggleable()
                     ->formatStateUsing(fn(int $state): string => $state === 0 ? '∞' : (string)$state)
                     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
-                    ->description(fn(CustomPlaylist $record): string => "Active: " . (int) Redis::get("active_streams:{$record->id}") ?? 0)
+                    ->description(fn(CustomPlaylist $record): string => "Active: " . (int) Redis::get("active_streams:{$record->uuid}") ?? 0)
                     ->sortable(),
                 TextColumn::make('live_channels_count')
                     ->label('Live')

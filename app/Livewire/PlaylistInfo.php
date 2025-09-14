@@ -48,7 +48,7 @@ class PlaylistInfo extends Component
             // 'last_synced' => $playlist->synced ? Carbon::parse($playlist->synced)->diffForHumans() : 'Never',
         ];
         if ($playlist->enable_proxy) {
-            $activeStreams = Redis::get("active_streams:{$playlist->id}") ?? 0;
+            $activeStreams = Redis::get("active_streams:{$playlist->uuid}") ?? 0;
             $availableStreams = $playlist->available_streams ?? 0;
             if ($availableStreams === 0) {
                 $availableStreams = "∞";

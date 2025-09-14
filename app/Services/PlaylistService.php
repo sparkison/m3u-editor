@@ -16,13 +16,21 @@ class PlaylistService
     /**
      * Get URLs for the given playlist
      *
-     * @param  Playlist|MergedPlaylist|CustomPlaylist $playlist
+     * @param  Playlist|MergedPlaylist|CustomPlaylist|PlaylistAlias $playlist
      * @return array
      */
     public static function getUrls($playlist)
     {
         // Get the first enabled auth (URLs can only contain one set of credentials)
-        $playlistAuth = $playlist->playlistAuths()->where('enabled', true)->first();
+        $playlistAuth = null;
+        if (method_exists($playlist, 'playlistAuths')) {
+            $playlistAuth = $playlist->playlistAuths()->where('enabled', true)->first();
+        } else if ($playlist instanceof PlaylistAlias) {
+            // If PlaylistAlias, check if direct authentication is set
+            $playlistAuth = $playlist->username && $playlist->password
+                ? (object) ['username' => $playlist->username, 'password' => $playlist->password]
+                : null;
+        }
         $auth = null;
         if ($playlistAuth) {
             $auth = '?username=' . $playlistAuth->username . '&password=' . $playlistAuth->password;

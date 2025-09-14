@@ -247,7 +247,7 @@ class StreamingChannelStats extends Page
             $isBadSource = false;
 
             if ($playlist) {
-                $activeStreamsOnPlaylist = Redis::get("active_streams:{$playlist->id}") ?? 0;
+                $activeStreamsOnPlaylist = Redis::get("active_streams:{$playlist->uuid}") ?? 0;
                 $maxStreamsOnPlaylist = $playlist->available_streams ?? 'N/A';
                 $maxStreamsDisplay = ($maxStreamsOnPlaylist == 0 && is_numeric($maxStreamsOnPlaylist)) ? '∞' : $maxStreamsOnPlaylist;
                 if ($maxStreamsOnPlaylist === 'N/A') $maxStreamsDisplay = 'N/A';

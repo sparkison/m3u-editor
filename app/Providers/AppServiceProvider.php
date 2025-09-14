@@ -293,7 +293,24 @@ class AppServiceProvider extends ServiceProvider
                 $playlistAlias->uuid = Str::orderedUuid()->toString();
                 return $playlistAlias;
             });
-
+            PlaylistAlias::updating(function (Playlist $playlist) {
+                if ($playlist->isDirty('short_urls_enabled')) {
+                    $playlist->generateShortUrl();
+                }
+                if ($playlist->isDirty('uuid')) {
+                    // If changing the UUID, remove the old short URLs and generate new ones
+                    if ($playlist->short_urls_enabled) {
+                        $playlist->removeShortUrls();
+                        $playlist->generateShortUrl();
+                    }
+                }
+                return $playlist;
+            });
+            PlaylistAlias::deleting(function (PlaylistAlias $playlistAlias) {
+                // Remove short URLs
+                $playlistAlias->removeShortUrls();
+                return $playlistAlias;
+            });
         } catch (Throwable $e) {
             // Log the error
             report($e);

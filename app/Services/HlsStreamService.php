@@ -113,12 +113,12 @@ class HlsStreamService
             }
 
             // Keep track of the active streams for this playlist using optimistic locking pattern
-            $activeStreams = $this->incrementActiveStreams($playlist->id);
+            $activeStreams = $this->incrementActiveStreams($playlist->uuid);
 
             // Then check if we're over limit
-            if ($this->wouldExceedStreamLimit($playlist->id, $playlist->available_streams, $activeStreams)) {
+            if ($this->wouldExceedStreamLimit($playlist->uuid, $playlist->available_streams, $activeStreams)) {
                 // We're over limit, so decrement and skip
-                $this->decrementActiveStreams($playlist->id);
+                $this->decrementActiveStreams($playlist->uuid);
                 Log::channel('ffmpeg')->debug("HLS Stream: Max streams reached for playlist {$playlist->name} ({$playlist->id}). Skipping channel {$currentStreamTitle}. Adding playlist to exhausted list for this request.");
                 // Add this playlist to the exhausted list for the current request scope
                 if (!in_array($playlist->id, $exhaustedPlaylistIds)) {
@@ -148,7 +148,7 @@ class HlsStreamService
 
             } catch (SourceNotResponding $e) {
                 // Log the error and cache the bad source
-                $this->decrementActiveStreams($playlist->id);
+                $this->decrementActiveStreams($playlist->uuid);
                 Log::channel('ffmpeg')->error("Source not responding for channel {$currentStreamTitle} (Original: {$title}): " . $e->getMessage());
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS, $e->getMessage());
                 $allAttemptsFailedDueToPlaylistLimits = false; // Mark failure as not due to playlist limits
@@ -156,7 +156,7 @@ class HlsStreamService
                 continue;
             } catch (FatalStreamContentException $e) {
                 // This is our new exception for critical FFmpeg content errors
-                $this->decrementActiveStreams($playlist->id); // Decrement active streams for the playlist
+                $this->decrementActiveStreams($playlist->uuid); // Decrement active streams for the playlist
                 Redis::srem("hls:active_{$type}_ids", $stream->id); // Remove current stream from active set
                 Log::channel('ffmpeg')->error("Fatal stream content error for {$currentStreamTitle} (Original: {$title}, Stream ID: {$stream->id}): " . $e->getMessage() . ". Attempting failover.");
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS_CONTENT_ERROR ?? 10, "Fatal content error: " . $e->getMessage()); // Mark bad for a very short time
@@ -179,7 +179,7 @@ class HlsStreamService
                 continue;
             } catch (Exception $e) {
                 // Log the error and potentially mark source as bad before trying next failover
-                $this->decrementActiveStreams($playlist->id); // Ensure decrement if not already handled
+                $this->decrementActiveStreams($playlist->uuid); // Ensure decrement if not already handled
                 Redis::srem("hls:active_{$type}_ids", $stream->id); // Remove current stream from active set
                 Log::channel('ffmpeg')->error("General error streaming channel {$currentStreamTitle} (Original: {$title}, Stream ID: {$stream->id}): " . $e->getMessage());
                 Redis::setex($badSourceCacheKey, ProxyService::BAD_SOURCE_CACHE_SECONDS_GENERAL_ERROR ?? ProxyService::BAD_SOURCE_CACHE_SECONDS, "General error: " . $e->getMessage());
@@ -525,7 +525,7 @@ class HlsStreamService
         if ($wasRunning && $model) {
             $playlist = $model->getEffectivePlaylist();
             if ($playlist) {
-                $this->decrementActiveStreams($playlist->id);
+                $this->decrementActiveStreams($playlist->uuid);
                 Log::channel('ffmpeg')->debug("Decremented active stream count for playlist {$playlist->id} as stream {$type} ID {$id} was running and is now stopped.");
             }
         } elseif (!$wasRunning && $model && $model->getEffectivePlaylist()) {

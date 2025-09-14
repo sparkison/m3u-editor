@@ -155,7 +155,7 @@ class PlaylistResource extends Resource
                     ->toggleable()
                     ->formatStateUsing(fn(int $state): string => $state === 0 ? '∞' : (string)$state)
                     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
-                    ->description(fn(Playlist $record): string => "Active: " . (int) Redis::get("active_streams:{$record->id}") ?? 0)
+                    ->description(fn(Playlist $record): string => "Active: " . (int) Redis::get("active_streams:{$record->uuid}") ?? 0)
                     ->sortable(),
                 TextColumn::make('groups_count')
                     ->label('Groups')
@@ -407,7 +407,7 @@ class PlaylistResource extends Resource
                         ->label('Reset active count')
                         ->icon('heroicon-o-numbered-list')
                         ->color('warning')
-                        ->action(fn($record) => Redis::set("active_streams:{$record->id}", 0))->after(function () {
+                        ->action(fn($record) => Redis::set("active_streams:{$record->uuid}", 0))->after(function () {
                             Notification::make()
                                 ->success()
                                 ->title('Active stream count reset')
@@ -501,7 +501,7 @@ class PlaylistResource extends Resource
                         ->color('warning')
                         ->action(function ($records) {
                             foreach ($records as $record) {
-                                Redis::set("active_streams:{$record->id}", 0);
+                                Redis::set("active_streams:{$record->uuid}", 0);
                             }
                         })->after(function () {
                             Notification::make()
@@ -686,7 +686,7 @@ class PlaylistResource extends Resource
                     ->label('Reset active count')
                     ->icon('heroicon-o-numbered-list')
                     ->color('warning')
-                    ->action(fn($record) => Redis::set("active_streams:{$record->id}", 0))->after(function () {
+                    ->action(fn($record) => Redis::set("active_streams:{$record->uuid}", 0))->after(function () {
                         Notification::make()
                             ->success()
                             ->title('Active stream count reset')
