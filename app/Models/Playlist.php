@@ -167,6 +167,45 @@ class Playlist extends Model
         return $this->hasMany(Episode::class);
     }
 
+    public function aliases(): HasMany
+    {
+        return $this->hasMany(PlaylistAlias::class);
+    }
+
+    public function enabledAliases(): HasMany
+    {
+        return $this->aliases()->where('enabled', true)->orderBy('priority');
+    }
+
+    public function getAllConfigs(): array
+    {
+        $configs = [];
+        
+        // Primary config
+        if ($this->xtream_config) {
+            $configs[] = [
+                'type' => 'primary',
+                'id' => $this->id,
+                'config' => $this->xtream_config,
+                'priority' => -1 // Primary always has highest priority
+            ];
+        }
+
+        // Alias configs
+        foreach ($this->enabledAliases as $alias) {
+            if ($alias->xtream_config) {
+                $configs[] = [
+                    'type' => 'alias',
+                    'id' => $alias->id,
+                    'config' => $alias->xtream_config,
+                    'priority' => $alias->priority
+                ];
+            }
+        }
+
+        return collect($configs)->sortBy('priority')->values()->all();
+    }
+
     public function xtreamStatus(): Attribute
     {
         return Attribute::make(

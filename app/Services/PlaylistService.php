@@ -179,31 +179,42 @@ class PlaylistService
      * Resolve a playlist by its UUID
      *
      * @param  string $uuid
-     * @return Playlist|MergedPlaylist|CustomPlaylist|null
+     * @return Playlist|MergedPlaylist|CustomPlaylist|PlaylistAlias|null
      */
     public function resolvePlaylistByUuid($uuid)
     {
-        // Fetch the playlist
+        // First try to find primary playlist
         $playlist = Playlist::where('uuid', $uuid)->first();
-        if (!$playlist) {
-            $playlist = MergedPlaylist::where('uuid', $uuid)->first();
-        }
-        if (!$playlist) {
-            $playlist = CustomPlaylist::where('uuid', $uuid)->first();
+        if ($playlist) {
+            return $playlist;
         }
 
-        // @TODO: Support PlaylistAlias resolution
-        // $alias = PlaylistAlias::where('uuid', $uuid)->first();
-        // if ($alias && $alias->enabled) {
-        //     $playlist = $alias->playlist; // Is this what we want?
-        // }
+        // Then try merged playlist
+        $playlist = MergedPlaylist::where('uuid', $uuid)->first();
+        if ($playlist) {
+            return $playlist;
+        }
 
-        return $playlist;
+        // Then try custom playlist
+        $playlist = CustomPlaylist::where('uuid', $uuid)->first();
+        if ($playlist) {
+            return $playlist;
+        }
+
+        // Finally try playlist alias
+        $alias = PlaylistAlias::where('uuid', $uuid)->where('enabled', true)->first();
+        if ($alias) {
+            return $alias; // Return the alias itself, not the underlying playlist
+        }
+
+        return null;
     }
 
     public static function getChannelBaseUrl(Playlist|PlaylistAlias $source, $channelId): string
     {
-        $config = $source instanceof PlaylistAlias ? $source->xtream_config : $source->xtream_config;
+        $config = $source instanceof PlaylistAlias 
+            ? $source->getEffectiveXtreamConfig() 
+            : $source->xtream_config;
 
         if (!$config) {
             return '';
@@ -218,7 +229,9 @@ class PlaylistService
 
     public static function getSeriesBaseUrl(Playlist|PlaylistAlias $source, $seriesId): string
     {
-        $config = $source instanceof PlaylistAlias ? $source->xtream_config : $source->xtream_config;
+        $config = $source instanceof PlaylistAlias 
+            ? $source->getEffectiveXtreamConfig() 
+            : $source->xtream_config;
 
         if (!$config) {
             return '';
@@ -306,7 +319,25 @@ class PlaylistService
                             $playlist = null;
                         }
                     } catch (ModelNotFoundException $e) {
-                        // No playlist found
+                        // Try PlaylistAlias
+                        try {
+                            $playlist = PlaylistAlias::with([
+                                'user',
+                                'playlist',
+                                'customPlaylist'
+                            ])->where('uuid', $password)
+                            ->where('enabled', true)
+                            ->firstOrFail();
+
+                            // Verify username matches playlist alias owner's name
+                            if ($playlist->user->name === $username) {
+                                $authMethod = 'owner_auth';
+                            } else {
+                                $playlist = null;
+                            }
+                        } catch (ModelNotFoundException $e) {
+                            // No playlist found
+                        }
                     }
                 }
             }

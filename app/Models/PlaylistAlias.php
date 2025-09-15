@@ -19,6 +19,7 @@ class PlaylistAlias extends Model
     protected $casts = [
         'xtream_config' => 'array',
         'enabled' => 'boolean',
+        'priority' => 'integer',
     ];
 
     // Always eager load the related playlist or custom playlist
@@ -78,6 +79,33 @@ class PlaylistAlias extends Model
 
         // Fall back to parent behavior
         return parent::__get($key);
+    }
+
+    /**
+     * Get channels relationship - delegates to effective playlist
+     */
+    public function channels()
+    {
+        $effectivePlaylist = $this->getEffectivePlaylist();
+        return $effectivePlaylist ? $effectivePlaylist->channels() : null;
+    }
+
+    /**
+     * Get series relationship - delegates to effective playlist
+     */
+    public function series()
+    {
+        $effectivePlaylist = $this->getEffectivePlaylist();
+        return $effectivePlaylist ? $effectivePlaylist->series() : null;
+    }
+
+    /**
+     * Get episodes relationship - delegates to effective playlist
+     */
+    public function episodes()
+    {
+        $effectivePlaylist = $this->getEffectivePlaylist();
+        return $effectivePlaylist ? $effectivePlaylist->episodes() : null;
     }
 
     public function xtreamStatus(): Attribute

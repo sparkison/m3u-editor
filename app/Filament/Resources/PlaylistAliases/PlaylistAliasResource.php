@@ -8,6 +8,7 @@ use App\Filament\Resources\Playlists\PlaylistResource;
 use App\Models\CustomPlaylist;
 use App\Models\Playlist;
 use App\Models\PlaylistAlias;
+use App\Models\User;
 use App\Services\EpgCacheService;
 use Carbon\Carbon;
 use Exception;
@@ -26,6 +27,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Validation\Rule;
 
@@ -100,9 +102,13 @@ class PlaylistAliasResource extends Resource
                 Tables\Columns\TextColumn::make('available_streams')
                     ->label('Proxy Streams')
                     ->toggleable()
+                    ->getStateUsing(function (PlaylistAlias $record) {
+                        $effectivePlaylist = $record->getEffectivePlaylist();
+                        return $effectivePlaylist ? $effectivePlaylist->available_streams : 0;
+                    })
                     ->formatStateUsing(fn(int $state): string => $state === 0 ? '∞' : (string)$state)
                     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
-                    ->description(fn(Playlist $record): string => "Active: " . (int) Redis::get("active_streams:{$record->uuid}") ?? 0),
+                    ->description(fn(PlaylistAlias $record): string => "Active: " . (int) Redis::get("active_streams:{$record->uuid}") ?? 0),
                 Tables\Columns\ToggleColumn::make('enabled'),
                 Tables\Columns\TextColumn::make('exp_date')
                     ->label('Expiry Date')
@@ -229,7 +235,7 @@ class PlaylistAliasResource extends Resource
                 ->schema([
                     Forms\Components\Select::make('playlist_id')
                         ->label('Playlist')
-                        ->options(fn() => Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                        ->options(fn() => Playlist::where('user_id', Auth::id())->pluck('name', 'id'))
                         ->searchable()
                         ->live()
                         ->afterStateUpdated(function (Set $set, $state) {
@@ -246,7 +252,7 @@ class PlaylistAliasResource extends Resource
                         ->rules(['exists:playlists,id']),
                     Forms\Components\Select::make('custom_playlist_id')
                         ->label('Custom Playlist')
-                        ->options(fn() => CustomPlaylist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                        ->options(fn() => CustomPlaylist::where('user_id', Auth::id())->pluck('name', 'id'))
                         ->searchable()
                         ->live()
                         ->afterStateUpdated(function (Set $set, $state) {
