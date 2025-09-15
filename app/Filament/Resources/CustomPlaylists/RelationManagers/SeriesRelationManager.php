@@ -37,6 +37,13 @@ class SeriesRelationManager extends RelationManager
         return false;
     }
 
+    public static function getTabComponent(Model $ownerRecord, string $pageClass): Tab
+    {
+        return Tab::make('Series')
+            ->badge($ownerRecord->series()->count())
+            ->icon('heroicon-m-video-camera');
+    }
+
     public function form(Schema $schema): Schema
     {
         return $schema

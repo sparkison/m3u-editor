@@ -45,6 +45,13 @@ class ChannelsRelationManager extends RelationManager
         return false;
     }
 
+    public static function getTabComponent(Model $ownerRecord, string $pageClass): Tab
+    {
+        return Tab::make('Live Channels')
+            ->badge($ownerRecord->channels()->where('is_vod', false)->count())
+            ->icon('heroicon-m-film');
+    }
+
     public function form(Schema $schema): Schema
     {
         return $schema
