@@ -113,7 +113,6 @@ class PlaylistAlias extends Model
         }
         return $effectivePlaylist->groups();
     }
-
     public function groupTags()
     {
         $effectivePlaylist = $this->getEffectivePlaylist();
@@ -123,6 +122,17 @@ class PlaylistAlias extends Model
         return $effectivePlaylist->groupTags();
     }
 
+    /**
+     * Get categories through the effective playlist
+     */
+    public function categories()
+    {
+        $effectivePlaylist = $this->getEffectivePlaylist();
+        if (!$effectivePlaylist) {
+            return collect();
+        }
+        return $effectivePlaylist->categories();
+    }
     public function categoryTags()
     {
         $effectivePlaylist = $this->getEffectivePlaylist();
@@ -233,8 +243,10 @@ class PlaylistAlias extends Model
      * Transform channel URL to use this alias's provider config
      * Only transforms the standard URL, not custom URLs
      */
-    public function transformChannelUrl(string $originalUrl): string
+    public function transformChannelUrl(Channel $channel): string
     {
+        $originalUrl = $channel->url ?? '';
+
         if (!$this->xtream_config) {
             return $originalUrl;
         }
@@ -250,8 +262,10 @@ class PlaylistAlias extends Model
     /**
      * Transform episode URL to use this alias's provider config
      */
-    public function transformEpisodeUrl(string $originalUrl): string
+    public function transformEpisodeUrl(Episode $episode): string
     {
+        $originalUrl = $episode->url ?? '';
+
         if (!$this->xtream_config) {
             return $originalUrl;
         }
@@ -267,8 +281,11 @@ class PlaylistAlias extends Model
     /**
      * Transform URL from source config to alias config
      */
-    private function transformUrl(string $originalUrl, array $sourceConfig, array $aliasConfig): string
-    {
+    private function transformUrl(
+        string $originalUrl,
+        array $sourceConfig,
+        array $aliasConfig
+    ): string {
         // Extract the source provider details
         $sourceBaseUrl = rtrim($sourceConfig['url'], '/');
         $sourceUsername = $sourceConfig['username'];

@@ -127,9 +127,7 @@ class SharedStreamService
             if ($primaryChannel) {
                 $playlist = $primaryChannel->getEffectivePlaylist();
                 if ($playlist) {
-                    $activeStreams = $this->incrementActiveStreams($playlist->uuid);
-                    if ($this->wouldExceedStreamLimit($playlist->uuid, $playlist->available_streams, $activeStreams)) {
-                        $this->decrementActiveStreams($playlist->uuid);
+                    if ($this->wouldExceedStreamLimit($playlist->uuid, $playlist->available_streams)) {
                         Log::channel('ffmpeg')->debug("SharedStream: Max streams reached for primary channel's playlist {$playlist->name} ({$playlist->id}). Skipping primary channel {$title} ({$modelId}).");
                         if (!in_array($playlist->id, $exhaustedPlaylistIds)) {
                             $exhaustedPlaylistIds[] = $playlist->id;
@@ -251,9 +249,7 @@ class SharedStreamService
                 }
 
                 if ($failoverPlaylist) {
-                    $activeStreams = $this->incrementActiveStreams($failoverPlaylist->uuid);
-                    if ($this->wouldExceedStreamLimit($failoverPlaylist->uuid, $failoverPlaylist->available_streams, $activeStreams)) {
-                        $this->decrementActiveStreams($failoverPlaylist->uuid);
+                    if ($this->wouldExceedStreamLimit($failoverPlaylist->uuid, $failoverPlaylist->available_streams)) {
                         Log::channel('ffmpeg')->debug("SharedStream: Max streams reached for failover channel's playlist {$failoverPlaylist->name} ({$failoverPlaylist->uuid}). Skipping failover channel {$failoverChannel->id}.");
                         if (!in_array($failoverPlaylist->id, $exhaustedPlaylistIds)) {
                             $exhaustedPlaylistIds[] = $failoverPlaylist->id;
@@ -354,9 +350,7 @@ class SharedStreamService
             if ($playlist && in_array($playlist->id, $exhaustedPlaylistIds)) {
                 Log::channel('ffmpeg')->debug("SharedStream: Playlist {$playlist->name} for original stream {$streamKey} is exhausted. Skipping restart attempt for this stream.");
             } elseif ($playlist) {
-                $activeStreams = $this->incrementActiveStreams($playlist->uuid);
-                if ($this->wouldExceedStreamLimit($playlist->uuid, $playlist->available_streams, $activeStreams)) {
-                    $this->decrementActiveStreams($playlist->uuid);
+                if ($this->wouldExceedStreamLimit($playlist->uuid, $playlist->available_streams)) {
                     Log::channel('ffmpeg')->debug("SharedStream: Max streams reached for playlist {$playlist->name} ({$playlist->id}) during restart attempt. Skipping original stream {$streamKey}.");
                     if (!in_array($playlist->id, $exhaustedPlaylistIds)) {
                         $exhaustedPlaylistIds[] = $playlist->id;
@@ -438,9 +432,7 @@ class SharedStreamService
             }
 
             if ($failoverPlaylist) {
-                $activeStreams = $this->incrementActiveStreams($failoverPlaylist->uuid);
-                if ($this->wouldExceedStreamLimit($failoverPlaylist->uuid, $failoverPlaylist->available_streams, $activeStreams)) {
-                    $this->decrementActiveStreams($failoverPlaylist->uuid);
+                if ($this->wouldExceedStreamLimit($failoverPlaylist->uuid, $failoverPlaylist->available_streams)) {
                     Log::channel('ffmpeg')->debug("SharedStream: Max streams for playlist {$failoverPlaylist->name} on failover restart. Skipping failover channel {$failoverChannel->id}.");
                     if (!in_array($failoverPlaylist->id, $exhaustedPlaylistIds)) {
                         $exhaustedPlaylistIds[] = $failoverPlaylist->id;

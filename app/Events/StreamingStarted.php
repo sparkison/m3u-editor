@@ -17,9 +17,9 @@ class StreamingStarted
     /**
      * Create a new event instance.
      * 
-     * @param int $playlistId The ID of the playlist for which streaming has started
+     * @param string $uuid The UUID of the playlist for which streaming has started
      */
     public function __construct(
-        public int $playlistId
+        public string $uuid
     ) {}
 }

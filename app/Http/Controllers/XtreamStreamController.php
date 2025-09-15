@@ -175,25 +175,11 @@ class XtreamStreamController extends Controller
         if ($channel instanceof Channel) {
             if ($playlist->enable_proxy) {
                 // If proxy enabled, call the controller method directly to avoid redirect loop
-                $bufferedStreamsEnabled = config('proxy.shared_streaming.enabled', false);
                 $encodedId = rtrim(base64_encode($streamId), '=');
-                if ($bufferedStreamsEnabled) {
-                    return app()->call('App\\Http\\Controllers\\SharedStreamController@streamChannel', [
-                        'encodedId' => $encodedId,
-                        'format' => $format
-                    ]);
-                } else {
-                    if ($format === 'm3u8') {
-                        return app()->call('App\\Http\\Controllers\\HlsStreamController@serveChannelPlaylist', [
-                            'encodedId' => $encodedId,
-                        ]);
-                    } else {
-                        return app()->call('App\\Http\\Controllers\\StreamController@__invoke', [
-                            'encodedId' => $encodedId,
-                            'format' => 'ts',
-                        ]);
-                    }
-                }
+                return app()->call('App\\Http\\Controllers\\SharedStreamController@streamChannel', [
+                    'encodedId' => $encodedId,
+                    'format' => $format
+                ]);
             } else {
                 return Redirect::to(PlaylistUrlService::getChannelUrl($channel, $playlist));
             }
@@ -211,25 +197,11 @@ class XtreamStreamController extends Controller
         if ($channel instanceof Channel) {
             if ($playlist->enable_proxy) {
                 // If proxy enabled, call the controller method directly to avoid redirect loop
-                $bufferedStreamsEnabled = config('proxy.shared_streaming.enabled', false);
                 $encodedId = rtrim(base64_encode($streamId), '=');
-                if ($bufferedStreamsEnabled) {
-                    return app()->call('App\\Http\\Controllers\\SharedStreamController@streamChannel', [
-                        'encodedId' => $encodedId,
-                        'format' => $format
-                    ]);
-                } else {
-                    if ($format === 'm3u8') {
-                        return app()->call('App\\Http\\Controllers\\HlsStreamController@serveChannelPlaylist', [
-                            'encodedId' => $encodedId,
-                        ]);
-                    } else {
-                        return app()->call('App\\Http\\Controllers\\StreamController@__invoke', [
-                            'encodedId' => $encodedId,
-                            'format' => $format,
-                        ]);
-                    }
-                }
+                return app()->call('App\\Http\\Controllers\\SharedStreamController@streamChannel', [
+                    'encodedId' => $encodedId,
+                    'format' => $format
+                ]);
             } else {
                 return Redirect::to(PlaylistUrlService::getChannelUrl($channel, $playlist));
             }
@@ -247,25 +219,11 @@ class XtreamStreamController extends Controller
         if ($episode instanceof Episode) {
             if ($playlist->enable_proxy) {
                 // If proxy enabled, call the controller method directly to avoid redirect loop
-                $bufferedStreamsEnabled = config('proxy.shared_streaming.enabled', false);
                 $encodedId = rtrim(base64_encode($streamId), '=');
-                if ($bufferedStreamsEnabled) {
-                    return app()->call('App\\Http\\Controllers\\SharedStreamController@streamEpisode', [
-                        'encodedId' => $encodedId,
-                        'format' => $format
-                    ]);
-                } else {
-                    if ($format === 'm3u8') {
-                        return app()->call('App\\Http\\Controllers\\HlsStreamController@serveEpisodePlaylist', [
-                            'encodedId' => $encodedId,
-                        ]);
-                    } else {
-                        return app()->call('App\\Http\\Controllers\\StreamController@episode', [
-                            'encodedId' => $encodedId,
-                            'format' => $format,
-                        ]);
-                    }
-                }
+                return app()->call('App\\Http\\Controllers\\SharedStreamController@streamEpisode', [
+                    'encodedId' => $encodedId,
+                    'format' => $format
+                ]);
             } else {
                 return Redirect::to(PlaylistUrlService::getEpisodeUrl($episode, $playlist));
             }
@@ -317,26 +275,11 @@ class XtreamStreamController extends Controller
 
         if ($playlist->enable_proxy) {
             // If proxy enabled, call the controller method directly to avoid redirect loop
-            $bufferedStreamsEnabled = config('proxy.shared_streaming.enabled', false);
             $encodedId = rtrim(base64_encode($streamId), '=');
-
-            if ($bufferedStreamsEnabled) {
-                return app()->call('App\\Http\\Controllers\\SharedStreamController@streamChannel', [
-                    'encodedId' => $encodedId,
-                    'format' => $format
-                ]);
-            } else {
-                if ($format === 'm3u8') {
-                    return app()->call('App\\Http\\Controllers\\HlsStreamController@serveChannelPlaylist', [
-                        'encodedId' => $encodedId,
-                    ]);
-                } else {
-                    return app()->call('App\\Http\\Controllers\\StreamController@__invoke', [
-                        'encodedId' => $encodedId,
-                        'format' => $format,
-                    ]);
-                }
-            }
+            return app()->call('App\\Http\\Controllers\\SharedStreamController@streamChannel', [
+                'encodedId' => $encodedId,
+                'format' => $format
+            ]);
         } else {
             // If proxy is not enabled, simply return the timeshift URL
             $streamUrl = PlaylistUrlService::getChannelUrl($channel, $playlist);

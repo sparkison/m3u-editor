@@ -4,6 +4,7 @@ namespace App\Forms\Components;
 
 use Exception;
 use App\Models\Playlist;
+use App\Models\SharedStream;
 use App\Services\XtreamService;
 use Carbon\Carbon;
 use Filament\Forms\Components\Field;
@@ -38,7 +39,7 @@ class PlaylistInfo extends Field
             // 'last_synced' => $playlist->synced ? Carbon::parse($playlist->synced)->diffForHumans() : 'Never',
         ];
         if ($playlist->enable_proxy) {
-            $activeStreams = Redis::get("active_streams:{$playlist->uuid}") ?? 0;
+            $activeStreams = SharedStream::active()->where('stream_info->options->playlist_id', $playlist->uuid)->count();
             $availableStreams = $playlist->available_streams ?? 0;
             if ($availableStreams === 0) {
                 $availableStreams = "∞";

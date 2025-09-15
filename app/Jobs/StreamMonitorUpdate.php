@@ -37,10 +37,6 @@ class StreamMonitorUpdate implements ShouldQueue
         SharedStreamService $sharedStreamService,
         StreamMonitorService $monitorService
     ): void {
-        // Only run if the newer Shared Streaming is enabled
-        if (!config('proxy.shared_streaming.enabled')) {
-            return;
-        }
         try {
             // Update monitoring statistics
             $monitorService->updateSystemStats();

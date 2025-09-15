@@ -17,9 +17,9 @@ class StreamingStopped
     /**
      * Create a new event instance.
      * 
-     * @param int $playlistId The ID of the playlist for which streaming has stopped
+     * @param string $uuid The UUID of the playlist for which streaming has stopped
      */
     public function __construct(
-        public int $playlistId
+        public string $uuid
     ) {}
 }

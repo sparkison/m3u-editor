@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\Channel;
-use App\Models\Episode;  
+use App\Models\Episode;
 use App\Models\Playlist;
 use App\Models\PlaylistAlias;
 use App\Models\CustomPlaylist;
@@ -25,14 +25,12 @@ class PlaylistUrlService
             return $channel->url_custom;
         }
 
-        $baseUrl = $channel->url;
-        
         // If context is a PlaylistAlias, transform the URL (custom channels will retain their custom URL)
-        if ($context instanceof PlaylistAlias && !empty($baseUrl)) {
-            return $context->transformChannelUrl($baseUrl);
+        if ($context instanceof PlaylistAlias) {
+            return $context->transformChannelUrl($channel);
         }
 
-        return $baseUrl ?? '';
+        return $channel->url ?? '';
     }
 
     /**
@@ -44,14 +42,12 @@ class PlaylistUrlService
      */
     public static function getEpisodeUrl(Episode $episode, $context = null): string
     {
-        $baseUrl = $episode->url;
-        
         // If context is a PlaylistAlias, transform the URL
         if ($context instanceof PlaylistAlias) {
-            return $context->transformEpisodeUrl($baseUrl);
+            return $context->transformEpisodeUrl($episode);
         }
 
-        return $baseUrl;
+        return $episode->url ?? '';
     }
 
     /**
@@ -59,23 +55,35 @@ class PlaylistUrlService
      * This method can be used to implement failover functionality
      * 
      * @param Playlist $playlist
-     * @return PlaylistAlias|null
+     * @return PlaylistAlias|Playlist|null
      */
-    public static function getAvailableAlias(Playlist $playlist): ?PlaylistAlias
+    public static function getAvailableAlias(Playlist $playlist): PlaylistAlias|Playlist|null
     {
+        // First, check if there are any available connections on the main playlist
+        $status = $playlist->xtream_status;
+        $activeStreams = $status['user_info']['active_cons'] ?? 0;
+        $maxStreams = $status['user_info']['max_connections'] ?? 0;
+        if ($activeStreams < $maxStreams) {
+            return $playlist;
+        }
+
         // Get all enabled aliases ordered by priority
         $aliases = $playlist->enabledAliases()
             ->with('user')
+            ->orderBy('priority', 'asc')
             ->get();
 
         foreach ($aliases as $alias) {
             // Check if this alias has available streams
-            $activeStreams = \Illuminate\Support\Facades\Redis::get("active_streams:{$alias->uuid}") ?? 0;
             $effectivePlaylist = $alias->getEffectivePlaylist();
-            $maxStreams = $effectivePlaylist ? $effectivePlaylist->available_streams : 0;
 
-            // If unlimited streams or has available capacity
-            if ($maxStreams === 0 || $activeStreams < $maxStreams) {
+            // Call the provider (status is cached for 5s in the Playlist model)
+            $status = $effectivePlaylist ? $effectivePlaylist->xtream_status : null;
+            $activeStreams = $status['user_info']['active_cons'] ?? 0;
+            $maxStreams = $status['user_info']['max_connections'] ?? 0;
+
+            // If provider has available capacity return first available alias
+            if ($activeStreams < $maxStreams) {
                 return $alias;
             }
         }
@@ -92,7 +100,7 @@ class PlaylistUrlService
     public static function getOptimalChannelStream(Channel $channel): array
     {
         $playlist = $channel->getEffectivePlaylist();
-        
+
         // First try to find an available alias
         if ($playlist instanceof Playlist) {
             $availableAlias = self::getAvailableAlias($playlist);
@@ -120,7 +128,7 @@ class PlaylistUrlService
     public static function getOptimalEpisodeStream(Episode $episode): array
     {
         $playlist = $episode->getEffectivePlaylist();
-        
+
         // First try to find an available alias
         if ($playlist instanceof Playlist) {
             $availableAlias = self::getAvailableAlias($playlist);

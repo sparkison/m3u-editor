@@ -27,37 +27,20 @@ class ProxyService
     {
         $proxyUrlOverride = config('proxy.url_override');
         $proxyFormat = $format ?? config('proxy.proxy_format', 'ts');
-        $sharedStreamingEnabled = config('proxy.shared_streaming.enabled', false);
         $id = rtrim(base64_encode($id), '=');
         if ($proxyUrlOverride && !$preview) {
             $proxyUrlOverride = rtrim($proxyUrlOverride, '/');
             if ($proxyFormat === 'hls') {
-                if ($sharedStreamingEnabled) {
-                    return "$proxyUrlOverride/shared/stream/$id.m3u8";
-                }
-                return "$proxyUrlOverride/api/stream/$id/playlist.m3u8";
+                return "$proxyUrlOverride/shared/stream/$id.m3u8";
             } else {
-                if ($sharedStreamingEnabled) {
-                    return "$proxyUrlOverride/shared/stream/$id.ts";
-                }
-                return "$proxyUrlOverride/stream/$id.ts";
+                return "$proxyUrlOverride/shared/stream/$id.ts";
             }
         }
 
-        if ($sharedStreamingEnabled) {
-            return route('shared.stream.channel', [
-                'encodedId' => $id,
-                'format' => $proxyFormat === 'hls' ? 'm3u8' : $format
-            ]);
-        }
-        return $proxyFormat === 'hls'
-            ? route('stream.hls.playlist', [
-                'encodedId' => $id
-            ])
-            : route('stream', [
-                'encodedId' => $id,
-                'format' => $format
-            ]);
+        return route('shared.stream.channel', [
+            'encodedId' => $id,
+            'format' => $proxyFormat === 'hls' ? 'm3u8' : $format
+        ]);
     }
 
     /**
@@ -71,37 +54,20 @@ class ProxyService
     {
         $proxyUrlOverride = config('proxy.url_override');
         $proxyFormat = $format ?? config('proxy.proxy_format', 'ts');
-        $sharedStreamingEnabled = config('proxy.shared_streaming.enabled', false);
         $id = rtrim(base64_encode($id), '=');
         if ($proxyUrlOverride && !$preview) {
             $proxyUrlOverride = rtrim($proxyUrlOverride, '/');
             if ($proxyFormat === 'hls') {
-                if ($sharedStreamingEnabled) {
-                    return "$proxyUrlOverride/shared/stream/e/$id.m3u8";
-                }
-                return "$proxyUrlOverride/api/stream/e/$id/playlist.m3u8";
+                return "$proxyUrlOverride/shared/stream/e/$id.m3u8";
             } else {
-                if ($sharedStreamingEnabled) {
-                    return "$proxyUrlOverride/shared/stream/e/$id.ts";
-                }
-                return "$proxyUrlOverride/stream/e/$id.ts";
+                return "$proxyUrlOverride/shared/stream/e/$id.ts";
             }
         }
 
-        if ($sharedStreamingEnabled) {
-            return route('shared.stream.episode', [
-                'encodedId' => $id,
-                'format' => $proxyFormat === 'hls' ? 'm3u8' : $format
-            ]);
-        }
-        return $proxyFormat === 'hls'
-            ? route('stream.hls.episode', [
-                'encodedId' => $id
-            ])
-            : route('stream.episode', [
-                'encodedId' => $id,
-                'format' => $format
-            ]);
+        return route('shared.stream.episode', [
+            'encodedId' => $id,
+            'format' => $proxyFormat === 'hls' ? 'm3u8' : $format
+        ]);
     }
 
     /**
@@ -119,7 +85,7 @@ class ProxyService
         // TiviMate sends utc/lutc as UNIX epochs (UTC). We only convert TZ + format.
         $utcPresent = $request->filled('utc');
         $xtreamTimeshiftPresent = $request->filled('timeshift_duration') && $request->filled('timeshift_date');
-        
+
         if ($utcPresent) {
             $utc = (int) $request->query('utc'); // programme start (UTC epoch)
             $lutc = (int) ($request->query('lutc') ?? time()); // “live” now (UTC epoch)
@@ -147,7 +113,7 @@ class ProxyService
             // Handle Xtream API timeshift format
             $duration = (int) $request->get('timeshift_duration'); // Duration in minutes
             $date = $request->get('timeshift_date'); // Format: YYYY-MM-DD:HH-MM-SS
-            
+
             // "…://host/live/u/p/<id>.<ext>" >>> "…://host/timeshift/u/p/duration/stamp/<id>.<ext>"
             $rewrite = static function (string $url, string $stamp, int $offset): string {
                 if (preg_match('~^(https?://[^/]+)/live/([^/]+)/([^/]+)/([^/]+)\.([^/]+)$~', $url, $m)) {
@@ -199,7 +165,7 @@ class ProxyService
                 $stamp = preg_replace('/[^\d\-:]/', '', $date);
                 $stamp = preg_replace('/:(\d{2})$/', '', $stamp); // Remove seconds if present
             }
-            
+
             $streamUrl = $rewrite($streamUrl, $stamp, $duration);
 
             // Helpful debug for verification

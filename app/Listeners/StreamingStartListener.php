@@ -14,7 +14,7 @@ class StreamingStartListener
      */
     public function handle(StreamingStarted $event): void
     {
-        Log::channel('ffmpeg')->info('StreamingStarted event fired for playlist: ' . $event->playlistId);
+        Log::channel('ffmpeg')->info('StreamingStarted event fired for playlist: ' . $event->uuid);
 
         // Additional logic can be added here if needed...
     }

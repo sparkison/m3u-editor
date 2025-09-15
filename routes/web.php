@@ -101,18 +101,6 @@ Route::get('/phpinfo', function () {
  * Proxy routes
  */
 
-// Stream an IPTV channel (MPEGTS/MP4)
-Route::get('/stream/{encodedId}.{format?}', \App\Http\Controllers\StreamController::class)
-    ->name('stream');
-
-Route::get('/stream/e/{encodedId}.{format?}', [\App\Http\Controllers\StreamController::class, 'episode'])
-    ->name('stream.episode');
-
-
-/*
- * Shared streaming routes (xTeVe-like proxy functionality)
- */
-
 // More specific routes first to avoid conflicts
 
 // HLS route with specific path structure

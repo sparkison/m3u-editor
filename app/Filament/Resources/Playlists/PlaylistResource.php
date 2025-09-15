@@ -66,12 +66,12 @@ use App\Livewire\PlaylistInfo;
 use App\Livewire\PlaylistM3uUrl;
 use App\Livewire\XtreamApiInfo;
 use App\Models\Category;
+use App\Models\SharedStream;
 use App\Models\SourceGroup;
 use App\Services\EpgCacheService;
 use Filament\Infolists;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Redis;
 use Filament\Actions;
 
 class PlaylistResource extends Resource
@@ -155,7 +155,7 @@ class PlaylistResource extends Resource
                     ->toggleable()
                     ->formatStateUsing(fn(int $state): string => $state === 0 ? '∞' : (string)$state)
                     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
-                    ->description(fn(Playlist $record): string => "Active: " . (int) Redis::get("active_streams:{$record->uuid}") ?? 0)
+                    ->description(fn(Playlist $record): string => "Active: " . SharedStream::active()->where('stream_info->options->playlist_id', $record->uuid)->count())
                     ->sortable(),
                 TextColumn::make('groups_count')
                     ->label('Groups')
@@ -403,23 +403,6 @@ class PlaylistResource extends Resource
                         ->modalIcon('heroicon-o-arrow-uturn-left')
                         ->modalDescription('Reset playlist status so it can be processed again. Only perform this action if you are having problems with the playlist syncing.')
                         ->modalSubmitActionLabel('Yes, reset now'),
-                    Action::make('reset_active_count')
-                        ->label('Reset active count')
-                        ->icon('heroicon-o-numbered-list')
-                        ->color('warning')
-                        ->action(fn($record) => Redis::set("active_streams:{$record->uuid}", 0))->after(function () {
-                            Notification::make()
-                                ->success()
-                                ->title('Active stream count reset')
-                                ->body('Playlist active stream count has been reset.')
-                                ->duration(3000)
-                                ->send();
-                        })
-                        ->requiresConfirmation()
-                        ->icon('heroicon-o-arrow-uturn-left')
-                        ->modalIcon('heroicon-o-numbered-list')
-                        ->modalDescription('Reset playlist active streams count. Proceed with caution as this could lead to an incorrect count if there are streams currently running.')
-                        ->modalSubmitActionLabel('Yes, reset now'),
                     Action::make('purge_series')
                         ->label('Purge Series')
                         ->icon('heroicon-s-trash')
@@ -494,27 +477,6 @@ class PlaylistResource extends Resource
                         ->icon('heroicon-o-arrow-uturn-left')
                         ->modalIcon('heroicon-o-arrow-uturn-left')
                         ->modalDescription('Reset status for the selected Playlists so they can be processed again. Only perform this action if you are having problems with the playlist syncing.')
-                        ->modalSubmitActionLabel('Yes, reset now'),
-                    BulkAction::make('reset_active_count')
-                        ->label('Reset active count')
-                        ->icon('heroicon-o-numbered-list')
-                        ->color('warning')
-                        ->action(function ($records) {
-                            foreach ($records as $record) {
-                                Redis::set("active_streams:{$record->uuid}", 0);
-                            }
-                        })->after(function () {
-                            Notification::make()
-                                ->success()
-                                ->title('Active stream count reset')
-                                ->body('Active stream count has been reset for the selected Playlists.')
-                                ->duration(3000)
-                                ->send();
-                        })
-                        ->requiresConfirmation()
-                        ->icon('heroicon-o-arrow-uturn-left')
-                        ->modalIcon('heroicon-o-numbered-list')
-                        ->modalDescription('Reset active streams count for the selected Playlists. Proceed with caution as this could lead to an incorrect count if there are streams currently running.')
                         ->modalSubmitActionLabel('Yes, reset now'),
                     DeleteBulkAction::make(),
                 ]),
@@ -681,23 +643,6 @@ class PlaylistResource extends Resource
                     ->icon('heroicon-o-arrow-uturn-left')
                     ->modalIcon('heroicon-o-arrow-uturn-left')
                     ->modalDescription('Reset playlist status so it can be processed again. Only perform this action if you are having problems with the playlist syncing.')
-                    ->modalSubmitActionLabel('Yes, reset now'),
-                Action::make('reset_active_count')
-                    ->label('Reset active count')
-                    ->icon('heroicon-o-numbered-list')
-                    ->color('warning')
-                    ->action(fn($record) => Redis::set("active_streams:{$record->uuid}", 0))->after(function () {
-                        Notification::make()
-                            ->success()
-                            ->title('Active stream count reset')
-                            ->body('Playlist active stream count has been reset.')
-                            ->duration(3000)
-                            ->send();
-                    })
-                    ->requiresConfirmation()
-                    ->icon('heroicon-o-arrow-uturn-left')
-                    ->modalIcon('heroicon-o-numbered-list')
-                    ->modalDescription('Reset playlist active streams count. Proceed with caution as this could lead to an incorrect count if there are streams currently running.')
                     ->modalSubmitActionLabel('Yes, reset now'),
                 DeleteAction::make(),
             ])->button(),
@@ -1175,7 +1120,6 @@ class PlaylistResource extends Resource
                             'hls' => 'HLS (.m3u8)',
                         ])
                         ->default('ts')
-                        ->helperText(fn() => config('proxy.shared_streaming.enabled') ? '' : 'NOTE: Only HLS streaming supports multiple connections per stream. MPEG-TS creates a new stream for each connection.')
                         ->hidden(fn(Get $get): bool => !$get('enable_proxy')),
                     TextInput::make('server_timezone')
                         ->label('Provider Timezone')

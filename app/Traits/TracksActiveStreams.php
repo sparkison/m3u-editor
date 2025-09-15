@@ -4,8 +4,8 @@ namespace App\Traits;
 
 use App\Events\StreamingStarted;
 use App\Events\StreamingStopped;
+use App\Models\SharedStream;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Redis;
 
 /**
  * Trait for tracking active streams count across controllers and services
@@ -17,107 +17,49 @@ use Illuminate\Support\Facades\Redis;
 trait TracksActiveStreams
 {
     /**
-     * Increment the active streams count for a playlist
-     * 
-     * @param int $playlistId
-     * @return int The new active streams count
-     */
-    protected function incrementActiveStreams(int $playlistId): int
-    {
-        $activeStreamsKey = "active_streams:{$playlistId}";
-
-        // Increment the counter
-        $activeStreams = Redis::incr($activeStreamsKey);
-
-        // Make sure we haven't gone negative for any reason
-        if ($activeStreams <= 0) {
-            Redis::set($activeStreamsKey, 1);
-            $activeStreams = 1;
-        }
-
-        // Fire event
-        event(new StreamingStarted($playlistId));
-
-        Log::channel('ffmpeg')->debug("Playlist {$playlistId} active streams now: {$activeStreams} (after increment; may be for new stream attempt or confirmed start)");
-
-        return $activeStreams;
-    }
-
-    /**
      * Decrement the active streams count for a playlist
      * 
-     * @param int $playlistId
+     * @param string $uuid
      * @return int The new active streams count
      */
-    protected function decrementActiveStreams(int $playlistId): int
+    protected function decrementActiveStreams(string $uuid)
     {
-        $activeStreamsKey = "active_streams:{$playlistId}";
-
-        // Decrement the counter
-        $activeStreams = Redis::decr($activeStreamsKey);
-
-        // Make sure we don't go below 0
-        if ($activeStreams < 0) {
-            Redis::set($activeStreamsKey, 0);
-            $activeStreams = 0;
-        }
-
         // Fire event
-        event(new StreamingStopped($playlistId));
+        event(new StreamingStopped($uuid));
 
-        Log::channel('ffmpeg')->debug("Playlist {$playlistId} active streams now: {$activeStreams} (after decrement; may be for failed/skipped attempt or confirmed stop)");
-
-        return $activeStreams;
+        $activeStreams = $this->getActiveStreamsCount($uuid);
+        Log::channel('ffmpeg')->debug("Playlist {$uuid} active streams now: {$activeStreams} (after decrement; may be for failed/skipped attempt or confirmed stop)");
     }
 
     /**
      * Get the current active streams count for a playlist
      * 
-     * @param int $playlistId
+     * @param string $uuid
      * @return int The current active streams count
      */
-    protected function getActiveStreamsCount(int $playlistId): int
+    protected function getActiveStreamsCount(string $uuid): int
     {
-        $activeStreamsKey = "active_streams:{$playlistId}";
-        $count = (int) Redis::get($activeStreamsKey) ?? 0;
-
-        // Ensure the count is never negative
-        if ($count < 0) {
-            Redis::set($activeStreamsKey, 0);
-            $count = 0;
-        }
-
-        return $count;
+        return SharedStream::active()->where('stream_info->options->playlist_id', $uuid)->count();
     }
 
     /**
      * Check if adding a new stream would exceed the playlist's limit
      * 
-     * @param int $playlistId
+     * @param string $uuid
      * @param int $availableStreams The maximum allowed streams (0 = unlimited)
-     * @param int $currentActiveStreams The current active streams count
      * @return bool True if limit would be exceeded
      */
-    protected function wouldExceedStreamLimit(int $playlistId, int $availableStreams, int $currentActiveStreams): bool
+    protected function wouldExceedStreamLimit(string $uuid, int $availableStreams): bool
     {
-        if ($availableStreams <= 0) {
-            return false; // Unlimited streams
+        if ($availableStreams <= 0 || $this->getActiveStreamsCount($uuid) < $availableStreams) {
+            // Fire event
+            event(new StreamingStarted($uuid));
+
+            // Not exceeded
+            return false;
         }
 
-        return $currentActiveStreams > $availableStreams;
-    }
-
-    /**
-     * Reset the active streams count for a playlist to zero
-     * 
-     * @param int $playlistId
-     * @return void
-     */
-    protected function resetActiveStreamsCount(int $playlistId): void
-    {
-        $activeStreamsKey = "active_streams:{$playlistId}";
-        Redis::set($activeStreamsKey, 0);
-
-        Log::channel('ffmpeg')->debug("Reset active streams count for playlist {$playlistId} to 0");
+        // Would exceed limit
+        return true;
     }
 }
