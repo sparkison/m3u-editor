@@ -86,11 +86,20 @@ class PlaylistService
     public static function getXtreamInfo($playlist)
     {
         // For Xtream API, we use the playlist UUID as the password
-        // and the user's name as the username
+        // and the user's name as the username. This is valid of all playlist types.
         $auth = [
             'username' => $playlist->user->name,
             'password' => $playlist->uuid,
         ];
+        if ($playlist instanceof PlaylistAlias) {
+            // For PlaylistAlias, override default auth if set
+            if ($playlist->username && $playlist->password) {
+                $auth = [
+                    'username' => $playlist->username,
+                    'password' => $playlist->password,
+                ];
+            }
+        }
 
         // Return the results
         return [
@@ -123,10 +132,17 @@ class PlaylistService
     public function getMediaFlowProxyUrls($playlist)
     {
         // Get the first enabled auth (URLs can only contain one set of credentials)
-        $playlistAuth = $playlist->playlistAuths()->where('enabled', true)->first();
+        if (method_exists($playlist, 'playlistAuths')) {
+            $playlistAuth = $playlist->playlistAuths()->where('enabled', true)->first();
+        } else if ($playlist instanceof PlaylistAlias) {
+            // If PlaylistAlias, check if direct authentication is set
+            $playlistAuth = $playlist->username && $playlist->password
+                ? (object) ['username' => $playlist->username, 'password' => $playlist->password]
+                : null;
+        }
         $auth = null;
         if ($playlistAuth) {
-            $auth = '&username=' . $playlistAuth->username . '&password=' . $playlistAuth->password;
+            $auth = '?username=' . $playlistAuth->username . '&password=' . $playlistAuth->password;
         }
 
         $settings = $this->getMediaFlowSettings();
@@ -176,7 +192,7 @@ class PlaylistService
             $playlist = CustomPlaylist::where('uuid', $uuid)->first();
         }
 
-        // @TODO: Support PlaylistAlias resolution in the future
+        // @TODO: Support PlaylistAlias resolution
         // $alias = PlaylistAlias::where('uuid', $uuid)->first();
         // if ($alias && $alias->enabled) {
         //     $playlist = $alias->playlist; // Is this what we want?

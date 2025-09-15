@@ -66,7 +66,7 @@ class PlaylistAlias extends Model
         }
 
         // Handle relationship access directly
-        if (in_array($key, ['playlist', 'customPlaylist', 'user'])) {
+        if (in_array($key, ['xtream_status', 'playlist', 'customPlaylist', 'user'])) {
             return parent::__get($key);
         }
 

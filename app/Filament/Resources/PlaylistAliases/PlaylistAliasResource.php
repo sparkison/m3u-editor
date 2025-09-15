@@ -3,10 +3,13 @@
 namespace App\Filament\Resources\PlaylistAliases;
 
 use App\Facades\PlaylistFacade;
+use App\Filament\Resources\CustomPlaylists\CustomPlaylistResource;
+use App\Filament\Resources\Playlists\PlaylistResource;
 use App\Models\CustomPlaylist;
 use App\Models\Playlist;
 use App\Models\PlaylistAlias;
 use App\Services\EpgCacheService;
+use Carbon\Carbon;
 use Exception;
 use Filament\Actions;
 use Filament\Forms;
@@ -20,6 +23,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables;
 use Filament\Tables\Enums\RecordActionsPosition;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Redis;
@@ -52,6 +56,9 @@ class PlaylistAliasResource extends Resource
     {
         return $table
             ->recordTitleAttribute('name')
+            ->modifyQueryUsing(function (Builder $query) {
+                $query->with(['playlist', 'customPlaylist']);
+            })
             ->columns([
                 Tables\Columns\TextColumn::make('id')
                     ->searchable()
@@ -67,30 +74,49 @@ class PlaylistAliasResource extends Resource
                             return $playlist->name . ' (' . $type . ')';
                         }
                         return 'N/A';
+                    })
+                    ->url(function ($record) {
+                        $playlist = $record->getEffectivePlaylist();
+                        if ($playlist instanceof Playlist) {
+                            return PlaylistResource::getUrl('edit', ['record' => $playlist->id]);
+                        } elseif ($playlist instanceof CustomPlaylist) {
+                            return CustomPlaylistResource::getUrl('edit', ['record' => $playlist->id]);
+                        }
+                        return null;
                     }),
                 Tables\Columns\TextColumn::make('user_info')
                     ->label('Provider Streams')
                     ->getStateUsing(function ($record) {
-                        if ($record->xtream) {
-                            try {
-                                if ($record->xtream_status['user_info'] ?? false) {
-                                    return $record->xtream_status['user_info']['max_connections'];
-                                }
-                            } catch (Exception $e) {
+                        try {
+                            if ($record->xtream_status['user_info'] ?? false) {
+                                return $record->xtream_status['user_info']['max_connections'];
                             }
+                        } catch (Exception $e) {
                         }
                         return 'N/A';
                     })
-                    ->description(fn($record): string => $record->xtream ? "Active: " . $record->xtream_status['user_info']['active_cons'] ?? 0 : '')
+                    ->description(fn($record): string => "Active: " . $record->xtream_status['user_info']['active_cons'] ?? 0)
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('available_streams')
                     ->label('Proxy Streams')
                     ->toggleable()
                     ->formatStateUsing(fn(int $state): string => $state === 0 ? '∞' : (string)$state)
                     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
-                    ->description(fn($record): string => "Active: " . (int) Redis::get("active_streams:{$record->uuid}") ?? 0)
-                    ->sortable(),
+                    ->description(fn(Playlist $record): string => "Active: " . (int) Redis::get("active_streams:{$record->uuid}") ?? 0),
                 Tables\Columns\ToggleColumn::make('enabled'),
+                Tables\Columns\TextColumn::make('exp_date')
+                    ->label('Expiry Date')
+                    ->getStateUsing(function ($record) {
+                        try {
+                            if ($record->xtream_status['user_info']['exp_date'] ?? false) {
+                                $expires = Carbon::createFromTimestamp($record->xtream_status['user_info']['exp_date']);
+                                return $expires->toDayDateTimeString();
+                            }
+                        } catch (Exception $e) {
+                        }
+                        return 'N/A';
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

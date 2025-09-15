@@ -293,7 +293,7 @@ class AppServiceProvider extends ServiceProvider
                 $playlistAlias->uuid = Str::orderedUuid()->toString();
                 return $playlistAlias;
             });
-            PlaylistAlias::updating(function (Playlist $playlist) {
+            PlaylistAlias::updating(function (PlaylistAlias $playlist) {
                 if ($playlist->isDirty('short_urls_enabled')) {
                     $playlist->generateShortUrl();
                 }
