@@ -10,8 +10,10 @@ use App\Models\CustomPlaylist;
 use App\Models\User;
 use App\Models\Channel;
 use App\Models\Episode;
+use App\Models\PlaylistAlias;
 use App\Models\Series;
 use App\Services\ProxyService;
+use App\Services\PlaylistUrlService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Hash;
@@ -70,7 +72,24 @@ class XtreamStreamController extends Controller
                             $playlist = null;
                         }
                     } catch (ModelNotFoundException $e) {
-                        return [null, null];
+                        try {
+                            $playlist = PlaylistAlias::with(['user'])
+                                ->where('uuid', $password)
+                                ->orWhere(fn($query) => $query->where([
+                                    ['username', $username],
+                                    ['password', $password],
+                                ]))->firstOrFail();
+
+                            // If username and password do not match directly, then username must match playlist owner's name
+                            if (!($playlist->username === $username && $playlist->password === $password)) {
+                                // Verify username matches playlist owner's name
+                                if ($playlist->user->name !== $username) {
+                                    $playlist = null;
+                                }
+                            }
+                        } catch (ModelNotFoundException $e) {
+                            return [null, null];
+                        }
                     }
                 }
             }
@@ -176,7 +195,7 @@ class XtreamStreamController extends Controller
                     }
                 }
             } else {
-                return Redirect::to($channel->url_custom ?? $channel->url);
+                return Redirect::to(PlaylistUrlService::getChannelUrl($channel, $playlist));
             }
         }
 
@@ -212,7 +231,7 @@ class XtreamStreamController extends Controller
                     }
                 }
             } else {
-                return Redirect::to($channel->url_custom ?? $channel->url);
+                return Redirect::to(PlaylistUrlService::getChannelUrl($channel, $playlist));
             }
         }
 
@@ -248,7 +267,7 @@ class XtreamStreamController extends Controller
                     }
                 }
             } else {
-                return Redirect::to($episode->url);
+                return Redirect::to(PlaylistUrlService::getEpisodeUrl($episode, $playlist));
             }
         }
 
@@ -320,7 +339,7 @@ class XtreamStreamController extends Controller
             }
         } else {
             // If proxy is not enabled, simply return the timeshift URL
-            $streamUrl = $channel->url_custom ?? $channel->url;
+            $streamUrl = PlaylistUrlService::getChannelUrl($channel, $playlist);
             $streamUrl = ProxyService::generateTimeshiftUrl($request, $streamUrl, $playlist);
             return Redirect::to($streamUrl);
         }

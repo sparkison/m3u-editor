@@ -12,6 +12,7 @@ use App\Models\CustomPlaylist;
 use App\Models\Epg;
 use App\Models\MergedPlaylist;
 use App\Models\Playlist;
+use App\Models\PlaylistAlias;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
@@ -768,11 +769,12 @@ class EpgCacheService
      * Get the cache file path for a playlist
      */
     static function getPlaylistEpgCachePath(
-        Playlist|MergedPlaylist|CustomPlaylist $playlist,
+        Playlist|MergedPlaylist|CustomPlaylist|PlaylistAlias $playlist,
         bool $compressed = false
     ): string {
-        // Playlist UUID can change, so use ID for cache file names
-        $filename = "playlist-{$playlist->id}-epg";
+        // Need to ensure unique filenames across all playlist types
+        $id = $playlist->getTable() . '-' . $playlist->id;
+        $filename = "$id-epg";
         if ($compressed) {
             $filename .= '.xml.gz';
         } else {

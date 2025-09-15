@@ -15,6 +15,7 @@ use App\Models\Playlist;
 use App\Models\MergedPlaylist;
 use App\Models\CustomPlaylist;
 use App\Services\EpgCacheService;
+use App\Services\PlaylistUrlService;
 use App\Settings\GeneralSettings;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -267,7 +268,7 @@ class EpgApiController extends Controller
                 }
 
                 // Store channel data for pagination
-                $url = $channel->url_custom ?? $channel->url;
+                $url = PlaylistUrlService::getChannelUrl($channel, $playlist);
                 $channelFormat = $proxyFormat;
                 if ($proxyEnabled) {
                     $url = ProxyFacade::getProxyUrlForChannel(

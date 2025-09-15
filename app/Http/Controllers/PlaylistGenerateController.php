@@ -10,6 +10,8 @@ use App\Models\Channel;
 use App\Models\Playlist;
 use App\Models\MergedPlaylist;
 use App\Models\CustomPlaylist;
+use App\Models\PlaylistAlias;
+use App\Services\PlaylistUrlService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -33,12 +35,22 @@ class PlaylistGenerateController extends Controller
             case 'CustomPlaylist':
                 $type = 'custom';
                 break;
+            case 'PlaylistAlias':
+                $type = 'alias';
+                break;
             default:
                 return response()->json(['Error' => 'Invalid Playlist Type'], 400);
         }
 
         // Check auth
-        $auths = $playlist->playlistAuths()->where('enabled', true)->get();
+        if ($type !== 'alias') {
+            $auths = $playlist->playlistAuths()->where('enabled', true)->get();
+        } else {
+            $auths = $playlist->username && $playlist->password
+                ? collect([$playlist->only(['username', 'password'])])
+                : collect();
+        }
+
         $usedAuth = null;
         if ($auths->isNotEmpty()) {
             $authenticated = false;
@@ -104,7 +116,7 @@ class PlaylistGenerateController extends Controller
                     // Get the title and name
                     $title = $channel->title_custom ?? $channel->title;
                     $name = $channel->name_custom ?? $channel->name;
-                    $url = $channel->url_custom ?? $channel->url;
+                    $url = PlaylistUrlService::getChannelUrl($channel, $playlist);
                     $epgData = $channel->epgChannel ?? null;
                     $channelNo = $channel->channel;
                     $timeshift = $channel->shift ?? 0;
@@ -298,7 +310,15 @@ class PlaylistGenerateController extends Controller
         }
 
         // Check auth
-        $auths = $playlist->playlistAuths()->where('enabled', true)->get();
+        if ($playlist instanceof PlaylistAlias) {
+            if ($playlist->username && $playlist->password) {
+                $auths = collect([$playlist->only(['username', 'password'])]);
+            } else {
+                $auths = collect();
+            }
+        } else {
+            $auths = $playlist->playlistAuths()->where('enabled', true)->get();
+        }
         if ($auths->isNotEmpty()) {
             $authenticated = false;
             foreach ($auths as $auth) {
@@ -367,12 +387,12 @@ class PlaylistGenerateController extends Controller
         $format = $playlist->proxy_options['output'] ?? 'ts';
         $defaultExtension = $format === 'hls' ? 'm3u8' : 'ts';
 
-        return response()->json($channels->transform(function (Channel $channel) use ($proxyEnabled, $defaultExtension, $username, $password, $idChannelBy, $autoIncrement, &$channelNumber) {
-            $url = $channel->url_custom ?? $channel->url;
+        return response()->json($channels->transform(function (Channel $channel) use ($proxyEnabled, $defaultExtension, $username, $password, $idChannelBy, $autoIncrement, &$channelNumber, $playlist) {
             if ($proxyEnabled) {
                 $extension = $defaultExtension;
             } else {
-                $extension = pathinfo($url, PATHINFO_EXTENSION);
+                $sourceUrl = $channel->url_custom ?? $channel->url;
+                $extension = pathinfo($sourceUrl, PATHINFO_EXTENSION);
             }
             $urlPath = '/live';
             if ($channel->is_vod) {

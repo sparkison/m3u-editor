@@ -59,7 +59,13 @@ class PlaylistAliasResource extends Resource
         return $table
             ->recordTitleAttribute('name')
             ->modifyQueryUsing(function (Builder $query) {
-                $query->with(['playlist', 'customPlaylist']);
+                $query->with(['playlist', 'customPlaylist'])
+                    ->withCount('live_channels')
+                    ->withCount('vod_channels')
+                    ->withCount('series')
+                    ->withCount('enabled_series')
+                    ->withCount('enabled_live_channels')
+                    ->withCount('enabled_vod_channels');
             })
             ->columns([
                 Tables\Columns\TextColumn::make('id')
@@ -67,6 +73,7 @@ class PlaylistAliasResource extends Resource
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('name')
+                    ->description(fn(PlaylistAlias $record): string => $record->description ?? '')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('alias_of')
                     ->getStateUsing(function ($record) {
@@ -86,6 +93,7 @@ class PlaylistAliasResource extends Resource
                         }
                         return null;
                     }),
+                // Tables\Columns\ToggleColumn::make('enabled'),
                 Tables\Columns\TextColumn::make('user_info')
                     ->label('Provider Streams')
                     ->getStateUsing(function ($record) {
@@ -102,14 +110,28 @@ class PlaylistAliasResource extends Resource
                 Tables\Columns\TextColumn::make('available_streams')
                     ->label('Proxy Streams')
                     ->toggleable()
-                    ->getStateUsing(function (PlaylistAlias $record) {
-                        $effectivePlaylist = $record->getEffectivePlaylist();
-                        return $effectivePlaylist ? $effectivePlaylist->available_streams : 0;
-                    })
                     ->formatStateUsing(fn(int $state): string => $state === 0 ? '∞' : (string)$state)
                     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
                     ->description(fn(PlaylistAlias $record): string => "Active: " . (int) Redis::get("active_streams:{$record->uuid}") ?? 0),
-                Tables\Columns\ToggleColumn::make('enabled'),
+                Tables\Columns\TextColumn::make('live_channels_count')
+                    ->label('Live')
+                    ->description(fn(PlaylistAlias $record): string => "Enabled: {$record->enabled_live_channels_count}")
+                    ->toggleable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('vod_channels_count')
+                    ->label('VOD')
+                    ->description(fn(PlaylistAlias $record): string => "Enabled: {$record->enabled_vod_channels_count}")
+                    ->toggleable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('series_count')
+                    ->label('Series')
+                    ->description(fn(PlaylistAlias $record): string => "Enabled: {$record->enabled_series_count}")
+                    ->toggleable()
+                    ->sortable(),
+                Tables\Columns\IconColumn::make('enable_proxy')
+                    ->label('Proxy')
+                    ->tooltip('Inherited from parent playlist. Change settings in the parent playlist to modify.')
+                    ->boolean(),
                 Tables\Columns\TextColumn::make('exp_date')
                     ->label('Expiry Date')
                     ->getStateUsing(function ($record) {
@@ -223,9 +245,9 @@ class PlaylistAliasResource extends Resource
     public static function getForm(): array
     {
         return [
-            Forms\Components\Toggle::make('enabled')
-                ->default(true)
-                ->columnSpan('full'),
+            // Forms\Components\Toggle::make('enabled')
+            //     ->default(true)
+            //     ->columnSpan('full'),
             Forms\Components\TextInput::make('name')
                 ->required(),
             Forms\Components\Textarea::make('description')
