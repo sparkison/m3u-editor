@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Channel;
 use App\Models\Episode;
+use App\Services\PlaylistUrlService;
 use App\Services\ProxyService;
 use App\Services\SharedStreamService;
 use Carbon\Carbon;
@@ -100,8 +101,8 @@ class SharedStreamController extends Controller
         $title = strip_tags($title);
 
         $streamUrl = $type === 'channel'
-            ? ($model->url_custom ?? $model->url)
-            : $model->url;
+            ? PlaylistUrlService::getChannelUrl($model, $playlist)
+            : PlaylistUrlService::getEpisodeUrl($model, $playlist);
 
         if (!$streamUrl) {
             Log::channel('ffmpeg')->error("SharedStreamController: No stream URL available for {$type} ID {$model->id}");
