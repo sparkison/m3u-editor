@@ -775,7 +775,7 @@ class XtreamApiController extends Controller
 
             $seriesItem = $playlist->series()
                 ->where('enabled', true)
-                ->where('id', $seriesId)
+                ->where('series.id', $seriesId)
                 ->with(['seasons.episodes', 'category'])
                 ->first();
 
@@ -1034,7 +1034,7 @@ class XtreamApiController extends Controller
             // Find the channel
             $channel = $playlist->channels()
                 ->where('enabled', true)
-                ->where('id', $channelId)
+                ->where('channels.id', $channelId)
                 ->where('is_vod', true)
                 ->first();
 
@@ -1127,7 +1127,7 @@ class XtreamApiController extends Controller
             // Find the channel
             $channel = $playlist->channels()
                 ->where('enabled', true)
-                ->where('id', $streamId)
+                ->where('channels.id', $streamId)
                 ->with('epgChannel')
                 ->first();
 
@@ -1211,7 +1211,7 @@ class XtreamApiController extends Controller
             // Find the channel
             $channel = $playlist->channels()
                 ->where('enabled', true)
-                ->where('id', $streamId)
+                ->where('channels.id', $streamId)
                 ->with('epgChannel')
                 ->first();
 
