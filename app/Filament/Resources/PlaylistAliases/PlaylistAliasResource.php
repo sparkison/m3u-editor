@@ -18,6 +18,7 @@ use Filament\Forms;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
@@ -59,13 +60,7 @@ class PlaylistAliasResource extends Resource
         return $table
             ->recordTitleAttribute('name')
             ->modifyQueryUsing(function (Builder $query) {
-                $query->with(['playlist', 'customPlaylist'])
-                    ->withCount('live_channels')
-                    ->withCount('vod_channels')
-                    ->withCount('series')
-                    ->withCount('enabled_series')
-                    ->withCount('enabled_live_channels')
-                    ->withCount('enabled_vod_channels');
+                $query->with(['playlist', 'customPlaylist']);
             })
             ->columns([
                 Tables\Columns\TextColumn::make('id')
@@ -105,7 +100,7 @@ class PlaylistAliasResource extends Resource
                         }
                         return 'N/A';
                     })
-                    ->description(fn($record): string => "Active: " . $record->xtream_status['user_info']['active_cons'] ?? 0)
+                    ->description(fn($record): string => "Active: " . ($record->xtream_status['user_info']['active_cons'] ?? 0))
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('available_streams')
                     ->label('Proxy Streams')
@@ -113,19 +108,19 @@ class PlaylistAliasResource extends Resource
                     ->formatStateUsing(fn(int $state): string => $state === 0 ? '∞' : (string)$state)
                     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
                     ->description(fn(PlaylistAlias $record): string => "Active: " . SharedStream::active()->where('stream_info->options->playlist_id', $record->uuid)->count()),
-                Tables\Columns\TextColumn::make('live_channels_count')
+                Tables\Columns\TextColumn::make('live_count')
                     ->label('Live')
-                    ->description(fn(PlaylistAlias $record): string => "Enabled: {$record->enabled_live_channels_count}")
+                    ->description(fn(PlaylistAlias $record): string => "Enabled: {$record->enabled_live_channels()->count()}")
                     ->toggleable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('vod_channels_count')
+                Tables\Columns\TextColumn::make('vod_count')
                     ->label('VOD')
-                    ->description(fn(PlaylistAlias $record): string => "Enabled: {$record->enabled_vod_channels_count}")
+                    ->description(fn(PlaylistAlias $record): string => "Enabled: {$record->enabled_vod_channels()->count()}")
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('series_count')
                     ->label('Series')
-                    ->description(fn(PlaylistAlias $record): string => "Enabled: {$record->enabled_series_count}")
+                    ->description(fn(PlaylistAlias $record): string => "Enabled: {$record->enabled_series()->count()}")
                     ->toggleable()
                     ->sortable(),
                 Tables\Columns\IconColumn::make('enable_proxy')
@@ -210,7 +205,37 @@ class PlaylistAliasResource extends Resource
             // Forms\Components\Toggle::make('enabled')
             //     ->default(true)
             //     ->columnSpan('full'),
-            Forms\Components\TextInput::make('name')
+            Grid::make()
+                ->columns(2)
+                ->columnSpan('full')
+                ->schema([
+                    Forms\Components\TextInput::make('name')
+                        ->required(),
+                    Forms\Components\Toggle::make('edit_uuid')
+                        ->label('View/Update Unique Identifier')
+                        ->inline(false)
+                        ->live()
+                        ->dehydrated(false)
+                        ->default(false)
+                        ->hiddenOn('create'),
+                ]),
+            Forms\Components\TextInput::make('uuid')
+                ->label('Unique Identifier')
+                ->columnSpanFull()
+                ->rules(function ($record) {
+                    return [
+                        'required',
+                        'min:3',
+                        'max:36',
+                        Rule::unique('playlist_auths', 'uuid')->ignore($record?->id),
+                    ];
+                })
+                ->helperText('Value must be between 3 and 36 characters.')
+                ->hintIcon(
+                    'heroicon-m-exclamation-triangle',
+                    tooltip: 'Be careful changing this value as this will change the URLs for the Playlist, its EPG, and HDHR.'
+                )
+                ->hidden(fn($get): bool => !$get('edit_uuid'))
                 ->required(),
             Forms\Components\Textarea::make('description')
                 ->helperText('Optional description for your reference.')
@@ -292,33 +317,6 @@ class PlaylistAliasResource extends Resource
                         ->password()
                         ->revealable(),
                 ]),
-
-            Forms\Components\Toggle::make('edit_uuid')
-                ->label('View/Update Unique Identifier')
-                ->columnSpanFull()
-                ->inline(false)
-                ->live()
-                ->dehydrated(false)
-                ->default(false)
-                ->hiddenOn('create'),
-            Forms\Components\TextInput::make('uuid')
-                ->label('Unique Identifier')
-                ->columnSpanFull()
-                ->rules(function ($record) {
-                    return [
-                        'required',
-                        'min:3',
-                        'max:36',
-                        Rule::unique('playlist_auths', 'uuid')->ignore($record?->id),
-                    ];
-                })
-                ->helperText('Value must be between 3 and 36 characters.')
-                ->hintIcon(
-                    'heroicon-m-exclamation-triangle',
-                    tooltip: 'Be careful changing this value as this will change the URLs for the Playlist, its EPG, and HDHR.'
-                )
-                ->hidden(fn($get): bool => !$get('edit_uuid'))
-                ->required(),
         ];
     }
 }

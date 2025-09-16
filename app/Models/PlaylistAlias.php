@@ -208,6 +208,27 @@ class PlaylistAlias extends Model
             ->where('enabled', true);
     }
 
+    public function liveCount(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->live_channels()->count()
+        );
+    }
+
+    public function vodCount(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->vod_channels()->count()
+        );
+    }
+
+    public function seriesCount(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->series()->count()
+        );
+    }
+
     /**
      * Fetch the Xtream status for this alias
      */
@@ -247,11 +268,13 @@ class PlaylistAlias extends Model
     {
         $originalUrl = $channel->url ?? '';
 
+        // We need the xtream config to do any transformation
         if (!$this->xtream_config) {
             return $originalUrl;
         }
 
-        $effectivePlaylist = $this->getEffectivePlaylist();
+        // Get the channel's effective playlist to find its source config
+        $effectivePlaylist = $channel->getEffectivePlaylist();
         if (!$effectivePlaylist || !$effectivePlaylist->xtream_config) {
             return $originalUrl;
         }
@@ -266,11 +289,13 @@ class PlaylistAlias extends Model
     {
         $originalUrl = $episode->url ?? '';
 
+        // We need the xtream config to do any transformation
         if (!$this->xtream_config) {
             return $originalUrl;
         }
 
-        $effectivePlaylist = $this->getEffectivePlaylist();
+        // Get the episode's effective playlist to find its source config
+        $effectivePlaylist = $episode->getEffectivePlaylist();
         if (!$effectivePlaylist || !$effectivePlaylist->xtream_config) {
             return $originalUrl;
         }

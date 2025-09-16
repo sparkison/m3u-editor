@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Log;
 class PruneStaleHlsProcesses extends Command
 {
     protected $signature = 'app:hls-prune {--threshold=8}';
-    protected $description = 'Stop FFmpeg for HLS streams with no segment requests recently, or cleanup clients for Shared Streaming with no recent activity.';
+    protected $description = 'Cleanup clients for Shared Streaming with no recent activity.';
 
     public function handle(
         SharedStreamService $sharedStreamService,
