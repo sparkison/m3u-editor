@@ -122,6 +122,7 @@ class PlaylistResource extends Resource
                     ->withCount('enabled_vod_channels')
                     ->withCount('enabled_series');
             })
+            ->deferLoading()
             ->columns([
                 TextColumn::make('id')
                     ->searchable()

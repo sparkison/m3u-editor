@@ -121,11 +121,11 @@ class XtreamService
         return $this->call(url: $url, timeout: 5)['user_info'] ?? []; // set short timeout
     }
 
-    public function userInfo(): array
+    public function userInfo($timeout = 5): array
     {
         $url = $this->server
             . "/player_api.php?username={$this->user}&password={$this->pass}";
-        return $this->call(url: $url, timeout: 5) ?? []; // set short timeout
+        return $this->call(url: $url, timeout: $timeout) ?? []; // set short timeout
     }
 
     public function getLiveCategories(): array

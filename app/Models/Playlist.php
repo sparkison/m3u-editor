@@ -180,7 +180,7 @@ class Playlist extends Model
     public function getAllConfigs(): array
     {
         $configs = [];
-        
+
         // Primary config
         if ($this->xtream_config) {
             $configs[] = [
@@ -211,16 +211,17 @@ class Playlist extends Model
         return Attribute::make(
             get: function ($value, $attributes) {
                 $results = $value;
+                $key = "playlist:{$attributes['id']}:xtream_status";
                 if ($this->xtream) {
                     // This value is live, cache for 5s at a time, then fetch again
                     try {
                         $xtream = XtreamService::make(xtream_config: $this->xtream_config);
                         if ($xtream) {
                             $results = Cache::remember(
-                                "playlist:{$attributes['id']}:xtream_status",
+                                $key,
                                 5, // cache for 5 seconds
                                 function () use ($xtream) {
-                                    $userInfo = $xtream->userInfo();
+                                    $userInfo = $xtream->userInfo(timeout: 3);
                                     return $userInfo ?: [];
                                 }
                             );

@@ -236,6 +236,7 @@ class PlaylistAlias extends Model
     {
         return Attribute::make(
             get: function ($value, $attributes) {
+                $key = "playlist_alias:{$attributes['id']}:xtream_status";
                 if (!$this->xtream_config) {
                     return [];
                 }
@@ -243,10 +244,10 @@ class PlaylistAlias extends Model
                     $xtream = XtreamService::make(xtream_config: $this->xtream_config);
                     if ($xtream) {
                         return Cache::remember(
-                            "playlist_alias:{$attributes['id']}:xtream_status",
+                            $key,
                             5, // cache for 5 seconds
                             function () use ($xtream) {
-                                $userInfo = $xtream->userInfo();
+                                $userInfo = $xtream->userInfo(timeout: 3);
                                 return $userInfo ?: [];
                             }
                         );
@@ -254,7 +255,6 @@ class PlaylistAlias extends Model
                 } catch (\Exception $e) {
                     Log::error('Failed to fetch metadata for Xtream playlist alias ' . $this->id, ['exception' => $e]);
                 }
-
                 return [];
             }
         );

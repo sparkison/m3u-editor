@@ -62,6 +62,7 @@ class PlaylistAliasResource extends Resource
             ->modifyQueryUsing(function (Builder $query) {
                 $query->with(['playlist', 'customPlaylist']);
             })
+            ->deferLoading()
             ->columns([
                 Tables\Columns\TextColumn::make('id')
                     ->searchable()
