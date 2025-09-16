@@ -18,9 +18,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use App\Facades\PlaylistUrlFacade;
 use App\Forms\Components\XtreamApiInfo;
+use App\Models\SharedStream;
 use App\Services\EpgCacheService;
 use Filament\Forms\FormsComponent;
-use Illuminate\Support\Facades\Redis;
 
 class CustomPlaylistResource extends Resource
 {
@@ -77,7 +77,7 @@ class CustomPlaylistResource extends Resource
                     ->toggleable()
                     ->formatStateUsing(fn(int $state): string => $state === 0 ? '∞' : (string)$state)
                     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
-                    ->description(fn(CustomPlaylist $record): string => "Active: " . (int) Redis::get("active_streams:{$record->id}") ?? 0)
+                    ->description(fn(CustomPlaylist $record): string => "Active: " . SharedStream::active()->where('stream_info->options->playlist_id', $record->uuid)->count())
                     ->sortable(),
                 Tables\Columns\TextColumn::make('live_channels_count')
                     ->label('Live')

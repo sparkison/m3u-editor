@@ -3,13 +3,10 @@
 namespace App\Livewire;
 
 use App\Models\Playlist;
-use App\Services\XtreamService;
+use App\Models\SharedStream;
 use Carbon\Carbon;
 use Livewire\Component;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Redis;
 
 class PlaylistInfo extends Component
 {
@@ -47,7 +44,7 @@ class PlaylistInfo extends Component
             // 'last_synced' => $playlist->synced ? Carbon::parse($playlist->synced)->diffForHumans() : 'Never',
         ];
         if ($playlist->enable_proxy) {
-            $activeStreams = Redis::get("active_streams:{$playlist->id}") ?? 0;
+            $activeStreams = SharedStream::active()->where('stream_info->options->playlist_id', $playlist->uuid)->count();
             $availableStreams = $playlist->available_streams ?? 0;
             if ($availableStreams === 0) {
                 $availableStreams = "∞";

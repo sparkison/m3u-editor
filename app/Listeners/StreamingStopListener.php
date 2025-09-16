@@ -14,7 +14,7 @@ class StreamingStopListener
      */
     public function handle(StreamingStopped $event): void
     {
-        Log::channel('ffmpeg')->info('StreamingStopped event fired for playlist: ' . $event->playlistId);
+        Log::channel('ffmpeg')->info('StreamingStopped event fired for playlist: ' . $event->uuid);
 
         // Additional logic can be added here if needed...
     }
