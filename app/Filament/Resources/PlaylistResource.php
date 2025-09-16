@@ -117,7 +117,7 @@ class PlaylistResource extends Resource
                         }
                         return 'N/A';
                     })
-                    ->description(fn(Playlist $record): string => $record->xtream ? "Active: " . $record->xtream_status['user_info']['active_cons'] ?? 0 : '')
+                    ->description(fn(Playlist $record): string => $record->xtream ? "Active: " . ($record->xtream_status['user_info']['active_cons'] ?? 0) : '')
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('available_streams')
                     ->label('Proxy Streams')
