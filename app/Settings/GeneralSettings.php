@@ -53,6 +53,7 @@ class GeneralSettings extends Settings
 
     // Stream file sync options
     public ?bool $stream_file_sync_enabled = false;
+    public ?bool $stream_file_sync_include_category = false;
     public ?bool $stream_file_sync_include_series = false;
     public ?bool $stream_file_sync_include_season = false;
     public ?string $stream_file_sync_location = null;

@@ -411,6 +411,11 @@ class Preferences extends SettingsPage
                                         Toggle::make('stream_file_sync_enabled')
                                             ->live()
                                             ->label('Enable .strm file generation'),
+                                        Toggle::make('stream_file_sync_include_category')
+                                            ->label('Create category folder')
+                                            ->live()
+                                            ->default(true)
+                                            ->hidden(fn($get) => !$get('stream_file_sync_enabled')),
                                         Toggle::make('stream_file_sync_include_series')
                                             ->label('Create series folder')
                                             ->live()
@@ -425,11 +430,9 @@ class Preferences extends SettingsPage
                                             ->label('Series Sync Location')
                                             ->live()
                                             ->rules([new CheckIfUrlOrLocalPath(localOnly: true, isDirectory: true)])
-                                            ->helperText(
-                                                fn($get) => !$get('stream_file_sync_include_series')
-                                                    ? 'File location: ' . $get('stream_file_sync_location') . ($get('stream_file_sync_include_season') ?? false ? '/Season 01' : '') . '/S01E01 - Episode Title.strm'
-                                                    : 'File location: ' . $get('stream_file_sync_location') . '/Series Name' . ($get('stream_file_sync_include_season') ?? false ? '/Season 01' : '') . '/S01E01 - Episode Title.strm'
-                                            )
+                                            ->helperText(function ($get) {
+                                                return 'File location: ' . $get('stream_file_sync_location') . ($get('stream_file_sync_include_category') ?? false ? '/Category Name' : '') . ($get('stream_file_sync_include_series') ?? false ? '/Series Name' : '') . ($get('stream_file_sync_include_season') ?? false ? '/Season 01' : '') . '/S01E01 - Episode Title.strm';
+                                            })
                                             ->maxLength(255)
                                             ->required()
                                             ->hidden(fn($get) => !$get('stream_file_sync_enabled'))

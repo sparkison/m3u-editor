@@ -31,6 +31,8 @@ class SyncSeriesStrmFiles implements ShouldQueue
     {
         // Get all the series episodes
         $series = $this->series;
+        $series->load('enabled_episodes', 'playlist', 'user', 'category');
+
         $playlist = $series->playlist;
         try {
             // Get playlist sync settings
@@ -39,6 +41,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
             // Get global sync settings
             $global_sync_settings = [
                 'enabled' => $settings->stream_file_sync_enabled ?? false,
+                'include_category' => $settings->stream_file_sync_include_category ?? true,
                 'include_series' => $settings->stream_file_sync_include_series ?? true,
                 'include_season' => $settings->stream_file_sync_include_season ?? true,
                 'sync_location' => $series->sync_location ?? $settings->stream_file_sync_location ?? null,
@@ -90,6 +93,19 @@ class SyncSeriesStrmFiles implements ShouldQueue
                     Log::error("Error sync .strm files for series \"{$series->name}\": Sync location \"{$path}\" does not exist.");
                 }
                 return;
+            }
+
+            // See if the category is enabled, if not, skip, else create the folder
+            if ($sync_settings['include_category'] ?? true) {
+                // Create the category folder
+                // Remove any special characters from the category name
+                $category = $series->category;
+                $catName = $category->name ?? $category->name_internal ?? 'Uncategorized';
+                $cleanName = preg_replace('/[^a-zA-Z0-9_\-]/', ' ', $catName);
+                $path .= '/' . $cleanName;
+                if (!is_dir($path)) {
+                    mkdir($path, 0777, true);
+                }
             }
 
             // See if the series is enabled, if not, skip, else create the folder
