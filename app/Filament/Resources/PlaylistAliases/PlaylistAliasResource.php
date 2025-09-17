@@ -228,6 +228,7 @@ class PlaylistAliasResource extends Resource
                         'required',
                         'min:3',
                         'max:36',
+                        Rule::unique('playlists', 'uuid'), // Ensure UUID is unique across both playlists and aliases
                         Rule::unique('playlist_aliases', 'uuid')->ignore($record?->id),
                     ];
                 })
