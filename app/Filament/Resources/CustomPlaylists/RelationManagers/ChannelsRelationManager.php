@@ -242,21 +242,45 @@ class ChannelsRelationManager extends RelationManager
                     ->color('danger')
                     ->button()->hiddenLabel()
                     ->icon('heroicon-o-x-circle')
+                    ->action(function (Model $record) use ($ownerRecord): void {
+                        $tags = $ownerRecord->groupTags()->get();
+                        $record->detachTags($tags);
+                        $ownerRecord->channels()->detach($record->id);
+                    })
                     ->size('sm'),
                 ...ChannelResource::getTableActions(),
             ], position: RecordActionsPosition::BeforeCells)
             ->toolbarActions([
                 ...ChannelResource::getTableBulkActions(addToCustom: false),
-                DetachBulkAction::make()->color('danger'),
+                BulkAction::make('detach')
+                    ->label('Detach Selected')
+                    ->action(function (Collection $records) use ($ownerRecord): void {
+                        $tags =  $ownerRecord->groupTags()->get();
+                        foreach ($records as $record) {
+                            $record->detachTags($tags);
+                        }
+                        $ownerRecord->channels()->detach($records->pluck('id'));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Detached from playlist')
+                            ->body('The selected channels have been detached from the custom playlist.')
+                            ->send();
+                    })
+                    ->color('danger')
+                    ->deselectRecordsAfterCompletion()
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-x-mark')
+                    ->modalIcon('heroicon-o-x-mark')
+                    ->modalDescription('Detach selected channels from custom playlist')
+                    ->modalSubmitActionLabel('Detach Selected'),
                 BulkAction::make('add_to_group')
                     ->label('Add to custom group')
                     ->schema([
                         Select::make('group')
                             ->label('Select group')
                             ->options(
-                                Tag::query()
-                                    ->where('type', $ownerRecord->uuid)
-                                    ->get()
+                                $ownerRecord->groupTags()->get()
                                     ->map(fn($name) => [
                                         'id' => $name->getAttributeValue('name'),
                                         'name' => $name->getAttributeValue('name'),
@@ -264,8 +288,12 @@ class ChannelsRelationManager extends RelationManager
                             )->required(),
                     ])
                     ->action(function (Collection $records, $data) use ($ownerRecord): void {
+                        $tags = $ownerRecord->groupTags()->get();
+                        $tag = $ownerRecord->groupTags()->where('name->en', $data['group'])->first();
                         foreach ($records as $record) {
-                            $record->syncTagsWithType([$data['group']], $ownerRecord->uuid);
+                            // Need to detach any existing tags from this playlist first
+                            $record->detachTags($tags);
+                            $record->attachTag($tag);
                         }
                     })->after(function () {
                         Notification::make()

@@ -46,6 +46,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
 use Livewire\Livewire;
+use Spatie\Tags\Tag;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -243,6 +244,11 @@ class AppServiceProvider extends ServiceProvider
                 }
                 return $mergedPlaylist;
             });
+            MergedPlaylist::deleting(function (MergedPlaylist $mergedPlaylist) {
+                // Remove short URLs
+                $mergedPlaylist->removeShortUrls();
+                return $mergedPlaylist;
+            });
 
             // Custom playlist
             // CustomPlaylist::created(fn(CustomPlaylist $customPlaylist) => /* ... */);
@@ -264,6 +270,16 @@ class AppServiceProvider extends ServiceProvider
                         $customPlaylist->generateShortUrl();
                     }
                 }
+                return $customPlaylist;
+            });
+            CustomPlaylist::deleting(function (CustomPlaylist $customPlaylist) {
+                // Remove short URLs
+                $customPlaylist->removeShortUrls();
+                // Cleanup tags
+                Tag::query()
+                    ->where('type', $customPlaylist->uuid)
+                    ->orWhere('type', $customPlaylist->uuid . '-category')
+                    ->delete();
                 return $customPlaylist;
             });
 
