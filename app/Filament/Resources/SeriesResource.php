@@ -556,6 +556,11 @@ class SeriesResource extends Resource
                                     Forms\Components\Toggle::make('sync_settings.enabled')
                                         ->live()
                                         ->label('Enable .strm file generation'),
+                                    Forms\Components\Toggle::make('sync_settings.include_category')
+                                        ->label('Create category folder')
+                                        ->live()
+                                        ->default(true)
+                                        ->hidden(fn($get) => !$get('sync_settings.enabled')),
                                     Forms\Components\Toggle::make('sync_settings.include_series')
                                         ->label('Create series folder')
                                         ->live()
@@ -570,11 +575,9 @@ class SeriesResource extends Resource
                                         ->label('Series Sync Location')
                                         ->live()
                                         ->rules([new CheckIfUrlOrLocalPath(localOnly: true, isDirectory: true)])
-                                        ->helperText(
-                                            fn($get) => !$get('sync_settings.include_series')
-                                                ? 'File location: ' . $get('sync_location') . ($get('sync_settings.include_season') ?? false ? '/Season 01' : '') . '/S01E01 - Episode Title.strm'
-                                                : 'File location: ' . $get('sync_location') . '/Series Name' . ($get('sync_settings.include_season') ?? false ? '/Season 01' : '') . '/S01E01 - Episode Title.strm'
-                                        )
+                                        ->helperText(function ($get) {
+                                            return 'File location: ' . ($get('sync_location') ?? '') . ($get('sync_settings.include_category') ?? false ? '/Category Name' : '') . ($get('sync_settings.include_series') ?? false ? '/Series Name' : '') . ($get('sync_settings.include_season') ?? false ? '/Season 01' : '') . '/S01E01 - Episode Title.strm';
+                                        })
                                         ->maxLength(255)
                                         ->required()
                                         ->hidden(fn($get) => !$get('sync_settings.enabled'))
