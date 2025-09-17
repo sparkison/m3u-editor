@@ -31,6 +31,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Spatie\Tags\Tag;
 
 class VodResource extends Resource
 {
@@ -433,9 +434,7 @@ class VodResource extends Resource
                             ->helperText(fn(Get $get) => !$get('playlist') ? 'Select a custom playlist first.' : 'Select the group you would like to assign to the selected channel(s) to.')
                             ->options(function ($get) {
                                 $customList = CustomPlaylist::find($get('playlist'));
-                                return $customList ? $customList->tags()
-                                    ->where('type', $customList->uuid)
-                                    ->get()
+                                return $customList ? $customList->categoryTags()->get()
                                     ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
                                     ->toArray() : [];
                             })
@@ -445,7 +444,13 @@ class VodResource extends Resource
                         $playlist = CustomPlaylist::findOrFail($data['playlist']);
                         $playlist->channels()->syncWithoutDetaching($records->pluck('id'));
                         if ($data['category']) {
-                            $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
+                            $tags = $playlist->groupTags()->get();
+                            $tag = $playlist->groupTags()->where('name->en', $data['category'])->first();
+                            foreach ($records as $record) {
+                                // Need to detach any existing tags from this playlist first
+                                $record->detachTags($tags);
+                                $record->attachTag($tag);
+                            }
                         }
                     })->after(function () {
                         Notification::make()

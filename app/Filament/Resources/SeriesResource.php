@@ -25,6 +25,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Spatie\Tags\Tag;
 
 class SeriesResource extends Resource
 {
@@ -269,9 +270,7 @@ class SeriesResource extends Resource
                             ->helperText(fn(Get $get) => !$get('playlist') ? 'Select a custom playlist first.' : 'Select the category you would like to assign to the selected series to.')
                             ->options(function ($get) {
                                 $customList = CustomPlaylist::find($get('playlist'));
-                                return $customList ? $customList->tags()
-                                    ->where('type', $customList->uuid . '-category')
-                                    ->get()
+                                return $customList ? $customList->categoryTags()->get()
                                     ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
                                     ->toArray() : [];
                             })
@@ -281,7 +280,13 @@ class SeriesResource extends Resource
                         $playlist = CustomPlaylist::findOrFail($data['playlist']);
                         $playlist->series()->syncWithoutDetaching($records->pluck('id'));
                         if ($data['category']) {
-                            $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
+                            $tags = $playlist->categoryTags()->get();
+                            $tag = $playlist->categoryTags()->where('name->en', $data['category'])->first();
+                            foreach ($records as $record) {
+                                // Need to detach any existing tags from this playlist first
+                                $record->detachTags($tags);
+                                $record->attachTag($tag);
+                            }
                         }
                     })->after(function () {
                         Notification::make()

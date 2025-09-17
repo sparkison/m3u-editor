@@ -193,21 +193,45 @@ class SeriesRelationManager extends RelationManager
                     ->color('danger')
                     ->button()->hiddenLabel()
                     ->icon('heroicon-o-x-circle')
+                    ->action(function (Model $record) use ($ownerRecord): void {
+                        $tags = $ownerRecord->categoryTags()->get();
+                        $record->detachTags($tags);
+                        $ownerRecord->series()->detach($record->id);
+                    })
                     ->size('sm'),
                 ...SeriesResource::getTableActions(),
             ], position: Tables\Enums\ActionsPosition::BeforeCells)
             ->bulkActions([
                 ...SeriesResource::getTableBulkActions(addToCustom: false),
-                Tables\Actions\DetachBulkAction::make()->color('danger'),
+                Tables\Actions\BulkAction::make('detach')
+                    ->label('Detach Selected')
+                    ->action(function (Collection $records) use ($ownerRecord): void {
+                        $tags = $ownerRecord->categoryTags()->get();
+                        foreach ($records as $record) {
+                            $record->detachTags($tags);
+                        }
+                        $ownerRecord->series()->detach($records->pluck('id'));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Detached from playlist')
+                            ->body('The selected series have been detached from the custom playlist.')
+                            ->send();
+                    })
+                    ->color('danger')
+                    ->deselectRecordsAfterCompletion()
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-x-mark')
+                    ->modalIcon('heroicon-o-x-mark')
+                    ->modalDescription('Detach selected series from custom playlist')
+                    ->modalSubmitActionLabel('Detach Selected'),
                 Tables\Actions\BulkAction::make('add_to_category')
                     ->label('Add to custom category')
                     ->form([
                         Forms\Components\Select::make('category')
                             ->label('Select group')
                             ->options(
-                                Tag::query()
-                                    ->where('type', $ownerRecord->uuid . '-category')
-                                    ->get()
+                                $ownerRecord->categoryTags()->get()
                                     ->map(fn($name) => [
                                         'id' => $name->getAttributeValue('name'),
                                         'name' => $name->getAttributeValue('name')
@@ -215,8 +239,12 @@ class SeriesRelationManager extends RelationManager
                             )->required(),
                     ])
                     ->action(function (Collection $records, $data) use ($ownerRecord): void {
+                        $tags = $ownerRecord->categoryTags()->get();
+                        $tag = $ownerRecord->categoryTags()->where('name->en', $data['category'])->first();
                         foreach ($records as $record) {
-                            $record->syncTagsWithType([$data['category']], $ownerRecord->uuid . '-category');
+                            // Need to detach any existing tags from this playlist first
+                            $record->detachTags($tags);
+                            $record->attachTag($tag);
                         }
                     })->after(function () {
                         Notification::make()

@@ -90,6 +90,18 @@ class CustomPlaylist extends Model
         return $this->hasMany(Channel::class);
     }
 
+    public function groupTags(): MorphToMany
+    {
+        return $this->morphToMany(\Spatie\Tags\Tag::class, 'taggable')
+            ->where('type', $this->uuid);
+    }
+
+    public function categoryTags(): MorphToMany
+    {
+        return $this->morphToMany(\Spatie\Tags\Tag::class, 'taggable')
+            ->where('type', $this->uuid . '-category');
+    }
+
     // public function playlists(): HasManyThrough
     // {
     //     return $this->hasManyThrough(
