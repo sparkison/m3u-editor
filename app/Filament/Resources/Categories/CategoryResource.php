@@ -144,9 +144,7 @@ class CategoryResource extends Resource
                                 ->helperText(fn(Get $get) => !$get('playlist') ? 'Select a custom playlist first.' : 'Select the category you would like to assign to the selected series to.')
                                 ->options(function ($get) {
                                     $customList = CustomPlaylist::find($get('playlist'));
-                                    return $customList ? $customList->tags()
-                                        ->where('type', $customList->uuid . '-category')
-                                        ->get()
+                                    return $customList ? $customList->categoryTags()->get()
                                         ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
                                         ->toArray() : [];
                                 })
@@ -155,8 +153,12 @@ class CategoryResource extends Resource
                         ->action(function ($record, array $data): void {
                             $playlist = CustomPlaylist::findOrFail($data['playlist']);
                             $playlist->series()->syncWithoutDetaching($record->series()->pluck('id'));
-                            if ($data['category']) {
-                                $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
+                            $tags = $playlist->categoryTags()->get();
+                            $tag = $playlist->categoryTags()->where('name->en', $data['category'])->first();
+                            foreach ($record->series()->cursor() as $series) {
+                                // Need to detach any existing tags from this playlist first
+                                $series->detachTags($tags);
+                                $series->attachTag($tag);
                             }
                         })->after(function () {
                             Notification::make()
@@ -304,9 +306,7 @@ class CategoryResource extends Resource
                                 ->helperText(fn(Get $get) => !$get('playlist') ? 'Select a custom playlist first.' : 'Select the category you would like to assign to the selected series to.')
                                 ->options(function ($get) {
                                     $customList = CustomPlaylist::find($get('playlist'));
-                                    return $customList ? $customList->tags()
-                                        ->where('type', $customList->uuid . '-category')
-                                        ->get()
+                                    return $customList ? $customList->categoryTags()->get()
                                         ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
                                         ->toArray() : [];
                                 })
@@ -314,13 +314,19 @@ class CategoryResource extends Resource
                         ])
                         ->action(function (Collection $records, array $data): void {
                             $playlist = CustomPlaylist::findOrFail($data['playlist']);
+                            $tags = $playlist->categoryTags()->get();
+                            $tag = $data['category'] ? $playlist->categoryTags()->where('name->en', $data['category'])->first() : null;
                             foreach ($records as $record) {
                                 // Sync the series to the custom playlist
                                 // This will add the series to the playlist without detaching existing ones
                                 // Prevents duplicates in the playlist
                                 $playlist->series()->syncWithoutDetaching($record->series()->pluck('id'));
                                 if ($data['category']) {
-                                    $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
+                                    foreach ($record->series()->cursor() as $series) {
+                                        // Need to detach any existing tags from this playlist first
+                                        $series->detachTags($tags);
+                                        $series->attachTag($tag);
+                                    }
                                 }
                             }
                         })->after(function () {

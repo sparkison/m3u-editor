@@ -45,9 +45,7 @@ class ViewGroup extends ViewRecord
                             ->helperText(fn(Get $get) => !$get('playlist') ? 'Select a custom playlist first.' : 'Select the group you would like to assign to the channels to.')
                             ->options(function ($get) {
                                 $customList = CustomPlaylist::find($get('playlist'));
-                                return $customList ? $customList->tags()
-                                    ->where('type', $customList->uuid)
-                                    ->get()
+                                return $customList ? $customList->groupTags()->get()
                                     ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
                                     ->toArray() : [];
                             })
@@ -57,7 +55,13 @@ class ViewGroup extends ViewRecord
                         $playlist = CustomPlaylist::findOrFail($data['playlist']);
                         $playlist->channels()->syncWithoutDetaching($record->channels()->pluck('id'));
                         if ($data['category']) {
-                            $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
+                            $tags = $playlist->groupTags()->get();
+                            $tag = $playlist->groupTags()->where('name->en', $data['category'])->first();
+                            foreach ($record->channels()->cursor() as $channel) {
+                                // Need to detach any existing tags from this playlist first
+                                $channel->detachTags($tags);
+                                $channel->attachTag($tag);
+                            }
                         }
                     })->after(function ($livewire) {
                         $livewire->dispatch('refreshRelation');
