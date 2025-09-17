@@ -150,9 +150,7 @@ class GroupResource extends Resource
                                 ->helperText(fn(Get $get) => !$get('playlist') ? 'Select a custom playlist first.' : 'Select the group you would like to assign to the selected channel(s) to.')
                                 ->options(function ($get) {
                                     $customList = CustomPlaylist::find($get('playlist'));
-                                    return $customList ? $customList->tags()
-                                        ->where('type', $customList->uuid)
-                                        ->get()
+                                    return $customList ? $customList->groupTags()->get()
                                         ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
                                         ->toArray() : [];
                                 })
@@ -162,7 +160,13 @@ class GroupResource extends Resource
                             $playlist = CustomPlaylist::findOrFail($data['playlist']);
                             $playlist->channels()->syncWithoutDetaching($record->channels()->pluck('id'));
                             if ($data['category']) {
-                                $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
+                                $tags = $playlist->groupTags()->get();
+                                $tag = $playlist->groupTags()->where('name->en', $data['category'])->first();
+                                foreach ($record->channels()->cursor() as $channel) {
+                                    // Need to detach any existing tags from this playlist first
+                                    $channel->detachTags($tags);
+                                    $channel->attachTag($tag);
+                                }
                             }
                         })->after(function () {
                             Notification::make()
@@ -272,9 +276,7 @@ class GroupResource extends Resource
                                 ->helperText(fn(Get $get) => !$get('playlist') ? 'Select a custom playlist first.' : 'Select the group you would like to assign to the selected channel(s) to.')
                                 ->options(function ($get) {
                                     $customList = CustomPlaylist::find($get('playlist'));
-                                    return $customList ? $customList->tags()
-                                        ->where('type', $customList->uuid)
-                                        ->get()
+                                    return $customList ? $customList->groupTags()->get()
                                         ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
                                         ->toArray() : [];
                                 })
@@ -282,13 +284,19 @@ class GroupResource extends Resource
                         ])
                         ->action(function (Collection $records, array $data): void {
                             $playlist = CustomPlaylist::findOrFail($data['playlist']);
+                            $tags = $playlist->groupTags()->get();
+                            $tag = $data['category'] ? $playlist->groupTags()->where('name->en', $data['category'])->first() : null;
                             foreach ($records as $record) {
                                 // Sync the channels to the custom playlist
                                 // This will add the channels to the playlist without detaching existing ones
                                 // Prevents duplicates in the playlist
                                 $playlist->channels()->syncWithoutDetaching($record->channels()->pluck('id'));
                                 if ($data['category']) {
-                                    $playlist->syncTagsWithType([$data['category']], $playlist->uuid);
+                                    foreach ($record->channels()->cursor() as $channel) {
+                                        // Need to detach any existing tags from this playlist first
+                                        $channel->detachTags($tags);
+                                        $channel->attachTag($tag);
+                                    }
                                 }
                             }
                         })->after(function () {

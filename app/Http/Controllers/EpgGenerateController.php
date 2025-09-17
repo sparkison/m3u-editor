@@ -22,7 +22,7 @@ class EpgGenerateController extends Controller
     /**
      * File cache configuration
      */
-    private const CACHE_TTL_HOURS = 12; // Cache files for 12 hours
+    private const CACHE_TTL_HOURS = 6; // Cache files for 6 hours
 
     /**
      * Generate the EPG XML file
