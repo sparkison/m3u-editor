@@ -379,7 +379,7 @@ class ChannelResource extends Resource
                             ->helperText(fn(Get $get) => !$get('playlist') ? 'Select a custom playlist first.' : 'Select the group you would like to assign to the selected channel(s) to.')
                             ->options(function ($get) {
                                 $customList = CustomPlaylist::find($get('playlist'));
-                                return $customList ? $customList->categoryTags()->get()
+                                return $customList ? $customList->groupTags()->get()
                                     ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
                                     ->toArray() : [];
                             })
