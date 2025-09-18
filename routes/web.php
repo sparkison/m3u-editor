@@ -167,3 +167,9 @@ Route::get('/series/{username}/{password}/{streamId}.{format}', [App\Http\Contro
 // Timeshift endpoints
 Route::get('/timeshift/{username}/{password}/{duration}/{date}/{streamId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleTimeshift'])
     ->name('xtream.stream.timeshift.root');
+
+// Add this route for the image proxy
+Route::get('/schedules-direct/{epg}/image/{imageHash}', [
+    \App\Http\Controllers\SchedulesDirectImageProxyController::class,
+    'proxyImage'
+])->name('schedules-direct.image.proxy');
