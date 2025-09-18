@@ -51,7 +51,7 @@ class SchedulesDirectService
             $success = false;
 
             // Retry logic
-            for ($retry = 0; $retry < self::MAX_RETRIES && !$success; $retry++) {
+            for ($retry = 0; $retry < self::MAX_RETRIES && ! $success; $retry++) {
                 if ($retry > 0) {
                     $sleepTime = min(30, (2 ** $retry));
                     sleep($sleepTime);
@@ -60,14 +60,14 @@ class SchedulesDirectService
                 $stationRequests = array_map(function ($stationId) use ($dates) {
                     return [
                         'stationID' => $stationId,
-                        'date' => $dates
+                        'date' => $dates,
                     ];
                 }, $stationChunk);
 
                 try {
                     $chunkSchedules = $this->getSchedules($token, $stationRequests);
 
-                    if (is_array($chunkSchedules) && !empty($chunkSchedules)) {
+                    if (is_array($chunkSchedules) && ! empty($chunkSchedules)) {
                         $success = true;
                         yield $chunkSchedules;
 
@@ -122,7 +122,7 @@ class SchedulesDirectService
      */
     public function authenticateFromEpg(Epg $epg): array
     {
-        if (!$epg->sd_username || !$epg->sd_password) {
+        if (! $epg->sd_username || ! $epg->sd_password) {
             throw new \Exception('Schedules Direct credentials not configured');
         }
 
@@ -161,6 +161,7 @@ class SchedulesDirectService
     public function getStatus(string $token): array
     {
         $response = $this->makeRequest('GET', '/status', [], $token);
+
         return $response->json();
     }
 
@@ -199,6 +200,7 @@ class SchedulesDirectService
     public function previewLineup(string $token, string $lineupId): array
     {
         $response = $this->makeRequest('GET', "/lineups/preview/{$lineupId}", [], $token);
+
         return $response->json();
     }
 
@@ -208,6 +210,7 @@ class SchedulesDirectService
     public function getAccountLineups(string $token): array
     {
         $response = $this->makeRequest('GET', '/lineups', [], $token);
+
         return $response->json();
     }
 
@@ -247,6 +250,7 @@ class SchedulesDirectService
     public function getLineup(string $token, string $lineupId): array
     {
         $response = $this->makeRequest('GET', "/lineups/{$lineupId}", [], $token);
+
         return $response->json();
     }
 
@@ -256,6 +260,7 @@ class SchedulesDirectService
     public function getUserLineups(string $token): array
     {
         $response = $this->makeRequest('GET', '/lineups', [], $token);
+
         return $response->json();
     }
 
@@ -265,6 +270,7 @@ class SchedulesDirectService
     public function getSchedules(string $token, array $stationRequests): array
     {
         $response = $this->makeRequest('POST', '/schedules', $stationRequests, $token);
+
         return $response->json();
     }
 
@@ -274,7 +280,130 @@ class SchedulesDirectService
     public function getPrograms(string $token, array $programIds): array
     {
         $response = $this->makeRequest('POST', '/programs', $programIds, $token);
+
         return $response->json();
+    }
+
+    /**
+     * Get artwork for programs (currently disabled due to API format issues)
+     * TODO: Research the correct format for the /metadata/programs endpoint
+     */
+    public function getProgramArtwork(string $token, array $programIds): array
+    {
+        // Temporarily disable program artwork fetching until we can determine the correct API format
+        Log::debug('Program artwork fetching is currently disabled', [
+            'program_count' => count($programIds),
+        ]);
+
+        return [];
+    }
+
+    /**
+     * Extract station artwork directly from lineup data
+     * Station logos are included in the lineup response, not from a separate API
+     */
+    private function extractStationArtworkFromLineup(array $lineupData): array
+    {
+        $stationArtworkCache = [];
+
+        try {
+            if (! empty($lineupData['stations'])) {
+                Log::debug('Extracting station artwork from lineup', ['station_count' => count($lineupData['stations'])]);
+
+                foreach ($lineupData['stations'] as $station) {
+                    $stationId = $station['stationID'] ?? null;
+                    if ($stationId && ! empty($station['stationLogo'])) {
+                        foreach ($station['stationLogo'] as $logo) {
+                            if (! empty($logo['URL'])) {
+                                $stationArtworkCache[$stationId] = $logo['URL'];
+                                break; // Use first available logo
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            Log::warning('Failed to extract station artwork from lineup', ['error' => $e->getMessage()]);
+        }
+
+        Log::debug('Station artwork cache built', ['stations' => count($stationArtworkCache)]);
+
+        return $stationArtworkCache;
+    }
+
+    /**
+     * Fetch program artwork from Schedules Direct for a batch of program IDs
+     */
+    private function fetchProgramArtwork(string $token, array $programIds): array
+    {
+        $programArtworkCache = [];
+
+        try {
+            if (! empty($programIds)) {
+                Log::debug('Fetching program artwork batch', ['program_count' => count($programIds)]);
+                $programArtwork = $this->getProgramArtwork($token, $programIds);
+
+                foreach ($programArtwork as $programData) {
+                    $programId = $programData['programID'] ?? null;
+                    if ($programId && ! empty($programData['data'])) {
+                        // Look for different types of artwork
+                        $artwork = $this->extractBestArtwork($programData['data']);
+                        if ($artwork) {
+                            $programArtworkCache[$programId] = $artwork;
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            Log::warning('Failed to fetch program artwork batch', [
+                'program_count' => count($programIds),
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return $programArtworkCache;
+    }
+
+    /**
+     * Extract the best available artwork from program data
+     */
+    private function extractBestArtwork(array $artworkData): ?string
+    {
+        // Priority order for artwork types
+        $artworkTypes = ['Ep', 'Sm', 'Ms', 'Sh']; // Episode, Season, Series, Show
+
+        foreach ($artworkTypes as $type) {
+            if (isset($artworkData[$type])) {
+                foreach ($artworkData[$type] as $artwork) {
+                    if (! empty($artwork['URI'])) {
+                        return $artwork['URI'];
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract artwork URL directly from program data
+     * This looks for artwork URLs embedded in the program response itself
+     */
+    private function extractArtworkFromProgram($program): ?string
+    {
+        // Check if program has artwork flags
+        $hasArtwork = $program->hasImageArtwork ?? false;
+        $hasEpisodeArtwork = $program->hasEpisodeArtwork ?? false;
+        $hasSeriesArtwork = $program->hasSeriesArtwork ?? false;
+        $hasSeasonArtwork = $program->hasSeasonArtwork ?? false;
+
+        if (! $hasArtwork && ! $hasEpisodeArtwork && ! $hasSeriesArtwork && ! $hasSeasonArtwork) {
+            return null;
+        }
+
+        // For now, we'll return null since we need to implement the metadata API correctly
+        // The artwork URLs are not included in the regular program data
+        return null;
     }
 
     /**
@@ -282,18 +411,18 @@ class SchedulesDirectService
      */
     public function syncEpgData(Epg $epg): void
     {
-        Log::debug("Starting Schedules Direct sync", [
+        Log::debug('Starting Schedules Direct sync', [
             'epg_id' => $epg->id,
-            'chunk_size' => self::STATIONS_PER_CHUNK
+            'chunk_size' => self::STATIONS_PER_CHUNK,
         ]);
         try {
             // Validate token or re-authenticate
-            if (!$epg->hasValidSchedulesDirectToken()) {
+            if (! $epg->hasValidSchedulesDirectToken()) {
                 $this->authenticateFromEpg($epg);
             }
 
             // Get lineup data
-            if (!$epg->hasSchedulesDirectLineup()) {
+            if (! $epg->hasSchedulesDirectLineup()) {
                 throw new \Exception('No lineup configured for Schedules Direct EPG');
             }
 
@@ -328,10 +457,10 @@ class SchedulesDirectService
                 ? array_slice($epg->sd_station_ids, 0, self::MAX_STATIONS_PER_SYNC)
                 : $epg->sd_station_ids;
 
-            Log::debug("Starting Schedules Direct sync", [
+            Log::debug('Starting Schedules Direct sync', [
                 'epg_id' => $epg->id,
                 'station_count' => count($stationIds),
-                'chunk_size' => self::STATIONS_PER_CHUNK
+                'chunk_size' => self::STATIONS_PER_CHUNK,
             ]);
 
             // Generate dates
@@ -349,10 +478,10 @@ class SchedulesDirectService
                 'sd_errors' => null,
                 'sd_progress' => 100,
             ]);
-            Log::debug("Successfully completed Schedules Direct sync", [
+            Log::debug('Successfully completed Schedules Direct sync', [
                 'epg_id' => $epg->id,
                 'stations_processed' => count($stationIds),
-                'file_path' => $xmlFilePath
+                'file_path' => $xmlFilePath,
             ]);
         } catch (\Exception $e) {
             $errors = $epg->sd_errors ?? [];
@@ -362,7 +491,7 @@ class SchedulesDirectService
             ];
 
             $epg->update(['sd_errors' => $errors]);
-            Log::error("Failed to sync Schedules Direct EPG data", [
+            Log::error('Failed to sync Schedules Direct EPG data', [
                 'epg_id' => $epg->id,
                 'error' => $e->getMessage(),
             ]);
@@ -389,30 +518,34 @@ class SchedulesDirectService
         }
 
         // Ensure directory exists
-        if (!Storage::disk('local')->exists($epg->folder_path)) {
+        if (! Storage::disk('local')->exists($epg->folder_path)) {
             Storage::disk('local')->makeDirectory($epg->folder_path);
         }
 
         // Open file for writing
         $file = fopen($filePath, 'w');
-        if (!$file) {
+        if (! $file) {
             throw new \Exception("Cannot open file for writing: {$filePath}");
         }
         try {
-            // Write XML header and channels
-            $this->writeXMLTVHeader($file, $lineupData);
+            // Extract station artwork from lineup data (logos are included in lineup response)
+            Log::debug('Extracting station artwork from lineup data');
+            $stationArtworkCache = $this->extractStationArtworkFromLineup($lineupData);
 
-            // Use optimized single-pass processing
-            $this->runStreamSchedulesToXMLTV($file, $epg, $stationIds, $dates);
+            // Write XML header and channels with artwork
+            $this->writeXMLTVHeader($file, $lineupData, ['stations' => $stationArtworkCache]);
+
+            // Use optimized single-pass processing - program artwork will be fetched during processing
+            $this->runStreamSchedulesToXMLTV($file, $epg, $stationIds, $dates, ['stations' => $stationArtworkCache]);
 
             // Write XML footer
             fwrite($file, "</tv>\n");
         } catch (\Exception $e) {
-            Log::error("Failed to stream process to XMLTV", [
+            Log::error('Failed to stream process to XMLTV', [
                 'epg_id' => $epg->id,
                 'error' => $e->getMessage(),
                 'file' => $e->getFile(),
-                'line' => $e->getLine()
+                'line' => $e->getLine(),
             ]);
             throw $e;
         } finally {
@@ -426,7 +559,7 @@ class SchedulesDirectService
     /**
      * Write XMLTV header and channel information
      */
-    private function writeXMLTVHeader($file, array $lineupData): void
+    private function writeXMLTVHeader($file, array $lineupData, array $artworkCache = []): void
     {
         fwrite($file, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         fwrite($file, "<tv generator-info-name=\"m3u editor Schedules Direct Integration\" generator-info-url=\"https://github.com/sparkison/m3u-editor\">\n");
@@ -439,17 +572,19 @@ class SchedulesDirectService
 
         foreach ($lineupData['map'] as $mapping) {
             $station = $stationsById[$mapping['stationID']] ?? null;
-            if (!$station) continue;
+            if (! $station) {
+                continue;
+            }
 
             fwrite($file, "  <channel id=\"{$mapping['stationID']}\">\n");
 
             // Display names - prefer name, then callsign, then channel number
-            if (!empty($station['name'])) {
+            if (! empty($station['name'])) {
                 $name = htmlspecialchars($station['name']);
                 fwrite($file, "    <display-name>{$name}</display-name>\n");
             }
 
-            if (!empty($station['callsign'])) {
+            if (! empty($station['callsign'])) {
                 $callsign = htmlspecialchars($station['callsign']);
                 fwrite($file, "    <display-name>{$callsign}</display-name>\n");
             }
@@ -457,6 +592,12 @@ class SchedulesDirectService
             // Channel number and callsign
             $channelNumber = htmlspecialchars($mapping['channel'] ?? $station['callsign']);
             fwrite($file, "    <display-name>{$channelNumber}</display-name>\n");
+
+            // Add channel icon if available
+            if (isset($artworkCache['stations'][$mapping['stationID']])) {
+                $iconUrl = htmlspecialchars($artworkCache['stations'][$mapping['stationID']]);
+                fwrite($file, "    <icon src=\"{$iconUrl}\" />\n");
+            }
 
             fwrite($file, "  </channel>\n");
         }
@@ -469,18 +610,19 @@ class SchedulesDirectService
         $file,
         Epg $epg,
         array $stationIds,
-        array $dates
+        array $dates,
+        array $artworkCache = []
     ): void {
         @ini_set('max_execution_time', 0);
 
         $totalStations = count($stationIds);
         $totalChunks = ceil($totalStations / self::STATIONS_PER_CHUNK);
 
-        Log::debug("Starting simplified EPG processing", [
+        Log::debug('Starting simplified EPG processing', [
             'epg_id' => $epg->id,
             'total_stations' => $totalStations,
             'stations_per_chunk' => self::STATIONS_PER_CHUNK,
-            'total_chunks' => $totalChunks
+            'total_chunks' => $totalChunks,
         ]);
 
         // Process schedules and programs in a single streaming pass
@@ -489,9 +631,9 @@ class SchedulesDirectService
         foreach ($this->processScheduleChunks($epg->sd_token, $stationIds, $dates) as $scheduleChunk) {
             // Increment chunk index
             $chunkIndex++;
-            Log::debug("Processing schedule chunk", [
+            Log::debug('Processing schedule chunk', [
                 'chunk' => $chunkIndex,
-                'total_chunks' => $totalChunks
+                'total_chunks' => $totalChunks,
             ]);
 
             // Stream through schedule chunk and collect unique program IDs using file-based deduplication
@@ -505,7 +647,7 @@ class SchedulesDirectService
                 foreach ($schedule['programs'] ?? [] as $program) {
                     $programId = $program['programID'];
                     // Use array key existence check for O(1) deduplication
-                    if (!isset($seenProgramIds[$programId])) {
+                    if (! isset($seenProgramIds[$programId])) {
                         $seenProgramIds[$programId] = true;
                         fwrite($programIdHandle, $programId . "\n");
                         $programCount++;
@@ -515,37 +657,38 @@ class SchedulesDirectService
 
             // Close the program ID file handle
             fclose($programIdHandle);
-            Log::debug("Collected program IDs from schedule chunk", [
+            Log::debug('Collected program IDs from schedule chunk', [
                 'chunk' => $chunkIndex,
                 'schedules_in_chunk' => $scheduleCount,
-                'unique_program_ids' => $programCount
+                'unique_program_ids' => $programCount,
             ]);
 
             // Fetch programs for this chunk only using streaming batches
             if ($programCount > 0) {
-                Log::debug("Fetching programs for chunk", [
+                Log::debug('Fetching programs for chunk', [
                     'chunk' => $chunkIndex,
-                    'program_count' => $programCount
+                    'program_count' => $programCount,
                 ]);
                 try {
                     // Stream process programs directly without creating lookup arrays
                     $chunkProgramsWritten = 0;
-                    $this->streamProcessProgramsDirectly($tempProgramIdFile, $epg->sd_token, $chunkIndex, $scheduleChunk, $file, $chunkProgramsWritten);
+                    $this->streamProcessProgramsDirectly($tempProgramIdFile, $epg->sd_token, $chunkIndex, $scheduleChunk, $file, $chunkProgramsWritten, $artworkCache);
                     $totalProgramsWritten += $chunkProgramsWritten;
-                    Log::debug("Chunk completed", [
+                    Log::debug('Chunk completed', [
                         'chunk' => $chunkIndex,
                         'programs_written' => $chunkProgramsWritten,
-                        'total_programs_written' => $totalProgramsWritten
+                        'total_programs_written' => $totalProgramsWritten,
                     ]);
 
                     // Update progress
-                    $progress = min(100, (int)(($chunkIndex / $totalChunks) * 100));
+                    $progress = min(100, (int) (($chunkIndex / $totalChunks) * 100));
                     $epg->update(['sd_progress' => $progress]);
                 } catch (\Exception $e) {
-                    Log::error("Error processing chunk programs", [
+                    Log::error('Error processing chunk programs', [
                         'chunk' => $chunkIndex,
-                        'error' => $e->getMessage()
+                        'error' => $e->getMessage(),
                     ]);
+
                     continue;
                 } finally {
                     // Clean up temporary file
@@ -563,19 +706,19 @@ class SchedulesDirectService
                 gc_collect_cycles();
             }
         }
-        Log::debug("EPG processing completed", [
+        Log::debug('EPG processing completed', [
             'total_programs_written' => $totalProgramsWritten,
-            'chunks_processed' => $chunkIndex
+            'chunks_processed' => $chunkIndex,
         ]);
     }
 
     /**
      * Stream process programs directly without creating lookup arrays - pure streaming approach
      */
-    private function streamProcessProgramsDirectly(string $programIdFile, string $token, int $chunkIndex, array $scheduleChunk, $file, int &$programsWritten): void
+    private function streamProcessProgramsDirectly(string $programIdFile, string $token, int $chunkIndex, array $scheduleChunk, $file, int &$programsWritten, array $artworkCache = []): void
     {
         $handle = fopen($programIdFile, 'r');
-        if (!$handle) {
+        if (! $handle) {
             throw new \Exception("Cannot open program ID file: {$programIdFile}");
         }
 
@@ -585,12 +728,12 @@ class SchedulesDirectService
             // Stream through program IDs and batch them
             while (($line = fgets($handle)) !== false) {
                 $programId = trim($line);
-                if (!empty($programId)) {
+                if (! empty($programId)) {
                     $batch[] = $programId;
 
                     // When we reach batch size, process the programs immediately
                     if (count($batch) >= self::PROGRAMS_BATCH_SIZE) {
-                        $this->processProgramBatchDirectly($batch, $batchIndex, $token, $chunkIndex, $scheduleChunk, $file, $programsWritten);
+                        $this->processProgramBatchDirectly($batch, $batchIndex, $token, $chunkIndex, $scheduleChunk, $file, $programsWritten, $artworkCache);
                         $batch = []; // Clear the batch
                         $batchIndex++;
 
@@ -601,13 +744,13 @@ class SchedulesDirectService
             }
 
             // Process remaining programs in the last batch
-            if (!empty($batch)) {
-                $this->processProgramBatchDirectly($batch, $batchIndex, $token, $chunkIndex, $scheduleChunk, $file, $programsWritten);
+            if (! empty($batch)) {
+                $this->processProgramBatchDirectly($batch, $batchIndex, $token, $chunkIndex, $scheduleChunk, $file, $programsWritten, $artworkCache);
             }
-            Log::debug("Completed streaming direct program processing", [
+            Log::debug('Completed streaming direct program processing', [
                 'chunk' => $chunkIndex,
                 'total_batches' => $batchIndex + 1,
-                'programs_written' => $programsWritten
+                'programs_written' => $programsWritten,
             ]);
         } finally {
             fclose($handle);
@@ -617,18 +760,23 @@ class SchedulesDirectService
     /**
      * Process a batch of programs and immediately write matching schedule entries - no arrays
      */
-    private function processProgramBatchDirectly(array $programBatch, int $batchIndex, string $token, int $chunkIndex, array $scheduleChunk, $file, int &$programsWritten): void
+    private function processProgramBatchDirectly(array $programBatch, int $batchIndex, string $token, int $chunkIndex, array $scheduleChunk, $file, int &$programsWritten, array $artworkCache = []): void
     {
         // Create a temporary file for the API response
         $tempResponseFile = tempnam(sys_get_temp_dir(), 'epg_programs_response_');
         try {
-            Log::debug("Fetching program batch for direct processing", [
+            Log::debug('Fetching program batch for direct processing', [
                 'chunk' => $chunkIndex,
                 'batch' => $batchIndex + 1,
-                'batch_size' => count($programBatch)
+                'batch_size' => count($programBatch),
             ]);
 
-            // Stream the API response directly to a file
+            // For now, disable program artwork fetching due to API format issues
+            // We'll add this back once we determine the correct metadata API format
+            $programArtworkCache = [];
+
+            // Merge with existing artwork cache
+            $fullArtworkCache = array_merge($artworkCache, ['programs' => $programArtworkCache]);            // Stream the API response directly to a file
             $response = Http::withHeaders([
                 'User-Agent' => self::$USER_AGENT,
                 'token' => $token,
@@ -638,16 +786,26 @@ class SchedulesDirectService
                 $programs = Items::fromFile($tempResponseFile);
                 foreach ($programs as $program) {
                     $programId = $program->programID ?? null;
-                    if (!$programId) continue;
+                    if (! $programId) {
+                        continue;
+                    }
+
+                    // Extract artwork URLs directly from program data if available
+                    $programArtworkUrl = $this->extractArtworkFromProgram($program);
+                    if ($programArtworkUrl) {
+                        $fullArtworkCache['programs'][$programId] = $programArtworkUrl;
+                    }
 
                     // Find matching schedule entries and write them immediately
                     foreach ($scheduleChunk as $schedule) {
                         $stationId = $schedule['stationID'] ?? null;
-                        if (!$stationId) continue;
+                        if (! $stationId) {
+                            continue;
+                        }
 
                         foreach ($schedule['programs'] ?? [] as $scheduleProgram) {
                             if ($scheduleProgram['programID'] === $programId) {
-                                $this->writeProgramToXMLTV($file, $stationId, $scheduleProgram, $program);
+                                $this->writeProgramToXMLTV($file, $stationId, $scheduleProgram, $program, $fullArtworkCache);
                                 $programsWritten++;
                             }
                         }
@@ -656,24 +814,24 @@ class SchedulesDirectService
 
                 // Clear the JsonMachine iterator immediately
                 unset($programs);
-                Log::debug("Program batch processed directly", [
+                Log::debug('Program batch processed directly', [
                     'chunk' => $chunkIndex,
                     'batch' => $batchIndex + 1,
                     'programs_in_batch' => count($programBatch),
-                    'programs_written_in_batch' => $programsWritten
+                    'programs_written_in_batch' => $programsWritten,
                 ]);
             } else {
-                Log::error("Failed to fetch program batch", [
+                Log::error('Failed to fetch program batch', [
                     'chunk' => $chunkIndex,
                     'batch' => $batchIndex + 1,
-                    'status' => $response->status()
+                    'status' => $response->status(),
                 ]);
             }
         } catch (\Exception $e) {
-            Log::error("Error processing program batch directly", [
+            Log::error('Error processing program batch directly', [
                 'chunk' => $chunkIndex,
                 'batch' => $batchIndex + 1,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         } finally {
             // Clean up temporary response file
@@ -686,7 +844,7 @@ class SchedulesDirectService
     /**
      * Write a single program to XMLTV file working directly with JsonMachine objects
      */
-    private function writeProgramToXMLTV($file, string $stationId, array $scheduleProgram, $programData): void
+    private function writeProgramToXMLTV($file, string $stationId, array $scheduleProgram, $programData, array $artworkCache = []): void
     {
         // Handle schedule program data (always array)
         $airDateTime = $scheduleProgram['airDateTime'];
@@ -699,25 +857,32 @@ class SchedulesDirectService
         fwrite($file, "  <programme channel=\"{$stationId}\" start=\"{$start}\" stop=\"{$stop}\">\n");
 
         // Title - work directly with JsonMachine object
-        if (!empty($programData->titles[0]->title120)) {
+        if (! empty($programData->titles[0]->title120)) {
             $title = htmlspecialchars($programData->titles[0]->title120);
             fwrite($file, "    <title>{$title}</title>\n");
         }
 
         // Episode title
-        if (!empty($programData->episodeTitle150)) {
+        if (! empty($programData->episodeTitle150)) {
             $subTitle = htmlspecialchars($programData->episodeTitle150);
             fwrite($file, "    <sub-title>{$subTitle}</sub-title>\n");
         }
 
         // Description
-        if (!empty($programData->descriptions->description1000[0]->description)) {
+        if (! empty($programData->descriptions->description1000[0]->description)) {
             $desc = htmlspecialchars($programData->descriptions->description1000[0]->description);
             fwrite($file, "    <desc>{$desc}</desc>\n");
         }
 
+        // Program icon/artwork
+        $programId = $programData->programID ?? null;
+        if ($programId && isset($artworkCache['programs'][$programId])) {
+            $iconUrl = htmlspecialchars($artworkCache['programs'][$programId]);
+            fwrite($file, "    <icon src=\"{$iconUrl}\" />\n");
+        }
+
         // Categories/Genres
-        if (!empty($programData->genres)) {
+        if (! empty($programData->genres)) {
             foreach ($programData->genres as $genre) {
                 $genre = htmlspecialchars($genre);
                 fwrite($file, "    <category>{$genre}</category>\n");
@@ -725,7 +890,7 @@ class SchedulesDirectService
         }
 
         // Episode numbering
-        if (!empty($programData->metadata)) {
+        if (! empty($programData->metadata)) {
             foreach ($programData->metadata as $metadata) {
                 if (isset($metadata->Gracenote->season) && isset($metadata->Gracenote->episode)) {
                     $season = max(0, $metadata->Gracenote->season - 1);
@@ -737,7 +902,7 @@ class SchedulesDirectService
         }
 
         // Content rating
-        if (!empty($programData->contentRating)) {
+        if (! empty($programData->contentRating)) {
             foreach ($programData->contentRating as $rating) {
                 if ($rating->country === 'USA') {
                     $ratingSystem = htmlspecialchars($rating->body);
@@ -749,7 +914,7 @@ class SchedulesDirectService
         }
 
         // New flag
-        if (!empty($isNew)) {
+        if (! empty($isNew)) {
             fwrite($file, "    <premiere />\n");
         }
 
@@ -760,7 +925,7 @@ class SchedulesDirectService
     /**
      * Make authenticated request to Schedules Direct API with improved error handling
      */
-    private function makeRequest(string $method, string $endpoint, array $data = [], string $token = null): Response
+    private function makeRequest(string $method, string $endpoint, array $data = [], ?string $token = null): Response
     {
         $headers = [
             'User-Agent' => self::$USER_AGENT,
@@ -795,19 +960,19 @@ class SchedulesDirectService
                 'verify' => true,
                 'stream' => false, // Disable streaming to prevent memory issues
                 'max_redirects' => 3,
-                'allow_redirects' => ['strict' => true]
+                'allow_redirects' => ['strict' => true],
             ]);
 
-        Log::debug("Making Schedules Direct API request", [
+        Log::debug('Making Schedules Direct API request', [
             'method' => $method,
             'endpoint' => $endpoint,
             'timeout' => $timeout,
             'data_size' => is_array($data) ? count($data) : 0,
-            'has_token' => !empty($token)
+            'has_token' => ! empty($token),
         ]);
         try {
             $startTime = microtime(true);
-            if ($method === 'GET' && !empty($data)) {
+            if ($method === 'GET' && ! empty($data)) {
                 $url .= '?' . http_build_query($data);
                 $response = $request->get($url);
             } elseif ($method === 'POST') {
@@ -818,20 +983,20 @@ class SchedulesDirectService
                 $response = $request->send($method, $url, ['json' => $data]);
             }
             $duration = round(microtime(true) - $startTime, 2);
-            Log::debug("Schedules Direct API request completed", [
+            Log::debug('Schedules Direct API request completed', [
                 'method' => $method,
                 'endpoint' => $endpoint,
                 'duration_seconds' => $duration,
                 'status_code' => $response->status(),
-                'response_size' => strlen($response->body())
+                'response_size' => strlen($response->body()),
             ]);
         } catch (\Exception $e) {
-            Log::error("Schedules Direct API request failed", [
+            Log::error('Schedules Direct API request failed', [
                 'method' => $method,
                 'endpoint' => $endpoint,
                 'timeout' => $timeout,
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e)
+                'error_class' => get_class($e),
             ]);
             throw new \Exception("Schedules Direct API request failed: {$e->getMessage()}");
         }
@@ -840,16 +1005,17 @@ class SchedulesDirectService
             $message = $body['message'] ?? $body['response'] ?? 'Unknown error';
             $code = $body['code'] ?? $response->status();
 
-            Log::error("Schedules Direct API error response", [
+            Log::error('Schedules Direct API error response', [
                 'method' => $method,
                 'endpoint' => $endpoint,
                 'status' => $response->status(),
                 'code' => $code,
                 'message' => $message,
-                'full_response' => $response->body()
+                'full_response' => $response->body(),
             ]);
             throw new \Exception("Schedules Direct API error: {$message} (Code: {$code})");
         }
+
         return $response;
     }
 }
