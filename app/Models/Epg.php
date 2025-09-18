@@ -37,6 +37,7 @@ class Epg extends Model
         'sd_station_ids' => 'array',
         'sd_errors' => 'array',
         'sd_days_to_import' => 'integer',
+        'sd_metadata' => 'array',
     ];
 
     /**

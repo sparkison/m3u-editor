@@ -318,7 +318,7 @@ class SchedulesDirectService
 
             // Process in batches of 500 or fewer
             $batches = array_chunk($programIds, $maxBatchSize);
-            
+
             foreach ($batches as $batchIndex => $batch) {
                 Log::debug('Processing artwork batch', [
                     'batch' => $batchIndex + 1,
@@ -341,10 +341,10 @@ class SchedulesDirectService
                         if ($programId && !empty($artworkItems)) {
                             // Group and process all artwork types, not just the "best" one
                             $processedArtwork = [];
-                            
+
                             foreach ($artworkItems as $artwork) {
                                 if (empty($artwork['uri'])) continue;
-                                
+
                                 $artworkInfo = [
                                     'url' => $this->buildImageUrl($artwork['uri']),
                                     'type' => $this->mapSchedulesDirectCategoryToXMLTV($artwork['category'] ?? ''),
@@ -355,7 +355,7 @@ class SchedulesDirectService
                                     'category' => $artwork['category'] ?? '',
                                     'tier' => $artwork['tier'] ?? ''
                                 ];
-                                
+
                                 // Only include if we can map to a valid XMLTV type
                                 if (!empty($artworkInfo['type'])) {
                                     $processedArtwork[] = $artworkInfo;
@@ -367,7 +367,6 @@ class SchedulesDirectService
                             }
                         }
                     }
-
                 } else {
                     Log::error('Failed to fetch program artwork batch', [
                         'batch' => $batchIndex + 1,
@@ -389,7 +388,6 @@ class SchedulesDirectService
             ]);
 
             return $allArtwork;
-
         } catch (\Exception $e) {
             Log::error('Exception while fetching program artwork', [
                 'error' => $e->getMessage(),
@@ -413,8 +411,6 @@ class SchedulesDirectService
         return self::BASE_URL . '/image/' . $uri;
     }
 
-
-
     /**
      * Map Schedules Direct artwork categories to XMLTV image types
      */
@@ -424,20 +420,20 @@ class SchedulesDirectService
             // Main poster/iconic images
             'iconic' => 'poster',
             'poster art', 'box art' => 'poster',
-            
+
             // Banner images (usually landscape) - map to backdrop
             'banner', 'banner-l1', 'banner-l2', 'banner-l3', 'banner-lo', 'banner-lot' => 'backdrop',
-            
+
             // Still images from shows/movies
             'scene still', 'photo', 'still' => 'still',
-            
+
             // People images
             'cast ensemble', 'cast in character' => 'character',
             'photo-headshot' => 'person',
-            
+
             // Logo/branding - not typically used in XMLTV image tags, skip
             'logo', 'staple' => '', // Return empty to skip
-            
+
             default => 'poster' // Default to poster for unrecognized categories
         };
     }
@@ -450,7 +446,7 @@ class SchedulesDirectService
         if ($width == 0 || $height == 0) {
             return 'P'; // Default to portrait
         }
-        
+
         return $width > $height ? 'L' : 'P'; // Landscape or Portrait
     }
 
@@ -460,7 +456,7 @@ class SchedulesDirectService
     private function mapImageSize(int $width, int $height): string
     {
         $totalPixels = $width * $height;
-        
+
         if ($totalPixels >= 1000000) { // >= ~1000x1000
             return '3'; // Large
         } elseif ($totalPixels >= 250000) { // >= ~500x500
@@ -504,49 +500,6 @@ class SchedulesDirectService
     }
 
     /**
-     * Fetch program artwork from Schedules Direct for a batch of program IDs
-     */
-    private function fetchProgramArtwork(string $token, array $programIds): array
-    {
-        try {
-            if (!empty($programIds)) {
-                Log::debug('Fetching program artwork batch', ['program_count' => count($programIds)]);
-                
-                // getProgramArtwork now returns a simple array mapping programID => artworkURL
-                return $this->getProgramArtwork($token, $programIds);
-            }
-        } catch (\Exception $e) {
-            Log::warning('Failed to fetch program artwork batch', [
-                'program_count' => count($programIds),
-                'error' => $e->getMessage(),
-            ]);
-        }
-
-        return [];
-    }
-
-    /**
-     * Extract the best available artwork from program data
-     */
-    private function extractBestArtwork(array $artworkData): ?string
-    {
-        // Priority order for artwork types
-        $artworkTypes = ['Ep', 'Sm', 'Ms', 'Sh']; // Episode, Season, Series, Show
-
-        foreach ($artworkTypes as $type) {
-            if (isset($artworkData[$type])) {
-                foreach ($artworkData[$type] as $artwork) {
-                    if (! empty($artwork['URI'])) {
-                        return $artwork['URI'];
-                    }
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /**
      * Extract artwork URL directly from program data
      * This looks for artwork URLs embedded in the program response itself
      */
@@ -586,6 +539,9 @@ class SchedulesDirectService
             if (! $epg->hasSchedulesDirectLineup()) {
                 throw new \Exception('No lineup configured for Schedules Direct EPG');
             }
+
+            // Set the metadata fetching flag
+            self::$FETCH_PROGRAM_ARTWORK = $epg->sd_metadata['enabled'] ?? false;
 
             // Reset EPG SD sync status
             $epg->update([
@@ -1044,7 +1000,7 @@ class SchedulesDirectService
         $programId = $programData->programID ?? null;
         if ($programId && isset($artworkCache['programs'][$programId])) {
             $artworkList = $artworkCache['programs'][$programId];
-            
+
             // Handle both old format (single URL string) and new format (array of artwork info)
             if (is_string($artworkList)) {
                 // Legacy format - convert to image tag
@@ -1057,7 +1013,7 @@ class SchedulesDirectService
                     $type = htmlspecialchars($artwork['type']);
                     $size = htmlspecialchars($artwork['size']);
                     $orient = htmlspecialchars($artwork['orient']);
-                    
+
                     fwrite($file, "    <image type=\"{$type}\" size=\"{$size}\" orient=\"{$orient}\" system=\"schedulesdirect\">{$url}</image>\n");
                 }
             }
