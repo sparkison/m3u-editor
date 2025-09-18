@@ -300,7 +300,7 @@ class SchedulesDirectService
      * 2. Try alternative API endpoints for metadata
      * 3. Use program flags to determine if artwork exists
      */
-    public function getProgramArtwork(string $token, array $programIds): array
+    public function getProgramArtwork(string $token, array $programIds, ?string $epgUuid = null): array
     {
         if (empty($programIds)) {
             return [];
@@ -340,27 +340,7 @@ class SchedulesDirectService
 
                         if ($programId && !empty($artworkItems)) {
                             // Group and process all artwork types, not just the "best" one
-                            $processedArtwork = [];
-
-                            foreach ($artworkItems as $artwork) {
-                                if (empty($artwork['uri'])) continue;
-
-                                $artworkInfo = [
-                                    'url' => $this->buildImageUrl($artwork['uri']),
-                                    'type' => $this->mapSchedulesDirectCategoryToXMLTV($artwork['category'] ?? ''),
-                                    'width' => $artwork['width'] ?? 0,
-                                    'height' => $artwork['height'] ?? 0,
-                                    'orient' => $this->determineOrientation($artwork['width'] ?? 0, $artwork['height'] ?? 0),
-                                    'size' => $this->mapImageSize($artwork['width'] ?? 0, $artwork['height'] ?? 0),
-                                    'category' => $artwork['category'] ?? '',
-                                    'tier' => $artwork['tier'] ?? ''
-                                ];
-
-                                // Only include if we can map to a valid XMLTV type
-                                if (!empty($artworkInfo['type'])) {
-                                    $processedArtwork[] = $artworkInfo;
-                                }
-                            }
+                            $processedArtwork = $this->selectBestArtwork($artworkItems, $epgUuid);
 
                             if (!empty($processedArtwork)) {
                                 $allArtwork[$programId] = $processedArtwork;
@@ -377,7 +357,7 @@ class SchedulesDirectService
 
                 // Add small delay between batches to be respectful to the API
                 if ($batchIndex < count($batches) - 1) {
-                    usleep(250000); // 250ms delay
+                    usleep(100000); // 100ms delay
                 }
             }
 
@@ -398,16 +378,127 @@ class SchedulesDirectService
     }
 
     /**
+     * Select only the best 1-2 images per type to avoid XMLTV bloat
+     */
+    private function selectBestArtwork(array $artworkItems, ?string $epgUuid = null): array
+    {
+        $selectedArtwork = [];
+        $typeGroups = [];
+
+        // Group artwork by type
+        foreach ($artworkItems as $artwork) {
+            if (empty($artwork['uri'])) continue;
+
+            $xmltvType = $this->mapSchedulesDirectCategoryToXMLTV($artwork['category'] ?? '');
+            if (empty($xmltvType)) continue; // Skip unmappable types
+
+            $typeGroups[$xmltvType][] = $artwork;
+        }
+
+        // Select the best 1-2 images per type
+        foreach ($typeGroups as $type => $artworks) {
+            // Sort by quality (prefer higher resolution and better tiers)
+            usort($artworks, function ($a, $b) {
+                $scoreA = $this->calculateArtworkScore($a);
+                $scoreB = $this->calculateArtworkScore($b);
+                return $scoreB <=> $scoreA; // Descending order (highest score first)
+            });
+
+            // Take only the best 1-2 images per type
+            $limit = ($type === 'poster') ? 2 : 1; // Allow 2 posters, 1 of other types
+            $selectedFromType = array_slice($artworks, 0, $limit);
+
+            foreach ($selectedFromType as $artwork) {
+                $imageUrl = $this->buildImageUrl($artwork['uri'], $epgUuid);
+
+                $artworkInfo = [
+                    'url' => $imageUrl,
+                    'type' => $type,
+                    'width' => $artwork['width'] ?? 0,
+                    'height' => $artwork['height'] ?? 0,
+                    'orient' => $this->determineOrientation($artwork['width'] ?? 0, $artwork['height'] ?? 0),
+                    'size' => $this->mapImageSize($artwork['width'] ?? 0, $artwork['height'] ?? 0),
+                    'category' => $artwork['category'] ?? '',
+                    'tier' => $artwork['tier'] ?? ''
+                ];
+
+                $selectedArtwork[] = $artworkInfo;
+            }
+        }
+
+        Log::debug('Artwork selection completed', [
+            'original_count' => count($artworkItems),
+            'selected_count' => count($selectedArtwork),
+            'types_found' => array_keys($typeGroups)
+        ]);
+
+        return $selectedArtwork;
+    }
+
+    /**
+     * Calculate a quality score for artwork to prioritize the best images
+     */
+    private function calculateArtworkScore(array $artwork): int
+    {
+        $score = 0;
+
+        // Resolution scoring (higher resolution = better)
+        $width = $artwork['width'] ?? 0;
+        $height = $artwork['height'] ?? 0;
+        $pixels = $width * $height;
+
+        if ($pixels >= 1000000) $score += 100; // 1MP+
+        elseif ($pixels >= 500000) $score += 80;  // 500K+
+        elseif ($pixels >= 250000) $score += 60;  // 250K+
+        elseif ($pixels >= 100000) $score += 40;  // 100K+
+        else $score += 20; // Small images
+
+        // Tier scoring (Episode > Season > Series)
+        $tier = strtolower($artwork['tier'] ?? '');
+        switch ($tier) {
+            case 'episode':
+                $score += 50;
+                break;
+            case 'season':
+                $score += 40;
+                break;
+            case 'series':
+                $score += 30;
+                break;
+            default:
+                $score += 20;
+                break;
+        }
+
+        // Category scoring (prefer iconic/poster over banners)
+        $category = strtolower($artwork['category'] ?? '');
+        if (str_contains($category, 'iconic')) $score += 30;
+        elseif (str_contains($category, 'poster')) $score += 25;
+        elseif (str_contains($category, 'banner-l1')) $score += 20;
+        elseif (str_contains($category, 'banner')) $score += 10;
+
+        return $score;
+    }
+
+    /**
      * Build the complete image URL from the URI
      */
-    private function buildImageUrl(string $uri): string
+    private function buildImageUrl(string $uri, ?string $epgUuid = null): string
     {
         // If URI is already a complete URL (starts with https://), return as-is
         if (str_starts_with($uri, 'https://')) {
             return $uri;
         }
 
-        // Otherwise, construct the Schedules Direct image URL
+        // If we have an EPG UUID, use the proxy URL
+        if ($epgUuid) {
+            return route('schedules-direct.image.proxy', [
+                'epg' => $epgUuid,
+                'imageHash' => $uri
+            ]);
+        }
+
+        // Fallback to direct URL (will require authentication)
         return self::BASE_URL . '/image/' . $uri;
     }
 
@@ -789,7 +880,7 @@ class SchedulesDirectService
                 try {
                     // Stream process programs directly without creating lookup arrays
                     $chunkProgramsWritten = 0;
-                    $this->streamProcessProgramsDirectly($tempProgramIdFile, $epg->sd_token, $chunkIndex, $scheduleChunk, $file, $chunkProgramsWritten, $artworkCache);
+                    $this->streamProcessProgramsDirectly($tempProgramIdFile, $epg->sd_token, $chunkIndex, $scheduleChunk, $file, $chunkProgramsWritten, $artworkCache, $epg);
                     $totalProgramsWritten += $chunkProgramsWritten;
                     Log::debug('Chunk completed', [
                         'chunk' => $chunkIndex,
@@ -832,7 +923,7 @@ class SchedulesDirectService
     /**
      * Stream process programs directly without creating lookup arrays - pure streaming approach
      */
-    private function streamProcessProgramsDirectly(string $programIdFile, string $token, int $chunkIndex, array $scheduleChunk, $file, int &$programsWritten, array $artworkCache = []): void
+    private function streamProcessProgramsDirectly(string $programIdFile, string $token, int $chunkIndex, array $scheduleChunk, $file, int &$programsWritten, array $artworkCache = [], ?Epg $epg = null): void
     {
         $handle = fopen($programIdFile, 'r');
         if (! $handle) {
@@ -850,7 +941,7 @@ class SchedulesDirectService
 
                     // When we reach batch size, process the programs immediately
                     if (count($batch) >= self::PROGRAMS_BATCH_SIZE) {
-                        $this->processProgramBatchDirectly($batch, $batchIndex, $token, $chunkIndex, $scheduleChunk, $file, $programsWritten, $artworkCache);
+                        $this->processProgramBatchDirectly($batch, $batchIndex, $token, $chunkIndex, $scheduleChunk, $file, $programsWritten, $artworkCache, $epg);
                         $batch = []; // Clear the batch
                         $batchIndex++;
 
@@ -862,7 +953,7 @@ class SchedulesDirectService
 
             // Process remaining programs in the last batch
             if (! empty($batch)) {
-                $this->processProgramBatchDirectly($batch, $batchIndex, $token, $chunkIndex, $scheduleChunk, $file, $programsWritten, $artworkCache);
+                $this->processProgramBatchDirectly($batch, $batchIndex, $token, $chunkIndex, $scheduleChunk, $file, $programsWritten, $artworkCache, $epg);
             }
             Log::debug('Completed streaming direct program processing', [
                 'chunk' => $chunkIndex,
@@ -877,7 +968,7 @@ class SchedulesDirectService
     /**
      * Process a batch of programs and immediately write matching schedule entries - no arrays
      */
-    private function processProgramBatchDirectly(array $programBatch, int $batchIndex, string $token, int $chunkIndex, array $scheduleChunk, $file, int &$programsWritten, array $artworkCache = []): void
+    private function processProgramBatchDirectly(array $programBatch, int $batchIndex, string $token, int $chunkIndex, array $scheduleChunk, $file, int &$programsWritten, array $artworkCache = [], ?Epg $epg = null): void
     {
         // Create a temporary file for the API response
         $tempResponseFile = tempnam(sys_get_temp_dir(), 'epg_programs_response_');
@@ -891,7 +982,7 @@ class SchedulesDirectService
             // Fetch program artwork using the corrected metadata endpoint (if enabled)
             $programArtworkCache = [];
             if (self::$FETCH_PROGRAM_ARTWORK) {
-                $programArtworkCache = $this->getProgramArtwork($token, $programBatch);
+                $programArtworkCache = $this->getProgramArtwork($token, $programBatch, $epg?->uuid);
                 Log::debug("Fetched artwork for {$batchIndex} programs", ['artwork_count' => count($programArtworkCache)]);
             } else {
                 Log::debug('Program artwork disabled for faster sync');
