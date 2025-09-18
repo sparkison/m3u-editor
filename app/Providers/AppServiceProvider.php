@@ -149,14 +149,14 @@ class AppServiceProvider extends ServiceProvider
                     $playlist->user_id = auth()->id();
                 }
                 if (!$playlist->sync_interval) {
-                    $playlist->sync_interval = '24 hours';
+                    $playlist->sync_interval = '0 0 * * *';
                 }
                 $playlist->uuid = Str::orderedUuid()->toString();
                 return $playlist;
             });
             Playlist::updating(function (Playlist $playlist) {
                 if (!$playlist->sync_interval) {
-                    $playlist->sync_interval = '24 hours';
+                    $playlist->sync_interval = '0 0 * * *';
                 }
                 if ($playlist->isDirty('short_urls_enabled')) {
                     $playlist->generateShortUrl();
@@ -195,14 +195,14 @@ class AppServiceProvider extends ServiceProvider
                     $epg->user_id = auth()->id();
                 }
                 if (!$epg->sync_interval) {
-                    $epg->sync_interval = '24 hours';
+                    $epg->sync_interval = '0 0 * * *';
                 }
                 $epg->uuid = Str::orderedUuid()->toString();
                 return $epg;
             });
             Epg::updating(function (Epg $epg) {
                 if (!$epg->sync_interval) {
-                    $epg->sync_interval = '24 hours';
+                    $epg->sync_interval = '0 0 * * *';
                 }
                 return $epg;
             });

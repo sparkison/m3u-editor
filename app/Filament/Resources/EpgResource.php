@@ -684,7 +684,7 @@ class EpgResource extends Resource
                                 ->url('https://crontab.guru')
                                 ->openUrlInNewTab(true)
                         )
-                        ->helperText(fn($get) => CronExpression::isValidExpression($get('sync_interval'))
+                        ->helperText(fn($get) => $get('sync_interval') && CronExpression::isValidExpression($get('sync_interval'))
                             ? 'Next scheduled sync: ' . (new CronExpression($get('sync_interval')))->getNextRunDate()->format('Y-m-d H:i:s')
                             : 'Specify the CRON schedule for automatic sync, e.g. "0 3 * * *".')
                         ->hidden(fn(Get $get): bool => !$get('auto_sync')),
