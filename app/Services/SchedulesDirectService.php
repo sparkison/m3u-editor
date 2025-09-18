@@ -15,7 +15,9 @@ use JsonMachine\Items;
 class SchedulesDirectService
 {
     private const BASE_URL = 'https://json.schedulesdirect.org/20141201';
+
     private static string $USER_AGENT = 'm3u-editor/dev';
+    private static bool $FETCH_PROGRAM_ARTWORK = false; // Enable fetching program artwork
 
     // Configuration constants for performance tuning
     private const MAX_STATIONS_PER_SYNC = null;      // Limit stations for faster processing
@@ -287,17 +289,185 @@ class SchedulesDirectService
     }
 
     /**
-     * Get artwork for programs (currently disabled due to API format issues)
-     * TODO: Research the correct format for the /metadata/programs endpoint
+     * Get artwork for programs 
+     * 
+     * Based on testing, the /metadata/programs endpoint returns error 1008 "INCORRECT_REQUEST"
+     * for all tested formats. The regular /programs endpoint shows hasImageArtwork=true,
+     * indicating artwork is available, but accessed differently.
+     * 
+     * For now, this returns empty array but could be enhanced to:
+     * 1. Check for artwork URLs embedded in program responses
+     * 2. Try alternative API endpoints for metadata
+     * 3. Use program flags to determine if artwork exists
      */
     public function getProgramArtwork(string $token, array $programIds): array
     {
-        // Temporarily disable program artwork fetching until we can determine the correct API format
-        Log::debug('Program artwork fetching is currently disabled', [
-            'program_count' => count($programIds),
-        ]);
+        if (empty($programIds)) {
+            return [];
+        }
 
-        return [];
+        // Schedules Direct has a limit of 500 program IDs per request
+        $maxBatchSize = 500;
+        $allArtwork = [];
+
+        try {
+            Log::debug('Fetching program artwork from Schedules Direct', [
+                'program_count' => count($programIds),
+                'batches_needed' => ceil(count($programIds) / $maxBatchSize),
+            ]);
+
+            // Process in batches of 500 or fewer
+            $batches = array_chunk($programIds, $maxBatchSize);
+            
+            foreach ($batches as $batchIndex => $batch) {
+                Log::debug('Processing artwork batch', [
+                    'batch' => $batchIndex + 1,
+                    'batch_size' => count($batch),
+                ]);
+
+                // The correct endpoint requires a trailing slash: /metadata/programs/
+                $response = Http::withHeaders([
+                    'User-Agent' => self::$USER_AGENT,
+                    'token' => $token,
+                ])->timeout(30)->post(self::BASE_URL . '/metadata/programs/', $batch);
+
+                if ($response->successful()) {
+                    $artworkData = $response->json();
+
+                    foreach ($artworkData as $programArtwork) {
+                        $programId = $programArtwork['programID'] ?? null;
+                        $artworkItems = $programArtwork['data'] ?? [];
+
+                        if ($programId && !empty($artworkItems)) {
+                            // Group and process all artwork types, not just the "best" one
+                            $processedArtwork = [];
+                            
+                            foreach ($artworkItems as $artwork) {
+                                if (empty($artwork['uri'])) continue;
+                                
+                                $artworkInfo = [
+                                    'url' => $this->buildImageUrl($artwork['uri']),
+                                    'type' => $this->mapSchedulesDirectCategoryToXMLTV($artwork['category'] ?? ''),
+                                    'width' => $artwork['width'] ?? 0,
+                                    'height' => $artwork['height'] ?? 0,
+                                    'orient' => $this->determineOrientation($artwork['width'] ?? 0, $artwork['height'] ?? 0),
+                                    'size' => $this->mapImageSize($artwork['width'] ?? 0, $artwork['height'] ?? 0),
+                                    'category' => $artwork['category'] ?? '',
+                                    'tier' => $artwork['tier'] ?? ''
+                                ];
+                                
+                                // Only include if we can map to a valid XMLTV type
+                                if (!empty($artworkInfo['type'])) {
+                                    $processedArtwork[] = $artworkInfo;
+                                }
+                            }
+
+                            if (!empty($processedArtwork)) {
+                                $allArtwork[$programId] = $processedArtwork;
+                            }
+                        }
+                    }
+
+                } else {
+                    Log::error('Failed to fetch program artwork batch', [
+                        'batch' => $batchIndex + 1,
+                        'status' => $response->status(),
+                        'response' => $response->body(),
+                    ]);
+                }
+
+                // Add small delay between batches to be respectful to the API
+                if ($batchIndex < count($batches) - 1) {
+                    usleep(250000); // 250ms delay
+                }
+            }
+
+            Log::debug('Successfully fetched program artwork', [
+                'programs_with_artwork' => count($allArtwork),
+                'total_programs' => count($programIds),
+                'batches_processed' => count($batches),
+            ]);
+
+            return $allArtwork;
+
+        } catch (\Exception $e) {
+            Log::error('Exception while fetching program artwork', [
+                'error' => $e->getMessage(),
+                'program_count' => count($programIds),
+            ]);
+            return [];
+        }
+    }
+
+    /**
+     * Build the complete image URL from the URI
+     */
+    private function buildImageUrl(string $uri): string
+    {
+        // If URI is already a complete URL (starts with https://), return as-is
+        if (str_starts_with($uri, 'https://')) {
+            return $uri;
+        }
+
+        // Otherwise, construct the Schedules Direct image URL
+        return self::BASE_URL . '/image/' . $uri;
+    }
+
+
+
+    /**
+     * Map Schedules Direct artwork categories to XMLTV image types
+     */
+    private function mapSchedulesDirectCategoryToXMLTV(string $category): string
+    {
+        return match (strtolower($category)) {
+            // Main poster/iconic images
+            'iconic' => 'poster',
+            'poster art', 'box art' => 'poster',
+            
+            // Banner images (usually landscape) - map to backdrop
+            'banner', 'banner-l1', 'banner-l2', 'banner-l3', 'banner-lo', 'banner-lot' => 'backdrop',
+            
+            // Still images from shows/movies
+            'scene still', 'photo', 'still' => 'still',
+            
+            // People images
+            'cast ensemble', 'cast in character' => 'character',
+            'photo-headshot' => 'person',
+            
+            // Logo/branding - not typically used in XMLTV image tags, skip
+            'logo', 'staple' => '', // Return empty to skip
+            
+            default => 'poster' // Default to poster for unrecognized categories
+        };
+    }
+
+    /**
+     * Determine image orientation from dimensions
+     */
+    private function determineOrientation(int $width, int $height): string
+    {
+        if ($width == 0 || $height == 0) {
+            return 'P'; // Default to portrait
+        }
+        
+        return $width > $height ? 'L' : 'P'; // Landscape or Portrait
+    }
+
+    /**
+     * Map image dimensions to XMLTV size (1=small, 2=medium, 3=large)
+     */
+    private function mapImageSize(int $width, int $height): string
+    {
+        $totalPixels = $width * $height;
+        
+        if ($totalPixels >= 1000000) { // >= ~1000x1000
+            return '3'; // Large
+        } elseif ($totalPixels >= 250000) { // >= ~500x500
+            return '2'; // Medium
+        } else {
+            return '1'; // Small
+        }
     }
 
     /**
@@ -338,23 +508,12 @@ class SchedulesDirectService
      */
     private function fetchProgramArtwork(string $token, array $programIds): array
     {
-        $programArtworkCache = [];
-
         try {
-            if (! empty($programIds)) {
+            if (!empty($programIds)) {
                 Log::debug('Fetching program artwork batch', ['program_count' => count($programIds)]);
-                $programArtwork = $this->getProgramArtwork($token, $programIds);
-
-                foreach ($programArtwork as $programData) {
-                    $programId = $programData['programID'] ?? null;
-                    if ($programId && ! empty($programData['data'])) {
-                        // Look for different types of artwork
-                        $artwork = $this->extractBestArtwork($programData['data']);
-                        if ($artwork) {
-                            $programArtworkCache[$programId] = $artwork;
-                        }
-                    }
-                }
+                
+                // getProgramArtwork now returns a simple array mapping programID => artworkURL
+                return $this->getProgramArtwork($token, $programIds);
             }
         } catch (\Exception $e) {
             Log::warning('Failed to fetch program artwork batch', [
@@ -363,7 +522,7 @@ class SchedulesDirectService
             ]);
         }
 
-        return $programArtworkCache;
+        return [];
     }
 
     /**
@@ -773,9 +932,14 @@ class SchedulesDirectService
                 'batch_size' => count($programBatch),
             ]);
 
-            // For now, disable program artwork fetching due to API format issues
-            // We'll add this back once we determine the correct metadata API format
+            // Fetch program artwork using the corrected metadata endpoint (if enabled)
             $programArtworkCache = [];
+            if (self::$FETCH_PROGRAM_ARTWORK) {
+                $programArtworkCache = $this->getProgramArtwork($token, $programBatch);
+                Log::debug("Fetched artwork for {$batchIndex} programs", ['artwork_count' => count($programArtworkCache)]);
+            } else {
+                Log::debug('Program artwork disabled for faster sync');
+            }
 
             // Merge with existing artwork cache
             $fullArtworkCache = array_merge($artworkCache, ['programs' => $programArtworkCache]);            // Stream the API response directly to a file
@@ -876,11 +1040,27 @@ class SchedulesDirectService
             fwrite($file, "    <desc>{$desc}</desc>\n");
         }
 
-        // Program icon/artwork
+        // Program artwork using proper XMLTV <image> tags
         $programId = $programData->programID ?? null;
         if ($programId && isset($artworkCache['programs'][$programId])) {
-            $iconUrl = htmlspecialchars($artworkCache['programs'][$programId]);
-            fwrite($file, "    <icon src=\"{$iconUrl}\" />\n");
+            $artworkList = $artworkCache['programs'][$programId];
+            
+            // Handle both old format (single URL string) and new format (array of artwork info)
+            if (is_string($artworkList)) {
+                // Legacy format - convert to image tag
+                $iconUrl = htmlspecialchars($artworkList);
+                fwrite($file, "    <image type=\"poster\" size=\"2\" orient=\"P\" system=\"schedulesdirect\">{$iconUrl}</image>\n");
+            } elseif (is_array($artworkList)) {
+                // New format - multiple images with proper XMLTV attributes
+                foreach ($artworkList as $artwork) {
+                    $url = htmlspecialchars($artwork['url']);
+                    $type = htmlspecialchars($artwork['type']);
+                    $size = htmlspecialchars($artwork['size']);
+                    $orient = htmlspecialchars($artwork['orient']);
+                    
+                    fwrite($file, "    <image type=\"{$type}\" size=\"{$size}\" orient=\"{$orient}\" system=\"schedulesdirect\">{$url}</image>\n");
+                }
+            }
         }
 
         // Categories/Genres
