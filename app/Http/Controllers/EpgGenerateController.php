@@ -13,6 +13,7 @@ use App\Models\CustomPlaylist;
 use App\Models\Epg;
 use App\Models\MergedPlaylist;
 use App\Models\Playlist;
+use App\Models\PlaylistAlias;
 use App\Services\EpgCacheService;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
@@ -75,7 +76,7 @@ class EpgGenerateController extends Controller
     /**
      * Generate the EPG XML file contents
      *
-     * @param Playlist|MergedPlaylist|CustomPlaylist $playlist
+     * @param Playlist|MergedPlaylist|CustomPlaylist|PlaylistAlias $playlist
      */
     private function generate($playlist)
     {
@@ -286,6 +287,18 @@ class EpgGenerateController extends Controller
                                         $icon = LogoProxyController::generateProxyUrl($icon);
                                     }
                                     echo '    <icon src="' . $icon . '"/>' . PHP_EOL;
+                                }
+                                // Program artwork images (NEW)
+                                if (!empty($programme['images'] ?? null) && is_array($programme['images'])) {
+                                    foreach ($programme['images'] as $image) {
+                                        $url = htmlspecialchars($image['url'], ENT_XML1);
+                                        $type = htmlspecialchars($image['type'], ENT_XML1);
+                                        $size = htmlspecialchars($image['size'], ENT_XML1);
+                                        $orient = htmlspecialchars($image['orient'], ENT_XML1);
+                                        $system = htmlspecialchars($image['system'], ENT_XML1);
+
+                                        echo "    <image type=\"{$type}\" size=\"{$size}\" orient=\"{$orient}\" system=\"{$system}\">{$url}</image>\n";
+                                    }
                                 }
                                 if ($programme['rating']) {
                                     echo '    <rating><value>' . htmlspecialchars($programme['rating']) . '</value></rating>' . PHP_EOL;

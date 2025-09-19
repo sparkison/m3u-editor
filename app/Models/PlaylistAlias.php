@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\PlaylistChannelId;
 use App\Services\XtreamService;
 use App\Traits\ShortUrlTrait;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -75,6 +76,25 @@ class PlaylistAlias extends Model
     public function getXtreamAttribute(): bool
     {
         return !empty($this->xtream_config);
+    }
+
+    /**
+     * Get EPG settings
+     */
+    public function getAutoChannelIncrementAttribute(): bool
+    {
+        $effectivePlaylist = $this->getEffectivePlaylist();
+        return $effectivePlaylist ? $effectivePlaylist->auto_channel_increment : false;
+    }
+    public function getDummyEpgLengthAttribute(): int
+    {
+        $effectivePlaylist = $this->getEffectivePlaylist();
+        return $effectivePlaylist ? (int)($effectivePlaylist->dummy_epg_length ?? 120) : 120;
+    }
+    public function getIdChannelByAttribute(): PlaylistChannelId
+    {
+        $effectivePlaylist = $this->getEffectivePlaylist();
+        return $effectivePlaylist ? $effectivePlaylist->id_channel_by : PlaylistChannelId::ChannelId;
     }
 
     /**

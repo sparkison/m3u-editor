@@ -372,6 +372,7 @@ class EpgCacheService
                     'episode_num' => '',
                     'rating' => '',
                     'icon' => '',
+                    'images' => [], // New: store program artwork
                     'new' => false,
                 ];
 
@@ -394,6 +395,20 @@ class EpgCacheService
                                 break;
                             case 'icon':
                                 $programme['icon'] = trim($innerReader->getAttribute('src') ?: '');
+                                break;
+                            case 'image':
+                                // New: Parse XMLTV image tags for program artwork
+                                $imageUrl = trim($innerReader->readString() ?: '');
+                                if ($imageUrl) {
+                                    $imageData = [
+                                        'url' => $imageUrl,
+                                        'type' => trim($innerReader->getAttribute('type') ?: 'poster'),
+                                        'size' => trim($innerReader->getAttribute('size') ?: '1'),
+                                        'orient' => trim($innerReader->getAttribute('orient') ?: 'P'),
+                                        'system' => trim($innerReader->getAttribute('system') ?: 'unknown'),
+                                    ];
+                                    $programme['images'][] = $imageData;
+                                }
                                 break;
                             case 'premiere':
                                 $programme['new'] = true;
