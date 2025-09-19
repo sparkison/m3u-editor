@@ -479,6 +479,14 @@ class EpgResource extends Resource
                                 ->required(fn(Get $get): bool => $get('source_type') === EpgSourceType::SCHEDULES_DIRECT->value),
                         ]),
 
+                    Forms\Components\Toggle::make('sd_metadata.enabled')
+                        ->label('Import  Metadata')
+                        ->helperText('Enable to import additional program images (NOTE: this can significantly increase import time)')
+                        ->default(false)
+                        ->columnSpanFull()
+                        ->visible(fn(Get $get): bool => $get('source_type') === EpgSourceType::SCHEDULES_DIRECT->value),
+
+
                     Forms\Components\Grid::make()
                         ->columns(2)
                         ->schema([

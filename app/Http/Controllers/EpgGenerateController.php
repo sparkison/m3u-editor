@@ -291,6 +291,18 @@ class EpgGenerateController extends Controller
                                     }
                                     echo '    <icon src="' . $icon . '"/>' . PHP_EOL;
                                 }
+                                // Program artwork images (NEW)
+                                if (!empty($programme['images'] ?? null) && is_array($programme['images'])) {
+                                    foreach ($programme['images'] as $image) {
+                                        $url = htmlspecialchars($image['url'], ENT_XML1);
+                                        $type = htmlspecialchars($image['type'], ENT_XML1);
+                                        $size = htmlspecialchars($image['size'], ENT_XML1);
+                                        $orient = htmlspecialchars($image['orient'], ENT_XML1);
+                                        $system = htmlspecialchars($image['system'], ENT_XML1);
+
+                                        echo "    <image type=\"{$type}\" size=\"{$size}\" orient=\"{$orient}\" system=\"{$system}\">{$url}</image>\n";
+                                    }
+                                }
                                 if ($programme['rating']) {
                                     echo '    <rating><value>' . htmlspecialchars($programme['rating']) . '</value></rating>' . PHP_EOL;
                                 }
