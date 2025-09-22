@@ -40,11 +40,10 @@ class RefreshPlaylist extends Command
         } else {
             $this->info('Refreshing all playlists');
             // Get all playlists that are not currently processing
-            $playlists = Playlist::query()->where(
-                'status',
-                '!=',
-                Status::Processing,
-            )->whereNotNull('synced');
+            $playlists = Playlist::query()->where([
+                ['status', '!=', Status::Processing],
+                ['auto_sync', '=', true],
+            ])->whereNotNull('synced');
 
             $totalPlaylists = $playlists->count();
             if ($totalPlaylists === 0) {
@@ -54,9 +53,13 @@ class RefreshPlaylist extends Command
 
             $count = 0;
             $playlists->get()->each(function (Playlist $playlist) use (&$count) {
-                // Check the sync interval to see if we need to refresh yet
-                $isDue = (new CronExpression($playlist->sync_interval))->isDue();
-                if ($isDue) {
+                $cronExpression = new CronExpression($playlist->sync_interval);
+
+                // Check if sync is due (with a 1-minute buffer)
+                $lastRun = $playlist->synced ?? now()->subYears(1);
+                $nextDue = $cronExpression->getNextRunDate($lastRun->toDateTimeImmutable());
+
+                if (now() >= $nextDue) {
                     $count++;
                     dispatch(new ProcessM3uImport($playlist));
                 }
