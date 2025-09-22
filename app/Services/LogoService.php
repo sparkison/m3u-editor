@@ -47,7 +47,7 @@ class LogoService
         $playlist = $channel->playlist ?? $channel->customPlaylist ?? null;
 
         // Return proxied URL for remote images
-        return $playlist?->enable_proxy
+        return $playlist?->enable_logo_proxy
             ? LogoProxyController::generateProxyUrl($logoUrl)
             : $logoUrl;
     }
@@ -69,7 +69,7 @@ class LogoService
         }
 
         // Return proxied URL for remote images
-        return $series->playlist?->enable_proxy
+        return $series->playlist?->enable_logo_proxy
             ? LogoProxyController::generateProxyUrl($logoUrl)
             : $logoUrl;
     }
