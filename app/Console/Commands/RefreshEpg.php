@@ -40,11 +40,10 @@ class RefreshEpg extends Command
         } else {
             $this->info('Refreshing all EPGs');
             // Get all EPGs that are not currently processing
-            $epgs = Epg::query()->where(
-                'status',
-                '!=',
-                Status::Processing,
-            )->whereNotNull('synced');
+            $epgs = Epg::query()->where([
+                ['status', '!=', Status::Processing],
+                ['auto_sync', '=', true],
+            ])->whereNotNull('synced');
 
             $totalEpgs = $epgs->count();
             if ($totalEpgs === 0) {
@@ -54,9 +53,13 @@ class RefreshEpg extends Command
 
             $count = 0;
             $epgs->get()->each(function (Epg $epg) use (&$count) {
-                // Check the sync interval to see if we need to refresh yet
-                $isDue = (new CronExpression($epg->sync_interval))->isDue();
-                if ($isDue) {
+                $cronExpression = new CronExpression($epg->sync_interval);
+
+                // Check if sync is due (with a 1-minute buffer)
+                $lastRun = $epg->synced ?? now()->subYears(1);
+                $nextDue = $cronExpression->getNextRunDate($lastRun->toDateTimeImmutable());
+
+                if (now() >= $nextDue) {
                     $count++;
                     dispatch(new ProcessEpgImport($epg));
                 }
