@@ -287,11 +287,19 @@ class MergedPlaylistResource extends Resource
                 ->columns(2)
                 ->schema([
                     Toggle::make('enable_proxy')
-                        ->label('Enable Proxy')
+                        ->label('Enable Stream Proxy')
                         ->hint(fn(Get $get): string => $get('enable_proxy') ? 'Proxied' : 'Not proxied')
                         ->hintIcon(fn(Get $get): string => !$get('enable_proxy') ? 'heroicon-m-lock-open' : 'heroicon-m-lock-closed')
                         ->live()
                         ->helperText('When enabled, all streams will be proxied through the application. This allows for better compatibility with various clients and enables features such as stream limiting and output format selection.')
+                        ->inline(false)
+                        ->default(false),
+                    Toggle::make('enable_logo_proxy')
+                        ->label('Enable Logo Proxy')
+                        ->hint(fn(Get $get): string => $get('enable_logo_proxy') ? 'Proxied' : 'Not proxied')
+                        ->hintIcon(fn(Get $get): string => !$get('enable_logo_proxy') ? 'heroicon-m-lock-open' : 'heroicon-m-lock-closed')
+                        ->live()
+                        ->helperText('When enabled, channel logos will be proxied through the application. Logos will be cached for up to 30 days to reduce bandwidth and speed up loading times.')
                         ->inline(false)
                         ->default(false),
                     TextInput::make('streams')
