@@ -159,11 +159,11 @@ Route::get('/get.php', [XtreamApiController::class, 'handle'])->name('xtream.api
 Route::get('/xmltv.php', [XtreamApiController::class, 'epg'])->name('xtream.api.epg');
 
 // Stream endpoints
-Route::get('/live/{username}/{password}/{streamId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleLive'])
+Route::get('/live/{username}/{password}/{streamId}.{format?}', [App\Http\Controllers\XtreamStreamController::class, 'handleLive'])
     ->name('xtream.stream.live.root');
-Route::get('/movie/{username}/{password}/{streamId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleVod'])
+Route::get('/movie/{username}/{password}/{streamId}.{format?}', [App\Http\Controllers\XtreamStreamController::class, 'handleVod'])
     ->name('xtream.stream.vod.root');
-Route::get('/series/{username}/{password}/{streamId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleSeries'])
+Route::get('/series/{username}/{password}/{streamId}.{format?}', [App\Http\Controllers\XtreamStreamController::class, 'handleSeries'])
     ->name('xtream.stream.series.root');
 
 // Timeshift endpoints
