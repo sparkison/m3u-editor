@@ -147,13 +147,14 @@ class ProxyService
             $streamUrl = $rewrite($streamUrl, $stamp, $offset);
 
             // Helpful debug for verification
-            Log::channel('ffmpeg')->debug(sprintf(
-                '[TIMESHIFT-M3U] utc=%d lutc=%d tz=%s start=%s offset(min)=%d',
+            Log::debug(sprintf(
+                '[TIMESHIFT-M3U] utc=%d lutc=%d tz=%s start=%s offset(min)=%d final_url=%s',
                 $utc,
                 $lutc,
                 $providerTz,
                 $stamp,
-                $offset
+                $offset,
+                $streamUrl
             ));
         } elseif ($xtreamTimeshiftPresent) {
             // Convert Xtream API date format to timeshift URL format
@@ -169,7 +170,7 @@ class ProxyService
             $streamUrl = $rewrite($streamUrl, $stamp, $duration);
 
             // Helpful debug for verification
-            Log::channel('ffmpeg')->debug(sprintf(
+            Log::debug(sprintf(
                 '[TIMESHIFT-XTREAM] duration=%d date=%s converted_stamp=%s final_url=%s',
                 $duration,
                 $date,
