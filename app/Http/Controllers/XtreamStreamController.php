@@ -149,8 +149,9 @@ class XtreamStreamController extends Controller
     /**
      * Live stream requests.
      */
-    public function handleLive(Request $request, string $username, string $password, int $streamId, string $format = 'ts')
+    public function handleLive(Request $request, string $username, string $password, int $streamId, ?string $format = null)
     {
+        $format = $format ?? 'ts'; // Default to 'ts' if no format provided
         list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'live');
         if ($channel instanceof Channel) {
             if ($playlist->enable_proxy) {
@@ -171,8 +172,9 @@ class XtreamStreamController extends Controller
     /**
      * VOD stream requests.
      */
-    public function handleVod(Request $request, string $username, string $password, string $streamId, string $format = 'ts')
+    public function handleVod(Request $request, string $username, string $password, string $streamId, ?string $format = null)
     {
+        $format = $format ?? 'ts'; // Default to 'ts' if no format provided
         list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'vod');
         if ($channel instanceof Channel) {
             if ($playlist->enable_proxy) {
@@ -193,8 +195,9 @@ class XtreamStreamController extends Controller
     /**
      * Series episode stream requests.
      */
-    public function handleSeries(Request $request, string $username, string $password, int $streamId, string $format = 'mp4')
+    public function handleSeries(Request $request, string $username, string $password, int $streamId, ?string $format = null)
     {
+        $format = $format ?? 'mp4'; // Default to 'mp4' if no format provided
         list($playlist, $episode) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'episode');
         if ($episode instanceof Episode) {
             if ($playlist->enable_proxy) {
@@ -237,8 +240,10 @@ class XtreamStreamController extends Controller
      * 
      * @unauthenticated
      */
-    public function handleTimeshift(Request $request, string $username, string $password, int $duration, string $date, int $streamId, string $format = 'ts')
+    public function handleTimeshift(Request $request, string $username, string $password, int $duration, string $date, int $streamId, ?string $format = null)
     {
+        $format = $format ?? 'ts'; // Default to 'ts' if no format provided
+
         // Timeshift is only available for live channels
         list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'timeshift');
 
