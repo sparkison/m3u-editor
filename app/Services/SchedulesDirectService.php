@@ -987,7 +987,9 @@ class SchedulesDirectService
             }
 
             // Merge with existing artwork cache
-            $fullArtworkCache = array_merge($artworkCache, ['programs' => $programArtworkCache]);            // Stream the API response directly to a file
+            $fullArtworkCache = array_merge($artworkCache, ['programs' => $programArtworkCache]);
+
+            // Stream the API response directly to a file
             $response = Http::withHeaders([
                 'User-Agent' => self::$USER_AGENT,
                 'token' => $token,
@@ -1089,21 +1091,16 @@ class SchedulesDirectService
         $programId = $programData->programID ?? null;
         if ($programId && isset($artworkCache['programs'][$programId])) {
             $artworkList = $artworkCache['programs'][$programId];
-
-            // Handle both old format (single URL string) and new format (array of artwork info)
-            if (is_string($artworkList)) {
-                // Legacy format - convert to image tag
-                $iconUrl = htmlspecialchars($artworkList);
-                fwrite($file, "    <image type=\"poster\" size=\"2\" orient=\"P\" system=\"schedulesdirect\">{$iconUrl}</image>\n");
-            } elseif (is_array($artworkList)) {
+            if (is_array($artworkList)) {
                 // New format - multiple images with proper XMLTV attributes
                 foreach ($artworkList as $artwork) {
                     $url = htmlspecialchars($artwork['url']);
                     $type = htmlspecialchars($artwork['type']);
                     $size = htmlspecialchars($artwork['size']);
                     $orient = htmlspecialchars($artwork['orient']);
-
-                    fwrite($file, "    <image type=\"{$type}\" size=\"{$size}\" orient=\"{$orient}\" system=\"schedulesdirect\">{$url}</image>\n");
+                    $width = (int) ($artwork['width'] ?? 0);
+                    $height = (int) ($artwork['height'] ?? 0);
+                    fwrite($file, "    <icon url=\"{$url}\" type=\"{$type}\" width=\"{$width}\" height=\"{$height}\" orient=\"{$orient}\" size=\"{$size}\" />\n");
                 }
             }
         }

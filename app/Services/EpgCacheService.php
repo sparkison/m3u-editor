@@ -388,20 +388,22 @@ class EpgCacheService
                                 }
                                 break;
                             case 'icon':
-                                $programme['icon'] = trim($innerReader->getAttribute('src') ?: '');
-                                break;
-                            case 'image':
-                                // New: Parse XMLTV image tags for program artwork
-                                $imageUrl = trim($innerReader->readString() ?: '');
-                                if ($imageUrl) {
-                                    $imageData = [
-                                        'url' => $imageUrl,
-                                        'type' => trim($innerReader->getAttribute('type') ?: 'poster'),
-                                        'size' => trim($innerReader->getAttribute('size') ?: '1'),
-                                        'orient' => trim($innerReader->getAttribute('orient') ?: 'P'),
-                                        'system' => trim($innerReader->getAttribute('system') ?: 'unknown'),
-                                    ];
-                                    $programme['images'][] = $imageData;
+                                if (!$programme['icon']) {
+                                    $programme['icon'] = trim($innerReader->getAttribute('src') ?: '');
+                                } else {
+                                    // New: Parse additional XMLTV icon tags for program artwork
+                                    $imageUrl = trim($innerReader->getAttribute('src') ?: '');
+                                    if ($imageUrl) {
+                                        $imageData = [
+                                            'url' => $imageUrl,
+                                            'type' => trim($innerReader->getAttribute('type') ?: 'poster'),
+                                            'width' => (int) ($innerReader->getAttribute('width') ?: 0),
+                                            'height' => (int) ($innerReader->getAttribute('height') ?: 0),
+                                            'orient' => trim($innerReader->getAttribute('orient') ?: 'P'),
+                                            'size' => (int) ($innerReader->getAttribute('size') ?: 1),
+                                        ];
+                                        $programme['images'][] = $imageData;
+                                    }
                                 }
                                 break;
                             case 'premiere':
