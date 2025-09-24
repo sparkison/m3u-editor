@@ -293,18 +293,19 @@ class EpgGenerateController extends Controller
                                     foreach ($programme['images'] as $image) {
                                         $url = htmlspecialchars($image['url'], ENT_XML1);
                                         $type = htmlspecialchars($image['type'], ENT_XML1);
-                                        $size = htmlspecialchars($image['size'], ENT_XML1);
+                                        $width = htmlspecialchars($image['width'], ENT_XML1);
+                                        $height = htmlspecialchars($image['height'], ENT_XML1);
                                         $orient = htmlspecialchars($image['orient'], ENT_XML1);
-                                        $system = htmlspecialchars($image['system'], ENT_XML1);
+                                        $size = htmlspecialchars($image['size'], ENT_XML1);
 
-                                        echo "    <image type=\"{$type}\" size=\"{$size}\" orient=\"{$orient}\" system=\"{$system}\">{$url}</image>\n";
+                                        echo "    <icon src=\"{$url}\" type=\"{$type}\" width=\"{$width}\" height=\"{$height}\" orient=\"{$orient}\" size=\"{$size}\" />\n";
                                     }
                                 }
                                 if ($programme['rating']) {
                                     echo '    <rating><value>' . htmlspecialchars($programme['rating']) . '</value></rating>' . PHP_EOL;
                                 }
                                 if (!empty($programme['new']) && $programme['new']) {
-                                    echo '    <premiere/>' . PHP_EOL;
+                                    echo '    <new />' . PHP_EOL;
                                 }
 
                                 echo '  </programme>' . PHP_EOL;
