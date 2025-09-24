@@ -1100,7 +1100,7 @@ class SchedulesDirectService
                     $orient = htmlspecialchars($artwork['orient']);
                     $width = (int) ($artwork['width'] ?? 0);
                     $height = (int) ($artwork['height'] ?? 0);
-                    fwrite($file, "    <icon url=\"{$url}\" type=\"{$type}\" width=\"{$width}\" height=\"{$height}\" orient=\"{$orient}\" size=\"{$size}\" />\n");
+                    fwrite($file, "    <icon src=\"{$url}\" type=\"{$type}\" width=\"{$width}\" height=\"{$height}\" orient=\"{$orient}\" size=\"{$size}\" />\n");
                 }
             }
         }
@@ -1139,7 +1139,7 @@ class SchedulesDirectService
 
         // New flag
         if (! empty($isNew)) {
-            fwrite($file, "    <premiere />\n");
+            fwrite($file, "    <new />\n");
         }
 
         // End programme entry
