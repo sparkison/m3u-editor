@@ -412,7 +412,7 @@ class EpgCacheService
                                     }
                                 }
                                 break;
-                            case 'premiere':
+                            case 'new':
                                 $programme['new'] = true;
                                 break;
                             case 'episode-num':
