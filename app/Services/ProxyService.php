@@ -172,7 +172,7 @@ class ProxyService
             }
 
             // Need to convert from app timezone to provider timezone
-            $stamp = Carbon::createFromFormat('Y-m-d:H-i', $stamp, 'UTC')
+            $stamp = Carbon::createFromFormat('Y-m-d:H-i', $stamp, config('app.timezone', 'UTC'))
                 ->setTimezone($providerTz)
                 ->format('Y-m-d:H-i');
 
