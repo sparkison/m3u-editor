@@ -40,6 +40,7 @@ use Filament\Schemas\Components\Wizard\Step;
 use Filament\Forms\Components\CheckboxList;
 use App\Filament\Resources\SeriesResource\Pages;
 use App\Filament\Resources\SeriesResource\RelationManagers;
+use App\Jobs\SeriesFindAndReplace;
 use App\Models\Category;
 use App\Models\CustomPlaylist;
 use App\Models\Playlist;
@@ -248,10 +249,17 @@ class SeriesResource extends Resource
                     ->modalSubmitActionLabel('Move now'),
                 Action::make('process')
                     ->label('Fetch Series Metadata')
-                    ->action(function ($record) {
+                    ->schema([
+                        Toggle::make('overwrite_existing')
+                            ->label('Overwrite Existing Metadata')
+                            ->helperText('Overwrite existing metadata? If disabled, it will only fetch and process episodes for the Series.')
+                            ->default(false),
+                    ])
+                    ->action(function ($record, array $data) {
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new ProcessM3uImportSeriesEpisodes(
                                 playlistSeries: $record,
+                                overwrite_existing: $data['overwrite_existing'] ?? false,
                             ));
                     })->after(function () {
                         Notification::make()
@@ -404,11 +412,18 @@ class SeriesResource extends Resource
                 BulkAction::make('process')
                     ->label('Fetch Series Metadata')
                     ->icon('heroicon-o-arrow-down-tray')
-                    ->action(function ($records) {
+                    ->schema([
+                        Toggle::make('overwrite_existing')
+                            ->label('Overwrite Existing Metadata')
+                            ->helperText('Overwrite existing metadata? If disabled, it will only fetch and process episodes for the Series.')
+                            ->default(false),
+                    ])
+                    ->action(function ($records, array $data) {
                         foreach ($records as $record) {
                             app('Illuminate\Contracts\Bus\Dispatcher')
                                 ->dispatch(new ProcessM3uImportSeriesEpisodes(
                                     playlistSeries: $record,
+                                    overwrite_existing: $data['overwrite_existing'] ?? false,
                                 ));
                         }
                     })->after(function () {
@@ -446,6 +461,66 @@ class SeriesResource extends Resource
                     ->modalIcon('heroicon-o-document-arrow-down')
                     ->modalDescription('Sync selected series .strm files now? This will generate .strm files for the selected series at the path set for the series.')
                     ->modalSubmitActionLabel('Yes, sync now'),
+
+                BulkAction::make('find-replace')
+                    ->label('Find & Replace')
+                    ->schema([
+                        Toggle::make('use_regex')
+                            ->label('Use Regex')
+                            ->live()
+                            ->helperText('Use regex patterns to find and replace. If disabled, will use direct string comparison.')
+                            ->default(true),
+                        Select::make('column')
+                            ->label('Column to modify')
+                            ->options([
+                                'name' => 'Series Name',
+                                'genre' => 'Genre',
+                                'plot' => 'Plot',
+                            ])
+                            ->default('name')
+                            ->required()
+                            ->columnSpan(1),
+                        TextInput::make('find_replace')
+                            ->label(fn(Get $get) =>  !$get('use_regex') ? 'String to replace' : 'Pattern to replace')
+                            ->required()
+                            ->placeholder(
+                                fn(Get $get) => $get('use_regex')
+                                    ? '^(US- |UK- |CA- )'
+                                    : 'US -'
+                            )->helperText(
+                                fn(Get $get) => !$get('use_regex')
+                                    ? 'This is the string you want to find and replace.'
+                                    : 'This is the regex pattern you want to find. Make sure to use valid regex syntax.'
+                            ),
+                        TextInput::make('replace_with')
+                            ->label('Replace with (optional)')
+                            ->placeholder('Leave empty to remove')
+
+                    ])
+                    ->action(function (Collection $records, array $data): void {
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new SeriesFindAndReplace(
+                                user_id: auth()->id(), // The ID of the user who owns the content
+                                use_regex: $data['use_regex'] ?? true,
+                                column: $data['column'] ?? 'title',
+                                find_replace: $data['find_replace'] ?? null,
+                                replace_with: $data['replace_with'] ?? '',
+                                series: $records
+                            ));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Find & Replace started')
+                            ->body('Find & Replace working in the background. You will be notified once the process is complete.')
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-magnifying-glass')
+                    ->color('gray')
+                    ->modalIcon('heroicon-o-magnifying-glass')
+                    ->modalDescription('Select what you would like to find and replace in the selected epg channels.')
+                    ->modalSubmitActionLabel('Replace now'),
+
                 BulkAction::make('enable')
                     ->label('Enable selected')
                     ->action(function (Collection $records): void {

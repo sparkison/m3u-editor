@@ -18,7 +18,7 @@ class EpgChannelFindAndReplaceReset implements ShouldQueue
      * Create a new job instance.
      */
     public function __construct(
-        public int $user_id, // The ID of the user who owns the playlist
+        public int $user_id, // The ID of the user who owns the EPG
         public string $column,
         public ?Collection $channels = null,
         public ?bool $all_epgs = false,

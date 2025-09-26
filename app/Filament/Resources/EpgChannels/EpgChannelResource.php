@@ -160,7 +160,7 @@ class EpgChannelResource extends Resource
                                     'name' => 'Channel Name',
                                     'display_name' => 'Display Name',
                                 ])
-                                ->default('title')
+                                ->default('icon')
                                 ->required()
                                 ->columnSpan(1),
                             TextInput::make('find_replace')
@@ -213,7 +213,7 @@ class EpgChannelResource extends Resource
                                     'name' => 'Channel Name',
                                     'display_name' => 'Display Name',
                                 ])
-                                ->default('title')
+                                ->default('icon')
                                 ->required()
                                 ->columnSpan(1),
                         ])

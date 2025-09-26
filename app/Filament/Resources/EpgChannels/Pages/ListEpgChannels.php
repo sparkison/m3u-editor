@@ -16,7 +16,6 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Utilities\Get;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 
 class ListEpgChannels extends ListRecords
 {
@@ -53,7 +52,7 @@ class ListEpgChannels extends ListRecords
                                 'name' => 'Channel Name',
                                 'display_name' => 'Display Name',
                             ])
-                            ->default('title')
+                            ->default('icon')
                             ->required()
                             ->columnSpan(1),
                         TextInput::make('find_replace')
@@ -73,7 +72,7 @@ class ListEpgChannels extends ListRecords
                             ->placeholder('Leave empty to remove')
 
                     ])
-                    ->action(function (Collection $records, array $data): void {
+                    ->action(function (array $data): void {
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new EpgChannelFindAndReplace(
                                 user_id: auth()->id(), // The ID of the user who owns the content
@@ -120,7 +119,7 @@ class ListEpgChannels extends ListRecords
                                 'name' => 'Channel Name',
                                 'display_name' => 'Display Name',
                             ])
-                            ->default('title')
+                            ->default('icon')
                             ->required()
                             ->columnSpan(1),
                     ])

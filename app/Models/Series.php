@@ -70,7 +70,7 @@ class Series extends Model
         return $this->hasMany(Episode::class)->where('enabled', true);
     }
 
-    public function fetchMetadata()
+    public function fetchMetadata($refresh = false)
     {
         try {
             $playlist = $this->playlist;
@@ -90,6 +90,28 @@ class Series extends Model
             $info = $detail['info'] ?? [];
             $eps = $detail['episodes'] ?? [];
             $batchNo = Str::orderedUuid()->toString();
+
+            $update = [
+                'last_metadata_fetch' => now()
+            ];
+            if ($refresh) {
+                $item = $detail['info'] ?? null;
+                if ($item) {
+                    $update = array_merge($update, [
+                        'name' => $item['name'],
+                        'cover' => $item['cover'] ?? null,
+                        'plot' => $item['plot'] ?? null,
+                        'genre' => $item['genre'] ?? null,
+                        'release_date' => $item['releaseDate'] ?? $item['release_date'] ?? null,
+                        'cast' => $item['cast'] ?? null,
+                        'director' => $item['director'] ?? null,
+                        'rating' => $item['rating'] ?? null,
+                        'rating_5based' => (float) ($item['rating_5based'] ?? 0),
+                        'backdrop_path' => json_encode($item['backdrop_path'] ?? []),
+                        'youtube_trailer' => $item['youtube_trailer'] ?? null,
+                    ]);
+                }
+            }
 
             // If episodes found, process them
             if (count($eps) > 0) {
@@ -189,9 +211,7 @@ class Series extends Model
                 }
 
                 // Update last fetched timestamp for the series
-                $this->update([
-                    'last_metadata_fetch' => now()
-                ]);
+                $this->update($update);
 
                 // Dispatch the job to sync .strm files
                 dispatch(new SyncSeriesStrmFiles(series: $this, notify: false));

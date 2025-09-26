@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Models\EpgChannel;
+use App\Models\Series;
 use App\Models\User;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -10,7 +10,7 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
-class EpgChannelFindAndReplace implements ShouldQueue
+class SeriesFindAndReplace implements ShouldQueue
 {
     use Queueable;
 
@@ -18,14 +18,14 @@ class EpgChannelFindAndReplace implements ShouldQueue
      * Create a new job instance.
      */
     public function __construct(
-        public int $user_id, // The ID of the user who owns the EPG
+        public int $user_id, // The ID of the user who owns the series
         public bool $use_regex,
         public string $column,
         public string $find_replace,
         public string $replace_with,
-        public ?Collection $channels = null,
-        public ?bool $all_epgs = false,
-        public ?int $epg_id = null,
+        public ?Collection $series = null,
+        public ?bool $all_series = false,
+        public ?int $series_id = null,
     ) {
         //
     }
@@ -37,23 +37,22 @@ class EpgChannelFindAndReplace implements ShouldQueue
     {
         // Clock the time
         $start = now();
-        $customColumn = $this->column . '_custom';
         $updated = 0;
 
         // Process channels in chunks for better performance
-        if (!$this->channels) {
+        if (!$this->series) {
             // Use chunking to process large datasets efficiently
-            EpgChannel::query()
-                ->when(!$this->all_epgs && $this->epg_id, fn($query) => $query->where('epg_id', $this->epg_id))
-                ->chunkById(1000, function ($channels) use ($customColumn, &$updated) {
-                    $updated += $this->processChannelChunk($channels, $customColumn);
+            Series::query()
+                ->when(!$this->all_series && $this->series_id, fn($query) => $query->where('id', $this->series_id))
+                ->chunkById(1000, function ($series) use (&$updated) {
+                    $updated += $this->processSeriesChunk($series);
                 });
         } else {
             // Process the provided collection in chunks
-            $this->channels
+            $this->series
                 ->chunk(1000)
-                ->each(function ($chunk) use ($customColumn, &$updated) {
-                    $updated += $this->processChannelChunk($chunk, $customColumn);
+                ->each(function ($chunk) use (&$updated) {
+                    $updated += $this->processSeriesChunk($chunk);
                 });
         }
 
@@ -66,30 +65,29 @@ class EpgChannelFindAndReplace implements ShouldQueue
         Notification::make()
             ->success()
             ->title('Find & Replace completed')
-            ->body("Epg Channel find & replace has completed successfully. {$updated} epg channels updated.")
+            ->body("Series find & replace has completed successfully. {$updated} series updated.")
             ->broadcast($user);
         Notification::make()
             ->success()
             ->title('Find & Replace completed')
-            ->body("Epg Channel find & replace has completed successfully. Operation completed in {$completedInRounded} seconds and updated {$updated} epg channels.")
+            ->body("Series find & replace has completed successfully. Operation completed in {$completedInRounded} seconds and updated {$updated} series.")
             ->sendToDatabase($user);
     }
 
     /**
-     * Process a chunk of channels and perform find/replace operations
+     * Process a chunk of series and perform find/replace operations
      */
-    private function processChannelChunk($channels, string $customColumn): int
+    private function processSeriesChunk($series): int
     {
         $updatesMap = [];
         $find = $this->find_replace;
         $replace = $this->replace_with;
 
-        foreach ($channels as $channel) {
-            $providerValue = $channel->{$this->column};
-            $customValue = $channel->{$customColumn};
+        foreach ($series as $s) {
+            $providerValue = $s->{$this->column};
 
             // Get the value we're modifying
-            $valueToModify = $customValue ?? $providerValue;
+            $valueToModify = $providerValue;
 
             // Check if the value to modify is empty
             if (empty($valueToModify)) {
@@ -123,7 +121,7 @@ class EpgChannelFindAndReplace implements ShouldQueue
             }
 
             if ($newValue && $newValue !== $valueToModify) {
-                $updatesMap[$channel->id] = $newValue;
+                $updatesMap[$s->id] = $newValue;
             }
         }
 
@@ -141,8 +139,8 @@ class EpgChannelFindAndReplace implements ShouldQueue
 
             // Execute batch update using raw SQL for better performance
             DB::statement("
-                UPDATE epg_channels 
-                SET {$customColumn} = CASE id {$caseStatement} END,
+                UPDATE series 
+                SET {$this->column} = CASE id {$caseStatement} END,
                     updated_at = ?
                 WHERE id IN (" . implode(',', $ids) . ")
             ", [now()]);

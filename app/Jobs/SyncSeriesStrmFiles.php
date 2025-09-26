@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Facades\ProxyFacade;
 use App\Models\Series;
+use App\Models\User;
 use App\Settings\GeneralSettings;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -18,8 +19,11 @@ class SyncSeriesStrmFiles implements ShouldQueue
      * Create a new job instance.
      */
     public function __construct(
-        public Series $series,
-        public bool $notify = true
+        public ?Series $series = null,
+        public bool $notify = true,
+        public bool $all_playlists = false,
+        public ?int $playlist_id = null,
+        public ?int $user_id = null,
     ) {
         //
     }
@@ -31,6 +35,42 @@ class SyncSeriesStrmFiles implements ShouldQueue
     {
         // Get all the series episodes
         $series = $this->series;
+        if ($series) {
+            $this->fetchMetadataForSeries($series, $settings);
+        } else {
+            // Disable notifications for bulk processing
+            $this->notify = false;
+
+            // Process all series in chunks
+            Series::query()
+                ->where('enabled', true)
+                ->when($this->playlist_id, function ($query) {
+                    $query->where('playlist_id', $this->playlist_id);
+                })
+                ->with(['enabled_episodes', 'playlist', 'user', 'category'])
+                ->chunkById(100, function ($seriesChunk) use ($settings) {
+                    foreach ($seriesChunk as $series) {
+                        $this->fetchMetadataForSeries($series, $settings);
+                    }
+                });
+
+            // Notify the user we're done!
+            if ($this->user_id) {
+                $user = User::find($this->user_id);
+                if ($user) {
+                    Notification::make()
+                        ->success()
+                        ->title("Sync .strm files for series completed")
+                        ->body("Sync completed for all series.")
+                        ->broadcast($user)
+                        ->sendToDatabase($user);
+                }
+            }
+        }
+    }
+
+    private function fetchMetadataForSeries(Series $series, $settings)
+    {
         $series->load('enabled_episodes', 'playlist', 'user', 'category');
 
         $playlist = $series->playlist;
