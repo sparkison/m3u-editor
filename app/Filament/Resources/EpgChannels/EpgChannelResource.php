@@ -13,13 +13,22 @@ use App\Filament\Resources\EpgChannels\Pages\ListEpgChannels;
 use Filament\Forms\Components\TextInput;
 use App\Filament\Resources\EpgChannelResource\Pages;
 use App\Filament\Resources\EpgChannelResource\RelationManagers;
+use App\Jobs\EpgChannelFindAndReplace;
+use App\Jobs\EpgChannelFindAndReplaceReset;
 use App\Models\EpgChannel;
+use Filament\Actions\BulkAction;
+use Filament\Actions\BulkActionGroup;
 use Filament\Forms;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Database\Eloquent\Collection;
 
 class EpgChannelResource extends Resource
 {
@@ -70,20 +79,29 @@ class EpgChannelResource extends Resource
             ->defaultPaginationPageOption(25)
             ->recordAction(null)
             ->columns([
-                ImageColumn::make('icon')
+                ImageColumn::make('logo')
+                    ->label('Logo')
                     ->checkFileExistence(false)
-                    ->toggleable()
-                    ->height(30)
-                    ->width('auto'),
-                TextInputColumn::make('display_name')
-                    ->sortable()
+                    ->size('inherit', 'inherit')
+                    ->extraImgAttributes(fn($record): array => [
+                        'style' => 'height:2.5rem; width:auto; border-radius:4px;', // Live channel style
+                    ])
+                    ->getStateUsing(fn($record) => $record->icon_custom ?? $record->icon)
+                    ->toggleable(),
+                TextInputColumn::make('display_name_custom')
+                    ->label('Display Name')
+                    ->rules(['min:0', 'max:255'])
                     ->tooltip(fn($record) => $record->display_name)
-                    ->toggleable()
-                    ->searchable(),
-                TextColumn::make('name')
-                    ->limit(40)
-                    ->sortable()
-                    ->searchable(),
+                    ->placeholder(fn($record) => $record->display_name)
+                    ->searchable()
+                    ->toggleable(),
+                TextInputColumn::make('name_custom')
+                    ->label('Name')
+                    ->rules(['min:0', 'max:255'])
+                    ->tooltip(fn($record) => $record->name)
+                    ->placeholder(fn($record) => $record->name)
+                    ->searchable()
+                    ->toggleable(),
                 TextColumn::make('lang')
                     ->sortable()
                     ->toggleable()
@@ -126,9 +144,100 @@ class EpgChannelResource extends Resource
                     ->hiddenLabel(),
             ], position: RecordActionsPosition::BeforeCells)
             ->toolbarActions([
-                // Tables\Actions\BulkActionGroup::make([
-                //     Tables\Actions\DeleteBulkAction::make(),
-                // ]),
+                BulkActionGroup::make([
+                    BulkAction::make('find-replace')
+                        ->label('Find & Replace')
+                        ->schema([
+                            Toggle::make('use_regex')
+                                ->label('Use Regex')
+                                ->live()
+                                ->helperText('Use regex patterns to find and replace. If disabled, will use direct string comparison.')
+                                ->default(true),
+                            Select::make('column')
+                                ->label('Column to modify')
+                                ->options([
+                                    'icon' => 'Channel Icon',
+                                    'name' => 'Channel Name',
+                                    'display_name' => 'Display Name',
+                                ])
+                                ->default('title')
+                                ->required()
+                                ->columnSpan(1),
+                            TextInput::make('find_replace')
+                                ->label(fn(Get $get) =>  !$get('use_regex') ? 'String to replace' : 'Pattern to replace')
+                                ->required()
+                                ->placeholder(
+                                    fn(Get $get) => $get('use_regex')
+                                        ? '^(US- |UK- |CA- )'
+                                        : 'US -'
+                                )->helperText(
+                                    fn(Get $get) => !$get('use_regex')
+                                        ? 'This is the string you want to find and replace.'
+                                        : 'This is the regex pattern you want to find. Make sure to use valid regex syntax.'
+                                ),
+                            TextInput::make('replace_with')
+                                ->label('Replace with (optional)')
+                                ->placeholder('Leave empty to remove')
+
+                        ])
+                        ->action(function (Collection $records, array $data): void {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new EpgChannelFindAndReplace(
+                                    user_id: auth()->id(), // The ID of the user who owns the content
+                                    use_regex: $data['use_regex'] ?? true,
+                                    column: $data['column'] ?? 'title',
+                                    find_replace: $data['find_replace'] ?? null,
+                                    replace_with: $data['replace_with'] ?? '',
+                                    channels: $records
+                                ));
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Find & Replace started')
+                                ->body('Find & Replace working in the background. You will be notified once the process is complete.')
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-magnifying-glass')
+                        ->color('gray')
+                        ->modalIcon('heroicon-o-magnifying-glass')
+                        ->modalDescription('Select what you would like to find and replace in the selected epg channels.')
+                        ->modalSubmitActionLabel('Replace now'),
+                    BulkAction::make('find-replace-reset')
+                        ->label('Undo Find & Replace')
+                        ->schema([
+                            Select::make('column')
+                                ->label('Column to reset')
+                                ->options([
+                                    'icon' => 'Channel Icon',
+                                    'name' => 'Channel Name',
+                                    'display_name' => 'Display Name',
+                                ])
+                                ->default('title')
+                                ->required()
+                                ->columnSpan(1),
+                        ])
+                        ->action(function (Collection $records, array $data): void {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new EpgChannelFindAndReplaceReset(
+                                    user_id: auth()->id(), // The ID of the user who owns the content
+                                    column: $data['column'] ?? 'title',
+                                    channels: $records
+                                ));
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Find & Replace reset started')
+                                ->body('Find & Replace reset working in the background. You will be notified once the process is complete.')
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-arrow-uturn-left')
+                        ->color('warning')
+                        ->modalIcon('heroicon-o-arrow-uturn-left')
+                        ->modalDescription('Reset Find & Replace results back to epg defaults for the selected epg channels. This will remove any custom values set in the selected column.')
+                        ->modalSubmitActionLabel('Reset now'),
+                ]),
             ]);
     }
 
@@ -151,21 +260,23 @@ class EpgChannelResource extends Resource
     public static function getForm(): array
     {
         return [
-            // Forms\Components\TextInput::make('name')
-            //     ->required()
-            //     ->maxLength(255),
-            TextInput::make('icon')
+            TextInput::make('icon_custom')
+                ->label('Icon')
+                ->columnSpan(1)
                 ->prefixIcon('heroicon-m-globe-alt')
-                ->url(),
-            TextInput::make('display_name')
-                ->maxLength(255),
-            // Forms\Components\TextInput::make('lang')
-            //     ->maxLength(255),
-            // Forms\Components\TextInput::make('channel_id')
-            //     ->maxLength(255),
-            // Forms\Components\Select::make('epg_id')
-            //     ->relationship('epg', 'name')
-            //     ->required(),
+                ->placeholder(fn($record) => $record?->icon)
+                ->helperText("Leave empty to use provider icon.")
+                ->type('url'),
+            TextInput::make('display_name_custom')
+                ->label('Display Name')
+                ->columnSpan(1)
+                ->placeholder(fn($record) => $record?->display_name)
+                ->helperText("Leave empty to use provider display name."),
+            TextInput::make('name_custom')
+                ->label('Name')
+                ->columnSpan(2)
+                ->placeholder(fn($record) => $record?->name)
+                ->helperText("Leave empty to use provider name."),
         ];
     }
 }

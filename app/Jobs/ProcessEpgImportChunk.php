@@ -62,13 +62,16 @@ class ProcessEpgImportChunk implements ShouldQueue
             // Upsert the channels
             EpgChannel::upsert($bulk, uniqueBy: ['name', 'channel_id', 'epg_id', 'user_id'], update: [
                 // Don't update the following fields...
-                // 'name',
-                // 'display_name',
-                // 'icon',
+                // 'name_custom',
+                // 'display_name_custom',
+                // 'icon_custom',
                 // 'epg_id',
                 // 'user_id',
                 // ...only update the following fields
                 'lang',
+                // 'name', // part of uniqueBy, so won't be updated
+                'display_name',
+                'icon',
                 'channel_id',
                 'import_batch_no',
                 'additional_display_names',

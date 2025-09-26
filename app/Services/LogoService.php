@@ -25,12 +25,19 @@ class LogoService
         } elseif ($channel->logo_type === ChannelLogoType::Channel) {
             $logoUrl = $channel->logo_internal;
         } else {
-            $logoUrl = $channel->epgChannel?->icon ?? $channel->logo ?? $channel->logo_internal;
+            $logoUrl = $channel->epgChannel?->icon_custom
+                ?? $channel->epgChannel?->icon
+                ?? $channel->logo
+                ?? $channel->logo_internal;
         }
 
         // Fallback to any available logo if preferred type is empty
         if (empty($logoUrl)) {
-            $logoUrl = $channel->logo ?? $channel->logo_internal ?? $channel->epgChannel?->icon ?? '';
+            $logoUrl = $channel->logo
+                ?? $channel->logo_internal
+                ?? $channel->epgChannel?->icon_custom
+                ?? $channel->epgChannel?->icon
+                ?? '';
         }
 
         // If still empty, return placeholder

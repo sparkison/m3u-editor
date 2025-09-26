@@ -219,7 +219,7 @@ class ListChannels extends ListRecords
                             ->placeholder('Leave empty to remove')
 
                     ])
-                    ->action(function (Collection $records, array $data): void {
+                    ->action(function (array $data): void {
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new ChannelFindAndReplace(
                                 user_id: auth()->id(), // The ID of the user who owns the content
