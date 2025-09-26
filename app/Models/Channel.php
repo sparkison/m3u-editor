@@ -197,7 +197,7 @@ class Channel extends Model
         return [];
     }
 
-    public function fetchMetadata($xtream = null)
+    public function fetchMetadata($xtream = null, $refresh = false)
     {
         try {
             if (! $xtream) {

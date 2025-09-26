@@ -45,6 +45,11 @@ class ChannelFindAndReplace implements ShouldQueue
                 $customColumn = 'logo';
                 $this->column = 'logo_internal'; // Use the internal logo column for find/replace
                 break;
+            case 'info->description':
+            case 'info->genre':
+                // These are JSON columns, so we'll be replacing the content directly
+                $customColumn = $this->column;
+                break;
             default:
                 // Most will use the same name appended with `_custom`
                 // e.g. `name_custom` for `name`
@@ -98,18 +103,26 @@ class ChannelFindAndReplace implements ShouldQueue
         $replace = $this->replace_with;
 
         foreach ($channels as $channel) {
-            $providerValue = $channel->{$this->column};
-            $customValue = $channel->{$customColumn};
+            $newValue = null;
 
-            // Get the value we're modifying
-            $valueToModify = $customValue ?? $providerValue;
+            // Check if this is a JSON column
+            if (str_starts_with($this->column, 'info->')) {
+                $jsonKey = str_replace('info->', '', $this->column);
+
+                // Get the value we're modifying
+                $valueToModify = $channel->info[$jsonKey === 'description' ? 'description' : 'genre'] ?? null;
+            } else {
+                $providerValue = $channel->{$this->column};
+                $customValue = $channel->{$customColumn};
+
+                // Get the value we're modifying
+                $valueToModify = $customValue ?? $providerValue;
+            }
 
             // Check if the value to modify is empty
             if (empty($valueToModify)) {
                 continue;
             }
-
-            $newValue = null;
 
             // Determine the value to replace
             if ($this->use_regex) {
@@ -140,29 +153,83 @@ class ChannelFindAndReplace implements ShouldQueue
             }
         }
 
-        // Perform batch update if we have changes
         if (!empty($updatesMap)) {
-            // Build the update cases for batch update
-            $cases = [];
-            $ids = array_keys($updatesMap);
+            return $this->performBatchUpdate($updatesMap, $customColumn);
+        }
 
+        return 0;
+    }
+
+    /**
+     * Perform batch update with database-specific JSON handling
+     */
+    private function performBatchUpdate(array $updatesMap, string $customColumn): int
+    {
+        $ids = array_keys($updatesMap);
+
+        if (str_starts_with($this->column, 'info->')) {
+            $jsonKey = str_replace('info->', '', $this->column);
+            $driver = DB::connection()->getDriverName();
+
+            if ($driver === 'sqlite') {
+                // SQLite JSON update using json_set
+                $cases = [];
+                foreach ($updatesMap as $id => $value) {
+                    $cases[] = "WHEN {$id} THEN json_set(COALESCE(info, '{}'), '$.{$jsonKey}', " . DB::connection()->getPdo()->quote($value) . ")";
+                }
+                $caseStatement = implode(' ', $cases);
+
+                DB::statement("
+                    UPDATE channels 
+                    SET info = CASE id {$caseStatement} END,
+                        updated_at = ?
+                    WHERE id IN (" . implode(',', $ids) . ")
+                ", [now()]);
+            } elseif ($driver === 'pgsql') {
+                // PostgreSQL JSON update using jsonb_set
+                $cases = [];
+                foreach ($updatesMap as $id => $value) {
+                    $cases[] = "WHEN {$id} THEN jsonb_set(COALESCE(info, '{}'), '{" . $jsonKey . "}', " . DB::connection()->getPdo()->quote(json_encode($value)) . ")";
+                }
+                $caseStatement = implode(' ', $cases);
+
+                DB::statement("
+                    UPDATE channels 
+                    SET info = CASE id {$caseStatement} END,
+                        updated_at = ?
+                    WHERE id IN (" . implode(',', $ids) . ")
+                ", [now()]);
+            } else {
+                // MySQL/MariaDB JSON update using JSON_SET
+                $cases = [];
+                foreach ($updatesMap as $id => $value) {
+                    $cases[] = "WHEN {$id} THEN JSON_SET(COALESCE(info, '{}'), '$.{$jsonKey}', " . DB::connection()->getPdo()->quote($value) . ")";
+                }
+                $caseStatement = implode(' ', $cases);
+
+                DB::statement("
+                    UPDATE channels 
+                    SET info = CASE id {$caseStatement} END,
+                        updated_at = ?
+                    WHERE id IN (" . implode(',', $ids) . ")
+                ", [now()]);
+            }
+        } else {
+            // Regular column update
+            $cases = [];
             foreach ($updatesMap as $id => $value) {
                 $cases[] = "WHEN {$id} THEN " . DB::connection()->getPdo()->quote($value);
             }
-
             $caseStatement = implode(' ', $cases);
 
-            // Execute batch update using raw SQL for better performance
             DB::statement("
                 UPDATE channels 
                 SET {$customColumn} = CASE id {$caseStatement} END,
                     updated_at = ?
                 WHERE id IN (" . implode(',', $ids) . ")
             ", [now()]);
-
-            return count($updatesMap);
         }
 
-        return 0;
+        return count($updatesMap);
     }
 }

@@ -22,6 +22,8 @@ use App\Filament\Exports\ChannelExporter;
 use App\Filament\Imports\ChannelImporter;
 use App\Filament\Resources\Vods\VodResource;
 use App\Filament\Resources\EpgMaps\EpgMapResource;
+use App\Jobs\ProcessVodChannels;
+use App\Jobs\SyncVodStrmFiles;
 use App\Models\Channel;
 use App\Models\Epg;
 use App\Models\Playlist;
@@ -146,6 +148,71 @@ class ListVod extends ListRecords
                     ->modalIcon('heroicon-o-arrows-pointing-out')
                     ->modalDescription('Unmerge all channels with the same ID, removing all failover relationships.')
                     ->modalSubmitActionLabel('Unmerge now'),
+
+                Action::make('process_vod')
+                    ->label('Fetch Metadata')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->schema([
+                        Toggle::make('overwrite_existing')
+                            ->label('Overwrite Existing Metadata')
+                            ->helperText('Overwrite existing metadata? If disabled, it will only fetch and process metadata if it does not already exist.')
+                            ->default(false),
+                        Select::make('playlist')
+                            ->label('Playlist')
+                            ->required()
+                            ->helperText('Select the Playlist you would like to fetch VOD metadata for.')
+                            ->options(Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                            ->searchable(),
+                    ])
+                    ->action(function ($data) {
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new ProcessVodChannels(
+                                force: $data['overwrite_existing'] ?? false,
+                                playlist: $data['playlist'] ?? null,
+                            ));
+                    })
+                    ->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title("Fetching VOD metadata for playlist")
+                            ->body('The VOD metadata fetching and processing has been started. You will be notified when it is complete.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->modalIcon('heroicon-o-arrow-down-tray')
+                    ->modalDescription('Fetch and process VOD metadata for the selected Playlist? Only enabled VOD channels will be processed.')
+                    ->modalSubmitActionLabel('Yes, process now'),
+                Action::make('sync')
+                    ->label('Sync VOD .strm files')
+                    ->schema([
+                        Select::make('playlist')
+                            ->label('Playlist')
+                            ->required()
+                            ->helperText('Select the Playlist you would like to fetch VOD metadata for.')
+                            ->options(Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                            ->searchable(),
+                    ])
+                    ->action(function ($data) {
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new SyncVodStrmFiles(
+                                playlist: $data['playlist'] ?? null,
+                            ));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('.strm files are being synced for selected VOD channels')
+                            ->body('You will be notified once complete.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->modalIcon('heroicon-o-document-arrow-down')
+                    ->modalDescription('Sync selected VOD .strm files now? This will generate .strm files for the selected VOD channels at the path set for the channels.')
+                    ->modalSubmitActionLabel('Yes, sync now'),
+
                 Action::make('map')
                     ->label('Map EPG to Playlist')
                     ->schema(EpgMapResource::getForm())
@@ -197,6 +264,8 @@ class ListVod extends ListRecords
                             ->options([
                                 'title' => 'Channel Title',
                                 'name' => 'Channel Name (tvg-name)',
+                                'info->description' => 'Description (metadata)',
+                                'info->genre' => 'Genre (metadata)',
                             ])
                             ->default('title')
                             ->required()
@@ -218,7 +287,7 @@ class ListVod extends ListRecords
                             ->placeholder('Leave empty to remove')
 
                     ])
-                    ->action(function (Collection $records, array $data): void {
+                    ->action(function (array $data): void {
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new ChannelFindAndReplace(
                                 user_id: auth()->id(), // The ID of the user who owns the content
@@ -269,7 +338,7 @@ class ListVod extends ListRecords
                             ->required()
                             ->columnSpan(1),
                     ])
-                    ->action(function (Collection $records, array $data): void {
+                    ->action(function (array $data): void {
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new ChannelFindAndReplaceReset(
                                 user_id: auth()->id(), // The ID of the user who owns the content

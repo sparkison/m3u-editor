@@ -270,7 +270,7 @@ class ListChannels extends ListRecords
                             ->required()
                             ->columnSpan(1),
                     ])
-                    ->action(function (Collection $records, array $data): void {
+                    ->action(function (array $data): void {
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new ChannelFindAndReplaceReset(
                                 user_id: auth()->id(), // The ID of the user who owns the content

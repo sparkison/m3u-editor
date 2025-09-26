@@ -1042,9 +1042,9 @@ class XtreamApiController extends Controller
                 return response()->json(['error' => 'VOD not found'], 404);
             }
 
-            // Check if VOD metadata has been fetched, and if so how recently
-            if (!$channel->last_metadata_fetch || $channel->last_metadata_fetch < now()->subDays(1)) {
-                // Either no metadata, or stale metadata
+            // Check if VOD metadata has been fetched
+            if (!$channel->last_metadata_fetch) {
+                // No metadata, fetch it!
                 $results = $channel->fetchMetadata();
                 if ($results === false) {
                     return response()->json(['error' => 'Failed to fetch VOD metadata'], 500);

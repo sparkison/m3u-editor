@@ -23,6 +23,7 @@ class SyncVodStrmFiles implements ShouldQueue
         public bool $notify = true,
         public ?Channel $channel = null,
         public ?Collection $channels = null,
+        public ?Playlist $playlist = null,
     ) {
         //
     }
@@ -44,6 +45,14 @@ class SyncVodStrmFiles implements ShouldQueue
             $channels = $this->channels ?? collect();
             if ($this->channel) {
                 $channels->push($this->channel);
+            } else if ($this->playlist) {
+                $channels = $this->playlist->channels()
+                    ->where([
+                        ['is_vod', true],
+                        ['enabled', true],
+                        ['source_id', '!=', null],
+                    ])
+                    ->get();
             }
 
             // Loop through each channel and sync

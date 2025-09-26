@@ -404,9 +404,18 @@ class VodResource extends Resource
                 Action::make('process_vod')
                     ->label('Fetch Metadata')
                     ->icon('heroicon-o-arrow-down-tray')
+                    ->schema([
+                        Toggle::make('overwrite_existing')
+                            ->label('Overwrite Existing Metadata')
+                            ->helperText('Overwrite existing metadata? If disabled, it will only fetch and process metadata if it does not already exist.')
+                            ->default(false),
+                    ])
                     ->action(function ($record) {
                         app('Illuminate\Contracts\Bus\Dispatcher')
-                            ->dispatch(new ProcessVodChannels(channel: $record));
+                            ->dispatch(new ProcessVodChannels(
+                                channel: $record,
+                                force: $record->overwrite_existing ?? false
+                            ));
                     })->after(function () {
                         Notification::make()
                             ->success()
@@ -553,13 +562,22 @@ class VodResource extends Resource
                 BulkAction::make('process_vod')
                     ->label('Fetch Metadata')
                     ->icon('heroicon-o-arrow-down-tray')
-                    ->action(function ($records) {
+                    ->schema([
+                        Toggle::make('overwrite_existing')
+                            ->label('Overwrite Existing Metadata')
+                            ->helperText('Overwrite existing metadata? If disabled, it will only fetch and process metadata if it does not already exist.')
+                            ->default(false),
+                    ])
+                    ->action(function ($records, $data) {
                         $count = 0;
                         foreach ($records as $record) {
                             if ($record->is_vod) {
                                 $count++;
                                 app('Illuminate\Contracts\Bus\Dispatcher')
-                                    ->dispatch(new ProcessVodChannels(channel: $record));
+                                    ->dispatch(new ProcessVodChannels(
+                                        channel: $record,
+                                        force: $data['overwrite_existing'] ?? false
+                                    ));
                             }
                         }
 
@@ -574,7 +592,7 @@ class VodResource extends Resource
                     ->requiresConfirmation()
                     ->icon('heroicon-o-arrow-down-tray')
                     ->modalIcon('heroicon-o-arrow-down-tray')
-                    ->modalDescription('Fetch and process VOD metadata for the selected channels? Only VOD channels will be processed.')
+                    ->modalDescription('Fetch and process VOD metadata for the selected channels? Only enabled VOD channels will be processed.')
                     ->modalSubmitActionLabel('Yes, process now'),
                 BulkAction::make('sync')
                     ->label('Sync VOD .strm files')
@@ -761,6 +779,8 @@ class VodResource extends Resource
                             ->options([
                                 'title' => 'Channel Title',
                                 'name' => 'Channel Name (tvg-name)',
+                                'info->description' => 'Description (metadata)',
+                                'info->genre' => 'Genre (metadata)',
                             ])
                             ->default('title')
                             ->required()
@@ -1322,8 +1342,7 @@ class VodResource extends Resource
                         ->label('YouTube Trailer')
                         ->helperText('YouTube trailer URL or ID.')
                         ->placeholder('https://www.youtube.com/watch?v=abc123')
-                        ->type('url')
-                        ->rules(['nullable', 'url', 'max:500']),
+                        ->rules(['nullable', 'max:500']),
 
                     // Images
                     TextInput::make('info.cover_big')
