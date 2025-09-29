@@ -16,6 +16,7 @@ use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Log;
 
 class ProcessM3uImportComplete implements ShouldQueue
 {
@@ -318,6 +319,26 @@ class ProcessM3uImportComplete implements ShouldQueue
                 ->orderBy('created_at', 'asc')
                 ->limit($syncStatusQuery->count() - $this->maxLogs)
                 ->delete();
+        }
+
+        // Auto-merge channels with same Stream ID if enabled
+        if ($playlist->auto_merge_channels) {
+            try {
+                dispatch(new \App\Jobs\MergeChannels(
+                    user: $user,
+                    playlists: collect([$playlist->id]),
+                    playlistId: $playlist->id,
+                    checkResolution: false,
+                    disableFallbackChannels: $playlist->disable_fallback_channels,
+                ));
+                
+                Log::info("Auto-merge channels job dispatched for playlist {$playlist->id}");
+            } catch (\Exception $e) {
+                Log::error("Auto-merge channels failed for playlist {$playlist->id}: {$e->getMessage()}", [
+                    'exception' => $e,
+                    'playlist_id' => $playlist->id,
+                ]);
+            }
         }
 
         // Determine if syncing series metadata as well
