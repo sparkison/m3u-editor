@@ -24,6 +24,7 @@ class MergeChannels implements ShouldQueue
         public Collection $playlists,
         public int $playlistId,
         public bool $checkResolution = false,
+        public bool $disableFallbackChannels = false,
     ) {}
 
     /**
@@ -91,6 +92,11 @@ class MergeChannels implements ShouldQueue
                     ['user_id' => $this->user->id]
                 );
                 $processed++;
+
+                // Optionally disable fallback channels if requested
+                if ($this->disableFallbackChannels) {
+                    $failover->update(['enabled' => false]);
+                }
             }
         }
 
