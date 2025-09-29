@@ -70,10 +70,10 @@ class SyncVodStrmFiles implements ShouldQueue
                 }
 
                 // Setup episode prefix
-                $group = preg_replace('/[^a-zA-Z0-9_\-]/', ' ', $channel->group);
+                $group = $this->makeFilesystemSafe($channel->group);
 
                 // Create the .strm file
-                $title = preg_replace('/[^a-zA-Z0-9_\-]/', ' ', $channel->title);
+                $title = $this->makeFilesystemSafe($channel->title);
                 $fileName = "{$title}.strm";
 
                 // Create the season folder
@@ -114,5 +114,26 @@ class SyncVodStrmFiles implements ShouldQueue
             // Log the exception or handle it as needed
             Log::error('Error syncing VOD .strm files: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Make a string safe for filesystem use while preserving Unicode characters like umlauts
+     * 
+     * @param string $name The original name
+     * @return string Filesystem-safe name
+     */
+    private function makeFilesystemSafe(string $name): string
+    {
+        // Replace filesystem-unsafe characters but preserve Unicode characters
+        $unsafe = ['/', '\\', ':', '*', '?', '"', '<', '>', '|', "\0"];
+        $safe = str_replace($unsafe, ' ', $name);
+        
+        // Remove multiple spaces and trim
+        $safe = preg_replace('/\s+/', ' ', trim($safe));
+        
+        // Remove leading/trailing dots (Windows limitation)
+        $safe = trim($safe, '. ');
+        
+        return $safe ?: 'Unnamed';
     }
 }
