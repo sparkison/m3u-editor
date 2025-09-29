@@ -320,6 +320,26 @@ class ProcessM3uImportComplete implements ShouldQueue
                 ->delete();
         }
 
+        // Auto-merge channels with same Stream ID if enabled
+        if ($playlist->auto_merge_channels) {
+            try {
+                dispatch(new \App\Jobs\MergeChannels(
+                    user: $user,
+                    playlists: collect([$playlist->id]),
+                    playlistId: $playlist->id,
+                    checkResolution: false,
+                    disableFallbackChannels: $playlist->disable_fallback_channels ?? false,
+                ));
+                
+                Log::info("Auto-merge channels job dispatched for playlist {$playlist->id}");
+            } catch (\Exception $e) {
+                Log::error("Auto-merge channels failed for playlist {$playlist->id}: {$e->getMessage()}", [
+                    'exception' => $e,
+                    'playlist_id' => $playlist->id,
+                ]);
+            }
+        }
+
         // Determine if syncing series metadata as well
         if ($playlist->auto_fetch_series_metadata && $playlist->series()->where('enabled', true)->exists()) {
             // Process series import
