@@ -22,6 +22,7 @@ return [
     'max_channels' => env('MAX_CHANNELS', 50000), // Maximum number of channels allowed for m3u import
     'invalidate_import' => env('INVALIDATE_IMPORT', null), // Invalidate import if number of "new" channels is less than the current count (minus `INVALIDATE_IMPORT_THRESHOLD`)
     'invalidate_import_threshold' => env('INVALIDATE_IMPORT_THRESHOLD', null), // Threshold for invalidating import
+    'default_epg_days' => env('DEFAULT_EPG_DAYS', 7), // Default number of days to fetch for EPG generation
     'crypto_addresses' => [
         [
             'name' => 'Bitcoin',
