@@ -101,7 +101,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 // Remove any special characters from the category name
                 $category = $series->category;
                 $catName = $category->name ?? $category->name_internal ?? 'Uncategorized';
-                $cleanName = preg_replace('/[^a-zA-Z0-9_\-]/', ' ', $catName);
+                $cleanName = $this->makeFilesystemSafe($catName);
                 $path .= '/' . $cleanName;
                 if (!is_dir($path)) {
                     mkdir($path, 0777, true);
@@ -112,7 +112,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
             if ($sync_settings['include_series'] ?? true) {
                 // Create the series folder
                 // Remove any special characters from the series name
-                $cleanName = preg_replace('/[^a-zA-Z0-9_\-]/', ' ', $series->name);
+                $cleanName = $this->makeFilesystemSafe($series->name);
                 $path .= '/' . $cleanName;
                 if (!is_dir($path)) {
                     mkdir($path, 0777, true);
@@ -127,7 +127,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 $prefx = "S" . str_pad($season, 2, '0', STR_PAD_LEFT) . "E{$num}";
 
                 // Create the .strm file
-                $fileName = preg_replace('/[^a-zA-Z0-9_\-]/', ' ', "{$prefx} - {$ep->title}");
+                $fileName = $this->makeFilesystemSafe("{$prefx} - {$ep->title}");
                 $fileName = "{$fileName}.strm";
 
                 // Create the season folder
@@ -180,5 +180,26 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 ->broadcast($series->user)
                 ->sendToDatabase($series->user);
         }
+    }
+
+    /**
+     * Make a string safe for filesystem use while preserving Unicode characters like umlauts
+     * 
+     * @param string $name The original name
+     * @return string Filesystem-safe name
+     */
+    private function makeFilesystemSafe(string $name): string
+    {
+        // Replace filesystem-unsafe characters but preserve Unicode characters
+        $unsafe = ['/', '\\', ':', '*', '?', '"', '<', '>', '|', "\0"];
+        $safe = str_replace($unsafe, ' ', $name);
+        
+        // Remove multiple spaces and trim
+        $safe = preg_replace('/\s+/', ' ', trim($safe));
+        
+        // Remove leading/trailing dots (Windows limitation)
+        $safe = trim($safe, '. ');
+        
+        return $safe ?: 'Unnamed';
     }
 }
