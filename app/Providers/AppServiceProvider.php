@@ -269,6 +269,15 @@ class AppServiceProvider extends ServiceProvider
                         $customPlaylist->removeShortUrls();
                         $customPlaylist->generateShortUrl();
                     }
+
+                    // Need to also update any tags with the new type
+                    $originalUuid = $customPlaylist->getOriginal('uuid');
+                    Tag::query()
+                        ->where('type', $originalUuid)
+                        ->update(['type' => $customPlaylist->uuid]);
+                    Tag::query()
+                        ->where('type', $originalUuid . '-category')
+                        ->update(['type' => $customPlaylist->uuid . '-category']);
                 }
                 return $customPlaylist;
             });
