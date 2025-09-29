@@ -62,6 +62,9 @@ class MergeChannels implements ShouldQueue
             return strtolower(trim($streamId));
         });
 
+        // Collect IDs for bulk operations if disabling fallback channels
+        $channelsToDisable = [];
+
         // Process each group of channels with the same stream ID
         foreach ($groupedChannels as $streamId => $group) {
             if ($group->count() <= 1) {
@@ -93,11 +96,16 @@ class MergeChannels implements ShouldQueue
                 );
                 $processed++;
 
-                // Optionally disable fallback channels if requested
+                // Collect IDs for bulk disable operation
                 if ($this->disableFallbackChannels) {
-                    $failover->update(['enabled' => false]);
+                    $channelsToDisable[] = $failover->id;
                 }
             }
+        }
+
+        // Perform bulk update to disable fallback channels if requested
+        if ($this->disableFallbackChannels && !empty($channelsToDisable)) {
+            Channel::whereIn('id', $channelsToDisable)->update(['enabled' => false]);
         }
 
         $this->sendCompletionNotification($processed);
