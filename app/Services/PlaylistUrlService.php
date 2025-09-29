@@ -25,6 +25,14 @@ class PlaylistUrlService
             return $channel->url_custom;
         }
 
+        // Check if custom channel
+        if ($channel->is_custom) {
+            // If the URLs are empty, then set the channel to the first failover (if any assigned)
+            if (empty($channel->url) && $channel->failovers()->exists()) {
+                $channel = $channel->failovers()->first();
+            }
+        }
+
         // If context is a PlaylistAlias, transform the URL (custom channels will retain their custom URL)
         if ($context instanceof PlaylistAlias) {
             return $context->transformChannelUrl($channel);
