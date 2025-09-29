@@ -22,6 +22,9 @@
                     document.body.removeChild(el);
                     copied = true; setTimeout(() => copied = false, 1500);
                 }
+                if (copied) {
+                    showNotification('IP address copied to clipboard', 'success');
+                }
             "
         >{{ $externalIp }}</code>
         
@@ -41,6 +44,9 @@
                     document.execCommand('copy');
                     document.body.removeChild(el);
                     copied = true; setTimeout(() => copied = false, 1500);
+                }
+                if (copied) {
+                    showNotification('IP address copied to clipboard', 'success');
                 }
             "
         >
