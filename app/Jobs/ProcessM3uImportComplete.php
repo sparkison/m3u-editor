@@ -16,6 +16,7 @@ use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Log;
 
 class ProcessM3uImportComplete implements ShouldQueue
 {
@@ -328,7 +329,7 @@ class ProcessM3uImportComplete implements ShouldQueue
                     playlists: collect([$playlist->id]),
                     playlistId: $playlist->id,
                     checkResolution: false,
-                    disableFallbackChannels: $playlist->disable_fallback_channels ?? false,
+                    disableFallbackChannels: $playlist->disable_fallback_channels,
                 ));
                 
                 Log::info("Auto-merge channels job dispatched for playlist {$playlist->id}");
