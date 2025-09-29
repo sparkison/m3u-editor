@@ -233,8 +233,10 @@ class EpgGenerateController extends Controller
                 if ($epg->is_cached) {
                     // Get all programmes from cache
                     $startDate = Carbon::now()->subDays(1)->format('Y-m-d');
+                    $epgDays = config('dev.default_epg_days', 7);
+                    $epgDays = is_numeric($epgDays) && $epgDays > 0 ? (int) $epgDays : 7;
                     $endDate = Carbon::now()
-                        ->addDays(config('dev.default_epg_days', 7))
+                        ->addDays($epgDays)
                         ->format('Y-m-d');
 
                     // Get all channel IDs that this EPG should map to
