@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Route;
 Route::post('/admin/refresh-external-ip', function (ExternalIpService $ipService) {
     $ipService->clearCache();
     $ip = $ipService->getExternalIp();
-    return response()->json(['success' => true, 'external_ip' => $ip]);
+    return response()->json(['success' => true, 'external_ip' => "123.111.222.333"]);
 })->middleware(['auth']);
 
 // Handle short URLs with optional path forwarding (e.g. /s/{key}/device.xml)

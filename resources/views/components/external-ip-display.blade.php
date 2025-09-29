@@ -6,7 +6,7 @@
 <div class="flex items-center gap-2 px-3 py-1 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
     <div class="flex items-center gap-1">
         <code 
-            class="px-2 py-1 text-xs font-mono bg-white dark:bg-gray-900 rounded text-gray-800 dark:text-gray-200 select-all cursor-pointer"
+            class="px-2 py-1.5 text-xs font-mono bg-white dark:bg-gray-900 rounded text-gray-800 dark:text-gray-200 select-all cursor-pointer"
             x-tooltip="'WAN IP, Click to copy'"
             x-on:click="
                 if (window.navigator && window.navigator.clipboard && window.navigator.clipboard.writeText) {
