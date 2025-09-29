@@ -1076,6 +1076,20 @@ class PlaylistResource extends Resource
                         ->type('number')
                         ->hidden(fn(Get $get): bool => !$get('auto_channel_increment'))
                         ->required(),
+                    Forms\Components\Toggle::make('auto_merge_channels')
+                        ->label('Automatically merge channels with same Stream ID')
+                        ->columnSpan(1)
+                        ->inline(false)
+                        ->live()
+                        ->default(false)
+                        ->helperText('After each playlist sync, automatically merge channels with identical Stream IDs and create failover relationships.'),
+                    Forms\Components\Toggle::make('disable_fallback_channels')
+                        ->label('Disable fallback channels after merge')
+                        ->columnSpan(1)
+                        ->inline(false)
+                        ->default(false)
+                        ->hidden(fn(Get $get): bool => !$get('auto_merge_channels'))
+                        ->helperText('When merging channels, automatically disable the fallback channels, leaving only the master channel enabled.'),
                 ]),
             Forms\Components\Section::make('Streaming Output')
                 ->description('Output processing options')
