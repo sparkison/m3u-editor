@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Facades\ProxyFacade;
 use App\Models\Channel;
 use App\Models\Playlist;
+use App\Services\PlaylistService;
 use App\Settings\GeneralSettings;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -79,10 +80,10 @@ class SyncVodStrmFiles implements ShouldQueue
                 }
 
                 // Setup episode prefix
-                $group = preg_replace('/[^a-zA-Z0-9_\-]/', ' ', $channel->group);
+                $group = PlaylistService::makeFilesystemSafe($channel->group);
 
                 // Create the .strm file
-                $title = preg_replace('/[^a-zA-Z0-9_\-]/', ' ', $channel->title);
+                $title = PlaylistService::makeFilesystemSafe($channel->title);
                 $fileName = "{$title}.strm";
 
                 // Create the season folder

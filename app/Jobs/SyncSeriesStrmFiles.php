@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Facades\ProxyFacade;
 use App\Models\Series;
 use App\Models\User;
+use App\Services\PlaylistService;
 use App\Settings\GeneralSettings;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -141,7 +142,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 // Remove any special characters from the category name
                 $category = $series->category;
                 $catName = $category->name ?? $category->name_internal ?? 'Uncategorized';
-                $cleanName = preg_replace('/[^a-zA-Z0-9_\-]/', ' ', $catName);
+                $cleanName = PlaylistService::makeFilesystemSafe($catName);
                 $path .= '/' . $cleanName;
                 if (!is_dir($path)) {
                     mkdir($path, 0777, true);
@@ -152,7 +153,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
             if ($sync_settings['include_series'] ?? true) {
                 // Create the series folder
                 // Remove any special characters from the series name
-                $cleanName = preg_replace('/[^a-zA-Z0-9_\-]/', ' ', $series->name);
+                $cleanName = PlaylistService::makeFilesystemSafe($series->name);
                 $path .= '/' . $cleanName;
                 if (!is_dir($path)) {
                     mkdir($path, 0777, true);
@@ -167,7 +168,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 $prefx = "S" . str_pad($season, 2, '0', STR_PAD_LEFT) . "E{$num}";
 
                 // Create the .strm file
-                $fileName = preg_replace('/[^a-zA-Z0-9_\-]/', ' ', "{$prefx} - {$ep->title}");
+                $fileName = PlaylistService::makeFilesystemSafe("{$prefx} - {$ep->title}");
                 $fileName = "{$fileName}.strm";
 
                 // Create the season folder

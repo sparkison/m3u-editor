@@ -212,8 +212,8 @@ class PlaylistService
 
     public static function getChannelBaseUrl(Playlist|PlaylistAlias $source, $channelId): string
     {
-        $config = $source instanceof PlaylistAlias 
-            ? $source->getEffectiveXtreamConfig() 
+        $config = $source instanceof PlaylistAlias
+            ? $source->getEffectiveXtreamConfig()
             : $source->xtream_config;
 
         if (!$config) {
@@ -229,8 +229,8 @@ class PlaylistService
 
     public static function getSeriesBaseUrl(Playlist|PlaylistAlias $source, $seriesId): string
     {
-        $config = $source instanceof PlaylistAlias 
-            ? $source->getEffectiveXtreamConfig() 
+        $config = $source instanceof PlaylistAlias
+            ? $source->getEffectiveXtreamConfig()
             : $source->xtream_config;
 
         if (!$config) {
@@ -242,6 +242,21 @@ class PlaylistService
         $password = $config['password'];
 
         return "{$baseUrl}/series/{$username}/{$password}/{$seriesId}";
+    }
+
+    public static function makeFilesystemSafe(string $name): string
+    {
+        // Replace filesystem-unsafe characters but preserve Unicode characters
+        $unsafe = ['/', '\\', ':', '*', '?', '"', '<', '>', '|', "\0"];
+        $safe = str_replace($unsafe, ' ', $name);
+
+        // Remove multiple spaces and trim
+        $safe = preg_replace('/\s+/', ' ', trim($safe));
+
+        // Remove leading/trailing dots (Windows limitation)
+        $safe = trim($safe, '. ');
+
+        return $safe ?: 'Unnamed';
     }
 
     /**
@@ -326,8 +341,8 @@ class PlaylistService
                                 'playlist',
                                 'customPlaylist'
                             ])->where('uuid', $password)
-                            ->where('enabled', true)
-                            ->firstOrFail();
+                                ->where('enabled', true)
+                                ->firstOrFail();
 
                             // Verify username matches playlist alias owner's name
                             if ($playlist->user->name === $username) {
