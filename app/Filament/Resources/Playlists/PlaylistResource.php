@@ -904,16 +904,12 @@ class PlaylistResource extends Resource
                         ->columnSpanFull()
                         ->hidden(fn(Get $get): bool => !$get('auto_merge_channels_enabled'))
                         ->schema([
-                            Toggle::make('auto_merge_config.check_resolution')
+                            static::makeToggle('auto_merge_config.check_resolution')
                                 ->label('Prioritize by resolution')
-                                ->helperText('When enabled, channels with higher resolution will be prioritized as master channels during merge. This process takes longer as stream resolution needs to be analyzed.')
-                                ->inline(false)
-                                ->default(false),
-                            Toggle::make('auto_merge_config.force_complete_remerge')
+                                ->helperText('When enabled, channels with higher resolution will be prioritized as master channels during merge. This process takes longer as stream resolution needs to be analyzed.'),
+                            static::makeToggle('auto_merge_config.force_complete_remerge')
                                 ->label('Force complete re-merge')
-                                ->helperText('When enabled, all channels will be re-evaluated during merge, including existing failover relationships. Disable this for better performance if you only want to merge new channels.')
-                                ->inline(false)
-                                ->default(false),
+                                ->helperText('When enabled, all channels will be re-evaluated during merge, including existing failover relationships. Disable this for better performance if you only want to merge new channels.'),
                         ]),
 
                     TextInput::make('sync_interval')
@@ -1424,5 +1420,15 @@ class PlaylistResource extends Resource
             }
         }
         return $wizard;
+    }
+
+    /**
+     * Create a toggle with consistent default configuration.
+     */
+    private static function makeToggle(string $name): Toggle
+    {
+        return Toggle::make($name)
+            ->inline(false)
+            ->default(false);
     }
 }
