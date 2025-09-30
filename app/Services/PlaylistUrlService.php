@@ -28,8 +28,8 @@ class PlaylistUrlService
         // Check if custom channel
         if ($channel->is_custom) {
             // If the URLs are empty, then set the channel to the first failover (if any assigned)
-            if (empty($channel->url) && $channel->failovers()->exists()) {
-                $channel = $channel->failovers()->first();
+            if (empty($channel->url) && $channel->failoverChannels()->exists()) {
+                $channel = $channel->failoverChannels()->first();
             }
         }
 

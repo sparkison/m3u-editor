@@ -37,10 +37,11 @@ class ProxyService
             }
         }
 
-        return route('shared.stream.channel', [
+        $route = route('shared.stream.channel', [
             'encodedId' => $id,
             'format' => $proxyFormat === 'hls' ? 'm3u8' : $format
         ]);
+        return $route;
     }
 
     /**

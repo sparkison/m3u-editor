@@ -2,8 +2,8 @@
 @php
 $record = $getRecord();
 $settings = app(\App\Settings\GeneralSettings::class);
-$playlist = App\Models\Playlist::find($record->playlist_id) ?? null;
-$proxyEnabled = $settings->force_video_player_proxy || $playlist->enable_proxy;
+$playlist = $record->getEffectivePlaylist() ?? null;
+$proxyEnabled = $settings->force_video_player_proxy || ($playlist->enable_proxy ?? false);
 $url = $record->url_custom ?? $record->url;
 if ($proxyEnabled) {
     $format = $playlist->proxy_options['output'] ?? 'ts';
@@ -17,6 +17,7 @@ if ($proxyEnabled) {
         $format = $record->container_extension ?? 'ts';
     }
 }
+$channelTitle = $record->name_custom ?? $record->name ?? $record->title;
 $playerId = "channel_{$record->id}_preview";
 @endphp
     <div 
@@ -25,7 +26,7 @@ $playerId = "channel_{$record->id}_preview";
             playerId: '{{ $playerId }}',
             streamUrl: '{{ $url }}',
             streamFormat: '{{ $format }}',
-            channelTitle: '{{ Str::replace("'", "`", $record->name_custom ?? $record->name) }}'
+            channelTitle: '{{ Str::replace("'", "`", $channelTitle) }}'
         }"
         x-init="
             console.log('Video preview initializing:', { playerId, streamUrl, streamFormat });

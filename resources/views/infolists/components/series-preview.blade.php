@@ -2,7 +2,7 @@
     @php($record = $getRecord())
     @php($settings = app(\App\Settings\GeneralSettings::class))
     @php($playlist = App\Models\Playlist::find($record->playlist_id) ?? null)
-    @php($proxyEnabled = $settings->force_video_player_proxy || $playlist->enable_proxy)
+    @php($proxyEnabled = $settings->force_video_player_proxy || ($playlist->enable_proxy ?? false))
     @php($url = $record->url)
     @php($format = pathinfo($record->url, PATHINFO_EXTENSION))
     @if($proxyEnabled)
