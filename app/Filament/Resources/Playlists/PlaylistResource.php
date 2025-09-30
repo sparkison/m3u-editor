@@ -886,6 +886,34 @@ class PlaylistResource extends Resource
                                 ->helperText('When enabled, a backup will be created before syncing.')
                                 ->inline(false)
                                 ->default(false),
+                            Toggle::make('auto_merge_channels_enabled')
+                                ->label('Auto-merge channels after sync')
+                                ->helperText('When enabled, channels with the same stream ID will be automatically merged with failover relationships after each sync.')
+                                ->live()
+                                ->inline(false)
+                                ->default(false),
+                            Toggle::make('auto_merge_deactivate_failover')
+                                ->label('Deactivate failover channels')
+                                ->helperText('When enabled, all failover channels will be automatically deactivated during the merge process, keeping only the master channel active.')
+                                ->inline(false)
+                                ->default(false)
+                                ->hidden(fn(Get $get): bool => !$get('auto_merge_channels_enabled')),
+                        ]),
+
+                    Fieldset::make('Auto-Merge Advanced Settings')
+                        ->columnSpanFull()
+                        ->hidden(fn(Get $get): bool => !$get('auto_merge_channels_enabled'))
+                        ->schema([
+                            Toggle::make('auto_merge_config.check_resolution')
+                                ->label('Prioritize by resolution')
+                                ->helperText('When enabled, channels with higher resolution will be prioritized as master channels during merge. This process takes longer as stream resolution needs to be analyzed.')
+                                ->inline(false)
+                                ->default(false),
+                            Toggle::make('auto_merge_config.force_complete_remerge')
+                                ->label('Force complete re-merge')
+                                ->helperText('When enabled, all channels will be re-evaluated during merge, including existing failover relationships. Disable this for better performance if you only want to merge new channels.')
+                                ->inline(false)
+                                ->default(false),
                         ]),
 
                     TextInput::make('sync_interval')
