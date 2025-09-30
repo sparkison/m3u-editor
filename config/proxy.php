@@ -10,6 +10,10 @@ return [
     'ffmpeg_codec_audio' => env('PROXY_FFMPEG_CODEC_AUDIO', null),
     'ffmpeg_codec_subtitles' => env('PROXY_FFMPEG_CODEC_SUBTITLES', null),
 
+    // Use m3u-proxy service
+    'use_m3u_proxy' => env('USE_M3U_PROXY', false),
+    'm3u_proxy_base_url' => env('M3U_PROXY_BASE_URL', 'http://localhost:8085'), // Base URL of the external m3u-proxy server
+
     /*
     |--------------------------------------------------------------------------
     | Shared Streaming Configuration (xTeVe-like proxy functionality)
@@ -19,7 +23,6 @@ return [
     | multiple clients to share the same upstream stream, reducing server load.
     |
     */
-
     'shared_streaming' => [
         // Enable shared streaming functionality
         'enabled' => env('SHARED_STREAMING_ENABLED', true),

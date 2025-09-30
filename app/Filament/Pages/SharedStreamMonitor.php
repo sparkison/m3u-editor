@@ -48,6 +48,11 @@ class SharedStreamMonitor extends Page
         // $this->monitorService = app(StreamMonitorService::class);
     }
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return !config('proxy.use_m3u_proxy', false);
+    }
+
     public function mount(): void
     {
         $this->refreshData();
