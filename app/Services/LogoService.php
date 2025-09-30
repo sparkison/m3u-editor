@@ -55,7 +55,7 @@ class LogoService
 
         // Return proxied URL for remote images
         return $playlist?->enable_logo_proxy
-            ? LogoProxyController::generateProxyUrl($logoUrl)
+            ? LogoProxyController::generateProxyUrl($logoUrl, internal: true) // Don't use `PROXY_URL_OVERRIDE`, use base app url for Resource requests
             : $logoUrl;
     }
 
@@ -77,7 +77,7 @@ class LogoService
 
         // Return proxied URL for remote images
         return $series->playlist?->enable_logo_proxy
-            ? LogoProxyController::generateProxyUrl($logoUrl)
+            ? LogoProxyController::generateProxyUrl($logoUrl, internal: true) // Don't use `PROXY_URL_OVERRIDE`, use base app url for Resource requests
             : $logoUrl;
     }
 

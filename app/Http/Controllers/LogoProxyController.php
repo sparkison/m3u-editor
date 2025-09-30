@@ -62,9 +62,9 @@ class LogoProxyController extends Controller
     /**
      * Generate a proxy URL for a given logo URL
      */
-    public static function generateProxyUrl(string $originalUrl): string
+    public static function generateProxyUrl(string $originalUrl, $internal = false): string
     {
-        $proxyUrlOverride = config('proxy.url_override');
+        $proxyUrlOverride = config('proxy.url_override') && !$internal;
         if (empty($originalUrl) || !filter_var($originalUrl, FILTER_VALIDATE_URL)) {
             $url = '/placeholder.png';
         } else {
