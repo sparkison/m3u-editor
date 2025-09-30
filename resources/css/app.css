@@ -2,6 +2,8 @@
 
 @import '../../vendor/filament/filament/resources/css/theme.css';
 
+@import "./globals/global.scss";
+
 @import "./components/tables.scss";
 @import "./components/widgets.css";
 @import "./components/footer.css";

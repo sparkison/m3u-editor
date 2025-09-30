@@ -1,0 +1,9 @@
+@media (max-width: 768px) {
+    .fi-dropdown-panel {
+        right: auto !important;
+        left: 0 !important;
+        /* stick to the left edge instead of right */
+        max-width: 90vw !important;
+        z-index: 9999 !important;
+    }
+}
