@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Series;
 use App\Models\User;
+use App\Settings\GeneralSettings;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -30,12 +31,18 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(): void
+    public function handle(GeneralSettings $settings): void
     {
         // Get the series
         $series = $this->playlistSeries;
+
+        // Get global sync settings
+        $global_sync_settings = [
+            'enabled' => $settings->stream_file_sync_enabled ?? false,
+        ];
+
         if ($series) {
-            $this->fetchMetadataForSeries($series);
+            $this->fetchMetadataForSeries($series, $global_sync_settings);
         } else {
             // Disable notifications for bulk processing
             $this->notify = false;
@@ -47,9 +54,9 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
                     $query->where('playlist_id', $this->playlist_id);
                 })
                 ->with(['playlist'])
-                ->chunkById(100, function ($seriesChunk) {
+                ->chunkById(100, function ($seriesChunk) use ($global_sync_settings) {
                     foreach ($seriesChunk as $series) {
-                        $this->fetchMetadataForSeries($series);
+                        $this->fetchMetadataForSeries($series, $global_sync_settings);
                     }
                 });
 
@@ -68,7 +75,7 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
         }
     }
 
-    private function fetchMetadataForSeries($series)
+    private function fetchMetadataForSeries($series, $settings)
     {
         // Get the playlist
         $playlist = $series->playlist;
@@ -78,7 +85,7 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
         if ($this->notify && $results !== false) {
             // Check if the playlist has .strm file sync enabled
             $sync_settings = $series->sync_settings;
-            $syncStrmFiles = $sync_settings['enabled'] ?? false;
+            $syncStrmFiles = $settings['enabled'] ?? $sync_settings['enabled'] ?? false;
             $body = "Series sync completed successfully for \"{$series->name}\". Imported {$results} episodes.";
             if ($syncStrmFiles) {
                 $body .= " .strm file sync is enabled, syncing now.";
