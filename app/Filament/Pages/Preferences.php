@@ -97,26 +97,51 @@ class Preferences extends SettingsPage
                     ->tabs([
                         Tab::make('Appearance')
                             ->schema([
-                                Section::make('Layout options')
+                                Section::make('Layout & Display Options')
                                     ->schema([
-                                        Select::make('navigation_position')
-                                            ->label('Navigation position')
-                                            ->helperText('Choose the position of primary navigation')
-                                            ->options([
-                                                'left' => 'Left',
-                                                'top' => 'Top',
+                                        Grid::make()
+                                            ->columnSpanFull()
+                                            ->columns(2)
+                                            ->schema([
+                                                Toggle::make('show_breadcrumbs')
+                                                    ->label('Show breadcrumbs')
+                                                    ->helperText('Show breadcrumbs under the page titles'),
+                                                Toggle::make('output_wan_address')
+                                                    ->label('Output WAN address for streams')
+                                                    ->helperText('When enabled, the application will output the WAN address of the server m3u-editor is currently running on.')
+                                                    ->default(function () {
+                                                        return config('dev.show_wan_details') !== null
+                                                            ? (bool) config('dev.show_wan_details')
+                                                            : false;
+                                                    })
+                                                    ->afterStateHydrated(function (Toggle $component, $state) {
+                                                        if (config('dev.show_wan_details') !== null) {
+                                                            $component->state((bool) config('dev.show_wan_details'));
+                                                        }
+                                                    })->disabled(fn() => config('dev.show_wan_details') !== null)
+                                                    ->hint(fn() => config('dev.show_wan_details') !== null ? 'Already set by environment variable!' : null)
+                                                    ->dehydrated(fn() => config('dev.show_wan_details') === null),
                                             ]),
-                                        Toggle::make('show_breadcrumbs')
-                                            ->label('Show breadcrumbs')
-                                            ->helperText('Show breadcrumbs under the page titles'),
-                                        Select::make('content_width')
-                                            ->label('Max width of the page content')
-                                            ->options([
-                                                Width::ScreenMedium->value => 'Medium',
-                                                Width::ScreenLarge->value => 'Large',
-                                                Width::ScreenExtraLarge->value => 'XL',
-                                                Width::ScreenTwoExtraLarge->value => '2XL',
-                                                Width::Full->value => 'Full',
+                                        Grid::make()
+                                            ->columnSpanFull()
+                                            ->columns(2)
+                                            ->schema([
+                                                Select::make('navigation_position')
+                                                    ->label('Navigation position')
+                                                    ->helperText('Choose the position of primary navigation')
+                                                    ->options([
+                                                        'left' => 'Left',
+                                                        'top' => 'Top',
+                                                    ]),
+                                                Select::make('content_width')
+                                                    ->label('Max width of the page content')
+                                                    ->options([
+                                                        Width::ScreenMedium->value => 'Medium',
+                                                        Width::ScreenLarge->value => 'Large',
+                                                        Width::ScreenExtraLarge->value => 'XL',
+                                                        Width::ScreenTwoExtraLarge->value => '2XL',
+                                                        Width::Full->value => 'Full',
+                                                    ]),
                                             ]),
                                     ]),
                             ]),

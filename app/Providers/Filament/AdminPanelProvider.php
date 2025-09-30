@@ -49,14 +49,17 @@ class AdminPanelProvider extends PanelProvider
             'navigation_position' => 'left',
             'show_breadcrumbs' => true,
             'content_width' => Width::ScreenLarge,
-            // 'show_logs' => false, // Default always enabled for admins
+            'output_wan_address' => false,
         ];
         try {
+            $envShowWan = config('dev.show_wan_details', false);
             $settings = [
                 'navigation_position' => $userPreferences->navigation_position ?? $settings['navigation_position'],
                 'show_breadcrumbs' => $userPreferences->show_breadcrumbs ?? $settings['show_breadcrumbs'],
                 'content_width' => $userPreferences->content_width ?? $settings['content_width'],
-                // 'show_logs' => $userPreferences->show_logs ?? $settings['show_logs'],
+                'output_wan_address' => $envShowWan !== null
+                    ? (bool) $envShowWan
+                    : (bool) ($userPreferences->output_wan_address ?? $settings['output_wan_address']),
             ];
         } catch (Exception $e) {
             // Ignore
@@ -158,20 +161,18 @@ class AdminPanelProvider extends PanelProvider
             $adminPanel->sidebarCollapsibleOnDesktop();
         }
 
-        return $adminPanel;
-    }
-
-    public function register(): void
-    {
-        parent::register();
-        FilamentView::registerRenderHook('panels::body.end', fn() => Blade::render("@vite('resources/js/app.js')"));
-
         // Register External IP display in the navigation bar
-        if (config('dev.show_wan_details', false)) {
+        if ($settings['output_wan_address']) {
             FilamentView::registerRenderHook(
                 PanelsRenderHook::GLOBAL_SEARCH_BEFORE, // Place it before the global search
                 fn(): string => view('components.external-ip-display')->render()
             );
         }
+
+        // Register our custom app js
+        FilamentView::registerRenderHook('panels::body.end', fn() => Blade::render("@vite('resources/js/app.js')"));
+
+        // Return the configured panel
+        return $adminPanel;
     }
 }

@@ -13,6 +13,7 @@ class GeneralSettings extends Settings
     public ?bool $show_api_docs = false;
     public ?bool $show_queue_manager = false;
     public ?string $content_width = Width::ScreenExtraLarge->value;
+    public ?bool $output_wan_address = false;
 
     // Proxy settings
     public ?string $ffmpeg_user_agent = 'VLC/3.0.21 LibVLC/3.0.21';
