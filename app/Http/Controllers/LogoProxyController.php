@@ -64,12 +64,12 @@ class LogoProxyController extends Controller
      */
     public static function generateProxyUrl(string $originalUrl, $internal = false): string
     {
-        $proxyUrlOverride = config('proxy.url_override') && !$internal;
+        $proxyUrlOverride = config('proxy.url_override');
         if (empty($originalUrl) || !filter_var($originalUrl, FILTER_VALIDATE_URL)) {
             $url = '/placeholder.png';
         } else {
             $encodedUrl = base64_encode($originalUrl);
-            $url = $proxyUrlOverride
+            $url = $proxyUrlOverride && !$internal
                 ? rtrim($proxyUrlOverride, '/') . "/logo-proxy/{$encodedUrl}"
                 : url("/logo-proxy/{$encodedUrl}");
         }
