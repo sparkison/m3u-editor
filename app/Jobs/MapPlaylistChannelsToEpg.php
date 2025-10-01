@@ -127,6 +127,27 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                     ->when(!$this->force, function ($query) {
                         $query->where('epg_channel_id', null);
                     });
+            } else {
+                // Error, somehow ended up here without a playlist or channels
+                $error = "No channels or playlist specified for EPG mapping.";
+                Log::error("Error processing EPG mapping: {$error}");
+                $map->update([
+                    'status' => Status::Failed,
+                    'errors' => $error,
+                    'total_channel_count' => 0,
+                    'current_mapped_count' => 0,
+                    'progress' => 100,
+                    'processing' => false,
+                ]);
+
+                Notification::make()
+                    ->danger()
+                    ->title("Error processing \"{$epg->name}\" mapping")
+                    ->body($error)
+                    ->broadcast($epg->user)
+                    ->sendToDatabase($epg->user);
+
+                return;
             }
 
             // Update the progress
