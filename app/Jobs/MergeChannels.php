@@ -61,7 +61,7 @@ class MergeChannels implements ShouldQueue
         // Get all channels with stream IDs in a single efficient query
         // Exclude channels that are already configured as failovers (unless we're re-merging everything)
         $shouldExcludeExistingFailovers = !empty($existingFailoverChannelIds) && !$this->forceCompleteRemerge;
-        
+
         $allChannels = Channel::where('user_id', $this->user->id)
             ->whereIn('playlist_id', $playlistIds)
             ->where(function ($query) {
@@ -109,13 +109,13 @@ class MergeChannels implements ShouldQueue
                     ],
                     ['user_id' => $this->user->id]
                 );
-                
+
                 // Deactivate failover channel if requested
                 if ($this->deactivateFailoverChannels && $failover->enabled) {
                     $failover->update(['enabled' => false]);
                     $deactivatedCount++;
                 }
-                
+
                 $processed++;
             }
         }

@@ -44,7 +44,7 @@ class CopyAttributesToPlaylist implements ShouldQueue
             $this->copyChannelAttributes();
         } catch (\Exception $e) {
             // Log the error
-            Log::error('Error copying attributes to playlist: '.$e->getMessage());
+            Log::error('Error copying attributes to playlist: ' . $e->getMessage());
 
             // Notify the user of the failure
             Notification::make()
@@ -81,11 +81,11 @@ class CopyAttributesToPlaylist implements ShouldQueue
         $sourceFieldsToSelect = ['id', 'source_id', 'name', 'title', 'stream_id', 'logo_internal', 'enabled', 'group', 'channel', 'shift', 'station_id', 'url'] + array_keys($attributeMapping);
         $sourceFieldsToSelect = array_unique($sourceFieldsToSelect);
 
-        $sourceChannels = $sourcePlaylist->channels()
-            ->select($sourceFieldsToSelect)
-            ->get()
-            ->keyBy('source_id'); // Key by source_id for efficient lookups
-
+        // Build a lookup array from source channels using cursor for memory efficiency
+        $sourceChannels = collect();
+        foreach ($sourcePlaylist->channels()->select($sourceFieldsToSelect)->cursor() as $sourceChannel) {
+            $sourceChannels->put($sourceChannel->source_id, $sourceChannel);
+        }
         if ($sourceChannels->isEmpty()) {
             return;
         }
@@ -110,7 +110,7 @@ class CopyAttributesToPlaylist implements ShouldQueue
                         // Try to match by name and title if source_id match fails
                         $sourceChannel = $sourceChannels->first(function ($channel) use ($targetChannel) {
                             return $channel->name === $targetChannel->name &&
-                                   $channel->title === $targetChannel->title;
+                                $channel->title === $targetChannel->title;
                         });
                     }
 
