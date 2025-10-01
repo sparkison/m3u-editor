@@ -297,6 +297,11 @@ class SeriesRelationManager extends RelationManager
         )->toArray();
 
         // Add an "All" tab to show all channels
+        array_unshift(
+            $tabs,
+            Tab::make('All')
+                ->badge($ownerRecord->series()->count())
+        );
         array_push(
             $tabs,
             Tab::make('Uncategorized')

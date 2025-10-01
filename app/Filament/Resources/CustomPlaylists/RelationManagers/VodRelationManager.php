@@ -319,6 +319,12 @@ class VodRelationManager extends RelationManager
         )->toArray();
 
         // Add an "All" tab to show all channels
+        array_unshift(
+            $tabs,
+            Tab::make('All')
+                ->modifyQueryUsing(fn($query) => $query->where('is_vod', true))
+                ->badge($ownerRecord->channels()->where('is_vod', true)->count())
+        );
         array_push(
             $tabs,
             Tab::make('Uncategorized')
