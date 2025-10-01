@@ -834,6 +834,7 @@ class VodResource extends Resource
                                 'title' => 'Channel Title',
                                 'name' => 'Channel Name (tvg-name)',
                                 'logo' => 'Channel Logo (tvg-logo)',
+                                'url' => 'Custom URL (tvg-url)',
                             ])
                             ->default('title')
                             ->required()
