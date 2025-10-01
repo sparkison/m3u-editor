@@ -59,17 +59,17 @@ RUN if [ "$(uname -m)" = "x86_64" ]; then \
             intel-media-sdk \
             libmfx \
             libva-dev \
-            libdrm-dev \
+            libdrm-dev; \
     elif [ "$(uname -m)" = "aarch64" ]; then \
         echo "Installing ARM-compatible VAAPI drivers for aarch64..." && \
         apk add --no-cache \
             libva-dev \
-            libdrm-dev \
+            libdrm-dev; \
     else \
         echo "Installing basic VAAPI support for $(uname -m) architecture..." && \
         apk add --no-cache \
             libva-dev \
-            libdrm-dev \
+            libdrm-dev; \
     fi
 
 # Install PostgreSQL server & client
