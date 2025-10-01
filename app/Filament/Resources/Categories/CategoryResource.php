@@ -513,6 +513,9 @@ class CategoryResource extends Resource
         return $schema
             ->components([
                 Section::make('Category Details')
+                    ->collapsible(true)
+                    ->collapsed(true)
+                    ->compact()
                     ->columns(2)
                     ->schema([
                         TextEntry::make('name')

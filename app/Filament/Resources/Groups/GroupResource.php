@@ -464,6 +464,9 @@ class GroupResource extends Resource
         return $schema
             ->components([
                 Section::make('Group Details')
+                    ->collapsible(true)
+                    ->collapsed(true)
+                    ->compact()
                     ->columns(2)
                     ->schema([
                         TextEntry::make('name')

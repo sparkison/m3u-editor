@@ -14,3 +14,16 @@ table {
         padding-bottom: 4px !important;
     }
 }
+
+.fi-ta-content-ctn {
+    max-height: 70vh;
+
+    .fi-ta-table {
+        thead {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            @apply bg-gray-50 dark:bg-gray-900;
+        }
+    }
+}
