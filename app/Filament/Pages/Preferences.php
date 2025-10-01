@@ -684,13 +684,13 @@ class Preferences extends SettingsPage
                                                     ->persistent()
                                                     ->broadcast(Auth::user());
                                             }),
-                                        Action::make('view_logs')
-                                            ->label('View Logs')
-                                            ->color('gray')
-                                            ->icon('heroicon-o-document-text')
-                                            ->iconPosition('after')
-                                            ->size('sm')
-                                            ->url('/logs'),
+                                        // Action::make('view_logs')
+                                        //     ->label('View Logs')
+                                        //     ->color('gray')
+                                        //     ->icon('heroicon-o-document-text')
+                                        //     ->iconPosition('after')
+                                        //     ->size('sm')
+                                        //     ->url('/logs'),
                                         Action::make('view_queue_manager')
                                             ->label('Queue Manager')
                                             ->icon('heroicon-o-arrow-top-right-on-square')
