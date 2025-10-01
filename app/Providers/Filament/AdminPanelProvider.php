@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use AchyutN\FilamentLogViewer\FilamentLogViewer;
 use App\Filament\Auth\EditProfile;
 use App\Filament\Auth\Login;
 use App\Filament\Pages\Backups;
@@ -16,7 +17,6 @@ use App\Filament\Widgets\SystemHealthWidget;
 use App\Filament\Widgets\UpdateNoticeWidget;
 // use App\Filament\Widgets\PayPalDonateWidget;
 use App\Settings\GeneralSettings;
-use Boquizo\FilamentLogViewer\FilamentLogViewerPlugin;
 use Exception;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Http\Middleware\Authenticate;
@@ -119,12 +119,6 @@ class AdminPanelProvider extends PanelProvider
                 FilamentSpatieLaravelBackupPlugin::make()
                     ->authorize(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true))
                     ->usingPage(Backups::class),
-                FilamentLogViewerPlugin::make()
-                    ->navigationGroup('Tools')
-                    ->navigationSort(99)
-                    ->navigationIcon('')
-                    ->navigationLabel('Logs')
-                    ->authorize(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true)),
             ])
             ->maxContentWidth($settings['content_width'])
             ->middleware([

@@ -17,7 +17,6 @@
         "filament/filament": "^4.0",
         "filament/spatie-laravel-settings-plugin": "^4.0",
         "filament/spatie-laravel-tags-plugin": "^4.0",
-        "gboquizosanchez/filament-log-viewer": "^2.0",
         "halaxa/json-machine": "^1.2",
         "laravel/framework": "^12.0",
         "laravel/horizon": "^5.30",
