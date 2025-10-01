@@ -24,6 +24,8 @@ class MergeChannels implements ShouldQueue
         public Collection $playlists,
         public int $playlistId,
         public bool $checkResolution = false,
+        public bool $deactivateFailoverChannels = false,
+        public bool $forceCompleteRemerge = false,
     ) {}
 
     /**
@@ -32,6 +34,7 @@ class MergeChannels implements ShouldQueue
     public function handle(): void
     {
         $processed = 0;
+        $deactivatedCount = 0;
 
         // Build unified playlist IDs array and create priority lookup
         $playlistIds = $this->playlists->map(function ($item) {
@@ -47,13 +50,29 @@ class MergeChannels implements ShouldQueue
         // Create playlist priority lookup for efficient sorting
         $playlistPriority = $playlistIds ? array_flip($playlistIds) : [];
 
+        // Get existing failover channel IDs to exclude them from being masters
+        $existingFailoverChannelIds = ChannelFailover::where('user_id', $this->user->id)
+            ->whereHas('channelFailover', function ($query) use ($playlistIds) {
+                $query->whereIn('playlist_id', $playlistIds);
+            })
+            ->pluck('channel_failover_id')
+            ->toArray();
+
         // Get all channels with stream IDs in a single efficient query
+        // Exclude channels that are already configured as failovers (unless we're re-merging everything)
+        $shouldExcludeExistingFailovers = !empty($existingFailoverChannelIds) && !$this->forceCompleteRemerge;
+        
         $allChannels = Channel::where('user_id', $this->user->id)
             ->whereIn('playlist_id', $playlistIds)
             ->where(function ($query) {
                 $query->where('stream_id_custom', '!=', '')
                     ->orWhere('stream_id', '!=', '');
-            })->cursor();
+            })
+            ->when($shouldExcludeExistingFailovers, function ($query) use ($existingFailoverChannelIds) {
+                // Only exclude existing failovers if we're not forcing a complete re-merge
+                $query->whereNotIn('id', $existingFailoverChannelIds);
+            })
+            ->cursor();
 
         // Group channels by stream ID using LazyCollection
         $groupedChannels = $allChannels->groupBy(function ($channel) {
@@ -90,11 +109,18 @@ class MergeChannels implements ShouldQueue
                     ],
                     ['user_id' => $this->user->id]
                 );
+                
+                // Deactivate failover channel if requested
+                if ($this->deactivateFailoverChannels && $failover->enabled) {
+                    $failover->update(['enabled' => false]);
+                    $deactivatedCount++;
+                }
+                
                 $processed++;
             }
         }
 
-        $this->sendCompletionNotification($processed);
+        $this->sendCompletionNotification($processed, $deactivatedCount);
     }
 
     /**
@@ -144,12 +170,19 @@ class MergeChannels implements ShouldQueue
         return 0;
     }
 
-    protected function sendCompletionNotification($processed)
+    protected function sendCompletionNotification($processed, $deactivatedCount = 0)
     {
-        $body = $processed > 0 ? "Merged {$processed} channels successfully." : 'No channels were merged.';
+        if ($processed > 0) {
+            $body = "Merged {$processed} channels successfully.";
+            if ($deactivatedCount > 0) {
+                $body .= " {$deactivatedCount} failover channels were deactivated.";
+            }
+        } else {
+            $body = 'No channels were merged.';
+        }
 
         Notification::make()
-            ->title('Merge complete')
+            ->title('Channel merge complete')
             ->body($body)
             ->success()
             ->broadcast($this->user)
