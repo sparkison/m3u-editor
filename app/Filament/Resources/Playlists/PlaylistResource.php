@@ -1021,14 +1021,14 @@ class PlaylistResource extends Resource
                 ->columns(2)
                 ->schema([
                     Toggle::make('auto_fetch_series_metadata')
-                        ->label('Auto-fetch series metadata')
+                        ->label('Fetch metadata & sync stream files')
                         ->inline(false)
                         ->hintIcon(
                             'heroicon-m-question-mark-circle',
-                            tooltip: 'Recommend leaving this disabled, unless you are including Series in the M3U output. When accessing via the Xtream API, metadata will be automatically fetched'
+                            tooltip: 'Recommend leaving this disabled, unless you are including Series in the M3U output, or syncing stream files. When accessing via the Xtream API, metadata will be automatically fetched'
                         )
                         ->default(false)
-                        ->helperText('This will only fetch metadata for enabled series. When disabled, series metadata will be fetched automatically when access via the Xtream API for this playlist.'),
+                        ->helperText('This will only fetch metadata/sync stream files for enabled series. When disabled, series metadata will be fetched automatically when access via the Xtream API for this playlist.'),
                     Toggle::make('include_series_in_m3u')
                         ->label('Include series in M3U output')
                         ->inline(false)
@@ -1038,6 +1038,33 @@ class PlaylistResource extends Resource
                         )
                         ->default(false)
                         ->helperText('When enabled, series will be included in the M3U output. It is recommended to enable the "Auto-fetch series metadata" option when enabled.'),
+                ])->hidden(fn(Get $get): bool => !$get('xtream')),
+
+            Section::make('VOD Processing')
+                ->description('Processing options for playlist VOD')
+                ->columnSpanFull()
+                ->collapsible()
+                ->collapsed($creating)
+                ->columns(2)
+                ->schema([
+                    Toggle::make('auto_fetch_vod_metadata')
+                        ->label('Fetch metadata')
+                        ->inline(false)
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'Enable this to automatically fetch metadata for enabled VOD channels. When accessing via the Xtream API, metadata will be automatically fetched.'
+                        )
+                        ->default(false)
+                        ->helperText('This will only fetch metadata for enabled VOD channels.'),
+                    Toggle::make('auto_sync_vod_stream_files')
+                        ->label('Sync stream files')
+                        ->inline(false)
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'Enable this to automatically sync stream files for enabled VOD channels.'
+                        )
+                        ->default(false)
+                        ->helperText('This will only sync stream files for enabled VOD channels.'),
                 ])->hidden(fn(Get $get): bool => !$get('xtream')),
         ];
 
