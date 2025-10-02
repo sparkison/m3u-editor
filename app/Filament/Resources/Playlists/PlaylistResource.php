@@ -409,6 +409,7 @@ class PlaylistResource extends Resource
                                     'group' => 'Group (group-title)',
                                     'shift' => 'Shift (tvg-shift)',
                                     'channel' => 'Channel Number (tvg-chno/num)',
+                                    'sort' => 'Sort Order',
                                 ])
                                 ->multiple()
                                 ->required()

@@ -79,7 +79,35 @@ class CopyAttributesToPlaylist implements ShouldQueue
         $attributeMapping = $this->getAttributeMapping();
 
         // Get all source channels that we want to copy from
-        $sourceFieldsToSelect = ['id', 'source_id', 'name', 'title', 'stream_id', 'logo_internal', 'enabled', 'group', 'channel', 'shift', 'station_id', 'url'] + array_keys($attributeMapping);
+        // Include both base fields and custom fields so we can prefer custom when available
+        $sourceFieldsToSelect = [
+            'id',
+            'source_id',
+            'name',
+            'name_custom',
+            'title',
+            'title_custom',
+            'stream_id',
+            'stream_id_custom',
+            'logo_internal',
+            'enabled',
+            'group',
+            'channel',
+            'shift',
+            'station_id',
+            'url'
+        ];
+
+        // Add any additional fields from attribute mapping
+        foreach ($attributeMapping as $sourceField => $targetFieldOrFields) {
+            if (is_array($targetFieldOrFields)) {
+                // The value is an array of fields to try, add all of them
+                $sourceFieldsToSelect = array_merge($sourceFieldsToSelect, $targetFieldOrFields);
+            } else {
+                // Single source field
+                $sourceFieldsToSelect[] = $sourceField;
+            }
+        }
         $sourceFieldsToSelect = array_unique($sourceFieldsToSelect);
 
         // Build a lookup array from source channels using cursor for memory efficiency
@@ -101,7 +129,26 @@ class CopyAttributesToPlaylist implements ShouldQueue
         }
 
         // Process target channels in chunks for better performance
-        $fieldsToSelect = ['id', 'source_id', 'name', 'title', 'logo', 'name_custom', 'title_custom', 'stream_id_custom', 'url_custom', 'enabled', 'group', 'group_id', 'playlist_id', 'user_id', 'channel', 'shift', 'station_id'] + array_values($attributeMapping);
+        $fieldsToSelect = [
+            'id',
+            'source_id',
+            'name',
+            'title',
+            'logo',
+            'name_custom',
+            'title_custom',
+            'stream_id_custom',
+            'url_custom',
+            'enabled',
+            'group',
+            'group_internal',
+            'group_id',
+            'playlist_id',
+            'user_id',
+            'channel',
+            'shift',
+            'station_id',
+        ] + array_values($attributeMapping);
         $fieldsToSelect = array_unique($fieldsToSelect);
 
         $targetPlaylist->channels()
@@ -127,8 +174,25 @@ class CopyAttributesToPlaylist implements ShouldQueue
 
                     $updateData = [];
 
-                    foreach ($attributeMapping as $sourceField => $targetField) {
-                        $sourceValue = $sourceChannel->{$sourceField};
+                    foreach ($attributeMapping as $sourceField => $targetFieldOrFields) {
+                        // Handle case where targetFieldOrFields is an array [target_custom, fallback]
+                        if (is_array($targetFieldOrFields)) {
+                            // This means we should try custom field first, then fallback to base field
+                            // The target is always the first element (the custom field)
+                            $targetField = $targetFieldOrFields[0];
+                            $sourceValue = null;
+                            foreach ($targetFieldOrFields as $field) {
+                                $sourceValue = $sourceChannel->{$field};
+                                if ($sourceValue !== null) {
+                                    break; // Use first non-null value
+                                }
+                            }
+                        } else {
+                            // Simple mapping: source field -> target field
+                            $targetField = $targetFieldOrFields;
+                            $sourceValue = $sourceChannel->{$sourceField};
+                        }
+
                         $targetValue = $targetChannel->{$targetField};
 
                         // Only update if we have a value to copy and either overwrite is enabled
@@ -208,48 +272,46 @@ class CopyAttributesToPlaylist implements ShouldQueue
         // If copying all attributes, include all supported attributes
         if ($this->allAttributes) {
             return [
-                'enabled' => 'enabled',
-                'name' => 'name_custom',
-                'title' => 'title_custom',
                 'logo_internal' => 'logo',  // Special case: logo_internal (source) -> logo (custom override)
-                'stream_id' => 'stream_id_custom',
-                'station_id' => 'station_id', // Not a provider value, so we can copy directly
+                'name' => ['name_custom', 'name'], // Prefer custom, fallback to base
+                'title' => ['title_custom', 'title'], // Prefer custom, fallback to base
+                'stream_id' => ['stream_id_custom', 'stream_id'], // Prefer custom, fallback to base
+                'station_id' => 'station_id',
+                'enabled' => 'enabled',
                 'group' => 'group',
                 'shift' => 'shift',
                 'channel' => 'channel',
-                // 'url' => 'url_custom', // If we want to support URL copying as well?
+                'sort' => 'sort',
             ];
         }
 
         // Map selected attributes to their custom field equivalents
         foreach ($this->channelAttributes as $attribute) {
             switch ($attribute) {
-                case 'enabled':
-                    $mapping['enabled'] = 'enabled';
-                    break;
-                case 'name':
-                    $mapping['name'] = 'name_custom';
-                    break;
-                case 'title':
-                    $mapping['title'] = 'title_custom';
-                    break;
+                // Handle special cases first
                 case 'logo':
                     $mapping['logo_internal'] = 'logo'; // Special case: source logo_internal -> custom logo
                     break;
+
+                // Then custom field mappings
+                case 'name':
+                    $mapping['name'] = ['name_custom', 'name']; // Prefer custom, fallback to base
+                    break;
+                case 'title':
+                    $mapping['title'] = ['title_custom', 'title']; // Prefer custom, fallback to base
+                    break;
                 case 'stream_id':
-                    $mapping['stream_id'] = 'stream_id_custom';
+                    $mapping['stream_id'] = ['stream_id_custom', 'stream_id']; // Prefer custom, fallback to base
                     break;
+
+                // And finally, direct mappings without custom fields
+                case 'enabled':
                 case 'station_id':
-                    $mapping['station_id'] = 'station_id';
-                    break;
                 case 'group':
-                    $mapping['group'] = 'group';
-                    break;
                 case 'shift':
-                    $mapping['shift'] = 'shift';
-                    break;
                 case 'channel':
-                    $mapping['channel'] = 'channel';
+                case 'sort':
+                    $mapping[$attribute] = $attribute;
                     break;
             }
         }
