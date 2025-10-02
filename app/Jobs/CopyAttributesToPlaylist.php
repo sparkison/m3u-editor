@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Channel;
+use App\Models\Group;
 use App\Models\Playlist;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -41,7 +42,7 @@ class CopyAttributesToPlaylist implements ShouldQueue
         }
 
         try {
-            $this->copyChannelAttributes();
+            $results = $this->copyChannelAttributes();
         } catch (\Exception $e) {
             // Log the error
             Log::error('Error copying attributes to playlist: ' . $e->getMessage());
@@ -50,7 +51,7 @@ class CopyAttributesToPlaylist implements ShouldQueue
             Notification::make()
                 ->danger()
                 ->title('Error copying playlist settings')
-                ->body('There was an error copying the playlist settings. Please try again.')
+                ->body("There was an error copying the \"{$sourcePlaylist->name}\" settings to \"{$playlist->name}\". Please try again.")
                 ->broadcast($sourcePlaylist->user)
                 ->sendToDatabase($sourcePlaylist->user);
 
@@ -61,7 +62,7 @@ class CopyAttributesToPlaylist implements ShouldQueue
         Notification::make()
             ->success()
             ->title('Playlist settings copied')
-            ->body('Playlist settings have been copied successfully.')
+            ->body("\"{$sourcePlaylist->name}\" settings have been copied successfully. {$results} channels updated on target \"{$playlist->name}\".")
             ->broadcast($sourcePlaylist->user)
             ->sendToDatabase($sourcePlaylist->user);
     }
@@ -69,7 +70,7 @@ class CopyAttributesToPlaylist implements ShouldQueue
     /**
      * Copy channel attributes from source playlist to target playlist
      */
-    private function copyChannelAttributes(): void
+    private function copyChannelAttributes(): int
     {
         $sourcePlaylist = $this->source;
         $targetPlaylist = Playlist::find($this->targetId);
@@ -87,19 +88,25 @@ class CopyAttributesToPlaylist implements ShouldQueue
             $sourceChannels->put($sourceChannel->source_id, $sourceChannel);
         }
         if ($sourceChannels->isEmpty()) {
-            return;
+            return 0; // Nothing to copy
         }
 
         $totalUpdated = 0;
         $batchSize = 1000;
 
+        // Preload existing groups for the target playlist into a case-insensitive map
+        $groupNameToId = [];
+        foreach ($targetPlaylist->groups()->get(['id', 'name']) as $g) {
+            $groupNameToId[strtolower($g->name ?? '')] = $g->id;
+        }
+
         // Process target channels in chunks for better performance
-        $fieldsToSelect = ['id', 'source_id', 'name', 'title', 'logo', 'name_custom', 'title_custom', 'stream_id_custom', 'url_custom', 'enabled', 'group', 'channel', 'shift', 'station_id'] + array_values($attributeMapping);
+        $fieldsToSelect = ['id', 'source_id', 'name', 'title', 'logo', 'name_custom', 'title_custom', 'stream_id_custom', 'url_custom', 'enabled', 'group', 'group_id', 'playlist_id', 'user_id', 'channel', 'shift', 'station_id'] + array_values($attributeMapping);
         $fieldsToSelect = array_unique($fieldsToSelect);
 
         $targetPlaylist->channels()
             ->select($fieldsToSelect)
-            ->chunkById($batchSize, function ($targetChannels) use ($sourceChannels, $attributeMapping, &$totalUpdated) {
+            ->chunkById($batchSize, function ($targetChannels) use ($sourceChannels, $attributeMapping, &$totalUpdated, &$groupNameToId, $targetPlaylist) {
                 $updates = [];
 
                 foreach ($targetChannels as $targetChannel) {
@@ -126,9 +133,45 @@ class CopyAttributesToPlaylist implements ShouldQueue
 
                         // Only update if we have a value to copy and either overwrite is enabled
                         // or the target field is empty
-                        if ($sourceValue !== null && ($this->overwrite || $targetValue === null)) {
-                            $updateData[$targetField] = $sourceValue;
+                        if ($sourceValue === null || (! $this->overwrite && $targetValue !== null)) {
+                            continue;
                         }
+
+                        // Special handling for group: translate group name into group_id on target
+                        if ($targetField === 'group') {
+                            $desiredName = trim((string) $sourceValue);
+                            if ($desiredName === '') {
+                                continue;
+                            }
+
+                            $lower = strtolower($desiredName);
+
+                            // Use existing mapping from outer scope if available
+                            if (array_key_exists($lower, $groupNameToId)) {
+                                $groupId = $groupNameToId[$lower];
+                            } else {
+                                // Create the group for the target playlist and cache the id
+                                $customGroup = Group::query()->create([
+                                    'name' => $desiredName,
+                                    'playlist_id' => $targetPlaylist->id,
+                                    'user_id' => $targetPlaylist->user_id ?? null,
+                                    'sort_order' => 0,
+                                    'created_at' => now(),
+                                    'updated_at' => now(),
+                                ]);
+                                $groupId = $customGroup->id;
+                                $groupNameToId[$lower] = $groupId;
+                            }
+
+                            // Set both the textual group column and the foreign key
+                            $updateData['group'] = $desiredName;
+                            $updateData['group_id'] = $groupId;
+
+                            continue;
+                        }
+
+                        // Default copy behavior
+                        $updateData[$targetField] = $sourceValue;
                     }
 
                     if (! empty($updateData)) {
@@ -136,6 +179,8 @@ class CopyAttributesToPlaylist implements ShouldQueue
                         $updates[$targetChannel->id] = $updateData;
                     }
                 }
+
+                // groupNameToId is updated by-reference and persists across chunks
 
                 // Batch update all channels in this chunk
                 if (! empty($updates)) {
@@ -149,6 +194,8 @@ class CopyAttributesToPlaylist implements ShouldQueue
             });
 
         Log::info("CopyAttributesToPlaylist: Updated {$totalUpdated} channels from playlist {$sourcePlaylist->id} to playlist {$targetPlaylist->id}");
+
+        return $totalUpdated;
     }
 
     /**
@@ -170,7 +217,7 @@ class CopyAttributesToPlaylist implements ShouldQueue
                 'group' => 'group',
                 'shift' => 'shift',
                 'channel' => 'channel',
-                'url' => 'url_custom', // If we want to support URL copying as well?
+                // 'url' => 'url_custom', // If we want to support URL copying as well?
             ];
         }
 

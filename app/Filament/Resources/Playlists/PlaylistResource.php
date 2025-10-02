@@ -416,6 +416,7 @@ class PlaylistResource extends Resource
                                 ->hidden(fn($get) => (bool) $get('all_attributes')),
                             Toggle::make('overwrite')
                                 ->label('Overwrite Existing Attributes')
+                                ->default(true)
                                 ->helperText('If enabled, existing custom attributes in the target playlist will be overwritten. If disabled, only empty custom attributes will be updated.'),
                         ])
                         ->action(function ($record, $data) {
