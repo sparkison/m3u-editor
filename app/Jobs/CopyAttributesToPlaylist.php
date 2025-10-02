@@ -23,6 +23,7 @@ class CopyAttributesToPlaylist implements ShouldQueue
         public int $targetId,
         public array $channelAttributes,
         public array $channelMatchAttributes,
+        public bool $createIfMissing = false,
         public bool $allAttributes = false,
         public bool $overwrite = false,
     ) {
@@ -32,21 +33,21 @@ class CopyAttributesToPlaylist implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(): void
+    public function handle(): int
     {
         $sourcePlaylist = $this->source;
         $playlist = Playlist::find($this->targetId);
 
         // Make sure we still have both playlists
         if (! ($sourcePlaylist && $playlist)) {
-            return;
+            return 0;
         }
 
         try {
             $results = $this->copyChannelAttributes();
         } catch (\Exception $e) {
             // Log the error
-            Log::error('Error copying attributes to playlist: '.$e->getMessage());
+            Log::error('Error copying attributes to playlist: ' . $e->getMessage());
 
             // Notify the user of the failure
             Notification::make()
@@ -56,7 +57,7 @@ class CopyAttributesToPlaylist implements ShouldQueue
                 ->broadcast($sourcePlaylist->user)
                 ->sendToDatabase($sourcePlaylist->user);
 
-            return;
+            return 0;
         }
 
         // If here, success! Notify the user
@@ -66,6 +67,8 @@ class CopyAttributesToPlaylist implements ShouldQueue
             ->body("\"{$sourcePlaylist->name}\" settings have been copied successfully. {$results} channels updated on target \"{$playlist->name}\".")
             ->broadcast($sourcePlaylist->user)
             ->sendToDatabase($sourcePlaylist->user);
+
+        return $results;
     }
 
     /**
@@ -83,6 +86,7 @@ class CopyAttributesToPlaylist implements ShouldQueue
         $sourceFieldsToSelect = [
             'id',
             'source_id',
+            'is_vod',
             'name',
             'name_custom',
             'title',
@@ -112,6 +116,7 @@ class CopyAttributesToPlaylist implements ShouldQueue
         $sourceFieldsToSelect = array_unique($sourceFieldsToSelect);
 
         $totalUpdated = 0;
+        $totalCreated = 0;
         $batchSize = 1000;
 
         // Preload existing groups for the target playlist into a case-insensitive map
@@ -120,172 +125,301 @@ class CopyAttributesToPlaylist implements ShouldQueue
             $groupNameToId[strtolower($g->name ?? '')] = $g->id;
         }
 
-        // Build the target fields to select
-        $targetFieldsToSelect = [
-            'id',
-            'source_id',
-            'name',
-            'title',
-            'logo',
-            'name_custom',
-            'title_custom',
-            'stream_id',
-            'stream_id_custom',
-            'url',
-            'url_custom',
-            'enabled',
-            'group',
-            'group_internal',
-            'group_id',
-            'playlist_id',
-            'user_id',
-            'channel',
-            'shift',
-            'station_id',
-            'logo_internal',
-        ];
+        // Build the target fields to select for matching
+        $targetFieldsToSelect = array_unique(array_merge(['id'], $this->channelMatchAttributes));
 
-        // Add match attributes to ensure they're selected on target
-        $targetFieldsToSelect = array_merge($targetFieldsToSelect, $this->channelMatchAttributes);
-        $targetFieldsToSelect = array_unique($targetFieldsToSelect);
+        // If we're creating missing channels, we process from source → target
+        // Otherwise, we process from target → source (for updates only)
+        if ($this->createIfMissing) {
+            // Process source channels in chunks, creating or updating as needed
+            $sourcePlaylist->channels()
+                ->select($sourceFieldsToSelect)
+                ->chunkById($batchSize, function ($sourceChannels) use ($targetPlaylist, $targetFieldsToSelect, $attributeMapping, &$totalUpdated, &$totalCreated, &$groupNameToId) {
+                    $updates = [];
+                    $channelsToCreate = [];
 
-        // Memory-efficient streaming approach:
-        // 1. Process target channels in chunks (e.g., 1000 at a time)
-        // 2. For each target chunk, query ONLY the potentially matching source channels
-        // 3. Match and update immediately, then release from memory
-        // This ensures we never load all channels into memory at once
-        $targetPlaylist->channels()
-            ->select($targetFieldsToSelect)
-            ->chunkById($batchSize, function ($targetChannels) use ($sourcePlaylist, $sourceFieldsToSelect, $attributeMapping, &$totalUpdated, &$groupNameToId, $targetPlaylist) {
-                $updates = [];
+                    // Build WHERE conditions to find matching target channels for this source chunk
+                    $matchConditions = $this->buildMatchConditions($sourceChannels, $this->channelMatchAttributes);
 
-                // Build WHERE conditions to find matching source channels for this target chunk
-                // Extract unique values for each match attribute from this chunk of target channels
-                $matchConditions = $this->buildMatchConditions($targetChannels, $this->channelMatchAttributes);
-
-                if (empty($matchConditions)) {
-                    return; // No valid match conditions for this chunk
-                }
-
-                // Query only the source channels that could potentially match this target chunk
-                // Using whereIn on match attributes drastically reduces the result set
-                $sourceChannelsQuery = $sourcePlaylist->channels()->select($sourceFieldsToSelect);
-
-                // Apply the match conditions (all attributes must match)
-                foreach ($this->channelMatchAttributes as $attribute) {
-                    if (isset($matchConditions[$attribute]) && ! empty($matchConditions[$attribute])) {
-                        $sourceChannelsQuery->whereIn($attribute, $matchConditions[$attribute]);
-                    }
-                }
-
-                // Stream through matching source channels and build a temporary lookup for this chunk only
-                // This lookup is small (only channels that match current target chunk) and is released after processing
-                $sourceChannelsByMatchKey = [];
-                foreach ($sourceChannelsQuery->cursor() as $sourceChannel) {
-                    $matchKey = $this->buildMatchKey($sourceChannel, $this->channelMatchAttributes);
-                    if ($matchKey !== null) {
-                        $sourceChannelsByMatchKey[$matchKey] = $sourceChannel;
-                    }
-                }
-
-                // Process each target channel in this chunk
-                foreach ($targetChannels as $targetChannel) {
-                    $matchKey = $this->buildMatchKey($targetChannel, $this->channelMatchAttributes);
-
-                    if ($matchKey === null || ! isset($sourceChannelsByMatchKey[$matchKey])) {
-                        continue; // No matching source channel found
+                    if (empty($matchConditions)) {
+                        return; // No valid match conditions for this chunk
                     }
 
-                    $sourceChannel = $sourceChannelsByMatchKey[$matchKey];
+                    // Query only the target channels that could potentially match this source chunk
+                    $targetChannelsQuery = $targetPlaylist->channels()->select($targetFieldsToSelect);
 
-                    $updateData = [];
+                    // Apply the match conditions
+                    foreach ($this->channelMatchAttributes as $attribute) {
+                        if (isset($matchConditions[$attribute]) && ! empty($matchConditions[$attribute])) {
+                            $targetChannelsQuery->whereIn($attribute, $matchConditions[$attribute]);
+                        }
+                    }
 
-                    foreach ($attributeMapping as $sourceField => $targetFieldOrFields) {
-                        // Handle case where targetFieldOrFields is an array [target_custom, fallback]
-                        if (is_array($targetFieldOrFields)) {
-                            // This means we should try custom field first, then fallback to base field
-                            // The target is always the first element (the custom field)
-                            $targetField = $targetFieldOrFields[0];
-                            $sourceValue = null;
-                            foreach ($targetFieldOrFields as $field) {
-                                $sourceValue = $sourceChannel->{$field};
-                                if ($sourceValue !== null) {
-                                    break; // Use first non-null value
-                                }
+                    // Build lookup of existing target channels by match key
+                    $targetChannelsByMatchKey = [];
+                    foreach ($targetChannelsQuery->cursor() as $targetChannel) {
+                        $matchKey = $this->buildMatchKey($targetChannel, $this->channelMatchAttributes);
+                        if ($matchKey !== null) {
+                            $targetChannelsByMatchKey[$matchKey] = $targetChannel;
+                        }
+                    }
+
+                    // Process each source channel
+                    foreach ($sourceChannels as $sourceChannel) {
+                        $matchKey = $this->buildMatchKey($sourceChannel, $this->channelMatchAttributes);
+
+                        if ($matchKey === null) {
+                            continue; // Can't match without a valid key
+                        }
+
+                        // Check if target channel exists
+                        if (isset($targetChannelsByMatchKey[$matchKey])) {
+                            // Update existing channel
+                            $targetChannel = $targetChannelsByMatchKey[$matchKey];
+                            $updateData = $this->buildUpdateData($sourceChannel, $targetChannel, $attributeMapping, $groupNameToId, $targetPlaylist);
+
+                            if (! empty($updateData)) {
+                                $updateData['updated_at'] = now();
+                                $updates[$targetChannel->id] = $updateData;
                             }
                         } else {
-                            // Simple mapping: source field -> target field
-                            $targetField = $targetFieldOrFields;
-                            $sourceValue = $sourceChannel->{$sourceField};
+                            // Create new channel
+                            $channelData = $this->buildChannelData($sourceChannel, $targetPlaylist, $groupNameToId);
+                            $channelsToCreate[] = $channelData;
                         }
+                    }
 
-                        $targetValue = $targetChannel->{$targetField};
+                    // Batch update existing channels
+                    if (! empty($updates)) {
+                        foreach ($updates as $channelId => $updateData) {
+                            Channel::query()->where('id', $channelId)->update($updateData);
+                            $totalUpdated++;
+                        }
+                    }
 
-                        // Only update if we have a value to copy and either overwrite is enabled
-                        // or the target field is empty
-                        if ($sourceValue === null || (! $this->overwrite && $targetValue !== null)) {
+                    // Batch insert new channels
+                    if (! empty($channelsToCreate)) {
+                        Channel::query()->insert($channelsToCreate);
+                        $totalCreated += count($channelsToCreate);
+                    }
+                });
+        } else {
+            // Process target channels in chunks, updating only (no creation)
+            $targetPlaylist->channels()
+                ->select(array_unique(array_merge($targetFieldsToSelect, [
+                    'id',
+                    'name_custom',
+                    'title_custom',
+                    'stream_id_custom',
+                    'logo',
+                    'enabled',
+                    'group',
+                    'group_id',
+                    'shift',
+                    'channel',
+                    'station_id',
+                    'sort',
+                ])))
+                ->chunkById($batchSize, function ($targetChannels) use ($sourcePlaylist, $sourceFieldsToSelect, $attributeMapping, &$totalUpdated, &$groupNameToId, $targetPlaylist) {
+                    $updates = [];
+
+                    // Build WHERE conditions to find matching source channels
+                    $matchConditions = $this->buildMatchConditions($targetChannels, $this->channelMatchAttributes);
+
+                    if (empty($matchConditions)) {
+                        return;
+                    }
+
+                    // Query only the source channels that could potentially match this target chunk
+                    $sourceChannelsQuery = $sourcePlaylist->channels()->select($sourceFieldsToSelect);
+
+                    foreach ($this->channelMatchAttributes as $attribute) {
+                        if (isset($matchConditions[$attribute]) && ! empty($matchConditions[$attribute])) {
+                            $sourceChannelsQuery->whereIn($attribute, $matchConditions[$attribute]);
+                        }
+                    }
+
+                    // Build lookup of source channels by match key
+                    $sourceChannelsByMatchKey = [];
+                    foreach ($sourceChannelsQuery->cursor() as $sourceChannel) {
+                        $matchKey = $this->buildMatchKey($sourceChannel, $this->channelMatchAttributes);
+                        if ($matchKey !== null) {
+                            $sourceChannelsByMatchKey[$matchKey] = $sourceChannel;
+                        }
+                    }
+
+                    // Process each target channel
+                    foreach ($targetChannels as $targetChannel) {
+                        $matchKey = $this->buildMatchKey($targetChannel, $this->channelMatchAttributes);
+
+                        if ($matchKey === null || ! isset($sourceChannelsByMatchKey[$matchKey])) {
                             continue;
                         }
 
-                        // Special handling for group: translate group name into group_id on target
-                        if ($targetField === 'group') {
-                            $desiredName = trim((string) $sourceValue);
-                            if ($desiredName === '') {
-                                continue;
-                            }
+                        $sourceChannel = $sourceChannelsByMatchKey[$matchKey];
+                        $updateData = $this->buildUpdateData($sourceChannel, $targetChannel, $attributeMapping, $groupNameToId, $targetPlaylist);
 
-                            $lower = strtolower($desiredName);
-
-                            // Use existing mapping from outer scope if available
-                            if (array_key_exists($lower, $groupNameToId)) {
-                                $groupId = $groupNameToId[$lower];
-                            } else {
-                                // Create the group for the target playlist and cache the id
-                                $customGroup = Group::query()->create([
-                                    'name' => $desiredName,
-                                    'playlist_id' => $targetPlaylist->id,
-                                    'user_id' => $targetPlaylist->user_id ?? null,
-                                    'sort_order' => 0,
-                                    'created_at' => now(),
-                                    'updated_at' => now(),
-                                ]);
-                                $groupId = $customGroup->id;
-                                $groupNameToId[$lower] = $groupId;
-                            }
-
-                            // Set both the textual group column and the foreign key
-                            $updateData['group'] = $desiredName;
-                            $updateData['group_id'] = $groupId;
-
-                            continue;
+                        if (! empty($updateData)) {
+                            $updateData['updated_at'] = now();
+                            $updates[$targetChannel->id] = $updateData;
                         }
-
-                        // Default copy behavior
-                        $updateData[$targetField] = $sourceValue;
                     }
 
-                    if (! empty($updateData)) {
-                        $updateData['updated_at'] = now();
-                        $updates[$targetChannel->id] = $updateData;
+                    // Batch update all channels in this chunk
+                    if (! empty($updates)) {
+                        foreach ($updates as $channelId => $updateData) {
+                            DB::table('channels')
+                                ->where('id', $channelId)
+                                ->update($updateData);
+                            $totalUpdated++;
+                        }
+                    }
+                });
+        }
+
+        $totalProcessed = $totalUpdated + $totalCreated;
+        Log::info("CopyAttributesToPlaylist: Updated {$totalUpdated} and created {$totalCreated} channels from playlist {$sourcePlaylist->id} to playlist {$targetPlaylist->id}");
+
+        return $totalProcessed;
+    }
+
+    /**
+     * Build update data array for an existing target channel from source channel
+     */
+    private function buildUpdateData(
+        $sourceChannel,
+        $targetChannel,
+        array $attributeMapping,
+        array &$groupNameToId,
+        Playlist $targetPlaylist
+    ): array {
+        $updateData = [];
+
+        foreach ($attributeMapping as $sourceField => $targetFieldOrFields) {
+            // Handle case where targetFieldOrFields is an array [target_custom, fallback]
+            if (is_array($targetFieldOrFields)) {
+                $targetField = $targetFieldOrFields[0];
+                $sourceValue = null;
+                foreach ($targetFieldOrFields as $field) {
+                    $sourceValue = $sourceChannel->{$field};
+                    if ($sourceValue !== null) {
+                        break;
                     }
                 }
+            } else {
+                $targetField = $targetFieldOrFields;
+                $sourceValue = $sourceChannel->{$sourceField};
+            }
 
-                // groupNameToId is updated by-reference and persists across chunks
+            $targetValue = $targetChannel->{$targetField};
 
-                // Batch update all channels in this chunk
-                if (! empty($updates)) {
-                    foreach ($updates as $channelId => $updateData) {
-                        DB::table('channels')
-                            ->where('id', $channelId)
-                            ->update($updateData);
-                        $totalUpdated++;
-                    }
+            // Only update if we have a value to copy and either overwrite is enabled
+            // or the target field is empty
+            if ($sourceValue === null || (! $this->overwrite && $targetValue !== null)) {
+                continue;
+            }
+
+            // Special handling for group: translate group name into group_id on target
+            if ($targetField === 'group') {
+                $desiredName = trim((string) $sourceValue);
+                if ($desiredName === '') {
+                    continue;
                 }
-            });
 
-        Log::info("CopyAttributesToPlaylist: Updated {$totalUpdated} channels from playlist {$sourcePlaylist->id} to playlist {$targetPlaylist->id}");
+                $lower = strtolower($desiredName);
 
-        return $totalUpdated;
+                if (array_key_exists($lower, $groupNameToId)) {
+                    $groupId = $groupNameToId[$lower];
+                } else {
+                    // Create the group for the target playlist and cache the id
+                    $customGroup = Group::query()->create([
+                        'name' => $desiredName,
+                        'playlist_id' => $targetPlaylist->id,
+                        'user_id' => $targetPlaylist->user_id ?? null,
+                        'sort_order' => 0,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                    $groupId = $customGroup->id;
+                    $groupNameToId[$lower] = $groupId;
+                }
+
+                $updateData['group'] = $desiredName;
+                $updateData['group_id'] = $groupId;
+
+                continue;
+            }
+
+            // Default copy behavior
+            $updateData[$targetField] = $sourceValue;
+        }
+
+        return $updateData;
+    }
+
+    /**
+     * Build channel data array for creating a new channel from source
+     */
+    private function buildChannelData(
+        $sourceChannel,
+        Playlist $targetPlaylist,
+        array &$groupNameToId
+    ): array {
+        $channelData = [
+            //'is_custom' => true, // New channels are always custom
+            'playlist_id' => $targetPlaylist->id,
+            'user_id' => $targetPlaylist->user_id,
+            //'is_vod' => $sourceChannel->is_vod ?? false,
+            'source_id' => $sourceChannel->source_id ?? null,
+            'name' => $sourceChannel->name ?? null,
+            'title' => $sourceChannel->title ?? null,
+            'url' => $sourceChannel->url ?? null,
+            'logo' => $sourceChannel->logo ?? null,
+            'logo_internal' => $sourceChannel->logo ?? $sourceChannel->logo_internal ?? null,
+            'stream_id' => $sourceChannel->stream_id ?? null,
+            'station_id' => $sourceChannel->station_id ?? null,
+            'channel' => $sourceChannel->channel ?? null,
+            'shift' => $sourceChannel->shift ?? 0,
+            'enabled' => $sourceChannel->enabled ?? true,
+            'group' => $sourceChannel->group ?? null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+
+        // Copy custom fields if they exist on the source
+        if (isset($sourceChannel->name_custom)) {
+            $channelData['name_custom'] = $sourceChannel->name_custom;
+        }
+        if (isset($sourceChannel->title_custom)) {
+            $channelData['title_custom'] = $sourceChannel->title_custom;
+        }
+        if (isset($sourceChannel->stream_id_custom)) {
+            $channelData['stream_id_custom'] = $sourceChannel->stream_id_custom;
+        }
+
+        // Handle group creation/assignment
+        if (! empty($sourceChannel->group)) {
+            $groupName = trim((string) $sourceChannel->group);
+            $lower = strtolower($groupName);
+
+            if (array_key_exists($lower, $groupNameToId)) {
+                $channelData['group_id'] = $groupNameToId[$lower];
+            } else {
+                // Create the group and cache it
+                $customGroup = Group::query()->create([
+                    'name' => $groupName,
+                    'playlist_id' => $targetPlaylist->id,
+                    'user_id' => $targetPlaylist->user_id ?? null,
+                    'sort_order' => 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                $groupNameToId[$lower] = $customGroup->id;
+                $channelData['group_id'] = $customGroup->id;
+            }
+        }
+
+        return $channelData;
     }
 
     /**
@@ -375,7 +509,7 @@ class CopyAttributesToPlaylist implements ShouldQueue
                     $mapping['logo_internal'] = 'logo'; // Special case: source logo_internal -> custom logo
                     break;
 
-                    // Then custom field mappings
+                // Then custom field mappings
                 case 'name':
                     $mapping['name'] = ['name_custom', 'name']; // Prefer custom, fallback to base
                     break;
@@ -386,7 +520,7 @@ class CopyAttributesToPlaylist implements ShouldQueue
                     $mapping['stream_id'] = ['stream_id_custom', 'stream_id']; // Prefer custom, fallback to base
                     break;
 
-                    // And finally, direct mappings without custom fields
+                // And finally, direct mappings without custom fields
                 case 'enabled':
                 case 'station_id':
                 case 'group':

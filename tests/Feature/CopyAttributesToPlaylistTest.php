@@ -54,6 +54,7 @@ it('can copy all attributes from source to target playlist', function () {
         targetId: $targetPlaylist->id,
         channelAttributes: [],
         channelMatchAttributes: ['source_id'], // Match by source_id
+        createIfMissing: false,
         allAttributes: true,
         overwrite: true // When copying all attributes, we should overwrite existing values
     );
@@ -110,6 +111,7 @@ it('can copy specific attributes from source to target playlist', function () {
         targetId: $targetPlaylist->id,
         channelAttributes: ['name', 'logo'],
         channelMatchAttributes: ['source_id'], // Match by source_id
+        createIfMissing: false,
         allAttributes: false,
         overwrite: false
     );
@@ -158,6 +160,7 @@ it('respects overwrite flag when copying attributes', function () {
         targetId: $targetPlaylist->id,
         channelAttributes: ['name', 'title'],
         channelMatchAttributes: ['source_id'], // Match by source_id
+        createIfMissing: false,
         allAttributes: false,
         overwrite: false
     );
@@ -177,6 +180,7 @@ it('respects overwrite flag when copying attributes', function () {
         targetId: $targetPlaylist->id,
         channelAttributes: ['name', 'title'],
         channelMatchAttributes: ['source_id'], // Match by source_id
+        createIfMissing: false,
         allAttributes: false,
         overwrite: true
     );
@@ -219,6 +223,7 @@ it('can match channels by name and title when source_id does not match', functio
         targetId: $targetPlaylist->id,
         channelAttributes: ['logo'],
         channelMatchAttributes: ['name', 'title'], // Match by name AND title
+        createIfMissing: false,
         allAttributes: false,
         overwrite: false
     );
@@ -259,6 +264,7 @@ it('handles cases where no matching channels are found', function () {
         targetId: $targetPlaylist->id,
         channelAttributes: ['name'],
         channelMatchAttributes: ['source_id'], // Match by source_id
+        createIfMissing: false,
         allAttributes: false,
         overwrite: false
     );
@@ -269,4 +275,69 @@ it('handles cases where no matching channels are found', function () {
 
     // Should remain unchanged since no matching channel was found
     expect($targetChannel->name_custom)->toBeNull();
+});
+
+it('can create missing channels when createIfMissing is enabled', function () {
+    // Create source playlist with channels
+    $sourcePlaylist = Playlist::factory()->create(['user_id' => $this->user->id]);
+    $sourceChannel1 = Channel::factory()->create([
+        'playlist_id' => $sourcePlaylist->id,
+        'user_id' => $this->user->id,
+        'source_id' => 'new-channel-1',
+        'name' => 'New Channel 1',
+        'title' => 'New Channel Title 1',
+        'url' => 'https://example.com/new1.m3u8',
+        'logo_internal' => 'https://example.com/logo1.png',
+        'stream_id' => 'new-stream-1',
+        'enabled' => true,
+        'group' => 'New Group',
+    ]);
+    $sourceChannel2 = Channel::factory()->create([
+        'playlist_id' => $sourcePlaylist->id,
+        'user_id' => $this->user->id,
+        'source_id' => 'new-channel-2',
+        'name' => 'New Channel 2',
+        'title' => 'New Channel Title 2',
+        'url' => 'https://example.com/new2.m3u8',
+        'enabled' => false,
+    ]);
+
+    // Create target playlist (empty - no matching channels)
+    $targetPlaylist = Playlist::factory()->create(['user_id' => $this->user->id]);
+
+    // Initial channel count should be 0
+    expect($targetPlaylist->channels()->count())->toBe(0);
+
+    // Run the job with createIfMissing enabled
+    $job = new CopyAttributesToPlaylist(
+        source: $sourcePlaylist,
+        targetId: $targetPlaylist->id,
+        channelAttributes: [],
+        channelMatchAttributes: ['url'], // Match by URL
+        createIfMissing: true, // Enable channel creation
+        allAttributes: true,
+        overwrite: true
+    );
+
+    $result = $job->handle();
+
+    // Should have created 2 new channels
+    expect($result)->toBe(2);
+    expect($targetPlaylist->channels()->count())->toBe(2);
+
+    // Verify the created channels have the correct attributes
+    $createdChannel1 = $targetPlaylist->channels()->where('url', 'https://example.com/new1.m3u8')->first();
+    expect($createdChannel1)->not->toBeNull();
+    expect($createdChannel1->name)->toBe('New Channel 1');
+    expect($createdChannel1->title)->toBe('New Channel Title 1');
+    expect($createdChannel1->logo_internal)->toBe('https://example.com/logo1.png');
+    expect($createdChannel1->stream_id)->toBe('new-stream-1');
+    expect($createdChannel1->enabled)->toBe(true);
+    expect($createdChannel1->group)->toBe('New Group');
+    expect($createdChannel1->group_id)->not->toBeNull(); // Group should be created and assigned
+
+    $createdChannel2 = $targetPlaylist->channels()->where('url', 'https://example.com/new2.m3u8')->first();
+    expect($createdChannel2)->not->toBeNull();
+    expect($createdChannel2->name)->toBe('New Channel 2');
+    expect($createdChannel2->enabled)->toBe(false);
 });

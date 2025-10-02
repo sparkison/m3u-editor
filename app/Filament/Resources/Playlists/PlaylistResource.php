@@ -411,6 +411,14 @@ class PlaylistResource extends Resource
                                 ->required()
                                 ->default(['url'])
                                 ->columnSpanFull(),
+                            Toggle::make('create_missing_channels')
+                                ->label('Create Missing Channels')
+                                ->live()
+                                ->hintIcon(
+                                    'heroicon-s-information-circle',
+                                    tooltip: 'If enabled, missing channels will be created in the target playlist. If disabled, only existing matched channels will be updated.',
+                                )
+                                ->default(false),
                             Toggle::make('all_attributes')
                                 ->label('All Attributes')
                                 ->live()
@@ -452,6 +460,7 @@ class PlaylistResource extends Resource
                                     targetId: $data['target_playlist_id'],
                                     channelAttributes: $data['channel_attributes'] ?? [],
                                     channelMatchAttributes: $data['channel_match_attributes'] ?? ['url'],
+                                    createIfMissing: $data['create_missing_channels'] ?? false,
                                     allAttributes: $data['all_attributes'] ?? false,
                                     overwrite: $data['overwrite'] ?? false,
                                 ));
