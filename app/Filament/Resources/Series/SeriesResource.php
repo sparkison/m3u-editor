@@ -415,7 +415,7 @@ class SeriesResource extends Resource
                     ->schema([
                         Toggle::make('overwrite_existing')
                             ->label('Overwrite Existing Metadata')
-                            ->helperText('Overwrite existing metadata? If disabled, it will only fetch and process episodes for the Series.')
+                            ->helperText('Overwrite existing metadata? Episodes and seasons will always be fetched/updated.')
                             ->default(false),
                     ])
                     ->action(function ($records, array $data) {

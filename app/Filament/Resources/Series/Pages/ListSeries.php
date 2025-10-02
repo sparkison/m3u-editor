@@ -62,7 +62,7 @@ class ListSeries extends ListRecords
                     ->schema([
                         Toggle::make('overwrite_existing')
                             ->label('Overwrite Existing Metadata')
-                            ->helperText('Overwrite existing metadata? If disabled, it will only fetch and process episodes for the enabled Series.')
+                            ->helperText('Overwrite existing metadata? Episodes and seasons will always be fetched/updated.')
                             ->default(false),
                         Toggle::make('all_playlists')
                             ->label('All Playlists')
