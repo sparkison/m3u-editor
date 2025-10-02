@@ -197,9 +197,11 @@ class CopyAttributesToPlaylist implements ShouldQueue
                         }
                     }
 
-                    // Batch insert new channels
+                    // Batch insert new channels using Eloquent to ensure casts are applied
                     if (! empty($channelsToCreate)) {
-                        Channel::query()->insert($channelsToCreate);
+                        foreach ($channelsToCreate as $channelData) {
+                            Channel::create($channelData);
+                        }
                         $totalCreated += count($channelsToCreate);
                     }
                 });
@@ -366,10 +368,10 @@ class CopyAttributesToPlaylist implements ShouldQueue
         array &$groupNameToId
     ): array {
         $channelData = [
-            //'is_custom' => true, // New channels are always custom
+            'is_custom' => true,
             'playlist_id' => $targetPlaylist->id,
             'user_id' => $targetPlaylist->user_id,
-            //'is_vod' => $sourceChannel->is_vod ?? false,
+            'is_vod' => $sourceChannel->is_vod ?? false,
             'source_id' => $sourceChannel->source_id ?? null,
             'name' => $sourceChannel->name ?? null,
             'title' => $sourceChannel->title ?? null,
