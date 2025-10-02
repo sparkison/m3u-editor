@@ -179,14 +179,14 @@ class Series extends Model
                             'url' => $url,
                             'info' => json_encode([
                                 'release_date' => $ep['info']['release_date'] ?? null,
-                                'plot' => $ep['info']['plot'] ?? null,
+                                'plot' => $ep['info']['plot'] ?? $seasonInfo['plot'] ?? null,
                                 'duration_secs' => $ep['info']['duration_secs'] ?? null,
                                 'duration' => $ep['info']['duration'] ?? null,
                                 'movie_image' => $ep['info']['movie_image'] ?? null,
                                 'bitrate' => $ep['info']['bitrate'] ?? 0,
                                 'rating' => $ep['info']['rating'] ?? null,
-                                'season' => $ep['info']['season'] ?? null,
-                                'tmdb_id' => $ep['info']['tmdb_id'] ?? null,
+                                'season' => (int) $season,
+                                'tmdb_id' => $ep['info']['tmdb_id'] ?? $seasonInfo['tmdb'] ?? null,
                                 'cover_big' => $ep['info']['cover_big'] ?? null,
                             ]),
                         ];
