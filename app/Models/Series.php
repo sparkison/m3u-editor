@@ -124,9 +124,11 @@ class Series extends Model
                         ->where('season_number', $season)
                         ->first();
 
+                    // Get season info if available
+                    $seasonInfo = $info['seasons'][$season] ?? [];
+
                     if (!$playlistSeason) {
                         // Create the season if it doesn't exist
-                        $seasonInfo = $info['seasons'][$season] ?? [];
                         $playlistSeason = $this->seasons()->create([
                             'season_number' => $season,
                             'name' => "Season " . str_pad($season, 2, '0', STR_PAD_LEFT),
