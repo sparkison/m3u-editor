@@ -74,10 +74,7 @@ class ProcessEpgImportComplete implements ShouldQueue
         ]);
 
         // Check if there are any sync jobs that should be re-run
-        $epg->epgMaps()->where([
-            ['recurring', '=', true],
-            ['playlist_id', '!=', null],
-        ])->get()->each(function ($map) {
+        $epg->epgMaps()->where('recurring', true)->get()->each(function ($map) {
             dispatch(new MapPlaylistChannelsToEpg(
                 epg: $map->epg_id,
                 playlist: $map->playlist_id,

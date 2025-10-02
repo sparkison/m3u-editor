@@ -229,15 +229,11 @@ class EpgMapResource extends Resource
                 ->searchable(),
             Toggle::make('override')
                 ->label('Overwrite')
-                ->disabled((fn($record) => $record && $record->playlist_id === null))
-                ->helperText((fn($record): string => $record && $record->playlist_id === null ? 'Not available for custom channel mappings' : 'Overwrite channels with existing mappings?'))
-                ->hintIcon((fn($record) => $record && $record->playlist_id === null ? 'heroicon-o-lock-closed' : ''))
+                ->helperText('Overwrite channels with existing mappings?')
                 ->default(false),
             Toggle::make('recurring')
                 ->label('Recurring')
-                ->disabled((fn($record) => $record && $record->playlist_id === null))
-                ->helperText((fn($record): string => $record && $record->playlist_id === null ? 'Not available for custom channel mappings' : 'Re-run this mapping everytime the EPG is synced?'))
-                ->hintIcon((fn($record) => $record && $record->playlist_id === null ? 'heroicon-o-lock-closed' : ''))
+                ->helperText('Re-run this mapping everytime the EPG is synced?')
                 ->default(false),
             Fieldset::make('Advanced Settings')
                 ->columns(2)

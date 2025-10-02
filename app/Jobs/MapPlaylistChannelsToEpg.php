@@ -84,6 +84,11 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
 
             // Set force to the existing map override setting if not explicitly set
             $this->force = $map->override;
+
+            // Set channels, if set on mapping
+            if ($map->channels) {
+                $this->channels = $map->channels;
+            }
         } else {
             $map = EpgMap::create([
                 'name' => $epg->name . $subtext,
@@ -96,6 +101,7 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                 'override' => $this->force,
                 'recurring' => $this->recurring,
                 'settings' => $this->settings,
+                'channels' => $this->channels,
                 'mapped_at' => now(),
             ]);
         }
