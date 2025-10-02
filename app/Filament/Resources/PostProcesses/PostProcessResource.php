@@ -45,7 +45,7 @@ class PostProcessResource extends Resource
     protected static ?string $label = 'Post Process';
     protected static ?string $pluralLabel = 'Post Processing';
     protected static string | \UnitEnum | null $navigationGroup = 'Tools';
-    
+
     public static function getGloballySearchableAttributes(): array
     {
         return ['name'];
@@ -65,7 +65,7 @@ class PostProcessResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema
-            ->components(self::getForm());
+            ->components(self::getForm($schema->getOperation()));
     }
 
     public static function table(Table $table): Table
@@ -135,7 +135,7 @@ class PostProcessResource extends Resource
         ];
     }
 
-    public static function getForm(): array
+    public static function getForm($operation = 'create'): array
     {
         $schema = [
             Toggle::make('enabled')
@@ -223,9 +223,18 @@ class PostProcessResource extends Resource
                         ->label('Request type')
                         ->grouped()
                         ->required()
+                        ->boolean()
                         ->options([
                             false => 'GET',
                             true => 'POST',
+                        ])
+                        ->icons([
+                            false => 'heroicon-s-arrow-down-on-square',
+                            true => 'heroicon-s-arrow-up-on-square',
+                        ])
+                        ->colors([
+                            false => 'success',
+                            true => 'primary',
                         ])
                         ->default(false)
                         ->helperText('Send as GET or POST request.'),
@@ -422,10 +431,15 @@ class PostProcessResource extends Resource
                         ->helperText('Add conditions that must be met for this post process to execute. All conditions must be true for execution.'),
                 ]),
         ];
-        return [
-            Grid::make()
-                ->schema($schema)
-                ->columns(2),
+        return  [
+            $operation === 'create'
+                ? Grid::make()->schema($schema)->columns(2)
+                : Section::make('Configuration')
+                    ->icon('heroicon-s-pencil-square')
+                    ->collapsible()
+                    ->collapsed(true)
+                    ->compact()
+                    ->schema($schema)->columns(2),
         ];
     }
 }

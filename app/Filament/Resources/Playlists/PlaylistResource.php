@@ -831,6 +831,7 @@ class PlaylistResource extends Resource
                     ToggleButtons::make('xtream')
                         ->label('Playlist type')
                         ->grouped()
+                        ->boolean()
                         ->options([
                             false => 'm3u8 url or local file',
                             true => 'Xtream API',
@@ -838,6 +839,10 @@ class PlaylistResource extends Resource
                         ->icons([
                             false => 'heroicon-s-link',
                             true => 'heroicon-s-bolt',
+                        ])
+                        ->colors([
+                            false => 'primary',
+                            true => 'success',
                         ])
                         ->default(false)
                         ->live(),
