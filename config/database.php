@@ -118,6 +118,21 @@ return [
             'sslmode' => 'prefer',
         ],
 
+        'pg_test' => [
+            'driver' => 'pgsql',
+            'url' => env('DB_URL'),
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '5432'),
+            'database' => env('TEST_DB_DATABASE', 'm3ue_test'),
+            'username' => env('TEST_DB_USERNAME', 'root'),
+            'password' => env('TEST_DB_PASSWORD', 'root'),
+            'charset' => env('TEST_DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => 'prefer',
+        ],
+
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),

@@ -22,6 +22,7 @@ class CopyAttributesToPlaylist implements ShouldQueue
         public Playlist $source,
         public int $targetId,
         public array $channelAttributes,
+        public array $channelMatchAttributes,
         public bool $allAttributes = false,
         public bool $overwrite = false,
     ) {

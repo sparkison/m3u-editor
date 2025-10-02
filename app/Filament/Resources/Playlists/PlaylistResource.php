@@ -392,11 +392,33 @@ class PlaylistResource extends Resource
                                 })
                                 ->searchable()
                                 ->required(),
+                            Select::make('channel_match_attributes')
+                                ->label('Channel Match Attributes')
+                                ->options([
+                                    'name' => 'Name',
+                                    'title' => 'Title',
+                                    'url' => 'URL',
+                                    'stream_id' => 'TVG-ID/Stream ID',
+                                    'station_id' => 'Station ID (tvc-guide-stationid)',
+                                    'logo_internal' => 'Logo (tvg-logo)',
+                                    'channel' => 'Channel Number (tvg-chno/num)',
+                                ])
+                                ->hintIcon(
+                                    'heroicon-s-information-circle',
+                                    tooltip: 'Select the channel attributes to match channels between the source and target playlists. Channels will be matched based on these attributes. If multiple attributes are selected, all must match for a channel to be considered the same.',
+                                )
+                                ->multiple()
+                                ->required()
+                                ->default(['url'])
+                                ->columnSpanFull(),
                             Toggle::make('all_attributes')
                                 ->label('All Attributes')
                                 ->live()
-                                ->default(true)
-                                ->helperText('If enabled, all channel attributes will be copied to the target playlist.'),
+                                ->hintIcon(
+                                    'heroicon-s-information-circle',
+                                    tooltip: 'If enabled, all channel attributes will be copied to the target playlist. If disabled, only the selected attributes below will be copied.',
+                                )
+                                ->default(true),
                             Select::make('channel_attributes')
                                 ->label('Channel Attributes to Copy')
                                 ->options([
@@ -417,8 +439,11 @@ class PlaylistResource extends Resource
                                 ->hidden(fn($get) => (bool) $get('all_attributes')),
                             Toggle::make('overwrite')
                                 ->label('Overwrite Existing Attributes')
-                                ->default(true)
-                                ->helperText('If enabled, existing custom attributes in the target playlist will be overwritten. If disabled, only empty custom attributes will be updated.'),
+                                ->hintIcon(
+                                    'heroicon-s-information-circle',
+                                    tooltip: 'If enabled, existing custom attributes in the target playlist will be overwritten. If disabled, only empty custom attributes will be updated.',
+                                )
+                                ->default(true),
                         ])
                         ->action(function ($record, $data) {
                             app('Illuminate\Contracts\Bus\Dispatcher')
@@ -426,6 +451,7 @@ class PlaylistResource extends Resource
                                     source: $record,
                                     targetId: $data['target_playlist_id'],
                                     channelAttributes: $data['channel_attributes'] ?? [],
+                                    channelMatchAttributes: $data['channel_match_attributes'] ?? ['url'],
                                     allAttributes: $data['all_attributes'] ?? false,
                                     overwrite: $data['overwrite'] ?? false,
                                 ));
