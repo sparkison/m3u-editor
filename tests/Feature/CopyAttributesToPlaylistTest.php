@@ -53,6 +53,7 @@ it('can copy all attributes from source to target playlist', function () {
         source: $sourcePlaylist,
         targetId: $targetPlaylist->id,
         channelAttributes: [],
+        channelMatchAttributes: ['source_id'], // Match by source_id
         allAttributes: true,
         overwrite: true // When copying all attributes, we should overwrite existing values
     );
@@ -108,6 +109,7 @@ it('can copy specific attributes from source to target playlist', function () {
         source: $sourcePlaylist,
         targetId: $targetPlaylist->id,
         channelAttributes: ['name', 'logo'],
+        channelMatchAttributes: ['source_id'], // Match by source_id
         allAttributes: false,
         overwrite: false
     );
@@ -155,6 +157,7 @@ it('respects overwrite flag when copying attributes', function () {
         source: $sourcePlaylist,
         targetId: $targetPlaylist->id,
         channelAttributes: ['name', 'title'],
+        channelMatchAttributes: ['source_id'], // Match by source_id
         allAttributes: false,
         overwrite: false
     );
@@ -173,6 +176,7 @@ it('respects overwrite flag when copying attributes', function () {
         source: $sourcePlaylist,
         targetId: $targetPlaylist->id,
         channelAttributes: ['name', 'title'],
+        channelMatchAttributes: ['source_id'], // Match by source_id
         allAttributes: false,
         overwrite: true
     );
@@ -209,11 +213,12 @@ it('can match channels by name and title when source_id does not match', functio
         'logo' => null,
     ]);
 
-    // Run the job
+    // Run the job - match by name AND title (both must match)
     $job = new CopyAttributesToPlaylist(
         source: $sourcePlaylist,
         targetId: $targetPlaylist->id,
         channelAttributes: ['logo'],
+        channelMatchAttributes: ['name', 'title'], // Match by name AND title
         allAttributes: false,
         overwrite: false
     );
@@ -253,6 +258,7 @@ it('handles cases where no matching channels are found', function () {
         source: $sourcePlaylist,
         targetId: $targetPlaylist->id,
         channelAttributes: ['name'],
+        channelMatchAttributes: ['source_id'], // Match by source_id
         allAttributes: false,
         overwrite: false
     );

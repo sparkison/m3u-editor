@@ -124,7 +124,7 @@ return [
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '5432'),
             'database' => env('TEST_DB_DATABASE', 'm3ue_test'),
-            'username' => env('TEST_DB_USERNAME', 'root'),
+            'username' => env('TEST_DB_USERNAME', 'postgres'),
             'password' => env('TEST_DB_PASSWORD', 'root'),
             'charset' => env('TEST_DB_CHARSET', 'utf8'),
             'prefix' => '',

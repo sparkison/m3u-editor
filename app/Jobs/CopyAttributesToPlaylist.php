@@ -46,7 +46,7 @@ class CopyAttributesToPlaylist implements ShouldQueue
             $results = $this->copyChannelAttributes();
         } catch (\Exception $e) {
             // Log the error
-            Log::error('Error copying attributes to playlist: ' . $e->getMessage());
+            Log::error('Error copying attributes to playlist: '.$e->getMessage());
 
             // Notify the user of the failure
             Notification::make()
@@ -79,8 +79,7 @@ class CopyAttributesToPlaylist implements ShouldQueue
         // Get the attribute mapping for copying
         $attributeMapping = $this->getAttributeMapping();
 
-        // Get all source channels that we want to copy from
-        // Include both base fields and custom fields so we can prefer custom when available
+        // Build the source fields to select - include both base and custom fields
         $sourceFieldsToSelect = [
             'id',
             'source_id',
@@ -96,29 +95,21 @@ class CopyAttributesToPlaylist implements ShouldQueue
             'channel',
             'shift',
             'station_id',
-            'url'
+            'url',
         ];
 
         // Add any additional fields from attribute mapping
         foreach ($attributeMapping as $sourceField => $targetFieldOrFields) {
             if (is_array($targetFieldOrFields)) {
-                // The value is an array of fields to try, add all of them
                 $sourceFieldsToSelect = array_merge($sourceFieldsToSelect, $targetFieldOrFields);
             } else {
-                // Single source field
                 $sourceFieldsToSelect[] = $sourceField;
             }
         }
-        $sourceFieldsToSelect = array_unique($sourceFieldsToSelect);
 
-        // Build a lookup array from source channels using cursor for memory efficiency
-        $sourceChannels = collect();
-        foreach ($sourcePlaylist->channels()->select($sourceFieldsToSelect)->cursor() as $sourceChannel) {
-            $sourceChannels->put($sourceChannel->source_id, $sourceChannel);
-        }
-        if ($sourceChannels->isEmpty()) {
-            return 0; // Nothing to copy
-        }
+        // Add match attributes to ensure they're available for matching
+        $sourceFieldsToSelect = array_merge($sourceFieldsToSelect, $this->channelMatchAttributes);
+        $sourceFieldsToSelect = array_unique($sourceFieldsToSelect);
 
         $totalUpdated = 0;
         $batchSize = 1000;
@@ -129,8 +120,8 @@ class CopyAttributesToPlaylist implements ShouldQueue
             $groupNameToId[strtolower($g->name ?? '')] = $g->id;
         }
 
-        // Process target channels in chunks for better performance
-        $fieldsToSelect = [
+        // Build the target fields to select
+        $targetFieldsToSelect = [
             'id',
             'source_id',
             'name',
@@ -138,7 +129,9 @@ class CopyAttributesToPlaylist implements ShouldQueue
             'logo',
             'name_custom',
             'title_custom',
+            'stream_id',
             'stream_id_custom',
+            'url',
             'url_custom',
             'enabled',
             'group',
@@ -149,29 +142,61 @@ class CopyAttributesToPlaylist implements ShouldQueue
             'channel',
             'shift',
             'station_id',
-        ] + array_values($attributeMapping);
-        $fieldsToSelect = array_unique($fieldsToSelect);
+            'logo_internal',
+        ];
 
+        // Add match attributes to ensure they're selected on target
+        $targetFieldsToSelect = array_merge($targetFieldsToSelect, $this->channelMatchAttributes);
+        $targetFieldsToSelect = array_unique($targetFieldsToSelect);
+
+        // Memory-efficient streaming approach:
+        // 1. Process target channels in chunks (e.g., 1000 at a time)
+        // 2. For each target chunk, query ONLY the potentially matching source channels
+        // 3. Match and update immediately, then release from memory
+        // This ensures we never load all channels into memory at once
         $targetPlaylist->channels()
-            ->select($fieldsToSelect)
-            ->chunkById($batchSize, function ($targetChannels) use ($sourceChannels, $attributeMapping, &$totalUpdated, &$groupNameToId, $targetPlaylist) {
+            ->select($targetFieldsToSelect)
+            ->chunkById($batchSize, function ($targetChannels) use ($sourcePlaylist, $sourceFieldsToSelect, $attributeMapping, &$totalUpdated, &$groupNameToId, $targetPlaylist) {
                 $updates = [];
 
+                // Build WHERE conditions to find matching source channels for this target chunk
+                // Extract unique values for each match attribute from this chunk of target channels
+                $matchConditions = $this->buildMatchConditions($targetChannels, $this->channelMatchAttributes);
+
+                if (empty($matchConditions)) {
+                    return; // No valid match conditions for this chunk
+                }
+
+                // Query only the source channels that could potentially match this target chunk
+                // Using whereIn on match attributes drastically reduces the result set
+                $sourceChannelsQuery = $sourcePlaylist->channels()->select($sourceFieldsToSelect);
+
+                // Apply the match conditions (all attributes must match)
+                foreach ($this->channelMatchAttributes as $attribute) {
+                    if (isset($matchConditions[$attribute]) && ! empty($matchConditions[$attribute])) {
+                        $sourceChannelsQuery->whereIn($attribute, $matchConditions[$attribute]);
+                    }
+                }
+
+                // Stream through matching source channels and build a temporary lookup for this chunk only
+                // This lookup is small (only channels that match current target chunk) and is released after processing
+                $sourceChannelsByMatchKey = [];
+                foreach ($sourceChannelsQuery->cursor() as $sourceChannel) {
+                    $matchKey = $this->buildMatchKey($sourceChannel, $this->channelMatchAttributes);
+                    if ($matchKey !== null) {
+                        $sourceChannelsByMatchKey[$matchKey] = $sourceChannel;
+                    }
+                }
+
+                // Process each target channel in this chunk
                 foreach ($targetChannels as $targetChannel) {
-                    // Try to find matching source channel by source_id first, then by name+title
-                    $sourceChannel = $sourceChannels->get($targetChannel->source_id);
+                    $matchKey = $this->buildMatchKey($targetChannel, $this->channelMatchAttributes);
 
-                    if (! $sourceChannel) {
-                        // Try to match by name and title if source_id match fails
-                        $sourceChannel = $sourceChannels->first(function ($channel) use ($targetChannel) {
-                            return $channel->name === $targetChannel->name &&
-                                $channel->title === $targetChannel->title;
-                        });
+                    if ($matchKey === null || ! isset($sourceChannelsByMatchKey[$matchKey])) {
+                        continue; // No matching source channel found
                     }
 
-                    if (! $sourceChannel) {
-                        continue; // No matching channel found
-                    }
+                    $sourceChannel = $sourceChannelsByMatchKey[$matchKey];
 
                     $updateData = [];
 
@@ -264,6 +289,62 @@ class CopyAttributesToPlaylist implements ShouldQueue
     }
 
     /**
+     * Build WHERE conditions for efficiently querying matching source channels
+     * Returns an array mapping each match attribute to the set of values from target channels
+     *
+     * @param  \Illuminate\Support\Collection  $targetChannels
+     * @return array<string, array<string>> Map of attribute => unique values
+     */
+    private function buildMatchConditions($targetChannels, array $matchAttributes): array
+    {
+        $conditions = [];
+
+        foreach ($matchAttributes as $attribute) {
+            $values = [];
+            foreach ($targetChannels as $channel) {
+                $value = $channel->{$attribute} ?? null;
+                if ($value !== null && $value !== '') {
+                    // Store normalized value for matching
+                    $values[] = $value;
+                }
+            }
+
+            // Store unique values for this attribute
+            if (! empty($values)) {
+                $conditions[$attribute] = array_unique($values);
+            }
+        }
+
+        return $conditions;
+    }
+
+    /**
+     * Build a composite match key from the channel using the specified match attributes
+     *
+     * @param  Channel  $channel
+     * @return string|null Returns null if any required match attribute is empty
+     */
+    private function buildMatchKey($channel, array $matchAttributes): ?string
+    {
+        $keyParts = [];
+
+        foreach ($matchAttributes as $attribute) {
+            $value = $channel->{$attribute} ?? null;
+
+            // If any match attribute is null/empty, we can't create a valid match key
+            if ($value === null || $value === '') {
+                return null;
+            }
+
+            // Normalize the value for consistent matching
+            $keyParts[] = strtolower(trim((string) $value));
+        }
+
+        // Create a composite key by joining all parts with a delimiter
+        return implode('|', $keyParts);
+    }
+
+    /**
      * Get the mapping of source fields to target custom fields
      */
     private function getAttributeMapping(): array
@@ -294,7 +375,7 @@ class CopyAttributesToPlaylist implements ShouldQueue
                     $mapping['logo_internal'] = 'logo'; // Special case: source logo_internal -> custom logo
                     break;
 
-                // Then custom field mappings
+                    // Then custom field mappings
                 case 'name':
                     $mapping['name'] = ['name_custom', 'name']; // Prefer custom, fallback to base
                     break;
@@ -305,7 +386,7 @@ class CopyAttributesToPlaylist implements ShouldQueue
                     $mapping['stream_id'] = ['stream_id_custom', 'stream_id']; // Prefer custom, fallback to base
                     break;
 
-                // And finally, direct mappings without custom fields
+                    // And finally, direct mappings without custom fields
                 case 'enabled':
                 case 'station_id':
                 case 'group':
