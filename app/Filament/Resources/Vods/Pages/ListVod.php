@@ -96,7 +96,11 @@ class ListVod extends ListRecords
                         Toggle::make('by_resolution')
                             ->label('Order by Resolution')
                             ->live()
-                            ->helperText('When enabled, the highest resolution failover will be prioritized first. This will take longer to process as each matched stream will need to be assessed to determine resolution.')
+                            ->helperText('⚠️ IPTV WARNING: This will analyze each stream to determine resolution, which may cause rate limiting or blocking with IPTV providers. Only enable if your provider allows stream analysis.')
+                            ->default(false),
+                        Toggle::make('deactivate_failover_channels')
+                            ->label('Deactivate Failover Channels')
+                            ->helperText('When enabled, channels that become failovers will be automatically disabled.')
                             ->default(false),
                     ])
                     ->action(function (array $data): void {
@@ -106,6 +110,7 @@ class ListVod extends ListRecords
                                 playlists: collect($data['failover_playlists']),
                                 playlistId: $data['playlist_id'],
                                 checkResolution: $data['by_resolution'] ?? false, // Sort failovers by resolution, or by playlist (default behavior)
+                                deactivateFailoverChannels: $data['deactivate_failover_channels'] ?? false,
                             ));
                     })->after(function () {
                         Notification::make()
