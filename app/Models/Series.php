@@ -8,6 +8,7 @@ use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Log;
 use Spatie\Tags\HasTags;
@@ -53,6 +54,11 @@ class Series extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function customPlaylists(): BelongsToMany
+    {
+        return $this->belongsToMany(CustomPlaylist::class, 'series_custom_playlist');
     }
 
     public function seasons(): HasMany

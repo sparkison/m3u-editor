@@ -152,6 +152,11 @@ class CustomPlaylistResource extends Resource
                         ->icon('heroicon-o-arrow-top-right-on-square')
                         ->url(fn($record) => PlaylistFacade::getUrls($record)['hdhr'])
                         ->openUrlInNewTab(),
+                    Action::make('Public URL')
+                        ->label('Public URL')
+                        ->icon('heroicon-o-arrow-top-right-on-square')
+                        ->url(fn($record) => '/playlist/v/' . $record->uuid)
+                        ->openUrlInNewTab(),
                     DeleteAction::make(),
                 ])->button()->hiddenLabel()->size('sm')
             ], position: RecordActionsPosition::BeforeCells)

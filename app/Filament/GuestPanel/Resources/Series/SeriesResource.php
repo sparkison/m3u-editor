@@ -6,6 +6,8 @@ use App\Facades\LogoFacade;
 use App\Facades\PlaylistFacade;
 use App\Filament\GuestPanel\Pages\Concerns\HasPlaylist;
 use App\Filament\GuestPanel\Resources\Series\RelationManagers\EpisodesRelationManager;
+use App\Models\CustomPlaylist;
+use App\Models\Playlist;
 use App\Models\Series;
 use BackedEnum;
 use Filament\Actions;
@@ -56,12 +58,23 @@ class SeriesResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $playlist = PlaylistFacade::resolvePlaylistByUuid(static::getCurrentUuid());
-        return parent::getEloquentQuery()
-            ->with('playlist') // Eager load the playlist relationship
-            ->where([
-                ['enabled', true], // Only show enabled series
-                ['playlist_id', $playlist?->id] // Only show series from the current playlist
-            ]);
+        if ($playlist instanceof Playlist) {
+            return parent::getEloquentQuery()
+                ->with('playlist') // Eager load the playlist relationship
+                ->where([
+                    ['enabled', true], // Only show enabled series
+                    ['playlist_id', $playlist?->id] // Only show series from the current playlist
+                ]);
+        }
+        if ($playlist instanceof CustomPlaylist) {
+            return parent::getEloquentQuery()
+                ->with('customPlaylists') // Eager load the customPlaylists relationship
+                ->whereHas('customPlaylists', function ($query) use ($playlist) {
+                    $query->where('custom_playlists.id', $playlist->id);
+                })
+                ->where('enabled', true); // Only show enabled series
+        }
+        return parent::getEloquentQuery();
     }
 
     public static function form(Schema $schema): Schema

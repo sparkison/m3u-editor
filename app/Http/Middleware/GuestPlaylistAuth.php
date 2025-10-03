@@ -52,7 +52,7 @@ class GuestPlaylistAuth extends Middleware
                 );
             }
         }
-        $playlist = Playlist::where('uuid', $uuid)->first();
+        $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
         if (!$playlist) {
             throw new AuthenticationException(
                 'Invalid playlist unique identifier',

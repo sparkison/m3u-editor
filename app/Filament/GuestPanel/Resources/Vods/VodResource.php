@@ -19,6 +19,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 use App\Facades\LogoFacade;
 use App\Facades\PlaylistFacade;
+use App\Models\CustomPlaylist;
+use App\Models\Playlist;
 use Filament\Tables\Enums\RecordActionsPosition;
 
 class VodResource extends Resource
@@ -61,13 +63,27 @@ class VodResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $playlist = PlaylistFacade::resolvePlaylistByUuid(static::getCurrentUuid());
-        return parent::getEloquentQuery()
-            ->with(['epgChannel', 'playlist', 'customPlaylist'])
-            ->where([
-                ['enabled', true], // Only show enabled channels
-                ['is_vod', true], // Only show VOD channels
-                ['playlist_id', $playlist?->id] // Only show VOD channels from the current playlist
-            ]);
+        if ($playlist instanceof Playlist) {
+            return parent::getEloquentQuery()
+                ->with(['epgChannel', 'playlist', 'customPlaylist'])
+                ->where([
+                    ['enabled', true], // Only show enabled channels
+                    ['is_vod', true], // Only show VOD channels
+                    ['playlist_id', $playlist?->id] // Only show VOD channels from the current playlist
+                ]);
+        }
+        if ($playlist instanceof CustomPlaylist) {
+            return parent::getEloquentQuery()
+                ->with(['epgChannel', 'customPlaylists']) // Eager load the customPlaylists relationship
+                ->whereHas('customPlaylists', function ($query) use ($playlist) {
+                    $query->where('custom_playlists.id', $playlist->id);
+                })
+                ->where([
+                    ['enabled', true], // Only show enabled channels
+                    ['is_vod', true], // Only show VOD channels
+                ]);
+        }
+        return parent::getEloquentQuery();
     }
 
     public static function form(Schema $schema): Schema
