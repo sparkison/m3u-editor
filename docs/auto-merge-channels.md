@@ -37,14 +37,35 @@ The system identifies channels for merging by:
 
 ### 3. Master Channel Selection
 Priority rules for selecting the master channel:
-1. **With Resolution Check**: Channel with highest resolution from preferred playlist, then highest resolution overall
-2. **Without Resolution Check**: Channel from preferred playlist with earliest order, then earliest playlist order overall
+
+**With Resolution Check (when "Order by Resolution" is enabled):**
+⚠️ **IMPORTANT**: This option will analyze each stream to determine resolution, which can cause rate limiting or blocking with IPTV providers. Only use this option when necessary and with providers that allow stream analysis.
+
+1. Find all channels with the highest resolution (requires stream analysis)
+2. If a "Preferred Playlist" is selected: Take the first channel from that playlist with highest resolution
+3. If no preferred playlist or no channel with highest resolution found there: Take the first channel with highest resolution (sorted by ID for consistency)
+
+**Without Resolution Check (Default behavior - RECOMMENDED for IPTV):**
+This is the safe option that doesn't require accessing streams, preventing rate limiting issues.
+
+1. If a "Preferred Playlist" is selected: Take the first channel from that playlist (sorted by ID)
+2. If no preferred playlist: Take the first channel based on playlist priority, then sorted by ID
+
+**For a single playlist:**
+- With Resolution Check: Channel with highest resolution becomes master (⚠️ requires stream analysis)
+- Without Resolution Check: The first channel (sorted by ID) becomes master (✅ safe for IPTV)
 
 ### 4. Failover Management
 - Remaining channels become failovers for the master channel
-- Failovers are sorted by resolution (descending) or playlist priority
+- **Improved sorting**: Failovers are sorted with multiple criteria for consistency:
+  - With resolution check: Resolution (desc) → Playlist priority → Channel ID (⚠️ requires stream analysis)
+  - Without resolution check: Playlist priority → Channel ID (✅ safe for IPTV)
 - If deactivation is enabled, failover channels are automatically disabled
 - Existing failover relationships are updated or created as needed
+
+**IPTV Considerations:**
+- Default behavior (without resolution check) is recommended for IPTV providers to avoid rate limiting
+- Resolution checking should only be used when the provider allows stream analysis without restrictions
 
 ## Performance Optimizations
 
@@ -57,6 +78,11 @@ Priority rules for selecting the master channel:
 - Uses cursor-based iteration for large channel sets
 - Bulk operations for creating failover relationships
 - Single query to identify existing failover channels
+
+### IPTV-Specific Optimizations
+- **Default mode (no resolution check)**: Fast processing with no stream access required
+- **Resolution mode**: Only use when absolutely necessary and provider allows stream analysis
+- **Rate limiting protection**: Default behavior prevents stream analysis to avoid provider restrictions
 
 ## Configuration
 
@@ -94,6 +120,15 @@ Located in the sync settings section of playlist creation/editing:
 3. **Advanced Settings** (expandable section)
    - **Prioritize by resolution**: Use stream analysis for master selection
    - **Force complete re-merge**: Reprocess all channels regardless of existing state
+
+### Manual Merge Interface
+Located in Channels and VODs list pages:
+
+1. **Merge Same ID** action
+   - **Preferred Playlist**: Select playlist to prioritize as master during merge
+   - **Failover Playlists**: One or more playlists to use as failover sources
+   - **Order by Resolution**: ⚠️ Enable resolution-based prioritization (may cause IPTV rate limiting)
+   - **Deactivate Failover Channels**: Automatically disable channels used as failovers
 
 ## Testing Locally
 
