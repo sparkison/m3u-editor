@@ -58,6 +58,10 @@ return [
 
     'logo_cache_expiry_days' => env('LOGO_CACHE_EXPIRY_DAYS', 30),
 
+    'login_path' => env('LOGIN_PATH', 'login'),
+
+    'redirect_guest_to_login' => env('REDIRECT_GUEST_TO_LOGIN', true),
+
     'log' => [
         'dir' => env('LOG_DIR', storage_path('logs')),
     ],

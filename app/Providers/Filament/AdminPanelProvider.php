@@ -15,6 +15,7 @@ use App\Filament\Widgets\SharedStreamStatsWidget;
 use App\Filament\Widgets\StatsOverview;
 use App\Filament\Widgets\SystemHealthWidget;
 use App\Filament\Widgets\UpdateNoticeWidget;
+use App\Http\Middleware\DashboardMiddleware;
 // use App\Filament\Widgets\PayPalDonateWidget;
 use App\Settings\GeneralSettings;
 use Exception;
@@ -69,6 +70,7 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('')
             ->login(Login::class)
+            ->loginRouteSlug(trim(config('app.login_path', 'login'), '/') ?? 'login')
             ->profile(EditProfile::class, isSimple: false)
             ->multiFactorAuthentication([
                 AppAuthentication::make()
@@ -122,6 +124,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->maxContentWidth($settings['content_width'])
             ->middleware([
+                DashboardMiddleware::class,
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
