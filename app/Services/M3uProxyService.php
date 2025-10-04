@@ -2,6 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\Channel;
+use App\Models\CustomPlaylist;
+use App\Models\Episode;
+use App\Models\MergedPlaylist;
+use App\Models\Playlist;
+use App\Models\PlaylistAlias;
 use Exception;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -9,6 +15,7 @@ use Illuminate\Support\Facades\Log;
 class M3uProxyService
 {
     protected string $apiBaseUrl;
+
     protected string $proxyUrlOverride;
 
     public function __construct()
@@ -18,74 +25,68 @@ class M3uProxyService
     }
 
     /**
-     * Request or build a stream URL from the external m3u-proxy server.
+     * Request or build a channel stream URL from the external m3u-proxy server.
      *
-     * @param string $type 'channel'|'episode'
-     * @param string|int $id
-     * @param string $format 'ts'|'hls' etc.
-     * @param bool $preview if true, return preview/local route style
-     * @return string
+     * @param  Playlist|CustomPlaylist|MergedPlaylist|PlaylistAlias  $playlist
+     * @param  Channel  $channel
      *
      * @throws Exception when base URL missing or API returns an error
      */
-    public function getStreamUrl(string $type, $id, string $format = 'ts', bool $preview = false): string
+    public function getChannelUrl($playlist, $channel): string
     {
         if (empty($this->apiBaseUrl)) {
-            throw new Exception('M3U proxy base URL is not configured (M3U_PROXY_BASE_URL).');
+            throw new Exception('M3U Proxy base URL is not configured');
         }
 
-        $encoded = rtrim(base64_encode((string) $id), '=');
-
-        // If preview, don't call external server - return the in-app route style (keeps preview behavior)
-        if ($preview) {
-            $baseUrl = $this->proxyUrlOverride ?: url();
-            if ($type === 'episode') {
-                return "{$baseUrl}/shared/stream/e/{$encoded}." . ($format === 'hls' ? 'm3u8' : $format);
-            }
-            return "{$baseUrl}/shared/stream/{$encoded}." . ($format === 'hls' ? 'm3u8' : $format);
+        $primaryUrl = PlaylistUrlService::getChannelUrl($channel, $playlist);
+        if (empty($primaryUrl)) {
+            throw new Exception('Channel primary URL is empty');
         }
 
-        // Try API first. The openapi for your external proxy may differ; adapt the endpoint/params as needed.
-        try {
-            $apiEndpoint = $this->apiBaseUrl . '/api/streams';
-            $response = Http::timeout(5)->acceptJson()->get($apiEndpoint, [
-                'type' => $type,
-                'id' => $encoded,
-                'format' => $format,
-            ]);
+        $userAgent = $playlist->user_agent;
+        $failovers = $channel->failoverChannels()
+            ->select(['id', 'url', 'url_custom'])->get()
+            ->map(fn($ch) => PlaylistUrlService::getChannelUrl($ch, $playlist))
+            ->filter()
+            ->values()
+            ->toArray();
 
-            if ($response->successful()) {
-                $payload = $response->json();
+        // Create/fetch the stream from the m3u-proxy API
+        $streamId = $this->createOrUpdateStream($primaryUrl, $failovers, $userAgent);
 
-                // Support common response shapes: { url: '...' } or { data: { url: '...' } }
-                $url = $payload['url'] ?? ($payload['data']['url'] ?? null);
+        // Return the proxy URL using the stream ID
+        return $this->buildProxyUrl($streamId);
+    }
 
-                if (!empty($url)) {
-                    return $url;
-                }
-
-                // If API returned data object with stream location
-                if (!empty($payload['data']['stream_url'])) {
-                    return $payload['data']['stream_url'];
-                }
-            }
-
-            Log::debug('M3U proxy API call failed or returned unexpected payload', [
-                'endpoint' => $apiEndpoint,
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
-        } catch (Exception $e) {
-            Log::warning('M3U proxy API request failed: ' . $e->getMessage());
-            // fall-through to fallback URL building
+    /**
+     * Request or build an episode stream URL from the external m3u-proxy server.
+     *
+     * @param  Playlist|CustomPlaylist|MergedPlaylist|PlaylistAlias  $playlist
+     * @param  Episode  $episode
+     *
+     * @throws Exception when base URL missing or API returns an error
+     */
+    public function getEpisodeUrl($playlist, $episode): string
+    {
+        if (empty($this->apiBaseUrl)) {
+            throw new Exception('M3U Proxy base URL is not configured');
         }
 
-        // Fallback predictable URL format (mirrors existing url_override pattern)
-        if ($type === 'episode') {
-            return "{$this->apiBaseUrl}/shared/stream/e/{$encoded}." . ($format === 'hls' ? 'm3u8' : $format);
+        $url = PlaylistUrlService::getEpisodeUrl($episode, $playlist);
+        if (empty($url)) {
+            throw new Exception('Episode URL is empty');
         }
 
-        return "{$this->apiBaseUrl}/shared/stream/{$encoded}." . ($format === 'hls' ? 'm3u8' : $format);
+        $userAgent = $playlist->user_agent;
+
+        // Episodes typically don't have failovers, but we'll support it if needed
+        $failoverUrls = [];
+
+        // Create/fetch the stream from the m3u-proxy API
+        $streamId = $this->createOrUpdateStream($url, $failoverUrls, $userAgent);
+
+        // Return the proxy URL using the stream ID
+        return $this->buildProxyUrl($streamId);
     }
 
     /**
@@ -95,15 +96,27 @@ class M3uProxyService
     public function stopStream(string $streamId): bool
     {
         if (empty($this->apiBaseUrl)) {
+            Log::warning('M3U Proxy base URL not configured');
+
             return false;
         }
 
         try {
-            $endpoint = $this->apiBaseUrl . '/api/streams/' . urlencode($streamId);
-            $response = Http::timeout(5)->delete($endpoint);
-            return $response->successful();
+            $endpoint = $this->apiBaseUrl . '/streams/' . urlencode($streamId);
+            $response = Http::timeout(10)->acceptJson()->delete($endpoint);
+
+            if ($response->successful()) {
+                Log::info("Stream {$streamId} stopped successfully");
+
+                return true;
+            }
+
+            Log::warning("Failed to stop stream {$streamId}: " . $response->body());
+
+            return false;
         } catch (Exception $e) {
-            Log::warning('Failed to stop stream on m3u-proxy: ' . $e->getMessage());
+            Log::error("Error stopping stream {$streamId}: " . $e->getMessage());
+
             return false;
         }
     }
@@ -119,8 +132,8 @@ class M3uProxyService
         }
 
         try {
-            $endpoint = $this->apiBaseUrl . '/api/streams';
-            $response = Http::timeout(5)->acceptJson()->get($endpoint, ['status' => 'active']);
+            $endpoint = $this->apiBaseUrl . '/streams';
+            $response = Http::timeout(5)->acceptJson()->get($endpoint);
             if ($response->successful()) {
                 return $response->json() ?: [];
             }
@@ -129,5 +142,79 @@ class M3uProxyService
         }
 
         return [];
+    }
+
+    /**
+     * Create or update a stream on the m3u-proxy API.
+     * Returns the stream ID.
+     *
+     * @param  string  $url  Primary stream URL
+     * @param  array  $failoverUrls  Array of failover URLs
+     * @param  string|null  $userAgent  Custom user agent
+     * @return string Stream ID
+     *
+     * @throws Exception when API request fails
+     */
+    protected function createOrUpdateStream(string $url, array $failoverUrls = [], ?string $userAgent = null): string
+    {
+        try {
+            $endpoint = $this->apiBaseUrl . '/streams';
+
+            $payload = [
+                'url' => $url,
+                'failover_urls' => $failoverUrls ?: null,
+            ];
+
+            if (! empty($userAgent)) {
+                $payload['user_agent'] = $userAgent;
+            }
+
+            $response = Http::timeout(10)
+                ->acceptJson()
+                ->post($endpoint, $payload);
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                if (isset($data['stream_id'])) {
+                    Log::info('Stream created/updated successfully', [
+                        'stream_id' => $data['stream_id'],
+                        'url' => $url,
+                    ]);
+
+                    return $data['stream_id'];
+                }
+
+                throw new Exception('Stream ID not found in API response');
+            }
+
+            throw new Exception('Failed to create stream: ' . $response->body());
+        } catch (Exception $e) {
+            Log::error('Error creating/updating stream on m3u-proxy', [
+                'error' => $e->getMessage(),
+                'url' => $url,
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Build the proxy URL for a given stream ID.
+     * Uses the configured proxy format (HLS or direct stream).
+     *
+     * @return string The full proxy URL
+     */
+    protected function buildProxyUrl(string $streamId): string
+    {
+        $baseUrl = ! empty($this->proxyUrlOverride) ? $this->proxyUrlOverride : $this->apiBaseUrl;
+        $format = config('proxy.proxy_format', 'hls');
+
+        if ($format === 'hls') {
+            // HLS format: /hls/{stream_id}/playlist.m3u8
+            return $baseUrl . '/hls/' . urlencode($streamId) . '/playlist.m3u8';
+        }
+
+        // Direct stream format: /stream/{stream_id}
+        return $baseUrl . '/stream/' . urlencode($streamId);
     }
 }
