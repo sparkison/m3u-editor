@@ -52,6 +52,18 @@ class DuplicatePlaylist implements ShouldQueue
             $newPlaylist->updated_at = $now;
             $newPlaylist->saveQuietly(); // Don't fire model events to prevent auto sync
 
+            // Copy the "source" groups
+            foreach ($playlist->sourceGroups()->get() as $source) {
+                $newSource = $source->replicate(except: [
+                    'id',
+                    'playlist_id',
+                ]);
+                $newSource->playlist_id = $newPlaylist->id;
+                $newSource->created_at = $now;
+                $newSource->updated_at = $now;
+                $newSource->save();
+            }
+
             // Copy the groups
             foreach ($playlist->groups()->get() as $group) {
                 $newGroup = $group->replicate(except: [
