@@ -52,7 +52,7 @@ class SimilaritySearchService
      */
     public function findMatchingEpgChannel($channel, $epg = null): ?EpgChannel
     {
-        $debug = config('app.debug');
+        $debug = false; // config('app.debug');
         $regionCode = $epg->preferred_local ? strtolower($epg->preferred_local) : null;
         $title = $channel->title_custom ?? $channel->title;
         $name = $channel->name_custom ?? $channel->name;
