@@ -86,7 +86,7 @@ class PlaylistGenerateController extends Controller
 
         // Get all active channels
         return response()->stream(
-            function () use ($playlist, $proxyEnabled, $type, $usedAuth, $defaultExtension) {
+            function () use ($playlist, $proxyEnabled, $type, $usedAuth, $format, $defaultExtension) {
                 // Get all active channels
                 $channels = $playlist->channels()
                     ->leftJoin('groups', 'channels.group_id', '=', 'groups.id')
@@ -165,19 +165,35 @@ class PlaylistGenerateController extends Controller
                         $icon = url('/placeholder.png');
                     }
 
+                    // Determine the extension and possibly proxy the URL
                     if ($proxyEnabled) {
+                        // If proxy enabled, we need to set the extension to the default
                         $extension = $defaultExtension;
+
+                        // Proxy the logo through the logo proxy controller
                         $icon = LogoProxyController::generateProxyUrl($icon);
+
+                        // Get the proxy URL
+                        $url = ProxyFacade::getProxyUrlForChannel(
+                            $channel->id,
+                            $format
+                        );
                     } else {
+                        // Get the extension from the source URL
                         $extension = pathinfo($url, PATHINFO_EXTENSION);
                     }
 
-                    $urlPath = '/live';
-                    if ($channel->is_vod) {
-                        $urlPath = '/movie';
-                        $extension = $channel->container_extension ?? 'mkv';
+                    // Format the URL in Xtream Codes format if not disabled
+                    // This way we can perform additional stream analysis, check for stream limits, etc.
+                    // When disabled, will return the raw URL from the channel (or the proxyfied URL if proxy enabled)
+                    if (!(config('app.disable_m3u_xtream_format') ?? false)) {
+                        $urlPath = '/live';
+                        if ($channel->is_vod) {
+                            $urlPath = '/movie';
+                            $extension = $channel->container_extension ?? 'mkv';
+                        }
+                        $url = url("{$urlPath}/{$username}/{$password}/" . $channel->id . "." . $extension);
                     }
-                    $url = url("{$urlPath}/{$username}/{$password}/" . $channel->id . "." . $extension);
 
                     // Make sure TVG ID only contains characters and numbers
                     $tvgId = preg_replace(config('dev.tvgid.regex'), '', $tvgId);

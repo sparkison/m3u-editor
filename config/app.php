@@ -62,6 +62,8 @@ return [
 
     'redirect_guest_to_login' => env('REDIRECT_GUEST_TO_LOGIN', true),
 
+    'disable_m3u_xtream_format' => env('DISABLE_M3U_XTREAM_FORMAT', false),
+
     'log' => [
         'dir' => env('LOG_DIR', storage_path('logs')),
     ],
