@@ -54,8 +54,12 @@ class M3uProxyService
         // Create/fetch the stream from the m3u-proxy API
         $streamId = $this->createOrUpdateStream($primaryUrl, $failovers, $userAgent);
 
+        // Get the format from the URL
+        $format = pathinfo($primaryUrl, PATHINFO_EXTENSION);
+        $format = $format === 'm3u8' ? 'hls' : $format;
+
         // Return the proxy URL using the stream ID
-        return $this->buildProxyUrl($streamId);
+        return $this->buildProxyUrl($streamId, $format);
     }
 
     /**
@@ -85,8 +89,12 @@ class M3uProxyService
         // Create/fetch the stream from the m3u-proxy API
         $streamId = $this->createOrUpdateStream($url, $failoverUrls, $userAgent);
 
+        // Get the format from the URL
+        $format = pathinfo($url, PATHINFO_EXTENSION);
+        $format = $format === 'm3u8' ? 'hls' : $format;
+
         // Return the proxy URL using the stream ID
-        return $this->buildProxyUrl($streamId);
+        return $this->buildProxyUrl($streamId, $format);
     }
 
     /**
@@ -204,10 +212,9 @@ class M3uProxyService
      *
      * @return string The full proxy URL
      */
-    protected function buildProxyUrl(string $streamId): string
+    protected function buildProxyUrl(string $streamId, $format = 'hls'): string
     {
         $baseUrl = ! empty($this->proxyUrlOverride) ? $this->proxyUrlOverride : $this->apiBaseUrl;
-        $format = config('proxy.proxy_format', 'hls');
 
         if ($format === 'hls') {
             // HLS format: /hls/{stream_id}/playlist.m3u8

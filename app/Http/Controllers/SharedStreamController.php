@@ -4,10 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Channel;
 use App\Models\Episode;
+use App\Services\PlaylistService;
 use App\Services\PlaylistUrlService;
-use App\Services\ProxyService;
 use App\Services\SharedStreamService;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
@@ -118,7 +117,7 @@ class SharedStreamController extends Controller
         }
 
         // Generate timeshift URL if applicable
-        $streamUrl = ProxyService::generateTimeshiftUrl($request, $streamUrl, $playlist);
+        $streamUrl = PlaylistService::generateTimeshiftUrl($request, $streamUrl, $playlist);
 
         $clientId = $this->generateClientId($request);
         $userAgent = $playlist->user_agent ?? 'VLC/3.0.21';

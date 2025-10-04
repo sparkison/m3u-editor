@@ -23,7 +23,6 @@ use App\Models\PlaylistAlias;
 use App\Models\User;
 use App\Services\EpgCacheService;
 use App\Services\FfmpegCodecService;
-use App\Services\HlsStreamService;
 use App\Services\PlaylistService;
 use App\Services\ProxyService;
 use App\Settings\GeneralSettings;
@@ -409,9 +408,6 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton('playlist', function () {
             return new PlaylistService();
         });
-
-        // Register the HLS stream service
-        $this->app->singleton(HlsStreamService::class);
 
         // Register the FFmpeg codec service
         $this->app->singleton(FfmpegCodecService::class);

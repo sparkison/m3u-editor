@@ -3,20 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\PlaylistAuth;
-use App\Facades\ProxyFacade;
 use App\Models\Playlist;
 use App\Models\MergedPlaylist;
 use App\Models\CustomPlaylist;
-use App\Models\User;
 use App\Models\Channel;
 use App\Models\Episode;
 use App\Models\PlaylistAlias;
-use App\Models\Series;
-use App\Services\ProxyService;
+use App\Services\PlaylistService;
 use App\Services\PlaylistUrlService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
@@ -316,7 +312,7 @@ class XtreamStreamController extends Controller
         } else {
             // If proxy is not enabled, simply return the timeshift URL
             $streamUrl = PlaylistUrlService::getChannelUrl($channel, $playlist);
-            $streamUrl = ProxyService::generateTimeshiftUrl($request, $streamUrl, $playlist);
+            $streamUrl = PlaylistService::generateTimeshiftUrl($request, $streamUrl, $playlist);
             return Redirect::to($streamUrl);
         }
     }

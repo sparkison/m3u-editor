@@ -8,8 +8,11 @@ use App\Models\CustomPlaylist;
 use App\Models\PlaylistAlias;
 use App\Models\PlaylistAuth;
 use App\Settings\GeneralSettings;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class PlaylistService
 {
@@ -404,5 +407,126 @@ class PlaylistService
             // Ignore
         }
         return $settings;
+    }
+
+    /**
+     * Generate a timeshift URL for a given stream.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @param string $streamUrl
+     * @param Playlist|MergedPlaylist|CustomPlaylist|PlaylistAlias $playlist
+     * 
+     * @return string
+     */
+    public static function generateTimeshiftUrl(Request $request, string $streamUrl, $playlist)
+    {
+        // TiviMate sends utc/lutc as UNIX epochs (UTC). We only convert TZ + format.
+        $utcPresent = $request->filled('utc');
+
+        // Xtream API sends timeshift_duration (minutes) and timeshift_date (YYYY-MM-DD:HH-MM-SS)
+        $xtreamTimeshiftPresent = $request->filled('timeshift_duration') && $request->filled('timeshift_date');
+
+        // Use the portal/provider timezone (DST-aware). Prefer per-playlist; last resort UTC.
+        $providerTz = $playlist?->server_timezone ?? 'Etc/UTC';
+
+        /* ── Timeshift SETUP (TiviMate → portal format) ───────────────────── */
+        if ($utcPresent && !$xtreamTimeshiftPresent) {
+            $utc = (int) $request->query('utc'); // programme start (UTC epoch)
+            $lutc = (int) ($request->query('lutc') ?? time()); // “live” now (UTC epoch)
+
+            // duration (minutes) from start → now; ceil avoids off-by-one near edges
+            $offset = max(1, (int) ceil(max(0, $lutc - $utc) / 60));
+
+            // "…://host/live/u/p/<id>.<ext>" >>> "…://host/streaming/timeshift.php?username=u&password=p&stream=id&start=stamp&duration=offset"
+            $rewrite = static function (string $url, string $stamp, int $offset): string {
+                if (preg_match('~^(https?://[^/]+)/live/([^/]+)/([^/]+)/([^/]+)\.[^/]+$~', $url, $m)) {
+                    [$_, $base, $user, $pass, $id] = $m;
+                    return sprintf(
+                        '%s/streaming/timeshift.php?username=%s&password=%s&stream=%s&start=%s&duration=%d',
+                        $base,
+                        $user,
+                        $pass,
+                        $id,
+                        $stamp,
+                        $offset
+                    );
+                }
+                return $url; // fallback if pattern does not match
+            };
+        } elseif ($xtreamTimeshiftPresent) {
+            /* ── Timeshift SETUP (Xtream API → Xtream API format) ─────────────────── */
+
+            // Handle Xtream API timeshift format
+            $duration = (int) $request->get('timeshift_duration'); // Duration in minutes
+            $date = $request->get('timeshift_date'); // Format: YYYY-MM-DD:HH-MM-SS
+
+            // "…://host/live/u/p/<id>.<ext>" >>> "…://host/timeshift/u/p/duration/stamp/<id>.<ext>"
+            $rewrite = static function (string $url, string $stamp, int $offset): string {
+                if (preg_match('~^(https?://[^/]+)/live/([^/]+)/([^/]+)/([^/]+)\.([^/]+)$~', $url, $m)) {
+                    [$_, $base, $user, $pass, $id, $ext] = $m;
+                    return sprintf(
+                        '%s/timeshift/%s/%s/%d/%s/%s.%s',
+                        $base,
+                        $user,
+                        $pass,
+                        $offset,
+                        $stamp,
+                        $id,
+                        $ext
+                    );
+                }
+                return $url; // fallback if pattern does not match
+            };
+        }
+        /* ─────────────────────────────────────────────────────────────────── */
+
+        // ── Apply timeshift rewriting AFTER we know the provider timezone ──
+        if ($utcPresent && !$xtreamTimeshiftPresent) {
+            // Convert the absolute UTC epoch from TiviMate to provider-local time string expected by timeshift.php
+            $stamp = Carbon::createFromTimestampUTC($utc)
+                ->setTimezone($providerTz)
+                ->format('Y-m-d:H-i');
+
+            $streamUrl = $rewrite($streamUrl, $stamp, $offset);
+
+            // Helpful debug for verification
+            Log::debug(sprintf(
+                '[TIMESHIFT-M3U] utc=%d lutc=%d tz=%s start=%s offset(min)=%d final_url=%s',
+                $utc,
+                $lutc,
+                $providerTz,
+                $stamp,
+                $offset,
+                $streamUrl
+            ));
+        } elseif ($xtreamTimeshiftPresent) {
+            // Convert Xtream API date format to timeshift URL format
+            // Input: YYYY-MM-DD:HH-MM-SS, Output: YYYY-MM-DD:HH-MM
+            if (preg_match('/^(\d{4})-(\d{2})-(\d{2}):(\d{2})-(\d{2})-(\d{2})$/', $date, $matches)) {
+                $stamp = sprintf('%s-%s-%s:%s-%s', $matches[1], $matches[2], $matches[3], $matches[4], $matches[5]);
+            } else {
+                // If the format doesn't match expected pattern, try to clean it up
+                $stamp = preg_replace('/[^\d\-:]/', '', $date);
+                $stamp = preg_replace('/:(\d{2})$/', '', $stamp); // Remove seconds if present
+            }
+
+            // Need to convert from app timezone to provider timezone
+            $stamp = Carbon::createFromFormat('Y-m-d:H-i', $stamp, config('app.timezone', 'UTC'))
+                ->setTimezone($providerTz)
+                ->format('Y-m-d:H-i');
+
+            $streamUrl = $rewrite($streamUrl, $stamp, $duration);
+
+            // Helpful debug for verification
+            Log::debug(sprintf(
+                '[TIMESHIFT-XTREAM] duration=%d date=%s converted_stamp=%s final_url=%s',
+                $duration,
+                $date,
+                $stamp,
+                $streamUrl
+            ));
+        }
+
+        return $streamUrl;
     }
 }
