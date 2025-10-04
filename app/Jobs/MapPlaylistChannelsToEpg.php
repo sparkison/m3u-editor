@@ -30,8 +30,8 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
 
     public $deleteWhenMissingModels = true;
 
-    // Giving a timeout of 15 minutes to the Job to process the mapping
-    public $timeout = 60 * 15;
+    // Giving a timeout of 30 minutes to the Job to process the mapping
+    public $timeout = 60 * 30;
 
     // Similarity search service
     protected SimilaritySearchService $similaritySearch;
@@ -245,7 +245,8 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                         ];
                     }
                 }
-            })->chunk(50)->each(function ($chunk) use ($epg, $map, $batchNo) {
+            })->chunk(50)->each(function ($chunk) use ($epg, $map, $channelCount, $batchNo) {
+                $map->update(['progress' => min(99, $map->progress + (50 / $channelCount * 100))]);
                 Job::create([
                     'title' => "Processing channel import for EPG: {$epg->name}",
                     'batch_no' => $batchNo,
@@ -255,9 +256,6 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                     ]
                 ]);
             });
-
-            // Update the progress
-            $map->update(['progress' => 20]);
 
             // Get the jobs for the batch
             $jobs = [];
