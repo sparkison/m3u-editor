@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Facades\PlaylistFacade;
 use Exception;
 use App\Models\Playlist;
 use App\Models\SharedStream;
@@ -30,7 +31,7 @@ class PlaylistInfo extends Component
 
     public function getStats(): array
     {
-        $playlist = Playlist::find($this->record->id);
+        $playlist = PlaylistFacade::resolvePlaylistByUuid($this->record->uuid);
         if (!$playlist) {
             return [];
         }

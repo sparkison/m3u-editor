@@ -13,6 +13,7 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Forms;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -28,6 +29,12 @@ class CategoriesRelationManager extends RelationManager
 
     protected static ?string $title = 'Categories';
     protected static ?string $navigationLabel = 'Categories';
+
+    public static function getTabComponent(Model $ownerRecord, string $pageClass): Tab
+    {
+        return Tab::make('Categories')
+            ->badge($ownerRecord->categories()->count());
+    }
 
     public function form(Schema $schema): Schema
     {

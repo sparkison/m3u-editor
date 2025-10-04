@@ -90,10 +90,20 @@ class CustomPlaylist extends Model
         return $this->hasMany(Channel::class);
     }
 
+    public function groups(): MorphToMany
+    {
+        return $this->groupTags();
+    }
+
     public function groupTags(): MorphToMany
     {
         return $this->morphToMany(\Spatie\Tags\Tag::class, 'taggable')
             ->where('type', $this->uuid);
+    }
+
+    public function categories(): MorphToMany
+    {
+        return $this->categoryTags();
     }
 
     public function categoryTags(): MorphToMany

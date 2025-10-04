@@ -6,6 +6,7 @@ use Filament\Actions\DeleteAction;
 use App\Filament\Resources\CustomPlaylists\CustomPlaylistResource;
 use App\Services\EpgCacheService;
 use Filament\Actions;
+use Filament\Actions\ViewAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 
@@ -16,7 +17,11 @@ class EditCustomPlaylist extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            DeleteAction::make(),
+            ViewAction::make()
+                ->label('View Playlist')
+                ->icon('heroicon-m-eye'),
+            DeleteAction::make()
+                ->icon('heroicon-m-trash'),
         ];
     }
 

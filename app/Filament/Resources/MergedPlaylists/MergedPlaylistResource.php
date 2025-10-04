@@ -367,6 +367,7 @@ class MergedPlaylistResource extends Resource
                         ->tabs([
                             Tab::make('General')
                                 ->columns(2)
+                                ->icon('heroicon-m-cog')
                                 ->schema([
                                     Section::make('Playlist Settings')
                                         ->compact()
@@ -489,6 +490,7 @@ class MergedPlaylistResource extends Resource
 
                             Tab::make('Output')
                                 ->columns(2)
+                                ->icon('heroicon-m-arrow-up-right')
                                 ->schema($outputScheme),
                         ]),
                 ]),

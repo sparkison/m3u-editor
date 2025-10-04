@@ -43,9 +43,11 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use App\Facades\PlaylistFacade;
+use App\Filament\Resources\CustomPlaylists\Pages\ViewCustomPlaylist;
 use App\Forms\Components\XtreamApiInfo;
 use App\Models\SharedStream;
 use App\Services\EpgCacheService;
+use Filament\Actions\ViewAction;
 use Filament\Forms\FormsComponent;
 use Illuminate\Support\Facades\Redis;
 
@@ -140,7 +142,6 @@ class CustomPlaylistResource extends Resource
             ])
             ->recordActions([
                 ActionGroup::make([
-                    EditAction::make(),
                     Action::make('Download M3U')
                         ->label('Download M3U')
                         ->icon('heroicon-o-arrow-down-tray')
@@ -158,7 +159,11 @@ class CustomPlaylistResource extends Resource
                         ->url(fn($record) => '/playlist/v/' . $record->uuid)
                         ->openUrlInNewTab(),
                     DeleteAction::make(),
-                ])->button()->hiddenLabel()->size('sm')
+                ])->button()->hiddenLabel()->size('sm'),
+                EditAction::make()
+                    ->button()->hiddenLabel()->size('sm'),
+                ViewAction::make()
+                    ->button()->hiddenLabel()->size('sm'),
             ], position: RecordActionsPosition::BeforeCells)
             ->toolbarActions([
                 BulkActionGroup::make([
@@ -183,6 +188,7 @@ class CustomPlaylistResource extends Resource
         return [
             'index' => ListCustomPlaylists::route('/'),
             // 'create' => Pages\CreateCustomPlaylist::route('/create'),
+            'view' => ViewCustomPlaylist::route('/{record}'),
             'edit' => EditCustomPlaylist::route('/{record}/edit'),
         ];
     }
@@ -358,23 +364,6 @@ class CustomPlaylistResource extends Resource
                         ->hidden(fn(Get $get): bool => !$get('enable_proxy')),
                 ])
         ];
-
-        $urls = [
-            PlaylistM3uUrl::make('m3u_url')
-                ->label('M3U URL')
-                ->columnSpan(1)
-                ->dehydrated(false), // don't save the value in the database
-            PlaylistEpgUrl::make('epg_url')
-                ->label('EPG URL')
-                ->columnSpan(1)
-                ->dehydrated(false), // don't save the value in the database
-        ];
-        if (PlaylistFacade::mediaFlowProxyEnabled()) {
-            $urls[] = MediaFlowProxyUrl::make('mediaflow_proxy_url')
-                ->label('Proxied M3U URL')
-                ->columnSpan(1)
-                ->dehydrated(false); // don't save the value in the database
-        }
         return [
             Grid::make()
                 ->hiddenOn(['edit']) // hide this field on the edit form
@@ -395,6 +384,7 @@ class CustomPlaylistResource extends Resource
                         ->tabs([
                             Tab::make('General')
                                 ->columns(2)
+                                ->icon('heroicon-m-cog')
                                 ->schema([
                                     Section::make('Playlist Settings')
                                         ->compact()
@@ -486,36 +476,8 @@ class CustomPlaylistResource extends Resource
                                                 ->dehydrated(false), // Don't save this field directly
                                         ])
                                 ]),
-                            Tab::make('Links')
-                                ->columns(2)
-                                ->icon('heroicon-m-link')
-                                ->schema([
-                                    Section::make('Links')
-                                        ->compact()
-                                        ->description('Manage playlist links and URL options.')
-                                        ->icon('heroicon-m-link')
-                                        ->columnSpan(2)
-                                        ->columns(2)
-                                        ->schema($urls)
-                                ]),
-                            Tab::make('Xtream API')
-                                ->columns(2)
-                                ->icon('heroicon-m-bolt')
-                                ->schema([
-                                    Section::make('Xtream API')
-                                        ->compact()
-                                        ->description('Xtream API connection details.')
-                                        ->icon('heroicon-m-bolt')
-                                        ->columnSpan(2)
-                                        ->schema([
-                                            XtreamApiInfo::make('xtream_api_info')
-                                                ->label('Xtream API Info')
-                                                ->columnSpan(2)
-                                                ->dehydrated(false), // don't save the value in the database
-                                        ]),
-                                ]),
-
                             Tab::make('Output')
+                                ->icon('heroicon-m-arrow-up-right')
                                 ->columns(2)
                                 ->schema($outputScheme),
                         ]),
