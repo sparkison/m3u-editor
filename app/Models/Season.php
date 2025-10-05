@@ -26,6 +26,7 @@ class Season extends Model
         'series_id' => 'integer',
         'season_number' => 'integer',
         'episode_count' => 'integer',
+        'metadata' => 'array',
     ];
 
     public function user(): BelongsTo

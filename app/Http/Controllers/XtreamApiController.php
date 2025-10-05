@@ -820,10 +820,32 @@ class XtreamApiController extends Controller
                 'category_id' => (string)($seriesItem->category_id ?? ($seriesItem->category ? $seriesItem->category->id : 'all')),
             ];
 
+            $seasons = [];
             $episodesBySeason = [];
             if ($seriesItem->seasons && $seriesItem->seasons->isNotEmpty()) {
                 foreach ($seriesItem->seasons as $season) {
                     $seasonNumber = $season->season_number;
+                    $seasonCover = $playlist->enable_proxy && ($season->cover ?? false)
+                        ? LogoProxyController::generateProxyUrl($season->cover)
+                        : $season->cover;
+                    $tmdbCover = $playlist->enable_proxy && ($seriesItem->metadata['cover_tmdb'] ?? false)
+                        ? LogoProxyController::generateProxyUrl($seriesItem->metadata['cover_tmdb'])
+                        : ($seriesItem->metadata['cover_tmdb'] ?? null);
+                    $coverBig = $playlist->enable_proxy && ($season->cover_big ?? false)
+                        ? LogoProxyController::generateProxyUrl($season->cover_big)
+                        : ($season->cover_big ?? null);
+                    $seasons[] = [
+                        'name' => $season->metadata['name'] ?? "Season {$seasonNumber}",
+                        'episode_count' => $season->episode_count ?? 0,
+                        'overview' => $season->metadata['overview'] ?? '',
+                        'air_date' => $season->metadata['air_date'] ?? '',
+                        'cover' => $seasonCover,
+                        'cover_tmdb' => $tmdbCover,
+                        'season_number' => (int)$seasonNumber,
+                        'cover_big' => $coverBig,
+                        'releaseDate' => $season->metadata['release_date'] ?? $season->metadata['releaseDate'] ?? $season->metadata['air_date'] ?? '',
+                        'duration' => (string)($season->metadata['duration'] ?? 0),
+                    ];
                     $seasonEpisodes = [];
                     if ($season->episodes && $season->episodes->isNotEmpty()) {
                         $orderedEpisodes = $season->episodes->sortBy('episode_num');
@@ -866,7 +888,7 @@ class XtreamApiController extends Controller
             return response()->json([
                 'info' => $seriesInfo,
                 'episodes' => $episodesBySeason,
-                'seasons' => $episodesBySeason // Alias for compatibility
+                'seasons' => $seasons
             ]);
         } else if ($action === 'get_live_categories') {
             $liveCategories = [];

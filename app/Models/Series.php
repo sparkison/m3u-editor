@@ -93,6 +93,7 @@ class Series extends Model
             }
 
             $detail = $xtream->getSeriesInfo($this->source_series_id);
+            $seasons = $detail['seasons'] ?? [];
             $info = $detail['info'] ?? [];
             $eps = $detail['episodes'] ?? [];
             $batchNo = Str::orderedUuid()->toString();
@@ -131,13 +132,13 @@ class Series extends Model
                         ->first();
 
                     // Get season info if available
-                    $seasonInfo = $info['seasons'][$season] ?? [];
+                    $seasonInfo = $seasons[$season] ?? [];
 
                     if (!$playlistSeason) {
                         // Create the season if it doesn't exist
                         $playlistSeason = $this->seasons()->create([
                             'season_number' => $season,
-                            'name' => "Season " . str_pad($season, 2, '0', STR_PAD_LEFT),
+                            'name' => $seasonInfo['name'] ?? "Season " . str_pad($season, 2, '0', STR_PAD_LEFT),
                             'source_season_id' => $seasonInfo['id'] ?? null,
                             'episode_count' => $seasonInfo['episode_count'] ?? 0,
                             'cover' => $seasonInfo['cover'] ?? null,
@@ -147,6 +148,7 @@ class Series extends Model
                             'series_id' => $this->id,
                             'category_id' => $playlistCategory->id,
                             'import_batch_no' => $batchNo,
+                            'metadata' => $seasonInfo,
                         ]);
                     } else {
                         // Update the season if it exists
@@ -159,6 +161,7 @@ class Series extends Model
                             'cover_big' => $seasonInfo['cover_big'] ?? null,
                             'series_id' => $this->id,
                             'import_batch_no' => $batchNo,
+                            'metadata' => $seasonInfo,
                         ]);
                     }
 
