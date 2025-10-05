@@ -199,7 +199,7 @@ class PlayerTranscodingService
     private function getFfmpegPath(): string
     {
         $settings = app(GeneralSettings::class);
-        $ffmpegPath = $settings['ffmpeg_path'] ?? 'jellyfin-ffmpeg'; // Default to 'jellyfin-ffmpeg' if not in settings for some reason
+        $ffmpegPath = $settings->ffmpeg_path ?? 'jellyfin-ffmpeg'; // Default to 'jellyfin-ffmpeg' if not in settings for some reason
         return $ffmpegPath;
     }
 

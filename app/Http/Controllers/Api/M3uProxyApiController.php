@@ -66,7 +66,9 @@ class M3uProxyApiController extends Controller
         $url = app(M3uProxyService::class)->getChannelUrl($playlist, $id);
         $format = pathinfo($url, PATHINFO_EXTENSION);
 
-        return $this->streamTranscodedContent($request, $url, $format, $channel->name, $playlist);
+        $title = $channel->name_custom ?? $channel->name ?? $channel->title ?? 'Channel ' . $id;
+
+        return $this->streamTranscodedContent($request, $url, $format, $title, $playlist);
     }
 
     /**
@@ -85,7 +87,9 @@ class M3uProxyApiController extends Controller
         $url = app(M3uProxyService::class)->getEpisodeUrl($playlist, $id);
         $format = pathinfo($url, PATHINFO_EXTENSION);
 
-        return $this->streamTranscodedContent($request, $url, $format, $episode->title, $playlist);
+        $title = $episode->title ?? 'Episode ' . $id;
+
+        return $this->streamTranscodedContent($request, $url, $format, $title, $playlist);
     }
 
     /**
@@ -113,7 +117,6 @@ class M3uProxyApiController extends Controller
                 @ini_set('max_execution_time', 0);
                 @ini_set('output_buffering', 'off');
                 @ini_set('implicit_flush', 1);
-                @apache_setenv('no-gzip', '1');
 
                 if (ob_get_level()) {
                     ob_end_clean();
