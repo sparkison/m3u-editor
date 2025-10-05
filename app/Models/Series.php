@@ -99,7 +99,8 @@ class Series extends Model
             $batchNo = Str::orderedUuid()->toString();
 
             $update = [
-                'last_metadata_fetch' => now()
+                'last_metadata_fetch' => now(),
+                'metadata' => $info, // Store raw metadata
             ];
             if ($refresh) {
                 $item = $detail['info'] ?? null;
