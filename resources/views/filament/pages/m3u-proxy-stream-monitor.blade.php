@@ -197,8 +197,6 @@
                                                     <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Client IP</th>
                                                     <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Connected</th>
                                                     <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Duration</th>
-                                                    {{-- <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Data Received</th> --}}
-                                                    {{-- <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Bandwidth</th> --}}
                                                     <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                                                 </tr>
                                             </thead>
@@ -208,8 +206,6 @@
                                                         <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ $client['ip'] }}</td>
                                                         <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $client['connected_at'] }}</td>
                                                         <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $client['duration'] }}</td>
-                                                        {{-- <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $client['bytes_received'] }}</td> --}}
-                                                        {{-- <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $client['bandwidth'] }}</td> --}}
                                                         <td class="px-3 py-2 whitespace-nowrap">
                                                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $client['is_active'] ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200' }}">
                                                                 {{ $client['is_active'] ? 'Active' : 'Inactive' }}
@@ -229,10 +225,6 @@
                                     <div>
                                         <span class="text-gray-500 dark:text-gray-400">Stream ID:</span>
                                         <div class="font-mono text-xs break-all text-gray-900 dark:text-gray-100">{{ $stream['stream_id'] }}</div>
-                                    </div>
-                                    <div>
-                                        <span class="text-gray-500 dark:text-gray-400">Buffer Size:</span>
-                                        <div class="font-medium text-gray-900 dark:text-gray-100">{{ $stream['buffer_size'] }}</div>
                                     </div>
                                     <div>
                                         <span class="text-gray-500 dark:text-gray-400">Started At:</span>

@@ -12,7 +12,7 @@ return [
 
     // Use m3u-proxy service
     'use_m3u_proxy' => env('USE_M3U_PROXY', false),
-    'm3u_proxy_base_url' => env('M3U_PROXY_BASE_URL', 'http://localhost:8085'), // Base URL of the external m3u-proxy server
+    'm3u_proxy_url' => env('M3U_PROXY_URL', 'http://localhost:8085'), // Base URL of the external m3u-proxy server
 
     /*
     |--------------------------------------------------------------------------

@@ -2,6 +2,10 @@
 
 namespace App\Filament\Pages;
 
+use App\Facades\LogoFacade;
+use App\Http\Controllers\LogoProxyController;
+use App\Models\Channel;
+use App\Models\Episode;
 use Filament\Actions\Action;
 use Filament\Support\Enums\Size;
 use Filament\Forms\Components\TextInput;
@@ -51,12 +55,21 @@ class M3uProxyStreamMonitor extends Page
     public function refreshData(): void
     {
         $this->streams = $this->getActiveStreams();
-        // Basic aggregated stats can be implemented by the external API — attempt fetch or compute locally
+
+        $totalClients = array_sum(array_map(fn($s) => $s['client_count'] ?? 0, $this->streams));
+        $totalBandwidth = array_sum(array_map(fn($s) => $s['bandwidth_kbps'] ?? 0, $this->streams));
+        $activeStreams = count(array_filter($this->streams, fn($s) => $s['status'] === 'active'));
+
         $this->globalStats = [
             'total_streams' => count($this->streams),
-            'active_streams' => count($this->streams),
-            'total_clients' => array_sum(array_map(fn($s) => $s['client_count'] ?? 0, $this->streams)),
+            'active_streams' => $activeStreams,
+            'total_clients' => $totalClients,
+            'total_bandwidth_kbps' => round($totalBandwidth, 2),
+            'avg_clients_per_stream' => count($this->streams) > 0
+                ? number_format($totalClients / count($this->streams), 2)
+                : '0.00',
         ];
+
         $this->systemStats = []; // populate if external API provides system metrics
     }
 
@@ -69,18 +82,18 @@ class M3uProxyStreamMonitor extends Page
                 ->size(Size::Small)
                 ->action('refreshData'),
 
-            Action::make('cleanup')
-                ->label('Cleanup Streams')
-                ->icon('heroicon-o-trash')
-                ->size(Size::Small)
-                ->color('danger')
-                ->requiresConfirmation()
-                ->modalDescription('This will stop all inactive streams via external API.')
-                ->action(function (): void {
-                    // If external API exposes a cleanup endpoint add call here
-                    Notification::make()->title('Cleanup requested.')->success()->send();
-                    $this->refreshData();
-                }),
+            // Action::make('cleanup')
+            //     ->label('Cleanup Streams')
+            //     ->icon('heroicon-o-trash')
+            //     ->size(Size::Small)
+            //     ->color('danger')
+            //     ->requiresConfirmation()
+            //     ->modalDescription('This will stop all inactive streams via external API.')
+            //     ->action(function (): void {
+            //         // If external API exposes a cleanup endpoint add call here
+            //         Notification::make()->title('Cleanup requested.')->success()->send();
+            //         $this->refreshData();
+            //     }),
         ];
     }
 
@@ -113,44 +126,99 @@ class M3uProxyStreamMonitor extends Page
     protected function getActiveStreams(): array
     {
         $apiStreams = $this->apiService->fetchActiveStreams();
+        $apiClients = $this->apiService->fetchActiveClients();
 
-        // Normalize API payload to the same structure the existing monitor expects.
-        return array_map(function ($s) {
-            // expected minimal fields from external API: id, source_url, format, status, client_count, bandwidth_kbps, clients[], started_at
-            $clients = [];
-            if (!empty($s['clients']) && is_array($s['clients'])) {
-                $clients = array_map(function ($c) {
-                    $connectedAt = isset($c['connected_at']) ? Carbon::parse($c['connected_at']) : null;
-                    $duration = $connectedAt ? now()->diff($connectedAt)->forHumans() : 0;
-                    return [
-                        'ip' => $c['ip'] ?? ($c['ip_address'] ?? 'Unknown'),
-                        'client_id' => $c['id'] ?? $c['client_id'] ?? null,
-                        'connected_at' => $connectedAt ? $connectedAt->timezone(config('app.timezone'))->toDayDateTimeString() : null,
-                        'user_agent' => $c['user_agent'] ?? 'Unknown',
-                        'duration' => $duration,
-                        'is_active' => ($c['status'] ?? '') === 'connected',
+        if (empty($apiStreams['streams'])) {
+            return [];
+        }
+
+        // Group clients by stream_id for easier lookup
+        $clientsByStream = collect($apiClients['clients'] ?? [])
+            ->groupBy('stream_id')
+            ->toArray();
+
+        $streams = [];
+        foreach ($apiStreams['streams'] as $stream) {
+            $streamId = $stream['stream_id'];
+            $streamClients = $clientsByStream[$streamId] ?? [];
+
+            // Get model information if metadata exists
+            $model = [];
+            if (isset($stream['metadata']['type']) && isset($stream['metadata']['id'])) {
+                $modelType = $stream['metadata']['type'];
+                $modelId = $stream['metadata']['id'];
+                if ($modelType === 'channel') {
+                    $channel = Channel::find($modelId);
+                    if ($channel) {
+                        $title = $channel->name_custom ?? $channel->name ?? $channel->title;
+                        $logo = LogoFacade::getChannelLogoUrl($channel);
+                    }
+                } elseif ($modelType === 'episode') {
+                    $episode = Episode::find($modelId);
+                    if ($episode) {
+                        $title = $episode->title;
+                        $logo = LogoFacade::getEpisodeLogoUrl($episode);
+                    }
+                }
+                if ($title || $logo) {
+                    $model = [
+                        'title' => $title ?? 'N/A',
+                        'logo' => $logo,
                     ];
-                }, $s['clients']);
+                }
             }
 
-            return [
-                'stream_id' => $s['id'] ?? $s['stream_id'] ?? null,
-                'source_url' => isset($s['source_url']) ? $this->truncateUrl($s['source_url']) : null,
-                'format' => strtoupper($s['format'] ?? ''),
-                'status' => $s['status'] ?? 'unknown',
-                'client_count' => $s['client_count'] ?? count($clients),
-                'bandwidth_kbps' => $s['bandwidth_kbps'] ?? 0,
-                'bytes_transferred' => $s['bytes_transferred'] ?? 0,
-                'buffer_size' => $s['buffer_size'] ?? 0,
-                'started_at' => $s['started_at'] ?? null,
-                'uptime' => isset($s['started_at']) ? Carbon::parse($s['started_at'])->diffForHumans(null, true) : 'N/A',
-                'process_running' => $s['process_running'] ?? ($s['status'] === 'active'),
+            // Calculate uptime
+            $startedAt = Carbon::parse($stream['created_at']);
+            $uptime = $startedAt->diffForHumans(null, true);
+
+            // Format bytes transferred
+            $bytesTransferred = $this->formatBytes($stream['total_bytes_served']);
+
+            // Calculate bandwidth (approximate based on bytes and time)
+            $durationSeconds = $startedAt->diffInSeconds(now());
+            $bandwidthKbps = $durationSeconds > 0
+                ? round(($stream['total_bytes_served'] * 8) / $durationSeconds / 1000, 2)
+                : 0;
+
+            // Format buffer size
+            $bufferSize = 'N/A'; // m3u-proxy may not expose this
+
+            // Normalize clients
+            $clients = array_map(function ($client) {
+                $connectedAt = Carbon::parse($client['created_at']);
+                return [
+                    'ip' => $client['ip_address'],
+                    'connected_at' => $connectedAt->format('Y-m-d H:i:s'),
+                    'duration' => $connectedAt->diffForHumans(null, true),
+                    'bytes_received' => $this->formatBytes($client['bytes_served']),
+                    'bandwidth' => 'N/A', // Can calculate if needed
+                    'is_active' => Carbon::parse($client['last_access'])->diffInSeconds(now()) < 30,
+                ];
+            }, $streamClients);
+
+            $streams[] = [
+                'stream_id' => $streamId,
+                'source_url' => $this->truncateUrl($stream['original_url']),
+                'current_url' => $stream['current_url'],
+                'format' => strtoupper($stream['stream_type']),
+                'status' => $stream['is_active'] ? 'active' : 'inactive',
+                'client_count' => $stream['client_count'],
+                'bandwidth_kbps' => $bandwidthKbps,
+                'bytes_transferred' => $bytesTransferred,
+                'uptime' => $uptime,
+                'buffer_size' => $bufferSize,
+                'started_at' => $startedAt->format('Y-m-d H:i:s'),
+                'process_running' => $stream['is_active'] && $stream['client_count'] > 0,
+                'model' => $model,
                 'clients' => $clients,
-                'peak_clients' => $s['peak_clients'] ?? 0,
-                'avg_bandwidth' => $s['avg_bandwidth'] ?? 0,
-                'model' => $s['model'] ?? null,
+                'has_failover' => $stream['has_failover'],
+                'error_count' => $stream['error_count'],
+                'segments_served' => $stream['total_segments_served'],
             ];
-        }, $apiStreams);
+        }
+
+        return $streams;
     }
 
     // Reuse helper methods from original monitor
@@ -161,6 +229,17 @@ class M3uProxyStreamMonitor extends Page
         }
 
         return substr($url, 0, $maxLength - 3) . '...';
+    }
+
+    protected function formatBytes(int $bytes, int $precision = 2): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+
+        for ($i = 0; $bytes > 1024 && $i < count($units) - 1; $i++) {
+            $bytes /= 1024;
+        }
+
+        return round($bytes, $precision) . ' ' . $units[$i];
     }
 
     public function getViewData(): array

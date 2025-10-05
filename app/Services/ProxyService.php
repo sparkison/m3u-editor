@@ -25,6 +25,14 @@ class ProxyService
      */
     public function getProxyUrlForChannel($id, $format = 'ts', $preview = false)
     {
+        $m3uProxy = config('proxy.use_m3u_proxy', false);
+        if ($m3uProxy) {
+            if ($preview) {
+                return route('m3u-proxy.channel.player', ['id' => $id]);
+            }
+            return route('m3u-proxy.channel', ['id' => $id]);
+        }
+
         $proxyUrlOverride = config('proxy.url_override');
         $proxyFormat = $format ?? config('proxy.proxy_format', 'ts');
         $id = rtrim(base64_encode($id), '=');
@@ -53,6 +61,14 @@ class ProxyService
      */
     public function getProxyUrlForEpisode($id, $format = 'ts', $preview = false)
     {
+        $m3uProxy = config('proxy.use_m3u_proxy', false);
+        if ($m3uProxy) {
+            if ($preview) {
+                return route('m3u-proxy.episode.player', ['id' => $id]);
+            }
+            return route('m3u-proxy.episode', ['id' => $id]);
+        }
+
         $proxyUrlOverride = config('proxy.url_override');
         $proxyFormat = $format ?? config('proxy.proxy_format', 'ts');
         $id = rtrim(base64_encode($id), '=');
