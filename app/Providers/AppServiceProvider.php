@@ -384,7 +384,7 @@ class AppServiceProvider extends ServiceProvider
                     'playlist/',
                     'epg/',
                     'user/',
-                    'channel',
+                    'channel/',
                     'player_api.php'
                 ]);
             })

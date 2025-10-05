@@ -143,7 +143,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     });
 
     // Channel API routes
-    Route::get('channel', [\App\Http\Controllers\ChannelController::class, 'index'])
+    Route::get('channel/get', [\App\Http\Controllers\ChannelController::class, 'index'])
         ->name('api.channels.index');
     Route::patch('channel/{id}', [\App\Http\Controllers\ChannelController::class, 'update'])
         ->name('api.channels.update');
