@@ -1314,9 +1314,7 @@ class XtreamApiController extends Controller
         }
 
         // If here, user is authenticated
-        return app()->call('App\\Http\\Controllers\\EpgGenerateController@__invoke', [
-            'uuid' => $playlist->uuid,
-        ]);
+        return redirect()->to(route('epg.generate', ['uuid' => $playlist->uuid]));
     }
 
     /**
