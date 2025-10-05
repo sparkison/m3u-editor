@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Route;
 Route::post('/admin/refresh-external-ip', function (ExternalIpService $ipService) {
     $ipService->clearCache();
     $ip = $ipService->getExternalIp();
+
     return response()->json(['success' => true, 'external_ip' => $ip]);
 })->middleware(['auth']);
 
@@ -140,6 +141,12 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         Route::get('epgs', [\App\Http\Controllers\UserController::class, 'epgs'])
             ->name('api.user.epgs');
     });
+
+    // Channel API routes
+    Route::get('channel', [\App\Http\Controllers\ChannelController::class, 'index'])
+        ->name('api.channels.index');
+    Route::patch('channel/{id}', [\App\Http\Controllers\ChannelController::class, 'update'])
+        ->name('api.channels.update');
 });
 
 // Playlist API routes

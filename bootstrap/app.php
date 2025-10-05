@@ -21,6 +21,8 @@ return Application::configure(basePath: dirname(__DIR__))
             ->trustProxies(at: ['*'])
             ->validateCsrfTokens(except: [
                 'webhook/test',
+                'channel',
+                'channel/*',
             ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
