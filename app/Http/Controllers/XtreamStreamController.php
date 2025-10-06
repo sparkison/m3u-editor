@@ -195,6 +195,13 @@ class XtreamStreamController extends Controller
         list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'live');
         if ($channel instanceof Channel) {
             if ($playlist->enable_proxy) {
+                $m3uProxy = config('proxy.use_m3u_proxy', false);
+                if ($m3uProxy) {
+                    return app()->call('App\\Http\\Controllers\\Api\\M3uProxyApiController@channel', [
+                        'id' => $streamId
+                    ]);
+                }
+
                 // If proxy enabled, call the controller method directly to avoid redirect loop
                 $encodedId = rtrim(base64_encode($streamId), '=');
                 return app()->call('App\\Http\\Controllers\\SharedStreamController@streamChannel', [
@@ -219,6 +226,13 @@ class XtreamStreamController extends Controller
         list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'vod');
         if ($channel instanceof Channel) {
             if ($playlist->enable_proxy) {
+                $m3uProxy = config('proxy.use_m3u_proxy', false);
+                if ($m3uProxy) {
+                    return app()->call('App\\Http\\Controllers\\Api\\M3uProxyApiController@channel', [
+                        'id' => $streamId
+                    ]);
+                }
+
                 // If proxy enabled, call the controller method directly to avoid redirect loop
                 $encodedId = rtrim(base64_encode($streamId), '=');
                 return app()->call('App\\Http\\Controllers\\SharedStreamController@streamChannel', [
@@ -243,6 +257,13 @@ class XtreamStreamController extends Controller
         list($playlist, $episode) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'episode');
         if ($episode instanceof Episode) {
             if ($playlist->enable_proxy) {
+                $m3uProxy = config('proxy.use_m3u_proxy', false);
+                if ($m3uProxy) {
+                    return app()->call('App\\Http\\Controllers\\Api\\M3uProxyApiController@episode', [
+                        'id' => $streamId
+                    ]);
+                }
+
                 // If proxy enabled, call the controller method directly to avoid redirect loop
                 $encodedId = rtrim(base64_encode($streamId), '=');
                 return app()->call('App\\Http\\Controllers\\SharedStreamController@streamEpisode', [
@@ -302,6 +323,13 @@ class XtreamStreamController extends Controller
         ]);
 
         if ($playlist->enable_proxy) {
+            $m3uProxy = config('proxy.use_m3u_proxy', false);
+            if ($m3uProxy) {
+                return app()->call('App\\Http\\Controllers\\Api\\M3uProxyApiController@channel', [
+                    'id' => $streamId
+                ]);
+            }
+
             // If proxy enabled, call the controller method directly to avoid redirect loop
             $encodedId = rtrim(base64_encode($streamId), '=');
             return app()->call('App\\Http\\Controllers\\SharedStreamController@streamChannel', [
