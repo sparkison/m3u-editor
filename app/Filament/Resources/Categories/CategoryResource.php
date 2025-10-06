@@ -252,7 +252,7 @@ class CategoryResource extends Resource
                         ->modalDescription('Sync selected category series .strm files now? This will generate .strm files for the enabled series at the path set for the series.')
                         ->modalSubmitActionLabel('Yes, sync now'),
                     Action::make('enable')
-                        ->label('Enable selected')
+                        ->label('Enable Category Series')
                         ->action(function ($record): void {
                             $record->series()->update(['enabled' => true]);
                         })->after(function () {
@@ -270,7 +270,7 @@ class CategoryResource extends Resource
                         ->modalDescription('Enable the selected category series now?')
                         ->modalSubmitActionLabel('Yes, enable now'),
                     Action::make('disable')
-                        ->label('Disable selected')
+                        ->label('Disable Category Series')
                         ->action(function ($record): void {
                             $record->series()->update(['enabled' => false]);
                         })->after(function () {
@@ -447,7 +447,7 @@ class CategoryResource extends Resource
                         ->modalDescription('Sync selected category series .strm files now? This will generate .strm files for the selected series at the path set for the series.')
                         ->modalSubmitActionLabel('Yes, sync now'),
                     BulkAction::make('enable')
-                        ->label('Enable selected')
+                        ->label('Enable Category Series')
                         ->action(function (Collection $records): void {
                             foreach ($records as $record) {
                                 $record->series()->update(['enabled' => true]);
@@ -459,7 +459,6 @@ class CategoryResource extends Resource
                                 ->body('The selected category series have been enabled.')
                                 ->send();
                         })
-                        ->color('success')
                         ->deselectRecordsAfterCompletion()
                         ->requiresConfirmation()
                         ->icon('heroicon-o-check-circle')
@@ -467,7 +466,7 @@ class CategoryResource extends Resource
                         ->modalDescription('Enable the selected category series now?')
                         ->modalSubmitActionLabel('Yes, enable now'),
                     BulkAction::make('disable')
-                        ->label('Disable selected')
+                        ->label('Disable Category Series')
                         ->action(function (Collection $records): void {
                             foreach ($records as $record) {
                                 $record->series()->update(['enabled' => false]);
@@ -479,14 +478,52 @@ class CategoryResource extends Resource
                                 ->body('The selected category series have been disabled.')
                                 ->send();
                         })
-                        ->color('warning')
                         ->deselectRecordsAfterCompletion()
                         ->requiresConfirmation()
                         ->icon('heroicon-o-x-circle')
                         ->modalIcon('heroicon-o-x-circle')
                         ->modalDescription('Disable the selected category series now?')
                         ->modalSubmitActionLabel('Yes, disable now'),
-                    // Tables\Actions\DeleteBulkAction::make(),
+                    BulkAction::make('enable_categories')
+                        ->label('Enable Categories')
+                        ->action(function (Collection $records): void {
+                            foreach ($records as $record) {
+                                $record->update(['enabled' => true]);
+                            }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Selected categories enabled')
+                                ->body('The selected categories have been enabled.')
+                                ->send();
+                        })
+                        ->color('success')
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-check-circle')
+                        ->modalIcon('heroicon-o-check-circle')
+                        ->modalDescription('Enable the selected categories now?')
+                        ->modalSubmitActionLabel('Yes, enable now'),
+                    BulkAction::make('disable_categories')
+                        ->label('Disable Categories')
+                        ->action(function (Collection $records): void {
+                            foreach ($records as $record) {
+                                $record->update(['enabled' => false]);
+                            }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Selected categories disabled')
+                                ->body('The selected categories have been disabled.')
+                                ->send();
+                        })
+                        ->color('warning')
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-x-circle')
+                        ->modalIcon('heroicon-o-x-circle')
+                        ->modalDescription('Disable the selected categories now?')
+                        ->modalSubmitActionLabel('Yes, disable now'),
                 ]),
             ]);
     }
