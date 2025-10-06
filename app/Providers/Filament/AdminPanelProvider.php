@@ -124,10 +124,10 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->maxContentWidth($settings['content_width'])
             ->middleware([
-                DashboardMiddleware::class,
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
+                DashboardMiddleware::class, // Needs to be after StartSession
                 AuthenticateSession::class,
                 ShareErrorsFromSession::class,
                 VerifyCsrfToken::class,
