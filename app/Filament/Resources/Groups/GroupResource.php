@@ -110,6 +110,9 @@ class GroupResource extends Resource
                     ->label('Auto Enable')
                     ->toggleable()
                     ->tooltip('Auto enable newly added group channels')
+                    ->tooltip(fn($record) => $record->playlist?->enable_channels ? 'Playlist auto-enable new channels is enabled, all group channels will automatically be enabled on next sync.' : 'Auto enable newly added group channels')
+                    ->disabled(fn($record) => $record->playlist?->enable_channels)
+                    ->getStateUsing(fn($record) => $record->playlist?->enable_channels ? true : $record->enabled)
                     ->sortable(),
                 TextColumn::make('name_internal')
                     ->label('Default name')
@@ -393,7 +396,7 @@ class GroupResource extends Resource
                         ->modalDescription('Move the group channels to the another group.')
                         ->modalSubmitActionLabel('Move now'),
                     BulkAction::make('enable')
-                        ->label('Enable group channels')
+                        ->label('Enable Group Shannels')
                         ->action(function (Collection $records): void {
                             foreach ($records as $record) {
                                 $record->channels()->update([
@@ -407,7 +410,6 @@ class GroupResource extends Resource
                                 ->body('The selected group channels have been enabled.')
                                 ->send();
                         })
-                        ->color('success')
                         ->deselectRecordsAfterCompletion()
                         ->requiresConfirmation()
                         ->icon('heroicon-o-check-circle')
@@ -415,7 +417,7 @@ class GroupResource extends Resource
                         ->modalDescription('Enable the selected group(s) channels now?')
                         ->modalSubmitActionLabel('Yes, enable now'),
                     BulkAction::make('disable')
-                        ->label('Disable group channels')
+                        ->label('Disable Group Channels')
                         ->action(function (Collection $records): void {
                             foreach ($records as $record) {
                                 $record->channels()->update([
@@ -429,13 +431,56 @@ class GroupResource extends Resource
                                 ->body('The selected groups channels have been disabled.')
                                 ->send();
                         })
-                        ->color('warning')
                         ->deselectRecordsAfterCompletion()
                         ->requiresConfirmation()
                         ->icon('heroicon-o-x-circle')
                         ->modalIcon('heroicon-o-x-circle')
                         ->modalDescription('Disable the selected group(s) channels now?')
-                        ->modalSubmitActionLabel('Yes, disable now')
+                        ->modalSubmitActionLabel('Yes, disable now'),
+                    BulkAction::make('enable_groups')
+                        ->label('Enable Groups')
+                        ->action(function (Collection $records): void {
+                            foreach ($records as $record) {
+                                $record->update([
+                                    'enabled' => true,
+                                ]);
+                            }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Selected groups enabled')
+                                ->body('The selected groups have been enabled.')
+                                ->send();
+                        })
+                        ->color('success')
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-check-circle')
+                        ->modalIcon('heroicon-o-check-circle')
+                        ->modalDescription('Enable the selected group(s) now?')
+                        ->modalSubmitActionLabel('Yes, enable now'),
+                    BulkAction::make('disable_groups')
+                        ->label('Disable Groups')
+                        ->action(function (Collection $records): void {
+                            foreach ($records as $record) {
+                                $record->update([
+                                    'enabled' => false,
+                                ]);
+                            }
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Selected groups disabled')
+                                ->body('The selected groups have been disabled.')
+                                ->send();
+                        })
+                        ->color('warning')
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-x-circle')
+                        ->modalIcon('heroicon-o-x-circle')
+                        ->modalDescription('Disable the selected group(s) now?')
+                        ->modalSubmitActionLabel('Yes, disable now'),
                 ]),
             ]);
     }

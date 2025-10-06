@@ -234,7 +234,7 @@
                                         <span class="text-gray-500 dark:text-gray-400">Process Status:</span>
                                         <div class="font-medium">
                                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $stream['process_running'] ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200' }}">
-                                                {{ $stream['process_running'] ? 'Running' : 'Stopped' }}
+                                                {{ $stream['process_running'] ? 'Running' : 'Idle' }}
                                             </span>
                                         </div>
                                     </div>
