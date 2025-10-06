@@ -9,6 +9,7 @@ use App\Models\MergedPlaylist;
 use App\Models\Playlist;
 use App\Models\PlaylistAlias;
 use Exception;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -26,10 +27,11 @@ class M3uProxyService
      *
      * @param  Playlist|CustomPlaylist|MergedPlaylist|PlaylistAlias  $playlist
      * @param  int  $id
+     * @param  Request|null  $request  Optional request for additional parameters (e.g. timeshift)
      *
      * @throws Exception when base URL missing or API returns an error
      */
-    public function getChannelUrl($playlist, $id): string
+    public function getChannelUrl($playlist, $id, ?Request $request): string
     {
         if (empty($this->apiBaseUrl)) {
             throw new Exception('M3U Proxy base URL is not configured');
@@ -43,6 +45,11 @@ class M3uProxyService
         $primaryUrl = PlaylistUrlService::getChannelUrl($channel, $playlist);
         if (empty($primaryUrl)) {
             throw new Exception('Channel primary URL is empty');
+        }
+
+        // Check if timeshift parameters are provided
+        if ($request->filled('timeshift_duration') || $request->filled('timeshift_date') || $request->filled('utc')) {
+            $primaryUrl = PlaylistService::generateTimeshiftUrl($request, $primaryUrl, $playlist);
         }
 
         $userAgent = $playlist->user_agent;

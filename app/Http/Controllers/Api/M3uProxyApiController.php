@@ -27,7 +27,7 @@ class M3uProxyApiController extends Controller
         $channel = Channel::query()->with('playlist')->findOrFail($id);
         $playlist = $channel->getEffectivePlaylist();
 
-        $url = app(M3uProxyService::class)->getChannelUrl($playlist, $id);
+        $url = app(M3uProxyService::class)->getChannelUrl($playlist, $id, $request);
 
         return redirect($url);
     }
