@@ -89,6 +89,8 @@ class Preferences extends SettingsPage
     public function form(Schema $schema): Schema
     {
         $ffmpegPath = config('proxy.ffmpeg_path');
+        $m3uProxyEnabled = config('proxy.use_m3u_proxy', false);
+        $m3uProxyDocs = config('proxy.m3u_proxy_url', '') . '/docs';
         return $schema
             ->components([
                 Tabs::make()
@@ -161,10 +163,11 @@ class Preferences extends SettingsPage
                                                 Toggle::make('ffmpeg_debug')
                                                     ->label('Debug')
                                                     ->columnSpan(1)
+                                                    ->hidden($m3uProxyEnabled)
                                                     ->helperText('When enabled FFmpeg will output verbose logging to the log file (/var/www/logs/ffmpeg-YYYY-MM-DD.log). When disabled, FFmpeg will only log errors.'),
                                                 Toggle::make('force_video_player_proxy')
                                                     ->label('Force Video Player Proxy')
-                                                    ->columnSpan(1)
+                                                    ->columnSpan($m3uProxyEnabled ? 2 : 1)
                                                     ->helperText('When enabled, the in-app video player will always use the proxy. This can be useful to bypass mixed content issues when using HTTPS. When disabled, the video player will respect the playlist proxy settings.'),
                                             ]),
                                         Grid::make()
@@ -208,6 +211,7 @@ class Preferences extends SettingsPage
                                             ->type('number')
                                             ->default(3)
                                             ->minValue(0)
+                                            ->hidden($m3uProxyEnabled)
                                             ->helperText('If the FFmpeg process crashes or fails for any reason, how many times should it try to reconnect before aborting?'),
                                         TextInput::make('ffmpeg_ffprobe_timeout')
                                             ->label('FFprobe Timeout (seconds)')
@@ -215,6 +219,7 @@ class Preferences extends SettingsPage
                                             ->type('number')
                                             ->minValue(1)
                                             ->default(5)
+                                            ->hidden($m3uProxyEnabled)
                                             ->helperText('Timeout for ffprobe pre-check in seconds. Default: 5.'),
                                         TextInput::make('ffmpeg_user_agent')
                                             ->label('User agent')
@@ -222,6 +227,7 @@ class Preferences extends SettingsPage
                                             ->columnSpan(1)
                                             ->default('VLC/3.0.21 LibVLC/3.0.21')
                                             ->placeholder('VLC/3.0.21 LibVLC/3.0.21')
+                                            ->hidden($m3uProxyEnabled)
                                             ->helperText('Fallback user agent (defaults to the streams Playlist user agent, when set).'),
                                         TextInput::make('ffmpeg_hls_time')
                                             ->label('HLS Time (seconds)')
@@ -229,6 +235,7 @@ class Preferences extends SettingsPage
                                             ->type('number')
                                             ->minValue(1)
                                             ->default(4)
+                                            ->hidden($m3uProxyEnabled)
                                             ->helperText('Target HLS segment duration in seconds. Default: 4.'),
                                         TextInput::make('hls_playlist_max_attempts')
                                             ->label('HLS Playlist Max Wait Attempts')
@@ -236,6 +243,7 @@ class Preferences extends SettingsPage
                                             ->type('number')
                                             ->minValue(1)
                                             ->default(10)
+                                            ->hidden($m3uProxyEnabled)
                                             ->helperText('Max attempts to wait for HLS playlist. Default: 10.'),
                                         TextInput::make('hls_playlist_sleep_seconds')
                                             ->label('HLS Playlist Wait Sleep (seconds)')
@@ -244,13 +252,32 @@ class Preferences extends SettingsPage
                                             ->step('0.1')
                                             ->minValue(0.1)
                                             ->default(1.0)
+                                            ->hidden($m3uProxyEnabled)
                                             ->helperText('Seconds to sleep between playlist checks. Default: 1.0s.'),
 
                                     ]),
+                                Section::make('m3u proxy')
+                                    ->description('m3u proxy integration is enabled and will be used to proxy all streams when proxy is enabled')
+                                    ->columnSpanFull()
+                                    ->columns(4)
+                                    ->schema([
+                                        Action::make('m3u_proxy_info')
+                                            ->label('m3u proxy API docs')
+                                            ->url($m3uProxyDocs)
+                                            ->openUrlInNewTab(true)
+                                            ->icon('heroicon-m-arrow-top-right-on-square'),
+                                        Action::make('github')
+                                            ->label('m3u proxy GitHub')
+                                            ->url('https://github.com/sparkison/m3u-proxy')
+                                            ->openUrlInNewTab(true)
+                                            ->icon('heroicon-m-arrow-top-right-on-square'),
+                                    ])
+                                    ->hidden(!$m3uProxyEnabled),
                                 Section::make('Advanced FFmpeg Settings')
                                     ->description('These settings allow you to customize the FFmpeg transcoding process. Use with caution, as incorrect settings can lead to poor performance or compatibility issues.')
                                     ->collapsible()
                                     ->collapsed(true)
+                                    ->hidden($m3uProxyEnabled)
                                     ->schema([
                                         Select::make('hardware_acceleration_method')
                                             ->label('Hardware Acceleration')
