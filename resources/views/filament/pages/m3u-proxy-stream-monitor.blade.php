@@ -79,7 +79,33 @@
         </div>
 
         <!-- Streams List -->
-        @if(empty($streams))
+        @if($connectionError)
+            <x-filament::card class="p-8">
+                <div class="flex items-start gap-4">
+                    <div class="flex-shrink-0">
+                        <div class="p-3 bg-red-100 dark:bg-red-900 rounded-lg">
+                            <x-heroicon-s-exclamation-triangle class="h-8 w-8 text-red-600 dark:text-red-300" />
+                        </div>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold text-red-900 dark:text-red-100 mb-2">
+                            Unable to Connect to m3u-proxy
+                        </h3>
+                        <p class="text-sm text-red-800 dark:text-red-200 mb-3">
+                            {{ $connectionError }}
+                        </p>
+                        <div class="text-sm text-red-700 dark:text-red-300">
+                            <p class="font-medium mb-2">Please verify:</p>
+                            <ul class="list-disc list-inside space-y-1 ml-2">
+                                <li>The m3u-proxy server is running</li>
+                                <li>The proxy URL is configured correctly: <code class="px-1 py-0.5 bg-red-200 dark:bg-red-800 rounded text-xs">{{ config('proxy.m3u_proxy_url') }}</code></li>
+                                <li>There are no firewall or network issues blocking the connection</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </x-filament::card>
+        @elseif(empty($streams))
             <x-filament::card class="p-8 text-center">
                 <div class="text-gray-500 dark:text-gray-400">
                     <div class="w-full flex items-center justify-center mb-4">

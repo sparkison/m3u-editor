@@ -144,48 +144,92 @@ class M3uProxyService
 
     /**
      * Fetch active streams from external proxy server API.
-     * Returns array or empty array on failure.
+     * Returns array with 'success', 'streams', and optional 'error' keys.
      */
     public function fetchActiveStreams(): array
     {
         if (empty($this->apiBaseUrl)) {
-            return [];
+            return [
+                'success' => false,
+                'error' => 'M3U Proxy base URL is not configured',
+                'streams' => [],
+            ];
         }
 
         try {
             $endpoint = $this->apiBaseUrl . '/streams';
             $response = Http::timeout(5)->acceptJson()->get($endpoint);
             if ($response->successful()) {
-                return $response->json() ?: [];
+                $data = $response->json() ?: [];
+
+                return [
+                    'success' => true,
+                    'streams' => $data['streams'] ?? [],
+                    'total' => $data['total'] ?? 0,
+                ];
             }
+
+            Log::warning('Failed to fetch active streams from m3u-proxy: HTTP ' . $response->status());
+
+            return [
+                'success' => false,
+                'error' => 'M3U Proxy returned status ' . $response->status(),
+                'streams' => [],
+            ];
         } catch (Exception $e) {
             Log::warning('Failed to fetch active streams from m3u-proxy: ' . $e->getMessage());
-        }
 
-        return [];
+            return [
+                'success' => false,
+                'error' => 'Unable to connect to m3u-proxy: ' . $e->getMessage(),
+                'streams' => [],
+            ];
+        }
     }
 
     /**
      * Fetch active clients from external proxy server API.
-     * Returns array or empty array on failure.
+     * Returns array with 'success', 'clients', and optional 'error' keys.
      */
     public function fetchActiveClients(): array
     {
         if (empty($this->apiBaseUrl)) {
-            return [];
+            return [
+                'success' => false,
+                'error' => 'M3U Proxy base URL is not configured',
+                'clients' => [],
+            ];
         }
 
         try {
             $endpoint = $this->apiBaseUrl . '/clients';
             $response = Http::timeout(5)->acceptJson()->get($endpoint);
             if ($response->successful()) {
-                return $response->json() ?: [];
+                $data = $response->json() ?: [];
+
+                return [
+                    'success' => true,
+                    'clients' => $data['clients'] ?? [],
+                    'total_clients' => $data['total_clients'] ?? 0,
+                ];
             }
+
+            Log::warning('Failed to fetch active clients from m3u-proxy: HTTP ' . $response->status());
+
+            return [
+                'success' => false,
+                'error' => 'M3U Proxy returned status ' . $response->status(),
+                'clients' => [],
+            ];
         } catch (Exception $e) {
             Log::warning('Failed to fetch active clients from m3u-proxy: ' . $e->getMessage());
-        }
 
-        return [];
+            return [
+                'success' => false,
+                'error' => 'Unable to connect to m3u-proxy: ' . $e->getMessage(),
+                'clients' => [],
+            ];
+        }
     }
 
     /**

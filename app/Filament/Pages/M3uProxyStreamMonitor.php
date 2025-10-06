@@ -3,18 +3,15 @@
 namespace App\Filament\Pages;
 
 use App\Facades\LogoFacade;
-use App\Http\Controllers\LogoProxyController;
 use App\Models\Channel;
 use App\Models\Episode;
+use App\Services\M3uProxyService;
+use Carbon\Carbon;
+use Exception;
 use Filament\Actions\Action;
-use Filament\Support\Enums\Size;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use App\Services\M3uProxyService;
-use Exception;
-use Carbon\Carbon;
+use Filament\Support\Enums\Size;
 
 /**
  * Shared Stream Monitor (External API-backed)
@@ -23,17 +20,25 @@ use Carbon\Carbon;
  */
 class M3uProxyStreamMonitor extends Page
 {
-    protected static ?string $navigationLabel = 'Stream Monitor';
-    protected static ?string $title = 'Stream Monitor';
-    protected static string | \UnitEnum | null $navigationGroup = 'Tools';
+    protected static ?string $navigationLabel = 'm3u proxy';
+
+    protected static ?string $title = 'm3u proxy Stream Monitor';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Tools';
+
     protected static ?int $navigationSort = 6;
 
     protected string $view = 'filament.pages.m3u-proxy-stream-monitor';
 
     public $streams = [];
+
     public $globalStats = [];
+
     public $systemStats = [];
+
     public $refreshInterval = 5; // seconds
+
+    public $connectionError = null;
 
     protected M3uProxyService $apiService;
 
@@ -56,9 +61,9 @@ class M3uProxyStreamMonitor extends Page
     {
         $this->streams = $this->getActiveStreams();
 
-        $totalClients = array_sum(array_map(fn($s) => $s['client_count'] ?? 0, $this->streams));
-        $totalBandwidth = array_sum(array_map(fn($s) => $s['bandwidth_kbps'] ?? 0, $this->streams));
-        $activeStreams = count(array_filter($this->streams, fn($s) => $s['status'] === 'active'));
+        $totalClients = array_sum(array_map(fn ($s) => $s['client_count'] ?? 0, $this->streams));
+        $totalBandwidth = array_sum(array_map(fn ($s) => $s['bandwidth_kbps'] ?? 0, $this->streams));
+        $activeStreams = count(array_filter($this->streams, fn ($s) => $s['status'] === 'active'));
 
         $this->globalStats = [
             'total_streams' => count($this->streams),
@@ -128,6 +133,22 @@ class M3uProxyStreamMonitor extends Page
         $apiStreams = $this->apiService->fetchActiveStreams();
         $apiClients = $this->apiService->fetchActiveClients();
 
+        // Check for connection errors
+        if (! $apiStreams['success']) {
+            $this->connectionError = $apiStreams['error'] ?? 'Unknown error connecting to m3u-proxy';
+
+            return [];
+        }
+
+        if (! $apiClients['success']) {
+            $this->connectionError = $apiClients['error'] ?? 'Unknown error connecting to m3u-proxy';
+
+            return [];
+        }
+
+        // Clear any previous errors
+        $this->connectionError = null;
+
         if (empty($apiStreams['streams'])) {
             return [];
         }
@@ -187,6 +208,7 @@ class M3uProxyStreamMonitor extends Page
             // Normalize clients
             $clients = array_map(function ($client) {
                 $connectedAt = Carbon::parse($client['created_at']);
+
                 return [
                     'ip' => $client['ip_address'],
                     'connected_at' => $connectedAt->format('Y-m-d H:i:s'),
@@ -228,7 +250,7 @@ class M3uProxyStreamMonitor extends Page
             return $url;
         }
 
-        return substr($url, 0, $maxLength - 3) . '...';
+        return substr($url, 0, $maxLength - 3).'...';
     }
 
     protected function formatBytes(int $bytes, int $precision = 2): string
@@ -239,7 +261,7 @@ class M3uProxyStreamMonitor extends Page
             $bytes /= 1024;
         }
 
-        return round($bytes, $precision) . ' ' . $units[$i];
+        return round($bytes, $precision).' '.$units[$i];
     }
 
     public function getViewData(): array
@@ -249,6 +271,7 @@ class M3uProxyStreamMonitor extends Page
             'globalStats' => $this->globalStats,
             'systemStats' => $this->systemStats,
             'refreshInterval' => $this->refreshInterval,
+            'connectionError' => $this->connectionError,
         ];
     }
 }
