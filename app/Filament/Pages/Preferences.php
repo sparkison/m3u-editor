@@ -31,7 +31,10 @@ use Filament\Schemas\Components\Group;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+
+use function Pest\Laravel\json;
 
 class Preferences extends SettingsPage
 {
@@ -90,7 +93,8 @@ class Preferences extends SettingsPage
     {
         $ffmpegPath = config('proxy.ffmpeg_path');
         $m3uProxyEnabled = config('proxy.use_m3u_proxy', false);
-        $m3uProxyDocs = config('proxy.m3u_proxy_url', '') . '/docs';
+        $m3uProxyUrl = rtrim(config('proxy.m3u_proxy_url', ''), '/');
+        $m3uProxyDocs = $m3uProxyUrl . '/docs';
         return $schema
             ->components([
                 Tabs::make()
@@ -259,8 +263,38 @@ class Preferences extends SettingsPage
                                 Section::make('m3u proxy')
                                     ->description('m3u proxy integration is enabled and will be used to proxy all streams when proxy is enabled')
                                     ->columnSpanFull()
-                                    ->columns(4)
+                                    ->columns(3)
                                     ->schema([
+                                        Action::make('test_connection')
+                                            ->color('gray')
+                                            ->label('Test m3u proxy connection')
+                                            ->icon('heroicon-m-signal')
+                                            ->action(function () use ($m3uProxyUrl) {
+                                                try {
+                                                    $status = Http::get($m3uProxyUrl . '/health');
+                                                    if ($status->successful()) {
+                                                        $body = $status->body();
+                                                        Notification::make()
+                                                            ->title('Connection successful')
+                                                            ->body('Successfully connected to the m3u proxy instance: ' . $body)
+                                                            ->success()
+                                                            ->send();
+                                                    } else {
+                                                        Notification::make()
+                                                            ->title('Connection failed')
+                                                            ->body('Could not connect to the m3u proxy instance. Please check the URL and ensure the service is running.')
+                                                            ->danger()
+                                                            ->send();
+                                                    }
+                                                } catch (Exception $e) {
+                                                    Notification::make()
+                                                        ->title('Connection failed')
+                                                        ->body('Could not connect to the m3u proxy instance. ' . $e->getMessage())
+                                                        ->danger()
+                                                        ->send();
+                                                    return;
+                                                }
+                                            }),
                                         Action::make('m3u_proxy_info')
                                             ->label('m3u proxy API docs')
                                             ->url($m3uProxyDocs)
