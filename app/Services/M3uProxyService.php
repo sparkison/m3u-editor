@@ -123,7 +123,7 @@ class M3uProxyService
         }
 
         try {
-            $endpoint = $this->apiBaseUrl . '/streams/' . urlencode($streamId);
+            $endpoint = $this->apiBaseUrl . '/streams/' . $streamId;
             $response = Http::timeout(10)->acceptJson()->delete($endpoint);
 
             if ($response->successful()) {
