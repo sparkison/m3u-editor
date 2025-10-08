@@ -273,7 +273,8 @@ class EpgApiController extends Controller
                 if ($proxyEnabled) {
                     $url = ProxyFacade::getProxyUrlForChannel(
                         id: $channel->id,
-                        format: $proxyFormat
+                        format: $proxyFormat,
+                        preview: true
                     );
                 } else {
                     if (Str::endsWith($url, '.m3u8')) {

@@ -31,7 +31,7 @@ class M3uProxyService
      *
      * @throws Exception when base URL missing or API returns an error
      */
-    public function getChannelUrl($playlist, $id, ?Request $request): string
+    public function getChannelUrl($playlist, $id, ?Request $request = null): string
     {
         if (empty($this->apiBaseUrl)) {
             throw new Exception('M3U Proxy base URL is not configured');
@@ -48,7 +48,7 @@ class M3uProxyService
         }
 
         // Check if timeshift parameters are provided
-        if ($request->filled('timeshift_duration') || $request->filled('timeshift_date') || $request->filled('utc')) {
+        if ($request && ($request->filled('timeshift_duration') || $request->filled('timeshift_date') || $request->filled('utc'))) {
             $primaryUrl = PlaylistService::generateTimeshiftUrl($request, $primaryUrl, $playlist);
         }
 
