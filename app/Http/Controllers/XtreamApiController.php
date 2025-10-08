@@ -670,6 +670,7 @@ class XtreamApiController extends Controller
                     }
 
                     $extension = $channel->container_extension ?? 'mkv';
+                    $tmdb = $channel->info['tmdb_id'] ?? $channel->movie_data['tmdb_id'] ?? 0;
                     $vodStreams[] = [
                         'num' => $index + 1,
                         'name' => $channel->title_custom ?? $channel->title,
@@ -683,7 +684,8 @@ class XtreamApiController extends Controller
                         'added' => (string)$channel->created_at->timestamp,
                         'category_id' => $channelCategoryId,
                         'category_ids' => [$channelCategoryId],
-                        'tmdb_id' => (int)($channel->info['tmdb_id'] ?? $channel->movie_data['tmdb_id'] ?? 0),
+                        'tmdb' => (string)$tmdb,
+                        'tmdb_id' => (int)$tmdb,
                         'container_extension' => $channel->container_extension ?? 'mkv',
                         'custom_sid' => '',
                         'direct_source' => url("/movie/{$username}/{$password}/" . $channel->id . "." . $extension),
@@ -746,6 +748,7 @@ class XtreamApiController extends Controller
                         }
                     }
 
+                    $tmdb = $seriesItem->metadata['tmdb'] ?? '';
                     $seriesList[] = [
                         'num' => $index + 1,
                         'name' => $seriesItem->name,
@@ -760,7 +763,8 @@ class XtreamApiController extends Controller
                         'rating' => (string)($seriesItem->rating ?? 0),
                         'rating_5based' => round((floatval($seriesItem->rating ?? 0)) / 2, 1),
                         'backdrop_path' => $seriesItem->backdrop_path ?? [],
-                        'tmdb' => (string)($seriesItem->metadata['tmdb'] ?? ''),
+                        'tmdb' => (string)$tmdb,
+                        'tmdb_id' => (int)($tmdb ?: 0),
                         'youtube_trailer' => $seriesItem->youtube_trailer ?? '',
                         'episode_run_time' => (string)($seriesItem->episode_run_time ?? 0),
                         'category_id' => $seriesCategoryId,
@@ -805,6 +809,7 @@ class XtreamApiController extends Controller
             }
 
             $now = Carbon::now();
+            $tmdb = $seriesItem->metadata['tmdb'] ?? '';
             $seriesInfo = [
                 'name' => $seriesItem->name,
                 'cover' => $cover,
@@ -817,7 +822,8 @@ class XtreamApiController extends Controller
                 'rating' => (string)($seriesItem->rating ?? 0),
                 'rating_5based' => round((floatval($seriesItem->rating ?? 0)) / 2, 1),
                 'backdrop_path' => $backdropPaths,
-                'tmdb' => (string)($seriesItem->metadata['tmdb'] ?? ''),
+                'tmdb' => (string)$tmdb,
+                'tmdb_id' => (int)($tmdb ?: 0),
                 'youtube_trailer' => $seriesItem->youtube_trailer ?? '',
                 'episode_run_time' => (string)($seriesItem->episode_run_time ?? 0),
                 'category_id' => (string)($seriesItem->category_id ?? ($seriesItem->category ? $seriesItem->category->id : 'all')),
