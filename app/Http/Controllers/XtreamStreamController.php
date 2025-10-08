@@ -11,6 +11,7 @@ use App\Models\Episode;
 use App\Models\PlaylistAlias;
 use App\Services\PlaylistService;
 use App\Services\PlaylistUrlService;
+use App\Services\ProxyService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Database\Eloquent\Model;
@@ -195,8 +196,7 @@ class XtreamStreamController extends Controller
         list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'live');
         if ($channel instanceof Channel) {
             if ($playlist->enable_proxy) {
-                $m3uProxy = config('proxy.use_m3u_proxy', false);
-                if ($m3uProxy) {
+                if (ProxyService::m3uProxyEnabled()) {
                     return app()->call('App\\Http\\Controllers\\Api\\M3uProxyApiController@channel', [
                         'id' => $streamId
                     ]);
@@ -226,8 +226,7 @@ class XtreamStreamController extends Controller
         list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'vod');
         if ($channel instanceof Channel) {
             if ($playlist->enable_proxy) {
-                $m3uProxy = config('proxy.use_m3u_proxy', false);
-                if ($m3uProxy) {
+                if (ProxyService::m3uProxyEnabled()) {
                     return app()->call('App\\Http\\Controllers\\Api\\M3uProxyApiController@channel', [
                         'id' => $streamId
                     ]);
@@ -257,8 +256,7 @@ class XtreamStreamController extends Controller
         list($playlist, $episode) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'episode');
         if ($episode instanceof Episode) {
             if ($playlist->enable_proxy) {
-                $m3uProxy = config('proxy.use_m3u_proxy', false);
-                if ($m3uProxy) {
+                if (ProxyService::m3uProxyEnabled()) {
                     return app()->call('App\\Http\\Controllers\\Api\\M3uProxyApiController@episode', [
                         'id' => $streamId
                     ]);
@@ -323,8 +321,7 @@ class XtreamStreamController extends Controller
         ]);
 
         if ($playlist->enable_proxy) {
-            $m3uProxy = config('proxy.use_m3u_proxy', false);
-            if ($m3uProxy) {
+            if (ProxyService::m3uProxyEnabled()) {
                 return app()->call('App\\Http\\Controllers\\Api\\M3uProxyApiController@channel', [
                     'id' => $streamId
                 ]);

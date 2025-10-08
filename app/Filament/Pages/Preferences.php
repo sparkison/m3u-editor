@@ -23,6 +23,7 @@ use App\Rules\CheckIfUrlOrLocalPath;
 use App\Rules\Cron;
 use App\Settings\GeneralSettings;
 use App\Services\FfmpegCodecService;
+use App\Services\ProxyService;
 use Cron\CronExpression;
 use Filament\Forms;
 use Filament\Notifications\Notification;
@@ -91,8 +92,8 @@ class Preferences extends SettingsPage
 
     public function form(Schema $schema): Schema
     {
+        $m3uProxyEnabled = ProxyService::m3uProxyEnabled();
         $ffmpegPath = config('proxy.ffmpeg_path');
-        $m3uProxyEnabled = config('proxy.use_m3u_proxy', false);
         $m3uProxyUrl = rtrim(config('proxy.m3u_proxy_url', ''), '/');
         $m3uProxyDocs = $m3uProxyUrl . '/docs';
         return $schema

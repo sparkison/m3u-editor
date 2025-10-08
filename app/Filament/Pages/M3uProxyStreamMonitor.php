@@ -6,6 +6,7 @@ use App\Facades\LogoFacade;
 use App\Models\Channel;
 use App\Models\Episode;
 use App\Services\M3uProxyService;
+use App\Services\ProxyService;
 use Carbon\Carbon;
 use Exception;
 use Filament\Actions\Action;
@@ -49,7 +50,7 @@ class M3uProxyStreamMonitor extends Page
 
     public static function shouldRegisterNavigation(): bool
     {
-        return config('proxy.use_m3u_proxy', false);
+        return ProxyService::m3uProxyEnabled();
     }
 
     public function mount(): void

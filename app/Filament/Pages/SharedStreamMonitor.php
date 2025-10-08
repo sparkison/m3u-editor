@@ -11,6 +11,7 @@ use App\Models\Channel;
 use App\Models\Episode;
 use App\Models\SharedStream;
 use App\Models\SharedStreamStat;
+use App\Services\ProxyService;
 use App\Services\SharedStreamService;
 use App\Services\StreamMonitorService;
 use Carbon\Carbon;
@@ -50,7 +51,7 @@ class SharedStreamMonitor extends Page
 
     public static function shouldRegisterNavigation(): bool
     {
-        return !config('proxy.use_m3u_proxy', false);
+        return !ProxyService::m3uProxyEnabled();
     }
 
     public function mount(): void

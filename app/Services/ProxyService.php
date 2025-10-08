@@ -16,6 +16,11 @@ class ProxyService
     public const BAD_SOURCE_CACHE_SECONDS_CONTENT_ERROR = 10; // For fatal stream content errors
     public const BAD_SOURCE_CACHE_PREFIX = 'failover:bad_source:';
 
+    public static function m3uProxyEnabled(): bool
+    {
+        return config('proxy.use_m3u_proxy', false);
+    }
+
     /**
      * Get the proxy URL for a channel
      *
@@ -25,7 +30,7 @@ class ProxyService
      */
     public function getProxyUrlForChannel($id, $format = 'ts', $preview = false)
     {
-        $m3uProxy = config('proxy.use_m3u_proxy', false);
+        $m3uProxy = self::m3uProxyEnabled();
         if ($m3uProxy) {
             if ($preview) {
                 return route('m3u-proxy.channel.player', ['id' => $id]);
@@ -61,7 +66,7 @@ class ProxyService
      */
     public function getProxyUrlForEpisode($id, $format = 'ts', $preview = false)
     {
-        $m3uProxy = config('proxy.use_m3u_proxy', false);
+        $m3uProxy = self::m3uProxyEnabled();
         if ($m3uProxy) {
             if ($preview) {
                 return route('m3u-proxy.episode.player', ['id' => $id]);
