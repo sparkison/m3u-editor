@@ -30,6 +30,7 @@ use App\Filament\Resources\Series\Pages\EditSeries;
 use Filament\Schemas\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Fieldset;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\Textarea;
@@ -682,35 +683,141 @@ class SeriesResource extends Resource
                         ->schema([
                             Grid::make(1)
                                 ->schema([
+                                    Toggle::make('sync_settings.override_global')
+                                        ->label('Override Global Settings')
+                                        ->helperText('Enable to customize sync settings for this series (read-only when disabled, global settings from Preferences will be used)')
+                                        ->live(),
                                     Toggle::make('sync_settings.enabled')
                                         ->live()
+                                        ->disabled(fn($get) => !$get('sync_settings.override_global'))
                                         ->label('Enable .strm file generation'),
-                                    Toggle::make('sync_settings.include_category')
-                                        ->label('Create category folder')
-                                        ->live()
-                                        ->default(true)
-                                        ->hidden(fn($get) => !$get('sync_settings.enabled')),
-                                    Toggle::make('sync_settings.include_series')
-                                        ->label('Create series folder')
-                                        ->live()
-                                        ->default(true)
-                                        ->hidden(fn($get) => !$get('sync_settings.enabled')),
-                                    Toggle::make('sync_settings.include_season')
-                                        ->label('Create season folders')
-                                        ->live()
-                                        ->default(true)
-                                        ->hidden(fn($get) => !$get('sync_settings.enabled')),
                                     TextInput::make('sync_location')
-                                        ->label('Series Sync Location')
+                                        ->label('Location')
                                         ->live()
+                                        ->disabled(fn($get) => !$get('sync_settings.override_global'))
                                         ->rules([new CheckIfUrlOrLocalPath(localOnly: true, isDirectory: true)])
                                         ->helperText(function ($get) {
-                                            return 'File location: ' . ($get('sync_location') ?? '') . ($get('sync_settings.include_category') ?? false ? '/Category Name' : '') . ($get('sync_settings.include_series') ?? false ? '/Series Name' : '') . ($get('sync_settings.include_season') ?? false ? '/Season 01' : '') . '/S01E01 - Episode Title.strm';
+                                            $path = $get('sync_location') ?? '';
+                                            $includeCategory = $get('sync_settings.include_category') ?? false;
+                                            $includeSeries = $get('sync_settings.include_series') ?? false;
+                                            $includeSeason = $get('sync_settings.include_season') ?? false;
+
+                                            $preview = 'Preview: ' . $path;
+                                            if ($includeCategory) $preview .= '/Category Name';
+                                            if ($includeSeries) $preview .= '/Series Name';
+                                            if ($includeSeason) $preview .= '/Season 01';
+                                            $preview .= '/S01E01 - Episode Title.strm';
+
+                                            return $preview;
                                         })
                                         ->maxLength(255)
                                         ->required()
                                         ->hidden(fn($get) => !$get('sync_settings.enabled'))
-                                        ->placeholder('/usr/local/bin/streamlink'),
+                                        ->placeholder('M:\VOD\movies'),
+                                    Forms\Components\ToggleButtons::make('sync_settings.path_structure')
+                                        ->label('Path structure (folders)')
+                                        ->live()
+                                        ->disabled(fn($get) => !$get('sync_settings.override_global'))
+                                        ->multiple()
+                                        ->grouped()
+                                        ->options([
+                                            'category' => 'Group',
+                                            'series' => 'Series',
+                                            'season' => 'Season',
+                                        ])
+                                        ->afterStateHydrated(function ($component, $state, $get) {
+                                            // Convert old boolean fields to array format
+                                            if (is_null($state) || empty($state)) {
+                                                $structure = [];
+                                                if ($get('sync_settings.include_category')) $structure[] = 'category';
+                                                if ($get('sync_settings.include_series')) $structure[] = 'series';
+                                                if ($get('sync_settings.include_season')) $structure[] = 'season';
+                                                $component->state($structure);
+                                            }
+                                        })
+                                        ->dehydrateStateUsing(function ($state, Set $set) {
+                                            // Update the old boolean fields for backwards compatibility
+                                            $state = $state ?? [];
+                                            $set('sync_settings.include_category', in_array('category', $state));
+                                            $set('sync_settings.include_series', in_array('series', $state));
+                                            $set('sync_settings.include_season', in_array('season', $state));
+                                            return $state;
+                                        })->hidden(fn($get) => !$get('sync_settings.enabled')),
+                                    Fieldset::make('Include Metadata')
+                                        ->schema([
+                                            Forms\Components\ToggleButtons::make('sync_settings.filename_metadata')
+                                                ->label('Filename metadata')
+                                                ->live()
+                                                ->inline()
+                                                ->disabled(fn($get) => !$get('sync_settings.override_global'))
+                                                ->multiple()
+                                                ->columnSpanFull()
+                                                ->options([
+                                                    'year' => 'Year',
+                                                    'resolution' => 'Resolution',
+                                                    'codec' => 'Codec',
+                                                    'tmdb_id' => 'TMDB ID',
+                                                ])
+                                                ->afterStateHydrated(function ($component, $state, $get) {
+                                                    // Convert old boolean fields to array format
+                                                    if (is_null($state) || empty($state)) {
+                                                        $metadata = [];
+                                                        if ($get('sync_settings.filename_year')) $metadata[] = 'year';
+                                                        if ($get('sync_settings.filename_resolution')) $metadata[] = 'resolution';
+                                                        if ($get('sync_settings.filename_codec')) $metadata[] = 'codec';
+                                                        if ($get('sync_settings.filename_tmdb_id')) $metadata[] = 'tmdb_id';
+                                                        $component->state($metadata);
+                                                    }
+                                                })
+                                                ->dehydrateStateUsing(function ($state, Set $set) {
+                                                    // Update the old boolean fields for backwards compatibility
+                                                    $state = $state ?? [];
+                                                    $set('sync_settings.filename_year', in_array('year', $state));
+                                                    $set('sync_settings.filename_resolution', in_array('resolution', $state));
+                                                    $set('sync_settings.filename_codec', in_array('codec', $state));
+                                                    $set('sync_settings.filename_tmdb_id', in_array('tmdb_id', $state));
+                                                    return $state;
+                                                }),
+                                            Forms\Components\ToggleButtons::make('sync_settings.tmdb_id_format')
+                                                ->label('TMDB ID format')
+                                                ->disabled(fn($get) => !$get('sync_settings.override_global'))
+                                                ->inline()
+                                                ->options([
+                                                    'square' => '[square]',
+                                                    'curly' => '{curly}',
+                                                ])
+                                                ->icons([
+                                                    'square' => 'heroicon-o-hashtag',
+                                                    'curly' => 'heroicon-o-hashtag',
+                                                ])->hidden(fn($get) => !in_array('tmdb_id', $get('sync_settings.filename_metadata') ?? [])),
+                                        ])
+                                        ->hidden(fn($get) => !$get('sync_settings.enabled')),
+                                    Fieldset::make('Filename Cleansing')
+                                        ->schema([
+                                            Toggle::make('sync_settings.clean_special_chars')
+                                                ->label('Clean special characters')
+                                                ->disabled(fn($get) => !$get('sync_settings.override_global'))
+                                                ->helperText('Remove or replace special characters in filenames')
+                                                ->inline(false),
+                                            Toggle::make('sync_settings.remove_consecutive_chars')
+                                                ->label('Remove consecutive replacement characters')
+                                                ->disabled(fn($get) => !$get('sync_settings.override_global'))
+                                                ->inline(false)
+                                                ->live(),
+                                            Forms\Components\ToggleButtons::make('sync_settings.replace_char')
+                                                ->label('')
+                                                ->disabled(fn($get) => !$get('sync_settings.override_global'))
+                                                ->inline()
+                                                ->columnSpanFull()
+                                                ->options([
+                                                    'space' => 'Space',
+                                                    'dash' => '-',
+                                                    'underscore' => '_',
+                                                    'period' => '.',
+                                                    'remove' => 'Remove',
+                                                ])
+                                        ])
+                                        ->hidden(fn($get) => !$get('sync_settings.enabled')),
                                 ]),
                         ]),
                 ]),
