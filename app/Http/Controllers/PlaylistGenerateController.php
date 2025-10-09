@@ -70,15 +70,13 @@ class PlaylistGenerateController extends Controller
             }
         }
 
-        // Generate a filename
-        $filename = Str::slug($playlist->name) . '.m3u';
-
         // Check if proxy enabled
         if ($request->has('proxy')) {
             $proxyEnabled = $request->input('proxy') === 'true';
         } else {
             $proxyEnabled = $playlist->enable_proxy;
         }
+        $logoProxyEnabled = $playlist->enable_logo_proxy;
 
         // Check the proxy format
         $format = $playlist->proxy_options['output'] ?? 'ts';
@@ -86,7 +84,7 @@ class PlaylistGenerateController extends Controller
 
         // Get all active channels
         return response()->stream(
-            function () use ($playlist, $proxyEnabled, $type, $usedAuth, $format, $defaultExtension) {
+            function () use ($playlist, $proxyEnabled, $logoProxyEnabled, $type, $usedAuth, $format, $defaultExtension) {
                 // Get all active channels
                 $channels = $playlist->channels()
                     ->leftJoin('groups', 'channels.group_id', '=', 'groups.id')
@@ -172,15 +170,16 @@ class PlaylistGenerateController extends Controller
 
                         // Proxy the logo through the logo proxy controller
                         $icon = LogoProxyController::generateProxyUrl($icon);
-
+                    } else {
+                        // Get the extension from the source URL
+                        $extension = pathinfo($url, PATHINFO_EXTENSION);
+                    }
+                    if ($logoProxyEnabled) {
                         // Get the proxy URL
                         $url = ProxyFacade::getProxyUrlForChannel(
                             $channel->id,
                             $format
                         );
-                    } else {
-                        // Get the extension from the source URL
-                        $extension = pathinfo($url, PATHINFO_EXTENSION);
                     }
 
                     // Format the URL in Xtream Codes format if not disabled
