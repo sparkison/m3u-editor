@@ -3,46 +3,43 @@
 namespace App\Filament\Pages;
 
 use App\Jobs\RestartQueue;
-use App\Models\Channel;
-use App\Models\Series;
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Tabs;
-use Filament\Schemas\Components\Tabs\Tab;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Toggle;
-use Filament\Support\Enums\Width;
-use Filament\Schemas\Components\Grid;
-use Filament\Forms\Components\TextInput;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Utilities\Set;
-use Filament\Actions\Action;
-use Filament\Forms\Components\Textarea;
-use Exception;
-use ReflectionClass;
-use ReflectionProperty;
 use App\Rules\CheckIfUrlOrLocalPath;
 use App\Rules\Cron;
-use App\Settings\GeneralSettings;
 use App\Services\FfmpegCodecService;
+use App\Services\PlaylistService;
 use App\Services\ProxyService;
+use App\Settings\GeneralSettings;
 use Cron\CronExpression;
+use Exception;
+use Filament\Actions\Action;
 use Filament\Forms;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Pages\SettingsPage;
 use Filament\Schemas\Components\Fieldset;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Group;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
+use Filament\Support\Enums\Width;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
-
-use function Pest\Laravel\json;
+use ReflectionClass;
+use ReflectionProperty;
 
 class Preferences extends SettingsPage
 {
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-cog-6-tooth';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-cog-6-tooth';
 
     protected static string $settings = GeneralSettings::class;
 
@@ -57,7 +54,7 @@ class Preferences extends SettingsPage
                 ->label('Reset Queue')
                 ->action(function () {
                     app('Illuminate\Contracts\Bus\Dispatcher')
-                        ->dispatch(new RestartQueue());
+                        ->dispatch(new RestartQueue);
                 })
                 ->after(function () {
                     Notification::make()
@@ -89,7 +86,7 @@ class Preferences extends SettingsPage
                 ->icon('heroicon-o-exclamation-triangle')
                 ->modalIcon('heroicon-o-exclamation-triangle')
                 ->modalDescription('Clearing the logo cache will remove all cached logo images. This action cannot be undone.')
-                ->modalSubmitActionLabel('I understand, clear logo cache now')
+                ->modalSubmitActionLabel('I understand, clear logo cache now'),
         ];
     }
 
@@ -99,8 +96,8 @@ class Preferences extends SettingsPage
         $ffmpegPath = config('proxy.ffmpeg_path');
         $m3uProxyUrl = rtrim(config('proxy.m3u_proxy_url', ''), '/');
         $m3uProxyDocs = $m3uProxyUrl . '/docs';
-        $vodExample = self::getVodExample();
-        $seriesExample = self::getEpisodeExample();
+        $vodExample = PlaylistService::getVodExample();
+        $seriesExample = PlaylistService::getEpisodeExample();
         return $schema
             ->components([
                 Tabs::make()
@@ -193,9 +190,9 @@ class Preferences extends SettingsPage
                                                         'ffmpeg' => 'ffmpeg (v6)',
                                                     ])
                                                     ->searchable()
-                                                    ->suffixIcon(fn() => !empty($ffmpegPath) ? 'heroicon-m-lock-closed' : null)
-                                                    ->disabled(fn() => !empty($ffmpegPath))
-                                                    ->hint(fn() => !empty($ffmpegPath) ? 'Already set by environment variable!' : null)
+                                                    ->suffixIcon(fn() => ! empty($ffmpegPath) ? 'heroicon-m-lock-closed' : null)
+                                                    ->disabled(fn() => ! empty($ffmpegPath))
+                                                    ->hint(fn() => ! empty($ffmpegPath) ? 'Already set by environment variable!' : null)
                                                     ->dehydrated(fn() => empty($ffmpegPath))
                                                     ->placeholder(fn() => empty($ffmpegPath) ? 'jellyfin-ffmpeg' : $ffmpegPath),
                                                 Select::make('ffprobe_path')
@@ -208,9 +205,9 @@ class Preferences extends SettingsPage
                                                     ])
                                                     ->searchable()
                                                     // Assuming similar logic for ffprobe path being set by env var
-                                                    ->suffixIcon(fn() => !empty(config('proxy.ffprobe_path')) ? 'heroicon-m-lock-closed' : null)
-                                                    ->disabled(fn() => !empty(config('proxy.ffprobe_path')))
-                                                    ->hint(fn() => !empty(config('proxy.ffprobe_path')) ? 'Already set by environment variable!' : null)
+                                                    ->suffixIcon(fn() => ! empty(config('proxy.ffprobe_path')) ? 'heroicon-m-lock-closed' : null)
+                                                    ->disabled(fn() => ! empty(config('proxy.ffprobe_path')))
+                                                    ->hint(fn() => ! empty(config('proxy.ffprobe_path')) ? 'Already set by environment variable!' : null)
                                                     ->dehydrated(fn() => empty(config('proxy.ffprobe_path')))
                                                     ->placeholder(fn() => empty(config('proxy.ffprobe_path')) ? 'jellyfin-ffprobe' : config('proxy.ffprobe_path')),
                                             ]),
@@ -298,6 +295,7 @@ class Preferences extends SettingsPage
                                                         ->body('Could not connect to the m3u proxy instance. ' . $e->getMessage())
                                                         ->danger()
                                                         ->send();
+
                                                     return;
                                                 }
                                             }),
@@ -312,7 +310,7 @@ class Preferences extends SettingsPage
                                             ->openUrlInNewTab(true)
                                             ->icon('heroicon-m-arrow-top-right-on-square'),
                                     ])
-                                    ->hidden(!$m3uProxyEnabled),
+                                    ->hidden(! $m3uProxyEnabled),
                                 Section::make('Advanced FFmpeg Settings')
                                     ->description('These settings allow you to customize the FFmpeg transcoding process. Use with caution, as incorrect settings can lead to poor performance or compatibility issues.')
                                     ->collapsible()
@@ -344,7 +342,7 @@ class Preferences extends SettingsPage
                                                     // or if the state is somehow null/unexpected (though 'none' covers empty state).
                                                     if ($currentVideoCodec) { // Only proceed if a codec is actually set
                                                         $newValidCodecs = FfmpegCodecService::getVideoCodecs($state);
-                                                        if (!array_key_exists($currentVideoCodec, $newValidCodecs)) {
+                                                        if (! array_key_exists($currentVideoCodec, $newValidCodecs)) {
                                                             // If the current codec is not valid for the new hardware acceleration method,
                                                             // reset it to 'Copy Original'.
                                                             $set('ffmpeg_codec_video', '');
@@ -430,7 +428,7 @@ class Preferences extends SettingsPage
                                             ->color('gray')
                                             ->size('sm')
                                             ->url('https://github.com/mhdzumair/mediaflow-proxy')
-                                            ->openUrlInNewTab(true)
+                                            ->openUrlInNewTab(true),
                                     ])
                                     ->schema([
                                         TextInput::make('mediaflow_proxy_url')
@@ -459,7 +457,7 @@ class Preferences extends SettingsPage
                                             ->label('Proxy User Agent for Media Streams')
                                             ->placeholder('VLC/3.0.21 LibVLC/3.0.21')
                                             ->columnSpan(2),
-                                    ])
+                                    ]),
                             ]),
 
                         Tab::make('Sync Options')
@@ -472,13 +470,13 @@ class Preferences extends SettingsPage
                                     ->schema([
                                         Toggle::make('invalidate_import')
                                             ->label('Enable import invalidation')
-                                            ->disabled(fn() => !empty(config('dev.invalidate_import')))
-                                            ->hint(fn() => !empty(config('dev.invalidate_import')) ? 'Already set by environment variable!' : null)
+                                            ->disabled(fn() => ! empty(config('dev.invalidate_import')))
+                                            ->hint(fn() => ! empty(config('dev.invalidate_import')) ? 'Already set by environment variable!' : null)
                                             ->default(function () {
-                                                return !empty(config('dev.invalidate_import')) ? (bool) config('dev.invalidate_import') : false;
+                                                return ! empty(config('dev.invalidate_import')) ? (bool) config('dev.invalidate_import') : false;
                                             })
                                             ->afterStateHydrated(function (Toggle $component, $state) {
-                                                if (!empty(config('dev.invalidate_import'))) {
+                                                if (! empty(config('dev.invalidate_import'))) {
                                                     $component->state((bool) config('dev.invalidate_import'));
                                                 }
                                             })
@@ -486,9 +484,9 @@ class Preferences extends SettingsPage
                                             ->helperText('Invalidate Playlist sync if conditon met.'),
                                         TextInput::make('invalidate_import_threshold')
                                             ->label('Import invalidation threshold')
-                                            ->suffixIcon(fn() => !empty(config('dev.invalidate_import_threshold')) ? 'heroicon-m-lock-closed' : null)
-                                            ->disabled(fn() => !empty(config('dev.invalidate_import_threshold')))
-                                            ->hint(fn() => !empty(config('dev.invalidate_import_threshold')) ? 'Already set by environment variable!' : null)
+                                            ->suffixIcon(fn() => ! empty(config('dev.invalidate_import_threshold')) ? 'heroicon-m-lock-closed' : null)
+                                            ->disabled(fn() => ! empty(config('dev.invalidate_import_threshold')))
+                                            ->hint(fn() => ! empty(config('dev.invalidate_import_threshold')) ? 'Already set by environment variable!' : null)
                                             ->dehydrated(fn() => empty(config('dev.invalidate_import_threshold')))
                                             ->placeholder(fn() => empty(config('dev.invalidate_import_threshold')) ? 100 : config('dev.invalidate_import_threshold'))
                                             ->numeric()
@@ -507,23 +505,47 @@ class Preferences extends SettingsPage
                                             ->label('Series Sync Location')
                                             ->live()
                                             ->rules([new CheckIfUrlOrLocalPath(localOnly: true, isDirectory: true)])
-                                            ->helperText(function ($get) {
+                                            ->helperText(function ($get) use ($seriesExample) {
                                                 $path = $get('stream_file_sync_location') ?? '';
-                                                $includeCategory = $get('stream_file_sync_include_category') ?? false;
-                                                $includeSeries = $get('stream_file_sync_include_series') ?? false;
-                                                $includeSeason = $get('stream_file_sync_include_season') ?? false;
+                                                $pathStructure = $get('stream_file_sync_path_structure') ?? [];
+                                                $filenameMetadata = $get('stream_file_sync_filename_metadata') ?? [];
+                                                $tmdbIdFormat = $get('stream_file_sync_tmdb_id_format') ?? 'square';
 
+                                                // Build path preview
                                                 $preview = 'Preview: ' . $path;
-                                                if ($includeCategory) $preview .= '/Category Name';
-                                                if ($includeSeries) $preview .= '/Series Name';
-                                                if ($includeSeason) $preview .= '/Season 01';
-                                                $preview .= '/S01E01 - Episode Title.strm';
+
+                                                if (in_array('category', $pathStructure)) {
+                                                    $preview .= '/' . $seriesExample->category;
+                                                }
+                                                if (in_array('series', $pathStructure)) {
+                                                    $preview .= '/' . $seriesExample->series->metadata['name'];
+                                                }
+                                                if (in_array('season', $pathStructure)) {
+                                                    $preview .= '/Season ' . str_pad($seriesExample->info->season, 2, '0', STR_PAD_LEFT);
+                                                }
+
+                                                // Build filename preview
+                                                $season = str_pad($seriesExample->info->season, 2, '0', STR_PAD_LEFT);
+                                                $episode = str_pad($seriesExample->episode_num, 2, '0', STR_PAD_LEFT);
+                                                $filename = PlaylistService::makeFilesystemSafe("S{$season}E{$episode} - {$seriesExample->title}", $get('stream_file_sync_replace_char') ?? ' ');
+
+                                                // Add metadata to filename
+                                                if (in_array('year', $filenameMetadata) && ! empty($seriesExample->series->release_date)) {
+                                                    $year = substr($seriesExample->series->release_date, 0, 4);
+                                                    $filename .= " ({$year})";
+                                                }
+                                                if (in_array('tmdb_id', $filenameMetadata) && ! empty($seriesExample->info->tmdb_id)) {
+                                                    $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
+                                                    $filename .= " {$bracket[0]}tmdb-{$seriesExample->info->tmdb_id}{$bracket[1]}";
+                                                }
+
+                                                $preview .= '/' . $filename . '.strm';
 
                                                 return $preview;
                                             })
                                             ->maxLength(255)
                                             ->required()
-                                            ->hidden(fn($get) => !$get('stream_file_sync_enabled'))
+                                            ->hidden(fn($get) => ! $get('stream_file_sync_enabled'))
                                             ->placeholder('/Series'),
                                         Forms\Components\ToggleButtons::make('stream_file_sync_path_structure')
                                             ->label('Path structure (folders)')
@@ -541,9 +563,10 @@ class Preferences extends SettingsPage
                                                 $set('stream_file_sync_include_category', in_array('category', $state));
                                                 $set('stream_file_sync_include_series', in_array('series', $state));
                                                 $set('stream_file_sync_include_season', in_array('season', $state));
+
                                                 return $state;
                                             })
-                                            ->hidden(fn($get) => !$get('stream_file_sync_enabled')),
+                                            ->hidden(fn($get) => ! $get('stream_file_sync_enabled')),
                                         Fieldset::make('Include Metadata')
                                             ->columnSpanFull()
                                             ->schema([
@@ -555,8 +578,8 @@ class Preferences extends SettingsPage
                                                     ->columnSpanFull()
                                                     ->options([
                                                         'year' => 'Year',
-                                                        //'resolution' => 'Resolution',
-                                                        //'codec' => 'Codec',
+                                                        // 'resolution' => 'Resolution',
+                                                        // 'codec' => 'Codec',
                                                         'tmdb_id' => 'TMDB ID',
                                                     ])
                                                     ->dehydrateStateUsing(function ($state, Set $set) {
@@ -566,19 +589,21 @@ class Preferences extends SettingsPage
                                                         $set('stream_file_sync_filename_resolution', in_array('resolution', $state));
                                                         $set('stream_file_sync_filename_codec', in_array('codec', $state));
                                                         $set('stream_file_sync_filename_tmdb_id', in_array('tmdb_id', $state));
+
                                                         return $state;
                                                     }),
                                                 Forms\Components\ToggleButtons::make('stream_file_sync_tmdb_id_format')
                                                     ->label('TMDB ID format')
                                                     ->inline()
                                                     ->grouped()
+                                                    ->live()
                                                     ->options([
                                                         'square' => '[square]',
                                                         'curly' => '{curly}',
-                                                    ])->hidden(fn($get) => !in_array('tmdb_id', $get('stream_file_sync_filename_metadata') ?? []))
+                                                    ])->hidden(fn($get) => ! in_array('tmdb_id', $get('stream_file_sync_filename_metadata') ?? [])),
 
                                             ])
-                                            ->hidden(fn($get) => !$get('stream_file_sync_enabled')),
+                                            ->hidden(fn($get) => ! $get('stream_file_sync_enabled')),
                                         Fieldset::make('Filename Cleansing')
                                             ->columnSpanFull()
                                             ->schema([
@@ -592,6 +617,7 @@ class Preferences extends SettingsPage
                                                     ->live(),
                                                 Forms\Components\ToggleButtons::make('stream_file_sync_replace_char')
                                                     ->label('Replace with')
+                                                    ->live()
                                                     ->inline()
                                                     ->grouped()
                                                     ->columnSpanFull()
@@ -603,7 +629,7 @@ class Preferences extends SettingsPage
                                                         'remove' => 'Remove',
                                                     ]),
                                             ])
-                                            ->hidden(fn($get) => !$get('stream_file_sync_enabled')),
+                                            ->hidden(fn($get) => ! $get('stream_file_sync_enabled')),
                                     ]),
                                 Section::make('VOD stream file settings')
                                     ->description('Generate .strm files and sync them to a local file path. Options can be overriden per VOD in the VOD edit panel.')
@@ -618,19 +644,35 @@ class Preferences extends SettingsPage
                                             ->label('VOD Sync Location')
                                             ->live()
                                             ->rules([new CheckIfUrlOrLocalPath(localOnly: true, isDirectory: true)])
-                                            ->helperText(function ($get) {
+                                            ->helperText(function ($get) use ($vodExample) {
                                                 $path = $get('vod_stream_file_sync_location') ?? '';
-                                                $includeGroup = $get('vod_stream_file_sync_include_season') ?? false;
+                                                $pathStructure = $get('vod_stream_file_sync_path_structure') ?? [];
+                                                $filenameMetadata = $get('vod_stream_file_sync_filename_metadata') ?? [];
+                                                $tmdbIdFormat = $get('vod_stream_file_sync_tmdb_id_format') ?? 'square';
 
+                                                // Build path preview
                                                 $preview = 'Preview: ' . $path;
-                                                if ($includeGroup) $preview .= '/Group Name';
-                                                $preview .= '/VOD Title.strm';
+
+                                                if (in_array('group', $pathStructure)) {
+                                                    $preview .= '/' . $vodExample->group;
+                                                }
+
+                                                // Build filename preview
+                                                $filename = PlaylistService::makeFilesystemSafe($vodExample->title, $get('vod_stream_file_sync_replace_char') ?? ' ');
+
+                                                // Add metadata to filename (year might already be in title, but we'll add others)
+                                                if (in_array('tmdb_id', $filenameMetadata) && ! empty($vodExample->info['tmdb_id'])) {
+                                                    $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
+                                                    $filename .= " {$bracket[0]}tmdb-{$vodExample->info['tmdb_id']}{$bracket[1]}";
+                                                }
+
+                                                $preview .= '/' . $filename . '.strm';
 
                                                 return $preview;
                                             })
                                             ->maxLength(255)
                                             ->required()
-                                            ->hidden(fn($get) => !$get('vod_stream_file_sync_enabled'))
+                                            ->hidden(fn($get) => ! $get('vod_stream_file_sync_enabled'))
                                             ->placeholder('/VOD/movies'),
                                         Forms\Components\ToggleButtons::make('vod_stream_file_sync_path_structure')
                                             ->label('Path structure (folders)')
@@ -644,9 +686,10 @@ class Preferences extends SettingsPage
                                                 // Update the old boolean field for backwards compatibility
                                                 $state = $state ?? [];
                                                 $set('vod_stream_file_sync_include_season', in_array('group', $state));
+
                                                 return $state;
                                             })
-                                            ->hidden(fn($get) => !$get('vod_stream_file_sync_enabled')),
+                                            ->hidden(fn($get) => ! $get('vod_stream_file_sync_enabled')),
                                         Fieldset::make('Include Metadata')
                                             ->columnSpanFull()
                                             ->schema([
@@ -658,8 +701,8 @@ class Preferences extends SettingsPage
                                                     ->columnSpanFull()
                                                     ->options([
                                                         'year' => 'Year',
-                                                        //'resolution' => 'Resolution',
-                                                        //'codec' => 'Codec',
+                                                        // 'resolution' => 'Resolution',
+                                                        // 'codec' => 'Codec',
                                                         'tmdb_id' => 'TMDB ID',
                                                     ])
                                                     ->dehydrateStateUsing(function ($state, Set $set) {
@@ -669,18 +712,20 @@ class Preferences extends SettingsPage
                                                         $set('vod_stream_file_sync_filename_resolution', in_array('resolution', $state));
                                                         $set('vod_stream_file_sync_filename_codec', in_array('codec', $state));
                                                         $set('vod_stream_file_sync_filename_tmdb_id', in_array('tmdb_id', $state));
+
                                                         return $state;
                                                     }),
                                                 Forms\Components\ToggleButtons::make('vod_stream_file_sync_tmdb_id_format')
                                                     ->label('TMDB ID format')
                                                     ->inline()
                                                     ->grouped()
+                                                    ->live()
                                                     ->options([
                                                         'square' => '[square]',
                                                         'curly' => '{curly}',
-                                                    ])->hidden(fn($get) => !in_array('tmdb_id', $get('vod_stream_file_sync_filename_metadata') ?? [])),
+                                                    ])->hidden(fn($get) => ! in_array('tmdb_id', $get('vod_stream_file_sync_filename_metadata') ?? [])),
                                             ])
-                                            ->hidden(fn($get) => !$get('vod_stream_file_sync_enabled')),
+                                            ->hidden(fn($get) => ! $get('vod_stream_file_sync_enabled')),
                                         Fieldset::make('Filename Cleansing')
                                             ->columnSpanFull()
                                             ->schema([
@@ -703,10 +748,10 @@ class Preferences extends SettingsPage
                                                         'underscore' => '_',
                                                         'period' => '.',
                                                         'remove' => 'Remove',
-                                                    ])
+                                                    ]),
                                             ])
-                                            ->hidden(fn($get) => !$get('vod_stream_file_sync_enabled')),
-                                    ])
+                                            ->hidden(fn($get) => ! $get('vod_stream_file_sync_enabled')),
+                                    ]),
                             ]),
 
                         Tab::make('Backups')
@@ -732,7 +777,7 @@ class Preferences extends SettingsPage
                                                 TextInput::make('auto_backup_database_schedule')
                                                     ->label('Backup Schedule')
                                                     ->suffix(config('app.timezone'))
-                                                    ->rules([new Cron()])
+                                                    ->rules([new Cron])
                                                     ->live()
                                                     ->helperText(fn($get) => CronExpression::isValidExpression($get('auto_backup_database_schedule'))
                                                         ? 'Next scheduled backup: ' . (new CronExpression($get('auto_backup_database_schedule')))->getNextRunDate()->format('Y-m-d H:i:s')
@@ -742,8 +787,8 @@ class Preferences extends SettingsPage
                                                     ->type('number')
                                                     ->minValue(0)
                                                     ->helperText('Specify the maximum number of backups to keep. Enter 0 for no limit.'),
-                                            ])->hidden(fn($get) => !$get('auto_backup_database'))
-                                    ])
+                                            ])->hidden(fn($get) => ! $get('auto_backup_database')),
+                                    ]),
                             ]),
 
                         Tab::make('SMTP')
@@ -781,6 +826,7 @@ class Preferences extends SettingsPage
                                                             ->title('Missing SMTP Fields')
                                                             ->body('Please fill in all required SMTP fields before sending a test email.')
                                                             ->send();
+
                                                         return;
                                                     }
 
@@ -874,7 +920,7 @@ class Preferences extends SettingsPage
                                         Toggle::make('show_api_docs')
                                             ->label('Allow access to API docs')
                                             ->helperText('When enabled you can access the API documentation using the "API Docs" button. When disabled, the docs endpoint will return a 403 (Unauthorized). NOTE: The API will respond regardless of this setting. You do not need to enable it to use the API.'),
-                                    ])
+                                    ]),
                             ]),
                         Tab::make('Debugging')
                             ->schema([
@@ -897,7 +943,7 @@ class Preferences extends SettingsPage
                                             ->action(function (array $data): void {
                                                 Notification::make()
                                                     ->success()
-                                                    ->title("WebSocket Connection Test")
+                                                    ->title('WebSocket Connection Test')
                                                     ->body($data['message'])
                                                     ->persistent()
                                                     ->broadcast(Auth::user());
@@ -929,54 +975,16 @@ class Preferences extends SettingsPage
                                             ->helperText('When enabled you can access the queue manager using the "Queue Manager" button. When disabled, the queue manager endpoint will return a 403 (Unauthorized).'),
                                     ]),
                             ]),
-                    ])->contained(false)
+                    ])->contained(false),
             ]);
-    }
-
-    public static function getEpisodeExample(): object
-    {
-        // Minimal example data for an episode to use for the path preview
-        return (object)[
-            'episode_num' => 1,
-            'title' => 'Izuku Midoriya: Origin',
-            'container_extension' => 'mkv',
-            'info' => (object)[
-                'season' => 1,
-                'tmdb_id' => '1176693',
-                'movie_image' => 'http://m3ueditor.test/logo-proxy/aHR0cDovLzIzLjIyNy4xNDcuMTcyOjgwL2ltYWdlcy9mODQyYjlkYTA5YWFjODFlYWRlYzU0YzY0NWU1ZDE3OS5qcGc=',
-            ],
-            'category' => 'Anime',
-            'series' => (object)[
-                'name' => 'My Hero Academia (2016)',
-                'release_date' => '2016-04-03',
-                'metadata' => [
-                    'name' => 'My Hero Academia (2016)',
-                ]
-            ]
-        ];
-    }
-
-    public static function getVodExample(): object
-    {
-        // Minimal example data for VOD to use for the path preview
-        return (object)[
-            'title' => 'John Wick: Chapter 4 (2023)',
-            'year' => '2023',
-            'group' => 'Action',
-            'info' => [
-                'name' => 'John Wick: Chapter 4',
-                'tmdb_id' => 603692
-            ]
-        ];
     }
 
     /**
      * Create a Select component for codec selection with dynamic options based on hardware acceleration method.
      *
-     * @param string $label The label for the codec type (e.g., 'video', 'audio', 'subtitle').
-     * @param string $field The field name for the codec in the settings.
-     * @param \Filament\Schemas\Schema $schema The form instance to which this component belongs.
-     * @return Select
+     * @param  string  $label  The label for the codec type (e.g., 'video', 'audio', 'subtitle').
+     * @param  string  $field  The field name for the codec in the settings.
+     * @param  \Filament\Schemas\Schema  $schema  The form instance to which this component belongs.
      */
     private function makeCodecSelect(
         string $label,
@@ -1007,9 +1015,9 @@ class Preferences extends SettingsPage
                 }
             })
             ->placeholder(fn() => empty($configValue) ? 'copy' : $configValue)
-            ->suffixIcon(fn() => !empty($configValue) ? 'heroicon-m-lock-closed' : null)
-            ->disabled(fn() => !empty($configValue))
-            ->hint(fn() => !empty($configValue) ? 'Already set by environment variable!' : null)
+            ->suffixIcon(fn() => ! empty($configValue) ? 'heroicon-m-lock-closed' : null)
+            ->disabled(fn() => ! empty($configValue))
+            ->hint(fn() => ! empty($configValue) ? 'Already set by environment variable!' : null)
             ->dehydrated(fn() => empty($configValue));
     }
 
@@ -1021,7 +1029,7 @@ class Preferences extends SettingsPage
      * selected hardware acceleration method, and converts empty strings to null
      * for specific nullable text fields.
      *
-     * @param array $submittedFormData The data submitted from the form.
+     * @param  array  $submittedFormData  The data submitted from the form.
      * @return array The final settings data to be saved.
      */
     protected function mutateFormDataBeforeSave(array $submittedFormData): array
@@ -1077,9 +1085,9 @@ class Preferences extends SettingsPage
             'ffmpeg_custom_command_template',
             // mediaflow fields were removed, but if others exist that are text & nullable, add here
             // 'mediaflow_proxy_url', 'mediaflow_proxy_port', 'mediaflow_proxy_password',
-            // 'mediaflow_proxy_user_agent', 
+            // 'mediaflow_proxy_user_agent',
             'ffmpeg_path',
-            'ffprobe_path'
+            'ffprobe_path',
         ];
 
         foreach ($nullableTextfields as $field) {
@@ -1093,7 +1101,7 @@ class Preferences extends SettingsPage
         // Ensure 'hardware_acceleration_method' itself has a default if it was somehow missing
         // from both loaded settings and submitted form data (highly unlikely for a form field).
         // The initial $finalData = $loadedSettings->toArray() should cover this.
-        // If $loadedSettings didn't have it (e.g. fresh install, no defaults run), 
+        // If $loadedSettings didn't have it (e.g. fresh install, no defaults run),
         // it might still be an issue for Spatie settings if it's not nullable and has no default in the class.
         // However, 'hardware_acceleration_method' has a default in GeneralSettings.php.
 

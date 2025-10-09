@@ -1499,7 +1499,7 @@ class VodResource extends Resource
                                 ->live()
                                 ->disabled(fn($get) => !$get('sync_settings.override_global'))
                                 ->rules([new CheckIfUrlOrLocalPath(localOnly: true, isDirectory: true)])
-                                ->helperText(function ($get) {
+                                ->helperText(function ($record, $get) {
                                     $path = $get('sync_location') ?? '';
                                     $includeGroup = $get('sync_settings.include_season') ?? false;
 
@@ -1575,6 +1575,7 @@ class VodResource extends Resource
                                         ->label('TMDB ID format')
                                         ->disabled(fn($get) => !$get('sync_settings.override_global'))
                                         ->inline()
+                                        ->live()
                                         ->grouped()
                                         ->options([
                                             'square' => '[square]',

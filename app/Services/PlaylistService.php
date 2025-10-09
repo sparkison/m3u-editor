@@ -247,11 +247,32 @@ class PlaylistService
         return "{$baseUrl}/series/{$username}/{$password}/{$seriesId}";
     }
 
-    public static function makeFilesystemSafe(string $name): string
+    public static function makeFilesystemSafe(string $name, $replaceWith = ' '): string
     {
+        switch ($replaceWith) {
+            case 'space':
+                $replaceWith = ' ';
+                break;
+            case 'underscore':
+                $replaceWith = '_';
+                break;
+            case 'dash':
+                $replaceWith = '-';
+                break;
+            case 'remove':
+                $replaceWith = '';
+                break;
+            case 'period':
+                $replaceWith = '.';
+                break;
+            default:
+                $replaceWith = ' ';
+                break;
+        }
+
         // Replace filesystem-unsafe characters but preserve Unicode characters
         $unsafe = ['/', '\\', ':', '*', '?', '"', '<', '>', '|', "\0"];
-        $safe = str_replace($unsafe, ' ', $name);
+        $safe = str_replace($unsafe, $replaceWith, $name);
 
         // Remove multiple spaces and trim
         $safe = preg_replace('/\s+/', ' ', trim($safe));
@@ -260,6 +281,44 @@ class PlaylistService
         $safe = trim($safe, '. ');
 
         return $safe ?: 'Unnamed';
+    }
+
+
+    public static function getEpisodeExample(): object
+    {
+        // Minimal example data for an episode to use for the path preview
+        return (object) [
+            'episode_num' => 1,
+            'title' => 'Izuku Midoriya: Origin',
+            'container_extension' => 'mkv',
+            'info' => (object) [
+                'season' => 1,
+                'tmdb_id' => '1176693',
+                'movie_image' => 'http://m3ueditor.test/logo-proxy/aHR0cDovLzIzLjIyNy4xNDcuMTcyOjgwL2ltYWdlcy9mODQyYjlkYTA5YWFjODFlYWRlYzU0YzY0NWU1ZDE3OS5qcGc=',
+            ],
+            'category' => 'Anime',
+            'series' => (object) [
+                'name' => 'My Hero Academia (2016)',
+                'release_date' => '2016-04-03',
+                'metadata' => [
+                    'name' => 'My Hero Academia (2016)',
+                ],
+            ],
+        ];
+    }
+
+    public static function getVodExample(): object
+    {
+        // Minimal example data for VOD to use for the path preview
+        return (object) [
+            'title' => 'John Wick: Chapter 4 (2023)',
+            'year' => '2023',
+            'group' => 'Action',
+            'info' => [
+                'name' => 'John Wick: Chapter 4',
+                'tmdb_id' => 603692,
+            ],
+        ];
     }
 
     /**
