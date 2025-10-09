@@ -685,6 +685,12 @@ class SeriesResource extends Resource
                                 ->schema([
                                     Toggle::make('sync_settings.override_global')
                                         ->label('Override Global Settings')
+                                        ->hintAction(
+                                            Action::make('Global Sync Settings')
+                                                ->icon('heroicon-o-arrow-top-right-on-square')
+                                                ->url('/preferences?tab=sync-options%3A%3Adata%3A%3Atab')
+                                                ->openUrlInNewTab()
+                                        )
                                         ->helperText('Enable to customize sync settings for this series (read-only when disabled, global settings from Preferences will be used)')
                                         ->live(),
                                     Toggle::make('sync_settings.enabled')
@@ -713,7 +719,7 @@ class SeriesResource extends Resource
                                         ->maxLength(255)
                                         ->required()
                                         ->hidden(fn($get) => !$get('sync_settings.enabled'))
-                                        ->placeholder('M:\VOD\movies'),
+                                        ->placeholder('/VOD/movies'),
                                     Forms\Components\ToggleButtons::make('sync_settings.path_structure')
                                         ->label('Path structure (folders)')
                                         ->live()
@@ -754,8 +760,8 @@ class SeriesResource extends Resource
                                                 ->columnSpanFull()
                                                 ->options([
                                                     'year' => 'Year',
-                                                    'resolution' => 'Resolution',
-                                                    'codec' => 'Codec',
+                                                    //'resolution' => 'Resolution',
+                                                    //'codec' => 'Codec',
                                                     'tmdb_id' => 'TMDB ID',
                                                 ])
                                                 ->afterStateHydrated(function ($component, $state, $get) {
@@ -782,13 +788,10 @@ class SeriesResource extends Resource
                                                 ->label('TMDB ID format')
                                                 ->disabled(fn($get) => !$get('sync_settings.override_global'))
                                                 ->inline()
+                                                ->grouped()
                                                 ->options([
                                                     'square' => '[square]',
                                                     'curly' => '{curly}',
-                                                ])
-                                                ->icons([
-                                                    'square' => 'heroicon-o-hashtag',
-                                                    'curly' => 'heroicon-o-hashtag',
                                                 ])->hidden(fn($get) => !in_array('tmdb_id', $get('sync_settings.filename_metadata') ?? [])),
                                         ])
                                         ->hidden(fn($get) => !$get('sync_settings.enabled')),
@@ -805,9 +808,10 @@ class SeriesResource extends Resource
                                                 ->inline(false)
                                                 ->live(),
                                             Forms\Components\ToggleButtons::make('sync_settings.replace_char')
-                                                ->label('')
+                                                ->label('Replace with')
                                                 ->disabled(fn($get) => !$get('sync_settings.override_global'))
                                                 ->inline()
+                                                ->grouped()
                                                 ->columnSpanFull()
                                                 ->options([
                                                     'space' => 'Space',

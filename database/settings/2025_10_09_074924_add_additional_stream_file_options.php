@@ -1,5 +1,6 @@
 <?php
 
+use App\Settings\GeneralSettings;
 use Spatie\LaravelSettings\Migrations\SettingsMigration;
 
 return new class extends SettingsMigration
@@ -32,6 +33,41 @@ return new class extends SettingsMigration
             $this->migrator->add('general.stream_file_sync_replace_char', 'space');
         }
 
+        // Convert existing boolean values to array format for Series path structure
+        if (!$this->migrator->exists('general.stream_file_sync_path_structure')) {
+            $settings = app(GeneralSettings::class);
+            $structure = [];
+            if ($settings->stream_file_sync_include_category) {
+                $structure[] = 'category';
+            }
+            if ($settings->stream_file_sync_include_series) {
+                $structure[] = 'series';
+            }
+            if ($settings->stream_file_sync_include_season) {
+                $structure[] = 'season';
+            }
+            $this->migrator->add('general.stream_file_sync_path_structure', $structure);
+        }
+
+        // Convert existing boolean values to array format for Series filename metadata
+        if (!$this->migrator->exists('general.stream_file_sync_filename_metadata')) {
+            $settings = app(GeneralSettings::class);
+            $metadata = [];
+            if ($settings->stream_file_sync_filename_year) {
+                $metadata[] = 'year';
+            }
+            if ($settings->stream_file_sync_filename_resolution) {
+                $metadata[] = 'resolution';
+            }
+            if ($settings->stream_file_sync_filename_codec) {
+                $metadata[] = 'codec';
+            }
+            if ($settings->stream_file_sync_filename_tmdb_id) {
+                $metadata[] = 'tmdb_id';
+            }
+            $this->migrator->add('general.stream_file_sync_filename_metadata', $metadata);
+        }
+
         // VOD stream file sync filename options
         if (!$this->migrator->exists('general.vod_stream_file_sync_filename_year')) {
             $this->migrator->add('general.vod_stream_file_sync_filename_year', false);
@@ -56,6 +92,35 @@ return new class extends SettingsMigration
         }
         if (!$this->migrator->exists('general.vod_stream_file_sync_replace_char')) {
             $this->migrator->add('general.vod_stream_file_sync_replace_char', 'space');
+        }
+
+        // Convert existing boolean values to array format for VOD path structure
+        if (!$this->migrator->exists('general.vod_stream_file_sync_path_structure')) {
+            $settings = app(GeneralSettings::class);
+            $structure = [];
+            if ($settings->vod_stream_file_sync_include_season) {
+                $structure[] = 'group';
+            }
+            $this->migrator->add('general.vod_stream_file_sync_path_structure', $structure);
+        }
+
+        // Convert existing boolean values to array format for VOD filename metadata
+        if (!$this->migrator->exists('general.vod_stream_file_sync_filename_metadata')) {
+            $settings = app(GeneralSettings::class);
+            $metadata = [];
+            if ($settings->vod_stream_file_sync_filename_year) {
+                $metadata[] = 'year';
+            }
+            if ($settings->vod_stream_file_sync_filename_resolution) {
+                $metadata[] = 'resolution';
+            }
+            if ($settings->vod_stream_file_sync_filename_codec) {
+                $metadata[] = 'codec';
+            }
+            if ($settings->vod_stream_file_sync_filename_tmdb_id) {
+                $metadata[] = 'tmdb_id';
+            }
+            $this->migrator->add('general.vod_stream_file_sync_filename_metadata', $metadata);
         }
     }
 };

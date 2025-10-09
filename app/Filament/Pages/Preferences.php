@@ -3,6 +3,8 @@
 namespace App\Filament\Pages;
 
 use App\Jobs\RestartQueue;
+use App\Models\Channel;
+use App\Models\Series;
 use Filament\Schemas\Schema;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
@@ -97,6 +99,8 @@ class Preferences extends SettingsPage
         $ffmpegPath = config('proxy.ffmpeg_path');
         $m3uProxyUrl = rtrim(config('proxy.m3u_proxy_url', ''), '/');
         $m3uProxyDocs = $m3uProxyUrl . '/docs';
+        $vodExample = self::getVodExample();
+        $seriesExample = self::getEpisodeExample();
         return $schema
             ->components([
                 Tabs::make()
@@ -520,7 +524,7 @@ class Preferences extends SettingsPage
                                             ->maxLength(255)
                                             ->required()
                                             ->hidden(fn($get) => !$get('stream_file_sync_enabled'))
-                                            ->placeholder('M:\Series'),
+                                            ->placeholder('/Series'),
                                         Forms\Components\ToggleButtons::make('stream_file_sync_path_structure')
                                             ->label('Path structure (folders)')
                                             ->live()
@@ -531,17 +535,6 @@ class Preferences extends SettingsPage
                                                 'series' => 'Series',
                                                 'season' => 'Season',
                                             ])
-                                            ->afterStateHydrated(function ($component, $state) {
-                                                // If path_structure is not set, derive from old boolean fields
-                                                if (is_null($state) || empty($state)) {
-                                                    $settings = app(GeneralSettings::class);
-                                                    $structure = [];
-                                                    if ($settings->stream_file_sync_include_category) $structure[] = 'category';
-                                                    if ($settings->stream_file_sync_include_series) $structure[] = 'series';
-                                                    if ($settings->stream_file_sync_include_season) $structure[] = 'season';
-                                                    $component->state($structure);
-                                                }
-                                            })
                                             ->dehydrateStateUsing(function ($state, Set $set) {
                                                 // Update the old boolean fields for backwards compatibility
                                                 $state = $state ?? [];
@@ -549,7 +542,8 @@ class Preferences extends SettingsPage
                                                 $set('stream_file_sync_include_series', in_array('series', $state));
                                                 $set('stream_file_sync_include_season', in_array('season', $state));
                                                 return $state;
-                                            })->hidden(fn($get) => !$get('stream_file_sync_enabled')),
+                                            })
+                                            ->hidden(fn($get) => !$get('stream_file_sync_enabled')),
                                         Fieldset::make('Include Metadata')
                                             ->columnSpanFull()
                                             ->schema([
@@ -561,22 +555,10 @@ class Preferences extends SettingsPage
                                                     ->columnSpanFull()
                                                     ->options([
                                                         'year' => 'Year',
-                                                        'resolution' => 'Resolution',
-                                                        'codec' => 'Codec',
+                                                        //'resolution' => 'Resolution',
+                                                        //'codec' => 'Codec',
                                                         'tmdb_id' => 'TMDB ID',
                                                     ])
-                                                    ->afterStateHydrated(function ($component, $state) {
-                                                        // If metadata array is not set, derive from old boolean fields
-                                                        if (is_null($state) || empty($state)) {
-                                                            $settings = app(GeneralSettings::class);
-                                                            $metadata = [];
-                                                            if ($settings->stream_file_sync_filename_year) $metadata[] = 'year';
-                                                            if ($settings->stream_file_sync_filename_resolution) $metadata[] = 'resolution';
-                                                            if ($settings->stream_file_sync_filename_codec) $metadata[] = 'codec';
-                                                            if ($settings->stream_file_sync_filename_tmdb_id) $metadata[] = 'tmdb_id';
-                                                            $component->state($metadata);
-                                                        }
-                                                    })
                                                     ->dehydrateStateUsing(function ($state, Set $set) {
                                                         // Update the old boolean fields for backwards compatibility
                                                         $state = $state ?? [];
@@ -589,15 +571,11 @@ class Preferences extends SettingsPage
                                                 Forms\Components\ToggleButtons::make('stream_file_sync_tmdb_id_format')
                                                     ->label('TMDB ID format')
                                                     ->inline()
+                                                    ->grouped()
                                                     ->options([
                                                         'square' => '[square]',
                                                         'curly' => '{curly}',
-                                                    ])
-                                                    ->icons([
-                                                        'square' => 'heroicon-o-hashtag',
-                                                        'curly' => 'heroicon-o-hashtag',
-                                                    ])
-                                                    ->hidden(fn($get) => !in_array('tmdb_id', $get('stream_file_sync_filename_metadata') ?? []))
+                                                    ])->hidden(fn($get) => !in_array('tmdb_id', $get('stream_file_sync_filename_metadata') ?? []))
 
                                             ])
                                             ->hidden(fn($get) => !$get('stream_file_sync_enabled')),
@@ -615,6 +593,7 @@ class Preferences extends SettingsPage
                                                 Forms\Components\ToggleButtons::make('stream_file_sync_replace_char')
                                                     ->label('Replace with')
                                                     ->inline()
+                                                    ->grouped()
                                                     ->columnSpanFull()
                                                     ->options([
                                                         'space' => 'Space',
@@ -652,7 +631,7 @@ class Preferences extends SettingsPage
                                             ->maxLength(255)
                                             ->required()
                                             ->hidden(fn($get) => !$get('vod_stream_file_sync_enabled'))
-                                            ->placeholder('M:\VOD\movies'),
+                                            ->placeholder('/VOD/movies'),
                                         Forms\Components\ToggleButtons::make('vod_stream_file_sync_path_structure')
                                             ->label('Path structure (folders)')
                                             ->live()
@@ -661,21 +640,13 @@ class Preferences extends SettingsPage
                                             ->options([
                                                 'group' => 'Group',
                                             ])
-                                            ->afterStateHydrated(function ($component, $state) {
-                                                // If path_structure is not set, derive from old boolean field
-                                                if (is_null($state) || empty($state)) {
-                                                    $settings = app(GeneralSettings::class);
-                                                    $structure = [];
-                                                    if ($settings->vod_stream_file_sync_include_season) $structure[] = 'group';
-                                                    $component->state($structure);
-                                                }
-                                            })
                                             ->dehydrateStateUsing(function ($state, Set $set) {
                                                 // Update the old boolean field for backwards compatibility
                                                 $state = $state ?? [];
                                                 $set('vod_stream_file_sync_include_season', in_array('group', $state));
                                                 return $state;
-                                            })->hidden(fn($get) => !$get('vod_stream_file_sync_enabled')),
+                                            })
+                                            ->hidden(fn($get) => !$get('vod_stream_file_sync_enabled')),
                                         Fieldset::make('Include Metadata')
                                             ->columnSpanFull()
                                             ->schema([
@@ -687,22 +658,10 @@ class Preferences extends SettingsPage
                                                     ->columnSpanFull()
                                                     ->options([
                                                         'year' => 'Year',
-                                                        'resolution' => 'Resolution',
-                                                        'codec' => 'Codec',
+                                                        //'resolution' => 'Resolution',
+                                                        //'codec' => 'Codec',
                                                         'tmdb_id' => 'TMDB ID',
                                                     ])
-                                                    ->afterStateHydrated(function ($component, $state) {
-                                                        // If metadata array is not set, derive from old boolean fields
-                                                        if (is_null($state) || empty($state)) {
-                                                            $settings = app(GeneralSettings::class);
-                                                            $metadata = [];
-                                                            if ($settings->vod_stream_file_sync_filename_year) $metadata[] = 'year';
-                                                            if ($settings->vod_stream_file_sync_filename_resolution) $metadata[] = 'resolution';
-                                                            if ($settings->vod_stream_file_sync_filename_codec) $metadata[] = 'codec';
-                                                            if ($settings->vod_stream_file_sync_filename_tmdb_id) $metadata[] = 'tmdb_id';
-                                                            $component->state($metadata);
-                                                        }
-                                                    })
                                                     ->dehydrateStateUsing(function ($state, Set $set) {
                                                         // Update the old boolean fields for backwards compatibility
                                                         $state = $state ?? [];
@@ -713,14 +672,12 @@ class Preferences extends SettingsPage
                                                         return $state;
                                                     }),
                                                 Forms\Components\ToggleButtons::make('vod_stream_file_sync_tmdb_id_format')
+                                                    ->label('TMDB ID format')
                                                     ->inline()
+                                                    ->grouped()
                                                     ->options([
                                                         'square' => '[square]',
                                                         'curly' => '{curly}',
-                                                    ])
-                                                    ->icons([
-                                                        'square' => 'heroicon-o-hashtag',
-                                                        'curly' => 'heroicon-o-hashtag',
                                                     ])->hidden(fn($get) => !in_array('tmdb_id', $get('vod_stream_file_sync_filename_metadata') ?? [])),
                                             ])
                                             ->hidden(fn($get) => !$get('vod_stream_file_sync_enabled')),
@@ -738,6 +695,7 @@ class Preferences extends SettingsPage
                                                 Forms\Components\ToggleButtons::make('vod_stream_file_sync_replace_char')
                                                     ->label('Replace with')
                                                     ->inline()
+                                                    ->grouped()
                                                     ->columnSpanFull()
                                                     ->options([
                                                         'space' => 'Space',
@@ -973,6 +931,43 @@ class Preferences extends SettingsPage
                             ]),
                     ])->contained(false)
             ]);
+    }
+
+    public static function getEpisodeExample(): object
+    {
+        // Minimal example data for an episode to use for the path preview
+        return (object)[
+            'episode_num' => 1,
+            'title' => 'Izuku Midoriya: Origin',
+            'container_extension' => 'mkv',
+            'info' => (object)[
+                'season' => 1,
+                'tmdb_id' => '1176693',
+                'movie_image' => 'http://m3ueditor.test/logo-proxy/aHR0cDovLzIzLjIyNy4xNDcuMTcyOjgwL2ltYWdlcy9mODQyYjlkYTA5YWFjODFlYWRlYzU0YzY0NWU1ZDE3OS5qcGc=',
+            ],
+            'category' => 'Anime',
+            'series' => (object)[
+                'name' => 'My Hero Academia (2016)',
+                'release_date' => '2016-04-03',
+                'metadata' => [
+                    'name' => 'My Hero Academia (2016)',
+                ]
+            ]
+        ];
+    }
+
+    public static function getVodExample(): object
+    {
+        // Minimal example data for VOD to use for the path preview
+        return (object)[
+            'title' => 'John Wick: Chapter 4 (2023)',
+            'year' => '2023',
+            'group' => 'Action',
+            'info' => [
+                'name' => 'John Wick: Chapter 4',
+                'tmdb_id' => 603692
+            ]
+        ];
     }
 
     /**
