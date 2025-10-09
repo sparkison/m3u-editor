@@ -40,13 +40,19 @@ class SyncVodStrmFiles implements ShouldQueue
                 'enabled' => $settings->vod_stream_file_sync_enabled ?? false,
                 'include_season' => $settings->vod_stream_file_sync_include_season ?? true,
                 'sync_location' => $settings->vod_stream_file_sync_location ?? null,
+                'path_structure' => $settings->vod_stream_file_sync_path_structure ?? ['group'],
+                'filename_metadata' => $settings->vod_stream_file_sync_filename_metadata ?? [],
+                'tmdb_id_format' => $settings->vod_stream_file_sync_tmdb_id_format ?? 'square',
+                'clean_special_chars' => $settings->vod_stream_file_sync_clean_special_chars ?? false,
+                'remove_consecutive_chars' => $settings->vod_stream_file_sync_remove_consecutive_chars ?? false,
+                'replace_char' => $settings->vod_stream_file_sync_replace_char ?? 'space',
             ];
 
             // Setup our channels to sync
             $channels = $this->channels ?? collect();
             if ($this->channel) {
                 $channels->push($this->channel);
-            } else if ($this->playlist) {
+            } elseif ($this->playlist) {
                 $channels = $this->playlist->channels()
                     ->where([
                         ['is_vod', true],
@@ -59,13 +65,13 @@ class SyncVodStrmFiles implements ShouldQueue
             // Loop through each channel and sync
             foreach ($channels as $channel) {
                 $sync_settings = array_merge($global_sync_settings, $channel->sync_settings ?? []);
-                if (!$sync_settings['enabled'] ?? false) {
+                if (! $sync_settings['enabled'] ?? false) {
                     continue;
                 }
 
                 // Get the path info
                 $path = rtrim($sync_settings['sync_location'], '/');
-                if (!is_dir($path)) {
+                if (! is_dir($path)) {
                     if ($this->notify) {
                         Notification::make()
                             ->danger()
@@ -76,26 +82,62 @@ class SyncVodStrmFiles implements ShouldQueue
                     } else {
                         Log::error("Error sync .strm files for VOD channel \"{$channel->title}\": Sync location \"{$path}\" does not exist.");
                     }
+
                     return;
                 }
 
-                // Setup episode prefix
-                $group = PlaylistService::makeFilesystemSafe($channel->group);
+                // Get path structure and replacement character settings
+                $pathStructure = $sync_settings['path_structure'] ?? ['group'];
+                $replaceChar = $sync_settings['replace_char'] ?? 'space';
+                $cleanSpecialChars = $sync_settings['clean_special_chars'] ?? false;
+                $filenameMetadata = $sync_settings['filename_metadata'] ?? [];
+                $tmdbIdFormat = $sync_settings['tmdb_id_format'] ?? 'square';
+                $removeConsecutiveChars = $sync_settings['remove_consecutive_chars'] ?? false;
 
-                // Create the .strm file
-                $title = PlaylistService::makeFilesystemSafe($channel->title);
-                $fileName = "{$title}.strm";
-
-                // Create the season folder
-                if ($sync_settings['include_season'] ?? true) {
-                    $groupPath = $path . '/' . $group;
-                    if (!is_dir($groupPath)) {
+                // Create the group folder if enabled
+                if (in_array('group', $pathStructure)) {
+                    $group = $cleanSpecialChars
+                        ? PlaylistService::makeFilesystemSafe($channel->group, $replaceChar)
+                        : PlaylistService::makeFilesystemSafe($channel->group);
+                    $groupPath = $path.'/'.$group;
+                    if (! is_dir($groupPath)) {
                         mkdir($groupPath, 0777, true);
                     }
-                    $filePath = $groupPath . '/' . $fileName;
-                } else {
-                    $filePath = $path . '/' . $fileName;
+                    $path = $groupPath;
                 }
+
+                // Build the filename
+                $fileName = $channel->title;
+
+                // Add metadata to filename
+                if (in_array('year', $filenameMetadata) && ! empty($channel->year)) {
+                    // Only add year if it's not already in the title
+                    if (strpos($fileName, "({$channel->year})") === false) {
+                        $fileName .= " ({$channel->year})";
+                    }
+                }
+
+                if (in_array('tmdb_id', $filenameMetadata)) {
+                    $tmdbId = $channel->info['tmdb_id'] ?? $channel->movie_data['tmdb_id'] ?? null;
+                    if (! empty($tmdbId)) {
+                        $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
+                        $fileName .= " {$bracket[0]}tmdb-{$tmdbId}{$bracket[1]}";
+                    }
+                }
+
+                // Clean the filename
+                $fileName = $cleanSpecialChars
+                    ? PlaylistService::makeFilesystemSafe($fileName, $replaceChar)
+                    : PlaylistService::makeFilesystemSafe($fileName);
+
+                // Remove consecutive replacement characters if enabled
+                if ($removeConsecutiveChars && $replaceChar !== 'remove') {
+                    $char = $replaceChar === 'space' ? ' ' : ($replaceChar === 'dash' ? '-' : ($replaceChar === 'underscore' ? '_' : '.'));
+                    $fileName = preg_replace('/'.preg_quote($char, '/').'{2,}/', $char, $fileName);
+                }
+
+                $fileName = "{$fileName}.strm";
+                $filePath = $path.'/'.$fileName;
 
                 // Get the url
                 $url = $channel->url_custom ?? $channel->url;
@@ -122,7 +164,7 @@ class SyncVodStrmFiles implements ShouldQueue
             }
         } catch (\Exception $e) {
             // Log the exception or handle it as needed
-            Log::error('Error syncing VOD .strm files: ' . $e->getMessage());
+            Log::error('Error syncing VOD .strm files: '.$e->getMessage());
         }
     }
 }

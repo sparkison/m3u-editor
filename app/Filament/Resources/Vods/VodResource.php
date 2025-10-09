@@ -1528,6 +1528,14 @@ class VodResource extends Resource
                                     // Build filename preview
                                     $filename = $title;
 
+                                    // Add year to filename if selected and available
+                                    if (in_array('year', $filenameMetadata) && ! empty($year)) {
+                                        // Only add year if it's not already in the title
+                                        if (strpos($filename, "({$year})") === false) {
+                                            $filename .= " ({$year})";
+                                        }
+                                    }
+
                                     // Add metadata to filename
                                     if (in_array('tmdb_id', $filenameMetadata) && ! empty($tmdbId)) {
                                         $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];

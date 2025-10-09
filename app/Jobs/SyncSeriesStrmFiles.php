@@ -61,8 +61,8 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 if ($user) {
                     Notification::make()
                         ->success()
-                        ->title("Sync .strm files for series completed")
-                        ->body("Sync completed for all series.")
+                        ->title('Sync .strm files for series completed')
+                        ->body('Sync completed for all series.')
                         ->broadcast($user)
                         ->sendToDatabase($user);
                 }
@@ -86,21 +86,28 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 'include_series' => $settings->stream_file_sync_include_series ?? true,
                 'include_season' => $settings->stream_file_sync_include_season ?? true,
                 'sync_location' => $series->sync_location ?? $settings->stream_file_sync_location ?? null,
+                'path_structure' => $settings->stream_file_sync_path_structure ?? ['category', 'series', 'season'],
+                'filename_metadata' => $settings->stream_file_sync_filename_metadata ?? [],
+                'tmdb_id_format' => $settings->stream_file_sync_tmdb_id_format ?? 'square',
+                'clean_special_chars' => $settings->stream_file_sync_clean_special_chars ?? false,
+                'remove_consecutive_chars' => $settings->stream_file_sync_remove_consecutive_chars ?? false,
+                'replace_char' => $settings->stream_file_sync_replace_char ?? 'space',
             ];
 
             // Merge global settings with series specific settings
             $sync_settings = array_merge($global_sync_settings, $sync_settings ?? []);
 
             // Check if sync is enabled
-            if (!$sync_settings['enabled'] ?? false) {
+            if (! $sync_settings['enabled'] ?? false) {
                 if ($this->notify) {
                     Notification::make()
                         ->danger()
                         ->title("Error sync .strm files for series \"{$series->name}\"")
-                        ->body("Sync is not enabled for this series.")
+                        ->body('Sync is not enabled for this series.')
                         ->broadcast($series->user)
                         ->sendToDatabase($series->user);
                 }
+
                 return;
             }
 
@@ -113,16 +120,17 @@ class SyncSeriesStrmFiles implements ShouldQueue
                     Notification::make()
                         ->danger()
                         ->title("Error sync .strm files for series \"{$series->name}\"")
-                        ->body("No episodes found for this series. Try processing it first.")
+                        ->body('No episodes found for this series. Try processing it first.')
                         ->broadcast($series->user)
                         ->sendToDatabase($series->user);
                 }
+
                 return;
             }
 
             // Get the path info
             $path = rtrim($sync_settings['sync_location'], '/');
-            if (!is_dir($path)) {
+            if (! is_dir($path)) {
                 if ($this->notify) {
                     Notification::make()
                         ->danger()
@@ -133,53 +141,94 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 } else {
                     Log::error("Error sync .strm files for series \"{$series->name}\": Sync location \"{$path}\" does not exist.");
                 }
+
                 return;
             }
 
+            // Get path structure and replacement character settings
+            $pathStructure = $sync_settings['path_structure'] ?? ['category', 'series', 'season'];
+            $replaceChar = $sync_settings['replace_char'] ?? 'space';
+            $cleanSpecialChars = $sync_settings['clean_special_chars'] ?? false;
+
             // See if the category is enabled, if not, skip, else create the folder
-            if ($sync_settings['include_category'] ?? true) {
+            if (in_array('category', $pathStructure)) {
                 // Create the category folder
                 // Remove any special characters from the category name
                 $category = $series->category;
                 $catName = $category->name ?? $category->name_internal ?? 'Uncategorized';
-                $cleanName = PlaylistService::makeFilesystemSafe($catName);
-                $path .= '/' . $cleanName;
-                if (!is_dir($path)) {
+                $cleanName = $cleanSpecialChars
+                    ? PlaylistService::makeFilesystemSafe($catName, $replaceChar)
+                    : PlaylistService::makeFilesystemSafe($catName);
+                $path .= '/'.$cleanName;
+                if (! is_dir($path)) {
                     mkdir($path, 0777, true);
                 }
             }
 
             // See if the series is enabled, if not, skip, else create the folder
-            if ($sync_settings['include_series'] ?? true) {
+            if (in_array('series', $pathStructure)) {
                 // Create the series folder
                 // Remove any special characters from the series name
-                $cleanName = PlaylistService::makeFilesystemSafe($series->name);
-                $path .= '/' . $cleanName;
-                if (!is_dir($path)) {
+                $cleanName = $cleanSpecialChars
+                    ? PlaylistService::makeFilesystemSafe($series->name, $replaceChar)
+                    : PlaylistService::makeFilesystemSafe($series->name);
+                $path .= '/'.$cleanName;
+                if (! is_dir($path)) {
                     mkdir($path, 0777, true);
                 }
             }
+
+            // Get filename metadata settings
+            $filenameMetadata = $sync_settings['filename_metadata'] ?? [];
+            $tmdbIdFormat = $sync_settings['tmdb_id_format'] ?? 'square';
+            $removeConsecutiveChars = $sync_settings['remove_consecutive_chars'] ?? false;
 
             // Loop through each episode
             foreach ($episodes as $ep) {
                 // Setup episode prefix
                 $season = $ep->season;
                 $num = str_pad($ep->episode_num, 2, '0', STR_PAD_LEFT);
-                $prefx = "S" . str_pad($season, 2, '0', STR_PAD_LEFT) . "E{$num}";
+                $prefx = 'S'.str_pad($season, 2, '0', STR_PAD_LEFT)."E{$num}";
 
-                // Create the .strm file
-                $fileName = PlaylistService::makeFilesystemSafe("{$prefx} - {$ep->title}");
+                // Build the base filename
+                $fileName = "{$prefx} - {$ep->title}";
+
+                // Add metadata to filename
+                if (in_array('year', $filenameMetadata) && ! empty($series->release_date)) {
+                    $year = substr($series->release_date, 0, 4);
+                    $fileName .= " ({$year})";
+                }
+
+                if (in_array('tmdb_id', $filenameMetadata)) {
+                    $tmdbId = $series->metadata['tmdb_id'] ?? $ep->info['tmdb_id'] ?? null;
+                    if (! empty($tmdbId)) {
+                        $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
+                        $fileName .= " {$bracket[0]}tmdb-{$tmdbId}{$bracket[1]}";
+                    }
+                }
+
+                // Clean the filename
+                $fileName = $cleanSpecialChars
+                    ? PlaylistService::makeFilesystemSafe($fileName, $replaceChar)
+                    : PlaylistService::makeFilesystemSafe($fileName);
+
+                // Remove consecutive replacement characters if enabled
+                if ($removeConsecutiveChars && $replaceChar !== 'remove') {
+                    $char = $replaceChar === 'space' ? ' ' : ($replaceChar === 'dash' ? '-' : ($replaceChar === 'underscore' ? '_' : '.'));
+                    $fileName = preg_replace('/'.preg_quote($char, '/').'{2,}/', $char, $fileName);
+                }
+
                 $fileName = "{$fileName}.strm";
 
                 // Create the season folder
-                if ($sync_settings['include_season'] ?? true) {
-                    $seasonPath = $path . '/Season ' . str_pad($season, 2, '0', STR_PAD_LEFT);
-                    if (!is_dir($seasonPath)) {
+                if (in_array('season', $pathStructure)) {
+                    $seasonPath = $path.'/Season '.str_pad($season, 2, '0', STR_PAD_LEFT);
+                    if (! is_dir($seasonPath)) {
                         mkdir($seasonPath, 0777, true);
                     }
-                    $filePath = $seasonPath . '/' . $fileName;
+                    $filePath = $seasonPath.'/'.$fileName;
                 } else {
-                    $filePath = $path . '/' . $fileName;
+                    $filePath = $path.'/'.$fileName;
                 }
 
                 // Get the url
