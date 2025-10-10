@@ -30,6 +30,7 @@ class TestBroadcasting extends Command
         $users = User::get(['id', 'email']);
         if ($users->isEmpty()) {
             $this->info('No users found.');
+
             return false;
         }
         if ($users->count() === 1) {
@@ -42,12 +43,13 @@ class TestBroadcasting extends Command
         $this->info('Testing broadcasting...');
         Notification::make()
             ->success()
-            ->title("Broadcast testing")
+            ->title('Broadcast testing')
             ->body('Testing system broadcasting')
             ->broadcast($user);
 
-        $this->info('Broadcast sent to: ' . $user->email);
+        $this->info('Broadcast sent to: '.$user->email);
         $this->info('Done.');
+
         return true;
     }
 }

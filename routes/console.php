@@ -24,29 +24,6 @@ Schedule::command('app:refresh-epg')
     ->everyMinute()
     ->withoutOverlapping();
 
-// Prune stale processes
-Schedule::command('app:hls-prune')
-    ->everyFiveSeconds()
-    ->withoutOverlapping();
-
-// Shared stream management jobs
-Schedule::job(new \App\Jobs\SharedStreamCleanup())
-    ->everyTenMinutes()
-    ->withoutOverlapping()
-    ->name('shared-stream-cleanup');
-Schedule::job(new \App\Jobs\StreamBufferManager())
-    ->everyTenMinutes()
-    ->withoutOverlapping()
-    ->name('shared-stream-buffer-management');
-
-// Shared stream maintenance
-Schedule::command('app:shared-streams cleanup')
-    ->everyFiveMinutes()
-    ->withoutOverlapping();
-Schedule::command('app:shared-streams sync')
-    ->everyTenMinutes()
-    ->withoutOverlapping();
-
 // EPG cache health
 Schedule::command('app:epg-cache-health-check')
     ->everyFifteenMinutes()

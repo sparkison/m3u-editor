@@ -407,19 +407,18 @@ class XtreamApiController extends Controller
                 $streams = $playlist->streams ?? 1;
                 $activeConnections = 0;
             }
-
             $outputFormats = ['m3u8', 'ts'];
-            if ($playlist->enable_proxy) {
-                $proxyOutput = $playlist->proxy_options['output'] ?? 'ts';
-                if ($proxyOutput === 'hls') {
-                    $outputFormats = ['m3u8'];
-                } else {
-                    $outputFormats = [$proxyOutput];
-                }
-                $activeConnections = SharedStream::active()
-                    ->where('stream_info->options->playlist_id', $playlist->uuid)
-                    ->count();
-            }
+            // if ($playlist->enable_proxy) {
+            //     $proxyOutput = $playlist->proxy_options['output'] ?? 'ts';
+            //     if ($proxyOutput === 'hls') {
+            //         $outputFormats = ['m3u8'];
+            //     } else {
+            //         $outputFormats = [$proxyOutput];
+            //     }
+            //     $activeConnections = SharedStream::active()
+            //         ->where('stream_info->options->playlist_id', $playlist->uuid)
+            //         ->count();
+            // }
 
             $userInfo = [
                 // 'playlist_id' => (string)$playlist->id, // Debugging
@@ -1194,9 +1193,10 @@ class XtreamApiController extends Controller
             }
 
             // Check if channel is currently playing
-            $isNowPlaying = SharedStream::active()
-                ->where('stream_info->model_id', $channel->id)
-                ->exists();
+            // $isNowPlaying = SharedStream::active()
+            //     ->where('stream_info->model_id', $channel->id)
+            //     ->exists();
+            $isNowPlaying = false;
 
             // Filter programmes to current time and future, then limit
             $now = Carbon::now();
@@ -1269,9 +1269,10 @@ class XtreamApiController extends Controller
             $epgListings = [];
             if (isset($programmes[$channel->epgChannel->channel_id])) {
                 // Check if channel is currently playing
-                $isNowPlaying = SharedStream::active()
-                    ->where('stream_info->model_id', $channel->id)
-                    ->exists();
+                // $isNowPlaying = SharedStream::active()
+                //     ->where('stream_info->model_id', $channel->id)
+                //     ->exists();
+                $isNowPlaying = false;
 
                 $now = Carbon::now();
                 foreach ($programmes[$channel->epgChannel->channel_id] as $index => $programme) {

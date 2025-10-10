@@ -49,6 +49,7 @@ Route::get('/s/{shortUrlKey}/{path?}', function (Request $request, string $short
     return $response;
 })->where('path', '.*');
 
+
 /*
  * Logo proxy route - cache and serve remote logos
  */
@@ -59,6 +60,7 @@ Route::get('/logo-proxy/{encodedUrl}', [LogoProxyController::class, 'serveLogo']
 /*
  * Playlist/EPG output routes
  */
+
 
 // Generate M3U playlist from the playlist configuration
 Route::get('/{uuid}/playlist.m3u', PlaylistGenerateController::class)
@@ -85,6 +87,7 @@ Route::get('/{uuid}/epg.xml.gz', [EpgGenerateController::class, 'compressed'])
 Route::get('epgs/{uuid}/epg.xml', EpgFileController::class)
     ->name('epg.file');
 
+
 /*
  * DEBUG routes
  */
@@ -104,29 +107,25 @@ Route::get('/phpinfo', function () {
     }
 });
 
+
 /*
- * Proxy routes
+ * Proxy routes (redirects to m3u-proxy API)
  */
 
-// More specific routes first to avoid conflicts
+// Deprecated route for episode - redirect to m3u-proxy API
+Route::get('/shared/stream/e/{encodedId}.{format?}', function (string $encodedId) {
+    $id = base64_decode($encodedId);
 
-// HLS route with specific path structure
-Route::get('/shared/stream/{streamKey}/hls', [\App\Http\Controllers\SharedStreamController::class, 'serveHLS'])
-    ->name('shared.stream.hls')
-    ->where('streamKey', '[a-f0-9]{32}'); // Match 32-character MD5 hashes
+    return redirect()->route('m3u-proxy.episode', ['id' => $id]);
+})->name('shared.stream.episode');
 
-// Episode route with /e/ prefix
-Route::get('/shared/stream/e/{encodedId}.{format?}', [\App\Http\Controllers\SharedStreamController::class, 'streamEpisode'])
-    ->name('shared.stream.episode');
+// Deprecated route for channel - redirect to m3u-proxy API
+Route::get('/shared/stream/{encodedId}.{format?}', function (string $encodedId) {
+    $id = base64_decode($encodedId);
 
-// Direct stream key access (32-character MD5 hash without extension)
-Route::get('/shared/stream/{streamKey}', [\App\Http\Controllers\SharedStreamController::class, 'serveSharedStream'])
-    ->name('shared.stream.direct')
-    ->where('streamKey', '[a-f0-9]{32}'); // Match 32-character MD5 hashes
+    return redirect()->route('m3u-proxy.channel', ['id' => $id]);
+})->name('shared.stream.channel');
 
-// Channel route (catch-all for encoded IDs with optional format)
-Route::get('/shared/stream/{encodedId}.{format?}', [\App\Http\Controllers\SharedStreamController::class, 'streamChannel'])
-    ->name('shared.stream.channel');
 
 /*
  * API routes
@@ -161,9 +160,11 @@ Route::group(['prefix' => 'epg'], function () {
         ->name('api.epg.sync');
 });
 
+
 /*
  * Xtream API endpoints at root
  */
+
 // Main Xtream API endpoint at /player_api.php and /get.php
 Route::get('/player_api.php', [XtreamApiController::class, 'handle'])->name('xtream.api.player');
 Route::get('/get.php', [XtreamApiController::class, 'handle'])->name('xtream.api.get');

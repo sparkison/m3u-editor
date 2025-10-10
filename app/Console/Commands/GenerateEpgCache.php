@@ -30,14 +30,15 @@ class GenerateEpgCache extends Command
         $id = $this->argument('id');
 
         $epg = Epg::find($id);
-        if (!$epg) {
+        if (! $epg) {
             $this->error("EPG with ID {$id} not found");
+
             return 1;
         }
 
         $this->info("Generating cache for EPG: {$epg->name}");
 
-        $cacheService = new EpgCacheService();
+        $cacheService = new EpgCacheService;
 
         // Set high memory and time limits for command line execution
         ini_set('memory_limit', '4G');
@@ -48,10 +49,12 @@ class GenerateEpgCache extends Command
         $duration = microtime(true) - $start;
 
         if ($result) {
-            $this->info("Cache generated successfully in " . round($duration, 2) . " seconds");
+            $this->info('Cache generated successfully in '.round($duration, 2).' seconds');
+
             return 0;
         } else {
-            $this->error("Failed to generate cache");
+            $this->error('Failed to generate cache');
+
             return 1;
         }
     }

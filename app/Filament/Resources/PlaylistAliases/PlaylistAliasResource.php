@@ -104,12 +104,12 @@ class PlaylistAliasResource extends Resource
                     })
                     ->description(fn($record): string => "Active: " . ($record->xtream_status['user_info']['active_cons'] ?? 0))
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('available_streams')
-                    ->label('Proxy Streams')
-                    ->toggleable()
-                    ->formatStateUsing(fn(int $state): string => $state === 0 ? '∞' : (string)$state)
-                    ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
-                    ->description(fn(PlaylistAlias $record): string => "Active: " . SharedStream::active()->where('stream_info->options->playlist_id', $record->uuid)->count()),
+                // Tables\Columns\TextColumn::make('available_streams')
+                //     ->label('Proxy Streams')
+                //     ->toggleable()
+                //     ->formatStateUsing(fn(int $state): string => $state === 0 ? '∞' : (string)$state)
+                //     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
+                //     ->description(fn(PlaylistAlias $record): string => "Active: " . SharedStream::active()->where('stream_info->options->playlist_id', $record->uuid)->count()),
                 Tables\Columns\TextColumn::make('live_count')
                     ->label('Live')
                     ->description(fn(PlaylistAlias $record): string => "Enabled: {$record->enabled_live_channels()->count()}")

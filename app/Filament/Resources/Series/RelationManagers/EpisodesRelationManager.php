@@ -14,7 +14,6 @@ use Filament\Schemas\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\ImageEntry;
 use App\Infolists\Components\SeriesPreview;
-use App\Livewire\ChannelStreamStats;
 use Filament\Forms;
 use Filament\Infolists;
 use Filament\Notifications\Notification;

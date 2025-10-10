@@ -2,13 +2,13 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Database\Connection;
-use LogicException;
 use Illuminate\Console\Command;
-use Illuminate\Database\DatabaseManager;
-use Illuminate\Database\SQLiteConnection;
+use Illuminate\Database\Connection;
 use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Query\Expression;
+use Illuminate\Database\SQLiteConnection;
+use LogicException;
 
 class SqliteWalEnable extends Command
 {
@@ -30,7 +30,6 @@ class SqliteWalEnable extends Command
     /**
      * Execute the console command.
      *
-     * @param DatabaseManager $manager
      * @return void
      */
     public function handle(DatabaseManager $manager)
@@ -51,8 +50,6 @@ class SqliteWalEnable extends Command
     /**
      * Returns the Database Connection
      *
-     * @param DatabaseManager $manager
-     * @param  string $connection
      * @return Connection
      */
     protected function getDatabase(DatabaseManager $manager, string $connection)
@@ -60,7 +57,7 @@ class SqliteWalEnable extends Command
         $db = $manager->connection($connection);
 
         // We will throw an exception if the database is not SQLite
-        if (!$db instanceof SQLiteConnection) {
+        if (! $db instanceof SQLiteConnection) {
             throw new LogicException("The '$connection' connection must be sqlite, [{$db->getDriverName()}] given.");
         }
 
@@ -70,7 +67,6 @@ class SqliteWalEnable extends Command
     /**
      * Sets the Journal Mode to WAL
      *
-     * @param ConnectionInterface $connection
      * @return bool
      */
     protected function setWalJournalMode(ConnectionInterface $connection)
@@ -81,7 +77,6 @@ class SqliteWalEnable extends Command
     /**
      * Returns the current Journal Mode of the Database Connection
      *
-     * @param ConnectionInterface $connection
      * @return string
      */
     protected function getJournalMode(ConnectionInterface $connection)

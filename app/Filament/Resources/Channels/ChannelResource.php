@@ -45,7 +45,6 @@ use App\Filament\Resources\ChannelResource\Pages;
 use App\Filament\Resources\ChannelResource\RelationManagers;
 use App\Filament\Resources\EpgMaps\EpgMapResource;
 use App\Infolists\Components\VideoPreview;
-use App\Livewire\ChannelStreamStats;
 use App\Models\Channel;
 use App\Models\ChannelFailover;
 use App\Models\CustomPlaylist;

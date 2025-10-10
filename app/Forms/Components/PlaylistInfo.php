@@ -39,7 +39,8 @@ class PlaylistInfo extends Field
             // 'last_synced' => $playlist->synced ? Carbon::parse($playlist->synced)->diffForHumans() : 'Never',
         ];
         if ($playlist->enable_proxy) {
-            $activeStreams = SharedStream::active()->where('stream_info->options->playlist_id', $playlist->uuid)->count();
+            // @TODO: Determine active streams via m3u-proxy tracking
+            $activeStreams = 0; // SharedStream::active()->where('stream_info->options->playlist_id', $playlist->uuid)->count();
             $availableStreams = $playlist->available_streams ?? 0;
             if ($availableStreams === 0) {
                 $availableStreams = "∞";

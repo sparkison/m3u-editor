@@ -50,7 +50,8 @@ class PlaylistInfo extends Component
             // 'last_synced' => $playlist->synced ? Carbon::parse($playlist->synced)->diffForHumans() : 'Never',
         ];
         if ($playlist->enable_proxy) {
-            $activeStreams = SharedStream::active()->where('stream_info->options->playlist_id', $playlist->uuid)->count();
+            //$activeStreams = SharedStream::active()->where('stream_info->options->playlist_id', $playlist->uuid)->count();
+            $activeStreams = 0;
             $availableStreams = $playlist->available_streams ?? 0;
             if ($availableStreams === 0) {
                 $availableStreams = "∞";

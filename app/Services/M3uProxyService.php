@@ -64,6 +64,7 @@ class M3uProxyService
         $streamId = $this->createOrUpdateStream($primaryUrl, $failovers, $userAgent, [
             'id' => $id,
             'type' => 'channel',
+            'playlist_id' => $playlist->id,
         ]);
 
         // Get the format from the URL
@@ -107,6 +108,7 @@ class M3uProxyService
         $streamId = $this->createOrUpdateStream($url, $failoverUrls, $userAgent, [
             'id' => $id,
             'type' => 'episode',
+            'playlist_id' => $playlist->id,
         ]);
 
         // Get the format from the URL

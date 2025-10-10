@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use Exception;
-use Illuminate\Http\JsonResponse;
 use App\Enums\ChannelLogoType;
 use App\Enums\PlaylistChannelId;
 use App\Facades\PlaylistFacade;
@@ -12,12 +10,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\LogoProxyController;
 use App\Models\Epg;
 use App\Models\Playlist;
-use App\Models\MergedPlaylist;
-use App\Models\CustomPlaylist;
 use App\Services\EpgCacheService;
 use App\Services\PlaylistUrlService;
 use App\Settings\GeneralSettings;
 use Carbon\Carbon;
+use Exception;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -27,8 +25,6 @@ class EpgApiController extends Controller
     /**
      * Get EPG data for viewing with pagination support
      *
-     * @param string $uuid
-     * @param Request $request
      * @return JsonResponse
      */
     public function getData(string $uuid, Request $request)
@@ -53,10 +49,10 @@ class EpgApiController extends Controller
         ]);
         try {
             // Check if cache exists and is valid
-            if (!$epg->is_cached) {
+            if (! $epg->is_cached) {
                 return response()->json([
                     'error' => 'Failed to retrieve EPG cache. Please try generating the EPG cache.',
-                    'suggestion' => 'Try using the "Generate Cache" button to regenerate the data.'
+                    'suggestion' => 'Try using the "Generate Cache" button to regenerate the data.',
                 ], 500);
             }
 
@@ -66,6 +62,7 @@ class EpgApiController extends Controller
                 ->orderBy('channel_id')  // Secondary sort by channel ID
                 ->when($search, function ($queryBuilder) use ($search) {
                     $search = Str::lower($search);
+
                     return $queryBuilder->where(function ($query) use ($search) {
                         $query->whereRaw('LOWER(name) LIKE ?', ['%' . $search . '%'])
                             ->orWhereRaw('LOWER(display_name) LIKE ?', ['%' . $search . '%']);
@@ -79,7 +76,7 @@ class EpgApiController extends Controller
             $channelIds = $epgChannels->pluck('channel_id')->toArray();
 
             // Get cached channel data for these specific channels
-            $cacheService = new EpgCacheService();
+            $cacheService = new EpgCacheService;
 
             // Build ordered channels array using database order
             $channels = [];
@@ -90,7 +87,7 @@ class EpgApiController extends Controller
                     'database_id' => $epgChannel->id, // Add the actual database ID for editing
                     'display_name' => $epgChannel->display_name ?? $epgChannel->name ?? $channelId,
                     'icon' => $epgChannel->icon ?? url('/placeholder.png'),
-                    'lang' => $epgChannel->lang ?? 'en'
+                    'lang' => $epgChannel->lang ?? 'en',
                 ];
             }
 
@@ -103,6 +100,7 @@ class EpgApiController extends Controller
             // Create pagination info using database count for accuracy
             $totalChannels = $epg->channels()->when($search, function ($queryBuilder) use ($search) {
                 $search = Str::lower($search);
+
                 return $queryBuilder->where(function ($query) use ($search) {
                     $query->whereRaw('LOWER(name) LIKE ?', ['%' . $search . '%'])
                         ->orWhereRaw('LOWER(display_name) LIKE ?', ['%' . $search . '%']);
@@ -116,6 +114,7 @@ class EpgApiController extends Controller
                 'has_more' => (($page - 1) * $perPage + $perPage) < $totalChannels,
                 'next_page' => (($page - 1) * $perPage + $perPage) < $totalChannels ? $page + 1 : null,
             ];
+
             return response()->json([
                 'epg' => [
                     'id' => $epg->id,
@@ -134,12 +133,13 @@ class EpgApiController extends Controller
                     'cache_created' => $metadata['cache_created'] ?? null,
                     'total_programmes' => $metadata['total_programmes'] ?? 0,
                     'programme_date_range' => $metadata['programme_date_range'] ?? null,
-                ]
+                ],
             ]);
         } catch (Exception $e) {
             Log::error("Error retrieving EPG data for {$epg->name}: {$e->getMessage()}");
+
             return response()->json([
-                'error' => 'Failed to retrieve EPG data: ' . $e->getMessage()
+                'error' => 'Failed to retrieve EPG data: ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -147,19 +147,18 @@ class EpgApiController extends Controller
     /**
      * Get EPG data for a specific playlist with pagination support
      *
-     * @param string $uuid Playlist UUID
-     * @param Request $request
+     * @param  string  $uuid  Playlist UUID
      * @return JsonResponse
      */
     public function getDataForPlaylist(string $uuid, Request $request)
     {
         // Find the playlist
         $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
-        if (!$playlist) {
+        if (! $playlist) {
             return response()->json(['Error' => 'Playlist Not Found'], 404);
         }
 
-        $cacheService = new EpgCacheService();
+        $cacheService = new EpgCacheService;
         $settings = app(GeneralSettings::class);
         $forceProxy = $settings->force_video_player_proxy ?? false;
 
@@ -187,7 +186,7 @@ class EpgApiController extends Controller
             $playlistChannels = $playlist->channels()
                 ->leftJoin('groups', 'channels.group_id', '=', 'groups.id')
                 ->where('channels.enabled', true)
-                ->when(!$vod, function ($query) {
+                ->when(! $vod, function ($query) {
                     return $query->where('channels.is_vod', false);
                 })
                 ->with(['epgChannel', 'tags', 'group'])
@@ -197,6 +196,7 @@ class EpgApiController extends Controller
                 ->orderBy('channels.title')
                 ->when($search, function ($queryBuilder) use ($search) {
                     $search = Str::lower($search);
+
                     return $queryBuilder->where(function ($query) use ($search) {
                         $query->whereRaw('LOWER(channels.name) LIKE ?', ['%' . $search . '%'])
                             ->orWhereRaw('LOWER(channels.name_custom) LIKE ?', ['%' . $search . '%'])
@@ -216,27 +216,30 @@ class EpgApiController extends Controller
             // If auto channel increment is enabled, set the starting channel number
             $channelNumber = $playlist->auto_channel_increment ? $playlist->channel_start - 1 : 0;
             $idChannelBy = $playlist->id_channel_by;
+            $dummyEpgEnabled = $playlist->dummy_epg;
+            $dummyEpgLength = (int) ($playlist->dummy_epg_length ?? 120); // Default to 120 minutes if not set
 
             // Group channels by EPG and collect EPG data
             $epgChannelMap = [];
             $epgIds = [];
+            $dummyEpgChannels = [];
             $playlistChannelData = [];
             foreach ($playlistChannels as $channel) {
                 $epgData = $channel->epgChannel ?? null;
                 $channelNo = $channel->channel;
-                if (!$channelNo) {
+                if (! $channelNo) {
                     $channelNo = ++$channelNumber;
                 }
                 if ($epgData) {
                     $epgId = $epgData->epg_id;
                     $epgIds[] = $epgId;
-                    if (!isset($epgChannelMap[$epgId])) {
+                    if (! isset($epgChannelMap[$epgId])) {
                         $epgChannelMap[$epgId] = [];
                     }
 
                     // Map EPG channel ID to playlist channel info
                     // Store array of playlist channels for each EPG channel (one-to-many mapping)
-                    if (!isset($epgChannelMap[$epgId][$epgData->channel_id])) {
+                    if (! isset($epgChannelMap[$epgId][$epgData->channel_id])) {
                         $epgChannelMap[$epgId][$epgData->channel_id] = [];
                     }
 
@@ -247,7 +250,28 @@ class EpgApiController extends Controller
                         'title' => $channel->name_custom ?? $channel->name,
                         'channel_number' => $channel->channel,
                         'group' => $channel->group ?? $channel->group_internal,
-                        'logo' => $channel->logo ?? $channel->logo_internal ?? ''
+                        'logo' => $channel->logo ?? $channel->logo_internal ?? '',
+                    ];
+                } elseif ($dummyEpgEnabled) {
+                    // Get the icon
+                    $icon = $channel->logo ?? $channel->logo_internal ?? '';
+                    if (empty($icon)) {
+                        $icon = url('/placeholder.png');
+                    }
+                    $icon = htmlspecialchars($icon);
+                    if ($proxyEnabled) {
+                        $icon = LogoProxyController::generateProxyUrl($icon);
+                    }
+
+                    // Keep track of which channels need a dummy EPG program
+                    $dummyEpgChannels[] = [
+                        'playlist_channel_id' => $channelNo,
+                        'title' => $channel->name_custom ?? $channel->name,
+                        'display_name' => $channel->title_custom ?? $channel->title,
+                        'icon' => $icon,
+                        'channel_number' => $channel->channel,
+                        'group' => $channel->group ?? $channel->group_internal,
+                        'include_category' => $playlist->dummy_epg_category,
                     ];
                 }
 
@@ -321,20 +345,21 @@ class EpgApiController extends Controller
                     'group' => $channel->group ?? $channel->group_internal,
                     'icon' => $icon,
                     'has_epg' => $epgData !== null,
-                    'epg_channel_id' => $epgData->channel_id ?? null
+                    'epg_channel_id' => $epgData->channel_id ?? null,
                 ];
             }
 
             // Apply pagination to playlist channels
             $totalChannels = $playlist->channels()->when($search, function ($queryBuilder) use ($search) {
                 $search = Str::lower($search);
+
                 return $queryBuilder->where(function ($query) use ($search) {
                     $query->whereRaw('LOWER(channels.name) LIKE ?', ['%' . $search . '%'])
                         ->orWhereRaw('LOWER(channels.name_custom) LIKE ?', ['%' . $search . '%'])
                         ->orWhereRaw('LOWER(channels.title) LIKE ?', ['%' . $search . '%'])
                         ->orWhereRaw('LOWER(channels.title_custom) LIKE ?', ['%' . $search . '%']);
                 });
-            })->when(!$vod, function ($query) {
+            })->when(! $vod, function ($query) {
                 return $query->where('channels.is_vod', false);
             })->where('enabled', true)->count();
 
@@ -345,18 +370,20 @@ class EpgApiController extends Controller
             $programmes = [];
             $epgIds = array_unique($epgIds);
 
-            Log::debug("Processing EPG data for " . count($epgIds) . " unique EPGs");
+            Log::debug('Processing EPG data for ' . count($epgIds) . ' unique EPGs');
             foreach ($epgIds as $epgId) {
                 try {
                     $epg = Epg::find($epgId);
-                    if (!$epg) {
+                    if (! $epg) {
                         Log::warning("EPG with ID {$epgId} not found");
+
                         continue;
                     }
 
                     // Check if cache exists and is valid
-                    if (!$epg->is_cached) {
+                    if (! $epg->is_cached) {
                         Log::debug("Cache invalid for EPG {$epg->name}, skipping (no auto-regeneration for playlist requests)");
+
                         continue;
                     }
 
@@ -409,6 +436,58 @@ class EpgApiController extends Controller
                 }
             }
 
+            // Generate dummy EPG programmes if enabled
+            if (count($dummyEpgChannels) > 0) {
+                Log::debug('Generating dummy EPG for ' . count($dummyEpgChannels) . ' channels');
+
+                foreach ($dummyEpgChannels as $dummyEpgChannel) {
+                    $playlistChannelId = $dummyEpgChannel['playlist_channel_id'];
+
+                    // Only generate for channels on current page
+                    if (! isset($channels[$playlistChannelId])) {
+                        continue;
+                    }
+
+                    $title = $dummyEpgChannel['title'];
+                    $displayName = $dummyEpgChannel['display_name'];
+                    $icon = $dummyEpgChannel['icon'];
+                    $group = $dummyEpgChannel['group'];
+                    $includeCategory = $dummyEpgChannel['include_category'];
+
+                    // Generate dummy programmes for the requested date range
+                    $dummyProgrammes = [];
+
+                    // Start from the beginning of the requested start date
+                    $currentTime = Carbon::parse($startDate)->startOfDay();
+                    $endDateTime = Carbon::parse($endDate)->endOfDay();
+
+                    // Generate programmes in chunks of $dummyEpgLength minutes
+                    while ($currentTime->lt($endDateTime)) {
+                        $programmeEnd = (clone $currentTime)->addMinutes($dummyEpgLength);
+
+                        // Format times in ISO 8601 format (matching cache format)
+                        $programme = [
+                            'start' => $currentTime->toIso8601String(),
+                            'stop' => $programmeEnd->toIso8601String(),
+                            'title' => $title,
+                            'desc' => $displayName,
+                            'icon' => $icon,
+                        ];
+
+                        // Add category if enabled
+                        if ($includeCategory && $group) {
+                            $programme['category'] = $group;
+                        }
+
+                        $dummyProgrammes[] = $programme;
+                        $currentTime = $programmeEnd;
+                    }
+
+                    // Add to programmes array
+                    $programmes[$playlistChannelId] = $dummyProgrammes;
+                }
+            }
+
             // Create pagination info
             $pagination = [
                 'current_page' => $page,
@@ -437,12 +516,13 @@ class EpgApiController extends Controller
                     'cached' => true,
                     'epg_count' => count($epgIds),
                     'channels_with_epg' => count(array_filter($playlistChannelData, fn($ch) => $ch['has_epg'])),
-                ]
+                ],
             ]);
         } catch (Exception $e) {
             Log::error("Error retrieving EPG data for playlist {$playlist->name}: {$e->getMessage()}");
+
             return response()->json([
-                'error' => 'Failed to retrieve EPG data: ' . $e->getMessage()
+                'error' => 'Failed to retrieve EPG data: ' . $e->getMessage(),
             ], 500);
         }
     }

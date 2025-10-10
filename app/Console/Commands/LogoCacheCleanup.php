@@ -28,8 +28,9 @@ class LogoCacheCleanup extends Command
      */
     public function handle(): int
     {
-        if (!$this->option('force') && !$this->confirm('This will delete expired logo cache files. Continue?')) {
+        if (! $this->option('force') && ! $this->confirm('This will delete expired logo cache files. Continue?')) {
             $this->info('Operation cancelled.');
+
             return Command::SUCCESS;
         }
 
@@ -37,7 +38,7 @@ class LogoCacheCleanup extends Command
 
         $all = $this->option('all') ?? false;
 
-        $controller = new LogoProxyController();
+        $controller = new LogoProxyController;
         $clearedCount = $all
             ? $controller->clearCache()
             : $controller->clearExpiredCache();

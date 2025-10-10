@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use App\Providers\VersionServiceProvider;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Cache;
 
 class CompareVersion extends Command
 {
@@ -41,6 +40,7 @@ class CompareVersion extends Command
         } else {
             $this->info("✅ No updates available.\n");
         }
+
         return 1;
     }
 }

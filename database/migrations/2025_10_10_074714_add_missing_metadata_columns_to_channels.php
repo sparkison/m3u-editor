@@ -11,10 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('channels', function (Blueprint $table) {
-            $table->jsonb('info')->nullable()->after('logo_internal');
-            $table->jsonb('movie_data')->nullable()->after('info');
-        });
+        // Need to make sure the column doesn't already exist (had an issue where original migration was removed but column remained)
+        if (!Schema::hasColumn('channels', 'info')) {
+            Schema::table('channels', function (Blueprint $table) {
+                $table->jsonb('info')->nullable()->after('logo_internal');
+            });
+        }
+        if (!Schema::hasColumn('channels', 'movie_data')) {
+            Schema::table('channels', function (Blueprint $table) {
+                $table->jsonb('movie_data')->nullable()->after('info');
+            });
+        }
     }
 
     /**

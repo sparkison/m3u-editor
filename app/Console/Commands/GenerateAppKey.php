@@ -28,6 +28,7 @@ class GenerateAppKey extends Command
         // Check if app key currently exists
         if (config('app.key')) {
             $this->info("🔑 App key check confirmed\n");
+
             return;
         } else {
             $this->info("🔑 App key not found, generating one now...\n");

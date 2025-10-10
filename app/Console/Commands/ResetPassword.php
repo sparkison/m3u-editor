@@ -29,6 +29,7 @@ class ResetPassword extends Command
         $users = User::get(['id', 'email']);
         if ($users->isEmpty()) {
             $this->info('No users found.');
+
             return false;
         }
         if ($users->count() === 1) {
@@ -41,12 +42,14 @@ class ResetPassword extends Command
         $password = $this->ask('🔒 Enter the new password');
         if (empty($password)) {
             $this->error('Password cannot be empty.');
+
             return false;
         }
         $user->password = bcrypt($password);
         $user->save();
         $this->info('✅ Password reset successfully!');
         $this->info("🔑 New password: $password, set for user: {$user->name}");
+
         return true;
     }
 }

@@ -62,7 +62,7 @@ class RunScheduledBackups extends Command
                 }
 
                 // Run the backup
-                app('Illuminate\Contracts\Bus\Dispatcher')->dispatch(new CreateBackup());
+                app('Illuminate\Contracts\Bus\Dispatcher')->dispatch(new CreateBackup);
             }
         }
     }

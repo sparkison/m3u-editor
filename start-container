@@ -21,6 +21,32 @@ export PG_USER="${PG_USER:-root}"
 export PG_PASSWORD="${PG_PASSWORD:-root}"
 export PG_PORT="${PG_PORT:-5432}" # Default 5432
 
+# M3U Proxy configuration
+# If M3U_PROXY_ENABLED=true, user is using external proxy service (disable embedded)
+# If M3U_PROXY_ENABLED=false/unset, use embedded proxy (default)
+export M3U_PROXY_ENABLED="${M3U_PROXY_ENABLED:-false}"
+export M3U_PROXY_START_EMBEDDED="true" # Will be set to false if external proxy enabled
+export M3U_PROXY_HOST="${M3U_PROXY_HOST:-127.0.0.1}" # Bind to localhost for embedded
+export M3U_PROXY_PORT="${M3U_PROXY_PORT:-8085}"
+export M3U_PROXY_LOG_LEVEL="${M3U_PROXY_LOG_LEVEL:-ERROR}" # Default ERROR
+
+# Set M3U_PROXY_URL based on mode
+if [ "${M3U_PROXY_ENABLED}" = "true" ]; then
+    # External mode - use provided URL (could set custom docs paths here if needed)
+    export M3U_PROXY_START_EMBEDDED="false"
+    export M3U_PROXY_URL="${M3U_PROXY_URL:-http://m3u-proxy:8085}"
+else
+    # Embedded mode - use APP_URL with /m3u-proxy/ path
+    # Set FastAPI root path to use /m3u-proxy prefix (nginx preserves the prefix)
+    export ROOT_PATH="/m3u-proxy"
+    # Include port unless using https
+    if [[ "$APP_URL" == *"https"* ]]; then
+        export M3U_PROXY_URL="${APP_URL}/m3u-proxy"
+    else
+        export M3U_PROXY_URL="${APP_URL}:${APP_PORT}/m3u-proxy"
+    fi
+fi
+
 # Run PHP as root (or m3ue)
 export SUPERVISOR_PHP_USER="root"
 export APP_URL="${APP_URL:-http://localhost}"
@@ -69,7 +95,7 @@ if [ -f /etc/nginx/conf.d/laravel.tmpl ]; then
     else
         echo "⚡️ Starting app at: $APP_URL:$APP_PORT"
     fi
-    envsubst '${APP_PORT} ${APP_URL} ${FPMPORT}' < /etc/nginx/conf.d/laravel.tmpl > /etc/nginx/conf.d/laravel.conf
+    envsubst '${APP_PORT} ${APP_URL} ${FPMPORT} ${M3U_PROXY_PORT}' < /etc/nginx/conf.d/laravel.tmpl > /etc/nginx/conf.d/laravel.conf
 fi
 
 # Check for configuration directories and files
@@ -409,11 +435,6 @@ echo ""
 # Run migrations
 echo "💾 Running migrations..."
 php artisan migrate --force
-
-# Flush FFmpeg process cache and prune HLS
-php artisan app:flush-ffmpeg-process-cache
-php artisan app:hls-prune
-echo ""
 
 # Build assets
 echo "🛠️ Building assets..."

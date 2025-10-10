@@ -102,13 +102,13 @@ class CustomPlaylistResource extends Resource
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('available_streams')
-                    ->label('Streams')
-                    ->toggleable()
-                    ->formatStateUsing(fn(int $state): string => $state === 0 ? '∞' : (string)$state)
-                    ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
-                    ->description(fn(CustomPlaylist $record): string => "Active: " . SharedStream::active()->where('stream_info->options->playlist_id', $record->uuid)->count())
-                    ->sortable(),
+                // TextColumn::make('available_streams')
+                //     ->label('Streams')
+                //     ->toggleable()
+                //     ->formatStateUsing(fn(int $state): string => $state === 0 ? '∞' : (string)$state)
+                //     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
+                //     ->description(fn(CustomPlaylist $record): string => "Active: " . SharedStream::active()->where('stream_info->options->playlist_id', $record->uuid)->count())
+                //     ->sortable(),
                 TextColumn::make('live_channels_count')
                     ->label('Live')
                     ->description(fn(CustomPlaylist $record): string => "Enabled: {$record->enabled_live_channels_count}")

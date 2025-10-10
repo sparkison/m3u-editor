@@ -150,13 +150,13 @@ class PlaylistResource extends Resource
                     })
                     ->description(fn(Playlist $record): string => $record->xtream ? 'Active: ' . ($record->xtream_status['user_info']['active_cons'] ?? 0) : '')
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('available_streams')
-                    ->label('Proxy Streams')
-                    ->toggleable()
-                    ->formatStateUsing(fn(int $state): string => $state === 0 ? '∞' : (string) $state)
-                    ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
-                    ->description(fn(Playlist $record): string => 'Active: ' . SharedStream::active()->where('stream_info->options->playlist_id', $record->uuid)->count())
-                    ->sortable(),
+                // TextColumn::make('available_streams')
+                //     ->label('Proxy Streams')
+                //     ->toggleable()
+                //     ->formatStateUsing(fn(int $state): string => $state === 0 ? '∞' : (string) $state)
+                //     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
+                //     ->description(fn(Playlist $record): string => 'Active: ' . SharedStream::active()->where('stream_info->options->playlist_id', $record->uuid)->count())
+                //     ->sortable(),
                 TextColumn::make('groups_count')
                     ->label('Groups')
                     ->counts('groups')

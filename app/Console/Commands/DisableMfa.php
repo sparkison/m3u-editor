@@ -30,6 +30,7 @@ class DisableMfa extends Command
         $users = User::get(['id', 'email']);
         if ($users->isEmpty()) {
             $this->info('No users found.');
+
             return false;
         }
         if ($users->count() === 1) {
