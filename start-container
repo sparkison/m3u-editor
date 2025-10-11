@@ -30,6 +30,13 @@ export M3U_PROXY_HOST="${M3U_PROXY_HOST:-127.0.0.1}" # Bind to localhost for emb
 export M3U_PROXY_PORT="${M3U_PROXY_PORT:-8085}"
 export M3U_PROXY_LOG_LEVEL="${M3U_PROXY_LOG_LEVEL:-ERROR}" # Default ERROR
 
+# Run PHP as root (or m3ue)
+export SUPERVISOR_PHP_USER="root"
+
+# Application URL and port
+export APP_URL="${APP_URL:-http://localhost}"
+export APP_PORT="${APP_PORT:-36400}" # Default 36400
+
 # Set M3U_PROXY_URL based on mode
 if [ "${M3U_PROXY_ENABLED}" = "true" ]; then
     # External mode - use provided URL (could set custom docs paths here if needed)
@@ -46,11 +53,6 @@ else
         export M3U_PROXY_URL="${APP_URL}:${APP_PORT}/m3u-proxy"
     fi
 fi
-
-# Run PHP as root (or m3ue)
-export SUPERVISOR_PHP_USER="root"
-export APP_URL="${APP_URL:-http://localhost}"
-export APP_PORT="${APP_PORT:-36400}" # Default 36400
 
 # Websockets
 export REVERB_PORT="${REVERB_PORT:-36800}" # Default 36800
