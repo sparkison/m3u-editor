@@ -11,6 +11,9 @@ use Filament\Forms\Components\Toggle;
 use App\Jobs\MergeChannels;
 use App\Jobs\UnmergeChannels;
 use App\Jobs\MapPlaylistChannelsToEpg;
+use App\Jobs\ProcessLocalDirectoryImport;
+use App\Jobs\ProcessEmbyVodSync;
+use App\Services\EmbyService;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Forms\Components\TextInput;
 use App\Jobs\ChannelFindAndReplace;
@@ -63,6 +66,157 @@ class ListVod extends ListRecords
                     model: $model,
                 ))
                 ->slideOver(),
+            Action::make('import_local_directory')
+                ->label('Import from Local Directory')
+                ->icon('heroicon-o-folder-open')
+                ->color('primary')
+                ->form([
+                    TextInput::make('base_path')
+                        ->label('Directory Path')
+                        ->required()
+                        ->placeholder('/path/to/movies')
+                        ->helperText('The full path to the directory containing your media files. For Docker, use paths inside the container (e.g., /var/www/media).'),
+                    Select::make('import_type')
+                        ->label('Import Type')
+                        ->required()
+                        ->options([
+                            'vod' => 'Movies/VOD',
+                            'series' => 'TV Series',
+                        ])
+                        ->default('vod')
+                        ->helperText('Choose whether to import as individual VOD movies or as TV series with seasons/episodes.'),
+                    Select::make('playlist_id')
+                        ->label('Playlist')
+                        ->required()
+                        ->options(Playlist::where('user_id', auth()->id())->pluck('name', 'id'))
+                        ->searchable()
+                        ->helperText('Select the playlist to associate these VOD channels with.'),
+                    TextInput::make('category_name')
+                        ->label('Category Name')
+                        ->placeholder('Movies')
+                        ->helperText('Optional: Specify a category name for the imported content. If not provided, folder names will be used as categories.'),
+                    Toggle::make('auto_enable')
+                        ->label('Auto-enable Channels')
+                        ->default(true)
+                        ->helperText('Automatically enable imported channels.'),
+                ])
+                ->action(function (array $data) {
+                    $playlist = Playlist::findOrFail($data['playlist_id']);
+                    
+                    dispatch(new ProcessLocalDirectoryImport(
+                        playlist: $playlist,
+                        basePath: $data['base_path'],
+                        importType: $data['import_type'],
+                        options: [
+                            'default_category' => $data['category_name'] ?? 'Imported Content',
+                            'auto_enable' => $data['auto_enable'] ?? true,
+                        ]
+                    ));
+                })
+                ->after(function () {
+                    Notification::make()
+                        ->success()
+                        ->title('Local directory import started')
+                        ->body('Importing media files from local directory. You will be notified once the process is complete.')
+                        ->send();
+                })
+                ->requiresConfirmation()
+                ->modalIcon('heroicon-o-folder-open')
+                ->modalDescription('Import VOD movies or TV series directly from a local directory. The system will scan for video files and create VOD channels automatically.')
+                ->modalSubmitActionLabel('Import now'),
+            Action::make('sync_from_emby')
+                ->label('Sync from Emby')
+                ->icon('heroicon-o-film')
+                ->color('success')
+                ->form([
+                    Select::make('library_id')
+                        ->label('Emby Library')
+                        ->required()
+                        ->searchable()
+                        ->options(function () {
+                            try {
+                                $embyService = new EmbyService();
+                                if (!$embyService->isConfigured()) {
+                                    return ['_not_configured' => 'Emby not configured - Please configure in Settings'];
+                                }
+                                
+                                $libraries = $embyService->getLibraries();
+                                $movieLibraries = [];
+                                
+                                foreach ($libraries as $library) {
+                                    if (isset($library['CollectionType']) && $library['CollectionType'] === 'movies') {
+                                        $movieLibraries[$library['ItemId']] = $library['Name'];
+                                    }
+                                }
+                                
+                                if (empty($movieLibraries)) {
+                                    return ['_no_libraries' => 'No movie libraries found'];
+                                }
+                                
+                                return $movieLibraries;
+                            } catch (\Exception $e) {
+                                return ['_error' => 'Error: ' . $e->getMessage()];
+                            }
+                        })
+                        ->helperText('Select the Emby movie library to sync from.'),
+                    Select::make('playlist_id')
+                        ->label('Playlist')
+                        ->required()
+                        ->options(Playlist::where('user_id', auth()->id())->pluck('name', 'id'))
+                        ->searchable()
+                        ->helperText('Select the playlist to associate these VOD channels with.'),
+                    Toggle::make('use_direct_path')
+                        ->label('Use Direct File Paths')
+                        ->default(false)
+                        ->helperText('When enabled, uses direct file paths instead of Emby streaming URLs. Requires file access from this server.'),
+                    Toggle::make('auto_enable')
+                        ->label('Auto-enable Channels')
+                        ->default(true)
+                        ->helperText('Automatically enable imported channels.'),
+                ])
+                ->action(function (array $data) {
+                    // Validate library selection
+                    if (in_array($data['library_id'], ['_not_configured', '_no_libraries', '_error'])) {
+                        Notification::make()
+                            ->danger()
+                            ->title('Cannot Sync')
+                            ->body('Please configure Emby in Settings first.')
+                            ->send();
+                        return;
+                    }
+                    
+                    $playlist = Playlist::findOrFail($data['playlist_id']);
+                    
+                    // Get library name
+                    $embyService = new EmbyService();
+                    $libraries = $embyService->getLibraries();
+                    $libraryName = 'Emby Movies';
+                    foreach ($libraries as $library) {
+                        if ($library['ItemId'] === $data['library_id']) {
+                            $libraryName = $library['Name'];
+                            break;
+                        }
+                    }
+                    
+                    dispatch(new ProcessEmbyVodSync(
+                        playlist: $playlist,
+                        libraryId: $data['library_id'],
+                        libraryName: $libraryName,
+                        useDirectPath: $data['use_direct_path'] ?? false,
+                        autoEnable: $data['auto_enable'] ?? true,
+                    ));
+                })
+                ->after(function () {
+                    Notification::make()
+                        ->success()
+                        ->title('Emby sync started')
+                        ->body('Syncing movies from Emby library. You will be notified once the process is complete.')
+                        ->send();
+                })
+                ->requiresConfirmation()
+                ->modalIcon('heroicon-o-film')
+                ->modalDescription('Sync movies from your Emby server library. This will import all movies with their metadata, posters, and streaming URLs.')
+                ->modalSubmitActionLabel('Sync now'),
             ActionGroup::make([
                 Action::make('merge')
                     ->label('Merge Same ID')
