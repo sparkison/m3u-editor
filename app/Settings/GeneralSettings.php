@@ -77,6 +77,10 @@ class GeneralSettings extends Settings
     public ?string $auto_backup_database_schedule = null;
     public ?int $auto_backup_database_max_backups = 5;
 
+    // Emby integration settings
+    public ?string $emby_server_url = null;
+    public ?string $emby_api_key = null;
+
     public static function group(): string
     {
         return 'general';
