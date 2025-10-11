@@ -1027,6 +1027,7 @@ class ProcessM3uImport implements ShouldQueue
             start: $start,
             maxHit: $this->maxItemsHit,
             isNew: $this->isNew,
+            runningSeriesImport: $seriesCategories && $seriesCategories->count() > 0,
         );
 
         // Add series processing to the chain, if passed in
