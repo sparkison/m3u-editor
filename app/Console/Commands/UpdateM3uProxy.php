@@ -53,7 +53,7 @@ class UpdateM3uProxy extends Command
 
         // Run git pull
         $this->info('📥 Pulling latest changes from repository...');
-        $pullProcess = new Process(['git', 'pull', 'origin', 'main'], $proxyPath);
+        $pullProcess = new Process(['git', 'pull', 'origin', 'master'], $proxyPath);
         $pullProcess->setTimeout(60);
         $pullProcess->run();
 
