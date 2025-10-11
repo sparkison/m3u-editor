@@ -100,7 +100,7 @@ class EmbyService
                 'ParentId' => $libraryId,
                 'IncludeItemTypes' => $itemType,
                 'Recursive' => 'true',
-                'Fields' => 'Path,Overview,Genres,Studios,Tags,ProductionYear,PremiereDate,CommunityRating,OfficialRating,MediaStreams,MediaSources',
+                'Fields' => 'Path,Overview,Genres,Studios,Tags,ProductionYear,PremiereDate,CommunityRating,OfficialRating,MediaStreams,MediaSources,People,RunTimeTicks',
             ];
             
             Log::info('Emby API Request', [
@@ -199,7 +199,7 @@ class EmbyService
                 'X-Emby-Token' => $this->apiKey,
             ])->timeout(30)->get($this->serverUrl . '/Shows/' . $seriesId . '/Episodes', [
                 'SeasonId' => $seasonId,
-                'Fields' => 'Path,Overview,MediaStreams,MediaSources',
+                'Fields' => 'Path,Overview,MediaStreams,MediaSources,People,PremiereDate,RunTimeTicks,CommunityRating,OfficialRating',
             ]);
 
             if ($response->successful()) {
@@ -216,6 +216,8 @@ class EmbyService
 
     /**
      * Get image URL for an item
+     * Note: API key is required in URL for images as they're accessed directly by browsers
+     * Consider implementing a proxy endpoint if you need to hide the API key
      */
     public function getImageUrl(string $itemId, string $imageType = 'Primary'): ?string
     {
@@ -228,6 +230,8 @@ class EmbyService
 
     /**
      * Get streaming URL for an item
+     * Note: API key is required in URL for streaming as media players don't support custom headers
+     * This is a limitation of the Emby API when used with external players
      */
     public function getStreamUrl(string $itemId): string
     {
@@ -240,10 +244,69 @@ class EmbyService
     }
 
     /**
+     * Get streaming URL with device ID for better security tracking
+     * Emby can track which device/app is accessing content
+     */
+    public function getStreamUrlWithDeviceId(string $itemId, string $deviceId = 'M3U-Editor'): string
+    {
+        if (!$this->isConfigured()) {
+            throw new Exception('Emby server URL and API key must be configured');
+        }
+
+        return $this->serverUrl . "/Videos/{$itemId}/stream?api_key=" . $this->apiKey . "&Static=true&DeviceId=" . urlencode($deviceId);
+    }
+
+    /**
      * Get direct file path from item
      */
     public function getFilePath(array $item): ?string
     {
         return $item['Path'] ?? $item['MediaSources'][0]['Path'] ?? null;
+    }
+
+    /**
+     * Extract cast names from People array
+     */
+    public function extractCast(array $people): ?string
+    {
+        $actors = array_filter($people, function ($person) {
+            return isset($person['Type']) && $person['Type'] === 'Actor';
+        });
+
+        if (empty($actors)) {
+            return null;
+        }
+
+        $names = array_map(function ($actor) {
+            return $actor['Name'] ?? '';
+        }, $actors);
+
+        return implode(', ', array_filter($names));
+    }
+
+    /**
+     * Extract director name from People array
+     */
+    public function extractDirector(array $people): ?string
+    {
+        foreach ($people as $person) {
+            if (isset($person['Type']) && $person['Type'] === 'Director') {
+                return $person['Name'] ?? null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Format duration from seconds to HH:MM:SS
+     */
+    public function formatDuration(int $seconds): string
+    {
+        $hours = floor($seconds / 3600);
+        $minutes = floor(($seconds % 3600) / 60);
+        $secs = $seconds % 60;
+
+        return sprintf('%02d:%02d:%02d', $hours, $minutes, $secs);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\PlaylistSourceType;
 use App\Enums\Status;
 use App\Events\SyncCompleted;
 use App\Models\Category;
@@ -45,12 +46,13 @@ class ProcessEmbySeriesSync implements ShouldQueue
         $start = now();
 
         try {
-            // Update playlist status
+            // Update playlist status and set source type
             $this->playlist->update([
                 'processing' => true,
                 'status' => Status::Processing,
                 'errors' => null,
                 'progress' => 0,
+                'source_type' => PlaylistSourceType::Emby,
             ]);
 
             $embyService = new EmbyService();
@@ -87,6 +89,7 @@ class ProcessEmbySeriesSync implements ShouldQueue
             $totalSeries = count($seriesList);
             $importedSeriesCount = 0;
             $importedEpisodeCount = 0;
+            $batchNo = \Illuminate\Support\Str::orderedUuid()->toString();
 
             // Create category for this library
             $category = Category::firstOrCreate([
@@ -105,7 +108,7 @@ class ProcessEmbySeriesSync implements ShouldQueue
                         'name' => $seriesData['Name'] ?? 'Unknown',
                         'id' => $seriesData['Id'] ?? 'Unknown',
                     ]);
-                    $episodeCount = $this->processSeries($seriesData, $category, $embyService);
+                    $episodeCount = $this->processSeries($seriesData, $category, $batchNo, $embyService);
                     $importedSeriesCount++;
                     $importedEpisodeCount += $episodeCount;
                 } catch (Exception $e) {
@@ -156,7 +159,7 @@ class ProcessEmbySeriesSync implements ShouldQueue
     /**
      * Process a single series
      */
-    private function processSeries(array $seriesData, Category $category, EmbyService $embyService): int
+    private function processSeries(array $seriesData, Category $category, string $batchNo, EmbyService $embyService): int
     {
         $seriesName = $seriesData['Name'] ?? 'Unknown';
         $seriesId = $seriesData['Id'];
@@ -166,9 +169,21 @@ class ProcessEmbySeriesSync implements ShouldQueue
         $overview = $seriesData['Overview'] ?? null;
         $year = $seriesData['ProductionYear'] ?? null;
         $genres = isset($seriesData['Genres']) ? implode(', ', $seriesData['Genres']) : null;
-        $rating = $seriesData['CommunityRating'] ?? null;
+        $communityRating = $seriesData['CommunityRating'] ?? null;
+        $officialRating = $seriesData['OfficialRating'] ?? null;
         $posterUrl = $embyService->getImageUrl($seriesId, 'Primary');
         $backdropUrl = $embyService->getImageUrl($seriesId, 'Backdrop');
+        
+        // Extract cast and director from People array
+        $cast = null;
+        $director = null;
+        if (isset($seriesData['People']) && is_array($seriesData['People'])) {
+            $cast = $embyService->extractCast($seriesData['People']);
+            $director = $embyService->extractDirector($seriesData['People']);
+        }
+        
+        // Calculate rating_5based from CommunityRating (rating / 2)
+        $rating5based = $communityRating ? round($communityRating / 2, 1) : null;
 
         // Create or update series
         $series = Series::updateOrCreate([
@@ -180,12 +195,13 @@ class ProcessEmbySeriesSync implements ShouldQueue
             'enabled' => $this->autoEnable,
             'cover' => $posterUrl,
             'plot' => $overview,
-            'cast' => null,
-            'director' => null,
+            'cast' => $cast,
+            'director' => $director,
             'genre' => $genres,
             'release_date' => $year ? "{$year}-01-01" : null,
-            'rating' => $rating,
+            'rating' => $rating5based,
             'backdrop_path' => [$backdropUrl],
+            'import_batch_no' => $batchNo,
         ]);
 
         // Get seasons for this series
@@ -214,6 +230,7 @@ class ProcessEmbySeriesSync implements ShouldQueue
                 'user_id' => $this->playlist->user_id,
                 'name' => $seasonData['Name'] ?? "Season {$seasonNumber}",
                 'cover' => $embyService->getImageUrl($seasonId, 'Primary'),
+                'import_batch_no' => $batchNo,
             ]);
 
             // Get episodes for this season
@@ -233,7 +250,7 @@ class ProcessEmbySeriesSync implements ShouldQueue
 
             foreach ($episodes as $episodeData) {
                 try {
-                    $this->processEpisode($episodeData, $season, $seasonNumber, $embyService);
+                    $this->processEpisode($episodeData, $series, $season, $seasonNumber, $batchNo, $embyService);
                     $episodeCount++;
                 } catch (Exception $e) {
                     Log::warning("Failed to import episode: " . $e->getMessage());
@@ -247,7 +264,7 @@ class ProcessEmbySeriesSync implements ShouldQueue
     /**
      * Process a single episode
      */
-    private function processEpisode(array $episodeData, Season $season, int $seasonNumber, EmbyService $embyService): void
+    private function processEpisode(array $episodeData, Series $series, Season $season, int $seasonNumber, string $batchNo, EmbyService $embyService): void
     {
         $episodeNumber = $episodeData['IndexNumber'] ?? 1;
         $episodeId = $episodeData['Id'];
@@ -277,6 +294,37 @@ class ProcessEmbySeriesSync implements ShouldQueue
         // Get episode metadata
         $overview = $episodeData['Overview'] ?? null;
         $posterUrl = $embyService->getImageUrl($episodeId, 'Primary');
+        
+        // Extract additional metadata for info JSON
+        $releaseDate = null;
+        if (isset($episodeData['PremiereDate'])) {
+            try {
+                $releaseDate = Carbon::parse($episodeData['PremiereDate'])->format('M d, Y');
+            } catch (Exception $e) {
+                Log::warning("Failed to parse PremiereDate for episode {$title}: " . $e->getMessage());
+            }
+        }
+        
+        // Convert RunTimeTicks to seconds (RunTimeTicks / 10000000)
+        $durationSecs = null;
+        $durationFormatted = null;
+        if (isset($episodeData['RunTimeTicks'])) {
+            $durationSecs = (int)($episodeData['RunTimeTicks'] / 10000000);
+            $durationFormatted = $embyService->formatDuration($durationSecs);
+        }
+        
+        // Get rating
+        $rating = $episodeData['CommunityRating'] ?? null;
+        
+        // Build comprehensive info array matching Xtream format
+        $info = [
+            'emby_id' => $episodeId,
+            'release_date' => $releaseDate,
+            'duration_secs' => $durationSecs,
+            'duration' => $durationFormatted,
+            'rating' => $rating,
+            'movie_image' => $posterUrl,
+        ];
 
         // Create or update episode
         Log::debug('Creating/updating episode', [
@@ -284,6 +332,7 @@ class ProcessEmbySeriesSync implements ShouldQueue
             'season_id' => $season->id,
             'episode_num' => $episodeNumber,
             'url' => $url,
+            'info' => $info,
         ]);
         
         Episode::updateOrCreate([
@@ -296,12 +345,12 @@ class ProcessEmbySeriesSync implements ShouldQueue
             'playlist_id' => $this->playlist->id,
             'user_id' => $this->playlist->user_id,
             'enabled' => $this->autoEnable,
+            'series_id' => $series->id,
             'season' => $seasonNumber,
             'plot' => $overview,
             'cover' => $posterUrl,
-            'info' => [
-                'emby_id' => $episodeId,
-            ],
+            'import_batch_no' => $batchNo,
+            'info' => $info,
         ]);
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\PlaylistSourceType;
 use App\Enums\Status;
 use App\Events\SyncCompleted;
 use App\Models\Channel;
@@ -44,12 +45,13 @@ class ProcessEmbyVodSync implements ShouldQueue
         $start = now();
 
         try {
-            // Update playlist status
+            // Update playlist status and set source type
             $this->playlist->update([
                 'processing' => true,
                 'status' => Status::Processing,
                 'errors' => null,
                 'progress' => 0,
+                'source_type' => PlaylistSourceType::Emby,
             ]);
 
             $embyService = new EmbyService();
