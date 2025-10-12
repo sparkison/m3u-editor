@@ -17,6 +17,7 @@ use App\Models\PlaylistAlias;
 use App\Models\Series;
 use App\Models\SharedStream;
 use App\Services\EpgCacheService;
+use App\Services\M3uProxyService;
 use App\Services\XtreamService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
@@ -408,17 +409,15 @@ class XtreamApiController extends Controller
                 $activeConnections = 0;
             }
             $outputFormats = ['m3u8', 'ts'];
-            // if ($playlist->enable_proxy) {
-            //     $proxyOutput = $playlist->proxy_options['output'] ?? 'ts';
-            //     if ($proxyOutput === 'hls') {
-            //         $outputFormats = ['m3u8'];
-            //     } else {
-            //         $outputFormats = [$proxyOutput];
-            //     }
-            //     $activeConnections = SharedStream::active()
-            //         ->where('stream_info->options->playlist_id', $playlist->uuid)
-            //         ->count();
-            // }
+            if ($playlist->enable_proxy) {
+                $proxyOutput = $playlist->xtream_config['output'] ?? 'ts';
+                if ($proxyOutput === 'hls') {
+                    $outputFormats = ['m3u8'];
+                } else {
+                    $outputFormats = [$proxyOutput];
+                }
+                $activeConnections = M3uProxyService::getPlaylistActiveStreamsCount($playlist);
+            }
 
             $userInfo = [
                 // 'playlist_id' => (string)$playlist->id, // Debugging
@@ -494,8 +493,6 @@ class XtreamApiController extends Controller
             }
 
             $proxyEnabled = $playlist->enable_proxy;
-            $defaultExtension = $playlist->proxy_options['output'] ?? 'ts';
-            $defaultExtension = $defaultExtension === 'hls' ? 'm3u8' : $defaultExtension;
             $enabledChannels = $channelsQuery
                 ->orderBy('groups.sort_order')
                 ->orderBy('channels.sort')
@@ -564,13 +561,10 @@ class XtreamApiController extends Controller
                             break;
                     }
 
-                    if ($proxyEnabled) {
-                        $extension = $defaultExtension;
-                    } else {
-                        // Get the file extension from the URL
-                        $url = $channel->url_custom ?? $channel->url;
-                        $extension = pathinfo($url, PATHINFO_EXTENSION);
-                    }
+                    // Get the file extension from the URL
+                    $url = $channel->url_custom ?? $channel->url;
+                    $extension = pathinfo($url, PATHINFO_EXTENSION);
+
                     $liveStreams[] = [
                         'num' => $channelNo,
                         'name' => $channel->title_custom ?? $channel->title,
@@ -1193,9 +1187,7 @@ class XtreamApiController extends Controller
             }
 
             // Check if channel is currently playing
-            // $isNowPlaying = SharedStream::active()
-            //     ->where('stream_info->model_id', $channel->id)
-            //     ->exists();
+            $isNowPlaying = M3uProxyService::isChannelActive($channel);
             $isNowPlaying = false;
 
             // Filter programmes to current time and future, then limit
@@ -1269,9 +1261,7 @@ class XtreamApiController extends Controller
             $epgListings = [];
             if (isset($programmes[$channel->epgChannel->channel_id])) {
                 // Check if channel is currently playing
-                // $isNowPlaying = SharedStream::active()
-                //     ->where('stream_info->model_id', $channel->id)
-                //     ->exists();
+                $isNowPlaying = M3uProxyService::isChannelActive($channel);
                 $isNowPlaying = false;
 
                 $now = Carbon::now();

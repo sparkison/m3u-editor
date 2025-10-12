@@ -234,10 +234,8 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 // Get the url
                 $url = $ep->url;
                 if ($playlist && $playlist->enable_proxy) {
-                    $format = $episode->container_extension ?? $playlist->proxy_options['output'] ?? 'mp4';
                     $url = ProxyFacade::getProxyUrlForEpisode(
                         id: $ep->id,
-                        format: $format
                     );
                 }
 

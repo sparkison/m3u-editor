@@ -78,13 +78,9 @@ class PlaylistGenerateController extends Controller
         }
         $logoProxyEnabled = $playlist->enable_logo_proxy;
 
-        // Check the proxy format
-        $format = $playlist->proxy_options['output'] ?? 'ts';
-        $defaultExtension = $format === 'hls' ? 'm3u8' : 'ts';
-
         // Get all active channels
         return response()->stream(
-            function () use ($playlist, $proxyEnabled, $logoProxyEnabled, $type, $usedAuth, $format, $defaultExtension) {
+            function () use ($playlist, $proxyEnabled, $logoProxyEnabled, $type, $usedAuth) {
                 // Get all active channels
                 $channels = $playlist->channels()
                     ->leftJoin('groups', 'channels.group_id', '=', 'groups.id')
@@ -163,22 +159,18 @@ class PlaylistGenerateController extends Controller
                         $icon = url('/placeholder.png');
                     }
 
+                    // Get the extension from the source URL
+                    $extension = pathinfo($url, PATHINFO_EXTENSION);
+
                     // Determine the extension and possibly proxy the URL
                     if ($proxyEnabled) {
-                        // If proxy enabled, we need to set the extension to the default
-                        $extension = $defaultExtension;
-
                         // Proxy the logo through the logo proxy controller
                         $icon = LogoProxyController::generateProxyUrl($icon);
-                    } else {
-                        // Get the extension from the source URL
-                        $extension = pathinfo($url, PATHINFO_EXTENSION);
                     }
                     if ($logoProxyEnabled) {
                         // Get the proxy URL
                         $url = ProxyFacade::getProxyUrlForChannel(
                             $channel->id,
-                            $format
                         );
                     }
 
@@ -398,17 +390,9 @@ class PlaylistGenerateController extends Controller
         $autoIncrement = $playlist->auto_channel_increment;
         $channelNumber = $autoIncrement ? $playlist->channel_start - 1 : 0;
 
-        // Check the proxy format
-        $format = $playlist->proxy_options['output'] ?? 'ts';
-        $defaultExtension = $format === 'hls' ? 'm3u8' : 'ts';
-
-        return response()->json($channels->transform(function (Channel $channel) use ($proxyEnabled, $defaultExtension, $username, $password, $idChannelBy, $autoIncrement, &$channelNumber, $playlist) {
-            if ($proxyEnabled) {
-                $extension = $defaultExtension;
-            } else {
-                $sourceUrl = $channel->url_custom ?? $channel->url;
-                $extension = pathinfo($sourceUrl, PATHINFO_EXTENSION);
-            }
+        return response()->json($channels->transform(function (Channel $channel) use ($proxyEnabled, $username, $password, $idChannelBy, $autoIncrement, &$channelNumber, $playlist) {
+            $sourceUrl = $channel->url_custom ?? $channel->url;
+            $extension = pathinfo($sourceUrl, PATHINFO_EXTENSION);
             $urlPath = '/live';
             if ($channel->is_vod) {
                 $urlPath = '/movie';

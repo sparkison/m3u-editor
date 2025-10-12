@@ -102,24 +102,21 @@ class EpgViewer extends Component implements HasForms, HasActions
                     if ($this->type !== 'Epg') {
                         $playlist = $updated->playlist;
                         $proxyEnabled = $playlist->enable_proxy;
-                        $proxyFormat = $playlist->proxy_options['output'] ?? 'ts';
-                        $channelFormat = $proxyFormat;
                         $url = $updated->url_custom ?? $updated->url;
 
                         // Get the URL based on proxy settings
                         if ($proxyEnabled) {
                             $url = ProxyFacade::getProxyUrlForChannel(
                                 id: $updated->id,
-                                format: $proxyFormat
                             );
+                        }
+
+                        if (Str::endsWith($url, '.m3u8')) {
+                            $channelFormat = 'hls';
+                        } elseif (Str::endsWith($url, '.ts')) {
+                            $channelFormat = 'ts';
                         } else {
-                            if (Str::endsWith($url, '.m3u8')) {
-                                $channelFormat = 'hls';
-                            } elseif (Str::endsWith($url, '.ts')) {
-                                $channelFormat = 'ts';
-                            } else {
-                                $channelFormat = $channel->container_extension ?? 'ts';
-                            }
+                            $channelFormat = $channel->container_extension ?? 'ts';
                         }
 
                         // MKV compatibility hack

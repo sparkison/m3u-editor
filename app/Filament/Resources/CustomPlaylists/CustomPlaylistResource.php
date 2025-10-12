@@ -47,6 +47,7 @@ use App\Filament\Resources\CustomPlaylists\Pages\ViewCustomPlaylist;
 use App\Forms\Components\XtreamApiInfo;
 use App\Models\SharedStream;
 use App\Services\EpgCacheService;
+use App\Services\M3uProxyService;
 use App\Services\ProxyService;
 use Filament\Actions\ViewAction;
 use Filament\Forms\FormsComponent;
@@ -102,13 +103,13 @@ class CustomPlaylistResource extends Resource
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
-                // TextColumn::make('available_streams')
-                //     ->label('Streams')
-                //     ->toggleable()
-                //     ->formatStateUsing(fn(int $state): string => $state === 0 ? '∞' : (string)$state)
-                //     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
-                //     ->description(fn(CustomPlaylist $record): string => "Active: " . SharedStream::active()->where('stream_info->options->playlist_id', $record->uuid)->count())
-                //     ->sortable(),
+                TextColumn::make('available_streams')
+                    ->label('Streams')
+                    ->toggleable()
+                    ->formatStateUsing(fn(int $state): string => $state === 0 ? '∞' : (string)$state)
+                    ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
+                    ->description(fn(CustomPlaylist $record): string => "Active: " . M3uProxyService::getPlaylistActiveStreamsCount($record))
+                    ->sortable(),
                 TextColumn::make('live_channels_count')
                     ->label('Live')
                     ->description(fn(CustomPlaylist $record): string => "Enabled: {$record->enabled_live_channels_count}")

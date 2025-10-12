@@ -143,10 +143,8 @@ class SyncVodStrmFiles implements ShouldQueue
                 $url = $channel->url_custom ?? $channel->url;
                 if ($playlist = $channel->getEffectivePlaylist()) {
                     if ($playlist->enable_proxy) {
-                        $format = $channel->container_extension ?? $playlist->proxy_options['output'] ?? 'mkv';
                         $url = ProxyFacade::getProxyUrlForChannel(
                             id: $channel->id,
-                            format: $format
                         );
                     }
                 }

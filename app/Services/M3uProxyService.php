@@ -25,6 +25,78 @@ class M3uProxyService
     }
 
     /**
+     * Check if a channel is currently active (being streamed) via m3u-proxy.
+     */
+    public static function isChannelActive(Channel $channel): bool
+    {
+        $allStreams = (new self())->fetchActiveStreams();
+        if (! $allStreams['success']) {
+            return false;
+        }
+
+        foreach ($allStreams['streams'] as $stream) {
+            if (
+                isset($stream['metadata']['type'], $stream['metadata']['id']) &&
+                $stream['metadata']['type'] === 'channel' &&
+                $stream['metadata']['id'] == $channel->id
+            ) {
+                return $stream['client_count'] > 0;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if an episode is currently active (being streamed) via m3u-proxy.
+     */
+    public static function isEpisodeActive(Episode $episode): bool
+    {
+        $allStreams = (new self())->fetchActiveStreams();
+        if (! $allStreams['success']) {
+            return false;
+        }
+
+        foreach ($allStreams['streams'] as $stream) {
+            if (
+                isset($stream['metadata']['type'], $stream['metadata']['id']) &&
+                $stream['metadata']['type'] === 'episode' &&
+                $stream['metadata']['id'] == $episode->id
+            ) {
+                return $stream['client_count'] > 0;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Get the count of active streams from the external m3u-proxy server for a given playlist.
+     */
+    public static function getPlaylistActiveStreamsCount($playlist): int
+    {
+        $streams = self::getPlaylistActiveStreams($playlist);
+        return count($streams);
+    }
+
+    /**
+     * Get active streams from the external m3u-proxy server, optionally filtered by playlist ID.
+     * Returns array of streams or empty array on error.
+     */
+    public static function getPlaylistActiveStreams($playlist): array
+    {
+        $allStreams = (new self())->fetchActiveStreams();
+        if (! $allStreams['success']) {
+            return [];
+        }
+
+        // Filter streams by playlist ID in metadata
+        $filteredStreams = array_filter($allStreams['streams'], function ($stream) use ($playlist) {
+            return isset($stream['metadata']['playlist_id']) && $stream['client_count'] > 0 && $stream['metadata']['playlist_id'] == $playlist->id;
+        });
+
+        return $filteredStreams;
+    }
+
+    /**
      * Request or build a channel stream URL from the external m3u-proxy server.
      *
      * @param  Playlist|CustomPlaylist|MergedPlaylist|PlaylistAlias  $playlist
@@ -262,13 +334,17 @@ class M3uProxyService
      * @param  string  $url  Primary stream URL
      * @param  array  $failoverUrls  Array of failover URLs
      * @param  string|null  $userAgent  Custom user agent
-     * @param  array  $metadata  Additional metadata (e.g. ['id' => 123, 'type' => 'channel'])
+     * @param  array|null  $metadata  Additional metadata (e.g. ['id' => 123, 'type' => 'channel'])
      * @return string Stream ID
      *
      * @throws Exception when API request fails
      */
-    protected function createOrUpdateStream(string $url, array $failoverUrls = [], ?string $userAgent = null, array $metadata = []): string
-    {
+    protected function createOrUpdateStream(
+        string $url,
+        array $failoverUrls = [],
+        ?string $userAgent = null,
+        ?array $metadata = []
+    ): string {
         try {
             $endpoint = $this->apiBaseUrl . '/streams';
 

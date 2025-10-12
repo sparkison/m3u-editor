@@ -20,10 +20,9 @@ class ProxyService
      * Get the proxy URL for a channel
      *
      * @param string|int $id
-     * @param string $format
      * @return string
      */
-    public function getProxyUrlForChannel($id, $format = 'ts', $preview = false)
+    public function getProxyUrlForChannel($id, $preview = false)
     {
         $m3uProxy = self::m3uProxyEnabled();
         if ($m3uProxy) {
@@ -40,10 +39,9 @@ class ProxyService
      * Get the proxy URL for an episode
      *
      * @param string|int $id
-     * @param string $format
      * @return string
      */
-    public function getProxyUrlForEpisode($id, $format = 'ts', $preview = false)
+    public function getProxyUrlForEpisode($id, $preview = false)
     {
         $m3uProxy = self::m3uProxyEnabled();
         if ($m3uProxy) {

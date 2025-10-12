@@ -211,7 +211,6 @@ class EpgApiController extends Controller
 
             // Check the proxy format
             $proxyEnabled = $forceProxy || $playlist->enable_proxy;
-            $proxyFormat = $playlist->proxy_options['output'] ?? 'ts';
 
             // If auto channel increment is enabled, set the starting channel number
             $channelNumber = $playlist->auto_channel_increment ? $playlist->channel_start - 1 : 0;
@@ -293,21 +292,20 @@ class EpgApiController extends Controller
 
                 // Store channel data for pagination
                 $url = PlaylistUrlService::getChannelUrl($channel, $playlist);
-                $channelFormat = $proxyFormat;
                 if ($proxyEnabled) {
                     $url = ProxyFacade::getProxyUrlForChannel(
                         id: $channel->id,
-                        format: $proxyFormat,
                         preview: true
                     );
+                }
+
+                // Determine the channel format based on URL or container extension
+                if (Str::endsWith($url, '.m3u8')) {
+                    $channelFormat = 'hls';
+                } elseif (Str::endsWith($url, '.ts')) {
+                    $channelFormat = 'ts';
                 } else {
-                    if (Str::endsWith($url, '.m3u8')) {
-                        $channelFormat = 'hls';
-                    } elseif (Str::endsWith($url, '.ts')) {
-                        $channelFormat = 'ts';
-                    } else {
-                        $channelFormat = $channel->container_extension ?? 'ts';
-                    }
+                    $channelFormat = $channel->container_extension ?? 'ts';
                 }
 
                 // MKV compatibility hack

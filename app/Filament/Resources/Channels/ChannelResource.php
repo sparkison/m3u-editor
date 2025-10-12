@@ -1032,7 +1032,6 @@ class ChannelResource extends Resource
                             try {
                                 return ProxyFacade::getProxyUrlForChannel(
                                     $record->id,
-                                    $record->playlist->proxy_options['output'] ?? 'ts'
                                 );
                             } catch (Exception $e) {
                                 return null;
