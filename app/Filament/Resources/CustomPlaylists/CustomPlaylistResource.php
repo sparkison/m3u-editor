@@ -197,8 +197,6 @@ class CustomPlaylistResource extends Resource
 
     public static function getForm($creating = false): array
     {
-        $m3uProxyEnabled = ProxyService::m3uProxyEnabled();
-
         $schema = [
             Grid::make()
                 ->columns(2)
@@ -352,20 +350,11 @@ class CustomPlaylistResource extends Resource
                         ->default(0) // Default to 0 streams (for unlimted)
                         ->required()
                         ->hidden(fn(Get $get): bool => !$get('enable_proxy')),
-                    Select::make('proxy_options.output')
-                        ->label('Proxy Output Format')
-                        ->required()
-                        ->options([
-                            'ts' => 'MPEG-TS (.ts)',
-                            'hls' => 'HLS (.m3u8)',
-                        ])
-                        ->default('ts')
-                        ->hidden(fn(Get $get): bool => !$get('enable_proxy') || $m3uProxyEnabled),
                     TextInput::make('server_timezone')
                         ->label('Provider Timezone')
                         ->helperText('The portal/provider timezone (DST-aware). Needed to correctly use timeshift functionality when playlist proxy is enabled.')
                         ->placeholder('Etc/UTC')
-                        ->columnSpan($m3uProxyEnabled ? 2 : 1)
+                        ->columnSpan(2)
                         ->hidden(fn(Get $get): bool => !$get('enable_proxy')),
                 ])
         ];

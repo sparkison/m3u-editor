@@ -172,8 +172,6 @@ class MergedPlaylistResource extends Resource
 
     public static function getForm($creating = false): array
     {
-        $m3uProxyEnabled = ProxyService::m3uProxyEnabled();
-
         $schema = [
             Grid::make()
                 ->columns(2)
@@ -322,15 +320,6 @@ class MergedPlaylistResource extends Resource
                         ->helperText('The portal/provider timezone (DST-aware). Needed to correctly use timeshift functionality when playlist proxy is enabled.')
                         ->placeholder('Etc/UTC')
                         ->hidden(fn(Get $get): bool => !$get('enable_proxy')),
-                    Select::make('proxy_options.output')
-                        ->label('Proxy Output Format')
-                        ->required()
-                        ->options([
-                            'ts' => 'MPEG-TS (.ts)',
-                            'hls' => 'HLS (.m3u8)',
-                        ])
-                        ->default('ts')
-                        ->hidden(fn(Get $get): bool => !$get('enable_proxy') || $m3uProxyEnabled),
                 ])
         ];
 
