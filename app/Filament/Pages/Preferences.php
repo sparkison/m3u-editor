@@ -95,6 +95,7 @@ class Preferences extends SettingsPage
         $ffmpegPath = config('proxy.ffmpeg_path');
 
         $m3uProxyUrl = rtrim(config('proxy.m3u_proxy_url', ''), '/');
+        $m3uToken = config('proxy.m3u_proxy_token', null);
         $m3uProxyDocs = $m3uProxyUrl . '/docs';
 
         $vodExample = PlaylistService::getVodExample();
@@ -218,9 +219,13 @@ class Preferences extends SettingsPage
                                             ->color('gray')
                                             ->label('Test m3u proxy connection')
                                             ->icon('heroicon-m-signal')
-                                            ->action(function () use ($m3uProxyUrl) {
+                                            ->action(function () use ($m3uProxyUrl, $m3uToken) {
                                                 try {
-                                                    $status = Http::get($m3uProxyUrl . '/health');
+                                                    $url = $m3uProxyUrl . '/health';
+                                                    if ($m3uToken) {
+                                                        $url .= '?api_token=' . $m3uToken;
+                                                    }
+                                                    $status = Http::get($url);
                                                     if ($status->successful()) {
                                                         $body = $status->body();
                                                         Notification::make()

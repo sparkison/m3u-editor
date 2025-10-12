@@ -16,10 +16,12 @@ use Illuminate\Support\Facades\Log;
 class M3uProxyService
 {
     protected string $apiBaseUrl;
+    protected string $apiToken;
 
     public function __construct()
     {
         $this->apiBaseUrl = rtrim(config('proxy.m3u_proxy_url'), '/');
+        $this->apiToken = config('proxy.m3u_proxy_token');
     }
 
     /**
@@ -133,7 +135,11 @@ class M3uProxyService
 
         try {
             $endpoint = $this->apiBaseUrl . '/streams/' . $streamId;
-            $response = Http::timeout(10)->acceptJson()->delete($endpoint);
+            $response = Http::timeout(10)->acceptJson()
+                ->withHeaders($this->apiToken ? [
+                    'X-API-Token' => $this->apiToken,
+                ] : [])
+                ->delete($endpoint);
 
             if ($response->successful()) {
                 Log::info("Stream {$streamId} stopped successfully");
@@ -167,7 +173,11 @@ class M3uProxyService
 
         try {
             $endpoint = $this->apiBaseUrl . '/streams';
-            $response = Http::timeout(5)->acceptJson()->get($endpoint);
+            $response = Http::timeout(5)->acceptJson()
+                ->withHeaders($this->apiToken ? [
+                    'X-API-Token' => $this->apiToken,
+                ] : [])
+                ->get($endpoint);
             if ($response->successful()) {
                 $data = $response->json() ?: [];
 
@@ -212,7 +222,11 @@ class M3uProxyService
 
         try {
             $endpoint = $this->apiBaseUrl . '/clients';
-            $response = Http::timeout(5)->acceptJson()->get($endpoint);
+            $response = Http::timeout(5)->acceptJson()
+                ->withHeaders($this->apiToken ? [
+                    'X-API-Token' => $this->apiToken,
+                ] : [])
+                ->get($endpoint);
             if ($response->successful()) {
                 $data = $response->json() ?: [];
 
@@ -270,7 +284,9 @@ class M3uProxyService
 
             $response = Http::timeout(10)
                 ->acceptJson()
-                ->post($endpoint, $payload);
+                ->withHeaders($this->apiToken ? [
+                    'X-API-Token' => $this->apiToken,
+                ] : [])->post($endpoint, $payload);
 
             if ($response->successful()) {
                 $data = $response->json();

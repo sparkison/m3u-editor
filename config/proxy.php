@@ -16,6 +16,7 @@ return [
     'use_m3u_proxy' => true, // Always true - proxy integration is available
     'external_proxy_enabled' => env('M3U_PROXY_ENABLED', false), // true = external service, false/null = embedded
     'm3u_proxy_url' => env('M3U_PROXY_URL'), // Auto-set in start-container based on mode
+    'm3u_proxy_token' => env('M3U_PROXY_TOKEN'), // API token for authenticating with the proxy service
 
     /*
     |--------------------------------------------------------------------------

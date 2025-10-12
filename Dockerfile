@@ -20,6 +20,7 @@ ENV WWWUSER="m3ue"
 # Install basic packages
 RUN apk update && apk --no-cache add \
     coreutils \
+    openssl \
     supervisor \
     envsubst \
     su-exec \
