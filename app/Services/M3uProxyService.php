@@ -90,7 +90,7 @@ class M3uProxyService
 
         // Filter streams by playlist ID in metadata
         $filteredStreams = array_filter($allStreams['streams'], function ($stream) use ($playlist) {
-            return isset($stream['metadata']['playlist_id']) && $stream['client_count'] > 0 && $stream['metadata']['playlist_id'] == $playlist->id;
+            return isset($stream['metadata']['playlist_id']) && $stream['client_count'] > 0 && $stream['metadata']['playlist_uuid'] == $playlist->uuid;
         });
 
         return $filteredStreams;
@@ -138,7 +138,7 @@ class M3uProxyService
         $streamId = $this->createOrUpdateStream($primaryUrl, $failovers, $userAgent, [
             'id' => $id,
             'type' => 'channel',
-            'playlist_id' => $playlist->id,
+            'playlist_uuid' => $playlist->uuid,
         ]);
 
         // Get the format from the URL
@@ -182,7 +182,7 @@ class M3uProxyService
         $streamId = $this->createOrUpdateStream($url, $failoverUrls, $userAgent, [
             'id' => $id,
             'type' => 'episode',
-            'playlist_id' => $playlist->id,
+            'playlist_uuid' => $playlist->uuid,
         ]);
 
         // Get the format from the URL
