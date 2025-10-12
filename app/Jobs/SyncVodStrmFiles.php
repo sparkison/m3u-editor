@@ -99,7 +99,7 @@ class SyncVodStrmFiles implements ShouldQueue
                     $group = $cleanSpecialChars
                         ? PlaylistService::makeFilesystemSafe($channel->group, $replaceChar)
                         : PlaylistService::makeFilesystemSafe($channel->group);
-                    $groupPath = $path.'/'.$group;
+                    $groupPath = $path . '/' . $group;
                     if (! is_dir($groupPath)) {
                         mkdir($groupPath, 0777, true);
                     }
@@ -133,21 +133,20 @@ class SyncVodStrmFiles implements ShouldQueue
                 // Remove consecutive replacement characters if enabled
                 if ($removeConsecutiveChars && $replaceChar !== 'remove') {
                     $char = $replaceChar === 'space' ? ' ' : ($replaceChar === 'dash' ? '-' : ($replaceChar === 'underscore' ? '_' : '.'));
-                    $fileName = preg_replace('/'.preg_quote($char, '/').'{2,}/', $char, $fileName);
+                    $fileName = preg_replace('/' . preg_quote($char, '/') . '{2,}/', $char, $fileName);
                 }
 
                 $fileName = "{$fileName}.strm";
-                $filePath = $path.'/'.$fileName;
+                $filePath = $path . '/' . $fileName;
 
-                // Get the url
-                $url = $channel->url_custom ?? $channel->url;
-                if ($playlist = $channel->getEffectivePlaylist()) {
-                    if ($playlist->enable_proxy) {
-                        $url = ProxyFacade::getProxyUrlForChannel(
-                            id: $channel->id,
-                        );
-                    }
+                // Generate the url
+                $playlist = $this->playlist ?? $channel->getEffectivePlaylist();
+                $urlPath = '/live';
+                if ($channel->is_vod) {
+                    $urlPath = '/movie';
+                    $extension = $channel->container_extension ?? 'mkv';
                 }
+                $url = url("{$urlPath}/{$playlist->user->name}/{$playlist->uuid}/" . $channel->id . "." . $extension);
 
                 // Check if the file already exists
                 if (file_exists($filePath)) {
@@ -162,7 +161,7 @@ class SyncVodStrmFiles implements ShouldQueue
             }
         } catch (\Exception $e) {
             // Log the exception or handle it as needed
-            Log::error('Error syncing VOD .strm files: '.$e->getMessage());
+            Log::error('Error syncing VOD .strm files: ' . $e->getMessage());
         }
     }
 }

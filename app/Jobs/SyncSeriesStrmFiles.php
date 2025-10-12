@@ -159,7 +159,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 $cleanName = $cleanSpecialChars
                     ? PlaylistService::makeFilesystemSafe($catName, $replaceChar)
                     : PlaylistService::makeFilesystemSafe($catName);
-                $path .= '/'.$cleanName;
+                $path .= '/' . $cleanName;
                 if (! is_dir($path)) {
                     mkdir($path, 0777, true);
                 }
@@ -172,7 +172,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 $cleanName = $cleanSpecialChars
                     ? PlaylistService::makeFilesystemSafe($series->name, $replaceChar)
                     : PlaylistService::makeFilesystemSafe($series->name);
-                $path .= '/'.$cleanName;
+                $path .= '/' . $cleanName;
                 if (! is_dir($path)) {
                     mkdir($path, 0777, true);
                 }
@@ -188,7 +188,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 // Setup episode prefix
                 $season = $ep->season;
                 $num = str_pad($ep->episode_num, 2, '0', STR_PAD_LEFT);
-                $prefx = 'S'.str_pad($season, 2, '0', STR_PAD_LEFT)."E{$num}";
+                $prefx = 'S' . str_pad($season, 2, '0', STR_PAD_LEFT) . "E{$num}";
 
                 // Build the base filename
                 $fileName = "{$prefx} - {$ep->title}";
@@ -215,29 +215,25 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 // Remove consecutive replacement characters if enabled
                 if ($removeConsecutiveChars && $replaceChar !== 'remove') {
                     $char = $replaceChar === 'space' ? ' ' : ($replaceChar === 'dash' ? '-' : ($replaceChar === 'underscore' ? '_' : '.'));
-                    $fileName = preg_replace('/'.preg_quote($char, '/').'{2,}/', $char, $fileName);
+                    $fileName = preg_replace('/' . preg_quote($char, '/') . '{2,}/', $char, $fileName);
                 }
 
                 $fileName = "{$fileName}.strm";
 
                 // Create the season folder
                 if (in_array('season', $pathStructure)) {
-                    $seasonPath = $path.'/Season '.str_pad($season, 2, '0', STR_PAD_LEFT);
+                    $seasonPath = $path . '/Season ' . str_pad($season, 2, '0', STR_PAD_LEFT);
                     if (! is_dir($seasonPath)) {
                         mkdir($seasonPath, 0777, true);
                     }
-                    $filePath = $seasonPath.'/'.$fileName;
+                    $filePath = $seasonPath . '/' . $fileName;
                 } else {
-                    $filePath = $path.'/'.$fileName;
+                    $filePath = $path . '/' . $fileName;
                 }
 
-                // Get the url
-                $url = $ep->url;
-                if ($playlist && $playlist->enable_proxy) {
-                    $url = ProxyFacade::getProxyUrlForEpisode(
-                        id: $ep->id,
-                    );
-                }
+                // Generate the url
+                $containerExtension = $ep->container_extension ?? 'mp4';
+                $url = url("/series/{$playlist->user->name}/{$playlist->uuid}/" . $ep->id . "." . $containerExtension);
 
                 // Check if the file already exists
                 if (file_exists($filePath)) {

@@ -164,14 +164,14 @@ class PlaylistGenerateController extends Controller
 
                     // Determine the extension and possibly proxy the URL
                     if ($proxyEnabled) {
-                        // Proxy the logo through the logo proxy controller
-                        $icon = LogoProxyController::generateProxyUrl($icon);
-                    }
-                    if ($logoProxyEnabled) {
                         // Get the proxy URL
                         $url = ProxyFacade::getProxyUrlForChannel(
                             $channel->id,
                         );
+                    }
+                    if ($logoProxyEnabled) {
+                        // Proxy the logo through the logo proxy controller
+                        $icon = LogoProxyController::generateProxyUrl($icon);
                     }
 
                     // Format the URL in Xtream Codes format if not disabled
@@ -242,6 +242,7 @@ class PlaylistGenerateController extends Controller
                             $channelNo = ++$channelNumber;
                             $group = $s->category->name ?? 'Seasons';
                             $name = $s->name;
+                            $url = PlaylistUrlService::getEpisodeUrl($episode, $playlist);
                             $title = $episode->title;
                             $runtime = $episode->info['duration_secs'] ?? -1;
                             $icon = $episode->info['movie_image'] ?? $streamId->info['cover'] ?? '';
@@ -252,8 +253,10 @@ class PlaylistGenerateController extends Controller
                             if ($proxyEnabled) {
                                 $icon = LogoProxyController::generateProxyUrl($icon);
                             }
-                            $containerExtension = $episode->container_extension ?? 'mp4';
-                            $url = url("/series/{$username}/{$password}/" . $episode->id . ".{$containerExtension}");
+                            if (!(config('app.disable_m3u_xtream_format') ?? false)) {
+                                $containerExtension = $episode->container_extension ?? 'mp4';
+                                $url = url("/series/{$username}/{$password}/" . $episode->id . ".{$containerExtension}");
+                            }
 
                             // Get the TVG ID
                             switch ($idChannelBy) {
