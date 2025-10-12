@@ -90,7 +90,7 @@ class M3uProxyService
 
         // Filter streams by playlist ID in metadata
         $filteredStreams = array_filter($allStreams['streams'], function ($stream) use ($playlist) {
-            return isset($stream['metadata']['playlist_id']) && $stream['client_count'] > 0 && $stream['metadata']['playlist_uuid'] == $playlist->uuid;
+            return isset($stream['metadata']['playlist_uuid']) && $stream['client_count'] > 0 && $stream['metadata']['playlist_uuid'] == $playlist->uuid;
         });
 
         return $filteredStreams;
