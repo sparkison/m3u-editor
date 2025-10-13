@@ -266,7 +266,60 @@ class M3uProxyService
             throw new Exception('Channel not found');
         }
 
-        $primaryUrl = PlaylistUrlService::getChannelUrl($channel, $playlist);
+        // Check if primary playlist has stream limits and if it's at capacity
+        $primaryUrl = null;
+        if ($playlist->available_streams !== 0) {
+            $activeStreams = self::getCachedActiveStreamsCountByMetadata('playlist_uuid', $playlist->uuid, 1);
+
+            // Keep track of original playlist in case we need to check failovers
+            $originalUuid = $playlist->uuid;
+
+            if ($activeStreams >= $playlist->available_streams) {
+                // Primary playlist is at capacity, check failovers
+                $failoverChannels = $channel->failoverChannels()
+                    ->select(['channels.id', 'channels.url', 'channels.url_custom'])
+                    ->get();
+
+                foreach ($failoverChannels as $failoverChannel) {
+                    $failoverPlaylist = $failoverChannel->getEffectivePlaylist();
+
+                    // Check if failover playlist has limits and capacity
+                    if ($failoverPlaylist->available_streams === 0) {
+                        // No limits on this failover playlist, use it
+                        $playlist = $failoverPlaylist;
+                        $primaryUrl = PlaylistUrlService::getChannelUrl($failoverChannel, $playlist);
+                        break;
+                    } else {
+                        // Check if failover playlist has capacity
+                        $failoverActiveStreams = self::getCachedActiveStreamsCountByMetadata('playlist_uuid', $failoverPlaylist->uuid, 1);
+
+                        if ($failoverActiveStreams < $failoverPlaylist->available_streams) {
+                            // Found available failover playlist
+                            $playlist = $failoverPlaylist;
+                            $primaryUrl = PlaylistUrlService::getChannelUrl($failoverChannel, $playlist);
+                            break;
+                        }
+                    }
+                }
+
+                // If we still have the original playlist, all are at capacity
+                if ($playlist->uuid === $originalUuid) {
+                    Log::info('Channel stream request denied - all playlists at capacity', [
+                        'channel_id' => $id,
+                        'primary_playlist' => $playlist->uuid,
+                        'primary_limit' => $playlist->available_streams,
+                        'primary_active' => $activeStreams
+                    ]);
+
+                    abort(503, 'All playlists have reached their maximum stream limit. Please try again later.');
+                }
+            }
+        }
+
+        // If we didn't already get a primary URL from failover logic, get it now
+        if ($primaryUrl === null) {
+            $primaryUrl = PlaylistUrlService::getChannelUrl($channel, $playlist);
+        }
         if (empty($primaryUrl)) {
             throw new Exception('Channel primary URL is empty');
         }
@@ -316,6 +369,22 @@ class M3uProxyService
         $episode = Episode::find($id);
         if (empty($episode)) {
             throw new Exception('Episode not found');
+        }
+
+        // Check if playlist has stream limits and if it's at capacity
+        if ($playlist->available_streams !== 0) {
+            $activeStreams = self::getCachedActiveStreamsCountByMetadata('playlist_uuid', $playlist->uuid, 1);
+
+            if ($activeStreams >= $playlist->available_streams) {
+                Log::info('Episode stream request denied - playlist at capacity', [
+                    'episode_id' => $id,
+                    'playlist' => $playlist->uuid,
+                    'limit' => $playlist->available_streams,
+                    'active' => $activeStreams
+                ]);
+
+                abort(503, 'Playlist has reached its maximum stream limit. Please try again later.');
+            }
         }
 
         $url = PlaylistUrlService::getEpisodeUrl($episode, $playlist);
