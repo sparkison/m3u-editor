@@ -19,7 +19,7 @@ class LogoProxyController extends Controller
     {
         try {
             // Decode the URL
-            $originalUrl = base64_decode($encodedUrl);
+            $originalUrl = base64_decode(strtr($encodedUrl, '-_', '+/') . str_repeat('=', (4 - strlen($encodedUrl) % 4) % 4));
 
             // Validate the decoded URL
             if (!filter_var($originalUrl, FILTER_VALIDATE_URL)) {
@@ -68,7 +68,7 @@ class LogoProxyController extends Controller
         if (empty($originalUrl) || !filter_var($originalUrl, FILTER_VALIDATE_URL)) {
             $url = '/placeholder.png';
         } else {
-            $encodedUrl = base64_encode($originalUrl);
+            $encodedUrl = rtrim(strtr(base64_encode($originalUrl), '+/', '-_'), '=');
             $url = $proxyUrlOverride && !$internal
                 ? rtrim($proxyUrlOverride, '/') . "/logo-proxy/{$encodedUrl}"
                 : url("/logo-proxy/{$encodedUrl}");
