@@ -269,7 +269,7 @@ class M3uProxyService
         // Check if primary playlist has stream limits and if it's at capacity
         $primaryUrl = null;
         if ($playlist->available_streams !== 0) {
-            $activeStreams = self::getCachedActiveStreamsCountByMetadata('playlist_uuid', $playlist->uuid, 1);
+            $activeStreams = self::getActiveStreamsCountByMetadata('playlist_uuid', $playlist->uuid);
 
             // Keep track of original playlist in case we need to check failovers
             $originalUuid = $playlist->uuid;
@@ -291,7 +291,7 @@ class M3uProxyService
                         break;
                     } else {
                         // Check if failover playlist has capacity
-                        $failoverActiveStreams = self::getCachedActiveStreamsCountByMetadata('playlist_uuid', $failoverPlaylist->uuid, 1);
+                        $failoverActiveStreams = self::getActiveStreamsCountByMetadata('playlist_uuid', $failoverPlaylist->uuid);
 
                         if ($failoverActiveStreams < $failoverPlaylist->available_streams) {
                             // Found available failover playlist
