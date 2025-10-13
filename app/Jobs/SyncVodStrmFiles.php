@@ -142,7 +142,8 @@ class SyncVodStrmFiles implements ShouldQueue
                 // Generate the url
                 $playlist = $this->playlist ?? $channel->getEffectivePlaylist();
                 $extension = $channel->container_extension ?? 'mkv';
-                $url = rtrim(url("/movie/{$playlist->user->name}/{$playlist->uuid}/" . $channel->id . "." . $extension), '.');
+                $url = rtrim("/movie/{$playlist->user->name}/{$playlist->uuid}/" . $channel->id . "." . $extension, '.');
+                $url = PlaylistService::getBaseUrl($url);
 
                 // Check if the file already exists
                 if (file_exists($filePath)) {

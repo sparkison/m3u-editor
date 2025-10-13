@@ -17,6 +17,27 @@ use Illuminate\Support\Facades\Log;
 class PlaylistService
 {
     /**
+     * Get the base URL of the application, including port if set
+     *
+     * @return string
+     */
+    public static function getBaseUrl($path = '')
+    {
+        // Manually construct base URL to ensure port is included if set
+        // @TODO: should we use the `PROXY_URL_OVERRIDE` env variable if set?
+        $port = null;
+        if (config('app.port') && !str_contains(config('app.url'), 'https://')) {
+            // Check if using HTTPS
+            $port = config('app.port');
+        }
+        $url = rtrim(url('/'), '/') . ($port ? ':' . $port : '');
+        if ($path) {
+            $url .= '/' . ltrim($path, '/');
+        }
+        return $url;
+    }
+
+    /**
      * Get URLs for the given playlist
      *
      * @param  Playlist|MergedPlaylist|CustomPlaylist|PlaylistAlias $playlist
