@@ -282,7 +282,7 @@ class XtreamApiControllerTest extends TestCase
         // Check direct_source for the first channel
         $jsonResponse = $response->json();
         if (!empty($jsonResponse)) {
-            $expectedDirectSource = url("/live/{$this->username}/{$this->password}/" . base64_encode($enabledChannel1->id) . ".ts");
+            $expectedDirectSource = url("/live/{$this->username}/{$this->password}/" . $enabledChannel1->id) . ".ts";
             $this->assertEquals($expectedDirectSource, $jsonResponse[0]['direct_source']);
         }
     }
@@ -369,10 +369,10 @@ class XtreamApiControllerTest extends TestCase
         $response->assertJsonPath("episodes.{$firstSeasonNumber}.0.id", (string)$firstEpisode->id);
         $response->assertJsonPath("episodes.{$firstSeasonNumber}.0.title", $firstEpisode->title);
         $response->assertJsonPath("episodes.{$firstSeasonNumber}.0.container_extension", $firstEpisode->container_extension ?? 'mp4');
-        $response->assertJsonPath("episodes.{$firstSeasonNumber}.0.stream_id", base64_encode($firstEpisode->id)); // stream_id is base64 encoded
+        $response->assertJsonPath("episodes.{$firstSeasonNumber}.0.stream_id", $firstEpisode->id); // stream_id is base64 encoded
 
         // $expectedUrlPath = "/series/{$this->playlist->uuid}/{$this->username}/{$this->password}/{$series->id}-{$firstEpisode->id}.{$firstEpisode->container_extension}";
-        $expectedDirectSource = url("/series/{$this->username}/{$this->password}/" . base64_encode($firstEpisode->id) . ".{$firstEpisode->container_extension}");
+        $expectedDirectSource = url("/series/{$this->username}/{$this->password}/" . $firstEpisode->id . ".{$firstEpisode->container_extension}");
         $actualDirectSource = $response->json("episodes.{$firstSeasonNumber}.0.direct_source");
         $this->assertNotNull($actualDirectSource, "Direct source URL is null.");
         // $this->assertStringContainsString($expectedUrlPath, $actualDirectSource);
@@ -424,12 +424,12 @@ class XtreamApiControllerTest extends TestCase
         $response->assertJsonPath('episodes.1.0.id', (string)$movieSeries->id);
         $response->assertJsonPath('episodes.1.0.title', $movieSeries->name);
         $response->assertJsonPath('episodes.1.0.container_extension', 'mp4');
-        $response->assertJsonPath('episodes.1.0.stream_id', base64_encode($movieSeries->id));
+        $response->assertJsonPath('episodes.1.0.stream_id', $movieSeries->id);
         $response->assertJsonPath('episodes.1.0.info.plot', $movieSeries->plot);
         $response->assertJsonPath('episodes.1.0.info.movie_image', 'https://m3ueditor.test/movie_cover.jpg');
 
         // $expectedUrlPath = "/series/{$this->playlist->uuid}/{$this->username}/{$this->password}/{$movieSeries->id}.{$movieSeries->container_extension}";
-        $expectedDirectSource = url("/series/{$this->username}/{$this->password}/" . base64_encode($movieSeries->id) . ".mp4");
+        $expectedDirectSource = url("/series/{$this->username}/{$this->password}/" . $movieSeries->id . ".mp4");
         $actualDirectSource = $response->json('episodes.1.0.direct_source');
         $this->assertNotNull($actualDirectSource, "Direct source URL is null for movie.");
         // $this->assertStringContainsString($expectedUrlPath, $actualDirectSource);

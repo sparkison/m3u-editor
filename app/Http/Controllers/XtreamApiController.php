@@ -1120,7 +1120,6 @@ class XtreamApiController extends Controller
             // Build movie_data section - use channel's movie_data field if available, otherwise build from channel data
             $movieData = $channel->movie_data ?? [];
 
-            $streamId = rtrim(base64_encode($channel->id), '=');
             $extension = $movieData['container_extension'] ?? $channel->container_extension ?? 'mp4';
             $defaultMovieData = [
                 'stream_id' => $channel->id,
