@@ -10,6 +10,7 @@ use App\Models\Playlist;
 use App\Models\PlaylistAlias;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -25,25 +26,202 @@ class M3uProxyService
     }
 
     /**
-     * Check if a channel is currently active (being streamed) via m3u-proxy.
+     * Get active streams count for a specific playlist using metadata filtering
+     */
+    public static function getPlaylistActiveStreamsCount($playlist): int
+    {
+        $service = new self();
+
+        if (empty($service->apiBaseUrl)) {
+            return 0;
+        }
+
+        try {
+            $endpoint = $service->apiBaseUrl . '/streams/by-metadata';
+            $response = Http::timeout(3)->acceptJson()
+                ->withHeaders($service->apiToken ? [
+                    'X-API-Token' => $service->apiToken,
+                ] : [])
+                ->get($endpoint, [
+                    'field' => 'playlist_uuid',
+                    'value' => $playlist->uuid,
+                    'active_only' => true
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                return $data['total_clients'] ?? 0; // Return total client count across all streams
+            }
+
+            Log::warning('Failed to fetch playlist streams from m3u-proxy: HTTP ' . $response->status());
+            return 0;
+        } catch (Exception $e) {
+            Log::warning('Failed to fetch playlist streams from m3u-proxy: ' . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Get active streams for a specific playlist using metadata filtering
+     */
+    public static function getPlaylistActiveStreams($playlist): array
+    {
+        $service = new self();
+
+        if (empty($service->apiBaseUrl)) {
+            return [];
+        }
+
+        try {
+            $endpoint = $service->apiBaseUrl . '/streams/by-metadata';
+            $response = Http::timeout(3)->acceptJson()
+                ->withHeaders($service->apiToken ? [
+                    'X-API-Token' => $service->apiToken,
+                ] : [])
+                ->get($endpoint, [
+                    'field' => 'playlist_uuid',
+                    'value' => $playlist->uuid,
+                    'active_only' => true
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                return $data['matching_streams'] ?? [];
+            }
+
+            Log::warning('Failed to fetch playlist streams from m3u-proxy: HTTP ' . $response->status());
+            return [];
+        } catch (Exception $e) {
+            Log::warning('Failed to fetch playlist streams from m3u-proxy: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Check if a specific channel is active using metadata filtering
      */
     public static function isChannelActive(Channel $channel): bool
     {
-        $allStreams = (new self())->fetchActiveStreams();
-        if (! $allStreams['success']) {
+        $service = new self();
+
+        if (empty($service->apiBaseUrl)) {
             return false;
         }
 
-        foreach ($allStreams['streams'] as $stream) {
-            if (
-                isset($stream['metadata']['type'], $stream['metadata']['id']) &&
-                $stream['metadata']['type'] === 'channel' &&
-                $stream['metadata']['id'] == $channel->id
-            ) {
-                return $stream['client_count'] > 0;
+        try {
+            $endpoint = $service->apiBaseUrl . '/streams/by-metadata';
+            $response = Http::timeout(2)->acceptJson()
+                ->withHeaders($service->apiToken ? [
+                    'X-API-Token' => $service->apiToken,
+                ] : [])
+                ->get($endpoint, [
+                    'field' => 'type',
+                    'value' => 'channel',
+                    'active_only' => true
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                // Check if any matching stream has this channel ID
+                foreach ($data['matching_streams'] ?? [] as $stream) {
+                    if (
+                        isset($stream['metadata']['id']) &&
+                        $stream['metadata']['id'] == $channel->id &&
+                        $stream['client_count'] > 0
+                    ) {
+                        return true;
+                    }
+                }
             }
+
+            return false;
+        } catch (Exception $e) {
+            Log::warning('Failed to check channel active status: ' . $e->getMessage());
+            return false;
         }
-        return false;
+    }
+
+    /**
+     * Get active streams count by any metadata field/value combination
+     */
+    public static function getActiveStreamsCountByMetadata(string $field, string $value): int
+    {
+        $service = new self();
+
+        if (empty($service->apiBaseUrl)) {
+            return 0;
+        }
+
+        try {
+            $endpoint = $service->apiBaseUrl . '/streams/by-metadata';
+            $response = Http::timeout(3)->acceptJson()
+                ->withHeaders($service->apiToken ? [
+                    'X-API-Token' => $service->apiToken,
+                ] : [])
+                ->get($endpoint, [
+                    'field' => $field,
+                    'value' => $value,
+                    'active_only' => true
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                return $data['total_clients'] ?? 0;
+            }
+
+            return 0;
+        } catch (Exception $e) {
+            Log::warning("Failed to get active streams count for {$field}={$value}: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Get cached active streams count with smart invalidation
+     */
+    public static function getCachedActiveStreamsCountByMetadata(string $field, string $value, int $cacheTtlSeconds = 2): int
+    {
+        $cacheKey = "m3u_proxy_active_count:{$field}:{$value}";
+
+        // Try to get from cache first
+        $cachedCount = Cache::get($cacheKey);
+        if ($cachedCount !== null) {
+            return $cachedCount;
+        }
+
+        // Fetch fresh count
+        $count = self::getActiveStreamsCountByMetadata($field, $value);
+
+        // Cache for specified TTL
+        Cache::put($cacheKey, $count, now()->addSeconds($cacheTtlSeconds));
+
+        return $count;
+    }
+
+    /**
+     * Get cached playlist active streams count
+     */
+    public static function getCachedPlaylistActiveStreamsCount($playlist, int $cacheTtlSeconds = 2): int
+    {
+        return self::getCachedActiveStreamsCountByMetadata('playlist_uuid', $playlist->uuid, $cacheTtlSeconds);
+    }
+
+    /**
+     * Invalidate cache for specific metadata field/value
+     */
+    public static function invalidateMetadataCache(string $field, string $value): void
+    {
+        $cacheKey = "m3u_proxy_active_count:{$field}:{$value}";
+        Cache::forget($cacheKey);
+    }
+
+    /**
+     * Invalidate cache when we know a playlist's stream status changed
+     */
+    public static function invalidatePlaylistCache($playlist): void
+    {
+        self::invalidateMetadataCache('playlist_uuid', $playlist->uuid);
     }
 
     /**
@@ -66,34 +244,6 @@ class M3uProxyService
             }
         }
         return false;
-    }
-
-    /**
-     * Get the count of active streams from the external m3u-proxy server for a given playlist.
-     */
-    public static function getPlaylistActiveStreamsCount($playlist): int
-    {
-        $streams = self::getPlaylistActiveStreams($playlist);
-        return count($streams);
-    }
-
-    /**
-     * Get active streams from the external m3u-proxy server, optionally filtered by playlist ID.
-     * Returns array of streams or empty array on error.
-     */
-    public static function getPlaylistActiveStreams($playlist): array
-    {
-        $allStreams = (new self())->fetchActiveStreams();
-        if (! $allStreams['success']) {
-            return [];
-        }
-
-        // Filter streams by playlist ID in metadata
-        $filteredStreams = array_filter($allStreams['streams'], function ($stream) use ($playlist) {
-            return isset($stream['metadata']['playlist_uuid']) && $stream['client_count'] > 0 && $stream['metadata']['playlist_uuid'] == $playlist->uuid;
-        });
-
-        return $filteredStreams;
     }
 
     /**
