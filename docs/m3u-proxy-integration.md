@@ -46,11 +46,11 @@ docker exec -it m3u-editor php artisan m3u-proxy:restart
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `M3U_PROXY_ENABLED` | `false` | false/unset = embedded, true = external |
-| `M3U_PROXY_HOST` | `127.0.0.1` | Proxy bind address (embedded, localhost) |
-| `M3U_PROXY_PORT` | `8085` | Proxy internal port (embedded) |
-| `M3U_PROXY_URL` | auto-set | `${APP_URL}/m3u-proxy` (embedded) or custom (external) |
-| `M3U_PROXY_TOKEN` | auto-set (embedded) | auto generated or custom (if using external instance, should match `API_TOKEN` in m3u-proxy instance) |
-| `M3U_PROXY_LOG_LEVEL` | `ERROR` | (embedded) set embedded instance log level |
+| `M3U_PROXY_HOST` | `127.0.0.1` | Proxy bind address (embedded) / ignored (external) |
+| `M3U_PROXY_PORT` | `8085` | Proxy internal port (embedded) / ignored (external) |
+| `M3U_PROXY_URL` | auto-set | `${APP_URL}/m3u-proxy` (embedded) / custom (external) |
+| `M3U_PROXY_TOKEN` | auto-set | auto generated (embedded) / custom (if using external instance, should match `API_TOKEN` in m3u-proxy instance) |
+| `M3U_PROXY_LOG_LEVEL` | `ERROR` | set log level (embedded) / ignored (external) |
 
 NOTE: When using API token authentication, please reference the m3u-proxy docs for more detail: [M3U Proxy Authentication](https://github.com/sparkison/m3u-proxy/blob/master/docs/AUTHENTICATION.md)
 
