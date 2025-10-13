@@ -211,6 +211,7 @@ class EpgApiController extends Controller
 
             // Check the proxy format
             $proxyEnabled = $forceProxy || $playlist->enable_proxy;
+            $logoProxyEnabled = $playlist->enable_logo_proxy;
 
             // If auto channel increment is enabled, set the starting channel number
             $channelNumber = $playlist->auto_channel_increment ? $playlist->channel_start - 1 : 0;
@@ -242,6 +243,11 @@ class EpgApiController extends Controller
                         $epgChannelMap[$epgId][$epgData->channel_id] = [];
                     }
 
+                    $logo = $channel->logo ?? $channel->logo_internal ?? '';
+                    if ($logoProxyEnabled) {
+                        $logo = LogoProxyController::generateProxyUrl($logo);
+                    }
+
                     // Add the playlist channel info to the EPG channel map
                     $epgChannelMap[$epgId][$epgData->channel_id][] = [
                         'playlist_channel_id' => $channelNo,
@@ -249,7 +255,7 @@ class EpgApiController extends Controller
                         'title' => $channel->name_custom ?? $channel->name,
                         'channel_number' => $channel->channel,
                         'group' => $channel->group ?? $channel->group_internal,
-                        'logo' => $channel->logo ?? $channel->logo_internal ?? '',
+                        'logo' => $logo ?? '',
                     ];
                 } elseif ($dummyEpgEnabled) {
                     // Get the icon
@@ -258,15 +264,15 @@ class EpgApiController extends Controller
                         $icon = url('/placeholder.png');
                     }
                     $icon = htmlspecialchars($icon);
-                    if ($proxyEnabled) {
+                    if ($logoProxyEnabled) {
                         $icon = LogoProxyController::generateProxyUrl($icon);
                     }
 
                     // Keep track of which channels need a dummy EPG program
                     $dummyEpgChannels[] = [
                         'playlist_channel_id' => $channelNo,
-                        'title' => $channel->name_custom ?? $channel->name,
                         'display_name' => $channel->title_custom ?? $channel->title,
+                        'title' => $channel->name_custom ?? $channel->name,
                         'icon' => $icon,
                         'channel_number' => $channel->channel,
                         'group' => $channel->group ?? $channel->group_internal,
@@ -328,7 +334,7 @@ class EpgApiController extends Controller
                 if (empty($icon)) {
                     $icon = url('/placeholder.png');
                 }
-                if ($proxyEnabled) {
+                if ($logoProxyEnabled) {
                     $icon = LogoProxyController::generateProxyUrl($icon);
                 }
                 $playlistChannelData[$channelNo] = [
