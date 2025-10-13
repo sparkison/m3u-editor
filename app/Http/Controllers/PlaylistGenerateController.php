@@ -162,13 +162,6 @@ class PlaylistGenerateController extends Controller
                     // Get the extension from the source URL
                     $extension = pathinfo($url, PATHINFO_EXTENSION);
 
-                    // Determine the extension and possibly proxy the URL
-                    if ($proxyEnabled) {
-                        // Get the proxy URL
-                        $url = ProxyFacade::getProxyUrlForChannel(
-                            $channel->id,
-                        );
-                    }
                     if ($logoProxyEnabled) {
                         // Proxy the logo through the logo proxy controller
                         $icon = LogoProxyController::generateProxyUrl($icon);
@@ -184,7 +177,13 @@ class PlaylistGenerateController extends Controller
                             $extension = $channel->container_extension ?? 'mkv';
                         }
                         $url = url("{$urlPath}/{$username}/{$password}/" . $channel->id . "." . $extension);
+                    } else if ($proxyEnabled) {
+                        // Get the proxy URL
+                        $url = ProxyFacade::getProxyUrlForChannel(
+                            $channel->id,
+                        );
                     }
+                    $url = rtrim($url, '.');
 
                     // Make sure TVG ID only contains characters and numbers
                     $tvgId = preg_replace(config('dev.tvgid.regex'), '', $tvgId);
@@ -250,13 +249,19 @@ class PlaylistGenerateController extends Controller
                                 $icon = url('/placeholder.png');
                             }
 
-                            if ($proxyEnabled) {
+                            if ($logoProxyEnabled) {
                                 $icon = LogoProxyController::generateProxyUrl($icon);
                             }
                             if (!(config('app.disable_m3u_xtream_format') ?? false)) {
                                 $containerExtension = $episode->container_extension ?? 'mp4';
                                 $url = url("/series/{$username}/{$password}/" . $episode->id . ".{$containerExtension}");
+                            } else if ($proxyEnabled) {
+                                // Get the proxy URL
+                                $url = ProxyFacade::getProxyUrlForEpisode(
+                                    $episode->id,
+                                );
                             }
+                            $url = rtrim($url, '.');
 
                             // Get the TVG ID
                             switch ($idChannelBy) {
@@ -388,12 +393,11 @@ class PlaylistGenerateController extends Controller
         $password = $playlist->uuid;
 
         // Check if proxy enabled
-        $proxyEnabled = $playlist->enable_proxy;
         $idChannelBy = $playlist->id_channel_by;
         $autoIncrement = $playlist->auto_channel_increment;
         $channelNumber = $autoIncrement ? $playlist->channel_start - 1 : 0;
 
-        return response()->json($channels->transform(function (Channel $channel) use ($proxyEnabled, $username, $password, $idChannelBy, $autoIncrement, &$channelNumber, $playlist) {
+        return response()->json($channels->transform(function (Channel $channel) use ($username, $password, $idChannelBy, $autoIncrement, &$channelNumber, $playlist) {
             $sourceUrl = $channel->url_custom ?? $channel->url;
             $extension = pathinfo($sourceUrl, PATHINFO_EXTENSION);
             $urlPath = '/live';
@@ -401,7 +405,7 @@ class PlaylistGenerateController extends Controller
                 $urlPath = '/movie';
                 $extension = $channel->container_extension ?? 'mkv';
             }
-            $url = url("{$urlPath}/{$username}/{$password}/" . $channel->id . "." . $extension);
+            $url = rtrim(url("{$urlPath}/{$username}/{$password}/" . $channel->id . "." . $extension), '.');
             $channelNo = $channel->channel;
             if (!$channelNo && $autoIncrement) {
                 $channelNo = ++$channelNumber;

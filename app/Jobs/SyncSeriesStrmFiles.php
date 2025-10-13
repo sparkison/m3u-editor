@@ -233,7 +233,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
 
                 // Generate the url
                 $containerExtension = $ep->container_extension ?? 'mp4';
-                $url = url("/series/{$playlist->user->name}/{$playlist->uuid}/" . $ep->id . "." . $containerExtension);
+                $url = rtrim(url("/series/{$playlist->user->name}/{$playlist->uuid}/" . $ep->id . "." . $containerExtension), '.');
 
                 // Check if the file already exists
                 if (file_exists($filePath)) {

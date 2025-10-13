@@ -179,7 +179,7 @@ Route::get('/series/{username}/{password}/{streamId}.{format?}', [App\Http\Contr
     ->name('xtream.stream.series.root');
 
 // Timeshift endpoints
-Route::get('/timeshift/{username}/{password}/{duration}/{date}/{streamId}.{format}', [App\Http\Controllers\XtreamStreamController::class, 'handleTimeshift'])
+Route::get('/timeshift/{username}/{password}/{duration}/{date}/{streamId}.{format?}', [App\Http\Controllers\XtreamStreamController::class, 'handleTimeshift'])
     ->name('xtream.stream.timeshift.root');
 
 // (Fallback) direct stream access (without /live/ or /movie/ prefix)
