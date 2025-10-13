@@ -396,7 +396,7 @@ class GroupResource extends Resource
                         ->modalDescription('Move the group channels to the another group.')
                         ->modalSubmitActionLabel('Move now'),
                     BulkAction::make('enable')
-                        ->label('Enable Group Shannels')
+                        ->label('Enable Group Channels')
                         ->action(function (Collection $records): void {
                             foreach ($records as $record) {
                                 $record->channels()->update([
