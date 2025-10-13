@@ -57,10 +57,15 @@ class M3uProxyStatus extends Command
 
         // Check API health
         $this->newLine();
+        $apiToken = config('proxy.m3u_proxy_token');
         $this->info('🏥 Health Check:');
 
         try {
-            $response = Http::timeout(5)->get($proxyUrl.'/health');
+            $response = Http::timeout(5)
+                ->withHeaders($apiToken ? [
+                    'X-API-Token' => $apiToken,
+                ] : [])
+                ->get($proxyUrl . '/health');
 
             if ($response->successful()) {
                 $data = $response->json();
@@ -75,10 +80,10 @@ class M3uProxyStatus extends Command
                     ]
                 );
             } else {
-                $this->error('❌ API returned status: '.$response->status());
+                $this->error('❌ API returned status: ' . $response->status());
             }
         } catch (\Exception $e) {
-            $this->error('❌ Failed to connect to m3u-proxy API: '.$e->getMessage());
+            $this->error('❌ Failed to connect to m3u-proxy API: ' . $e->getMessage());
             $this->newLine();
 
             if (! $usingExternalProxy) {
