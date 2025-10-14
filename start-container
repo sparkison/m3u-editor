@@ -37,21 +37,13 @@ export SUPERVISOR_PHP_USER="root"
 export APP_URL="${APP_URL:-http://localhost}"
 export APP_PORT="${APP_PORT:-36400}" # Default 36400
 
-# M3U Proxy API key (for embedded or external)
-# Generate if not set
-if [ -z "$M3U_PROXY_TOKEN" ]; then
-    export M3U_PROXY_TOKEN=$(openssl rand -hex 24)
-    echo "🔑 Generated random m3u proxy API token: $M3U_PROXY_TOKEN"
-else
-    export M3U_PROXY_TOKEN="${M3U_PROXY_TOKEN}"
-    echo "🔑 Using provided m3u proxy API token from environment"
-fi
-
 # Set M3U_PROXY_URL based on mode
 if [ "${M3U_PROXY_ENABLED}" = "true" ]; then
     # External mode - use provided URL (could set custom docs paths here if needed)
     export M3U_PROXY_START_EMBEDDED="false"
     export M3U_PROXY_URL="${M3U_PROXY_URL:-http://m3u-proxy:8085}"
+    # For external proxy, use provided token or leave unset
+    export M3U_PROXY_TOKEN="${M3U_PROXY_TOKEN}"
 else
     # Embedded mode - use APP_URL with /m3u-proxy/ path
     # Set FastAPI root path to use /m3u-proxy prefix (nginx preserves the prefix)
@@ -62,6 +54,16 @@ else
     else
         export M3U_PROXY_URL="${APP_URL}:${APP_PORT}/m3u-proxy"
     fi
+    
+    # M3U Proxy API key (for embedded proxy only)
+    # Generate if not set
+    if [ -z "$M3U_PROXY_TOKEN" ]; then
+        export M3U_PROXY_TOKEN=$(openssl rand -hex 24)
+        echo "🔑 Generated random m3u proxy API token: $M3U_PROXY_TOKEN"
+    else
+        export M3U_PROXY_TOKEN="${M3U_PROXY_TOKEN}"
+        echo "🔑 Using provided m3u proxy API token."
+    fi
 fi
 
 # Websockets
@@ -70,6 +72,30 @@ export BROADCAST_CONNECTION="${BROADCAST_CONNECTION:-reverb}"
 # If broadcast driver is null, set `VITE_WEBSOCKETS_DISABLED` to true
 if [ "$BROADCAST_CONNECTION" = "null" ]; then
     export VITE_WEBSOCKETS_DISABLED="true"
+else
+    # Using reverse proxy, port not needed in client
+    if [ -z "$REVERB_APP_ID" ]; then
+        # Generate random app id if not set
+        export REVERB_APP_ID=$(openssl rand -hex 12)
+    fi
+    if [ -z "$REVERB_APP_KEY" ]; then
+        # Generate random app key if not set
+        export REVERB_APP_KEY=$(openssl rand -hex 24)
+    fi
+    
+    # Export the websocket app key for Vite
+    export VITE_WEBSOCKET_APP_KEY="${REVERB_APP_KEY}"
+
+    # Setup the reverse proxy details
+    if [[ "$APP_URL" == *"https"* ]]; then
+        export VITE_WEBSOCKET_SCHEME="https"
+        export VITE_WEBSOCKET_HOST="${APP_URL#https://}" # Strip https:// -> "localhost"
+        export VITE_WEBSOCKET_PORT="443"  # Use 443 for HTTPS
+    else
+        export VITE_WEBSOCKET_SCHEME="http"
+        export VITE_WEBSOCKET_HOST="${APP_URL#http://}" # Strip http:// -> "localhost"  
+        export VITE_WEBSOCKET_PORT="${APP_PORT}"  # Use APP_PORT for HTTP reverse proxy
+    fi
 fi
 
 # Set timezone, default to UTC
@@ -107,7 +133,7 @@ if [ -f /etc/nginx/conf.d/laravel.tmpl ]; then
     else
         echo "⚡️ Starting app at: $APP_URL:$APP_PORT"
     fi
-    envsubst '${APP_PORT} ${APP_URL} ${FPMPORT} ${M3U_PROXY_PORT}' < /etc/nginx/conf.d/laravel.tmpl > /etc/nginx/conf.d/laravel.conf
+    envsubst '${APP_PORT} ${APP_URL} ${FPMPORT} ${M3U_PROXY_PORT} ${REVERB_PORT}' < /etc/nginx/conf.d/laravel.tmpl > /etc/nginx/conf.d/laravel.conf
 fi
 
 # Check for configuration directories and files
@@ -196,12 +222,6 @@ echo "" > "${startup_log_file}"
 
 # Link environment file
 ln -sf "${env_file}" .env
-
-# Write M3U_PROXY_URL and M3U_PROXY_TOKEN to .env
-sed -i '/^M3U_PROXY_URL=/d' .env
-sed -i '/^M3U_PROXY_TOKEN=/d' .env
-echo "M3U_PROXY_URL=${M3U_PROXY_URL}" >> .env
-echo "M3U_PROXY_TOKEN=${M3U_PROXY_TOKEN}" >> .env
 
 # Link db files
 ln -sf "${db_file}" "database/database.sqlite"
@@ -456,6 +476,14 @@ php artisan migrate --force
 
 # Build assets
 echo "🛠️ Building assets..."
+
+# Ensure environment variables are exported for npm build
+export VITE_WEBSOCKET_SCHEME
+export VITE_WEBSOCKET_HOST
+export VITE_WEBSOCKET_PORT
+export VITE_WEBSOCKET_APP_KEY
+export VITE_WEBSOCKETS_DISABLED
+
 npm install && npm run build
 
 # Ensure composer dir is writable
