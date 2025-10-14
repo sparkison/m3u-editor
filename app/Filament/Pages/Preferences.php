@@ -10,6 +10,7 @@ use App\Services\PlaylistService;
 use App\Services\ProxyService;
 use App\Settings\GeneralSettings;
 use Cron\CronExpression;
+use Dom\Text;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Forms;
@@ -213,7 +214,7 @@ class Preferences extends SettingsPage
                                 Section::make('M3U Proxy')
                                     ->description('m3u proxy integration is enabled and will be used to proxy all streams when proxy is enabled')
                                     ->columnSpanFull()
-                                    ->columns(3)
+                                    ->columns(4)
                                     ->schema([
                                         Action::make('test_connection')
                                             ->color('gray')
@@ -250,6 +251,17 @@ class Preferences extends SettingsPage
                                                     return;
                                                 }
                                             }),
+                                        Action::make('get_api_key')
+                                            ->color('gray')
+                                            ->label('Get m3u proxy API key')
+                                            ->icon('heroicon-m-key')
+                                            ->action(function () use ($m3uProxyUrl, $m3uToken) {
+                                                Notification::make()
+                                                    ->title('Your m3u proxy API key')
+                                                    ->body($m3uToken)
+                                                    ->info()
+                                                    ->send();
+                                            })->hidden(! $m3uToken),
                                         Action::make('m3u_proxy_info')
                                             ->label('m3u proxy API docs')
                                             ->url($m3uProxyDocs)
