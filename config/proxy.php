@@ -10,9 +10,13 @@ return [
     'ffmpeg_codec_audio' => env('PROXY_FFMPEG_CODEC_AUDIO', null),
     'ffmpeg_codec_subtitles' => env('PROXY_FFMPEG_CODEC_SUBTITLES', null),
 
-    // Use m3u-proxy service
-    'use_m3u_proxy' => env('USE_M3U_PROXY', false),
-    'm3u_proxy_url' => env('M3U_PROXY_URL', 'http://localhost:8085'), // Base URL of the external m3u-proxy server
+    // M3U Proxy Service Configuration
+    // If M3U_PROXY_ENABLED=true, uses external proxy service at M3U_PROXY_URL
+    // If M3U_PROXY_ENABLED=false/null, uses embedded proxy via nginx reverse proxy
+    'use_m3u_proxy' => true, // Always true - proxy integration is available
+    'external_proxy_enabled' => env('M3U_PROXY_ENABLED', false), // true = external service, false/null = embedded
+    'm3u_proxy_url' => env('M3U_PROXY_URL'), // Auto-set in start-container based on mode
+    'm3u_proxy_token' => env('M3U_PROXY_TOKEN'), // API token for authenticating with the proxy service
 
     /*
     |--------------------------------------------------------------------------

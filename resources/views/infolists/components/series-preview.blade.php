@@ -6,8 +6,7 @@
     @php($url = $record->url)
     @php($format = pathinfo($record->url, PATHINFO_EXTENSION))
     @if($proxyEnabled)
-        @php($format = $playlist->proxy_options['output'] ?? 'ts')
-        @php($url = App\Facades\ProxyFacade::getProxyUrlForEpisode(id: $record->id, format:  $format, preview: true))
+        @php($url = App\Facades\ProxyFacade::getProxyUrlForEpisode(id: $record->id, preview: true))
     @endif
     @php($playerId = "episode_{$record->id}_preview")
 

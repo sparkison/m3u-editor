@@ -28,8 +28,8 @@ class FlushJobsTable extends Command
     {
         $all = $this->argument('all');
         if ($all) {
-            $this->info("Flushing jobs table...");
-            $this->info("Clearing: " . Job::count() . " jobs");
+            $this->info('Flushing jobs table...');
+            $this->info('Clearing: '.Job::count().' jobs');
             Job::truncate();
             $this->info('Jobs table flushed successfully.');
         } else {
@@ -37,7 +37,7 @@ class FlushJobsTable extends Command
             $olderThan = now()->subDay();
             $where = ['created_at', '<=',  $olderThan];
             $this->info("Flushing jobs table where job is older than {$olderThan->toDateTimeString()}...");
-            $this->info("Clearing: " . Job::whereDate(...$where)->count() . " jobs");
+            $this->info('Clearing: '.Job::whereDate(...$where)->count().' jobs');
             Job::whereDate(...$where)->truncate();
             $this->info('Jobs table flushed successfully.');
         }

@@ -120,11 +120,8 @@ class Channel extends Model
      */
     public function getProxyUrlAttribute(): string
     {
-        $effectivePlaylist = $this->getEffectivePlaylist();
-
         return ProxyFacade::getProxyUrlForChannel(
             $this->id,
-            $effectivePlaylist->proxy_options['output'] ?? 'ts'
         );
     }
 

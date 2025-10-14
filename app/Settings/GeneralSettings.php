@@ -58,12 +58,36 @@ class GeneralSettings extends Settings
     public ?bool $stream_file_sync_include_series = false;
     public ?bool $stream_file_sync_include_season = false;
     public ?string $stream_file_sync_location = null;
+    public ?array $stream_file_sync_path_structure = null;
+    
+    // Stream file sync filename options
+    public ?array $stream_file_sync_filename_metadata = null;
+    public ?bool $stream_file_sync_filename_year = false;
+    public ?bool $stream_file_sync_filename_resolution = false;
+    public ?bool $stream_file_sync_filename_codec = false;
+    public ?bool $stream_file_sync_filename_tmdb_id = false;
+    public ?string $stream_file_sync_tmdb_id_format = 'square';
+    public ?bool $stream_file_sync_clean_special_chars = true;
+    public ?bool $stream_file_sync_remove_consecutive_chars = true;
+    public ?string $stream_file_sync_replace_char = 'space';
 
     // VOD stream file sync options
     public ?bool $vod_stream_file_sync_enabled = false;
     public ?bool $vod_stream_file_sync_include_series = false;
     public ?bool $vod_stream_file_sync_include_season = false;
     public ?string $vod_stream_file_sync_location = null;
+    public ?array $vod_stream_file_sync_path_structure = null;
+    
+    // VOD stream file sync filename options
+    public ?array $vod_stream_file_sync_filename_metadata = null;
+    public ?bool $vod_stream_file_sync_filename_year = false;
+    public ?bool $vod_stream_file_sync_filename_resolution = false;
+    public ?bool $vod_stream_file_sync_filename_codec = false;
+    public ?bool $vod_stream_file_sync_filename_tmdb_id = false;
+    public ?string $vod_stream_file_sync_tmdb_id_format = 'square';
+    public ?bool $vod_stream_file_sync_clean_special_chars = true;
+    public ?bool $vod_stream_file_sync_remove_consecutive_chars = true;
+    public ?string $vod_stream_file_sync_replace_char = 'space';
 
     // Video player proxy options
     public ?bool $force_video_player_proxy = false;

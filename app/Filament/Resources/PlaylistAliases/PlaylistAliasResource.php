@@ -11,6 +11,7 @@ use App\Models\PlaylistAlias;
 use App\Models\SharedStream;
 use App\Models\User;
 use App\Services\EpgCacheService;
+use App\Services\M3uProxyService;
 use App\Services\ProxyService;
 use Carbon\Carbon;
 use Exception;
@@ -109,7 +110,7 @@ class PlaylistAliasResource extends Resource
                     ->toggleable()
                     ->formatStateUsing(fn(int $state): string => $state === 0 ? '∞' : (string)$state)
                     ->tooltip('Total streams available for this playlist (∞ indicates no limit)')
-                    ->description(fn(PlaylistAlias $record): string => "Active: " . SharedStream::active()->where('stream_info->options->playlist_id', $record->uuid)->count()),
+                    ->description(fn(PlaylistAlias $record): string => "Active: " . M3uProxyService::getPlaylistActiveStreamsCount($record)),
                 Tables\Columns\TextColumn::make('live_count')
                     ->label('Live')
                     ->description(fn(PlaylistAlias $record): string => "Enabled: {$record->enabled_live_channels()->count()}")
@@ -204,8 +205,6 @@ class PlaylistAliasResource extends Resource
 
     public static function getForm(): array
     {
-        $m3uProxyEnabled = ProxyService::m3uProxyEnabled();
-
         return [
             // Forms\Components\Toggle::make('enabled')
             //     ->default(true)
@@ -363,15 +362,6 @@ class PlaylistAliasResource extends Resource
                         ->default(0) // Default to 0 streams (for unlimted)
                         ->required()
                         ->hidden(fn(Get $get): bool => !$get('enable_proxy')),
-                    Forms\Components\Select::make('proxy_options.output')
-                        ->label('Proxy Output Format')
-                        ->required()
-                        ->options([
-                            'ts' => 'MPEG-TS (.ts)',
-                            'hls' => 'HLS (.m3u8)',
-                        ])
-                        ->default('ts')
-                        ->hidden(fn(Get $get): bool => !$get('enable_proxy') || $m3uProxyEnabled),
                     Forms\Components\TextInput::make('server_timezone')
                         ->label('Provider Timezone')
                         ->helperText('The portal/provider timezone (DST-aware). Needed to correctly use timeshift functionality when playlist proxy is enabled.')

@@ -48,11 +48,6 @@ class M3uProxyStreamMonitor extends Page
         $this->apiService = app(M3uProxyService::class);
     }
 
-    public static function shouldRegisterNavigation(): bool
-    {
-        return ProxyService::m3uProxyEnabled();
-    }
-
     public function mount(): void
     {
         $this->refreshData();
@@ -62,9 +57,9 @@ class M3uProxyStreamMonitor extends Page
     {
         $this->streams = $this->getActiveStreams();
 
-        $totalClients = array_sum(array_map(fn ($s) => $s['client_count'] ?? 0, $this->streams));
-        $totalBandwidth = array_sum(array_map(fn ($s) => $s['bandwidth_kbps'] ?? 0, $this->streams));
-        $activeStreams = count(array_filter($this->streams, fn ($s) => $s['status'] === 'active'));
+        $totalClients = array_sum(array_map(fn($s) => $s['client_count'] ?? 0, $this->streams));
+        $totalBandwidth = array_sum(array_map(fn($s) => $s['bandwidth_kbps'] ?? 0, $this->streams));
+        $activeStreams = count(array_filter($this->streams, fn($s) => $s['status'] === 'active'));
 
         $this->globalStats = [
             'total_streams' => count($this->streams),
@@ -251,7 +246,7 @@ class M3uProxyStreamMonitor extends Page
             return $url;
         }
 
-        return substr($url, 0, $maxLength - 3).'...';
+        return substr($url, 0, $maxLength - 3) . '...';
     }
 
     protected function formatBytes(int $bytes, int $precision = 2): string
@@ -262,7 +257,7 @@ class M3uProxyStreamMonitor extends Page
             $bytes /= 1024;
         }
 
-        return round($bytes, $precision).' '.$units[$i];
+        return round($bytes, $precision) . ' ' . $units[$i];
     }
 
     public function getViewData(): array

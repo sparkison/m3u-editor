@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Enums\Status;
 use App\Jobs\ProcessM3uImport;
 use App\Models\Playlist;
-use Carbon\CarbonInterval;
 use Cron\CronExpression;
 use Illuminate\Console\Command;
 
@@ -35,7 +34,7 @@ class RefreshPlaylist extends Command
             $force = $this->argument('force') ?? false;
             $this->info("Refreshing playlist with ID: {$playlistId}");
             $playlist = Playlist::findOrFail($playlistId);
-            dispatch(new ProcessM3uImport($playlist, (bool)$force));
+            dispatch(new ProcessM3uImport($playlist, (bool) $force));
             $this->info('Dispatched playlist for refresh');
         } else {
             $this->info('Refreshing all playlists');
@@ -48,6 +47,7 @@ class RefreshPlaylist extends Command
             $totalPlaylists = $playlists->count();
             if ($totalPlaylists === 0) {
                 $this->info('No playlists available for refresh');
+
                 return;
             }
 
@@ -64,8 +64,8 @@ class RefreshPlaylist extends Command
                     dispatch(new ProcessM3uImport($playlist));
                 }
             });
-            $this->info('Dispatched ' . $count . ' playlists for refresh');
+            $this->info('Dispatched '.$count.' playlists for refresh');
         }
-        return;
+
     }
 }

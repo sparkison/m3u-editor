@@ -20,6 +20,7 @@ ENV WWWUSER="m3ue"
 # Install basic packages
 RUN apk update && apk --no-cache add \
     coreutils \
+    openssl \
     supervisor \
     envsubst \
     su-exec \
@@ -87,6 +88,13 @@ RUN touch crontab.tmp \
 # Install Redis config
 COPY ./docker/8.4/redis.conf /etc/redis/redis.tmpl
 RUN chmod 0644 /etc/redis/redis.tmpl
+
+# Clone and setup m3u-proxy (Python-based proxy service)
+RUN apk add --no-cache python3 py3-pip && \
+    git clone https://github.com/sparkison/m3u-proxy.git /opt/m3u-proxy && \
+    cd /opt/m3u-proxy && \
+    python3 -m venv .venv && \
+    .venv/bin/pip install --no-cache-dir -r requirements.txt
 
 # Install and configure PHP extensions (adjust as needed)
 RUN apk --no-cache add \

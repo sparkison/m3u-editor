@@ -6,6 +6,7 @@ use App\Facades\PlaylistFacade;
 use Exception;
 use App\Models\Playlist;
 use App\Models\SharedStream;
+use App\Services\M3uProxyService;
 use App\Services\XtreamService;
 use Carbon\Carbon;
 use Livewire\Component;
@@ -50,7 +51,7 @@ class PlaylistInfo extends Component
             // 'last_synced' => $playlist->synced ? Carbon::parse($playlist->synced)->diffForHumans() : 'Never',
         ];
         if ($playlist->enable_proxy) {
-            $activeStreams = SharedStream::active()->where('stream_info->options->playlist_id', $playlist->uuid)->count();
+            $activeStreams = M3uProxyService::getPlaylistActiveStreamsCount($playlist);
             $availableStreams = $playlist->available_streams ?? 0;
             if ($availableStreams === 0) {
                 $availableStreams = "∞";

@@ -21,10 +21,50 @@ export PG_USER="${PG_USER:-root}"
 export PG_PASSWORD="${PG_PASSWORD:-root}"
 export PG_PORT="${PG_PORT:-5432}" # Default 5432
 
+# M3U Proxy configuration
+# If M3U_PROXY_ENABLED=true, user is using external proxy service (disable embedded)
+# If M3U_PROXY_ENABLED=false/unset, use embedded proxy (default)
+export M3U_PROXY_ENABLED="${M3U_PROXY_ENABLED:-false}"
+export M3U_PROXY_START_EMBEDDED="true" # Will be set to false if external proxy enabled
+export M3U_PROXY_HOST="${M3U_PROXY_HOST:-127.0.0.1}" # Bind to localhost for embedded
+export M3U_PROXY_PORT="${M3U_PROXY_PORT:-8085}"
+export M3U_PROXY_LOG_LEVEL="${M3U_PROXY_LOG_LEVEL:-ERROR}" # Default ERROR
+
 # Run PHP as root (or m3ue)
 export SUPERVISOR_PHP_USER="root"
+
+# Application URL and port
 export APP_URL="${APP_URL:-http://localhost}"
 export APP_PORT="${APP_PORT:-36400}" # Default 36400
+
+# Set M3U_PROXY_URL based on mode
+if [ "${M3U_PROXY_ENABLED}" = "true" ]; then
+    # External mode - use provided URL (could set custom docs paths here if needed)
+    export M3U_PROXY_START_EMBEDDED="false"
+    export M3U_PROXY_URL="${M3U_PROXY_URL:-http://m3u-proxy:8085}"
+    # For external proxy, use provided token or leave unset
+    export M3U_PROXY_TOKEN="${M3U_PROXY_TOKEN}"
+else
+    # Embedded mode - use APP_URL with /m3u-proxy/ path
+    # Set FastAPI root path to use /m3u-proxy prefix (nginx preserves the prefix)
+    export ROOT_PATH="/m3u-proxy"
+    # Include port unless using https
+    if [[ "$APP_URL" == *"https"* ]]; then
+        export M3U_PROXY_URL="${APP_URL}/m3u-proxy"
+    else
+        export M3U_PROXY_URL="${APP_URL}:${APP_PORT}/m3u-proxy"
+    fi
+    
+    # M3U Proxy API key (for embedded proxy only)
+    # Generate if not set
+    if [ -z "$M3U_PROXY_TOKEN" ]; then
+        export M3U_PROXY_TOKEN=$(openssl rand -hex 24)
+        echo "🔑 Generated random m3u proxy API token: $M3U_PROXY_TOKEN"
+    else
+        export M3U_PROXY_TOKEN="${M3U_PROXY_TOKEN}"
+        echo "🔑 Using provided m3u proxy API token."
+    fi
+fi
 
 # Websockets
 export REVERB_PORT="${REVERB_PORT:-36800}" # Default 36800
@@ -32,6 +72,30 @@ export BROADCAST_CONNECTION="${BROADCAST_CONNECTION:-reverb}"
 # If broadcast driver is null, set `VITE_WEBSOCKETS_DISABLED` to true
 if [ "$BROADCAST_CONNECTION" = "null" ]; then
     export VITE_WEBSOCKETS_DISABLED="true"
+else
+    # Using reverse proxy, port not needed in client
+    if [ -z "$REVERB_APP_ID" ]; then
+        # Generate random app id if not set
+        export REVERB_APP_ID=$(openssl rand -hex 12)
+    fi
+    if [ -z "$REVERB_APP_KEY" ]; then
+        # Generate random app key if not set
+        export REVERB_APP_KEY=$(openssl rand -hex 24)
+    fi
+    
+    # Export the websocket app key for Vite
+    export VITE_WEBSOCKET_APP_KEY="${REVERB_APP_KEY}"
+
+    # Setup the reverse proxy details
+    if [[ "$APP_URL" == *"https"* ]]; then
+        export VITE_WEBSOCKET_SCHEME="https"
+        export VITE_WEBSOCKET_HOST="${APP_URL#https://}" # Strip https:// -> "localhost"
+        export VITE_WEBSOCKET_PORT="443"  # Use 443 for HTTPS
+    else
+        export VITE_WEBSOCKET_SCHEME="http"
+        export VITE_WEBSOCKET_HOST="${APP_URL#http://}" # Strip http:// -> "localhost"  
+        export VITE_WEBSOCKET_PORT="${APP_PORT}"  # Use APP_PORT for HTTP reverse proxy
+    fi
 fi
 
 # Set timezone, default to UTC
@@ -69,7 +133,7 @@ if [ -f /etc/nginx/conf.d/laravel.tmpl ]; then
     else
         echo "⚡️ Starting app at: $APP_URL:$APP_PORT"
     fi
-    envsubst '${APP_PORT} ${APP_URL} ${FPMPORT}' < /etc/nginx/conf.d/laravel.tmpl > /etc/nginx/conf.d/laravel.conf
+    envsubst '${APP_PORT} ${APP_URL} ${FPMPORT} ${M3U_PROXY_PORT} ${REVERB_PORT}' < /etc/nginx/conf.d/laravel.tmpl > /etc/nginx/conf.d/laravel.conf
 fi
 
 # Check for configuration directories and files
@@ -410,13 +474,16 @@ echo ""
 echo "💾 Running migrations..."
 php artisan migrate --force
 
-# Flush FFmpeg process cache and prune HLS
-php artisan app:flush-ffmpeg-process-cache
-php artisan app:hls-prune
-echo ""
-
 # Build assets
 echo "🛠️ Building assets..."
+
+# Ensure environment variables are exported for npm build
+export VITE_WEBSOCKET_SCHEME
+export VITE_WEBSOCKET_HOST
+export VITE_WEBSOCKET_PORT
+export VITE_WEBSOCKET_APP_KEY
+export VITE_WEBSOCKETS_DISABLED
+
 npm install && npm run build
 
 # Ensure composer dir is writable

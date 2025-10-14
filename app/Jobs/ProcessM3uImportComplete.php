@@ -48,6 +48,7 @@ class ProcessM3uImportComplete implements ShouldQueue
         public Carbon $start,
         public bool $maxHit = false,
         public bool $isNew = false,
+        public bool $runningSeriesImport = false,
     ) {
         // Set the invalidate import settings from config
         $this->invalidateImport = config('dev.invalidate_import', null);
@@ -373,7 +374,7 @@ class ProcessM3uImportComplete implements ShouldQueue
                 ->sendToDatabase($playlist->user);
         }
 
-        if ($syncSeriesMetadata) {
+        if ($this->runningSeriesImport) {
             return; // Exit early if series import is enabled, sync complete event will be fired after series import completes
         }
 

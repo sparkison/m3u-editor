@@ -1,25 +1,39 @@
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
+
 const disabled = import.meta.env.VITE_WEBSOCKETS_DISABLED ?? 'false';
+
 if (disabled === 'true') {
     window.Echo = null;
 } else {
     window.Pusher = Pusher;
-    const env = import.meta.env.VITE_REVERB_ENV ?? 'production';
-    const scheme = import.meta.env.VITE_REVERB_SCHEME ?? 'https'
-    let wsPort = import.meta.env.VITE_REVERB_PORT;
-    let wssPort = scheme === 'https' ? 443 : wsPort;
-    if (env !== 'production') {
-        wssPort = wsPort
+    
+    const scheme = import.meta.env.VITE_WEBSOCKET_SCHEME ?? 'https';
+    const host = import.meta.env.VITE_WEBSOCKET_HOST || '';
+    const port = import.meta.env.VITE_WEBSOCKET_PORT;
+    
+    // For reverse proxy setup, use the port from environment
+    let wsPort, wssPort;
+    
+    if (port && port !== '' && port !== 'null') {
+        wsPort = parseInt(port);
+        wssPort = parseInt(port);
+    } else {
+        // Fallback to default ports
+        wsPort = scheme === 'https' ? 443 : 80;
+        wssPort = scheme === 'https' ? 443 : 80;
     }
-    window.Echo = new Echo({
+
+    const echoConfig = {
         broadcaster: 'reverb',
-        key: import.meta.env.VITE_REVERB_APP_KEY,
-        wsHost: import.meta.env.VITE_REVERB_HOST,
-        wsPort,
-        wssPort,
+        key: import.meta.env.VITE_WEBSOCKET_APP_KEY,
+        wsHost: host,
+        wsPort: wsPort,
+        wssPort: wssPort,
         forceTLS: scheme === 'https',
         enabledTransports: ['ws', 'wss'],
-    });
+    };
+
+    window.Echo = new Echo(echoConfig);
 }
 

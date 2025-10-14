@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Enums\Status;
 use App\Jobs\ProcessEpgImport;
 use App\Models\Epg;
-use Carbon\CarbonInterval;
 use Cron\CronExpression;
 use Illuminate\Console\Command;
 
@@ -35,7 +34,7 @@ class RefreshEpg extends Command
             $force = $this->argument('force') ?? false;
             $this->info("Refreshing EPG with ID: {$epgId}");
             $epg = Epg::findOrFail($epgId);
-            dispatch(new ProcessEpgImport($epg, (bool)$force));
+            dispatch(new ProcessEpgImport($epg, (bool) $force));
             $this->info('Dispatched EPG for refresh');
         } else {
             $this->info('Refreshing all EPGs');
@@ -48,6 +47,7 @@ class RefreshEpg extends Command
             $totalEpgs = $epgs->count();
             if ($totalEpgs === 0) {
                 $this->info('No EPGs ready refresh');
+
                 return;
             }
 
@@ -64,8 +64,8 @@ class RefreshEpg extends Command
                     dispatch(new ProcessEpgImport($epg));
                 }
             });
-            $this->info('Dispatched ' . $count . ' epgs for refresh');
+            $this->info('Dispatched '.$count.' epgs for refresh');
         }
-        return;
+
     }
 }

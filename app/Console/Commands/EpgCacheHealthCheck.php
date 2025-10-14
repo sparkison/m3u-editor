@@ -39,7 +39,7 @@ class EpgCacheHealthCheck extends Command
                 if ($epg->status !== Status::Completed) {
                     continue; // Skip EPGs that are not completed (e.g., still processing)
                 }
-                if (!$cacheService->isCacheValid($epg)) {
+                if (! $cacheService->isCacheValid($epg)) {
                     $this->warn("Cache for EPG \"{$epg->name}\" is invalid. Regenerating...");
                     $epg->update(['is_cached' => false]);
                     dispatch(new GenerateEpgCache($epg->uuid, notify: false));

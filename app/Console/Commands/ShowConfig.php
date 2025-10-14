@@ -8,6 +8,7 @@ use Illuminate\Support\Arr;
 class ShowConfig extends Command
 {
     protected $signature = 'config:show {keys?* : One or more config keys (dot notation allowed)}';
+
     protected $description = 'Shows selected or all config values as a JSON blob.';
 
     public function handle()
@@ -24,6 +25,7 @@ class ShowConfig extends Command
 
                 if (is_null($value)) {
                     $this->warn("Key not found: $key");
+
                     continue;
                 }
 
@@ -32,6 +34,7 @@ class ShowConfig extends Command
         }
 
         $this->line(json_encode($output, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
         return Command::SUCCESS;
     }
 }

@@ -10,16 +10,240 @@ use App\Models\Playlist;
 use App\Models\PlaylistAlias;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class M3uProxyService
 {
     protected string $apiBaseUrl;
+    protected string $apiToken;
 
     public function __construct()
     {
         $this->apiBaseUrl = rtrim(config('proxy.m3u_proxy_url'), '/');
+        $this->apiToken = config('proxy.m3u_proxy_token');
+    }
+
+    /**
+     * Get active streams count for a specific playlist using metadata filtering
+     */
+    public static function getPlaylistActiveStreamsCount($playlist): int
+    {
+        $service = new self();
+
+        if (empty($service->apiBaseUrl)) {
+            return 0;
+        }
+
+        try {
+            $endpoint = $service->apiBaseUrl . '/streams/by-metadata';
+            $response = Http::timeout(3)->acceptJson()
+                ->withHeaders($service->apiToken ? [
+                    'X-API-Token' => $service->apiToken,
+                ] : [])
+                ->get($endpoint, [
+                    'field' => 'playlist_uuid',
+                    'value' => $playlist->uuid,
+                    'active_only' => true
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                return $data['total_clients'] ?? 0; // Return total client count across all streams
+            }
+
+            Log::warning('Failed to fetch playlist streams from m3u-proxy: HTTP ' . $response->status());
+            return 0;
+        } catch (Exception $e) {
+            Log::warning('Failed to fetch playlist streams from m3u-proxy: ' . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Get active streams for a specific playlist using metadata filtering
+     */
+    public static function getPlaylistActiveStreams($playlist): array
+    {
+        $service = new self();
+
+        if (empty($service->apiBaseUrl)) {
+            return [];
+        }
+
+        try {
+            $endpoint = $service->apiBaseUrl . '/streams/by-metadata';
+            $response = Http::timeout(3)->acceptJson()
+                ->withHeaders($service->apiToken ? [
+                    'X-API-Token' => $service->apiToken,
+                ] : [])
+                ->get($endpoint, [
+                    'field' => 'playlist_uuid',
+                    'value' => $playlist->uuid,
+                    'active_only' => true
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                return $data['matching_streams'] ?? [];
+            }
+
+            Log::warning('Failed to fetch playlist streams from m3u-proxy: HTTP ' . $response->status());
+            return [];
+        } catch (Exception $e) {
+            Log::warning('Failed to fetch playlist streams from m3u-proxy: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Check if a specific channel is active using metadata filtering
+     */
+    public static function isChannelActive(Channel $channel): bool
+    {
+        $service = new self();
+
+        if (empty($service->apiBaseUrl)) {
+            return false;
+        }
+
+        try {
+            $endpoint = $service->apiBaseUrl . '/streams/by-metadata';
+            $response = Http::timeout(2)->acceptJson()
+                ->withHeaders($service->apiToken ? [
+                    'X-API-Token' => $service->apiToken,
+                ] : [])
+                ->get($endpoint, [
+                    'field' => 'type',
+                    'value' => 'channel',
+                    'active_only' => true
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                // Check if any matching stream has this channel ID
+                foreach ($data['matching_streams'] ?? [] as $stream) {
+                    if (
+                        isset($stream['metadata']['id']) &&
+                        $stream['metadata']['id'] == $channel->id &&
+                        $stream['client_count'] > 0
+                    ) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        } catch (Exception $e) {
+            Log::warning('Failed to check channel active status: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get active streams count by any metadata field/value combination
+     */
+    public static function getActiveStreamsCountByMetadata(string $field, string $value): int
+    {
+        $service = new self();
+
+        if (empty($service->apiBaseUrl)) {
+            return 0;
+        }
+
+        try {
+            $endpoint = $service->apiBaseUrl . '/streams/by-metadata';
+            $response = Http::timeout(3)->acceptJson()
+                ->withHeaders($service->apiToken ? [
+                    'X-API-Token' => $service->apiToken,
+                ] : [])
+                ->get($endpoint, [
+                    'field' => $field,
+                    'value' => $value,
+                    'active_only' => true
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                return $data['total_clients'] ?? 0;
+            }
+
+            return 0;
+        } catch (Exception $e) {
+            Log::warning("Failed to get active streams count for {$field}={$value}: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Get cached active streams count with smart invalidation
+     */
+    public static function getCachedActiveStreamsCountByMetadata(string $field, string $value, int $cacheTtlSeconds = 2): int
+    {
+        $cacheKey = "m3u_proxy_active_count:{$field}:{$value}";
+
+        // Try to get from cache first
+        $cachedCount = Cache::get($cacheKey);
+        if ($cachedCount !== null) {
+            return $cachedCount;
+        }
+
+        // Fetch fresh count
+        $count = self::getActiveStreamsCountByMetadata($field, $value);
+
+        // Cache for specified TTL
+        Cache::put($cacheKey, $count, now()->addSeconds($cacheTtlSeconds));
+
+        return $count;
+    }
+
+    /**
+     * Get cached playlist active streams count
+     */
+    public static function getCachedPlaylistActiveStreamsCount($playlist, int $cacheTtlSeconds = 2): int
+    {
+        return self::getCachedActiveStreamsCountByMetadata('playlist_uuid', $playlist->uuid, $cacheTtlSeconds);
+    }
+
+    /**
+     * Invalidate cache for specific metadata field/value
+     */
+    public static function invalidateMetadataCache(string $field, string $value): void
+    {
+        $cacheKey = "m3u_proxy_active_count:{$field}:{$value}";
+        Cache::forget($cacheKey);
+    }
+
+    /**
+     * Invalidate cache when we know a playlist's stream status changed
+     */
+    public static function invalidatePlaylistCache($playlist): void
+    {
+        self::invalidateMetadataCache('playlist_uuid', $playlist->uuid);
+    }
+
+    /**
+     * Check if an episode is currently active (being streamed) via m3u-proxy.
+     */
+    public static function isEpisodeActive(Episode $episode): bool
+    {
+        $allStreams = (new self())->fetchActiveStreams();
+        if (! $allStreams['success']) {
+            return false;
+        }
+
+        foreach ($allStreams['streams'] as $stream) {
+            if (
+                isset($stream['metadata']['type'], $stream['metadata']['id']) &&
+                $stream['metadata']['type'] === 'episode' &&
+                $stream['metadata']['id'] == $episode->id
+            ) {
+                return $stream['client_count'] > 0;
+            }
+        }
+        return false;
     }
 
     /**
@@ -42,7 +266,60 @@ class M3uProxyService
             throw new Exception('Channel not found');
         }
 
-        $primaryUrl = PlaylistUrlService::getChannelUrl($channel, $playlist);
+        // Check if primary playlist has stream limits and if it's at capacity
+        $primaryUrl = null;
+        if ($playlist->available_streams !== 0) {
+            $activeStreams = self::getActiveStreamsCountByMetadata('playlist_uuid', $playlist->uuid);
+
+            // Keep track of original playlist in case we need to check failovers
+            $originalUuid = $playlist->uuid;
+
+            if ($activeStreams >= $playlist->available_streams) {
+                // Primary playlist is at capacity, check failovers
+                $failoverChannels = $channel->failoverChannels()
+                    ->select(['channels.id', 'channels.url', 'channels.url_custom'])
+                    ->get();
+
+                foreach ($failoverChannels as $failoverChannel) {
+                    $failoverPlaylist = $failoverChannel->getEffectivePlaylist();
+
+                    // Check if failover playlist has limits and capacity
+                    if ($failoverPlaylist->available_streams === 0) {
+                        // No limits on this failover playlist, use it
+                        $playlist = $failoverPlaylist;
+                        $primaryUrl = PlaylistUrlService::getChannelUrl($failoverChannel, $playlist);
+                        break;
+                    } else {
+                        // Check if failover playlist has capacity
+                        $failoverActiveStreams = self::getActiveStreamsCountByMetadata('playlist_uuid', $failoverPlaylist->uuid);
+
+                        if ($failoverActiveStreams < $failoverPlaylist->available_streams) {
+                            // Found available failover playlist
+                            $playlist = $failoverPlaylist;
+                            $primaryUrl = PlaylistUrlService::getChannelUrl($failoverChannel, $playlist);
+                            break;
+                        }
+                    }
+                }
+
+                // If we still have the original playlist, all are at capacity
+                if ($playlist->uuid === $originalUuid) {
+                    Log::info('Channel stream request denied - all playlists at capacity', [
+                        'channel_id' => $id,
+                        'primary_playlist' => $playlist->uuid,
+                        'primary_limit' => $playlist->available_streams,
+                        'primary_active' => $activeStreams
+                    ]);
+
+                    abort(503, 'All playlists have reached their maximum stream limit. Please try again later.');
+                }
+            }
+        }
+
+        // If we didn't already get a primary URL from failover logic, get it now
+        if ($primaryUrl === null) {
+            $primaryUrl = PlaylistUrlService::getChannelUrl($channel, $playlist);
+        }
         if (empty($primaryUrl)) {
             throw new Exception('Channel primary URL is empty');
         }
@@ -64,6 +341,7 @@ class M3uProxyService
         $streamId = $this->createOrUpdateStream($primaryUrl, $failovers, $userAgent, [
             'id' => $id,
             'type' => 'channel',
+            'playlist_uuid' => $playlist->uuid,
         ]);
 
         // Get the format from the URL
@@ -93,6 +371,22 @@ class M3uProxyService
             throw new Exception('Episode not found');
         }
 
+        // Check if playlist has stream limits and if it's at capacity
+        if ($playlist->available_streams !== 0) {
+            $activeStreams = self::getCachedActiveStreamsCountByMetadata('playlist_uuid', $playlist->uuid, 1);
+
+            if ($activeStreams >= $playlist->available_streams) {
+                Log::info('Episode stream request denied - playlist at capacity', [
+                    'episode_id' => $id,
+                    'playlist' => $playlist->uuid,
+                    'limit' => $playlist->available_streams,
+                    'active' => $activeStreams
+                ]);
+
+                abort(503, 'Playlist has reached its maximum stream limit. Please try again later.');
+            }
+        }
+
         $url = PlaylistUrlService::getEpisodeUrl($episode, $playlist);
         if (empty($url)) {
             throw new Exception('Episode URL is empty');
@@ -107,6 +401,7 @@ class M3uProxyService
         $streamId = $this->createOrUpdateStream($url, $failoverUrls, $userAgent, [
             'id' => $id,
             'type' => 'episode',
+            'playlist_uuid' => $playlist->uuid,
         ]);
 
         // Get the format from the URL
@@ -131,7 +426,11 @@ class M3uProxyService
 
         try {
             $endpoint = $this->apiBaseUrl . '/streams/' . $streamId;
-            $response = Http::timeout(10)->acceptJson()->delete($endpoint);
+            $response = Http::timeout(10)->acceptJson()
+                ->withHeaders($this->apiToken ? [
+                    'X-API-Token' => $this->apiToken,
+                ] : [])
+                ->delete($endpoint);
 
             if ($response->successful()) {
                 Log::info("Stream {$streamId} stopped successfully");
@@ -165,7 +464,11 @@ class M3uProxyService
 
         try {
             $endpoint = $this->apiBaseUrl . '/streams';
-            $response = Http::timeout(5)->acceptJson()->get($endpoint);
+            $response = Http::timeout(5)->acceptJson()
+                ->withHeaders($this->apiToken ? [
+                    'X-API-Token' => $this->apiToken,
+                ] : [])
+                ->get($endpoint);
             if ($response->successful()) {
                 $data = $response->json() ?: [];
 
@@ -210,7 +513,11 @@ class M3uProxyService
 
         try {
             $endpoint = $this->apiBaseUrl . '/clients';
-            $response = Http::timeout(5)->acceptJson()->get($endpoint);
+            $response = Http::timeout(5)->acceptJson()
+                ->withHeaders($this->apiToken ? [
+                    'X-API-Token' => $this->apiToken,
+                ] : [])
+                ->get($endpoint);
             if ($response->successful()) {
                 $data = $response->json() ?: [];
 
@@ -246,13 +553,17 @@ class M3uProxyService
      * @param  string  $url  Primary stream URL
      * @param  array  $failoverUrls  Array of failover URLs
      * @param  string|null  $userAgent  Custom user agent
-     * @param  array  $metadata  Additional metadata (e.g. ['id' => 123, 'type' => 'channel'])
+     * @param  array|null  $metadata  Additional metadata (e.g. ['id' => 123, 'type' => 'channel'])
      * @return string Stream ID
      *
      * @throws Exception when API request fails
      */
-    protected function createOrUpdateStream(string $url, array $failoverUrls = [], ?string $userAgent = null, array $metadata = []): string
-    {
+    protected function createOrUpdateStream(
+        string $url,
+        array $failoverUrls = [],
+        ?string $userAgent = null,
+        ?array $metadata = []
+    ): string {
         try {
             $endpoint = $this->apiBaseUrl . '/streams';
 
@@ -268,7 +579,9 @@ class M3uProxyService
 
             $response = Http::timeout(10)
                 ->acceptJson()
-                ->post($endpoint, $payload);
+                ->withHeaders($this->apiToken ? [
+                    'X-API-Token' => $this->apiToken,
+                ] : [])->post($endpoint, $payload);
 
             if ($response->successful()) {
                 $data = $response->json();

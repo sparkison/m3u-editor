@@ -4,9 +4,9 @@ namespace App\Console\Commands;
 
 use App\Models\Playlist;
 use App\Services\XtreamService;
-use Illuminate\Support\Str;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Console\PromptsForMissingInput;
+use Illuminate\Support\Str;
 
 class TestXtream extends Command implements PromptsForMissingInput
 {
@@ -39,10 +39,12 @@ class TestXtream extends Command implements PromptsForMissingInput
 
         if (! $playlist) {
             $this->error('Playlist not found.');
+
             return 1;
         }
         if (! $playlist->xtream) {
             $this->error('Playlist is not Xtream enabled.');
+
             return 1;
         }
 
@@ -50,7 +52,7 @@ class TestXtream extends Command implements PromptsForMissingInput
         $xtream_config = $playlist->xtream_config;
 
         $this->info('Xtream helper');
-        $this->info('Connecting to: ' . $xtream_config['url'] . '...');
+        $this->info('Connecting to: '.$xtream_config['url'].'...');
 
         $xtream = $xtream->init(
             playlist: $playlist,
@@ -58,11 +60,13 @@ class TestXtream extends Command implements PromptsForMissingInput
         );
         if (! $xtream) {
             $this->error('Xtream service initialization failed.');
+
             return 1;
         }
         $userInfo = $xtream->authenticate();
         if (! ($userInfo['auth'] ?? false)) {
             $this->error('Authentication failed.');
+
             return 1;
         }
 
@@ -84,6 +88,7 @@ class TestXtream extends Command implements PromptsForMissingInput
         $info = $xtream->userInfo();
         if (empty($info)) {
             $this->error('No information available from Xtream service.');
+
             return;
         }
 
@@ -109,8 +114,8 @@ class TestXtream extends Command implements PromptsForMissingInput
             $movie = $movies[array_search($pick, array_column($movies, 'name'))];
             $this->generateMovies($xtream, [
                 [
-                    ...$movie
-                ]
+                    ...$movie,
+                ],
             ], $catName);
         }
     }
@@ -151,6 +156,7 @@ class TestXtream extends Command implements PromptsForMissingInput
             foreach ($channels as $channel) {
                 $this->generateOneChannel($xtream, $channel, 'All', 0);
             }
+
             return;
         } else {
             $cats = $xtream->getLiveCategories();

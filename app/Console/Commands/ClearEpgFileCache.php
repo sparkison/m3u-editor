@@ -27,8 +27,9 @@ class ClearEpgFileCache extends Command
      */
     public function handle()
     {
-        if (!$this->option('force') && !$this->confirm('Are you sure you want to clear all EPG file caches?')) {
+        if (! $this->option('force') && ! $this->confirm('Are you sure you want to clear all EPG file caches?')) {
             $this->info('Cache clearing cancelled.');
+
             return 0;
         }
 

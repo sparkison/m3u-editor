@@ -70,23 +70,17 @@ class PlaylistGenerateController extends Controller
             }
         }
 
-        // Generate a filename
-        $filename = Str::slug($playlist->name) . '.m3u';
-
         // Check if proxy enabled
         if ($request->has('proxy')) {
             $proxyEnabled = $request->input('proxy') === 'true';
         } else {
             $proxyEnabled = $playlist->enable_proxy;
         }
-
-        // Check the proxy format
-        $format = $playlist->proxy_options['output'] ?? 'ts';
-        $defaultExtension = $format === 'hls' ? 'm3u8' : 'ts';
+        $logoProxyEnabled = $playlist->enable_logo_proxy;
 
         // Get all active channels
         return response()->stream(
-            function () use ($playlist, $proxyEnabled, $type, $usedAuth, $format, $defaultExtension) {
+            function () use ($playlist, $proxyEnabled, $logoProxyEnabled, $type, $usedAuth) {
                 // Get all active channels
                 $channels = $playlist->channels()
                     ->leftJoin('groups', 'channels.group_id', '=', 'groups.id')
@@ -165,22 +159,12 @@ class PlaylistGenerateController extends Controller
                         $icon = url('/placeholder.png');
                     }
 
-                    // Determine the extension and possibly proxy the URL
-                    if ($proxyEnabled) {
-                        // If proxy enabled, we need to set the extension to the default
-                        $extension = $defaultExtension;
+                    // Get the extension from the source URL
+                    $extension = pathinfo($url, PATHINFO_EXTENSION);
 
+                    if ($logoProxyEnabled) {
                         // Proxy the logo through the logo proxy controller
                         $icon = LogoProxyController::generateProxyUrl($icon);
-
-                        // Get the proxy URL
-                        $url = ProxyFacade::getProxyUrlForChannel(
-                            $channel->id,
-                            $format
-                        );
-                    } else {
-                        // Get the extension from the source URL
-                        $extension = pathinfo($url, PATHINFO_EXTENSION);
                     }
 
                     // Format the URL in Xtream Codes format if not disabled
@@ -193,7 +177,13 @@ class PlaylistGenerateController extends Controller
                             $extension = $channel->container_extension ?? 'mkv';
                         }
                         $url = url("{$urlPath}/{$username}/{$password}/" . $channel->id . "." . $extension);
+                    } else if ($proxyEnabled) {
+                        // Get the proxy URL
+                        $url = ProxyFacade::getProxyUrlForChannel(
+                            $channel->id,
+                        );
                     }
+                    $url = rtrim($url, '.');
 
                     // Make sure TVG ID only contains characters and numbers
                     $tvgId = preg_replace(config('dev.tvgid.regex'), '', $tvgId);
@@ -251,6 +241,7 @@ class PlaylistGenerateController extends Controller
                             $channelNo = ++$channelNumber;
                             $group = $s->category->name ?? 'Seasons';
                             $name = $s->name;
+                            $url = PlaylistUrlService::getEpisodeUrl($episode, $playlist);
                             $title = $episode->title;
                             $runtime = $episode->info['duration_secs'] ?? -1;
                             $icon = $episode->info['movie_image'] ?? $streamId->info['cover'] ?? '';
@@ -258,11 +249,19 @@ class PlaylistGenerateController extends Controller
                                 $icon = url('/placeholder.png');
                             }
 
-                            if ($proxyEnabled) {
+                            if ($logoProxyEnabled) {
                                 $icon = LogoProxyController::generateProxyUrl($icon);
                             }
-                            $containerExtension = $episode->container_extension ?? 'mp4';
-                            $url = url("/series/{$username}/{$password}/" . $episode->id . ".{$containerExtension}");
+                            if (!(config('app.disable_m3u_xtream_format') ?? false)) {
+                                $containerExtension = $episode->container_extension ?? 'mp4';
+                                $url = url("/series/{$username}/{$password}/" . $episode->id . ".{$containerExtension}");
+                            } else if ($proxyEnabled) {
+                                // Get the proxy URL
+                                $url = ProxyFacade::getProxyUrlForEpisode(
+                                    $episode->id,
+                                );
+                            }
+                            $url = rtrim($url, '.');
 
                             // Get the TVG ID
                             switch ($idChannelBy) {
@@ -394,28 +393,19 @@ class PlaylistGenerateController extends Controller
         $password = $playlist->uuid;
 
         // Check if proxy enabled
-        $proxyEnabled = $playlist->enable_proxy;
         $idChannelBy = $playlist->id_channel_by;
         $autoIncrement = $playlist->auto_channel_increment;
         $channelNumber = $autoIncrement ? $playlist->channel_start - 1 : 0;
 
-        // Check the proxy format
-        $format = $playlist->proxy_options['output'] ?? 'ts';
-        $defaultExtension = $format === 'hls' ? 'm3u8' : 'ts';
-
-        return response()->json($channels->transform(function (Channel $channel) use ($proxyEnabled, $defaultExtension, $username, $password, $idChannelBy, $autoIncrement, &$channelNumber, $playlist) {
-            if ($proxyEnabled) {
-                $extension = $defaultExtension;
-            } else {
-                $sourceUrl = $channel->url_custom ?? $channel->url;
-                $extension = pathinfo($sourceUrl, PATHINFO_EXTENSION);
-            }
+        return response()->json($channels->transform(function (Channel $channel) use ($username, $password, $idChannelBy, $autoIncrement, &$channelNumber, $playlist) {
+            $sourceUrl = $channel->url_custom ?? $channel->url;
+            $extension = pathinfo($sourceUrl, PATHINFO_EXTENSION);
             $urlPath = '/live';
             if ($channel->is_vod) {
                 $urlPath = '/movie';
                 $extension = $channel->container_extension ?? 'mkv';
             }
-            $url = url("{$urlPath}/{$username}/{$password}/" . $channel->id . "." . $extension);
+            $url = rtrim(url("{$urlPath}/{$username}/{$password}/" . $channel->id . "." . $extension), '.');
             $channelNo = $channel->channel;
             if (!$channelNo && $autoIncrement) {
                 $channelNo = ++$channelNumber;

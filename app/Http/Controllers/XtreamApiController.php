@@ -17,6 +17,7 @@ use App\Models\PlaylistAlias;
 use App\Models\Series;
 use App\Models\SharedStream;
 use App\Services\EpgCacheService;
+use App\Services\M3uProxyService;
 use App\Services\XtreamService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
@@ -407,18 +408,15 @@ class XtreamApiController extends Controller
                 $streams = $playlist->streams ?? 1;
                 $activeConnections = 0;
             }
-
             $outputFormats = ['m3u8', 'ts'];
             if ($playlist->enable_proxy) {
-                $proxyOutput = $playlist->proxy_options['output'] ?? 'ts';
+                $proxyOutput = $playlist->xtream_config['output'] ?? 'ts';
                 if ($proxyOutput === 'hls') {
                     $outputFormats = ['m3u8'];
                 } else {
                     $outputFormats = [$proxyOutput];
                 }
-                $activeConnections = SharedStream::active()
-                    ->where('stream_info->options->playlist_id', $playlist->uuid)
-                    ->count();
+                $activeConnections = M3uProxyService::getPlaylistActiveStreamsCount($playlist);
             }
 
             $userInfo = [
@@ -495,8 +493,6 @@ class XtreamApiController extends Controller
             }
 
             $proxyEnabled = $playlist->enable_proxy;
-            $defaultExtension = $playlist->proxy_options['output'] ?? 'ts';
-            $defaultExtension = $defaultExtension === 'hls' ? 'm3u8' : $defaultExtension;
             $enabledChannels = $channelsQuery
                 ->orderBy('groups.sort_order')
                 ->orderBy('channels.sort')
@@ -517,7 +513,7 @@ class XtreamApiController extends Controller
                         $logo = $channel->logo ?? $channel->logo_internal ?? '';
                         $streamIcon = filter_var($logo, FILTER_VALIDATE_URL) ? $logo : url($logo);
                     }
-                    if ($playlist->enable_proxy) {
+                    if ($playlist->enable_logo_proxy) {
                         $streamIcon = LogoProxyController::generateProxyUrl($streamIcon);
                     }
 
@@ -565,13 +561,10 @@ class XtreamApiController extends Controller
                             break;
                     }
 
-                    if ($proxyEnabled) {
-                        $extension = $defaultExtension;
-                    } else {
-                        // Get the file extension from the URL
-                        $url = $channel->url_custom ?? $channel->url;
-                        $extension = pathinfo($url, PATHINFO_EXTENSION);
-                    }
+                    // Get the file extension from the URL
+                    $url = $channel->url_custom ?? $channel->url;
+                    $extension = pathinfo($url, PATHINFO_EXTENSION);
+
                     $liveStreams[] = [
                         'num' => $channelNo,
                         'name' => $channel->title_custom ?? $channel->title,
@@ -643,7 +636,7 @@ class XtreamApiController extends Controller
                         $logo = $channel->logo ?? $channel->logo_internal ?? '';
                         $streamIcon = filter_var($logo, FILTER_VALIDATE_URL) ? $logo : url($logo);
                     }
-                    if ($playlist->enable_proxy) {
+                    if ($playlist->enable_logo_proxy) {
                         $streamIcon = LogoProxyController::generateProxyUrl($streamIcon);
                     }
 
@@ -803,7 +796,7 @@ class XtreamApiController extends Controller
 
             $cover = $seriesItem->cover ? (filter_var($seriesItem->cover, FILTER_VALIDATE_URL) ? $seriesItem->cover : url($seriesItem->cover)) : url('/placeholder.png');
             $backdropPaths = $seriesItem->backdrop_path ?? [];
-            if ($playlist->enable_proxy) {
+            if ($playlist->enable_logo_proxy) {
                 $cover = LogoProxyController::generateProxyUrl($cover);
                 $backdropPaths = array_map(fn($path) => LogoProxyController::generateProxyUrl($path), $backdropPaths);
             }
@@ -834,13 +827,13 @@ class XtreamApiController extends Controller
             if ($seriesItem->seasons && $seriesItem->seasons->isNotEmpty()) {
                 foreach ($seriesItem->seasons as $season) {
                     $seasonNumber = $season->season_number;
-                    $seasonCover = $playlist->enable_proxy && ($season->cover ?? false)
+                    $seasonCover = $playlist->enable_logo_proxy && ($season->cover ?? false)
                         ? LogoProxyController::generateProxyUrl($season->cover)
                         : $season->cover;
-                    $tmdbCover = $playlist->enable_proxy && ($seriesItem->metadata['cover_tmdb'] ?? false)
+                    $tmdbCover = $playlist->enable_logo_proxy && ($seriesItem->metadata['cover_tmdb'] ?? false)
                         ? LogoProxyController::generateProxyUrl($seriesItem->metadata['cover_tmdb'])
                         : ($seriesItem->metadata['cover_tmdb'] ?? null);
-                    $coverBig = $playlist->enable_proxy && ($season->cover_big ?? false)
+                    $coverBig = $playlist->enable_logo_proxy && ($season->cover_big ?? false)
                         ? LogoProxyController::generateProxyUrl($season->cover_big)
                         : ($season->cover_big ?? null);
                     $seasons[] = [
@@ -861,12 +854,12 @@ class XtreamApiController extends Controller
                         foreach ($orderedEpisodes as $episode) {
                             $containerExtension = $episode->container_extension ?? 'mp4';
                             if ($episode->info['movie_image'] ?? false) {
-                                $movieImage = $playlist->enable_proxy
+                                $movieImage = $playlist->enable_logo_proxy
                                     ? LogoProxyController::generateProxyUrl($episode->info['movie_image'])
                                     : $episode->info['movie_image'];
                             }
                             if ($episode->info['cover_big'] ?? false) {
-                                $movieImage = $playlist->enable_proxy
+                                $movieImage = $playlist->enable_logo_proxy
                                     ? LogoProxyController::generateProxyUrl($episode->info['cover_big'])
                                     : $episode->info['cover_big'];
                             }
@@ -1088,7 +1081,7 @@ class XtreamApiController extends Controller
             $cover = $info['cover_big'] ?? $channel->logo ?? $channel->logo_internal;
             $movieImage = $info['movie_image'] ?? $channel->logo ?? $channel->logo_internal;
             $backdropPaths = $info['backdrop_path'] ?? [];
-            if ($playlist->enable_proxy) {
+            if ($playlist->enable_logo_proxy) {
                 $cover = LogoProxyController::generateProxyUrl($cover);
                 $movieImage = LogoProxyController::generateProxyUrl($movieImage);
                 $backdropPaths = array_map(fn($path) => LogoProxyController::generateProxyUrl($path), $backdropPaths);
@@ -1127,7 +1120,6 @@ class XtreamApiController extends Controller
             // Build movie_data section - use channel's movie_data field if available, otherwise build from channel data
             $movieData = $channel->movie_data ?? [];
 
-            $streamId = rtrim(base64_encode($channel->id), '=');
             $extension = $movieData['container_extension'] ?? $channel->container_extension ?? 'mp4';
             $defaultMovieData = [
                 'stream_id' => $channel->id,
@@ -1194,9 +1186,8 @@ class XtreamApiController extends Controller
             }
 
             // Check if channel is currently playing
-            $isNowPlaying = SharedStream::active()
-                ->where('stream_info->model_id', $channel->id)
-                ->exists();
+            $isNowPlaying = M3uProxyService::isChannelActive($channel);
+            $isNowPlaying = false;
 
             // Filter programmes to current time and future, then limit
             $now = Carbon::now();
@@ -1269,9 +1260,8 @@ class XtreamApiController extends Controller
             $epgListings = [];
             if (isset($programmes[$channel->epgChannel->channel_id])) {
                 // Check if channel is currently playing
-                $isNowPlaying = SharedStream::active()
-                    ->where('stream_info->model_id', $channel->id)
-                    ->exists();
+                $isNowPlaying = M3uProxyService::isChannelActive($channel);
+                $isNowPlaying = false;
 
                 $now = Carbon::now();
                 foreach ($programmes[$channel->epgChannel->channel_id] as $index => $programme) {

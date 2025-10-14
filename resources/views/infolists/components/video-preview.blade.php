@@ -5,17 +5,15 @@ $settings = app(\App\Settings\GeneralSettings::class);
 $playlist = $record->getEffectivePlaylist() ?? null;
 $proxyEnabled = $settings->force_video_player_proxy || ($playlist->enable_proxy ?? false);
 $url = $record->url_custom ?? $record->url;
-if ($proxyEnabled) {
-    $format = $playlist->proxy_options['output'] ?? 'ts';
-    $url = App\Facades\ProxyFacade::getProxyUrlForChannel(id: $record->id, format: $format, preview: true);
+if (\Illuminate\Support\Str::endsWith($url, '.m3u8')) {
+    $format = 'hls';
+} elseif (\Illuminate\Support\Str::endsWith($url, '.ts')) {
+    $format = 'ts';
 } else {
-    if (\Illuminate\Support\Str::endsWith($url, '.m3u8')) {
-        $format = 'hls';
-    } elseif (\Illuminate\Support\Str::endsWith($url, '.ts')) {
-        $format = 'ts';
-    } else {
-        $format = $record->container_extension ?? 'ts';
-    }
+    $format = $record->container_extension ?? 'ts';
+}
+if ($proxyEnabled) {
+    $url = App\Facades\ProxyFacade::getProxyUrlForChannel(id: $record->id, preview: true);
 }
 $channelTitle = $record->name_custom ?? $record->name ?? $record->title;
 $playerId = "channel_{$record->id}_preview";

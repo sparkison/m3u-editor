@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 class Xtream2Strm extends Command
 {
     protected $signature = 'app:xtream-generate {playlist?}';
+
     protected $description = 'Generate .strm files from Xtream API';
 
     protected Playlist $playlist;
@@ -28,10 +29,12 @@ class Xtream2Strm extends Command
 
         if (! $playlist) {
             $this->error('Playlist not found.');
+
             return 1;
         }
         if (! $playlist->xtream) {
             $this->error('Playlist is not Xtream enabled.');
+
             return 1;
         }
 
@@ -39,7 +42,7 @@ class Xtream2Strm extends Command
         $xtream_config = $playlist->xtream_config;
 
         $this->info('Xtream helper');
-        $this->info('Connecting to: ' . $xtream_config['url'] . '...');
+        $this->info('Connecting to: '.$xtream_config['url'].'...');
 
         $xtream = $xtream->init(
             playlist: $playlist,
@@ -47,11 +50,13 @@ class Xtream2Strm extends Command
         );
         if (! $xtream) {
             $this->error('Xtream service initialization failed.');
+
             return 1;
         }
         $userInfo = $xtream->authenticate();
         if (! ($userInfo['auth'] ?? false)) {
             $this->error('Authentication failed.');
+
             return 1;
         }
 
@@ -80,7 +85,7 @@ class Xtream2Strm extends Command
         } else {
             $id = $movieMap[$pick];
             $this->generateMovies($xtream, [
-                ['name' => $pick, 'stream_id' => $id, 'container_extension' => $movies[array_search($pick, array_column($movies, 'name'))]['container_extension']]
+                ['name' => $pick, 'stream_id' => $id, 'container_extension' => $movies[array_search($pick, array_column($movies, 'name'))]['container_extension']],
             ], $catName);
         }
     }
@@ -89,11 +94,11 @@ class Xtream2Strm extends Command
     {
         $folder = Str::of($catName)->replace(' | ', ' - ')->trim();
         foreach ($movies as $movie) {
-            $name  = str_replace('/', '', $movie['name']);
+            $name = str_replace('/', '', $movie['name']);
             $url = $xtream->buildMovieUrl($movie['stream_id'], $movie['container_extension']);
-            $path = config('xtream.output_path') . '/' . $this->playlist->id . '/'
-                . config('xtream.dirs.movies') . '/' . $folder;
-            $this->writeStrm($path, $name . '.strm', $url);
+            $path = config('xtream.output_path').'/'.$this->playlist->id.'/'
+                .config('xtream.dirs.movies').'/'.$folder;
+            $this->writeStrm($path, $name.'.strm', $url);
             $this->info("→ {$name}.strm");
         }
     }
@@ -136,11 +141,11 @@ class Xtream2Strm extends Command
         foreach ($eps as $season => $episodes) {
             foreach ($episodes as $ep) {
                 $num = str_pad($ep['episode_num'], 2, '0', STR_PAD_LEFT);
-                $prefx = "S" . str_pad($season, 2, '0', STR_PAD_LEFT) . "E{$num}";
+                $prefx = 'S'.str_pad($season, 2, '0', STR_PAD_LEFT)."E{$num}";
                 $title = preg_match('/S\d{2}E\d{2} - (.*)/', $ep['title'], $m) ? $m[1] : 'Unknown';
                 $url = $xtream->buildSeriesUrl($ep['id'], $ep['container_extension']);
-                $path = config('xtream.output_path') . '/' . $this->playlist->id . '/'
-                    . config('xtream.dirs.series') . "/{$catFolder}/{$seriesName}/Season " . str_pad($season, 2, '0', '0');
+                $path = config('xtream.output_path').'/'.$this->playlist->id.'/'
+                    .config('xtream.dirs.series')."/{$catFolder}/{$seriesName}/Season ".str_pad($season, 2, '0', '0');
                 $this->writeStrm($path, "{$prefx} - {$title}.strm", $url);
                 $this->info("→ {$prefx} - {$title}.strm");
             }
