@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('episodes', function (Blueprint $table) {
-            $table->text('plot')->nullable()->after('season');
+            $table->longText('plot')->nullable()->after('season');
             $table->string('cover')->nullable()->after('plot');
         });
     }
