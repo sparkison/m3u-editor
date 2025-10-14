@@ -33,5 +33,5 @@ DockerfileDev
 rr
 websockets.sh
 config/database
-config/log
+config/logs
 config/env
