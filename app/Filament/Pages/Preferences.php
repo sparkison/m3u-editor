@@ -161,21 +161,21 @@ class Preferences extends SettingsPage
                         Tab::make('Proxy')
                             ->schema([
                                 Section::make('Internal Proxy')
-                                    ->description('FFmpeg proxy settings')
+                                    ->description('FFmpeg proxy settings for in-app video player')
                                     ->columnSpan('full')
                                     ->columns(3)
                                     ->collapsible()
                                     ->collapsed(false)
                                     ->schema([
-                                        Grid::make()
-                                            ->columnSpanFull()
-                                            ->columns(2)
-                                            ->schema([
-                                                Toggle::make('force_video_player_proxy')
-                                                    ->label('Force Video Player Proxy')
-                                                    ->columnSpan(2)
-                                                    ->helperText('When enabled, the in-app video player will always use the proxy. This can be useful to bypass mixed content issues when using HTTPS. When disabled, the video player will respect the playlist proxy settings.'),
-                                            ]),
+                                        // Grid::make()
+                                        //     ->columnSpanFull()
+                                        //     ->columns(2)
+                                        //     ->schema([
+                                        //         Toggle::make('force_video_player_proxy')
+                                        //             ->label('Force Video Player Proxy')
+                                        //             ->columnSpan(2)
+                                        //             ->helperText('When enabled, the in-app video player will always use the proxy. This can be useful to bypass mixed content issues when using HTTPS. When disabled, the video player will respect the playlist proxy settings.'),
+                                        //     ]),
                                         Grid::make()
                                             ->columnSpanFull()
                                             ->columns(2)

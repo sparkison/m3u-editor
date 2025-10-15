@@ -1,21 +1,15 @@
 <x-dynamic-component :component="$getEntryWrapperView()" :entry="$entry">
 @php
 $record = $getRecord();
-$settings = app(\App\Settings\GeneralSettings::class);
 $playlist = $record->getEffectivePlaylist() ?? null;
-$proxyEnabled = $settings->force_video_player_proxy || ($playlist->enable_proxy ?? false);
-$url = $record->url_custom ?? $record->url;
-if (\Illuminate\Support\Str::endsWith($url, '.m3u8')) {
-    $format = 'hls';
-} elseif (\Illuminate\Support\Str::endsWith($url, '.ts')) {
-    $format = 'ts';
-} else {
-    $format = $record->container_extension ?? 'ts';
-}
+$proxyEnabled = $playlist->enable_proxy ?? false;
+$format = 'ts';
 if ($proxyEnabled) {
-    $url = App\Facades\ProxyFacade::getProxyUrlForChannel(id: $record->id, preview: true);
+    $url = route('m3u-proxy.channel.player', ['id' => $record->id]);
+} else {
+    $url = route('channel.player', ['id' => $record->id]);
 }
-$channelTitle = $record->name_custom ?? $record->name ?? $record->title;
+$channelTitle = Str::replace("'", "`", $record->name_custom ?? $record->name ?? $record->title);
 $playerId = "channel_{$record->id}_preview";
 @endphp
     <div 
@@ -24,7 +18,7 @@ $playerId = "channel_{$record->id}_preview";
             playerId: '{{ $playerId }}',
             streamUrl: '{{ $url }}',
             streamFormat: '{{ $format }}',
-            channelTitle: '{{ Str::replace("'", "`", $channelTitle) }}'
+            channelTitle: '{{ $channelTitle }}'
         }"
         x-init="
             console.log('Video preview initializing:', { playerId, streamUrl, streamFormat });
