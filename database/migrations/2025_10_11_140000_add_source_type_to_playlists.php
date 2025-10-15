@@ -13,7 +13,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('playlists', function (Blueprint $table) {
-            $table->string('source_type')->nullable()->after('xtream');
+            $table->string('source_type')->nullable()->after('xtream')->comment('Source type: xtream, emby (Emby/Jellyfin compatible), m3u, local');
         });
 
         // Update existing records to have a default source_type if xtream is true
