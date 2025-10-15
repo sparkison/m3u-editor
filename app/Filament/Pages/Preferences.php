@@ -757,10 +757,10 @@ class Preferences extends SettingsPage
                                             ->helperText('The "From" email address for outgoing emails. Defaults to no-reply@m3u-editor.dev.'),
                                     ]),
                             ]),
-                        Tab::make('Emby')
+                        Tab::make('Integrations')
                             ->schema([
-                                Section::make('Emby Server Configuration')
-                                    ->description('Configure your Emby server connection to sync media libraries.')
+                                Section::make('Emby/Jellyfin Server Configuration')
+                                    ->description('Configure your Emby or Jellyfin server connection to sync media libraries. Both platforms use the same API structure and are fully compatible.')
                                     ->columnSpanFull()
                                     ->columns(2)
                                     ->headerActions([
@@ -778,7 +778,7 @@ class Preferences extends SettingsPage
                                                         Notification::make()
                                                             ->danger()
                                                             ->title('Missing Configuration')
-                                                            ->body('Please configure both Emby Server URL and API Key before testing the connection.')
+                                                            ->body('Please configure both Server URL and API Key before testing the connection.')
                                                             ->send();
                                                         return;
                                                     }
@@ -793,13 +793,13 @@ class Preferences extends SettingsPage
                                                         Notification::make()
                                                             ->success()
                                                             ->title('Connection Successful')
-                                                            ->body('Successfully connected to Emby server: ' . ($data['ServerName'] ?? 'Unknown'))
+                                                            ->body('Successfully connected to media server: ' . ($data['ServerName'] ?? 'Unknown'))
                                                             ->send();
                                                     } else {
                                                         Notification::make()
                                                             ->danger()
                                                             ->title('Connection Failed')
-                                                            ->body('Failed to connect to Emby server. Status: ' . $response->status())
+                                                            ->body('Failed to connect to media server. Status: ' . $response->status())
                                                             ->send();
                                                     }
                                                 } catch (Exception $e) {
@@ -817,21 +817,51 @@ class Preferences extends SettingsPage
                                             ->size('sm')
                                             ->url('https://github.com/MediaBrowser/Emby/wiki/API-Documentation')
                                             ->openUrlInNewTab(true),
+                                        Action::make('jellyfin_docs')
+                                            ->label('Jellyfin API Docs')
+                                            ->icon('heroicon-o-arrow-top-right-on-square')
+                                            ->iconPosition('after')
+                                            ->size('sm')
+                                            ->url('https://jellyfin.org/docs/general/server/media/')
+                                            ->openUrlInNewTab(true),
                                     ])
                                     ->schema([
                                         TextInput::make('emby_server_url')
-                                            ->label('Emby Server URL')
+                                            ->label('Server URL')
                                             ->placeholder('http://localhost:8096')
-                                            ->helperText('The full URL to your Emby server (e.g., http://192.168.1.100:8096)')
+                                            ->helperText('The full URL to your Emby or Jellyfin server (e.g., http://192.168.1.100:8096)')
                                             ->url()
                                             ->columnSpan(2),
                                         TextInput::make('emby_api_key')
-                                            ->label('Emby API Key')
-                                            ->placeholder('Enter your Emby API key')
-                                            ->helperText('You can generate an API key in Emby Dashboard → Advanced → API Keys')
+                                            ->label('API Key')
+                                            ->placeholder('Enter your server API key')
+                                            ->helperText('Generate an API key in your server dashboard: Settings → Advanced → API Keys')
                                             ->password()
                                             ->revealable()
                                             ->columnSpan(2),
+                                    ]),
+                                Section::make('Plex Media Server')
+                                    ->description('Plex integration support is planned for a future release.')
+                                    ->columnSpanFull()
+                                    ->columns(1)
+                                    ->schema([
+                                        \Filament\Forms\Components\Placeholder::make('plex_coming_soon')
+                                            ->label('')
+                                            ->content(new \Illuminate\Support\HtmlString('
+                                                <div class="flex items-center justify-center p-8 bg-gray-50 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
+                                                    <div class="text-center">
+                                                        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900 mb-4">
+                                                            <svg class="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                            </svg>
+                                                        </div>
+                                                        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Plex Integration</h3>
+                                                        <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Coming Soon</p>
+                                                        <p class="text-xs text-gray-400 dark:text-gray-500">Plex Media Server integration is currently in development and will be available in a future update.</p>
+                                                    </div>
+                                                </div>
+                                            '))
+                                            ->columnSpanFull(),
                                     ]),
                             ]),
                         Tab::make('API')

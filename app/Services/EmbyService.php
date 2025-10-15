@@ -7,6 +7,17 @@ use Exception;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Media Server Service for Emby/Jellyfin Integration
+ *
+ * This service provides integration with Emby and Jellyfin media servers.
+ * Both platforms share the same API structure and endpoints, making them
+ * fully compatible with this implementation.
+ *
+ * Supported Platforms:
+ * - Emby Media Server
+ * - Jellyfin Media Server
+ */
 class EmbyService
 {
     private ?string $serverUrl;
@@ -20,7 +31,7 @@ class EmbyService
     }
 
     /**
-     * Check if Emby is configured
+     * Check if media server (Emby/Jellyfin) is configured
      */
     public function isConfigured(): bool
     {
@@ -28,12 +39,12 @@ class EmbyService
     }
 
     /**
-     * Test connection to Emby server
+     * Test connection to media server (Emby/Jellyfin)
      */
     public function testConnection(): array
     {
         if (!$this->isConfigured()) {
-            throw new Exception('Emby server URL and API key must be configured');
+            throw new Exception('Media server URL and API key must be configured');
         }
 
         try {
@@ -61,12 +72,12 @@ class EmbyService
     }
 
     /**
-     * Get all libraries from Emby server
+     * Get all libraries from media server (Emby/Jellyfin)
      */
     public function getLibraries(): array
     {
         if (!$this->isConfigured()) {
-            throw new Exception('Emby server URL and API key must be configured');
+            throw new Exception('Media server URL and API key must be configured');
         }
 
         try {
@@ -80,7 +91,7 @@ class EmbyService
 
             throw new Exception('Failed to fetch libraries. Status: ' . $response->status());
         } catch (Exception $e) {
-            Log::error('Emby getLibraries error: ' . $e->getMessage());
+            Log::error('Media server getLibraries error: ' . $e->getMessage());
             throw $e;
         }
     }
@@ -91,7 +102,7 @@ class EmbyService
     public function getLibraryItems(string $libraryId, string $itemType = 'Movie'): array
     {
         if (!$this->isConfigured()) {
-            throw new Exception('Emby server URL and API key must be configured');
+            throw new Exception('Media server URL and API key must be configured');
         }
 
         try {
@@ -103,7 +114,7 @@ class EmbyService
                 'Fields' => 'Path,Overview,Genres,Studios,Tags,ProductionYear,PremiereDate,CommunityRating,OfficialRating,MediaStreams,MediaSources,People,RunTimeTicks',
             ];
             
-            Log::info('Emby API Request', [
+            Log::info('Media server API Request', [
                 'url' => $url,
                 'params' => $params,
             ]);
@@ -114,20 +125,20 @@ class EmbyService
 
             if ($response->successful()) {
                 $data = $response->json();
-                Log::info('Emby API Response', [
+                Log::info('Media server API Response', [
                     'total_items' => count($data['Items'] ?? []),
                     'sample' => isset($data['Items'][0]) ? $data['Items'][0]['Name'] : 'none',
                 ]);
                 return $data['Items'] ?? [];
             }
 
-            Log::error('Emby API failed', [
+            Log::error('Media server API failed', [
                 'status' => $response->status(),
                 'body' => $response->body(),
             ]);
             throw new Exception('Failed to fetch library items. Status: ' . $response->status() . ' - ' . $response->body());
         } catch (Exception $e) {
-            Log::error('Emby getLibraryItems error: ' . $e->getMessage());
+            Log::error('Media server getLibraryItems error: ' . $e->getMessage());
             throw $e;
         }
     }
@@ -138,7 +149,7 @@ class EmbyService
     public function getItem(string $itemId): array
     {
         if (!$this->isConfigured()) {
-            throw new Exception('Emby server URL and API key must be configured');
+            throw new Exception('Media server URL and API key must be configured');
         }
 
         try {
@@ -152,7 +163,7 @@ class EmbyService
 
             throw new Exception('Failed to fetch item details. Status: ' . $response->status());
         } catch (Exception $e) {
-            Log::error('Emby getItem error: ' . $e->getMessage());
+            Log::error('Media server getItem error: ' . $e->getMessage());
             throw $e;
         }
     }
@@ -163,7 +174,7 @@ class EmbyService
     public function getSeasons(string $seriesId): array
     {
         if (!$this->isConfigured()) {
-            throw new Exception('Emby server URL and API key must be configured');
+            throw new Exception('Media server URL and API key must be configured');
         }
 
         try {
@@ -180,7 +191,7 @@ class EmbyService
 
             throw new Exception('Failed to fetch seasons. Status: ' . $response->status());
         } catch (Exception $e) {
-            Log::error('Emby getSeasons error: ' . $e->getMessage());
+            Log::error('Media server getSeasons error: ' . $e->getMessage());
             throw $e;
         }
     }
@@ -191,7 +202,7 @@ class EmbyService
     public function getEpisodes(string $seriesId, string $seasonId): array
     {
         if (!$this->isConfigured()) {
-            throw new Exception('Emby server URL and API key must be configured');
+            throw new Exception('Media server URL and API key must be configured');
         }
 
         try {
@@ -209,7 +220,7 @@ class EmbyService
 
             throw new Exception('Failed to fetch episodes. Status: ' . $response->status());
         } catch (Exception $e) {
-            Log::error('Emby getEpisodes error: ' . $e->getMessage());
+            Log::error('Media server getEpisodes error: ' . $e->getMessage());
             throw $e;
         }
     }
@@ -218,6 +229,7 @@ class EmbyService
      * Get image URL for an item
      * Note: API key is required in URL for images as they're accessed directly by browsers
      * Consider implementing a proxy endpoint if you need to hide the API key
+     * Compatible with both Emby and Jellyfin
      */
     public function getImageUrl(string $itemId, string $imageType = 'Primary'): ?string
     {
@@ -231,26 +243,28 @@ class EmbyService
     /**
      * Get streaming URL for an item
      * Note: API key is required in URL for streaming as media players don't support custom headers
-     * This is a limitation of the Emby API when used with external players
+     * This is a limitation of the media server API when used with external players
+     * Compatible with both Emby and Jellyfin
      */
     public function getStreamUrl(string $itemId): string
     {
         if (!$this->isConfigured()) {
-            throw new Exception('Emby server URL and API key must be configured');
+            throw new Exception('Media server URL and API key must be configured');
         }
 
-        // Use lowercase 'static' parameter as per Emby API specification
+        // Use lowercase 'static' parameter as per API specification
         return $this->serverUrl . "/Videos/{$itemId}/stream?api_key=" . $this->apiKey . "&Static=true";
     }
 
     /**
      * Get streaming URL with device ID for better security tracking
-     * Emby can track which device/app is accessing content
+     * Media servers can track which device/app is accessing content
+     * Compatible with both Emby and Jellyfin
      */
     public function getStreamUrlWithDeviceId(string $itemId, string $deviceId = 'M3U-Editor'): string
     {
         if (!$this->isConfigured()) {
-            throw new Exception('Emby server URL and API key must be configured');
+            throw new Exception('Media server URL and API key must be configured');
         }
 
         return $this->serverUrl . "/Videos/{$itemId}/stream?api_key=" . $this->apiKey . "&Static=true&DeviceId=" . urlencode($deviceId);
