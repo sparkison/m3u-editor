@@ -742,6 +742,9 @@ class XtreamApiController extends Controller
                     }
 
                     $tmdb = $seriesItem->metadata['tmdb'] ?? '';
+                    $lastModified = $seriesItem->updated_at
+                        ? $seriesItem->updated_at->timestamp
+                        : Carbon::now()->timestamp;
                     $seriesList[] = [
                         'num' => $index + 1,
                         'name' => $seriesItem->name,
@@ -752,7 +755,7 @@ class XtreamApiController extends Controller
                         'director' => $seriesItem->director ?? '',
                         'genre' => $seriesItem->genre ?? '',
                         'releaseDate' => $seriesItem->release_date ?? '',
-                        'last_modified' => (string)($seriesItem->updated_at ?? $seriesItem->updated_at->timestamp),
+                        'last_modified' => (string)($lastModified),
                         'rating' => (string)($seriesItem->rating ?? 0),
                         'rating_5based' => round((floatval($seriesItem->rating ?? 0)) / 2, 1),
                         'backdrop_path' => $seriesItem->backdrop_path ?? [],
@@ -803,6 +806,9 @@ class XtreamApiController extends Controller
 
             $now = Carbon::now();
             $tmdb = $seriesItem->metadata['tmdb'] ?? '';
+            $lastModified = $seriesItem->updated_at
+                ? $seriesItem->updated_at->timestamp
+                : Carbon::now()->timestamp;
             $seriesInfo = [
                 'name' => $seriesItem->name,
                 'cover' => $cover,
@@ -811,7 +817,7 @@ class XtreamApiController extends Controller
                 'director' => $seriesItem->director ?? '',
                 'genre' => $seriesItem->genre ?? '',
                 'releaseDate' => $seriesItem->release_date ?? '',
-                'last_modified' => (string)($seriesItem->updated_at ? $seriesItem->updated_at->timestamp : $now->timestamp),
+                'last_modified' => (string)($lastModified),
                 'rating' => (string)($seriesItem->rating ?? 0),
                 'rating_5based' => round((floatval($seriesItem->rating ?? 0)) / 2, 1),
                 'backdrop_path' => $backdropPaths,
