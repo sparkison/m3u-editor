@@ -49,6 +49,7 @@ services:
       - DB_USERNAME=${PG_USER:-m3ue}
       - DB_PASSWORD=${PG_PASSWORD:-secret}
       # M3U Proxy settings (external)
+      - M3U_PROXY_ENABLED=true
       - M3U_PROXY_URL=http://m3u-proxy:8085
       - M3U_PROXY_TOKEN=${M3U_PROXY_TOKEN:-your-secure-token-here}
     volumes:
@@ -117,6 +118,7 @@ services:
       - APP_URL=http://localhost
       # ... (PostgreSQL settings same as above)
       # M3U Proxy settings (external, no Redis)
+      - M3U_PROXY_ENABLED=true
       - M3U_PROXY_URL=http://m3u-proxy:8085
       - M3U_PROXY_TOKEN=${M3U_PROXY_TOKEN:-your-secure-token-here}
     volumes:

@@ -28,7 +28,7 @@ class M3uProxyService
 
     public function mode(): string
     {
-        return config('proxy.external_proxy_enabled') ? 'embedded' : 'external';
+        return config('proxy.external_proxy_enabled') ? 'external' : 'embedded';
     }
 
     /**
