@@ -45,7 +45,6 @@ services:
       - DB_PASSWORD=${PG_PASSWORD:-changeme}
       
       # M3U Proxy Configuration (External)
-      - M3U_PROXY_ENABLED=true
       - M3U_PROXY_URL=http://m3u-proxy:8085
       - M3U_PROXY_TOKEN=${M3U_PROXY_TOKEN:-changeme}
     volumes:
