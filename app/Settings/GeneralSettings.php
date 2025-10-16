@@ -104,6 +104,8 @@ class GeneralSettings extends Settings
     // Media server integration settings (Emby/Jellyfin compatible)
     public ?string $emby_server_url = null;
     public ?string $emby_api_key = null;
+    public ?bool $emby_import_groups_categories = false;
+    public ?string $emby_genre_handling = 'primary';
 
     public static function group(): string
     {

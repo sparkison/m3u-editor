@@ -33,6 +33,7 @@ class ProcessEmbyVodSync implements ShouldQueue
         public string $libraryName,
         public bool $useDirectPath = false,
         public bool $autoEnable = true,
+        public ?bool $importGroupsFromGenres = null,
     ) {
         //
     }
@@ -195,39 +196,62 @@ class ProcessEmbyVodSync implements ShouldQueue
             $containerExtension = $movie['MediaSources'][0]['Container'];
         }
 
-        // Create or update VOD channel
-        Log::debug('Creating/updating VOD channel', [
-            'title' => $title,
-            'source_id' => 'emby_' . $embyId,
-            'url' => $url,
-        ]);
+        // Determine target groups - either genre-based or library-based
+        $targetGroups = collect([$group]); // Default to library group
         
-        Channel::updateOrCreate([
-            'source_id' => 'emby_' . $embyId,
-            'playlist_id' => $this->playlist->id,
-        ], [
-            'title' => $title,
-            'name' => $title,
-            'url' => $url,
-            'group' => $this->libraryName,
-            'group_internal' => $this->libraryName,
-            'group_id' => $group->id,
-            'user_id' => $this->playlist->user_id,
-            'enabled' => $this->autoEnable,
-            'is_vod' => true,
-            'logo_internal' => $posterUrl,
-            'container_extension' => $containerExtension,
-            'import_batch_no' => $batchNo,
-            'info' => [
-                'description' => $overview,
-                'year' => $year,
-                'genre' => $genres,
-                'rating' => $rating,
-                'official_rating' => $officialRating,
-                'backdrop' => $backdropUrl,
-                'emby_id' => $embyId,
-            ],
-        ]);
+        if ($embyService->shouldCreateGroupsFromGenres($this->importGroupsFromGenres)) {
+            $genreGroups = $embyService->processItemGenres($movie, $this->playlist, $batchNo, 'group', $this->importGroupsFromGenres);
+            if ($genreGroups->isNotEmpty()) {
+                $targetGroups = $genreGroups;
+                Log::debug('Using genre-based groups for movie', [
+                    'title' => $title,
+                    'groups' => $genreGroups->pluck('name')->toArray(),
+                ]);
+            }
+        }
+
+        // Create or update VOD channel for each target group
+        foreach ($targetGroups as $targetGroup) {
+            $sourceId = 'emby_' . $embyId;
+            if ($targetGroups->count() > 1) {
+                // Add group suffix for multi-group content to avoid conflicts
+                $sourceId .= '_' . Str::slug($targetGroup->name_internal);
+            }
+
+            Log::debug('Creating/updating VOD channel', [
+                'title' => $title,
+                'source_id' => $sourceId,
+                'url' => $url,
+                'group' => $targetGroup->name,
+            ]);
+            
+            Channel::updateOrCreate([
+                'source_id' => $sourceId,
+                'playlist_id' => $this->playlist->id,
+            ], [
+                'title' => $title,
+                'name' => $title,
+                'url' => $url,
+                'group' => $targetGroup->name,
+                'group_internal' => $targetGroup->name_internal,
+                'group_id' => $targetGroup->id,
+                'user_id' => $this->playlist->user_id,
+                'enabled' => $this->autoEnable,
+                'is_vod' => true,
+                'logo_internal' => $posterUrl,
+                'container_extension' => $containerExtension,
+                'import_batch_no' => $batchNo,
+                'info' => [
+                    'description' => $overview,
+                    'year' => $year,
+                    'genre' => $genres,
+                    'rating' => $rating,
+                    'official_rating' => $officialRating,
+                    'backdrop' => $backdropUrl,
+                    'emby_id' => $embyId,
+                ],
+            ]);
+        }
     }
 
     /**

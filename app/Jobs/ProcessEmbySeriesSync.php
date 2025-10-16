@@ -34,6 +34,7 @@ class ProcessEmbySeriesSync implements ShouldQueue
         public string $libraryName,
         public bool $useDirectPath = false,
         public bool $autoEnable = true,
+        public ?bool $importCategoriesFromGenres = null,
     ) {
         //
     }
@@ -185,24 +186,64 @@ class ProcessEmbySeriesSync implements ShouldQueue
         // Calculate rating_5based from CommunityRating (rating / 2)
         $rating5based = $communityRating ? round($communityRating / 2, 1) : null;
 
-        // Create or update series
-        $series = Series::updateOrCreate([
-            'name' => $seriesName,
-            'playlist_id' => $this->playlist->id,
-        ], [
-            'user_id' => $this->playlist->user_id,
-            'category_id' => $category->id,
-            'enabled' => $this->autoEnable,
-            'cover' => $posterUrl,
-            'plot' => $overview,
-            'cast' => $cast,
-            'director' => $director,
-            'genre' => $genres,
-            'release_date' => $year ? "{$year}-01-01" : null,
-            'rating' => $rating5based,
-            'backdrop_path' => [$backdropUrl],
-            'import_batch_no' => $batchNo,
-        ]);
+        // Determine target categories - either genre-based or library-based
+        $targetCategories = collect([$category]); // Default to library category
+        
+        if ($embyService->shouldCreateGroupsFromGenres($this->importCategoriesFromGenres)) {
+            $genreCategories = $embyService->processItemGenres($seriesData, $this->playlist, $batchNo, 'category', $this->importCategoriesFromGenres);
+            if ($genreCategories->isNotEmpty()) {
+                $targetCategories = $genreCategories;
+                Log::debug('Using genre-based categories for series', [
+                    'series_name' => $seriesName,
+                    'categories' => $genreCategories->pluck('name')->toArray(),
+                ]);
+            }
+        }
+
+        // Create or update series for each target category
+        $allEpisodeCount = 0;
+        foreach ($targetCategories as $targetCategory) {
+            $seriesKey = $seriesName;
+            if ($targetCategories->count() > 1) {
+                // Add category suffix for multi-category content to avoid conflicts
+                $seriesKey .= ' (' . $targetCategory->name . ')';
+            }
+
+            // Create or update series
+            $series = Series::updateOrCreate([
+                'name' => $seriesKey,
+                'playlist_id' => $this->playlist->id,
+            ], [
+                'user_id' => $this->playlist->user_id,
+                'category_id' => $targetCategory->id,
+                'enabled' => $this->autoEnable,
+                'cover' => $posterUrl,
+                'plot' => $overview,
+                'cast' => $cast,
+                'director' => $director,
+                'genre' => $genres,
+                'release_date' => $year ? "{$year}-01-01" : null,
+                'rating' => $rating5based,
+                'backdrop_path' => [$backdropUrl],
+                'import_batch_no' => $batchNo,
+            ]);
+
+            // Process seasons and episodes for this series instance
+            $seriesEpisodeCount = $this->processSeriesSeasons($seriesData, $series, $batchNo, $embyService);
+            $allEpisodeCount += $seriesEpisodeCount;
+        }
+
+        return $allEpisodeCount;
+    }
+
+    /**
+     * Process seasons and episodes for a series
+     */
+    private function processSeriesSeasons(array $seriesData, Series $series, string $batchNo, EmbyService $embyService): int
+    {
+        $seriesName = $seriesData['Name'] ?? 'Unknown';
+        $seriesId = $seriesData['Id'];
+        $episodeCount = 0;
 
         // Get seasons for this series
         Log::debug('Fetching seasons for series', [

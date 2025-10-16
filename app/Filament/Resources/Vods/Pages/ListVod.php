@@ -183,6 +183,13 @@ class ListVod extends ListRecords
                             ->label('Auto-enable Channels')
                             ->default(true)
                             ->helperText('Automatically enable imported channels.'),
+                        Toggle::make('import_groups_from_genres')
+                            ->label('Import Groups from Genres')
+                            ->default(function () {
+                                $settings = app(\App\Settings\GeneralSettings::class);
+                                return $settings->emby_import_groups_categories ?? false;
+                            })
+                            ->helperText('Create groups based on Emby genres. Uses the genre handling preference from Settings.'),
                     ])
                     ->action(function (array $data) {
                         // Validate library selection
@@ -214,6 +221,7 @@ class ListVod extends ListRecords
                             libraryName: $libraryName,
                             useDirectPath: $data['use_direct_path'] ?? false,
                             autoEnable: $data['auto_enable'] ?? true,
+                            importGroupsFromGenres: $data['import_groups_from_genres'] ?? null,
                         ));
                     })
                     ->after(function () {

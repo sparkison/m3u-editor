@@ -14,6 +14,7 @@ use Dom\Text;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Forms;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -838,6 +839,20 @@ class Preferences extends SettingsPage
                                             ->helperText('Generate an API key in your server dashboard: Settings → Advanced → API Keys')
                                             ->password()
                                             ->revealable()
+                                            ->columnSpan(2),
+                                        Toggle::make('emby_import_groups_categories')
+                                            ->label('Import Groups and Categories from Emby')
+                                            ->helperText('Automatically organize imported content using Emby\'s genre metadata. VODs will be grouped by genre, and series will be categorized by genre.')
+                                            ->columnSpan(2),
+                                        Radio::make('emby_genre_handling')
+                                            ->label('Multi-Genre Handling')
+                                            ->options([
+                                                'primary' => 'Primary Genre Only - Content appears in first genre only',
+                                                'all' => 'All Genres - Content appears in all applicable genres'
+                                            ])
+                                            ->default('primary')
+                                            ->helperText('Choose how to handle content with multiple genres. "All Genres" will create duplicate entries in each genre.')
+                                            ->visible(fn (Get $get) => $get('emby_import_groups_categories'))
                                             ->columnSpan(2),
                                     ]),
                                 Section::make('Plex Media Server')
