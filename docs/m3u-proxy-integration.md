@@ -68,6 +68,7 @@ services:
     container_name: m3u-proxy
     environment:
       - API_TOKEN=${M3U_PROXY_TOKEN:-your-secure-token-here}
+      - REDIS_ENABLED=true
       - REDIS_URL=redis://redis:6379/0
       - ENABLE_REDIS_POOLING=true
       - LOG_LEVEL=INFO

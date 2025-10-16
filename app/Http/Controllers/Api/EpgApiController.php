@@ -295,11 +295,15 @@ class EpgApiController extends Controller
                 }
 
                 // Store channel data for pagination
-                if ($proxyEnabled) {
-                    $url = route('m3u-proxy.channel.player', ['id' => $channel->id]);
-                } else {
-                    $url = PlaylistUrlService::getChannelUrl($channel, $playlist);
-                }
+                
+                // if ($proxyEnabled) {
+                //     $url = route('m3u-proxy.channel.player', ['id' => $channel->id]);
+                // } else {
+                //     $url = PlaylistUrlService::getChannelUrl($channel, $playlist);
+                // }
+
+                // Always proxy the internal proxy so we can attempt to transcode the stream for better compatibility
+                $url = route('m3u-proxy.channel.player', ['id' => $channel->id]);
 
                 // Determine the channel format based on URL or container extension
                 $originalUrl = $channel->url_custom ?? $channel->url;

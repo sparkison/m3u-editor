@@ -76,6 +76,7 @@ services:
       - API_TOKEN=${M3U_PROXY_TOKEN:-changeme}
       
       # Redis Configuration (for stream pooling)
+      - REDIS_ENABLED=true
       - REDIS_URL=redis://redis:6379/0
       - ENABLE_REDIS_POOLING=true
       
