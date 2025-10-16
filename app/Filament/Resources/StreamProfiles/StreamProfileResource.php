@@ -46,8 +46,8 @@ class StreamProfileResource extends Resource
                     ->required()
                     ->columnSpanFull()
                     ->rows(4)
-                    ->default('-c:v libx264 -preset faster -crf {crf|23} -maxrate {maxrate|2500k} -bufsize {bufsize|5000k} -c:a aac -b:a {audio_bitrate|192k} -f mpegts -')
-                    ->placeholder('-c:v libx264 -preset faster -crf {crf|23} -maxrate {maxrate|2500k} -bufsize {bufsize|5000k} -c:a aac -b:a {audio_bitrate|192k} -f mpegts -')
+                    ->default('-i {input_url} -c:v libx264 -preset faster -crf {crf|23} -maxrate {maxrate|2500k} -bufsize {bufsize|5000k} -c:a aac -b:a {audio_bitrate|192k} -f mpegts {output_args|pipe:1}')
+                    ->placeholder('-i {input_url} -c:v libx264 -preset faster -crf {crf|23} -maxrate {maxrate|2500k} -bufsize {bufsize|5000k} -c:a aac -b:a {audio_bitrate|192k} -f mpegts {output_args|pipe:1}')
                     ->helperText('FFmpeg arguments for transcoding. Use placeholders like {crf|23} for configurable parameters with defaults. The {input_url} placeholder is automatically handled. Hardware acceleration will be applied automatically by the proxy server.'),
             ]);
     }

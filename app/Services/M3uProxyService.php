@@ -662,7 +662,7 @@ class M3uProxyService
             // Build the payload for transcoding
             $payload = [
                 'url' => $url,
-                'profile' => $profile->getProfileName(),
+                'profile' => $profile->getProfileIdentifier(),  // Custom args template or predefined profile name
                 'metadata' => $metadata
             ];
 
@@ -676,12 +676,13 @@ class M3uProxyService
                 $payload['user_agent'] = $userAgent;
             }
 
-            // Add profile variables for FFmpeg template substitution
-            // The Python API will automatically add input_url and output_args
-            // We only need to send template variable overrides (e.g., video_bitrate, audio_bitrate)
-            $profileVars = $profile->getTemplateVariables();
-            if (!empty($profileVars)) {
-                $payload['profile_variables'] = $profileVars;
+            // Add profile variables for FFmpeg template substitution (if not using custom args)
+            // Only send template variables if the profile doesn't have custom args
+            if (!$profile->hasCustomArgs()) {
+                $profileVars = $profile->getTemplateVariables();
+                if (!empty($profileVars)) {
+                    $payload['profile_variables'] = $profileVars;
+                }
             }
 
             $response = Http::timeout(10)->acceptJson()

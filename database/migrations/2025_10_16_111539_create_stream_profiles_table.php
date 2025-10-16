@@ -34,7 +34,7 @@ return new class extends Migration
                 'user_id' => $user->id,
                 'name' => 'Default Profile',
                 'description' => 'Default transcoding profile',
-                'args' => '-c:v libx264 -preset faster -crf {crf|23} -maxrate {maxrate|2500k} -bufsize {bufsize|5000k} -c:a aac -b:a {audio_bitrate|192k} -f mpegts -',
+                'args' => '-i {input_url} -c:v libx264 -preset faster -crf {crf|23} -maxrate {maxrate|2500k} -bufsize {bufsize|5000k} -c:a aac -b:a {audio_bitrate|192k} -f mpegts {output_args|pipe:1}',
             ]);
 
             // Update the settings to assign the default profile to the `default_stream_profile_id` setting
