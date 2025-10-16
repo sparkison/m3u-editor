@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Log;
 class M3uProxyService
 {
     protected string $apiBaseUrl;
-    protected string $apiToken;
+    protected string|null $apiToken;
 
     public function __construct()
     {
