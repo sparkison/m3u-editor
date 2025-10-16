@@ -150,7 +150,7 @@ if [ -f /etc/nginx/conf.d/laravel.tmpl ]; then
     else
         echo "⚡️ Starting app at: $APP_URL:$APP_PORT"
     fi
-    envsubst '${APP_PORT} ${APP_URL} ${FPMPORT} ${M3U_PROXY_PORT} ${REVERB_PORT ${M3U_PROXY_NGINX_TARGET}' < /etc/nginx/conf.d/laravel.tmpl > /etc/nginx/conf.d/laravel.conf
+    envsubst '${APP_PORT} ${APP_URL} ${FPMPORT} ${M3U_PROXY_PORT} ${REVERB_PORT} ${M3U_PROXY_NGINX_TARGET}' < /etc/nginx/conf.d/laravel.tmpl > /etc/nginx/conf.d/laravel.conf
 fi
 
 # Check for configuration directories and files
