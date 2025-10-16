@@ -74,6 +74,8 @@ services:
     restart: unless-stopped
     networks:
       - m3u-network
+    devices:
+      - /dev/dri:/dev/dri
     depends_on:
       - redis
 

@@ -48,33 +48,26 @@ services:
       - M3U_PROXY_ENABLED=true
       - M3U_PROXY_URL=http://m3u-proxy:8085
       - M3U_PROXY_TOKEN=${M3U_PROXY_TOKEN:-changeme}
-      
     volumes:
       # Persistent configuration data
       - ./data:/var/www/config
       
       # PostgreSQL data persistence
       - pgdata:/var/lib/postgresql/data
-      
     restart: unless-stopped
-    
     ports:
       - "36400:36400"  # Main application port
       # - "5432:5432"  # Uncomment to expose PostgreSQL
-      
     networks:
       - m3u-network
-      
     depends_on:
       - m3u-proxy
-      
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:36400/up"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-
   m3u-proxy:
     image: sparkison/m3u-proxy:latest
     container_name: m3u-proxy
@@ -93,19 +86,16 @@ services:
       # - REDIS_POOL_MAX_CONNECTIONS=50
       # - STREAM_TIMEOUT=300
       # - CLEANUP_INTERVAL=60
-      
     restart: unless-stopped
-    
     # Don't expose port externally - only accessible via internal network
     # ports:
     #   - "8085:8085"  # Uncomment only if you need direct external access
-    
     networks:
       - m3u-network
-      
     depends_on:
       - redis
-      
+    devices:
+      - /dev/dri:/dev/dri
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8085/health"]
       interval: 30s
@@ -127,16 +117,12 @@ services:
     image: redis:7-alpine
     container_name: m3u-proxy-redis
     restart: unless-stopped
-    
     # Optional: Enable persistence
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
-    
     volumes:
       - redis-data:/data
-      
     networks:
       - m3u-network
-      
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -152,7 +138,6 @@ services:
     #     reservations:
     #       cpus: '0.25'
     #       memory: 128M
-
 networks:
   m3u-network:
     driver: bridge
