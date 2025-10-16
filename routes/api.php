@@ -14,16 +14,6 @@ Route::group(['prefix' => 'epg'], function () {
 });
 
 /*
- * Player API routes
- */
-Route::group(['prefix' => 'player'], function () {
-    Route::get('channel/{id}', [\App\Http\Controllers\Api\PlayerApiController::class, 'channelPlayer'])
-        ->name('channel.player');
-    Route::get('episode/{id}', [\App\Http\Controllers\Api\PlayerApiController::class, 'episodePlayer'])
-        ->name('episode.player');
-});
-
-/*
  * m3u-proxy API routes
  */
 Route::group(['prefix' => 'm3u-proxy'], function () {

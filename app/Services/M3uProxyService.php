@@ -8,6 +8,7 @@ use App\Models\Episode;
 use App\Models\MergedPlaylist;
 use App\Models\Playlist;
 use App\Models\PlaylistAlias;
+use App\Models\StreamProfile;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -252,10 +253,11 @@ class M3uProxyService
      * @param  Playlist|CustomPlaylist|MergedPlaylist|PlaylistAlias  $playlist
      * @param  int  $id
      * @param  Request|null  $request  Optional request for additional parameters (e.g. timeshift)
+     * @param  StreamProfile|null  $profile  Optional stream profile to apply
      *
      * @throws Exception when base URL missing or API returns an error
      */
-    public function getChannelUrl($playlist, $id, ?Request $request = null): string
+    public function getChannelUrl($playlist, $id, ?Request $request = null, ?StreamProfile $profile = null): string
     {
         if (empty($this->apiBaseUrl)) {
             throw new Exception('M3U Proxy base URL is not configured');
@@ -337,19 +339,32 @@ class M3uProxyService
             ->values()
             ->toArray();
 
-        // Create/fetch the stream from the m3u-proxy API
-        $streamId = $this->createOrUpdateStream($primaryUrl, $failovers, $userAgent, [
-            'id' => $id,
-            'type' => 'channel',
-            'playlist_uuid' => $playlist->uuid,
-        ]);
+        // Use appropriate endpoint based on whether transcoding profile is provided
+        if ($profile) {
+            // Use transcoding endpoint
+            $streamId = $this->createTranscodedStream($primaryUrl, $profile, $failovers, $userAgent, [
+                'id' => $id,
+                'type' => 'channel',
+                'playlist_uuid' => $playlist->uuid,
+            ]);
+            
+            // Return transcoded stream URL
+            return $this->buildTranscodeStreamUrl($streamId);
+        } else {
+            // Use direct streaming endpoint
+            $streamId = $this->createOrUpdateStream($primaryUrl, $failovers, $userAgent, [
+                'id' => $id,
+                'type' => 'channel',
+                'playlist_uuid' => $playlist->uuid,
+            ]);
 
-        // Get the format from the URL
-        $format = pathinfo($primaryUrl, PATHINFO_EXTENSION);
-        $format = $format === 'm3u8' ? 'hls' : $format;
+            // Get the format from the URL
+            $format = pathinfo($primaryUrl, PATHINFO_EXTENSION);
+            $format = $format === 'm3u8' ? 'hls' : $format;
 
-        // Return the proxy URL using the stream ID
-        return $this->buildProxyUrl($streamId, $format);
+            // Return the direct proxy URL using the stream ID
+            return $this->buildProxyUrl($streamId, $format);
+        }
     }
 
     /**
@@ -357,10 +372,11 @@ class M3uProxyService
      *
      * @param  Playlist|CustomPlaylist|MergedPlaylist|PlaylistAlias  $playlist
      * @param  int  $id
+     * @param  StreamProfile|null  $profile  Optional stream profile to apply
      *
      * @throws Exception when base URL missing or API returns an error
      */
-    public function getEpisodeUrl($playlist, $id): string
+    public function getEpisodeUrl($playlist, $id, ?StreamProfile $profile = null): string
     {
         if (empty($this->apiBaseUrl)) {
             throw new Exception('M3U Proxy base URL is not configured');
@@ -397,19 +413,32 @@ class M3uProxyService
         // Episodes typically don't have failovers, but we'll support it if needed
         $failoverUrls = [];
 
-        // Create/fetch the stream from the m3u-proxy API
-        $streamId = $this->createOrUpdateStream($url, $failoverUrls, $userAgent, [
-            'id' => $id,
-            'type' => 'episode',
-            'playlist_uuid' => $playlist->uuid,
-        ]);
+        // Use appropriate endpoint based on whether transcoding profile is provided
+        if ($profile) {
+            // Use transcoding endpoint
+            $streamId = $this->createTranscodedStream($url, $profile, $failoverUrls, $userAgent, [
+                'id' => $id,
+                'type' => 'episode',
+                'playlist_uuid' => $playlist->uuid,
+            ]);
+            
+            // Return transcoded stream URL
+            return $this->buildTranscodeStreamUrl($streamId);
+        } else {
+            // Use direct streaming endpoint
+            $streamId = $this->createOrUpdateStream($url, $failoverUrls, $userAgent, [
+                'id' => $id,
+                'type' => 'episode',
+                'playlist_uuid' => $playlist->uuid,
+            ]);
 
-        // Get the format from the URL
-        $format = pathinfo($url, PATHINFO_EXTENSION);
-        $format = $format === 'm3u8' ? 'hls' : $format;
+            // Get the format from the URL
+            $format = pathinfo($url, PATHINFO_EXTENSION);
+            $format = $format === 'm3u8' ? 'hls' : $format;
 
-        // Return the proxy URL using the stream ID
-        return $this->buildProxyUrl($streamId, $format);
+            // Return the direct proxy URL using the stream ID
+            return $this->buildProxyUrl($streamId, $format);
+        }
     }
 
     /**
@@ -606,6 +635,97 @@ class M3uProxyService
             ]);
             throw $e;
         }
+    }
+
+    /**
+     * Create a transcoded stream via the m3u-proxy transcoding API
+     *
+     * @param  string  $url  The stream URL to transcode
+     * @param  StreamProfile  $profile  The transcoding profile to use
+     * @param  array  $failovers  Optional failover URLs
+     * @param  string|null  $userAgent  Optional user agent
+     * @param  array  $metadata  Stream metadata
+     * @return string The transcoded stream ID
+     *
+     * @throws Exception when API returns an error
+     */
+    protected function createTranscodedStream(
+        string $url,
+        StreamProfile $profile,
+        array $failovers = [],
+        ?string $userAgent = null,
+        array $metadata = []
+    ): string {
+        try {
+            $endpoint = $this->apiBaseUrl . '/transcode';
+            
+            // Build the payload for transcoding
+            $payload = [
+                'url' => $url,
+                'profile' => $profile->getProfileName(),
+                'metadata' => $metadata
+            ];
+
+            // Add failovers if provided
+            if (!empty($failovers)) {
+                $payload['failover_urls'] = $failovers;
+            }
+
+            // Add user agent if provided
+            if ($userAgent) {
+                $payload['user_agent'] = $userAgent;
+            }
+
+            // Add custom FFmpeg args from profile
+            if ($profile->args) {
+                $payload['custom_args'] = $profile->getArgsArray([
+                    'input_url' => $url,
+                ]);
+            }
+
+            $response = Http::timeout(10)->acceptJson()
+                ->withHeaders(array_filter([
+                    'X-API-Token' => $this->apiToken,
+                    'Content-Type' => 'application/json'
+                ]))
+                ->post($endpoint, $payload);
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                if (isset($data['stream_id'])) {
+                    Log::info('Created transcoded stream on m3u-proxy', [
+                        'stream_id' => $data['stream_id'],
+                        'profile' => $profile->getProfileName(),
+                        'url' => $url,
+                    ]);
+
+                    return $data['stream_id'];
+                }
+
+                throw new Exception('Stream ID not found in transcoding API response');
+            }
+
+            throw new Exception('Failed to create transcoded stream: ' . $response->body());
+        } catch (Exception $e) {
+            Log::error('Error creating transcoded stream on m3u-proxy', [
+                'error' => $e->getMessage(),
+                'profile' => $profile->getProfileName(),
+                'url' => $url,
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Build the transcoded stream URL for a given stream ID
+     *
+     * @param  string  $streamId  The stream ID returned from transcoding API
+     * @return string The stream URL
+     */
+    protected function buildTranscodeStreamUrl(string $streamId): string
+    {
+        return $this->apiBaseUrl . "/stream/{$streamId}";
     }
 
     /**

@@ -1,14 +1,7 @@
 <x-dynamic-component :component="$getEntryWrapperView()" :entry="$entry">
 @php
 $record = $getRecord();
-$playlist = $record->getEffectivePlaylist() ?? null;
-$proxyEnabled = $playlist->enable_proxy ?? false;
-$format = 'ts';
-if ($proxyEnabled) {
-    $url = route('m3u-proxy.channel.player', ['id' => $record->id]);
-} else {
-    $url = route('channel.player', ['id' => $record->id]);
-}
+$url = route('m3u-proxy.channel.player', ['id' => $record->id]);
 $channelTitle = Str::replace("'", "`", $record->name_custom ?? $record->name ?? $record->title);
 $playerId = "channel_{$record->id}_preview";
 @endphp

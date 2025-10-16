@@ -21,11 +21,11 @@ use Filament\Support\Enums\Size;
  */
 class M3uProxyStreamMonitor extends Page
 {
-    protected static ?string $navigationLabel = 'M3U Proxy';
+    protected static ?string $navigationLabel = 'Stream Monitor';
 
     protected static ?string $title = 'M3U Proxy Stream Monitor';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Tools';
+    protected static string|\UnitEnum|null $navigationGroup = 'Proxy';
 
     protected static ?int $navigationSort = 6;
 

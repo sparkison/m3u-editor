@@ -91,6 +91,7 @@ class GeneralSettings extends Settings
 
     // Video player proxy options
     public ?bool $force_video_player_proxy = false;
+    public ?int $default_stream_profile_id = null;
 
     // Sync options
     public ?bool $invalidate_import = false;

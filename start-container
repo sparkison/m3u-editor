@@ -201,7 +201,6 @@ fi
 # Create log files
 [ ! -f "${queue_log_file}" ] && touch "${queue_log_file}"
 [ ! -f "${websockets_log_file}" ] && touch "${websockets_log_file}"
-[ ! -f "${ffmpeg_log_file}" ] && touch "${ffmpeg_log_file}"
 [ ! -f "${nginx_log_file}" ] && touch "${nginx_log_file}"
 [ ! -f "${startup_log_file}" ] && touch "${startup_log_file}"
 
@@ -210,7 +209,6 @@ echo "" > "/var/log/cron.out.log"
 echo "" > "/var/log/cron.err.log"
 echo "" > "${queue_log_file}"
 echo "" > "${websockets_log_file}"
-echo "" > "${ffmpeg_log_file}"
 echo "" > "${nginx_log_file}"
 echo "" > "${startup_log_file}"
 
@@ -219,6 +217,7 @@ echo "" > "${startup_log_file}"
 [ -f "${reverb_log_file}" ] && rm -f "${reverb_log_file}"
 [ -f "${horizon_log_file}" ] && rm -f "${horizon_log_file}"
 [ -f "${laravel_log_file}" ] && rm -f "${laravel_log_file}"
+[ -f "${ffmpeg_log_file}" ] && rm -f "${ffmpeg_log_file}"
 
 # Link environment file
 ln -sf "${env_file}" .env

@@ -6,8 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Channel;
 use App\Models\Episode;
 use App\Models\Playlist;
+use App\Models\StreamProfile;
 use App\Services\M3uProxyService;
-use App\Services\PlayerTranscodingService;
+use App\Settings\GeneralSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -24,10 +25,12 @@ class M3uProxyApiController extends Controller
      */
     public function channel(Request $request, $id)
     {
-        $channel = Channel::query()->with('playlist')->findOrFail($id);
+        $channel = Channel::query()->with(['playlist.streamProfile'])->findOrFail($id);
         $playlist = $channel->getEffectivePlaylist();
 
-        $url = app(M3uProxyService::class)->getChannelUrl($playlist, $id, $request);
+        // Get stream profile from playlist (if set)
+        $profile = $playlist->streamProfile;
+        $url = app(M3uProxyService::class)->getChannelUrl($playlist, $id, $request, $profile);
 
         return redirect($url);
     }
@@ -42,10 +45,66 @@ class M3uProxyApiController extends Controller
      */
     public function episode(Request $request, $id)
     {
-        $episode = Episode::query()->with('playlist')->findOrFail($id);
+        $episode = Episode::query()->with(['playlist.streamProfile'])->findOrFail($id);
         $playlist = $episode->playlist;
 
-        $url = app(M3uProxyService::class)->getEpisodeUrl($playlist, $id);
+        // Get stream profile from playlist (if set)
+        $profile = $playlist->streamProfile;
+        $url = app(M3uProxyService::class)->getEpisodeUrl($playlist, $id, $profile);
+
+        return redirect($url);
+    }
+
+    /**
+     * Example player endpoint for channel using m3u-proxy
+     * 
+     * @param  Request  $request
+     * @param  int  $id
+     * 
+     * @return StreamedResponse
+     */
+    public function channelPlayer(Request $request, $id)
+    {
+        $channel = Channel::query()->with(['playlist.streamProfile'])->findOrFail($id);
+        $playlist = $channel->getEffectivePlaylist();
+
+        // Get stream profile from playlist (if set), else fall back to default player profile
+        $profile = $playlist->streamProfile;
+        if (!$profile) {
+            // Use default profile set for the player
+            $settings = app(GeneralSettings::class);
+            $profileId = $settings->default_stream_profile_id ?? null;
+            $profile = $profileId ? StreamProfile::find($profileId) : null;
+        }
+
+        $url = app(M3uProxyService::class)->getChannelUrl($playlist, $id, $request, $profile);
+
+        return redirect($url);
+    }
+
+    /**
+     * Example player endpoint for episode using m3u-proxy
+     * 
+     * @param  Request  $request
+     * @param  int  $id
+     * 
+     * @return StreamedResponse
+     */
+    public function episodePlayer(Request $request, $id)
+    {
+        $episode = Episode::query()->with(['playlist.streamProfile'])->findOrFail($id);
+        $playlist = $episode->playlist;
+
+        // Get stream profile from playlist (if set), else fall back to default player profile
+        $profile = $playlist->streamProfile;
+        if (!$profile) {
+            // Use default profile set for the player
+            $settings = app(GeneralSettings::class);
+            $profileId = $settings->default_stream_profile_id ?? null;
+            $profile = $profileId ? StreamProfile::find($profileId) : null;
+        }
+
+        $url = app(M3uProxyService::class)->getEpisodeUrl($playlist, $id, $profile);
 
         return redirect($url);
     }
@@ -92,47 +151,5 @@ class M3uProxyApiController extends Controller
         }
 
         Log::info('Cache invalidated for m3u-proxy event', $data);
-    }
-
-    /**
-     * Example player endpoint for channel using m3u-proxy
-     * 
-     * @param  Request  $request
-     * @param  int  $id
-     * 
-     * @return StreamedResponse
-     */
-    public function channelPlayer(Request $request, $id)
-    {
-        $channel = Channel::query()->with('playlist')->findOrFail($id);
-        $playlist = $channel->getEffectivePlaylist();
-
-        $url = app(M3uProxyService::class)->getChannelUrl($playlist, $id);
-        $format = pathinfo($url, PATHINFO_EXTENSION);
-
-        $title = $channel->name_custom ?? $channel->name ?? $channel->title ?? 'Channel ' . $id;
-
-        return PlayerTranscodingService::streamTranscodedContent($request, $url, $format, $title, $playlist);
-    }
-
-    /**
-     * Example player endpoint for episode using m3u-proxy
-     * 
-     * @param  Request  $request
-     * @param  int  $id
-     * 
-     * @return StreamedResponse
-     */
-    public function episodePlayer(Request $request, $id)
-    {
-        $episode = Episode::query()->with('playlist')->findOrFail($id);
-        $playlist = $episode->playlist;
-
-        $url = app(M3uProxyService::class)->getEpisodeUrl($playlist, $id);
-        $format = pathinfo($url, PATHINFO_EXTENSION);
-
-        $title = $episode->title ?? 'Episode ' . $id;
-
-        return PlayerTranscodingService::streamTranscodedContent($request, $url, $format, $title, $playlist);
     }
 }

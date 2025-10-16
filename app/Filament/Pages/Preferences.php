@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Jobs\RestartQueue;
+use App\Models\StreamProfile;
 use App\Rules\CheckIfUrlOrLocalPath;
 use App\Rules\Cron;
 use App\Services\FfmpegCodecService;
@@ -18,6 +19,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Pages\SettingsPage;
 use Filament\Schemas\Components\Fieldset;
@@ -160,62 +162,20 @@ class Preferences extends SettingsPage
                             ]),
                         Tab::make('Proxy')
                             ->schema([
-                                Section::make('Internal Proxy')
-                                    ->description('FFmpeg proxy settings for in-app video player')
-                                    ->columnSpan('full')
-                                    ->columns(3)
-                                    ->collapsible()
-                                    ->collapsed(false)
-                                    ->schema([
-                                        // Grid::make()
-                                        //     ->columnSpanFull()
-                                        //     ->columns(2)
-                                        //     ->schema([
-                                        //         Toggle::make('force_video_player_proxy')
-                                        //             ->label('Force Video Player Proxy')
-                                        //             ->columnSpan(2)
-                                        //             ->helperText('When enabled, the in-app video player will always use the proxy. This can be useful to bypass mixed content issues when using HTTPS. When disabled, the video player will respect the playlist proxy settings.'),
-                                        //     ]),
-                                        Grid::make()
-                                            ->columnSpanFull()
-                                            ->columns(2)
-                                            ->schema([
-                                                Select::make('ffmpeg_path')
-                                                    ->label('FFmpeg')
-                                                    ->columnSpan(1)
-                                                    ->helperText('Which ffmpeg variant would you like to use.')
-                                                    ->options([
-                                                        'jellyfin-ffmpeg' => 'jellyfin-ffmpeg (default)',
-                                                        'ffmpeg' => 'ffmpeg (v6)',
-                                                    ])
-                                                    ->searchable()
-                                                    ->suffixIcon(fn() => ! empty($ffmpegPath) ? 'heroicon-m-lock-closed' : null)
-                                                    ->disabled(fn() => ! empty($ffmpegPath))
-                                                    ->hint(fn() => ! empty($ffmpegPath) ? 'Already set by environment variable!' : null)
-                                                    ->dehydrated(fn() => empty($ffmpegPath))
-                                                    ->placeholder(fn() => empty($ffmpegPath) ? 'jellyfin-ffmpeg' : $ffmpegPath),
-                                                Select::make('ffprobe_path')
-                                                    ->label('FFprobe')
-                                                    ->columnSpan(1)
-                                                    ->helperText('Which ffprobe variant would you like to use.')
-                                                    ->options([
-                                                        'jellyfin-ffprobe' => 'jellyfin-ffprobe (default)',
-                                                        'ffprobe' => 'ffprobe',
-                                                    ])
-                                                    ->searchable()
-                                                    // Assuming similar logic for ffprobe path being set by env var
-                                                    ->suffixIcon(fn() => ! empty(config('proxy.ffprobe_path')) ? 'heroicon-m-lock-closed' : null)
-                                                    ->disabled(fn() => ! empty(config('proxy.ffprobe_path')))
-                                                    ->hint(fn() => ! empty(config('proxy.ffprobe_path')) ? 'Already set by environment variable!' : null)
-                                                    ->dehydrated(fn() => empty(config('proxy.ffprobe_path')))
-                                                    ->placeholder(fn() => empty(config('proxy.ffprobe_path')) ? 'jellyfin-ffprobe' : config('proxy.ffprobe_path')),
-                                            ]),
-                                    ]),
                                 Section::make('M3U Proxy')
                                     ->description('m3u proxy integration is enabled and will be used to proxy all streams when proxy is enabled')
                                     ->columnSpanFull()
                                     ->columns(4)
                                     ->schema([
+                                        Select::make('default_stream_profile_id')
+                                            ->label('Default Transcoding Profile')
+                                            ->columnSpanFull()
+                                            ->searchable()
+                                            ->options(function () {
+                                                return StreamProfile::where('user_id', Auth::id())->pluck('name', 'id');
+                                            })
+                                            ->helperText('The default transcoding profile used for the in-app player. Leave empty to disable transcoding (some streams may not be playable in the player).'),
+
                                         Action::make('test_connection')
                                             ->color('gray')
                                             ->label('Test m3u proxy connection')
@@ -773,7 +733,7 @@ class Preferences extends SettingsPage
                                             ->action(function () {
                                                 try {
                                                     $settings = app(GeneralSettings::class);
-                                                    
+
                                                     if (empty($settings->emby_server_url) || empty($settings->emby_api_key)) {
                                                         Notification::make()
                                                             ->danger()
@@ -845,9 +805,9 @@ class Preferences extends SettingsPage
                                     ->columnSpanFull()
                                     ->columns(1)
                                     ->schema([
-                                        \Filament\Forms\Components\Placeholder::make('plex_coming_soon')
+                                        TextEntry::make('plex_coming_soon')
                                             ->label('')
-                                            ->content(new \Illuminate\Support\HtmlString('
+                                            ->state(new \Illuminate\Support\HtmlString('
                                                 <div class="flex items-center justify-center p-8 bg-gray-50 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
                                                     <div class="text-center">
                                                         <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900 mb-4">

@@ -18,6 +18,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\Placeholder;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Tabs\Tab;
@@ -64,10 +65,10 @@ class ListSeries extends ListRecords
                     ->label('Sync from Emby')
                     ->icon('heroicon-o-tv')
                     ->color('primary')
-                    ->form([
-                        Placeholder::make('security_warning')
+                    ->schema([
+                        TextEntry::make('security_warning')
                             ->label('Security Warning')
-                            ->content('⚠️ SECURITY WARNING: This feature connects to your Emby server and should only be used on trusted local networks. Ensure your Emby server is not exposed to the public internet when using this feature.')
+                            ->state('⚠️ SECURITY WARNING: This feature connects to your Emby server and should only be used on trusted local networks. Ensure your Emby server is not exposed to the public internet when using this feature.')
                             ->columnSpanFull()
                             ->extraAttributes([
                                 'class' => 'text-warning-600 dark:text-warning-400 font-semibold bg-warning-50 dark:bg-warning-950 p-4 rounded-lg border-2 border-warning-200 dark:border-warning-800',
@@ -82,20 +83,20 @@ class ListSeries extends ListRecords
                                     if (!$embyService->isConfigured()) {
                                         return ['_not_configured' => 'Emby not configured - Please configure in Settings'];
                                     }
-                                    
+
                                     $libraries = $embyService->getLibraries();
                                     $tvLibraries = [];
-                                    
+
                                     foreach ($libraries as $library) {
                                         if (isset($library['CollectionType']) && $library['CollectionType'] === 'tvshows') {
                                             $tvLibraries[$library['ItemId']] = $library['Name'];
                                         }
                                     }
-                                    
+
                                     if (empty($tvLibraries)) {
                                         return ['_no_libraries' => 'No TV show libraries found'];
                                     }
-                                    
+
                                     return $tvLibraries;
                                 } catch (\Exception $e) {
                                     return ['_error' => 'Error: ' . $e->getMessage()];
@@ -127,9 +128,9 @@ class ListSeries extends ListRecords
                                 ->send();
                             return;
                         }
-                        
+
                         $playlist = Playlist::findOrFail($data['playlist_id']);
-                        
+
                         // Get library name
                         $embyService = new EmbyService();
                         $libraries = $embyService->getLibraries();
@@ -140,7 +141,7 @@ class ListSeries extends ListRecords
                                 break;
                             }
                         }
-                        
+
                         dispatch(new ProcessEmbySeriesSync(
                             playlist: $playlist,
                             libraryId: $data['library_id'],

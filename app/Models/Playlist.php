@@ -71,6 +71,11 @@ class Playlist extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function streamProfile(): BelongsTo
+    {
+        return $this->belongsTo(StreamProfile::class);
+    }
+
     public function channels(): HasMany
     {
         return $this->hasMany(Channel::class);

@@ -33,6 +33,7 @@ use App\Models\Epg;
 use App\Models\Playlist;
 use Filament\Actions;
 use Filament\Forms;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
@@ -131,10 +132,10 @@ class ListVod extends ListRecords
                     ->label('Sync from Emby')
                     ->icon('heroicon-o-film')
                     ->color('primary')
-                    ->form([
-                        Placeholder::make('security_warning')
+                    ->schema([
+                        TextEntry::make('security_warning')
                             ->label('Security Warning')
-                            ->content('⚠️ SECURITY WARNING: This feature connects to your Emby server and should only be used on trusted local networks. Ensure your Emby server is not exposed to the public internet when using this feature.')
+                            ->state('⚠️ SECURITY WARNING: This feature connects to your Emby server and should only be used on trusted local networks. Ensure your Emby server is not exposed to the public internet when using this feature.')
                             ->columnSpanFull()
                             ->extraAttributes([
                                 'class' => 'text-warning-600 dark:text-warning-400 font-semibold bg-warning-50 dark:bg-warning-950 p-4 rounded-lg border-2 border-warning-200 dark:border-warning-800',
@@ -149,20 +150,20 @@ class ListVod extends ListRecords
                                     if (!$embyService->isConfigured()) {
                                         return ['_not_configured' => 'Emby not configured - Please configure in Settings'];
                                     }
-                                    
+
                                     $libraries = $embyService->getLibraries();
                                     $movieLibraries = [];
-                                    
+
                                     foreach ($libraries as $library) {
                                         if (isset($library['CollectionType']) && $library['CollectionType'] === 'movies') {
                                             $movieLibraries[$library['ItemId']] = $library['Name'];
                                         }
                                     }
-                                    
+
                                     if (empty($movieLibraries)) {
                                         return ['_no_libraries' => 'No movie libraries found'];
                                     }
-                                    
+
                                     return $movieLibraries;
                                 } catch (\Exception $e) {
                                     return ['_error' => 'Error: ' . $e->getMessage()];
@@ -194,9 +195,9 @@ class ListVod extends ListRecords
                                 ->send();
                             return;
                         }
-                        
+
                         $playlist = Playlist::findOrFail($data['playlist_id']);
-                        
+
                         // Get library name
                         $embyService = new EmbyService();
                         $libraries = $embyService->getLibraries();
@@ -207,7 +208,7 @@ class ListVod extends ListRecords
                                 break;
                             }
                         }
-                        
+
                         dispatch(new ProcessEmbyVodSync(
                             playlist: $playlist,
                             libraryId: $data['library_id'],

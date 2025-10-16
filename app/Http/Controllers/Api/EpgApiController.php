@@ -298,7 +298,7 @@ class EpgApiController extends Controller
                 if ($proxyEnabled) {
                     $url = route('m3u-proxy.channel.player', ['id' => $channel->id]);
                 } else {
-                    $url = route('channel.player', ['id' => $channel->id]);
+                    $url = PlaylistUrlService::getChannelUrl($channel, $playlist);
                 }
 
                 // Determine the channel format based on URL or container extension
