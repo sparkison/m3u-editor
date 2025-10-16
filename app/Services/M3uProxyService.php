@@ -26,6 +26,11 @@ class M3uProxyService
         $this->apiToken = config('proxy.m3u_proxy_token');
     }
 
+    public function mode(): string
+    {
+        return config('proxy.external_proxy_enabled') ? 'embedded' : 'external';
+    }
+
     /**
      * Get active streams count for a specific playlist using metadata filtering
      */
@@ -746,5 +751,55 @@ class M3uProxyService
 
         // Direct stream format: /stream/{stream_id}
         return $baseUrl . '/stream/' . $streamId;
+    }
+
+    /**
+     * Get m3u-proxy server information including configuration and capabilities
+     *
+     * @return array Array with 'success', 'info', and optional 'error' keys
+     */
+    public function getProxyInfo(): array
+    {
+        if (empty($this->apiBaseUrl)) {
+            return [
+                'success' => false,
+                'error' => 'M3U Proxy base URL is not configured',
+                'info' => [],
+            ];
+        }
+
+        try {
+            $endpoint = $this->apiBaseUrl . '/info';
+            $response = Http::timeout(5)->acceptJson()
+                ->withHeaders($this->apiToken ? [
+                    'X-API-Token' => $this->apiToken,
+                ] : [])
+                ->get($endpoint);
+
+            if ($response->successful()) {
+                $data = $response->json() ?: [];
+
+                return [
+                    'success' => true,
+                    'info' => $data,
+                ];
+            }
+
+            Log::warning('Failed to fetch proxy info from m3u-proxy: HTTP ' . $response->status());
+
+            return [
+                'success' => false,
+                'error' => 'M3U Proxy returned status ' . $response->status(),
+                'info' => [],
+            ];
+        } catch (Exception $e) {
+            Log::warning('Failed to fetch proxy info from m3u-proxy: ' . $e->getMessage());
+
+            return [
+                'success' => false,
+                'error' => 'Unable to connect to m3u-proxy: ' . $e->getMessage(),
+                'info' => [],
+            ];
+        }
     }
 }

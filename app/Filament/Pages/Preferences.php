@@ -7,6 +7,7 @@ use App\Models\StreamProfile;
 use App\Rules\CheckIfUrlOrLocalPath;
 use App\Rules\Cron;
 use App\Services\FfmpegCodecService;
+use App\Services\M3uProxyService;
 use App\Services\PlaylistService;
 use App\Services\ProxyService;
 use App\Settings\GeneralSettings;
@@ -37,6 +38,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use ReflectionClass;
 use ReflectionProperty;
 
@@ -180,35 +182,68 @@ class Preferences extends SettingsPage
                                             ->color('gray')
                                             ->label('Test m3u proxy connection')
                                             ->icon('heroicon-m-signal')
-                                            ->action(function () use ($m3uProxyUrl, $m3uToken) {
+                                            ->action(function () {
                                                 try {
-                                                    $url = $m3uProxyUrl . '/health';
-                                                    if ($m3uToken) {
-                                                        $url .= '?api_token=' . $m3uToken;
-                                                    }
-                                                    $status = Http::get($url);
-                                                    if ($status->successful()) {
-                                                        $body = $status->body();
+                                                    $service = new M3uProxyService();
+                                                    $result = $service->getProxyInfo();
+
+                                                    if ($result['success']) {
+                                                        $info = $result['info'];
+
+                                                        // Build a nice detailed message
+                                                        $mode = ucfirst($service->mode());
+                                                        $details = "**Version:** {$info['version']}\n\n";
+                                                        if ($service->mode() === 'external') {
+                                                            $details .= "**Deployment Mode:** ✅ {$mode}\n\n";
+                                                            $details .= " Standalone external proxy service\n\n";
+                                                        } else {
+                                                            $details .= "**Deployment Mode:** ❌ {$mode}\n\n";
+                                                            $details .= " Embedded\n\n";
+                                                        }
+
+                                                        // Hardware Acceleration
+                                                        $hwStatus = $info['hardware_acceleration']['enabled'] ? '✅ Enabled' : '❌ Disabled';
+                                                        $details .= "**Hardware Acceleration:** {$hwStatus}\n";
+                                                        if ($info['hardware_acceleration']['enabled']) {
+                                                            $details .= "- Type: {$info['hardware_acceleration']['type']}\n";
+                                                            $details .= "- Device: {$info['hardware_acceleration']['device']}\n";
+                                                        }
+                                                        $details .= "\n";
+
+                                                        // Redis Pooling
+                                                        $redisStatus = $info['redis']['pooling_enabled'] ? '✅ Enabled' : '❌ Disabled';
+                                                        $details .= "**Redis Pooling:** {$redisStatus}\n";
+                                                        if ($info['redis']['pooling_enabled']) {
+                                                            $details .= "- Max clients per stream: {$info['redis']['max_clients_per_stream']}\n";
+                                                            $details .= "- Sharing strategy: {$info['redis']['sharing_strategy']}\n";
+                                                        }
+                                                        $details .= "\n";
+
+                                                        // Ignore this for now, not sure if it will confuse...
+                                                        // // Transcoding Profiles
+                                                        // $profileCount = count($info['transcoding']['profiles']);
+                                                        // $details .= "**Transcoding Profiles:** {$profileCount} available\n";
+                                                        // $details .= "- " . implode(', ', array_keys($info['transcoding']['profiles']));
+
                                                         Notification::make()
-                                                            ->title('Connection successful')
-                                                            ->body('Successfully connected to the m3u proxy instance: ' . $body)
+                                                            ->title('Connection Successful')
+                                                            ->body(Str::markdown($details))
                                                             ->success()
+                                                            ->persistent()
                                                             ->send();
                                                     } else {
                                                         Notification::make()
-                                                            ->title('Connection failed')
-                                                            ->body('Could not connect to the m3u proxy instance. Please check the URL and ensure the service is running.')
+                                                            ->title('Connection Failed')
+                                                            ->body($result['error'] ?? 'Could not connect to the m3u proxy instance. Please check the URL and ensure the service is running.')
                                                             ->danger()
                                                             ->send();
                                                     }
                                                 } catch (Exception $e) {
                                                     Notification::make()
-                                                        ->title('Connection failed')
+                                                        ->title('Connection Failed')
                                                         ->body('Could not connect to the m3u proxy instance. ' . $e->getMessage())
                                                         ->danger()
                                                         ->send();
-
-                                                    return;
                                                 }
                                             }),
                                         Action::make('get_api_key')
