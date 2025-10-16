@@ -841,8 +841,8 @@ class Preferences extends SettingsPage
                                             ->revealable()
                                             ->columnSpan(2),
                                         Toggle::make('emby_import_groups_categories')
-                                            ->label('Import Groups and Categories from Emby')
-                                            ->helperText('Automatically organize imported content using Emby\'s genre metadata. VODs will be grouped by genre, and series will be categorized by genre.')
+                                            ->label('Import Groups and Categories from Emby/Jellyfin')
+                                            ->helperText('Automatically organize imported content using Emby/Jellyfin\'s genre metadata. VODs will be grouped by genre, and series will be categorized by genre.')
                                             ->columnSpan(2),
                                         Radio::make('emby_genre_handling')
                                             ->label('Multi-Genre Handling')
