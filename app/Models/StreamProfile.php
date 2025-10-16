@@ -46,29 +46,34 @@ class StreamProfile extends Model
     }
 
     /**
-     * Get the FFmpeg args as an array, replacing placeholders with actual values
+     * Get template variables for FFmpeg profile rendering.
+     * The 'args' field stores JSON-encoded key-value pairs for template substitution.
+     * 
+     * Example args field: {"video_bitrate": "3M", "audio_bitrate": "192k"}
+     * 
+     * @param array $additionalVars Optional additional variables to merge
+     * @return array Template variables as associative array
      */
-    public function getArgsArray(?array $parameters = []): array
+    public function getTemplateVariables(array $additionalVars = []): array
     {
-        $args = $this->args ?? '';
-
-        // Replace placeholders with actual values
-        foreach ($parameters as $key => $value) {
-            $args = str_replace("{{$key}}", $value, $args);
+        $variables = [];
+        
+        // Parse args as JSON if it's set
+        if ($this->args) {
+            $decoded = json_decode($this->args, true);
+            if (is_array($decoded)) {
+                $variables = $decoded;
+            }
         }
-
-        // Remove any unreplaced placeholders with default values
-        $args = preg_replace('/\{(\w+)\|([^}]+)\}/', '$2', $args);
-
-        // Remove any remaining unreplaced placeholders
-        $args = preg_replace('/\{[^}]+\}/', '', $args);
-
-        // Split into array and filter empty values
-        return array_filter(explode(' ', trim($args)));
+        
+        // Merge with additional variables (additional vars take precedence)
+        return array_merge($variables, $additionalVars);
     }
 
     /**
-     * Get a formatted profile name for API usage
+     * Get a formatted profile name for API usage.
+     * This should match one of the predefined profiles in the Python transcoding system.
+     * Available profiles: default, hq, lowlatency, 720p, 1080p, hevc, audio
      */
     public function getProfileName(): string
     {

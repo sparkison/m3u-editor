@@ -676,11 +676,12 @@ class M3uProxyService
                 $payload['user_agent'] = $userAgent;
             }
 
-            // Add custom FFmpeg args from profile
-            if ($profile->args) {
-                $payload['custom_args'] = $profile->getArgsArray([
-                    'input_url' => $url,
-                ]);
+            // Add profile variables for FFmpeg template substitution
+            // The Python API will automatically add input_url and output_args
+            // We only need to send template variable overrides (e.g., video_bitrate, audio_bitrate)
+            $profileVars = $profile->getTemplateVariables();
+            if (!empty($profileVars)) {
+                $payload['profile_variables'] = $profileVars;
             }
 
             $response = Http::timeout(10)->acceptJson()
