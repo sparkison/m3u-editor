@@ -141,6 +141,8 @@ services:
     restart: unless-stopped
     networks:
       - m3u-network
+    devices:
+      - /dev/dri:/dev/dri
 
 networks:
   m3u-network:
