@@ -103,7 +103,6 @@ volumes:
 - ✅ Better performance and resource utilization
 - ✅ Independent scaling and management
 - ✅ Separate logging and monitoring
-- ✅ No nginx reverse proxy overhead
 
 ### Option 2: External Proxy without Redis
 
