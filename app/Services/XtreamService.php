@@ -130,42 +130,42 @@ class XtreamService
 
     public function getLiveCategories(): array
     {
-        return $this->call($this->makeUrl('get_live_categories'));
+        return $this->call($this->makeUrl('get_live_categories')) ?? [];
     }
 
     public function getLiveStreams(string $catId): array
     {
-        return $this->call($this->makeUrl('get_live_streams', ['category_id' => $catId]));
+        return $this->call($this->makeUrl('get_live_streams', ['category_id' => $catId])) ?? [];
     }
 
     public function getVodCategories(): array
     {
-        return $this->call($this->makeUrl('get_vod_categories'));
+        return $this->call($this->makeUrl('get_vod_categories')) ?? [];
     }
 
     public function getVodStreams(string $catId): array
     {
-        return $this->call($this->makeUrl('get_vod_streams', ['category_id' => $catId]));
+        return $this->call($this->makeUrl('get_vod_streams', ['category_id' => $catId])) ?? [];
     }
 
     public function getSeriesCategories(): array
     {
-        return $this->call($this->makeUrl('get_series_categories'));
+        return $this->call($this->makeUrl('get_series_categories')) ?? [];
     }
 
     public function getSeries(string $catId): array
     {
-        return $this->call($this->makeUrl('get_series', ['category_id' => $catId]));
+        return $this->call($this->makeUrl('get_series', ['category_id' => $catId])) ?? [];
     }
 
     public function getVodInfo(string $vodId): array
     {
-        return $this->call($this->makeUrl('get_vod_info', ['vod_id' => $vodId]));
+        return $this->call($this->makeUrl('get_vod_info', ['vod_id' => $vodId])) ?? [];
     }
 
     public function getSeriesInfo(string $seriesId): array
     {
-        return $this->call($this->makeUrl('get_series_info', ['series_id' => $seriesId]));
+        return $this->call($this->makeUrl('get_series_info', ['series_id' => $seriesId])) ?? [];
     }
 
     public function buildMovieUrl(string $id, string $ext): string
