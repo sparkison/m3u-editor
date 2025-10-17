@@ -5,6 +5,7 @@ namespace App\Filament\Resources\StreamProfiles;
 use App\Models\StreamProfile;
 use BackedEnum;
 use Filament\Actions;
+use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -42,13 +43,22 @@ class StreamProfileResource extends Resource
                     ->helperText('Optional description of what this profile does'),
 
                 Textarea::make('args')
-                    ->label('FFmpeg Arguments')
+                    ->label('FFmpeg Template')
                     ->required()
                     ->columnSpanFull()
                     ->rows(4)
+                    ->hintAction(
+                        Action::make('view_profile_docs')
+                            ->label('View Docs')
+                            ->icon('heroicon-o-arrow-top-right-on-square')
+                            ->iconPosition('after')
+                            ->size('sm')
+                            ->url('https://github.com/sparkison/m3u-proxy/blob/experimental/docs/PROFILE_VARIABLES.md')
+                            ->openUrlInNewTab(true)
+                    )
                     ->default('-i {input_url} -c:v libx264 -preset faster -crf {crf|23} -maxrate {maxrate|2500k} -bufsize {bufsize|5000k} -c:a aac -b:a {audio_bitrate|192k} -f mpegts {output_args|pipe:1}')
                     ->placeholder('-i {input_url} -c:v libx264 -preset faster -crf {crf|23} -maxrate {maxrate|2500k} -bufsize {bufsize|5000k} -c:a aac -b:a {audio_bitrate|192k} -f mpegts {output_args|pipe:1}')
-                    ->helperText('FFmpeg arguments for transcoding. Use placeholders like {crf|23} for configurable parameters with defaults. The {input_url} placeholder is automatically handled. Hardware acceleration will be applied automatically by the proxy server.'),
+                    ->helperText('FFmpeg arguments for transcoding. Use placeholders like {crf|23} for configurable parameters with defaults. Hardware acceleration will be applied automatically by the proxy server.'),
             ]);
     }
 
