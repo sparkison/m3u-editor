@@ -81,7 +81,7 @@ services:
       - redis
 
   redis:
-    image: redis:7-alpine
+    image: redis:alpine3.22
     container_name: m3u-proxy-redis
     restart: unless-stopped
     networks:
