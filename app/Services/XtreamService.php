@@ -168,13 +168,15 @@ class XtreamService
         return $this->call($this->makeUrl('get_series_info', ['series_id' => $seriesId])) ?? [];
     }
 
-    public function buildMovieUrl(string $id, string $ext): string
+    public function buildMovieUrl(string $id, ?string $ext): string
     {
-        return "{$this->server}/movie/{$this->user}/{$this->pass}/{$id}.{$ext}";
+        $ext = $ext ? ".{$ext}" : '';
+        return "{$this->server}/movie/{$this->user}/{$this->pass}/{$id}{$ext}";
     }
 
-    public function buildSeriesUrl(string $id, string $ext): string
+    public function buildSeriesUrl(string $id, ?string $ext): string
     {
-        return "{$this->server}/series/{$this->user}/{$this->pass}/{$id}.{$ext}";
+        $ext = $ext ? ".{$ext}" : '';
+        return "{$this->server}/series/{$this->user}/{$this->pass}/{$id}{$ext}";
     }
 }
