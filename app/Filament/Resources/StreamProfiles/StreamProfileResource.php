@@ -80,7 +80,6 @@ class StreamProfileResource extends Resource
             ])
             ->recordActions([
                 Actions\DeleteAction::make()
-                    ->slideOver()
                     ->button()->hiddenLabel()->size('sm'),
                 Actions\EditAction::make()
                     ->slideOver()
