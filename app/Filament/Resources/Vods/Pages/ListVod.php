@@ -129,26 +129,26 @@ class ListVod extends ListRecords
                 //     ->modalDescription('Import VOD movies or TV series directly from a local directory. The system will scan for video files and create VOD channels automatically.')
                 //     ->modalSubmitActionLabel('Import now'),
                 Action::make('sync_from_emby')
-                    ->label('Sync from Emby')
+                    ->label('Sync from Emby/Jellyfin')
                     ->icon('heroicon-o-film')
                     ->color('primary')
                     ->schema([
                         TextEntry::make('security_warning')
                             ->label('Security Warning')
-                            ->state('⚠️ SECURITY WARNING: This feature connects to your Emby server and should only be used on trusted local networks. Ensure your Emby server is not exposed to the public internet when using this feature.')
+                            ->state('⚠️ SECURITY WARNING: This feature connects to your Emby/Jellyfin server and should only be used on trusted local networks. Ensure your Emby/Jellyfin server is not exposed to the public internet when using this feature.')
                             ->columnSpanFull()
                             ->extraAttributes([
                                 'class' => 'text-warning-600 dark:text-warning-400 font-semibold bg-warning-50 dark:bg-warning-950 p-4 rounded-lg border-2 border-warning-200 dark:border-warning-800',
                             ]),
                         Select::make('library_id')
-                            ->label('Emby Library')
+                            ->label('Emby/Jellyfin Library')
                             ->required()
                             ->searchable()
                             ->options(function () {
                                 try {
                                     $embyService = new EmbyService();
                                     if (!$embyService->isConfigured()) {
-                                        return ['_not_configured' => 'Emby not configured - Please configure in Settings'];
+                                        return ['_not_configured' => 'Emby/Jellyfin not configured - Please configure in Settings'];
                                     }
 
                                     $libraries = $embyService->getLibraries();
@@ -169,7 +169,7 @@ class ListVod extends ListRecords
                                     return ['_error' => 'Error: ' . $e->getMessage()];
                                 }
                             })
-                            ->helperText('Select the Emby movie library to sync from.'),
+                            ->helperText('Select the Emby/Jellyfin movie library to sync from.'),
                         Select::make('playlist_id')
                             ->label('Playlist')
                             ->required()
@@ -179,7 +179,7 @@ class ListVod extends ListRecords
                         Toggle::make('use_direct_path')
                             ->label('Use Direct File Paths')
                             ->default(false)
-                            ->helperText('When enabled, uses direct file paths instead of Emby streaming URLs. Requires file access from this server.'),
+                            ->helperText('When enabled, uses direct file paths instead of Emby/Jellyfin streaming URLs. Requires file access from this server.'),
                         Toggle::make('auto_enable')
                             ->label('Auto-enable Channels')
                             ->default(true)
@@ -191,7 +191,7 @@ class ListVod extends ListRecords
                             Notification::make()
                                 ->danger()
                                 ->title('Cannot Sync')
-                                ->body('Please configure Emby in Settings first.')
+                                ->body('Please configure Emby/Jellyfin in Settings first.')
                                 ->send();
                             return;
                         }
@@ -201,7 +201,7 @@ class ListVod extends ListRecords
                         // Get library name
                         $embyService = new EmbyService();
                         $libraries = $embyService->getLibraries();
-                        $libraryName = 'Emby Movies';
+                        $libraryName = 'Emby/Jellyfin Movies';
                         foreach ($libraries as $library) {
                             if ($library['ItemId'] === $data['library_id']) {
                                 $libraryName = $library['Name'];
@@ -220,13 +220,13 @@ class ListVod extends ListRecords
                     ->after(function () {
                         Notification::make()
                             ->success()
-                            ->title('Emby sync started')
-                            ->body('Syncing movies from Emby library. You will be notified once the process is complete.')
+                            ->title('Emby/Jellyfin sync started')
+                            ->body('Syncing movies from Emby/Jellyfin library. You will be notified once the process is complete.')
                             ->send();
                     })
                     ->requiresConfirmation()
                     ->modalIcon('heroicon-o-film')
-                    ->modalDescription('Sync movies from your Emby server library. This will import all movies with their metadata, posters, and streaming URLs.')
+                    ->modalDescription('Sync movies from your Emby/Jellyfin server library. This will import all movies with their metadata, posters, and streaming URLs.')
                     ->modalSubmitActionLabel('Sync now'),
                 Action::make('merge')
                     ->label('Merge Same ID')
