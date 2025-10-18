@@ -107,7 +107,7 @@ class SyncVodStrmFiles implements ShouldQueue
                 }
 
                 // Build the filename
-                $fileName = $channel->title;
+                $fileName = $channel->title_custom ?? $channel->title;
 
                 // Add metadata to filename
                 if (in_array('year', $filenameMetadata) && ! empty($channel->year)) {
