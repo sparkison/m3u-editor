@@ -1001,4 +1001,12 @@ class Preferences extends SettingsPage
             ->hint(fn() => ! empty($configValue) ? 'Already set by environment variable!' : null)
             ->dehydrated(fn() => empty($configValue));
     }
+
+    public function getSavedNotification(): ?Notification
+    {
+        return Notification::make()
+            ->success()
+            ->title('Settings saved')
+            ->body('Your preferences have been saved successfully.');
+    }
 }

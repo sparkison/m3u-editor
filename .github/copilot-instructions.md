@@ -1,3 +1,60 @@
+<!-- m3u-editor: AI coding assistant guidance (concise) -->
+# Quick guide for AI contributors
+
+- Project type: Laravel 12 application with Filament v4, Livewire v3, Tailwind v4. PHP 8.2.
+- Purpose: an M3U/Xtream playlist editor with EPG handling, proxying (ffmpeg / m3u-proxy), and Filament admin UI.
+
+Key things to know (do not assume):
+
+- Bootstrapping: read `bootstrap/app.php` to find custom middleware, CSRF exceptions, and where console/routes are registered. Many app behaviors are configured there.
+- Settings & UI: Filament pages and resources live in `app/Filament/*`. Example: `app/Filament/Pages/Preferences.php` shows many app conventions (use of Settings classes, Actions, Notification flows).
+- Proxy & streaming: proxy config is in `config/proxy.php` and ffmpeg behavior is surfaced in Filament settings; proxy code lives in `app/Services/ProxyService.php` and ffmpeg helpers in `app/Services/FfmpegCodecService.php`.
+- Important directories: `app/Jobs`, `app/Services`, `app/Models`, `app/Events`, `app/Listeners` — prefer Eloquent and Jobs for async work and side-effects.
+
+Dev workflows & commands you will suggest/use:
+
+- Install / setup (developer): composer install, npm install. The repo expects Docker but also runs locally. Common commands:
+  - PHP deps: `composer install`
+  - JS dev: `npm run dev` (vite) or `npm run build` for production assets
+  - App dev script (concurrent): `composer run dev` (see composer.json `dev` script)
+  - Tests: `php artisan test` (Pest)
+  - Formatting: `vendor/bin/pint` (run before commits)
+
+Project-specific conventions and patterns:
+
+- Filament-first UI: build admin screens via `app/Filament/*` using static make() patterns and Schema components (Tabs, Section, Grid). Follow existing file structure (Schemas/Components, Tables/Columns, Actions/).
+- Settings: app uses Filament Settings classes (see `app/Settings/GeneralSettings.php`) — prefer Settings classes over ad-hoc config for user-editable options.
+- Environment-overrides: many settings can be locked by env vars; components check `config()` and disable/dehydrate fields accordingly—follow that pattern when adding settings.
+- Jobs & Queues: use Jobs for background processing; restarting/resetting queues is handled via Artisan/Jobs (see `app/Jobs/RestartQueue.php`). Use `ShouldQueue` where appropriate.
+
+Testing guidance (concrete):
+
+- Tests are written with Pest. When modifying behavior add a Feature test under `tests/Feature/` or a Unit test under `tests/Unit/`.
+- Filament Livewire tests: authenticate then use Livewire::test() or livewire() helpers; see examples in existing tests.
+
+Integration points and external deps to watch for:
+
+- m3u-proxy: external proxy service used via `config('proxy.m3u_proxy_url')`. Preferences page contains actions that call its `/health` and `/docs` endpoints.
+- ffmpeg/jellyfin-ffmpeg: FFmpeg variant selection affects runtime behavior; env vars may pin paths (`proxy.ffmpeg_path`, `proxy.ffprobe_path`).
+- Reverb/Websockets, Horizon (queues), Redis, and optional Schedules Direct integration — check `config/*.php` and `app/Providers` for service wiring.
+
+When editing code (safety + QA):
+
+- Run affected tests only: `php artisan test --filter=YourTestName`.
+- Run `vendor/bin/pint` to format. Run `npm run dev` if touching frontend assets to confirm Vite manifest errors are not introduced.
+- Keep patches small and add a test when changing business logic.
+
+Files to reference for examples:
+
+- `bootstrap/app.php` — routing & middleware patterns
+- `app/Filament/Pages/Preferences.php` — settings UI, Actions, Notifications
+- `config/proxy.php` and `app/Services/ProxyService.php` — proxy integration
+- `composer.json` — dev scripts (composer run dev) and required PHP versions
+- `package.json` — vite scripts and tailwind version
+
+If unclear, ask the maintainer for the expected behavior. After edits, run tests + pint and report failures with exact command outputs.
+
+-- End of guidance
 <laravel-boost-guidelines>
 === foundation rules ===
 

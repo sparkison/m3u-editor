@@ -112,6 +112,8 @@ class EmbyService
                 'IncludeItemTypes' => $itemType,
                 'Recursive' => 'true',
                 'Fields' => 'Path,Overview,Genres,Studios,Tags,ProductionYear,PremiereDate,CommunityRating,OfficialRating,MediaStreams,MediaSources,People,RunTimeTicks',
+                'SortBy' => 'SortName,Name',
+                'SortOrder' => 'Ascending',
             ];
             
             Log::info('Media server API Request', [
@@ -356,7 +358,16 @@ class EmbyService
     public function shouldCreateMultipleGenreEntries(): bool
     {
         $settings = app(\App\Settings\GeneralSettings::class);
-        return ($settings->emby_genre_handling ?? 'primary') === 'all';
+        $genreHandling = $settings->emby_genre_handling ?? 'primary';
+        $result = $genreHandling === 'all';
+        
+        Log::info('🔍 DEBUG: shouldCreateMultipleGenreEntries called', [
+            'emby_genre_handling_setting' => $genreHandling,
+            'returns' => $result,
+            'comparison' => $genreHandling . ' === "all"',
+        ]);
+        
+        return $result;
     }
 
     /**
@@ -365,14 +376,22 @@ class EmbyService
     public function getTargetGenres(array $genres): array
     {
         if (empty($genres)) {
+            Log::info('🔍 DEBUG: getTargetGenres - empty genres array');
             return [];
         }
 
-        if ($this->shouldCreateMultipleGenreEntries()) {
-            return $genres; // Return all genres
-        }
+        $shouldCreateMultiple = $this->shouldCreateMultipleGenreEntries();
+        $result = $shouldCreateMultiple ? $genres : [reset($genres)];
+        
+        Log::info('🔍 DEBUG: getTargetGenres result', [
+            'input_genres' => $genres,
+            'input_count' => count($genres),
+            'shouldCreateMultiple' => $shouldCreateMultiple,
+            'output_genres' => $result,
+            'output_count' => count($result),
+        ]);
 
-        return [reset($genres)]; // Return only first genre
+        return $result;
     }
 
     /**
