@@ -197,7 +197,7 @@ class Preferences extends SettingsPage
                                                             $details .= "**Deployment Mode:** ✅ {$mode}\n\n";
                                                             $details .= " Standalone external proxy service\n\n";
                                                         } else {
-                                                            $details .= "**Deployment Mode:** ❌ {$mode}\n\n";
+                                                            $details .= "**Deployment Mode:** ⚠️ {$mode}\n\n";
                                                             $details .= " Embedded\n\n";
                                                         }
 
@@ -210,10 +210,19 @@ class Preferences extends SettingsPage
                                                         }
                                                         $details .= "\n";
 
+                                                        // If internal mode, show transcoding is unavailable, else show status
+                                                        if ($service->mode() !== 'external') {
+                                                            $details .= "**Transcoding:** ❌ Unavailable in internal mode\n";
+                                                        } else {
+                                                            $details .= "**Transcoding:** ✅ Available\n";
+                                                        }
+                                                        $details .= "\n";
+
                                                         // Redis Pooling
-                                                        $redisStatus = $info['redis']['pooling_enabled'] ? '✅ Enabled' : '❌ Disabled';
+                                                        $poolingEnabled = $service->mode() === 'external' && $info['redis']['pooling_enabled'];
+                                                        $redisStatus = $poolingEnabled ? '✅ Enabled' : '❌ Disabled';
                                                         $details .= "**Redis Pooling:** {$redisStatus}\n";
-                                                        if ($info['redis']['pooling_enabled']) {
+                                                        if ($poolingEnabled) {
                                                             $details .= "- Max clients per stream: {$info['redis']['max_clients_per_stream']}\n";
                                                             $details .= "- Sharing strategy: {$info['redis']['sharing_strategy']}\n";
                                                         }
