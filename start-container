@@ -54,7 +54,7 @@ if [ "${M3U_PROXY_ENABLED}" = "true" ]; then
     else
         export M3U_PROXY_URL="${APP_URL}:${APP_PORT}/m3u-proxy"
     fi
-    
+
     # For external proxy, use provided token
     export M3U_PROXY_TOKEN="${M3U_PROXY_TOKEN}"
     echo "🔗 External m3u-proxy mode enabled. Nginx will proxy /m3u-proxy/ to ${M3U_PROXY_NGINX_TARGET}"
@@ -69,6 +69,9 @@ else
     else
         export M3U_PROXY_URL="${APP_URL}:${APP_PORT}/m3u-proxy"
     fi
+
+    # Need to set the `PUBLIC_URL` for the proxy to use for re-writing HLS URLs
+    export M3U_PROXY_PUBLIC_URL="${M3U_PROXY_URL}"
     
     # M3U Proxy API key (for embedded proxy only)
     # Generate if not set
