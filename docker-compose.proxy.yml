@@ -82,6 +82,12 @@ services:
       
       # Logging
       - LOG_LEVEL=INFO
+
+      # Public URL for re-writing HLS stream URLs
+      # Set this to the public URL of your m3u-editor instance
+      # Replace `m3u-editor` with your actual domain or LAN IP if needed so it is accessible to clients
+      # NOTE: Make sure to add the `/m3u-proxy`
+      - PUBLIC_URL=http://m3u-editor/m3u-proxy  # Change to your public URL if needed
       
       # Note: ROOT_PATH=/m3u-proxy is now the default, no need to set it explicitly
       # Only set ROOT_PATH= (empty) if you need to use the root path instead
