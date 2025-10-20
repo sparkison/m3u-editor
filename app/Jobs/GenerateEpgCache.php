@@ -15,9 +15,9 @@ class GenerateEpgCache implements ShouldQueue
 {
     use Queueable;
 
-    // Giving a timeout of 30 minutes to the Job to generate the cache
+    // Giving a timeout of 90 minutes to the Job to generate the cache
     // This should be sufficient for most EPGs, but can be adjusted if needed
-    public $timeout = 60 * 30;
+    public $timeout = 60 * 90;
 
     // Allow up to 2 attempts (1 retry)
     public $tries = 2;
