@@ -90,34 +90,15 @@ fi
 
 # Websockets
 export REVERB_PORT="${REVERB_PORT:-36800}" # Default 36800
-export BROADCAST_CONNECTION="${BROADCAST_CONNECTION:-reverb}"
-# If broadcast driver is null, set `VITE_WEBSOCKETS_DISABLED` to true
-if [ "$BROADCAST_CONNECTION" = "null" ]; then
-    export VITE_WEBSOCKETS_DISABLED="true"
-else
-    # Using reverse proxy, port not needed in client
-    if [ -z "$REVERB_APP_ID" ]; then
-        # Generate random app id if not set
-        export REVERB_APP_ID=$(openssl rand -hex 12)
-    fi
-    if [ -z "$REVERB_APP_KEY" ]; then
-        # Generate random app key if not set
-        export REVERB_APP_KEY=$(openssl rand -hex 24)
-    fi
-    
-    # Export the websocket app key for Vite
-    export VITE_WEBSOCKET_APP_KEY="${REVERB_APP_KEY}"
 
-    # Setup the reverse proxy details
-    if [[ "$APP_URL" == *"https"* ]]; then
-        export VITE_WEBSOCKET_SCHEME="https"
-        export VITE_WEBSOCKET_HOST="${APP_URL#https://}" # Strip https:// -> "localhost"
-        export VITE_WEBSOCKET_PORT="443"  # Use 443 for HTTPS
-    else
-        export VITE_WEBSOCKET_SCHEME="http"
-        export VITE_WEBSOCKET_HOST="${APP_URL#http://}" # Strip http:// -> "localhost"  
-        export VITE_WEBSOCKET_PORT="${APP_PORT}"  # Use APP_PORT for HTTP reverse proxy
-    fi
+# Using reverse proxy, port not needed in client
+if [ -z "$REVERB_APP_ID" ]; then
+    # Generate random app id if not set
+    export REVERB_APP_ID=$(openssl rand -hex 12)
+fi
+if [ -z "$REVERB_APP_KEY" ]; then
+    # Generate random app key if not set
+    export REVERB_APP_KEY=$(openssl rand -hex 24)
 fi
 
 # Set timezone, default to UTC
@@ -497,15 +478,6 @@ php artisan migrate --force
 
 # Build assets
 echo "🛠️ Building assets..."
-
-# Ensure environment variables are exported for npm build
-export VITE_WEBSOCKET_SCHEME
-export VITE_WEBSOCKET_HOST
-export VITE_WEBSOCKET_PORT
-export VITE_WEBSOCKET_APP_KEY
-export VITE_WEBSOCKETS_DISABLED
-
-npm install && npm run build
 
 # Ensure composer dir is writable
 [ ! -d /.composer ] && mkdir /.composer

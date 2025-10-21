@@ -71,14 +71,12 @@ return [
 
         'apps' => [
             [
-                'key' => env('REVERB_APP_KEY'),
+                'key' => '5e2a227aacd3bc04713e595428195896617947b8f5ec11db31029abd13b13538', // env('REVERB_APP_KEY'),
                 'secret' => env('REVERB_APP_SECRET'),
                 'app_id' => env('REVERB_APP_ID'),
                 'options' => [
                     'host' => env('REVERB_HOST'),
-                    'port' => env('APP_ENV', 'production') === 'production' && env('REVERB_SCHEME', 'https') === 'https'
-                        ? 443 // force to 443 for https
-                        : env('REVERB_PORT', 443), // if not https, use the port specified
+                    'port' => env('REVERB_PORT'),
                     'scheme' => env('REVERB_SCHEME', 'https'),
                     'useTLS' => env('REVERB_SCHEME', 'https') === 'https',
                 ],
