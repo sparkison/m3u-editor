@@ -136,6 +136,9 @@ RUN composer install --no-dev --no-interaction --no-progress -o
 # Install npm dependencies and build assets
 RUN npm install && npm run build
 
+# Remove node_modules to save space after build
+RUN rm -rf node_modules
+
 # Setup user, group and permissions
 RUN addgroup $WWWGROUP \
     && adduser -h /var/www/html -s /bin/bash -G $WWWGROUP -D $WWWUSER
