@@ -8,28 +8,16 @@ if (disabled === 'true') {
 } else {
     window.Pusher = Pusher;
     
-    const scheme = import.meta.env.VITE_WEBSOCKET_SCHEME ?? 'https';
-    const host = import.meta.env.VITE_WEBSOCKET_HOST || '';
-    const port = import.meta.env.VITE_WEBSOCKET_PORT;
-    
-    // For reverse proxy setup, use the port from environment
-    let wsPort, wssPort;
-    
-    if (port && port !== '' && port !== 'null') {
-        wsPort = parseInt(port);
-        wssPort = parseInt(port);
-    } else {
-        // Fallback to default ports
-        wsPort = scheme === 'https' ? 443 : 80;
-        wssPort = scheme === 'https' ? 443 : 80;
-    }
+    const host = window.location.hostname;
+    const scheme = window.location.protocol.slice(0, -1); // remove the trailing ':'
+    const port = window.location.port;
 
     const echoConfig = {
         broadcaster: 'reverb',
-        key: import.meta.env.VITE_WEBSOCKET_APP_KEY,
+        key: "5e2a227aacd3bc04713e595428195896617947b8f5ec11db31029abd13b13538",
         wsHost: host,
-        wsPort: wsPort,
-        wssPort: wssPort,
+        wsPort: port,
+        wssPort: port,
         forceTLS: scheme === 'https',
         enabledTransports: ['ws', 'wss'],
     };

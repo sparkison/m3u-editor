@@ -1023,7 +1023,7 @@ class ChannelResource extends Resource
                         ->prefixIcon('heroicon-m-globe-alt')
                         ->hintIcon(
                             'heroicon-m-question-mark-circle',
-                            tooltip: 'Use m3u editor proxy to access this channel. Format is defined in playlist proxy options.'
+                            tooltip: 'Use m3u editor proxy to access this channel.'
                         )
                         ->formatStateUsing(function ($record) {
                             if (!$record || !$record->id) {
