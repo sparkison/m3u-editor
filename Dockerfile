@@ -133,6 +133,9 @@ RUN echo "GIT_BRANCH=${GIT_BRANCH}" > /var/www/html/.git-info && \
 # Install composer dependencies
 RUN composer install --no-dev --no-interaction --no-progress -o
 
+# Install npm dependencies and build assets
+RUN npm install && npm run build
+
 # Setup user, group and permissions
 RUN addgroup $WWWGROUP \
     && adduser -h /var/www/html -s /bin/bash -G $WWWGROUP -D $WWWUSER
