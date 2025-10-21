@@ -112,6 +112,8 @@ class EmbyService
                 'IncludeItemTypes' => $itemType,
                 'Recursive' => 'true',
                 'Fields' => 'Path,Overview,Genres,Studios,Tags,ProductionYear,PremiereDate,CommunityRating,OfficialRating,MediaStreams,MediaSources,People,RunTimeTicks',
+                'SortBy' => 'SortName,Name',
+                'SortOrder' => 'Ascending',
             ];
             
             Log::info('Media server API Request', [
@@ -322,5 +324,147 @@ class EmbyService
         $secs = $seconds % 60;
 
         return sprintf('%02d:%02d:%02d', $hours, $minutes, $secs);
+    }
+
+    /**
+     * Extract genres from an item for grouping purposes
+     */
+    public function extractGenresForGrouping(array $item): array
+    {
+        $genres = $item['Genres'] ?? [];
+        
+        // Filter out empty genres and clean them up
+        $cleanGenres = array_filter(array_map('trim', $genres));
+        
+        return array_values($cleanGenres);
+    }
+
+    /**
+     * Check if groups/categories should be created from genres
+     */
+    public function shouldCreateGroupsFromGenres(?bool $override = null): bool
+    {
+        if ($override !== null) {
+            return $override;
+        }
+        
+        $settings = app(\App\Settings\GeneralSettings::class);
+        return $settings->emby_import_groups_categories ?? false;
+    }
+
+    /**
+     * Check if content should be created in multiple genres
+     */
+    public function shouldCreateMultipleGenreEntries(): bool
+    {
+        $settings = app(\App\Settings\GeneralSettings::class);
+        $genreHandling = $settings->emby_genre_handling ?? 'primary';
+        $result = $genreHandling === 'all';
+        
+        Log::info('🔍 DEBUG: shouldCreateMultipleGenreEntries called', [
+            'emby_genre_handling_setting' => $genreHandling,
+            'returns' => $result,
+            'comparison' => $genreHandling . ' === "all"',
+        ]);
+        
+        return $result;
+    }
+
+    /**
+     * Get target genres based on user configuration
+     */
+    public function getTargetGenres(array $genres): array
+    {
+        if (empty($genres)) {
+            Log::info('🔍 DEBUG: getTargetGenres - empty genres array');
+            return [];
+        }
+
+        $shouldCreateMultiple = $this->shouldCreateMultipleGenreEntries();
+        $result = $shouldCreateMultiple ? $genres : [reset($genres)];
+        
+        Log::info('🔍 DEBUG: getTargetGenres result', [
+            'input_genres' => $genres,
+            'input_count' => count($genres),
+            'shouldCreateMultiple' => $shouldCreateMultiple,
+            'output_genres' => $result,
+            'output_count' => count($result),
+        ]);
+
+        return $result;
+    }
+
+    /**
+     * Create groups from genres for VOD content
+     */
+    public function createGroupsFromGenres(array $genres, \App\Models\Playlist $playlist, string $batchNo): \Illuminate\Support\Collection
+    {
+        $groups = collect();
+        
+        foreach ($genres as $genre) {
+            if (empty($genre)) {
+                continue;
+            }
+
+            $group = \App\Models\Group::firstOrCreate([
+                'name_internal' => $genre,
+                'playlist_id' => $playlist->id,
+                'user_id' => $playlist->user_id,
+                'custom' => false,
+            ], [
+                'name' => $genre,
+                'import_batch_no' => $batchNo,
+            ]);
+
+            $groups->push($group);
+        }
+
+        return $groups;
+    }
+
+    /**
+     * Create categories from genres for series content
+     */
+    public function createCategoriesFromGenres(array $genres, \App\Models\Playlist $playlist): \Illuminate\Support\Collection
+    {
+        $categories = collect();
+        
+        foreach ($genres as $genre) {
+            if (empty($genre)) {
+                continue;
+            }
+
+            $category = \App\Models\Category::firstOrCreate([
+                'name_internal' => $genre,
+                'playlist_id' => $playlist->id,
+            ], [
+                'name' => $genre,
+                'user_id' => $playlist->user_id,
+                'enabled' => true,
+            ]);
+
+            $categories->push($category);
+        }
+
+        return $categories;
+    }
+
+    /**
+     * Process item genres and create appropriate groups/categories
+     */
+    public function processItemGenres(array $item, \App\Models\Playlist $playlist, string $batchNo, string $type = 'group', ?bool $enableGenreGrouping = null): \Illuminate\Support\Collection
+    {
+        if (!$this->shouldCreateGroupsFromGenres($enableGenreGrouping)) {
+            return collect();
+        }
+
+        $genres = $this->extractGenresForGrouping($item);
+        $targetGenres = $this->getTargetGenres($genres);
+
+        if ($type === 'category') {
+            return $this->createCategoriesFromGenres($targetGenres, $playlist);
+        }
+
+        return $this->createGroupsFromGenres($targetGenres, $playlist, $batchNo);
     }
 }

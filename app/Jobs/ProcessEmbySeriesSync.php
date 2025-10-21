@@ -34,6 +34,7 @@ class ProcessEmbySeriesSync implements ShouldQueue
         public string $libraryName,
         public bool $useDirectPath = false,
         public bool $autoEnable = true,
+        public ?bool $importCategoriesFromGenres = null,
     ) {
         //
     }
@@ -46,6 +47,21 @@ class ProcessEmbySeriesSync implements ShouldQueue
         $start = now();
 
         try {
+            // Refresh playlist to get latest data
+            $this->playlist->refresh();
+            
+            // Check if an Emby Series sync is already in progress
+            $embyConfig = $this->playlist->emby_config ?? [];
+            if (isset($embyConfig['series']['syncing']) && $embyConfig['series']['syncing'] === true) {
+                Log::info('Emby Series sync already in progress, skipping', [
+                    'playlist_id' => $this->playlist->id,
+                ]);
+                return;
+            }
+
+            // Set the syncing flag
+            $embyConfig['series']['syncing'] = true;
+            
             // Update playlist status and set source type
             $this->playlist->update([
                 'processing' => true,
@@ -53,6 +69,17 @@ class ProcessEmbySeriesSync implements ShouldQueue
                 'errors' => null,
                 'progress' => 0,
                 'source_type' => PlaylistSourceType::Emby,
+                'emby_config' => [
+                    'vod' => $this->playlist->emby_config['vod'] ?? null,
+                    'series' => [
+                        'library_id' => $this->libraryId,
+                        'library_name' => $this->libraryName,
+                        'use_direct_path' => $this->useDirectPath,
+                        'auto_enable' => $this->autoEnable,
+                        'import_categories_from_genres' => $this->importCategoriesFromGenres,
+                        'syncing' => true,
+                    ],
+                ],
             ]);
 
             $embyService = new EmbyService();
@@ -123,9 +150,16 @@ class ProcessEmbySeriesSync implements ShouldQueue
                 $this->playlist->update(['progress' => $progress]);
             }
 
+            // Clean up series, seasons, and episodes that no longer exist in Emby library
+            $removedCounts = $this->cleanupOldSeries($batchNo);
+
             // Calculate completion time
             $completedIn = $start->diffInSeconds(now());
             $completedInRounded = round($completedIn, 2);
+
+            // Clear the syncing flag
+            $embyConfig = $this->playlist->fresh()->emby_config ?? [];
+            $embyConfig['series']['syncing'] = false;
 
             // Update playlist status
             $this->playlist->update([
@@ -135,10 +169,14 @@ class ProcessEmbySeriesSync implements ShouldQueue
                 'sync_time' => $completedIn,
                 'progress' => 100,
                 'processing' => false,
+                'emby_config' => $embyConfig,
             ]);
 
             // Send success notification
-            $message = "Successfully imported {$importedSeriesCount} series with {$importedEpisodeCount} episodes from Emby library '{$this->libraryName}' in {$completedInRounded} seconds.";
+            $removedMessage = $removedCounts['series'] > 0 
+                ? " Removed {$removedCounts['series']} series ({$removedCounts['episodes']} episodes) no longer available on server." 
+                : "";
+            $message = "Successfully imported {$importedSeriesCount} series with {$importedEpisodeCount} episodes from Emby library '{$this->libraryName}' in {$completedInRounded} seconds.{$removedMessage}";
             Notification::make()
                 ->success()
                 ->title('Emby Series Sync Completed')
@@ -150,8 +188,20 @@ class ProcessEmbySeriesSync implements ShouldQueue
                 ->body($message)
                 ->sendToDatabase($this->playlist->user);
 
-            event(new SyncCompleted($this->playlist));
+            event(new SyncCompleted($this->playlist, 'emby_series'));
         } catch (Exception $e) {
+            // Clear the syncing flag on error
+            try {
+                $embyConfig = $this->playlist->fresh()->emby_config ?? [];
+                $embyConfig['series']['syncing'] = false;
+                $this->playlist->update(['emby_config' => $embyConfig]);
+            } catch (Exception $clearException) {
+                Log::error('Failed to clear syncing flag after error', [
+                    'playlist_id' => $this->playlist->id,
+                    'error' => $clearException->getMessage(),
+                ]);
+            }
+            
             $this->sendError('Emby Series sync failed', $e->getMessage());
         }
     }
@@ -185,24 +235,93 @@ class ProcessEmbySeriesSync implements ShouldQueue
         // Calculate rating_5based from CommunityRating (rating / 2)
         $rating5based = $communityRating ? round($communityRating / 2, 1) : null;
 
-        // Create or update series
-        $series = Series::updateOrCreate([
-            'name' => $seriesName,
-            'playlist_id' => $this->playlist->id,
-        ], [
-            'user_id' => $this->playlist->user_id,
-            'category_id' => $category->id,
-            'enabled' => $this->autoEnable,
-            'cover' => $posterUrl,
-            'plot' => $overview,
-            'cast' => $cast,
-            'director' => $director,
-            'genre' => $genres,
-            'release_date' => $year ? "{$year}-01-01" : null,
-            'rating' => $rating5based,
-            'backdrop_path' => [$backdropUrl],
-            'import_batch_no' => $batchNo,
-        ]);
+        // Determine target categories - either genre-based or library-based
+        $targetCategories = collect([$category]); // Default to library category
+        
+        if ($embyService->shouldCreateGroupsFromGenres($this->importCategoriesFromGenres)) {
+            $genreCategories = $embyService->processItemGenres($seriesData, $this->playlist, $batchNo, 'category', $this->importCategoriesFromGenres);
+            if ($genreCategories->isNotEmpty()) {
+                $targetCategories = $genreCategories;
+                Log::debug('Using genre-based categories for series', [
+                    'series_name' => $seriesName,
+                    'categories' => $genreCategories->pluck('name')->toArray(),
+                ]);
+            }
+        }
+
+        // Create or update series for each target category
+        $allEpisodeCount = 0;
+        foreach ($targetCategories as $targetCategory) {
+            $seriesKey = $seriesName;
+            if ($targetCategories->count() > 1) {
+                // Add category suffix for multi-category content to avoid conflicts
+                $seriesKey .= ' (' . $targetCategory->name . ')';
+            }
+
+            // Check for orphaned series with same emby_id but different source_series_id
+            // This handles cases where configuration changes between syncs
+            $orphanedSeries = Series::where('playlist_id', $this->playlist->id)
+                ->where('name', $seriesKey)
+                ->where('source_series_id', '!=', $seriesId)
+                ->first();
+
+            if ($orphanedSeries) {
+                Log::info('Found orphaned series with different source_series_id', [
+                    'series_id' => $orphanedSeries->id,
+                    'name' => $seriesKey,
+                    'old_source_series_id' => $orphanedSeries->source_series_id,
+                    'new_source_series_id' => $seriesId,
+                    'emby_id' => $seriesId,
+                ]);
+                
+                // Update the source_series_id and batch number to match current sync
+                $orphanedSeries->update([
+                    'source_series_id' => $seriesId,
+                    'import_batch_no' => $batchNo,
+                ]);
+                
+                Log::info('Updated orphaned series to match current configuration', [
+                    'series_id' => $orphanedSeries->id,
+                    'updated_source_series_id' => $seriesId,
+                ]);
+            }
+
+            // Create or update series
+            $series = Series::updateOrCreate([
+                'name' => $seriesKey,
+                'playlist_id' => $this->playlist->id,
+            ], [
+                'user_id' => $this->playlist->user_id,
+                'category_id' => $targetCategory->id,
+                'source_series_id' => $seriesId, // Store Emby series ID for cleanup tracking
+                'enabled' => $this->autoEnable,
+                'cover' => $posterUrl,
+                'plot' => $overview,
+                'cast' => $cast,
+                'director' => $director,
+                'genre' => $genres,
+                'release_date' => $year ? "{$year}-01-01" : null,
+                'rating' => $rating5based,
+                'backdrop_path' => [$backdropUrl],
+                'import_batch_no' => $batchNo,
+            ]);
+
+            // Process seasons and episodes for this series instance
+            $seriesEpisodeCount = $this->processSeriesSeasons($seriesData, $series, $batchNo, $embyService);
+            $allEpisodeCount += $seriesEpisodeCount;
+        }
+
+        return $allEpisodeCount;
+    }
+
+    /**
+     * Process seasons and episodes for a series
+     */
+    private function processSeriesSeasons(array $seriesData, Series $series, string $batchNo, EmbyService $embyService): int
+    {
+        $seriesName = $seriesData['Name'] ?? 'Unknown';
+        $seriesId = $seriesData['Id'];
+        $episodeCount = 0;
 
         // Get seasons for this series
         Log::debug('Fetching seasons for series', [
@@ -355,6 +474,66 @@ class ProcessEmbySeriesSync implements ShouldQueue
     }
 
     /**
+     * Clean up series, seasons, and episodes that are no longer in the Emby library
+     */
+    private function cleanupOldSeries(string $currentBatchNo): array
+    {
+        // Only cleanup series that were imported from Emby (have source_series_id set)
+        // and either have a different batch number OR null batch number (old imports)
+        $seriesToDelete = Series::where('playlist_id', $this->playlist->id)
+            ->whereNotNull('source_series_id') // Only Emby-sourced series
+            ->where(function ($query) use ($currentBatchNo) {
+                $query->where('import_batch_no', '!=', $currentBatchNo)
+                      ->orWhereNull('import_batch_no');
+            });
+
+        $removedSeriesCount = $seriesToDelete->count();
+        $removedEpisodeCount = 0;
+
+        if ($removedSeriesCount > 0) {
+            Log::info('Starting Emby Series cleanup', [
+                'playlist_id' => $this->playlist->id,
+                'current_batch' => $currentBatchNo,
+                'series_to_remove' => $removedSeriesCount,
+            ]);
+
+            // Get the series BEFORE deleting to count episodes
+            // Use direct where clause instead of whereHas for better performance
+            $seriesToDeleteCollection = $seriesToDelete->get();
+            foreach ($seriesToDeleteCollection as $series) {
+                // Count episodes in this series (will be cascade deleted by database)
+                $removedEpisodeCount += Episode::where('series_id', $series->id)->count();
+            }
+
+            // Rebuild the query and delete in one atomic operation
+            // Database cascade deletes will automatically remove seasons and episodes
+            $deletedSeries = Series::where('playlist_id', $this->playlist->id)
+                ->whereNotNull('source_series_id') // Only Emby-sourced series
+                ->where(function ($query) use ($currentBatchNo) {
+                    $query->where('import_batch_no', '!=', $currentBatchNo)
+                          ->orWhereNull('import_batch_no');
+                })
+                ->delete();
+
+            Log::info('Emby Series cleanup completed', [
+                'playlist_id' => $this->playlist->id,
+                'series_removed' => $deletedSeries,
+                'episodes_removed' => $removedEpisodeCount,
+            ]);
+        } else {
+            Log::info('No series to cleanup', [
+                'playlist_id' => $this->playlist->id,
+                'current_batch' => $currentBatchNo,
+            ]);
+        }
+
+        return [
+            'series' => $removedSeriesCount,
+            'episodes' => $removedEpisodeCount,
+        ];
+    }
+
+    /**
      * Send error notification
      */
     private function sendError(string $message, string $error): void
@@ -380,6 +559,6 @@ class ProcessEmbySeriesSync implements ShouldQueue
             'processing' => false,
         ]);
 
-        event(new SyncCompleted($this->playlist));
+        event(new SyncCompleted($this->playlist, 'emby_series'));
     }
 }

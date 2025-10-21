@@ -117,6 +117,13 @@ class ListSeries extends ListRecords
                             ->label('Auto-enable Series')
                             ->default(true)
                             ->helperText('Automatically enable imported series.'),
+                        Toggle::make('import_categories_from_genres')
+                            ->label('Import Categories from Genres')
+                            ->default(function () {
+                                $settings = app(\App\Settings\GeneralSettings::class);
+                                return $settings->emby_import_groups_categories ?? false;
+                            })
+                            ->helperText('Create categories based on Emby genres. Uses the genre handling preference from Settings.'),
                     ])
                     ->action(function (array $data) {
                         // Validate library selection
@@ -148,6 +155,7 @@ class ListSeries extends ListRecords
                             libraryName: $libraryName,
                             useDirectPath: $data['use_direct_path'] ?? false,
                             autoEnable: $data['auto_enable'] ?? true,
+                            importCategoriesFromGenres: $data['import_categories_from_genres'] ?? null,
                         ));
                     })
                     ->after(function () {
