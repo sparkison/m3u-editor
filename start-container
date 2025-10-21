@@ -91,14 +91,17 @@ fi
 # Websockets
 export REVERB_PORT="${REVERB_PORT:-36800}" # Default 36800
 
+# REVERB_APP_KEY is fixed for now so we can pre-compile assets on build
+# See resources/js/echo.js and config/broadcasting.php
+
 # Using reverse proxy, port not needed in client
 if [ -z "$REVERB_APP_ID" ]; then
     # Generate random app id if not set
     export REVERB_APP_ID=$(openssl rand -hex 12)
 fi
-if [ -z "$REVERB_APP_KEY" ]; then
-    # Generate random app key if not set
-    export REVERB_APP_KEY=$(openssl rand -hex 24)
+if [ -z "$REVERB_APP_SECRET" ]; then
+    # Generate random app secret if not set
+    export REVERB_APP_SECRET=$(openssl rand -hex 24)
 fi
 
 # Set timezone, default to UTC
