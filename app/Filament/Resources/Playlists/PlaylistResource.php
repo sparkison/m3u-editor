@@ -282,7 +282,7 @@ class PlaylistResource extends Resource
                                 ->duration(10000)
                                 ->send();
                         })
-                        ->disabled(fn($record): bool => $record->status === Status::Processing)
+                        ->disabled(fn($record): bool => $record->processing === true)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
@@ -306,7 +306,7 @@ class PlaylistResource extends Resource
                                 ->duration(10000)
                                 ->send();
                         })
-                        ->disabled(fn($record): bool => $record->status === Status::Processing)
+                        ->disabled(fn($record): bool => $record->processing === true)
                         ->hidden(fn($record): bool => ! $record->xtream)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-down-tray')
@@ -331,13 +331,137 @@ class PlaylistResource extends Resource
                                 ->duration(10000)
                                 ->send();
                         })
-                        ->disabled(fn($record): bool => $record->status === Status::Processing)
+                        ->disabled(fn($record): bool => $record->processing === true)
                         ->hidden(fn($record): bool => ! $record->xtream)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-down-tray')
                         ->modalIcon('heroicon-o-arrow-down-tray')
                         ->modalDescription('Fetch VOD metadata for this playlist now? Only enabled VOD channels will be included.')
                         ->modalSubmitActionLabel('Yes, process now'),
+                    Action::make('sync_emby_vod')
+                        ->label('Sync Emby VOD')
+                        ->icon('heroicon-o-arrow-path')
+                        ->action(function ($record) {
+                            $embyConfig = $record->emby_config['vod'] ?? null;
+                            if (!$embyConfig) {
+                                Notification::make()
+                                    ->danger()
+                                    ->title('Emby VOD not configured')
+                                    ->body('This playlist does not have Emby VOD configuration. Please configure Emby VOD sync first.')
+                                    ->send();
+                                return;
+                            }
+                            
+                            $record->update([
+                                'status' => Status::Processing,
+                                'progress' => 0,
+                            ]);
+                            
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new \App\Jobs\ProcessEmbyVodSync(
+                                    playlist: $record,
+                                    libraryId: $embyConfig['library_id'],
+                                    libraryName: $embyConfig['library_name'],
+                                    useDirectPath: $embyConfig['use_direct_path'] ?? false,
+                                    autoEnable: $embyConfig['auto_enable'] ?? true,
+                                    importGroupsFromGenres: $embyConfig['import_groups_from_genres'] ?? null
+                                ));
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Emby VOD sync started')
+                                ->body('Emby VOD is being synced in the background. This will fetch movies from your Emby server and clean up any removed items. You will be notified on completion.')
+                                ->duration(10000)
+                                ->send();
+                        })
+                        ->disabled(fn($record): bool => $record->processing === true)
+                        ->hidden(fn($record): bool => ($record->emby_config['vod'] ?? null) === null)
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-arrow-path')
+                        ->modalIcon('heroicon-o-arrow-path')
+                        ->modalDescription('Sync VOD from Emby now? This will fetch current movies and remove any that no longer exist in your Emby library.')
+                        ->modalSubmitActionLabel('Yes, sync now'),
+                    Action::make('sync_emby_series')
+                        ->label('Sync Emby Series')
+                        ->icon('heroicon-o-arrow-path')
+                        ->action(function ($record) {
+                            $embyConfig = $record->emby_config['series'] ?? null;
+                            if (!$embyConfig) {
+                                Notification::make()
+                                    ->danger()
+                                    ->title('Emby Series not configured')
+                                    ->body('This playlist does not have Emby Series configuration. Please configure Emby Series sync first.')
+                                    ->send();
+                                return;
+                            }
+                            
+                            $record->update([
+                                'status' => Status::Processing,
+                                'series_progress' => 0,
+                            ]);
+                            
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new \App\Jobs\ProcessEmbySeriesSync(
+                                    playlist: $record,
+                                    libraryId: $embyConfig['library_id'],
+                                    libraryName: $embyConfig['library_name'],
+                                    useDirectPath: $embyConfig['use_direct_path'] ?? false,
+                                    autoEnable: $embyConfig['auto_enable'] ?? true,
+                                    importCategoriesFromGenres: $embyConfig['import_categories_from_genres'] ?? null
+                                ));
+                        })->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Emby Series sync started')
+                                ->body('Emby Series is being synced in the background. This will fetch TV shows from your Emby server and clean up any removed items. You will be notified on completion.')
+                                ->duration(10000)
+                                ->send();
+                        })
+                        ->disabled(fn($record): bool => $record->processing === true)
+                        ->hidden(fn($record): bool => ($record->emby_config['series'] ?? null) === null)
+                        ->requiresConfirmation()
+                        ->icon('heroicon-o-arrow-path')
+                        ->modalIcon('heroicon-o-arrow-path')
+                        ->modalDescription('Sync Series from Emby now? This will fetch current TV shows and remove any that no longer exist in your Emby library.')
+                        ->modalSubmitActionLabel('Yes, sync now'),
+                    Action::make('reset_processing')
+                        ->label('Reset Processing State')
+                        ->icon('heroicon-o-arrow-path')
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->modalHeading('Reset Processing State')
+                        ->modalDescription('This will clear any stuck processing locks and allow new syncs to run. Use this if syncs appear stuck.')
+                        ->modalSubmitActionLabel('Reset')
+                        ->action(function (Playlist $record) {
+                            // Clear processing flag
+                            $record->processing = false;
+                            
+                            // Clear Emby syncing flags if they exist
+                            if ($record->emby_config) {
+                                $embyConfig = $record->emby_config;
+                                
+                                if (isset($embyConfig['vod'])) {
+                                    $embyConfig['vod']['syncing'] = false;
+                                    unset($embyConfig['vod']['sync_started_at']);
+                                }
+                                
+                                if (isset($embyConfig['series'])) {
+                                    $embyConfig['series']['syncing'] = false;
+                                    unset($embyConfig['series']['sync_started_at']);
+                                }
+                                
+                                $record->emby_config = $embyConfig;
+                            }
+                            
+                            $record->save();
+                            
+                            Notification::make()
+                                ->success()
+                                ->title('Processing state reset')
+                                ->body('The playlist is no longer processing. You can now run new syncs.')
+                                ->send();
+                        })
+                        ->visible(fn (Playlist $record) => $record->processing === true),
                     Action::make('Download M3U')
                         ->label('Download M3U')
                         ->icon('heroicon-o-arrow-down-tray')
@@ -638,7 +762,7 @@ class PlaylistResource extends Resource
                             ->duration(10000)
                             ->send();
                     })
-                    ->disabled(fn($record): bool => $record->status === Status::Processing)
+                    ->disabled(fn($record): bool => $record->processing === true)
                     ->requiresConfirmation()
                     ->icon('heroicon-o-arrow-path')
                     ->modalIcon('heroicon-o-arrow-path')
@@ -662,7 +786,7 @@ class PlaylistResource extends Resource
                             ->duration(10000)
                             ->send();
                     })
-                    ->disabled(fn($record): bool => $record->status === Status::Processing)
+                    ->disabled(fn($record): bool => $record->processing === true)
                     ->hidden(fn($record): bool => ! $record->xtream)
                     ->requiresConfirmation()
                     ->icon('heroicon-o-arrow-down-tray')
@@ -687,13 +811,137 @@ class PlaylistResource extends Resource
                             ->duration(10000)
                             ->send();
                     })
-                    ->disabled(fn($record): bool => $record->status === Status::Processing)
+                    ->disabled(fn($record): bool => $record->processing === true)
                     ->hidden(fn($record): bool => ! $record->xtream)
                     ->requiresConfirmation()
                     ->icon('heroicon-o-arrow-down-tray')
                     ->modalIcon('heroicon-o-arrow-down-tray')
                     ->modalDescription('Fetch VOD metadata for this playlist now? Only enabled VOD channels will be included.')
                     ->modalSubmitActionLabel('Yes, process now'),
+                Action::make('sync_emby_vod')
+                    ->label('Sync Emby VOD')
+                    ->icon('heroicon-o-arrow-path')
+                    ->action(function ($record) {
+                        $embyConfig = $record->emby_config['vod'] ?? null;
+                        if (!$embyConfig) {
+                            Notification::make()
+                                ->danger()
+                                ->title('Emby VOD not configured')
+                                ->body('This playlist does not have Emby VOD configuration. Please configure Emby VOD sync first.')
+                                ->send();
+                            return;
+                        }
+                        
+                        $record->update([
+                            'status' => Status::Processing,
+                            'progress' => 0,
+                        ]);
+                        
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new \App\Jobs\ProcessEmbyVodSync(
+                                playlist: $record,
+                                libraryId: $embyConfig['library_id'],
+                                libraryName: $embyConfig['library_name'],
+                                useDirectPath: $embyConfig['use_direct_path'] ?? false,
+                                autoEnable: $embyConfig['auto_enable'] ?? true,
+                                importGroupsFromGenres: $embyConfig['import_groups_from_genres'] ?? null
+                            ));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Emby VOD sync started')
+                            ->body('Emby VOD is being synced in the background. This will fetch movies from your Emby server and clean up any removed items. You will be notified on completion.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->disabled(fn($record): bool => $record->processing === true)
+                    ->hidden(fn($record): bool => ($record->emby_config['vod'] ?? null) === null)
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrow-path')
+                    ->modalIcon('heroicon-o-arrow-path')
+                    ->modalDescription('Sync VOD from Emby now? This will fetch current movies and remove any that no longer exist in your Emby library.')
+                    ->modalSubmitActionLabel('Yes, sync now'),
+                Action::make('sync_emby_series')
+                    ->label('Sync Emby Series')
+                    ->icon('heroicon-o-arrow-path')
+                    ->action(function ($record) {
+                        $embyConfig = $record->emby_config['series'] ?? null;
+                        if (!$embyConfig) {
+                            Notification::make()
+                                ->danger()
+                                ->title('Emby Series not configured')
+                                ->body('This playlist does not have Emby Series configuration. Please configure Emby Series sync first.')
+                                ->send();
+                            return;
+                        }
+                        
+                        $record->update([
+                            'status' => Status::Processing,
+                            'series_progress' => 0,
+                        ]);
+                        
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new \App\Jobs\ProcessEmbySeriesSync(
+                                playlist: $record,
+                                libraryId: $embyConfig['library_id'],
+                                libraryName: $embyConfig['library_name'],
+                                useDirectPath: $embyConfig['use_direct_path'] ?? false,
+                                autoEnable: $embyConfig['auto_enable'] ?? true,
+                                importCategoriesFromGenres: $embyConfig['import_categories_from_genres'] ?? null
+                            ));
+                    })->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('Emby Series sync started')
+                            ->body('Emby Series is being synced in the background. This will fetch TV shows from your Emby server and clean up any removed items. You will be notified on completion.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->disabled(fn($record): bool => $record->processing === true)
+                    ->hidden(fn($record): bool => ($record->emby_config['series'] ?? null) === null)
+                    ->requiresConfirmation()
+                    ->icon('heroicon-o-arrow-path')
+                    ->modalIcon('heroicon-o-arrow-path')
+                    ->modalDescription('Sync Series from Emby now? This will fetch current TV shows and remove any that no longer exist in your Emby library.')
+                    ->modalSubmitActionLabel('Yes, sync now'),
+                Action::make('reset_processing')
+                    ->label('Reset Processing State')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Reset Processing State')
+                    ->modalDescription('This will clear any stuck processing locks and allow new syncs to run. Use this if syncs appear stuck.')
+                    ->modalSubmitActionLabel('Reset')
+                    ->action(function ($record) {
+                        // Clear processing flag
+                        $record->processing = false;
+                        
+                        // Clear Emby syncing flags if they exist
+                        if ($record->emby_config) {
+                            $embyConfig = $record->emby_config;
+                            
+                            if (isset($embyConfig['vod'])) {
+                                $embyConfig['vod']['syncing'] = false;
+                                unset($embyConfig['vod']['sync_started_at']);
+                            }
+                            
+                            if (isset($embyConfig['series'])) {
+                                $embyConfig['series']['syncing'] = false;
+                                unset($embyConfig['series']['sync_started_at']);
+                            }
+                            
+                            $record->emby_config = $embyConfig;
+                        }
+                        
+                        $record->save();
+                        
+                        Notification::make()
+                            ->success()
+                            ->title('Processing state reset')
+                            ->body('The playlist is no longer processing. You can now run new syncs.')
+                            ->send();
+                    })
+                    ->visible(fn ($record) => $record->processing === true),
                 Action::make('Download M3U')
                     ->label('Download M3U')
                     ->icon('heroicon-o-arrow-down-tray')

@@ -35,3 +35,5 @@ websockets.sh
 config/database
 config/logs
 config/env
+ARCHITECTURE_PLAN.md
+*.md
