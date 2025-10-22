@@ -98,7 +98,7 @@ class EpgCacheService
         }
         try {
             Log::debug("Starting EPG cache generation for {$epg->name}");
-            set_time_limit(60 * 90); // 90 minutes
+            set_time_limit(60 * 120); // 120 minutes
 
             // Get the channel count for progress tracking
             $totalChannels = $epg->channel_count ?? $epg->channels()->count();
