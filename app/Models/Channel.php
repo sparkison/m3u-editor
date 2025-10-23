@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\ChannelLogoType;
 use App\Enums\PlaylistSourceType;
 use App\Facades\ProxyFacade;
+use App\Http\Controllers\LogoProxyController;
 use App\Services\XtreamService;
 use Exception;
 use Filament\Notifications\Notification;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Spatie\Tags\HasTags;
 use Symfony\Component\Process\Process as SymfonyProcess;
+use Illuminate\Support\Str;
 
 class Channel extends Model
 {
@@ -102,6 +104,51 @@ class Channel extends Model
             'id', // Local key on the projects table...
             'channel_failover_id' // Local key on the environments table...
         )->orderBy('channel_failovers.sort');
+    }
+
+    public function getFloatingPlayerAttributes(): array
+    {
+        // Always proxy the internal proxy so we can attempt to transcode the stream for better compatibility
+        $url = route('m3u-proxy.channel.player', ['id' => $this->id]);
+
+        // Determine the channel format based on URL or container extension
+        $originalUrl = $this->url_custom ?? $this->url;
+        if (Str::endsWith($originalUrl, '.m3u8') || Str::endsWith($originalUrl, '.ts')) {
+            $channelFormat = 'ts';
+        } else {
+            $channelFormat = $this->container_extension ?? 'ts';
+        }
+
+        // Get the icon
+        $icon = '';
+        if ($this->logo) {
+            // Logo override takes precedence
+            $icon = $this->logo;
+        } elseif ($this->logo_type === ChannelLogoType::Epg) {
+            $icon = $epgData->icon ?? '';
+        } elseif ($this->logo_type === ChannelLogoType::Channel) {
+            $icon = $this->logo ?? $this->logo_internal ?? '';
+        }
+        if (empty($icon)) {
+            $icon = url('/placeholder.png');
+        }
+        // if ($logoProxyEnabled) {
+        //     $icon = LogoProxyController::generateProxyUrl($icon);
+        // }
+        return [
+            'id' => $this->id,
+            'database_id' => $this->id, // Add the actual database ID for editing
+            'url' => $url,
+            'format' => $channelFormat,
+            'tvg_id' => $this->id,
+            'display_name' => $this->title_custom ?? $this->title,
+            'title' => $this->name_custom ?? $this->name,
+            'channel_number' => $this->channel,
+            'group' => $this->group ?? $this->group_internal,
+            'icon' => $icon,
+            'has_epg' => false,
+            'epg_channel_id' => null,
+        ];
     }
 
     /**

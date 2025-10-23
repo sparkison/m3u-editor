@@ -150,3 +150,6 @@
         </a>
     </span>
 </footer>
+
+<!-- Floating Stream Players -->
+<x-floating-stream-players />

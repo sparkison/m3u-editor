@@ -44,13 +44,13 @@ use App\Facades\ProxyFacade;
 use App\Filament\Resources\ChannelResource\Pages;
 use App\Filament\Resources\ChannelResource\RelationManagers;
 use App\Filament\Resources\EpgMaps\EpgMapResource;
-use App\Infolists\Components\VideoPreview;
 use App\Models\Channel;
 use App\Models\ChannelFailover;
 use App\Models\CustomPlaylist;
 use App\Models\Epg;
 use App\Models\Group;
 use App\Models\Playlist;
+use Filament\Actions\Action;
 use Filament\Forms;
 use Illuminate\Support\HtmlString;
 use Filament\Notifications\Notification;
@@ -178,6 +178,7 @@ class ChannelResource extends Resource
             TextColumn::make('failovers_count')
                 ->label('Failovers')
                 ->counts('failovers')
+                ->badge()
                 ->toggleable()
                 ->sortable(),
             TextInputColumn::make('stream_id_custom')
@@ -381,8 +382,18 @@ class ChannelResource extends Resource
                 ->hiddenLabel()
                 ->disabled(fn(Model $record) => $record->is_custom)
                 ->hidden(fn(Model $record) => $record->is_custom),
+            Action::make('play')
+                ->tooltip('Play Channel')
+                ->action(function ($record, $livewire) {
+                    $livewire->dispatch('openFloatingStream', $record->getFloatingPlayerAttributes());
+                })
+                ->icon('heroicon-s-play-circle')
+                ->button()
+                ->hiddenLabel()
+                ->size('sm'),
             ViewAction::make()
                 ->button()
+                ->icon('heroicon-s-information-circle')
                 ->hiddenLabel()
                 ->slideOver(),
         ];
@@ -800,12 +811,8 @@ class ChannelResource extends Resource
     {
         return $schema
             ->components([
-                VideoPreview::make('preview')
-                    ->columnSpanFull()
-                    ->hiddenLabel(),
                 Section::make('Channel Details')
                     ->collapsible()
-                    ->collapsed()
                     ->columns(2)
                     ->schema([
                         TextEntry::make('url')

@@ -7,7 +7,6 @@ use App\Facades\ProxyFacade;
 use App\Filament\Resources\EpgMaps\EpgMapResource;
 use App\Filament\Resources\VodResource\Pages;
 use App\Filament\Resources\Vods\Pages\ListVod;
-use App\Infolists\Components\VideoPreview;
 use App\Jobs\ChannelFindAndReplace;
 use App\Jobs\ChannelFindAndReplaceReset;
 use App\Jobs\MapPlaylistChannelsToEpg;
@@ -182,6 +181,7 @@ class VodResource extends Resource
             TextColumn::make('failovers_count')
                 ->label('Failovers')
                 ->counts('failovers')
+                ->badge()
                 ->toggleable()
                 ->sortable(),
             IconColumn::make('has_metadata')
@@ -455,8 +455,18 @@ class VodResource extends Resource
                     ->modalDescription('Are you sure you want to delete this VOD channel? This action cannot be undone.')
                     ->modalSubmitActionLabel('Yes, delete VOD'),
             ])->button()->hiddenLabel()->size('sm'),
+            Action::make('play')
+                ->tooltip('Play Video')
+                ->action(function ($record, $livewire) {
+                    $livewire->dispatch('openFloatingStream', $record->getFloatingPlayerAttributes());
+                })
+                ->icon('heroicon-s-play-circle')
+                ->button()
+                ->hiddenLabel()
+                ->size('sm'),
             ViewAction::make()
                 ->button()
+                ->icon('heroicon-s-information-circle')
                 ->hiddenLabel()
                 ->slideOver(),
         ];
@@ -939,12 +949,8 @@ class VodResource extends Resource
     {
         return $schema
             ->components([
-                VideoPreview::make('preview')
-                    ->columnSpanFull()
-                    ->hiddenLabel(),
                 Section::make('Channel Details')
                     ->collapsible()
-                    ->collapsed()
                     ->columns(2)
                     ->schema([
                         TextEntry::make('url')

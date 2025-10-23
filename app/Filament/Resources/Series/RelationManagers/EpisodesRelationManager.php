@@ -10,10 +10,10 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\Layout\Grid;
 use Filament\Actions\ViewAction;
 use Filament\Actions;
+use Filament\Actions\Action;
 use Filament\Schemas\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\ImageEntry;
-use App\Infolists\Components\SeriesPreview;
 use Filament\Forms;
 use Filament\Infolists;
 use Filament\Notifications\Notification;
@@ -146,13 +146,22 @@ class EpisodesRelationManager extends RelationManager
                 //
             ])
             ->recordActions([
+                Action::make('play')
+                    ->tooltip('Play Episode')
+                    ->action(function ($record, $livewire) {
+                        $livewire->dispatch('openFloatingStream', $record->getFloatingPlayerAttributes());
+                    })
+                    ->icon('heroicon-s-play-circle')
+                    ->button()
+                    ->hiddenLabel()
+                    ->size('sm'),
                 ViewAction::make()
                     ->slideOver()
                     ->hiddenLabel()
-                    ->icon('heroicon-m-play')
+                    ->icon('heroicon-m-information-circle')
                     ->button()
                     ->size('xs')
-                    ->tooltip('Play Episode'),
+                    ->tooltip('Episode Details'),
             ])
             ->toolbarActions([
                 // @TODO - add download? Would need to generate streamlink files and compress then download...
@@ -211,12 +220,8 @@ class EpisodesRelationManager extends RelationManager
     {
         return $schema
             ->components([
-                SeriesPreview::make('preview')
-                    ->columnSpanFull()
-                    ->hiddenLabel(),
                 Section::make('Episode Details')
                     ->collapsible()
-                    ->collapsed(true)
                     ->columns(2)
                     ->schema([
                         TextEntry::make('series.name')
@@ -239,7 +244,6 @@ class EpisodesRelationManager extends RelationManager
 
                 Section::make('Episode Metadata')
                     ->collapsible()
-                    ->collapsed(true)
                     ->columns(3)
                     ->schema([
                         ImageEntry::make('info.movie_image')
