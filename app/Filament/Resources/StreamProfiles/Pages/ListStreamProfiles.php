@@ -3,7 +3,9 @@
 namespace App\Filament\Resources\StreamProfiles\Pages;
 
 use App\Filament\Resources\StreamProfiles\StreamProfileResource;
+use App\Models\StreamProfile;
 use Filament\Actions;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -16,7 +18,38 @@ class ListStreamProfiles extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            Actions\Action::make('generate_default_profiles')
+                ->label('Generate Default Profiles')
+                ->requiresConfirmation()
+                ->action(function () {
+                    $defaultProfiles = [
+                        [
+                            'user_id' => auth()->id(),
+                            'name' => 'Default Live Profile',
+                            'description' => 'Optimized for live streaming content.',
+                            'args' => '-fflags +genpts+discardcorrupt+igndts -i {input_url} -c:v libx264 -preset faster -crf {crf|23} -maxrate {maxrate|2500k} -bufsize {bufsize|5000k} -c:a aac -b:a {audio_bitrate|192k} -f mpegts {output_args|pipe:1}'
+                        ],
+                        [
+                            'user_id' => auth()->id(),
+                            'name' => 'Default VOD Profile',
+                            'description' => 'Optimized for Video on Demand content.',
+                            'args' => '-i {input_url} -c:v libx264 -preset faster -crf {crf|23} -maxrate {maxrate|2500k} -bufsize {bufsize|5000k} -c:a aac -b:a {audio_bitrate|192k} -movflags +frag_keyframe+empty_moov -f mp4 {output_args|pipe:1}'
+                        ],
+                    ];
+                    foreach ($defaultProfiles as $index => $defaultProfile) {
+                        StreamProfile::query()->create($defaultProfile);
+                    }
+                })
+                ->after(function () {
+                    Notification::make()
+                        ->title('Default stream profiles have been generated!')
+                        ->success()
+                        ->send();
+                })
+                ->color('success')
+                ->icon('heroicon-o-check-badge'),
             Actions\CreateAction::make()
+                ->label('New Profile')
                 ->slideOver(),
         ];
     }

@@ -175,6 +175,15 @@ class Preferences extends SettingsPage
                                             ->options(function () {
                                                 return StreamProfile::where('user_id', Auth::id())->pluck('name', 'id');
                                             })
+                                            ->hintAction(
+                                                Action::make('manage_profiles')
+                                                    ->label('Manage Profiles')
+                                                    ->icon('heroicon-o-arrow-top-right-on-square')
+                                                    ->iconPosition('after')
+                                                    ->size('sm')
+                                                    ->url('/stream-profiles')
+                                                    ->openUrlInNewTab(false)
+                                            )
                                             ->helperText('The default transcoding profile used for the in-app player. Leave empty to disable transcoding (some streams may not be playable in the player).'),
                                         Select::make('default_vod_stream_profile_id')
                                             ->label('VOD and Series Transcoding Profile')
@@ -183,6 +192,15 @@ class Preferences extends SettingsPage
                                             ->options(function () {
                                                 return StreamProfile::where('user_id', Auth::id())->pluck('name', 'id');
                                             })
+                                            ->hintAction(
+                                                Action::make('manage_profiles')
+                                                    ->label('Manage Profiles')
+                                                    ->icon('heroicon-o-arrow-top-right-on-square')
+                                                    ->iconPosition('after')
+                                                    ->size('sm')
+                                                    ->url('/stream-profiles')
+                                                    ->openUrlInNewTab(false)
+                                            )
                                             ->helperText('The default VOD and series transcoding profile used for the in-app player. When empty will use the default transcoding profile.'),
 
                                         Action::make('test_connection')
