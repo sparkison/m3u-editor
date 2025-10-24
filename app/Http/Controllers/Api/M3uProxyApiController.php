@@ -27,7 +27,7 @@ class M3uProxyApiController extends Controller
      * 
      * @return \Illuminate\Http\RedirectResponse
      */
-    public function channel(Request $request, $id, ?Playlist $playlist = null)
+    public function channel(Request $request, $id, $playlist = null)
     {
         $channel = Channel::query()->with([
             'playlist.streamProfile',
@@ -60,7 +60,7 @@ class M3uProxyApiController extends Controller
      * 
      * @return \Illuminate\Http\RedirectResponse
      */
-    public function episode(Request $request, $id, ?Playlist $playlist = null)
+    public function episode(Request $request, $id, $playlist = null)
     {
         $episode = Episode::query()->with([
             'playlist.streamProfile',
