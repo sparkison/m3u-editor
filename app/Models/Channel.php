@@ -119,35 +119,12 @@ class Channel extends Model
             $channelFormat = $this->container_extension ?? 'ts';
         }
 
-        // Get the icon
-        $icon = '';
-        if ($this->logo) {
-            // Logo override takes precedence
-            $icon = $this->logo;
-        } elseif ($this->logo_type === ChannelLogoType::Epg) {
-            $icon = $epgData->icon ?? '';
-        } elseif ($this->logo_type === ChannelLogoType::Channel) {
-            $icon = $this->logo ?? $this->logo_internal ?? '';
-        }
-        if (empty($icon)) {
-            $icon = url('/placeholder.png');
-        }
-        // if ($logoProxyEnabled) {
-        //     $icon = LogoProxyController::generateProxyUrl($icon);
-        // }
         return [
             'id' => $this->id,
-            'database_id' => $this->id, // Add the actual database ID for editing
+            'title' => $this->name_custom ?? $this->name,
             'url' => $url,
             'format' => $channelFormat,
-            'tvg_id' => $this->id,
-            'display_name' => $this->title_custom ?? $this->title,
-            'title' => $this->name_custom ?? $this->name,
-            'channel_number' => $this->channel,
-            'group' => $this->group ?? $this->group_internal,
-            'icon' => $icon,
-            'has_epg' => false,
-            'epg_channel_id' => null,
+            'type' => 'channel',
         ];
     }
 
@@ -246,7 +223,7 @@ class Channel extends Model
     {
         try {
             $playlist = $this->playlist;
-            
+
             // Check playlist source type
             if ($playlist->source_type === PlaylistSourceType::Emby) {
                 // Emby playlists already have metadata from EmbyService during sync
@@ -254,7 +231,7 @@ class Channel extends Model
                 Log::info('Skipping metadata fetch for Emby VOD', ['channel_id' => $this->id]);
                 return true;
             }
-            
+
             // For Xtream playlists, use XtreamService
             if (!$xtream) {
                 if (!$playlist->xtream && $playlist->source_type !== PlaylistSourceType::Xtream) {
@@ -263,7 +240,7 @@ class Channel extends Model
                 }
                 $xtream = XtreamService::make($playlist);
             }
-            
+
             if (! $xtream) {
                 Notification::make()
                     ->danger()

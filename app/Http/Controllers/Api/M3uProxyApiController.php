@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Channel;
 use App\Models\Episode;
+use App\Models\Playlist;
 use App\Models\StreamProfile;
 use App\Services\M3uProxyService;
 use App\Settings\GeneralSettings;
@@ -19,16 +20,17 @@ class M3uProxyApiController extends Controller
      * 
      * @param  Request  $request
      * @param  int  $id
+     * @param  Playlist|null  $playlist
      * 
      * @return \Illuminate\Http\RedirectResponse
      */
-    public function channel(Request $request, $id)
+    public function channel(Request $request, $id, ?Playlist $playlist = null)
     {
         $channel = Channel::query()->with([
             'playlist.streamProfile',
             'playlist.vodStreamProfile'
         ])->findOrFail($id);
-        $playlist = $channel->getEffectivePlaylist();
+        $playlist = $playlist ?? $channel->getEffectivePlaylist();
 
         // Get stream profile from playlist if set
         $profile = null;
@@ -51,16 +53,17 @@ class M3uProxyApiController extends Controller
      * 
      * @param  Request  $request
      * @param  int  $id
+     * @param  Playlist|null  $playlist
      * 
      * @return \Illuminate\Http\RedirectResponse
      */
-    public function episode(Request $request, $id)
+    public function episode(Request $request, $id, ?Playlist $playlist = null)
     {
         $episode = Episode::query()->with([
             'playlist.streamProfile',
             'playlist.vodStreamProfile'
         ])->findOrFail($id);
-        $playlist = $episode->playlist;
+        $playlist = $playlist ?? $episode->playlist;
 
         // Get stream profile from playlist if set
         $profile = null;

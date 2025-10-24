@@ -69,7 +69,7 @@ class Episode extends Model
         $url = route('m3u-proxy.episode.player', ['id' => $this->id]);
 
         // Determine the channel format based on URL or container extension
-        $originalUrl = $this->url_custom ?? $this->url;
+        $originalUrl = $this->url;
         if (Str::endsWith($originalUrl, '.m3u8') || Str::endsWith($originalUrl, '.ts')) {
             $episodeFormat = 'ts';
         } else {

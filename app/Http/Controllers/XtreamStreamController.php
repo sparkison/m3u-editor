@@ -197,7 +197,8 @@ class XtreamStreamController extends Controller
         if ($channel instanceof Channel) {
             if ($playlist->enable_proxy) {
                 return app()->call('App\\Http\\Controllers\\Api\\M3uProxyApiController@channel', [
-                    'id' => $streamId
+                    'id' => $streamId,
+                    'playlist' => $playlist,
                 ]);
             } else {
                 return Redirect::to(PlaylistUrlService::getChannelUrl($channel, $playlist));
@@ -217,7 +218,8 @@ class XtreamStreamController extends Controller
         if ($channel instanceof Channel) {
             if ($playlist->enable_proxy) {
                 return app()->call('App\\Http\\Controllers\\Api\\M3uProxyApiController@channel', [
-                    'id' => $streamId
+                    'id' => $streamId,
+                    'playlist' => $playlist,
                 ]);
             } else {
                 return Redirect::to(PlaylistUrlService::getChannelUrl($channel, $playlist));
@@ -237,7 +239,8 @@ class XtreamStreamController extends Controller
         if ($episode instanceof Episode) {
             if ($playlist->enable_proxy) {
                 return app()->call('App\\Http\\Controllers\\Api\\M3uProxyApiController@episode', [
-                    'id' => $streamId
+                    'id' => $streamId,
+                    'playlist' => $playlist,
                 ]);
             } else {
                 return Redirect::to(PlaylistUrlService::getEpisodeUrl($episode, $playlist));
@@ -292,7 +295,8 @@ class XtreamStreamController extends Controller
 
         if ($playlist->enable_proxy) {
             return app()->call('App\\Http\\Controllers\\Api\\M3uProxyApiController@channel', [
-                'id' => $streamId
+                'id' => $streamId,
+                'playlist' => $playlist,
             ]);
         } else {
             // If proxy is not enabled, simply return the timeshift URL
