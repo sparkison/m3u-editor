@@ -21,6 +21,8 @@ use App\Facades\LogoFacade;
 use App\Facades\PlaylistFacade;
 use App\Models\CustomPlaylist;
 use App\Models\Playlist;
+use Filament\Actions\Action;
+use Filament\Actions\ViewAction;
 use Filament\Tables\Enums\RecordActionsPosition;
 
 class VodResource extends Resource
@@ -204,11 +206,20 @@ class VodResource extends Resource
                 //
             ])
             ->recordActions([
-                Actions\ViewAction::make()
+                Action::make('play')
+                    ->tooltip('Play Video')
+                    ->action(function ($record, $livewire) {
+                        $livewire->dispatch('openFloatingStream', $record->getFloatingPlayerAttributes());
+                    })
+                    ->icon('heroicon-s-play-circle')
                     ->button()
-                    ->icon('heroicon-s-play')
                     ->hiddenLabel()
-                    ->slideOver()
+                    ->size('sm'),
+                // ViewAction::make()
+                //     ->button()
+                //     ->icon('heroicon-s-information-circle')
+                //     ->hiddenLabel()
+                //     ->slideOver(),
             ], position: RecordActionsPosition::BeforeCells)
             ->toolbarActions([
                 //
@@ -226,7 +237,7 @@ class VodResource extends Resource
     {
         return [
             'index' => Pages\ListVod::route('/'),
-            'view' => Pages\ViewVod::route('/{record}'),
+            // 'view' => Pages\ViewVod::route('/{record}'),
         ];
     }
 }

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process as SymfonyProcess;
+use Illuminate\Support\Str;
 
 class Episode extends Model
 {
@@ -60,6 +61,28 @@ class Episode extends Model
     public function season(): BelongsTo
     {
         return $this->belongsTo(Season::class);
+    }
+
+    public function getFloatingPlayerAttributes(): array
+    {
+        // Always proxy the internal proxy so we can attempt to transcode the stream for better compatibility
+        $url = route('m3u-proxy.episode.player', ['id' => $this->id]);
+
+        // Determine the channel format based on URL or container extension
+        $originalUrl = $this->url;
+        if (Str::endsWith($originalUrl, '.m3u8') || Str::endsWith($originalUrl, '.ts')) {
+            $episodeFormat = 'ts';
+        } else {
+            $episodeFormat = $this->container_extension ?? 'ts';
+        }
+
+        return [
+            'id' => 'episode-' . $this->id,
+            'title' => $this->title,
+            'url' => $url,
+            'format' => $episodeFormat,
+            'type' => 'episode',
+        ];
     }
 
     /**

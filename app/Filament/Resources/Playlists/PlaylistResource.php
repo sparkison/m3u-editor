@@ -1541,19 +1541,33 @@ class PlaylistResource extends Resource
                         ->required()
                         ->hidden(fn(Get $get): bool => ! $get('enable_proxy')),
                     TextInput::make('server_timezone')
+                        ->columnSpanFull()
                         ->label('Provider Timezone')
                         ->helperText('The portal/provider timezone (DST-aware). Needed to correctly use timeshift functionality when playlist proxy is enabled.')
                         ->placeholder('Etc/UTC')
                         ->hidden(fn(Get $get): bool => ! $get('enable_proxy')),
-                    Select::make('stream_profile_id')
-                        ->label('Stream Profile (Transcoding)')
-                        ->relationship('streamProfile', 'name')
-                        ->searchable()
-                        ->preload()
-                        ->nullable()
-                        ->helperText('Select a transcoding profile to apply to streams from this playlist. Leave empty for direct streaming.')
-                        ->placeholder('Leave empty for direct streaming')
-                        ->hidden(fn(Get $get): bool => ! $get('enable_proxy')),
+
+                    Fieldset::make('Transcoding Settings (optional)')
+                        ->columnSpanFull()
+                        ->schema([
+                            Select::make('stream_profile_id')
+                                ->label('Default Streaming Profile')
+                                ->relationship('streamProfile', 'name')
+                                ->searchable()
+                                ->preload()
+                                ->nullable()
+                                ->helperText('Select a transcoding profile to apply to streams from this playlist. Leave empty for direct streaming.')
+                                ->placeholder('Leave empty for direct streaming'),
+                            Select::make('vod_stream_profile_id')
+                                ->label('VOD and Series Streaming Profile')
+                                ->relationship('vodStreamProfile', 'name')
+                                ->searchable()
+                                ->preload()
+                                ->nullable()
+                                ->helperText('Select a transcoding profile to apply to streams from this playlist. Leave empty to use default profile or direct streaming.')
+                                ->placeholder('Leave empty for default profile or direct streaming'),
+                        ])->hidden(fn(Get $get): bool => ! $get('enable_proxy')),
+
                     Fieldset::make('HTTP Headers (optional)')
                         ->columnSpanFull()
                         ->schema([

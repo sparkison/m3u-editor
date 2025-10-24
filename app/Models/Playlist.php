@@ -78,6 +78,11 @@ class Playlist extends Model
         return $this->belongsTo(StreamProfile::class);
     }
 
+    public function vodStreamProfile(): BelongsTo
+    {
+        return $this->belongsTo(StreamProfile::class, 'vod_stream_profile_id');
+    }
+
     public function channels(): HasMany
     {
         return $this->hasMany(Channel::class);

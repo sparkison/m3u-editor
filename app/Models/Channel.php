@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\ChannelLogoType;
 use App\Enums\PlaylistSourceType;
 use App\Facades\ProxyFacade;
+use App\Http\Controllers\LogoProxyController;
 use App\Services\XtreamService;
 use Exception;
 use Filament\Notifications\Notification;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Spatie\Tags\HasTags;
 use Symfony\Component\Process\Process as SymfonyProcess;
+use Illuminate\Support\Str;
 
 class Channel extends Model
 {
@@ -102,6 +104,28 @@ class Channel extends Model
             'id', // Local key on the projects table...
             'channel_failover_id' // Local key on the environments table...
         )->orderBy('channel_failovers.sort');
+    }
+
+    public function getFloatingPlayerAttributes(): array
+    {
+        // Always proxy the internal proxy so we can attempt to transcode the stream for better compatibility
+        $url = route('m3u-proxy.channel.player', ['id' => $this->id]);
+
+        // Determine the channel format based on URL or container extension
+        $originalUrl = $this->url_custom ?? $this->url;
+        if (Str::endsWith($originalUrl, '.m3u8') || Str::endsWith($originalUrl, '.ts')) {
+            $channelFormat = 'ts';
+        } else {
+            $channelFormat = $this->container_extension ?? 'ts';
+        }
+
+        return [
+            'id' => $this->id,
+            'title' => $this->name_custom ?? $this->name,
+            'url' => $url,
+            'format' => $channelFormat,
+            'type' => 'channel',
+        ];
     }
 
     /**
@@ -199,7 +223,7 @@ class Channel extends Model
     {
         try {
             $playlist = $this->playlist;
-            
+
             // Check playlist source type
             if ($playlist->source_type === PlaylistSourceType::Emby) {
                 // Emby playlists already have metadata from EmbyService during sync
@@ -207,7 +231,7 @@ class Channel extends Model
                 Log::info('Skipping metadata fetch for Emby VOD', ['channel_id' => $this->id]);
                 return true;
             }
-            
+
             // For Xtream playlists, use XtreamService
             if (!$xtream) {
                 if (!$playlist->xtream && $playlist->source_type !== PlaylistSourceType::Xtream) {
@@ -216,7 +240,7 @@ class Channel extends Model
                 }
                 $xtream = XtreamService::make($playlist);
             }
-            
+
             if (! $xtream) {
                 Notification::make()
                     ->danger()

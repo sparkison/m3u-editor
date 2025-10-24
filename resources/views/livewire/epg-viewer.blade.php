@@ -431,9 +431,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- Floating Stream Players -->
-        <x-floating-stream-players />
         
         <!-- Filament Actions Modals -->
         <x-filament-actions::modals />

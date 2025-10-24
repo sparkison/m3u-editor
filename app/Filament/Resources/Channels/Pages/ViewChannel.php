@@ -14,6 +14,6 @@ class ViewChannel extends ViewRecord
 
     public function infolist(Schema $schema): Schema
     {
-        return ChannelResource::infolist($infolist);
+        return ChannelResource::infolist($schema);
     }
 }

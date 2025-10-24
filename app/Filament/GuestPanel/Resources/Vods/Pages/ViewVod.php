@@ -5,7 +5,6 @@ namespace App\Filament\GuestPanel\Resources\Vods\Pages;
 use App\Facades\PlaylistFacade;
 use App\Filament\GuestPanel\Pages\Concerns\HasPlaylist;
 use App\Filament\GuestPanel\Resources\Vods\VodResource;
-use App\Infolists\Components\VideoPreview;
 use Filament\Actions;
 use Filament\Infolists;
 use Filament\Resources\Pages\ViewRecord;
@@ -40,11 +39,6 @@ class ViewVod extends ViewRecord
     {
         return $schema
             ->components([
-                VideoPreview::make('preview')
-                    ->columnSpanFull()
-                    ->withDetails(false)
-                    ->autoPlay(false)
-                    ->hiddenLabel(),
                 Section::make('Channel Details')
                     ->icon('heroicon-m-information-circle')
                     ->columnSpanFull()

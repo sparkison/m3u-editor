@@ -170,12 +170,38 @@ class Preferences extends SettingsPage
                                     ->schema([
                                         Select::make('default_stream_profile_id')
                                             ->label('Default Transcoding Profile')
-                                            ->columnSpanFull()
+                                            ->columnSpan(2)
                                             ->searchable()
                                             ->options(function () {
                                                 return StreamProfile::where('user_id', Auth::id())->pluck('name', 'id');
                                             })
+                                            ->hintAction(
+                                                Action::make('manage_profiles')
+                                                    ->label('Manage Profiles')
+                                                    ->icon('heroicon-o-arrow-top-right-on-square')
+                                                    ->iconPosition('after')
+                                                    ->size('sm')
+                                                    ->url('/stream-profiles')
+                                                    ->openUrlInNewTab(false)
+                                            )
                                             ->helperText('The default transcoding profile used for the in-app player. Leave empty to disable transcoding (some streams may not be playable in the player).'),
+                                        Select::make('default_vod_stream_profile_id')
+                                            ->label('VOD and Series Transcoding Profile')
+                                            ->columnSpan(2)
+                                            ->searchable()
+                                            ->options(function () {
+                                                return StreamProfile::where('user_id', Auth::id())->pluck('name', 'id');
+                                            })
+                                            ->hintAction(
+                                                Action::make('manage_profiles')
+                                                    ->label('Manage Profiles')
+                                                    ->icon('heroicon-o-arrow-top-right-on-square')
+                                                    ->iconPosition('after')
+                                                    ->size('sm')
+                                                    ->url('/stream-profiles')
+                                                    ->openUrlInNewTab(false)
+                                            )
+                                            ->helperText('The default VOD and series transcoding profile used for the in-app player. When empty will use the default transcoding profile.'),
 
                                         Action::make('test_connection')
                                             ->color('gray')
@@ -855,7 +881,7 @@ class Preferences extends SettingsPage
                                             ])
                                             ->default('primary')
                                             ->helperText('Choose how to handle content with multiple genres. "All Genres" will create duplicate entries in each genre.')
-                                            ->visible(fn (Get $get) => $get('emby_import_groups_categories'))
+                                            ->visible(fn(Get $get) => $get('emby_import_groups_categories'))
                                             ->columnSpan(2),
                                     ]),
                                 Section::make('Plex Media Server')
