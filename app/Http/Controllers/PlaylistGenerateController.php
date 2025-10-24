@@ -161,6 +161,10 @@ class PlaylistGenerateController extends Controller
 
                     // Get the extension from the source URL
                     $extension = pathinfo($url, PATHINFO_EXTENSION);
+                    if (empty($extension)) {
+                        $sourcePlaylist = $channel->getEffectivePlaylist();
+                        $extension = $sourcePlaylist->xtream_config['output'] ?? 'ts'; // Default to 'ts' if not set
+                    }
 
                     if ($logoProxyEnabled) {
                         // Proxy the logo through the logo proxy controller
