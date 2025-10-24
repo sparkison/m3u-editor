@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Channel;
 use App\Models\Episode;
-use App\Models\Playlist;
 use App\Models\StreamProfile;
 use App\Services\M3uProxyService;
 use App\Settings\GeneralSettings;
@@ -25,11 +24,23 @@ class M3uProxyApiController extends Controller
      */
     public function channel(Request $request, $id)
     {
-        $channel = Channel::query()->with(['playlist.streamProfile'])->findOrFail($id);
+        $channel = Channel::query()->with([
+            'playlist.streamProfile',
+            'playlist.vodStreamProfile'
+        ])->findOrFail($id);
         $playlist = $channel->getEffectivePlaylist();
 
-        // Get stream profile from playlist (if set)
-        $profile = $playlist->streamProfile;
+        // Get stream profile from playlist if set
+        $profile = null;
+        if ($channel->is_vod && $playlist->vod_stream_profile_id) {
+            // For VOD channels, use the VOD stream profile if set
+            $profile = $playlist->vodStreamProfile;
+        }
+        if (! $profile) {
+            // Get stream profile from playlist if set
+            $profile = $playlist->streamProfile;
+        }
+
         $url = app(M3uProxyService::class)->getChannelUrl($playlist, $id, $request, $profile);
 
         return redirect($url);
@@ -45,11 +56,23 @@ class M3uProxyApiController extends Controller
      */
     public function episode(Request $request, $id)
     {
-        $episode = Episode::query()->with(['playlist.streamProfile'])->findOrFail($id);
+        $episode = Episode::query()->with([
+            'playlist.streamProfile',
+            'playlist.vodStreamProfile'
+        ])->findOrFail($id);
         $playlist = $episode->playlist;
 
-        // Get stream profile from playlist (if set)
-        $profile = $playlist->streamProfile;
+        // Get stream profile from playlist if set
+        $profile = null;
+        if ($playlist->vod_stream_profile_id) {
+            // For Series, use the VOD stream profile if set
+            $profile = $playlist->vodStreamProfile;
+        }
+        if (! $profile) {
+            // Get stream profile from playlist if set
+            $profile = $playlist->streamProfile;
+        }
+
         $url = app(M3uProxyService::class)->getEpisodeUrl($playlist, $id, $profile);
 
         return redirect($url);
@@ -65,15 +88,36 @@ class M3uProxyApiController extends Controller
      */
     public function channelPlayer(Request $request, $id)
     {
-        $channel = Channel::query()->with(['playlist.streamProfile'])->findOrFail($id);
+        $channel = Channel::query()->with([
+            'playlist.streamProfile',
+            'playlist.vodStreamProfile'
+        ])->findOrFail($id);
         $playlist = $channel->getEffectivePlaylist();
 
-        // Get stream profile from playlist (if set), else fall back to default player profile
-        $profile = $playlist->streamProfile;
-        if (!$profile) {
+        // Get stream profile from playlist if set
+        $profile = null;
+        if ($channel->is_vod && $playlist->vod_stream_profile_id) {
+            // For VOD channels, use the VOD stream profile if set
+            $profile = $playlist->vodStreamProfile;
+        }
+        if (! $profile) {
+            // Get stream profile from playlist if set
+            $profile = $playlist->streamProfile;
+        }
+        if (! $profile) {
             // Use default profile set for the player
             $settings = app(GeneralSettings::class);
-            $profileId = $settings->default_stream_profile_id ?? null;
+
+            if ($channel->is_vod) {
+                // For VOD channels, prefer the VOD default profile first
+                $profileId = $settings->default_vod_stream_profile_id ?? null;
+                if (! $profileId) {
+                    // Fallback to general default profile
+                    $profileId = $settings->default_stream_profile_id ?? null;
+                }
+            } else {
+                $profileId = $settings->default_stream_profile_id ?? null;
+            }
             $profile = $profileId ? StreamProfile::find($profileId) : null;
         }
 
@@ -92,15 +136,32 @@ class M3uProxyApiController extends Controller
      */
     public function episodePlayer(Request $request, $id)
     {
-        $episode = Episode::query()->with(['playlist.streamProfile'])->findOrFail($id);
+        $episode = Episode::query()->with([
+            'playlist.streamProfile',
+            'playlist.vodStreamProfile'
+        ])->findOrFail($id);
         $playlist = $episode->playlist;
 
-        // Get stream profile from playlist (if set), else fall back to default player profile
-        $profile = $playlist->streamProfile;
-        if (!$profile) {
+        // Get stream profile from playlist if set
+        $profile = null;
+        if ($playlist->vod_stream_profile_id) {
+            // For Series, use the VOD stream profile if set
+            $profile = $playlist->vodStreamProfile;
+        }
+        if (! $profile) {
+            // Get stream profile from playlist if set
+            $profile = $playlist->streamProfile;
+        }
+        if (! $profile) {
             // Use default profile set for the player
             $settings = app(GeneralSettings::class);
-            $profileId = $settings->default_stream_profile_id ?? null;
+
+            // For episodes, prefer the VOD default profile first
+            $profileId = $settings->default_vod_stream_profile_id ?? null;
+            if (! $profileId) {
+                // Fallback to general default profile
+                $profileId = $settings->default_stream_profile_id ?? null;
+            }
             $profile = $profileId ? StreamProfile::find($profileId) : null;
         }
 
