@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Channel;
 use App\Models\Episode;
 use App\Models\Playlist;
+use App\Models\CustomPlaylist;
+use App\Models\MergedPlaylist;
+use App\Models\PlaylistAlias;
 use App\Models\StreamProfile;
 use App\Services\M3uProxyService;
 use App\Settings\GeneralSettings;
@@ -20,7 +23,7 @@ class M3uProxyApiController extends Controller
      * 
      * @param  Request  $request
      * @param  int  $id
-     * @param  Playlist|null  $playlist
+     * @param  Playlist|MergedPlaylist|CustomPlaylist|PlaylistAlias|null  $playlist
      * 
      * @return \Illuminate\Http\RedirectResponse
      */
@@ -53,7 +56,7 @@ class M3uProxyApiController extends Controller
      * 
      * @param  Request  $request
      * @param  int  $id
-     * @param  Playlist|null  $playlist
+     * @param  Playlist|MergedPlaylist|CustomPlaylist|PlaylistAlias|null  $playlist
      * 
      * @return \Illuminate\Http\RedirectResponse
      */
