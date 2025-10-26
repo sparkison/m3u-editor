@@ -361,7 +361,7 @@ class M3uProxyService
                     'playlist_uuid' => $playlist->uuid,
                 ]);
 
-                return $this->buildTranscodeStreamUrl($existingStreamId);
+                return $this->buildTranscodeStreamUrl($existingStreamId, $profile->format ?? 'ts');
             }
 
             // No existing pooled stream found, create a new transcoded stream
@@ -372,7 +372,7 @@ class M3uProxyService
             ]);
 
             // Return transcoded stream URL
-            return $this->buildTranscodeStreamUrl($streamId);
+            return $this->buildTranscodeStreamUrl($streamId, $profile->format ?? 'ts');
         } else {
             // Use direct streaming endpoint
             $streamId = $this->createStream($primaryUrl, $failovers, $userAgent, $headers, [
@@ -453,7 +453,7 @@ class M3uProxyService
                     'playlist_uuid' => $playlist->uuid,
                 ]);
 
-                return $this->buildTranscodeStreamUrl($existingStreamId);
+                return $this->buildTranscodeStreamUrl($existingStreamId, $profile->format ?? 'ts');
             }
 
             // No existing pooled stream found, create a new transcoded stream
@@ -464,7 +464,7 @@ class M3uProxyService
             ]);
 
             // Return transcoded stream URL
-            return $this->buildTranscodeStreamUrl($streamId);
+            return $this->buildTranscodeStreamUrl($streamId, $profile->format ?? 'ts');
         } else {
             // Use direct streaming endpoint
             $streamId = $this->createStream($url, $failoverUrls, $userAgent, $headers, [
@@ -778,6 +778,7 @@ class M3uProxyService
                     Log::info('Created transcoded stream on m3u-proxy', [
                         'stream_id' => $data['stream_id'],
                         'profile' => $profile->getProfileIdentifier(),
+                        'format' => $profile->format,
                         'url' => $url,
                     ]);
 
@@ -802,10 +803,12 @@ class M3uProxyService
      * Build the transcoded stream URL for a given stream ID
      *
      * @param  string  $streamId  The stream ID returned from transcoding API
+     * @param  string  $format  The desired format (default 'ts' for MPEG-TS)
      * @return string The stream URL
      */
-    protected function buildTranscodeStreamUrl(string $streamId): string
+    protected function buildTranscodeStreamUrl(string $streamId, $format = 'ts'): string
     {
+        // NOTE: Format not used currently, but could be used to adjust URL structure if needed
         return $this->apiBaseUrl . "/stream/{$streamId}";
     }
 

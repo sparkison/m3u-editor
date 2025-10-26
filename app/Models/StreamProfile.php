@@ -59,38 +59,16 @@ class StreamProfile extends Model
     public function getTemplateVariables(array $additionalVars = []): array
     {
         $variables = [];
-        
+
         // Try to parse args as JSON (for template variable overrides)
-        if ($this->args) {
-            $decoded = json_decode($this->args, true);
-            if (is_array($decoded) && json_last_error() === JSON_ERROR_NONE) {
-                $variables = $decoded;
-            }
-        }
-        
+        // if ($this->format === 'm3u8') {
+        //     $variables['output_format'] = 'hls';
+        // } else {
+        //     $variables['output_format'] = $this->format;
+        // }
+
         // Merge with additional variables (additional vars take precedence)
         return array_merge($variables, $additionalVars);
-    }
-
-    /**
-     * Check if this profile uses custom FFmpeg args or a predefined profile name
-     * 
-     * @return bool True if using custom args template, false if using predefined profile name
-     */
-    public function hasCustomArgs(): bool
-    {
-        if (!$this->args) {
-            return false;
-        }
-        
-        // If args is valid JSON, it's template variables (not custom args)
-        $decoded = json_decode($this->args, true);
-        if (is_array($decoded) && json_last_error() === JSON_ERROR_NONE) {
-            return false;
-        }
-        
-        // Otherwise, it's a custom FFmpeg argument template string
-        return true;
     }
 
     /**
@@ -101,12 +79,6 @@ class StreamProfile extends Model
      */
     public function getProfileIdentifier(): string
     {
-        // If has custom args, return the full template
-        if ($this->hasCustomArgs()) {
-            return $this->args;
-        }
-        
-        // Otherwise return the profile name (should match predefined profiles: default, hq, 720p, etc.)
-        return strtolower(str_replace([' ', '-'], '_', $this->name));
+        return $this->args;
     }
 }
