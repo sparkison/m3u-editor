@@ -37,11 +37,10 @@ class M3uProxyApiController extends Controller
 
         // Get stream profile from playlist if set
         $profile = null;
-        if ($channel->is_vod && $playlist->vod_stream_profile_id) {
+        if ($channel->is_vod) {
             // For VOD channels, use the VOD stream profile if set
             $profile = $playlist->vodStreamProfile;
-        }
-        if (! $profile) {
+        } else {
             // Get stream profile from playlist if set
             $profile = $playlist->streamProfile;
         }
@@ -68,16 +67,8 @@ class M3uProxyApiController extends Controller
         ])->findOrFail($id);
         $playlist = $playlist ?? $episode->playlist;
 
-        // Get stream profile from playlist if set
-        $profile = null;
-        if ($playlist->vod_stream_profile_id) {
-            // For Series, use the VOD stream profile if set
-            $profile = $playlist->vodStreamProfile;
-        }
-        if (! $profile) {
-            // Get stream profile from playlist if set
-            $profile = $playlist->streamProfile;
-        }
+        // For Series, use the VOD stream profile if set
+        $profile = $playlist->vodStreamProfile;
 
         $url = app(M3uProxyService::class)->getEpisodeUrl($playlist, $id, $profile);
 
