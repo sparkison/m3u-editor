@@ -75,13 +75,6 @@ else
 
     # Need to set the `PUBLIC_URL` for the proxy to use for re-writing HLS URLs
     export M3U_PROXY_PUBLIC_URL="${M3U_PROXY_URL}"
-    
-    # Redis pooling settings for embedded proxy
-    export M3U_PROXY_REDIS_HOST="localhost"
-    export M3U_PROXY_REDIS_PORT="${REDIS_SERVER_PORT}"
-    export M3U_PROXY_REDIS_DB="6" # Default 6 (1-5 used by app)
-    export M3U_REDIS_ENABLED="true"
-    export M3U_ENABLE_TRANSCODING_POOLING="true"
 
     # M3U Proxy API key (for embedded proxy only)
     # Generate if not set
@@ -94,6 +87,14 @@ else
     fi
     echo "🔗 Embedded m3u-proxy mode enabled. Nginx will proxy /m3u-proxy/ to ${M3U_PROXY_NGINX_TARGET}"
 fi
+
+# Redis pooling settings for embedded proxy
+# Variables are ignored if using external proxy
+export M3U_PROXY_REDIS_HOST="localhost"
+export M3U_PROXY_REDIS_PORT="${REDIS_SERVER_PORT}"
+export M3U_PROXY_REDIS_DB="6" # Default 6 (1-5 used by app)
+export M3U_REDIS_ENABLED="true"
+export M3U_ENABLE_TRANSCODING_POOLING="true"
 
 # Websockets
 export REVERB_PORT="${REVERB_PORT:-36800}" # Default 36800
