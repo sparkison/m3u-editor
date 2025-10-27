@@ -7,6 +7,7 @@ use App\Enums\PlaylistSourceType;
 use App\Facades\ProxyFacade;
 use App\Http\Controllers\LogoProxyController;
 use App\Services\XtreamService;
+use App\Settings\GeneralSettings;
 use Exception;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -108,6 +109,20 @@ class Channel extends Model
 
     public function getFloatingPlayerAttributes(): array
     {
+        $settings = app(GeneralSettings::class);
+
+        if ($this->is_vod) {
+            // For VOD channels, prefer the VOD default profile first
+            $profileId = $settings->default_vod_stream_profile_id ?? null;
+            if (! $profileId) {
+                // Fallback to general default profile
+                $profileId = $settings->default_stream_profile_id ?? null;
+            }
+        } else {
+            $profileId = $settings->default_stream_profile_id ?? null;
+        }
+        $profile = $profileId ? StreamProfile::find($profileId) : null;
+
         // Always proxy the internal proxy so we can attempt to transcode the stream for better compatibility
         $url = route('m3u-proxy.channel.player', ['id' => $this->id]);
 
@@ -123,7 +138,7 @@ class Channel extends Model
             'id' => $this->id,
             'title' => $this->name_custom ?? $this->name,
             'url' => $url,
-            'format' => $channelFormat,
+            'format' => $profile->format ?? $channelFormat,
             'type' => 'channel',
         ];
     }

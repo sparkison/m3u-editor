@@ -27,13 +27,15 @@ class ListStreamProfiles extends ListRecords
                             'user_id' => auth()->id(),
                             'name' => 'Default Live Profile',
                             'description' => 'Optimized for live streaming content.',
-                            'args' => '-fflags +genpts+discardcorrupt+igndts -i {input_url} -c:v libx264 -preset faster -crf {crf|23} -maxrate {maxrate|2500k} -bufsize {bufsize|5000k} -c:a aac -b:a {audio_bitrate|192k} -f mpegts {output_args|pipe:1}'
+                            'args' => '-fflags +genpts+discardcorrupt+igndts -i {input_url} -c:v libx264 -preset faster -crf {crf|23} -maxrate {maxrate|2500k} -bufsize {bufsize|5000k} -c:a aac -b:a {audio_bitrate|192k} -f mpegts {output_args|pipe:1}',
+                            'format' => 'ts',
                         ],
                         [
                             'user_id' => auth()->id(),
                             'name' => 'Default VOD Profile',
                             'description' => 'Optimized for Video on Demand content.',
-                            'args' => '-i {input_url} -c:v libx264 -preset faster -crf {crf|23} -maxrate {maxrate|2500k} -bufsize {bufsize|5000k} -c:a aac -b:a {audio_bitrate|192k} -movflags +frag_keyframe+empty_moov -f mp4 {output_args|pipe:1}'
+                            'args' => '-fflags +genpts+discardcorrupt+igndts -i {input_url} -c:v libx264 -preset faster -crf {crf|23} -maxrate {maxrate|2500k} -bufsize {bufsize|5000k} -c:a aac -b:a {audio_bitrate|192k} -movflags +frag_keyframe+empty_moov -f mp4 {output_args|pipe:1}',
+                            'format' => 'mp4',
                         ],
                     ];
                     foreach ($defaultProfiles as $index => $defaultProfile) {

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Settings\GeneralSettings;
 use Exception;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -65,6 +66,16 @@ class Episode extends Model
 
     public function getFloatingPlayerAttributes(): array
     {
+        $settings = app(GeneralSettings::class);
+
+        // For episodes, prefer the VOD default profile first
+        $profileId = $settings->default_vod_stream_profile_id ?? null;
+        if (! $profileId) {
+            // Fallback to general default profile
+            $profileId = $settings->default_stream_profile_id ?? null;
+        }
+        $profile = $profileId ? StreamProfile::find($profileId) : null;
+
         // Always proxy the internal proxy so we can attempt to transcode the stream for better compatibility
         $url = route('m3u-proxy.episode.player', ['id' => $this->id]);
 
@@ -80,7 +91,7 @@ class Episode extends Model
             'id' => 'episode-' . $this->id,
             'title' => $this->title,
             'url' => $url,
-            'format' => $episodeFormat,
+            'format' => $profile->format ?? $episodeFormat,
             'type' => 'episode',
         ];
     }

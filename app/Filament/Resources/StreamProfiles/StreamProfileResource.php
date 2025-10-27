@@ -59,6 +59,24 @@ class StreamProfileResource extends Resource
                     ->default('-i {input_url} -c:v libx264 -preset faster -crf {crf|23} -maxrate {maxrate|2500k} -bufsize {bufsize|5000k} -c:a aac -b:a {audio_bitrate|192k} -f mpegts {output_args|pipe:1}')
                     ->placeholder('-i {input_url} -c:v libx264 -preset faster -crf {crf|23} -maxrate {maxrate|2500k} -bufsize {bufsize|5000k} -c:a aac -b:a {audio_bitrate|192k} -f mpegts {output_args|pipe:1}')
                     ->helperText('FFmpeg arguments for transcoding. Use placeholders like {crf|23} for configurable parameters with defaults. Hardware acceleration will be applied automatically by the proxy server.'),
+                Select::make('format')
+                    ->label('Stream Format')
+                    ->searchable()
+                    ->options([
+                        'mp4' => 'MP4 (.mp4)',
+                        'mov' => 'MOV (.mov)',
+                        'mkv' => 'Matroska (.mkv)',
+                        'webm' => 'WebM (.webm)',
+                        'ts' => 'MPEG-TS (.ts)',
+                        'mpeg' => 'MPEG (.mpeg)',
+                        'm3u8' => 'HLS (.m3u8)',
+                        'flv' => 'FLV (.flv)',
+                        'ogg' => 'OGG (.ogg)',
+                        'mp3' => 'MP3 (.mp3)'
+                    ])
+                    ->default('ts')
+                    ->required()
+                    ->helperText('The container format for the output stream.'),
             ]);
     }
 
@@ -72,6 +90,11 @@ class StreamProfileResource extends Resource
                     ->searchable(),
                 TextColumn::make('description')
                     ->label('Description')
+                    ->sortable()
+                    ->searchable(),
+                TextColumn::make('format')
+                    ->label('Format')
+                    ->badge()
                     ->sortable()
                     ->searchable(),
             ])
