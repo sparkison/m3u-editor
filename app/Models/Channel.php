@@ -112,12 +112,7 @@ class Channel extends Model
         $settings = app(GeneralSettings::class);
 
         if ($this->is_vod) {
-            // For VOD channels, prefer the VOD default profile first
             $profileId = $settings->default_vod_stream_profile_id ?? null;
-            if (! $profileId) {
-                // Fallback to general default profile
-                $profileId = $settings->default_stream_profile_id ?? null;
-            }
         } else {
             $profileId = $settings->default_stream_profile_id ?? null;
         }
@@ -128,17 +123,16 @@ class Channel extends Model
 
         // Determine the channel format based on URL or container extension
         $originalUrl = $this->url_custom ?? $this->url;
-        if (Str::endsWith($originalUrl, '.m3u8') || Str::endsWith($originalUrl, '.ts')) {
-            $channelFormat = 'ts';
-        } else {
-            $channelFormat = $this->container_extension ?? 'ts';
+        $format = pathinfo($originalUrl, PATHINFO_EXTENSION);
+        if (empty($format)) {
+            $format = $this->container_extension ?? 'ts';
         }
 
         return [
             'id' => $this->id,
             'title' => $this->name_custom ?? $this->name,
             'url' => $url,
-            'format' => $profile->format ?? $channelFormat,
+            'format' => $profile->format ?? $format,
             'type' => 'channel',
         ];
     }

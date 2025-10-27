@@ -70,10 +70,6 @@ class Episode extends Model
 
         // For episodes, prefer the VOD default profile first
         $profileId = $settings->default_vod_stream_profile_id ?? null;
-        if (! $profileId) {
-            // Fallback to general default profile
-            $profileId = $settings->default_stream_profile_id ?? null;
-        }
         $profile = $profileId ? StreamProfile::find($profileId) : null;
 
         // Always proxy the internal proxy so we can attempt to transcode the stream for better compatibility
@@ -81,17 +77,16 @@ class Episode extends Model
 
         // Determine the channel format based on URL or container extension
         $originalUrl = $this->url;
-        if (Str::endsWith($originalUrl, '.m3u8') || Str::endsWith($originalUrl, '.ts')) {
-            $episodeFormat = 'ts';
-        } else {
-            $episodeFormat = $this->container_extension ?? 'ts';
+        $format = pathinfo($originalUrl, PATHINFO_EXTENSION);
+        if (empty($format)) {
+            $format = $this->container_extension ?? 'ts';
         }
 
         return [
             'id' => 'episode-' . $this->id,
             'title' => $this->title,
             'url' => $url,
-            'format' => $profile->format ?? $episodeFormat,
+            'format' => $profile->format ?? $format,
             'type' => 'episode',
         ];
     }
