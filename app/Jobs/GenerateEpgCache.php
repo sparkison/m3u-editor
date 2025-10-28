@@ -52,12 +52,13 @@ class GenerateEpgCache implements ShouldQueue
             'status' => Status::Processing,
         ]);
         $result = $cacheService->cacheEpgData($epg);
-        $epg->update([
-            'status' => Status::Completed,
-        ]);
         $duration = microtime(true) - $start;
-
         if ($result) {
+            $epg->update([
+                'status' => Status::Completed,
+                'is_cached' => true,
+                'cache_progress' => 100,
+            ]);
             if ($this->notify) {
                 $msg = "Cache generated successfully in " . round($duration, 2) . " seconds";
                 Notification::make()
@@ -68,6 +69,11 @@ class GenerateEpgCache implements ShouldQueue
                     ->sendToDatabase($epg->user);
             }
         } else {
+            $epg->update([
+                'status' => Status::Failed,
+                'is_cached' => false,
+                'cache_progress' => 100,
+            ]);
             $error = "Failed to generate cache. You can try to run the cache generation again manually from the EPG management page.";
             Notification::make()
                 ->danger()
