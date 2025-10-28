@@ -1,0 +1,57 @@
+version: '3.8'
+
+# Pull-only compose for users who want to run the project using prebuilt images
+# from Docker Hub. Configure IMAGE_TAG to the tag you want (dev/experimental/latest).
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${PG_DATABASE:-m3ue}
+      POSTGRES_USER: ${PG_USER:-m3ue}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-m3ue}
+    volumes:
+      - m3ue_pgdata:/var/lib/postgresql/data
+    ports:
+      - '${PG_PORT:-5432}:5432'
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '${REDIS_SERVER_PORT:-6379}:6379'
+    volumes:
+      - redis-data:/data
+
+  m3u-editor:
+    image: sparkison/m3u-editor:${IMAGE_TAG:-latest}
+    environment:
+      - APP_ENV=${APP_ENV:-production}
+      - APP_URL=${APP_URL:-http://localhost}
+      - DB_CONNECTION=pgsql
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_DATABASE=${DB_DATABASE:-m3ue}
+      - DB_USERNAME=${DB_USERNAME:-m3ue}
+      - DB_PASSWORD=${DB_PASSWORD:-m3ue}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=6379
+      - M3U_PROXY_URL=${M3U_PROXY_URL:-http://m3u-proxy:8085}
+    depends_on:
+      - postgres
+      - redis
+      - m3u-proxy
+    ports:
+      - '${APP_PORT:-36400}:${APP_PORT:-36400}'
+
+  m3u-proxy:
+    image: sparkison/m3u-proxy:${IMAGE_TAG:-latest}
+    ports:
+      - '${M3U_PROXY_PORT:-38085}:8085'
+
+volumes:
+  m3ue_pgdata:
+  redis-data:
+
+# This file is intended for users who prefer running the stack from images only.
+# To use an external Postgres/Redis, you can omit those services and set
+# DB_HOST / REDIS_HOST to your external hosts (for example host.docker.internal).

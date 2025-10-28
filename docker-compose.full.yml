@@ -1,0 +1,114 @@
+version: '3.8'
+
+# Full development compose that runs the complete stack.
+# By default this will pull images from Docker Hub if IMAGE_TAG is set to a tag
+# that exists (e.g. latest, experimental, dev). If you'd like to build locally
+# for development, set LOCAL_BUILD=true and docker-compose will build the
+# `m3u-editor` image from the local Dockerfile.
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${PG_DATABASE:-m3ue}
+      POSTGRES_USER: ${PG_USER:-m3ue}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-m3ue}
+    volumes:
+      - m3ue_pgdata:/var/lib/postgresql/data
+    ports:
+      - '${PG_PORT:-5432}:5432'
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '${REDIS_SERVER_PORT:-6379}:6379'
+    volumes:
+      - redis-data:/data
+
+  php-fpm:
+    # PHP-FPM runtime image (build target: runtime). By default this will
+    # use the image tag provided (IMAGE_TAG) and can be built locally with
+    # `docker compose up --build` which will tag the built image with
+    # sparkison/m3u-editor:${IMAGE_TAG} so both build and pull workflows work.
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+      args:
+        GIT_BRANCH: ${GIT_BRANCH:-local}
+        GIT_COMMIT: ${GIT_COMMIT:-local}
+        GIT_TAG: ${GIT_TAG:-local}
+    image: sparkison/m3u-editor:${IMAGE_TAG:-latest}
+    environment:
+      - APP_ENV=${APP_ENV:-local}
+      - APP_DEBUG=${APP_DEBUG:-true}
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=${PG_PORT:-5432}
+      - DB_DATABASE=${PG_DATABASE:-m3ue}
+      - DB_USERNAME=${PG_USER:-m3ue}
+      - DB_PASSWORD=${PG_PASSWORD:-m3ue}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - M3U_PROXY_URL=http://m3u-proxy:8085
+      - FPMPORT=${FPMPORT:-9000}
+      - REVERB_PORT=${REVERB_PORT:-36800}
+      - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
+    depends_on:
+      - postgres
+      - redis
+      - m3u-proxy
+    volumes:
+      - ./docker-config:/var/www/config
+      - ./:/var/www/html:cached
+    # Expose ports that services running in this container use. In the
+    # separated setup nginx will proxy to php-fpm, but if a user chooses to
+    # run the php-fpm container directly they can map these ports.
+    ports:
+      - '${FPMPORT:-9000}:${FPMPORT:-9000}'
+      - '${REVERB_PORT:-36800}:${REVERB_PORT:-36800}'
+      - '${M3U_PROXY_PORT:-38085}:${M3U_PROXY_PORT:-38085}'
+
+  nginx:
+    # Nginx runs as a separate image. It uses the `nginx` build target from the
+    # Dockerfile so it contains the built assets and the nginx entrypoint that
+    # templates config from environment variables.
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: nginx
+    image: sparkison/m3u-editor:${IMAGE_TAG:-nginx}
+    depends_on:
+      - php-fpm
+    environment:
+      - APP_PORT=${APP_PORT:-36400}
+      - APP_URL=${APP_URL:-http://localhost}
+      - FPMPORT=${FPMPORT:-9000}
+      - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
+      - REVERB_PORT=${REVERB_PORT:-36800}
+    volumes:
+      - ./docker/8.4/nginx/nginx.tmpl:/etc/nginx/nginx.tmpl:ro
+      - ./docker/8.4/nginx/laravel.tmpl:/etc/nginx/conf.d/laravel.tmpl:ro
+      - ./public:/var/www/public:ro
+    # Map host APP_PORT to nginx 80 so users can continue to use APP_PORT
+    # to control the publicly reachable application port (compat with all-in-one)
+    ports:
+      - '${APP_PORT:-36400}:80'
+      - '${HTTPS_PORT:-443}:443'
+
+  m3u-proxy:
+    image: ${LOCAL_BUILD:-false} == "true" ? m3u-proxy:local : sparkison/m3u-proxy:${IMAGE_TAG:-latest}
+    build:
+      context: ./m3u-proxy
+      dockerfile: Dockerfile
+    ports:
+      - '${M3U_PROXY_PORT:-38085}:8085'
+
+volumes:
+  m3ue_pgdata:
+  redis-data:
+
+# Notes:
+# - To run fully from prebuilt images: set IMAGE_TAG to the desired tag and make sure
+#   images exist on Docker Hub (no LOCAL_BUILD or set LOCAL_BUILD=false).
+# - For local development (build from local Dockerfile): set LOCAL_BUILD=true.
