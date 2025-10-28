@@ -49,7 +49,7 @@ class RefreshEpg extends Command
                 ])->whereNotNull('synced')->get();
             foreach ($failed as $epg) {
                 $this->info("Attempting to re-cache EPG: {$epg->id}");
-                dispatch(new GenerateEpgCache($epg));
+                dispatch(new GenerateEpgCache($epg->uuid));
             }
 
             // Next, let's get all EPGs that are not currently processing and check if they are due for a sync
