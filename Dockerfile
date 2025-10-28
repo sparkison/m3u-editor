@@ -2,14 +2,12 @@
 # Multistage Dockerfile
 #
 # Stages:
-#  * node_builder   - builds JS/CSS assets (uses official Node image)
+#  * node_builder  - builds JS/CSS assets (uses official Node image)
 #  * composer      - installs PHP dependencies (uses official composer image)
 #  * runtime       - runtime image with PHP-FPM and application files (Alpine)
 #
 # Default final image is the `runtime` stage which contains PHP-FPM and the
-# application (built assets + vendor). You can build only the builder stages
-# in CI to produce intermediate artifacts, or build specific targets with
-# `--target` when needed.
+# application (built assets + vendor).
 ########################################
 
 ARG GIT_BRANCH
@@ -53,8 +51,7 @@ ENV WWWGROUP="m3ue"
 ENV WWWUSER="m3ue"
 WORKDIR /var/www/html
 
-# Install runtime packages and PHP extensions. Keep the list minimal but
-# compatible with the earlier monolithic Dockerfile. Adjust as needed.
+# Install runtime packages and PHP extensions
 RUN apk update && apk --no-cache add \
     coreutils \
     openssl \
@@ -83,9 +80,8 @@ RUN apk update && apk --no-cache add \
     bash tzdata \
     && ln -s /usr/bin/php84 /usr/bin/php
 
-# Redis config template used by start scripts (kept from original)
-COPY ./docker/8.4/redis.conf /etc/redis/redis.tmpl
-RUN chmod 0644 /etc/redis/redis.tmpl || true
+# Note: Redis is provided by a separate service/image. Redis config templating
+# is handled by the redis image's entrypoint (docker/8.4/redis/docker-entrypoint.sh).
 
 # PHP & supervisor configuration copied from the repo
 COPY ./docker/8.4/php.ini /etc/php84/conf.d/99-m3ue.ini
@@ -119,7 +115,6 @@ RUN echo -e '#!/bin/bash\nphp artisan "$@"' > /usr/bin/m3ue && chmod +x /usr/bin
 # Default entrypoint preserved from original Dockerfile
 ENTRYPOINT ["start-container"]
 
-# You can also build an `nginx` target if you want a separate nginx image.
 
 ########################################
 # Nginx-only image (serves static assets, proxies to php-fpm)
@@ -146,21 +141,7 @@ ENTRYPOINT ["/usr/local/bin/docker-entrypoint-nginx"]
 ########################################
 FROM runtime AS allinone
 
-# The all-in-one image includes optional packages that are not required for the
-# slim php-fpm runtime: nginx, postgres server/clients, python (for embedded
-# m3u-proxy), git and ffmpeg. Installing them only in this stage keeps the
-# `runtime` image smaller for modular deployments.
-RUN apk update && apk add --no-cache \
-    nginx \
-    postgresql postgresql-client postgresql-contrib || true
-
-# Copy nginx config templates
-COPY ./docker/8.4/nginx/nginx.conf /etc/nginx/nginx.tmpl
-COPY ./docker/8.4/nginx/laravel.tmpl /etc/nginx/conf.d/laravel.tmpl
-
-
-# Prepare directories for local postgres if used by the all-in-one image
-RUN mkdir -p /var/lib/postgresql /run/postgresql && chown -R $WWWUSER:$WWWGROUP /var/lib/postgresql /run/postgresql || true
+# ...
 
 # Keep the same entrypoint so users can run the single-image the same way
 ENTRYPOINT ["start-container"]

@@ -16,12 +16,15 @@ services:
     volumes:
       - m3ue_pgdata:/var/lib/postgresql/data
     ports:
-      - '${PG_PORT:-5432}:5432'
+      #- '${PG_PORT:-5432}:5432'
 
   redis:
-    image: redis:7-alpine
+    build:
+      context: .
+      dockerfile: docker/8.4/redis/Dockerfile
+    image: sparkison/m3u-editor-redis:${IMAGE_TAG:-latest}
     ports:
-      - '${REDIS_SERVER_PORT:-6379}:6379'
+      #- '${REDIS_SERVER_PORT:-6379}:6379'
     volumes:
       - redis-data:/data
 
@@ -65,9 +68,9 @@ services:
     # separated setup nginx will proxy to php-fpm, but if a user chooses to
     # run the php-fpm container directly they can map these ports.
     ports:
-      - '${FPMPORT:-9000}:${FPMPORT:-9000}'
-      - '${REVERB_PORT:-36800}:${REVERB_PORT:-36800}'
-      - '${M3U_PROXY_PORT:-38085}:${M3U_PROXY_PORT:-38085}'
+      #- '${FPMPORT:-9000}:${FPMPORT:-9000}'
+      #- '${REVERB_PORT:-36800}:${REVERB_PORT:-36800}'
+      #- '${M3U_PROXY_PORT:-38085}:${M3U_PROXY_PORT:-38085}'
 
   nginx:
     # Nginx runs as a separate image. It uses the `nginx` build target from the
@@ -93,16 +96,23 @@ services:
     # Map host APP_PORT to nginx 80 so users can continue to use APP_PORT
     # to control the publicly reachable application port (compat with all-in-one)
     ports:
-      - '${APP_PORT:-36400}:80'
-      - '${HTTPS_PORT:-443}:443'
+      - '${APP_PORT:-36400}:${APP_PORT:-36400}'
 
   m3u-proxy:
     image: ${LOCAL_BUILD:-false} == "true" ? m3u-proxy:local : sparkison/m3u-proxy:${IMAGE_TAG:-latest}
     build:
       context: ./m3u-proxy
       dockerfile: Dockerfile
+    environment:
+      - PORT=${M3U_PROXY_PORT:-38085}
+      - LOG_LEVEL=error
+      - REDIS_ENABLED=true
+      - REDIS_HOST=localhost
+      - REDIS_SERVER_PORT=${REDIS_SERVER_PORT:-6379}
+      - REDIS_DB=6
+      - ENABLE_TRANSCODING_POOLING=true
     ports:
-      - '${M3U_PROXY_PORT:-38085}:8085'
+      #- '${M3U_PROXY_PORT:-38085}:${M3U_PROXY_PORT:-38085}'
 
 volumes:
   m3ue_pgdata:
