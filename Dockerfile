@@ -74,7 +74,7 @@ ENTRYPOINT ["/usr/local/bin/docker-entrypoint-nginx"]
 ########################################
 # Redis
 ########################################
-FROM redis:alpine3.22 as redis
+FROM redis:alpine3.22 AS redis
 
 # Add envsubst (gettext) so we can template the redis config at container start
 RUN apk add --no-cache gettext
@@ -90,7 +90,7 @@ CMD ["/usr/local/bin/docker-entrypoint-redis"]
 ########################################
 # Postgres
 ########################################
-FROM postgres:17.6-alpine3.22 as postgres
+FROM postgres:17.6-alpine3.22 AS postgres
 
 # Small helper image based on the official Postgres alpine image
 # Adds envsubst (gettext) and a tiny entrypoint wrapper to render
