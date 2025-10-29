@@ -5,17 +5,41 @@ version: '3.8'
 # This file always uses `build:` so it produces images that can be pushed.
 
 services:
-  # Build the default "all-in-one" image (used as the default `:dev` tag)
-  m3u-editor-allinone:
+  # Nginx image (nginx stage)
+  m3u-editor-nginx:
     build:
       context: .
       dockerfile: Dockerfile
-      target: allinone
+      target: nginx
       args:
         GIT_BRANCH: ${GIT_BRANCH:-local}
         GIT_COMMIT: ${GIT_COMMIT:-local}
         GIT_TAG: ${GIT_TAG:-local}
-    image: sparkison/m3u-editor:allinone
+    image: sparkison/m3u-editor:nginx
+
+  # Postgres image (postgres stage)
+  m3u-editor-postgres:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: postgres
+      args:
+        GIT_BRANCH: ${GIT_BRANCH:-local}
+        GIT_COMMIT: ${GIT_COMMIT:-local}
+        GIT_TAG: ${GIT_TAG:-local}
+    image: sparkison/m3u-editor:postgres
+
+  # Redis image (redis stage)
+  m3u-editor-redis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: redis
+      args:
+        GIT_BRANCH: ${GIT_BRANCH:-local}
+        GIT_COMMIT: ${GIT_COMMIT:-local}
+        GIT_TAG: ${GIT_TAG:-local}
+    image: sparkison/m3u-editor:redis
 
   # PHP-FPM runtime image (runtime stage)
   m3u-editor-php:
@@ -28,35 +52,6 @@ services:
         GIT_COMMIT: ${GIT_COMMIT:-local}
         GIT_TAG: ${GIT_TAG:-local}
     image: sparkison/m3u-editor:fpm
-
-  # Nginx image (nginx stage)
-  m3u-editor-nginx:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: nginx
-    image: sparkison/m3u-editor:nginx
-
-  # Convenience service that builds and tags the main image with IMAGE_TAG
-  # (CI can use this to produce sparkison/m3u-editor:${IMAGE_TAG}). By default
-  # we point this to the allinone target so the default tag remains backwards
-  # compatible with the single-image workflow.
-  m3u-editor:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: allinone
-      args:
-        GIT_BRANCH: ${GIT_BRANCH:-local}
-        GIT_COMMIT: ${GIT_COMMIT:-local}
-        GIT_TAG: ${GIT_TAG:-local}
-    image: sparkison/m3u-editor:${IMAGE_TAG:-dev}
-
-  m3u-proxy:
-    build:
-      context: ./m3u-proxy
-      dockerfile: Dockerfile
-    image: sparkison/m3u-proxy:${IMAGE_TAG:-dev}
 
 # NOTE: This file is intended for building images only. The resulting images
 # are pushed to Docker Hub and then consumed by docker-compose.full.yml or
