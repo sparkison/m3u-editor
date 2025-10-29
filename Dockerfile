@@ -51,9 +51,11 @@ FROM nginx:1.26-alpine AS nginx
 WORKDIR /var/www/html
 COPY --from=node_builder /app/public /var/www/html/public
 
-# Copy nginx templates so we can envsubst at container start
+# Copy nginx templates so we can envsubst at container start. The repo keeps
+# a `laravel.conf` file — copy it as `laravel.tmpl` so the entrypoint can
+# render it at container start.
 COPY ./docker/8.4/nginx/nginx.conf /etc/nginx/nginx.tmpl
-COPY ./docker/8.4/nginx/laravel.tmpl /etc/nginx/conf.d/laravel.tmpl
+COPY ./docker/8.4/nginx/laravel.conf /etc/nginx/conf.d/laravel.tmpl
 
 # Add a small entrypoint that templates the config and runs nginx in foreground
 COPY docker/8.4/nginx/docker-entrypoint.sh /usr/local/bin/docker-entrypoint-nginx
@@ -70,7 +72,7 @@ FROM redis:alpine3.22 as redis
 RUN apk add --no-cache gettext
 
 COPY docker/8.4/redis/ /docker-entrypoint-redis/
-COPY docker/8.4/redis/redis.conf /etc/redis/redis.tmpl
+COPY ./docker/8.4/redis.conf /etc/redis/redis.tmpl
 COPY docker/8.4/redis/docker-entrypoint.sh /usr/local/bin/docker-entrypoint-redis
 RUN chmod +x /usr/local/bin/docker-entrypoint-redis
 
