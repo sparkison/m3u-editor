@@ -18,16 +18,20 @@ services:
         GIT_TAG: ${GIT_TAG:-local}
     image: sparkison/m3u-editor-nginx:${IMAGE_TAG:-latest}
     environment:
-      - FPMPORT=${FPMPORT:-9900}
+      # App reverse proxy setup
+      - FPMPORT=${FPMPORT:-9900} # Port that nginx uses to connect to php-fpm
+      - APP_URL=${APP_URL:-http://localhost} # Application URL/IP for accessing on LAN/WAN
       - APP_PORT=${APP_PORT:-36400}
-      - APP_URL=${APP_URL:-http://localhost}
       - APP_HOST=m3u-editor-fpm
+      # M3U Proxy reverse proxy setup
       - PROXY_PORT=${M3U_PROXY_PORT:-38085}
       - PROXY_HOST=m3u-proxy
+      # Websocket Reverb port for reverse proxying
       - REVERB_PORT=${REVERB_PORT:-36800}
     depends_on:
       - m3u-editor-fpm
     ports:
+      # Expose the main app port
       - '${APP_PORT:-36400}:${APP_PORT:-36400}'
     restart: unless-stopped
 
@@ -47,8 +51,9 @@ services:
       POSTGRES_DB: ${PG_DATABASE:-m3ue}
       POSTGRES_USER: ${PG_USER:-m3ue}
       POSTGRES_PASSWORD: ${PG_PASSWORD:-m3ue}
-      # Ensure PGDATA matches the layout inside the built Postgres image so
+      # PGDATA should match the layout inside the built Postgres image so
       # Docker mounts the named volume to the correct data directory.
+      # Ensures backwards compatibility with existing volumes
       PGDATA: /var/lib/postgresql/17/docker
     volumes:
       # Mount the named volume at the image's PGDATA path (not /var/lib/postgresql/data)
@@ -73,7 +78,7 @@ services:
     environment:
       - REDIS_SERVER_PORT=${REDIS_SERVER_PORT:-36790}
     volumes:
-      - redis-data:/data
+      - m3ue_redis_data:/data
     #ports:
     #  - '${REDIS_SERVER_PORT:-36790}:${REDIS_SERVER_PORT:-36790}'
     restart: unless-stopped
@@ -132,7 +137,7 @@ services:
 
 volumes:
   m3ue_pgdata:
-  redis-data:
+  m3ue_redis_data:
 
 # Notes:
 # - To run fully from prebuilt images: set IMAGE_TAG to the desired tag and make sure
