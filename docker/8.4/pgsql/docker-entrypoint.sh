@@ -45,4 +45,49 @@ if [ "${PG_HBA_ALLOW_ALL:-false}" = "true" ] || [ "${PG_HBA_ALLOW_DOCKER_NETWORK
   fi
 fi
 # Delegate to the base image's entrypoint (preserve initialization behavior)
+# If the data directory already exists, attempt a safe, temporary start of
+# Postgres to ensure the configured DB/user/password are present or updated.
+# This mirrors previous behaviour used in the monolith entrypoint and is
+if [ -f "${PGDATA:-/var/lib/postgresql/data}/PG_VERSION" ]; then
+  echo "PGDATA already initialized — temporarily starting Postgres to validate DB/user..."
+  # Ensure PG_PORT is set (use default 5432 if not provided)
+  PG_PORT=${PG_PORT:-5432}
+  # Start postgres temporarily as the postgres user, bound to loopback only and on PG_PORT
+  su - postgres -c "pg_ctl -D \"${PGDATA}\" -o \"-c listen_addresses='127.0.0.1' -c port=${PG_PORT}\" -w start" || true
+
+  # Helper to run psql as the postgres superuser over TCP (avoid Unix socket)
+  run_psql() {
+    su - postgres -c "psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -p ${PG_PORT} --username postgres --no-psqlrc -c \"$1\""
+  }
+
+  # Ensure database exists
+  if [ -n "${POSTGRES_DB:-}" ]; then
+    exists=$(su - postgres -c "psql -tA -h 127.0.0.1 -p ${PG_PORT} -U postgres -c \"SELECT 1 FROM pg_database WHERE datname='${POSTGRES_DB}'\"" ) || true
+    if [ "${exists}" != "1" ]; then
+      echo "Creating database '${POSTGRES_DB}'..."
+      run_psql "CREATE DATABASE \"${POSTGRES_DB}\";"
+    else
+      echo "Database '${POSTGRES_DB}' already exists"
+    fi
+  fi
+
+  # Ensure role/user exists and has correct password (if provided)
+  if [ -n "${POSTGRES_USER:-}" ]; then
+    role_exists=$(su - postgres -c "psql -tA -h 127.0.0.1 -p ${PG_PORT} -U postgres -c \"SELECT 1 FROM pg_roles WHERE rolname='${POSTGRES_USER}'\"" ) || true
+    if [ "${role_exists}" != "1" ]; then
+      echo "Creating role '${POSTGRES_USER}'..."
+      run_psql "CREATE ROLE \"${POSTGRES_USER}\" WITH LOGIN PASSWORD '${POSTGRES_PASSWORD:-m3ue}';"
+    else
+      if [ -n "${POSTGRES_PASSWORD:-}" ]; then
+        echo "Altering password for role '${POSTGRES_USER}'..."
+        run_psql "ALTER ROLE \"${POSTGRES_USER}\" WITH PASSWORD '${POSTGRES_PASSWORD}';"
+      fi
+    fi
+  fi
+
+  # Stop the temporary server
+  echo "Stopping temporary Postgres instance..."
+  su - postgres -c "pg_ctl -D \"${PGDATA}\" -m fast stop" || true
+fi
+
 exec /usr/local/bin/docker-entrypoint.sh "$@"
