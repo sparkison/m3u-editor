@@ -3,7 +3,7 @@ set -eu
 
 # Variables that may be used in templates. Export defaults so envsubst
 # (which reads environment variables) sees them even if not provided by compose.
-export NGINX_USER=${NGINX_USER:-www-data}
+export NGINX_USER=${NGINX_USER:-nginx}
 export APP_PORT=${APP_PORT:-36400}
 export APP_URL=${APP_URL:-http://localhost}
 export FPMPORT=${FPMPORT:-9000}
