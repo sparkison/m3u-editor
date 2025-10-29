@@ -7,7 +7,7 @@
 name: m3u-editor
 
 services:
-  nginx:
+  m3u-editor-nginx:
     build:
       context: .
       dockerfile: Dockerfile
@@ -29,7 +29,7 @@ services:
       - '${APP_PORT:-36400}:${APP_PORT:-36400}'
     restart: unless-stopped
 
-  postgres:
+  m3u-editor-postgres:
     build:
       context: .
       dockerfile: Dockerfile
@@ -58,7 +58,7 @@ services:
       retries: 12
     restart: unless-stopped
 
-  redis:
+  m3u-editor-redis:
     build:
       context: .
       dockerfile: Dockerfile
@@ -76,7 +76,7 @@ services:
     #  - '${REDIS_SERVER_PORT:-36790}:${REDIS_SERVER_PORT:-36790}'
     restart: unless-stopped
 
-  php-fpm:
+  m3u-editor-fpm:
     build:
       context: .
       dockerfile: Dockerfile

@@ -40,7 +40,7 @@ services:
     image: sparkison/m3u-editor-redis
 
   # PHP-FPM runtime image (runtime stage)
-  m3u-editor-php:
+  m3u-editor-fpm:
     build:
       context: .
       dockerfile: Dockerfile
