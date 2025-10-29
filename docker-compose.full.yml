@@ -6,6 +6,8 @@ version: '3.8'
 # for development, set LOCAL_BUILD=true and docker-compose will build the
 # `m3u-editor` image from the local Dockerfile.
 
+name: m3u-editor
+
 services:
   nginx:
     build:
@@ -112,7 +114,7 @@ services:
     restart: unless-stopped
 
   m3u-proxy:
-    image: ${LOCAL_BUILD:-false} == "true" ? m3u-proxy:local : sparkison/m3u-proxy:${IMAGE_TAG:-latest}
+    image: sparkison/m3u-proxy:${IMAGE_TAG:-latest}
     build:
       context: ../m3u-proxy
       dockerfile: Dockerfile
