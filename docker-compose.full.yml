@@ -40,6 +40,7 @@ services:
         GIT_TAG: ${GIT_TAG:-local}
     image: sparkison/m3u-editor-postgres:${IMAGE_TAG:-latest}
     environment:
+      PG_HBA_ALLOW_DOCKER_NETWORK: 'true'
       PG_PORT: ${PG_PORT:-54320}
       POSTGRES_DB: ${PG_DATABASE:-m3ue}
       POSTGRES_USER: ${PG_USER:-m3ue}

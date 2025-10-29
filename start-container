@@ -256,6 +256,42 @@ echo "🗂️ Enabling SQLite WAL mode..."
 php artisan sqlite:wal-enable jobs
 echo ""
 
+# Wait for dependent services (DB/Redis) to become reachable before running
+# migrations and starting supervisor. Uses bash /dev/tcp to test TCP connectivity.
+wait_for_tcp() {
+    host="$1"
+    port="$2"
+    timeout=${3:-60}
+    echo "⏳ Waiting for $host:$port (timeout ${timeout}s)"
+    start=$(date +%s)
+    while true; do
+        if bash -c "</dev/tcp/${host}/${port}" >/dev/null 2>&1; then
+            echo "✅ $host:$port is reachable"
+            return 0
+        fi
+        now=$(date +%s)
+        if [ $((now - start)) -ge $timeout ]; then
+            echo "⚠️  Timed out waiting for $host:$port after ${timeout}s"
+            return 1
+        fi
+        sleep 1
+    done
+}
+
+# Wait for Postgres (if using pgsql)
+if [ "${DB_CONNECTION:-}" = "pgsql" ]; then
+    DB_HOST=${DB_HOST:-postgres}
+    DB_PORT=${DB_PORT:-${PG_PORT:-54320}}
+    wait_for_tcp "$DB_HOST" "$DB_PORT" 60 || echo "Warning: Postgres not reachable at $DB_HOST:$DB_PORT"
+fi
+
+# Wait for Redis if configured
+if [ -n "${REDIS_HOST:-}" ]; then
+    REDIS_HOST=${REDIS_HOST:-redis}
+    REDIS_PORT=${REDIS_PORT:-${REDIS_SERVER_PORT:-63790}}
+    wait_for_tcp "$REDIS_HOST" "$REDIS_PORT" 30 || echo "Warning: Redis not reachable at $REDIS_HOST:$REDIS_PORT"
+fi
+
 # Run migrations
 echo "💾 Running migrations..."
 php artisan migrate --force
