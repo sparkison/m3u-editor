@@ -276,6 +276,14 @@ else
     echo "🚀 Starting services..."
     echo ""
     
+    # Ensure supervisord log directory exists (some images don't create it)
+    if [ ! -d "/var/log/supervisor" ]; then
+        mkdir -p /var/log/supervisor || true
+    fi
+    # Ensure the supervisord logfile exists and is writable
+    touch /var/log/supervisor/supervisord.log || true
+    chmod a+rw /var/log/supervisor/supervisord.log || true
+
     # Start supervisord
     exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
 fi

@@ -90,7 +90,7 @@ CMD ["/usr/local/bin/docker-entrypoint-redis"]
 ########################################
 # Postgres
 ########################################
-FROM postgres:18.0-alpine3.22 as postgres
+FROM postgres:17.6-alpine3.22 as postgres
 
 # Small helper image based on the official Postgres alpine image
 # Adds envsubst (gettext) and a tiny entrypoint wrapper to render
