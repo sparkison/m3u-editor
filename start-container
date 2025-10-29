@@ -288,7 +288,7 @@ fi
 # Wait for Redis if configured
 if [ -n "${REDIS_HOST:-}" ]; then
     REDIS_HOST=${REDIS_HOST:-redis}
-    REDIS_PORT=${REDIS_PORT:-${REDIS_SERVER_PORT:-63790}}
+    REDIS_PORT=${REDIS_PORT:-${REDIS_SERVER_PORT:-36790}}
     wait_for_tcp "$REDIS_HOST" "$REDIS_PORT" 30 || echo "Warning: Redis not reachable at $REDIS_HOST:$REDIS_PORT"
 fi
 
