@@ -27,7 +27,7 @@ services:
         GIT_BRANCH: ${GIT_BRANCH:-local}
         GIT_COMMIT: ${GIT_COMMIT:-local}
         GIT_TAG: ${GIT_TAG:-local}
-    image: sparkison/m3u-editor:php-fpm
+    image: sparkison/m3u-editor:fpm
 
   # Nginx image (nginx stage)
   m3u-editor-nginx:

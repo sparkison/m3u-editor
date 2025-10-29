@@ -43,9 +43,28 @@ COPY . /app
 RUN composer install --no-dev --no-interaction --no-progress -o --prefer-dist
 
 ########################################
-# Redis — minimal Alpine image with PHP-FPM
+# Nginx-only image (serves static assets, proxies to php-fpm)
 ########################################
-FROM redis:7-alpine as redis
+FROM nginx:1.26-alpine AS nginx
+
+# Copy built frontend assets into the nginx image
+WORKDIR /var/www/html
+COPY --from=node_builder /app/public /var/www/html/public
+
+# Copy nginx templates so we can envsubst at container start
+COPY ./docker/8.4/nginx/nginx.conf /etc/nginx/nginx.tmpl
+COPY ./docker/8.4/nginx/laravel.tmpl /etc/nginx/conf.d/laravel.tmpl
+
+# Add a small entrypoint that templates the config and runs nginx in foreground
+COPY docker/8.4/nginx/docker-entrypoint.sh /usr/local/bin/docker-entrypoint-nginx
+RUN chmod +x /usr/local/bin/docker-entrypoint-nginx
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint-nginx"]
+
+########################################
+# Redis
+########################################
+FROM redis:alpine3.22 as redis
 
 # Add envsubst (gettext) so we can template the redis config at container start
 RUN apk add --no-cache gettext
@@ -57,6 +76,25 @@ RUN chmod +x /usr/local/bin/docker-entrypoint-redis
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint-redis"]
 CMD ["/usr/local/bin/docker-entrypoint-redis"]
+
+########################################
+# Postgres
+########################################
+FROM postgres:18.0-alpine3.22 as postgres
+
+# Small helper image based on the official Postgres alpine image
+# Adds envsubst (gettext) and a tiny entrypoint wrapper to render
+# a `postgresql.conf` from a template at container start.
+
+USER root
+RUN apk update && apk add --no-cache gettext
+
+COPY docker/8.4/pgsql/postgresql.conf /etc/postgresql/postgresql.conf.tmpl
+COPY docker/8.4/pgsql/docker-entrypoint-pg.sh /usr/local/bin/docker-entrypoint-pg
+RUN chmod +x /usr/local/bin/docker-entrypoint-pg
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint-pg"]
+CMD ["postgres"]
 
 ########################################
 # Runtime — minimal Alpine image with PHP-FPM
@@ -127,26 +165,6 @@ RUN echo -e '#!/bin/bash\nphp artisan "$@"' > /usr/bin/m3ue && chmod +x /usr/bin
 
 # Default entrypoint preserved from original Dockerfile
 ENTRYPOINT ["start-container"]
-
-
-########################################
-# Nginx-only image (serves static assets, proxies to php-fpm)
-########################################
-FROM nginx:1.26-alpine AS nginx
-
-# Copy built frontend assets into the nginx image
-WORKDIR /var/www/html
-COPY --from=node_builder /app/public /var/www/html/public
-
-# Copy nginx templates so we can envsubst at container start
-COPY ./docker/8.4/nginx/nginx.conf /etc/nginx/nginx.tmpl
-COPY ./docker/8.4/nginx/laravel.tmpl /etc/nginx/conf.d/laravel.tmpl
-
-# Add a small entrypoint that templates the config and runs nginx in foreground
-COPY docker/8.4/nginx/docker-entrypoint.sh /usr/local/bin/docker-entrypoint-nginx
-RUN chmod +x /usr/local/bin/docker-entrypoint-nginx
-
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint-nginx"]
 
 ########################################
 # All-in-one image (backwards compatible master image)
