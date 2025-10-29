@@ -17,14 +17,16 @@ services:
         GIT_COMMIT: ${GIT_COMMIT:-local}
         GIT_TAG: ${GIT_TAG:-local}
     image: sparkison/m3u-editor-nginx:${IMAGE_TAG:-latest}
-    depends_on:
-      - m3u-editor-fpm
     environment:
+      - FPMPORT=${FPMPORT:-9900}
       - APP_PORT=${APP_PORT:-36400}
       - APP_URL=${APP_URL:-http://localhost}
-      - FPMPORT=${FPMPORT:-9900}
-      - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
+      - APP_HOST=m3u-editor-fpm
+      - PROXY_PORT=${M3U_PROXY_PORT:-38085}
+      - PROXY_HOST=m3u-proxy
       - REVERB_PORT=${REVERB_PORT:-36800}
+    depends_on:
+      - m3u-editor-fpm
     ports:
       - '${APP_PORT:-36400}:${APP_PORT:-36400}'
     restart: unless-stopped
@@ -91,12 +93,12 @@ services:
       - APP_DEBUG=${APP_DEBUG:-true}
       - FPMPORT=${FPMPORT:-9900}
       - DB_CONNECTION=pgsql # or sqlite
-      - DB_HOST=postgres
+      - DB_HOST=m3u-editor-postgres
       - DB_PORT=${PG_PORT:-54320}
       - DB_DATABASE=${PG_DATABASE:-m3ue}
       - DB_USERNAME=${PG_USER:-m3ue}
       - DB_PASSWORD=${PG_PASSWORD:-m3ue}
-      - REDIS_HOST=redis
+      - REDIS_HOST=m3u-editor-redis
       - REDIS_PORT=${REDIS_SERVER_PORT:-36790}
       - REVERB_PORT=${REVERB_PORT:-36800}
       - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
@@ -120,7 +122,7 @@ services:
       - PORT=${M3U_PROXY_PORT:-38085}
       - LOG_LEVEL=error # error, warn, info, debug
       - REDIS_ENABLED=true
-      - REDIS_HOST=redis
+      - REDIS_HOST=m3u-editor-redis
       - REDIS_SERVER_PORT=${REDIS_SERVER_PORT:-36790}
       - REDIS_DB=6 # Use a separate Redis DB for m3u-proxy caching, 1-5 used by editor
       - ENABLE_TRANSCODING_POOLING=true

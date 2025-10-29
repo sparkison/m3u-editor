@@ -6,10 +6,11 @@ set -eu
 export NGINX_USER=${NGINX_USER:-nginx}
 export APP_PORT=${APP_PORT:-36400}
 export APP_URL=${APP_URL:-http://localhost}
+export APP_HOST=${APP_HOST:-m3u-editor-fpm}
 export FPMPORT=${FPMPORT:-9000}
-export M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
 export REVERB_PORT=${REVERB_PORT:-36800}
-export M3U_PROXY_NGINX_TARGET=${M3U_PROXY_NGINX_TARGET:-127.0.0.1:38085}
+export PROXY_HOST=${PROXY_HOST:-m3u-proxy}
+export PROXY_PORT=${PROXY_PORT:-38085}
 
 TEMPLATE_DIR=/etc/nginx
 NGINX_TPL=${TEMPLATE_DIR}/nginx.tmpl
@@ -17,11 +18,11 @@ VHOST_TPL=${TEMPLATE_DIR}/conf.d/laravel.tmpl
 
 # Render templates if present
 if [ -f "$NGINX_TPL" ]; then
-  envsubst '${NGINX_USER} ${APP_PORT} ${APP_URL} ${FPMPORT} ${M3U_PROXY_PORT} ${REVERB_PORT} ${M3U_PROXY_NGINX_TARGET}' < "$NGINX_TPL" > /etc/nginx/nginx.conf
+  envsubst '${NGINX_USER}' < "$NGINX_TPL" > /etc/nginx/nginx.conf
 fi
 
 if [ -f "$VHOST_TPL" ]; then
-  envsubst '${APP_PORT} ${APP_URL} ${FPMPORT} ${M3U_PROXY_PORT} ${REVERB_PORT} ${M3U_PROXY_NGINX_TARGET}' < "$VHOST_TPL" > /etc/nginx/conf.d/default.conf
+  envsubst '${APP_PORT} ${APP_URL} ${APP_HOST} ${FPMPORT} ${PROXY_PORT} ${REVERB_PORT} ${PROXY_HOST}' < "$VHOST_TPL" > /etc/nginx/conf.d/default.conf
 fi
 
 # Create directories expected by nginx
