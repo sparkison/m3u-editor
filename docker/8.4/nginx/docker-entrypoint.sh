@@ -1,14 +1,15 @@
 #!/bin/sh
 set -eu
 
-# Variables that may be used in templates
-: ${NGINX_USER:=www-data}
-: ${APP_PORT:=36400}
-: ${APP_URL:=http://localhost}
-: ${FPMPORT:=9000}
-: ${M3U_PROXY_PORT:=38085}
-: ${REVERB_PORT:=36800}
-: ${M3U_PROXY_NGINX_TARGET:=127.0.0.1:38085}
+# Variables that may be used in templates. Export defaults so envsubst
+# (which reads environment variables) sees them even if not provided by compose.
+export NGINX_USER=${NGINX_USER:-www-data}
+export APP_PORT=${APP_PORT:-36400}
+export APP_URL=${APP_URL:-http://localhost}
+export FPMPORT=${FPMPORT:-9000}
+export M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
+export REVERB_PORT=${REVERB_PORT:-36800}
+export M3U_PROXY_NGINX_TARGET=${M3U_PROXY_NGINX_TARGET:-127.0.0.1:38085}
 
 TEMPLATE_DIR=/etc/nginx
 NGINX_TPL=${TEMPLATE_DIR}/nginx.tmpl
