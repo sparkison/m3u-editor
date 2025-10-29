@@ -1,3 +1,3 @@
 #!/bin/bash
 
-./vendor/bin/sail build --no-cache && ./vendor/bin/sail --env-file .env.docker up --remove-orphans
+docker compose build --no-cache && docker compose --env-file .env.docker up --remove-orphans
