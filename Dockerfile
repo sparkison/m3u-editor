@@ -100,14 +100,14 @@ USER root
 RUN apk update && apk add --no-cache gettext
 
 COPY docker/8.4/pgsql/postgresql.conf /etc/postgresql/postgresql.conf.tmpl
-COPY docker/8.4/pgsql/docker-entrypoint-pg.sh /usr/local/bin/docker-entrypoint-pg
-RUN chmod +x /usr/local/bin/docker-entrypoint-pg
+COPY docker/8.4/pgsql/docker-entrypoint.sh /usr/local/bin/docker-entrypoint
+RUN chmod +x /usr/local/bin/docker-entrypoint
 
 # Ensure PGDATA directory exists so Docker can mount volumes at container create
 RUN mkdir -p /var/lib/postgresql/data \
     && chown -R postgres:postgres /var/lib/postgresql || true
 
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint-pg"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint"]
 CMD ["postgres"]
 
 ########################################
