@@ -19,15 +19,8 @@ export FPMPORT="${FPMPORT:-9000}" # Default 9000
 # stack. Keep DB/REDIS environment variables configured to point to the
 # external services (DB_HOST, REDIS_HOST, etc.).
 
-# M3U Proxy configuration
-# If M3U_PROXY_ENABLED=true, user is using external proxy service (disable embedded)
-# If M3U_PROXY_ENABLED=false/unset, use embedded proxy (default)
-export M3U_PROXY_ENABLED="${M3U_PROXY_ENABLED:-false}"
-export M3U_PROXY_START_EMBEDDED="true" # Will be set to false if external proxy enabled
-export M3U_PROXY_HOST="${M3U_PROXY_HOST:-127.0.0.1}" # Bind to localhost for embedded
-export M3U_PROXY_PORT="${M3U_PROXY_PORT:-8085}"
-export M3U_PROXY_LOG_LEVEL="${M3U_PROXY_LOG_LEVEL:-ERROR}" # Default ERROR
-export M3U_PROXY_NGINX_TARGET="" # Will be set based on mode for nginx proxy_pass
+# M3U Proxy configuration (default to enabled/external)
+export M3U_PROXY_ENABLED=true
 
 # Run PHP as root (or m3ue)
 export SUPERVISOR_PHP_USER="root"
