@@ -15,7 +15,7 @@ services:
         GIT_BRANCH: ${GIT_BRANCH:-local}
         GIT_COMMIT: ${GIT_COMMIT:-local}
         GIT_TAG: ${GIT_TAG:-local}
-    image: sparkison/m3u-editor:nginx
+    image: sparkison/m3u-editor-nginx
 
   # Postgres image (postgres stage)
   m3u-editor-postgres:
@@ -27,7 +27,7 @@ services:
         GIT_BRANCH: ${GIT_BRANCH:-local}
         GIT_COMMIT: ${GIT_COMMIT:-local}
         GIT_TAG: ${GIT_TAG:-local}
-    image: sparkison/m3u-editor:postgres
+    image: sparkison/m3u-editor-postgres
 
   # Redis image (redis stage)
   m3u-editor-redis:
@@ -39,7 +39,7 @@ services:
         GIT_BRANCH: ${GIT_BRANCH:-local}
         GIT_COMMIT: ${GIT_COMMIT:-local}
         GIT_TAG: ${GIT_TAG:-local}
-    image: sparkison/m3u-editor:redis
+    image: sparkison/m3u-editor-redis
 
   # PHP-FPM runtime image (runtime stage)
   m3u-editor-php:
@@ -51,7 +51,7 @@ services:
         GIT_BRANCH: ${GIT_BRANCH:-local}
         GIT_COMMIT: ${GIT_COMMIT:-local}
         GIT_TAG: ${GIT_TAG:-local}
-    image: sparkison/m3u-editor:fpm
+    image: sparkison/m3u-editor-fpm
 
 # NOTE: This file is intended for building images only. The resulting images
 # are pushed to Docker Hub and then consumed by docker-compose.full.yml or

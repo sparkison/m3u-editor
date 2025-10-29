@@ -16,13 +16,13 @@ services:
         GIT_BRANCH: ${GIT_BRANCH:-local}
         GIT_COMMIT: ${GIT_COMMIT:-local}
         GIT_TAG: ${GIT_TAG:-local}
-    image: sparkison/m3u-editor:nginx
+    image: sparkison/m3u-editor-nginx:${IMAGE_TAG:-latest}
     depends_on:
       - php-fpm
     environment:
       - APP_PORT=${APP_PORT:-36400}
       - APP_URL=${APP_URL:-http://localhost}
-      - FPMPORT=${FPMPORT:-9000}
+      - FPMPORT=${FPMPORT:-9900}
       - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
       - REVERB_PORT=${REVERB_PORT:-36800}
     volumes:
@@ -31,6 +31,7 @@ services:
       - ./public:/var/www/public:ro
     ports:
       - '${APP_PORT:-36400}:${APP_PORT:-36400}'
+    restart: unless-stopped
 
   postgres:
     build:
@@ -41,9 +42,9 @@ services:
         GIT_BRANCH: ${GIT_BRANCH:-local}
         GIT_COMMIT: ${GIT_COMMIT:-local}
         GIT_TAG: ${GIT_TAG:-local}
-    image: sparkison/m3u-editor:postgres
+    image: sparkison/m3u-editor-postgres:${IMAGE_TAG:-latest}
     environment:
-      PG_PORT: ${PG_PORT:-5432}
+      PG_PORT: ${PG_PORT:-54320}
       POSTGRES_DB: ${PG_DATABASE:-m3ue}
       POSTGRES_USER: ${PG_USER:-m3ue}
       POSTGRES_PASSWORD: ${PG_PASSWORD:-m3ue}
@@ -54,6 +55,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 12
+    restart: unless-stopped
 
   redis:
     build:
@@ -64,11 +66,12 @@ services:
         GIT_BRANCH: ${GIT_BRANCH:-local}
         GIT_COMMIT: ${GIT_COMMIT:-local}
         GIT_TAG: ${GIT_TAG:-local}
-    image: sparkison/m3u-editor:redis
-    ports:
-      #- '${REDIS_SERVER_PORT:-63790}:${REDIS_SERVER_PORT:-63790}'
+    image: sparkison/m3u-editor-redis:${IMAGE_TAG:-latest}
     volumes:
       - redis-data:/data
+    ports:
+      #- '${REDIS_SERVER_PORT:-63790}:${REDIS_SERVER_PORT:-63790}'
+    restart: unless-stopped
 
   php-fpm:
     build:
@@ -79,20 +82,20 @@ services:
         GIT_BRANCH: ${GIT_BRANCH:-local}
         GIT_COMMIT: ${GIT_COMMIT:-local}
         GIT_TAG: ${GIT_TAG:-local}
-    image: sparkison/m3u-editor:fpm
+    image: sparkison/m3u-editor-fpm:${IMAGE_TAG:-latest}
     environment:
       - APP_ENV=${APP_ENV:-local}
       - APP_DEBUG=${APP_DEBUG:-true}
-      - DB_CONNECTION=pgsql
+      - FPMPORT=${FPMPORT:-9900}
+      - DB_CONNECTION=pgsql # or sqlite
       - DB_HOST=postgres
-      - DB_PORT=${PG_PORT:-5432}
+      - DB_PORT=${PG_PORT:-54320}
       - DB_DATABASE=${PG_DATABASE:-m3ue}
       - DB_USERNAME=${PG_USER:-m3ue}
       - DB_PASSWORD=${PG_PASSWORD:-m3ue}
       - REDIS_HOST=redis
       - REDIS_PORT=${REDIS_SERVER_PORT:-63790}
-      - M3U_PROXY_URL=http://localhost:${M3U_PROXY_PORT:-38085}
-      - FPMPORT=${FPMPORT:-9000}
+      - M3U_PROXY_URL=${M3U_PROXY_PUBLIC_URL:-http://localhost:${M3U_PROXY_PORT:-38085}}
       - REVERB_PORT=${REVERB_PORT:-36800}
       - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
     depends_on:
@@ -103,9 +106,10 @@ services:
       - ./docker-config:/var/www/config
       - ./:/var/www/html:cached
     ports:
-      #- '${FPMPORT:-9000}:${FPMPORT:-9000}'
+      #- '${FPMPORT:-9900}:${FPMPORT:-9900}'
       #- '${REVERB_PORT:-36800}:${REVERB_PORT:-36800}'
       #- '${M3U_PROXY_PORT:-38085}:${M3U_PROXY_PORT:-38085}'
+    restart: unless-stopped
 
   m3u-proxy:
     image: ${LOCAL_BUILD:-false} == "true" ? m3u-proxy:local : sparkison/m3u-proxy:${IMAGE_TAG:-latest}
@@ -114,14 +118,16 @@ services:
       dockerfile: Dockerfile
     environment:
       - PORT=${M3U_PROXY_PORT:-38085}
-      - LOG_LEVEL=error
+      - LOG_LEVEL=error # error, warn, info, debug
       - REDIS_ENABLED=true
       - REDIS_HOST=redis
       - REDIS_SERVER_PORT=${REDIS_SERVER_PORT:-63790}
-      - REDIS_DB=6
+      - REDIS_DB=6 # Use a separate Redis DB for m3u-proxy caching, 1-5 used by editor
       - ENABLE_TRANSCODING_POOLING=true
+      - PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-http://localhost:${M3U_PROXY_PORT:-38085}}
     ports:
       #- '${M3U_PROXY_PORT:-38085}:${M3U_PROXY_PORT:-38085}'
+    restart: unless-stopped
 
 volumes:
   m3ue_pgdata:
