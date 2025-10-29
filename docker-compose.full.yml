@@ -18,7 +18,7 @@ services:
         GIT_TAG: ${GIT_TAG:-local}
     image: sparkison/m3u-editor-nginx:${IMAGE_TAG:-latest}
     depends_on:
-      - php-fpm
+      - m3u-editor-fpm
     environment:
       - APP_PORT=${APP_PORT:-36400}
       - APP_URL=${APP_URL:-http://localhost}
@@ -101,8 +101,8 @@ services:
       - REVERB_PORT=${REVERB_PORT:-36800}
       - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
     depends_on:
-      - postgres
-      - redis
+      - m3u-editor-postgres
+      - m3u-editor-redis
       - m3u-proxy
     volumes:
       - ./data:/var/www/config
