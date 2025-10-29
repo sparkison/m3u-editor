@@ -25,10 +25,6 @@ services:
       - FPMPORT=${FPMPORT:-9900}
       - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
       - REVERB_PORT=${REVERB_PORT:-36800}
-    volumes:
-      - ./docker/8.4/nginx/nginx.conf:/etc/nginx/nginx.tmpl:ro
-      - ./docker/8.4/nginx/laravel.conf:/etc/nginx/conf.d/laravel.tmpl:ro
-      - ./public:/var/www/public:ro
     ports:
       - '${APP_PORT:-36400}:${APP_PORT:-36400}'
     restart: unless-stopped
@@ -108,12 +104,10 @@ services:
       - redis
       - m3u-proxy
     volumes:
-      - ./docker-config:/var/www/config
-      - ./:/var/www/html:cached
+      - ./data:/var/www/config
     #ports:
     #  - '${FPMPORT:-9900}:${FPMPORT:-9900}'
     #  - '${REVERB_PORT:-36800}:${REVERB_PORT:-36800}'
-    #  - '${M3U_PROXY_PORT:-38085}:${M3U_PROXY_PORT:-38085}'
     restart: unless-stopped
 
   m3u-proxy:

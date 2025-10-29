@@ -11,10 +11,10 @@ export REDIS_SERVER_PORT="${REDIS_SERVER_PORT:-36790}" # Default 36790
 export NGINX_USER="root"
 export FPMUSER="root"
 export FPMGROUP="root"
-export FPMPORT="${FPMPORT:-9000}" # Default 9000
+export FPMPORT="${FPMPORT:-9900}" # Default 9900
 
 
-# NOTE: Postgres and Redis are no longer started inside this container.
+# NOTE: Nginx, Postgres and Redis are no longer started inside this container.
 # These services should be provided by separate containers in your compose
 # stack. Keep DB/REDIS environment variables configured to point to the
 # external services (DB_HOST, REDIS_HOST, etc.).
@@ -145,41 +145,88 @@ fi
 # Create log files
 [ ! -f "${queue_log_file}" ] && touch "${queue_log_file}"
 [ ! -f "${websockets_log_file}" ] && touch "${websockets_log_file}"
-[ ! -f "${startup_log_file}" ] && touch "${startup_log_file}"
 
 # Clear out the log content (could build up over time, clean on container reboot)
 echo "" > "/var/log/cron.out.log"
 echo "" > "/var/log/cron.err.log"
 echo "" > "${queue_log_file}"
 echo "" > "${websockets_log_file}"
-echo "" > "${startup_log_file}"
 
-# Cleanup
+# Cleanup (remove old log files that are no longer used)
 [ -f "${swoole_log_file}" ] && rm -f "${swoole_log_file}"
 [ -f "${reverb_log_file}" ] && rm -f "${reverb_log_file}"
 [ -f "${horizon_log_file}" ] && rm -f "${horizon_log_file}"
 [ -f "${laravel_log_file}" ] && rm -f "${laravel_log_file}"
 [ -f "${ffmpeg_log_file}" ] && rm -f "${ffmpeg_log_file}"
 [ -f "${nginx_log_file}" ] && rm -f "${nginx_log_file}"
+[ -f "${startup_log_file}" ] && rm -f "${startup_log_file}"
 
-# Link environment file
-ln -sf "${env_file}" .env
+# Link or copy environment file
+# Prefer copying so the container instance owns a standalone .env instead of a symlink
+# This avoids running the container in the live host project context when files are not
+# intentionally bind-mounted. Only copy if a .env does not already exist.
+if [ ! -f .env ]; then
+    if [ -f "${env_file}" ]; then
+        cp -a "${env_file}" .env || ln -sf "${env_file}" .env
+    else
+        echo "-- No env file at ${env_file} to copy; leaving .env alone"
+    fi
+fi
 
-# Link db files
-ln -sf "${db_file}" "database/database.sqlite"
-ln -sf "${db_file_jobs}" "database/jobs.sqlite"
+# Copy db files into the project if they don't exist
+if [ ! -f "database/database.sqlite" ]; then
+    if [ -f "${db_file}" ]; then
+        cp -a "${db_file}" "database/database.sqlite"
+    else
+        touch "database/database.sqlite"
+    fi
+fi
+if [ ! -f "database/jobs.sqlite" ]; then
+    if [ -f "${db_file_jobs}" ]; then
+        cp -a "${db_file_jobs}" "database/jobs.sqlite"
+    else
+        touch "database/jobs.sqlite"
+    fi
+fi
 
-# Link logs
-rm -rf storage/logs
-ln -sf "${log_dir}" storage/
+# Copy or merge logs directory into storage/logs (prefer copy so the container
+# does not create a symlink into the config directory). If storage/logs exists
+# keep it; otherwise copy files from ${log_dir} into storage/logs.
+if [ -d storage/logs ]; then
+    echo "-- storage/logs already exists; leaving it in place"
+else
+    mkdir -p storage/logs
+    if [ -d "${log_dir}" ]; then
+        cp -a "${log_dir}/." storage/logs/ || true
+    fi
+fi
 
-# Link EPG, Playlist, Backups
-[ ! -d "storage/app/private/epg" ] && ln -sf "${epg_dir}" storage/app/private/epg
-[ ! -d "storage/app/private/epg-cache" ] && ln -sf "${epg_cache_dir}" storage/app/private/epg-cache
-[ ! -d "storage/app/private/cached-logos" ] && ln -sf "${logo_cache_dir}" storage/app/private/cached-logos
-[ ! -d "storage/app/private/playlist" ] && ln -sf "${playlist_dir}" storage/app/private/playlist
-[ ! -d "storage/app/private/playlist-epg-files" ] && ln -sf "${playlist_epg_dir}" storage/app/private/playlist-epg-files
-[ ! -d "storage/app/private/m3u-editor-backups" ] && ln -sf "${backup_dir}" storage/app/private/m3u-editor-backups
+# Copy EPG, Playlist, Backups into storage/app/private/* if they don't exist
+mkdir -p storage/app/private
+if [ ! -d "storage/app/private/epg" ]; then
+    mkdir -p storage/app/private/epg
+    [ -d "${epg_dir}" ] && cp -a "${epg_dir}/." storage/app/private/epg/ || true
+fi
+if [ ! -d "storage/app/private/epg-cache" ]; then
+    mkdir -p storage/app/private/epg-cache
+    [ -d "${epg_cache_dir}" ] && cp -a "${epg_cache_dir}/." storage/app/private/epg-cache/ || true
+fi
+if [ ! -d "storage/app/private/cached-logos" ]; then
+    mkdir -p storage/app/private/cached-logos
+    [ -d "${logo_cache_dir}" ] && cp -a "${logo_cache_dir}/." storage/app/private/cached-logos/ || true
+fi
+if [ ! -d "storage/app/private/playlist" ]; then
+    mkdir -p storage/app/private/playlist
+    [ -d "${playlist_dir}" ] && cp -a "${playlist_dir}/." storage/app/private/playlist/ || true
+fi
+if [ ! -d "storage/app/private/playlist-epg-files" ]; then
+    mkdir -p storage/app/private/playlist-epg-files
+    [ -d "${playlist_epg_dir}" ] && cp -a "${playlist_epg_dir}/." storage/app/private/playlist-epg-files/ || true
+fi
+if [ ! -d "storage/app/private/m3u-editor-backups" ]; then
+    mkdir -p storage/app/private/m3u-editor-backups
+    [ -d "${backup_dir}" ] && cp -a "${backup_dir}/." storage/app/private/m3u-editor-backups/ || true
+fi
 
 # Link Laravel storage
 if [ ! -d "public/storage" ]; then
