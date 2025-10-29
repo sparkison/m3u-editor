@@ -2,6 +2,7 @@
 set -eu
 
 # Variables that may be used in templates
+: ${NGINX_USER:=www-data}
 : ${APP_PORT:=36400}
 : ${APP_URL:=http://localhost}
 : ${FPMPORT:=9000}
@@ -15,7 +16,7 @@ VHOST_TPL=${TEMPLATE_DIR}/conf.d/laravel.tmpl
 
 # Render templates if present
 if [ -f "$NGINX_TPL" ]; then
-  envsubst '${APP_PORT} ${APP_URL} ${FPMPORT} ${M3U_PROXY_PORT} ${REVERB_PORT} ${M3U_PROXY_NGINX_TARGET}' < "$NGINX_TPL" > /etc/nginx/nginx.conf
+  envsubst '${NGINX_USER} ${APP_PORT} ${APP_URL} ${FPMPORT} ${M3U_PROXY_PORT} ${REVERB_PORT} ${M3U_PROXY_NGINX_TARGET}' < "$NGINX_TPL" > /etc/nginx/nginx.conf
 fi
 
 if [ -f "$VHOST_TPL" ]; then
