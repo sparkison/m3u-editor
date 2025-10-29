@@ -13,3 +13,9 @@ stubs
 *.sql
 *.csv
 *.m3u
+
+# Don't include local runtime env files in the build context
+# These files should not be baked into images; use --env-file at runtime
+.env
+.env.backup
+.env.docker

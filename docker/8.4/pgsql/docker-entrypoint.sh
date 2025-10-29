@@ -11,7 +11,7 @@ if [ -f "$TEMPLATE" ]; then
   # Ensure PGDATA exists (the base image sets PGDATA, default /var/lib/postgresql/data)
   : "${PGDATA:=/var/lib/postgresql/data}"
   # Provide defaults for template variables so envsubst produces valid config
-  export PG_PORT="${PG_PORT:-5432}"
+  export PG_PORT="${PG_PORT:-54320}"
   export POSTGRES_MAX_CONNECTIONS="${POSTGRES_MAX_CONNECTIONS:-100}"
   export POSTGRES_SHARED_BUFFERS="${POSTGRES_SHARED_BUFFERS:-128MB}"
   mkdir -p "$PGDATA"
