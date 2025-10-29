@@ -29,13 +29,6 @@ export SUPERVISOR_PHP_USER="root"
 export APP_URL="${APP_URL:-http://localhost}"
 export APP_PORT="${APP_PORT:-36400}" # Default 36400
 
-# Laravel will use APP_URL/m3u-proxy for browser-accessible URLs
-if [[ "$APP_URL" == *"https"* ]]; then
-    export M3U_PROXY_URL="${APP_URL}/m3u-proxy"
-else
-    export M3U_PROXY_URL="${APP_URL}:${APP_PORT}/m3u-proxy"
-fi
-
 # Websockets
 export REVERB_PORT="${REVERB_PORT:-36800}" # Default 36800
 

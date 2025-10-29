@@ -30,7 +30,7 @@ class M3uProxyStatus extends Command
         $this->displayHeader();
 
         $usingExternalProxy = config('proxy.external_proxy_enabled', false);
-        $proxyUrl = config('proxy.m3u_proxy_url', 'http://localhost:8085');
+        $proxyUrl = rtrim(config('proxy.m3u_proxy_host'), '/') . ':' . config('proxy.m3u_proxy_port');
 
         $this->info('🔍 Checking m3u-proxy status...');
         $this->newLine();

@@ -98,7 +98,7 @@
                             <p class="font-medium mb-2">Please verify:</p>
                             <ul class="list-disc list-inside space-y-1 ml-2">
                                 <li>The m3u-proxy server is running</li>
-                                <li>The proxy URL is configured correctly: <code class="px-1 py-0.5 bg-red-200 dark:bg-red-800 rounded text-xs">{{ config('proxy.m3u_proxy_url') }}</code></li>
+                                <li>The proxy URL is configured correctly: <code class="px-1 py-0.5 bg-red-200 dark:bg-red-800 rounded text-xs">{{ config('proxy.m3u_proxy_host') }}:{{ config('proxy.m3u_proxy_port') }}</code></li>
                                 <li>There are no firewall or network issues blocking the connection</li>
                             </ul>
                         </div>

@@ -106,7 +106,11 @@ services:
       - REDIS_HOST=m3u-editor-redis
       - REDIS_PORT=${REDIS_SERVER_PORT:-36790}
       - REVERB_PORT=${REVERB_PORT:-36800}
+      # Proxy settings
+      - M3U_PROXY_TOKEN=${M3U_PROXY_API_TOKEN:-changeme}
+      - M3U_PROXY_HOST=${M3U_PROXY_HOST:-http://m3u-proxy}
       - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
+      - M3U_PROXY_PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-${APP_URL}:${APP_PORT:-36400}/m3u-proxy}
     depends_on:
       - m3u-editor-postgres
       - m3u-editor-redis
@@ -125,6 +129,11 @@ services:
       dockerfile: Dockerfile
     environment:
       - PORT=${M3U_PROXY_PORT:-38085}
+      - API_TOKEN=${M3U_PROXY_API_TOKEN:-changeme}
+      # HLS rewrite URL when using direct proxying (not required for transcoding)
+      # Use the NGINX reverse proxy URL so HLS playlists are correctly rewritten
+      # <APP_URL>:<APP_PORT>/m3u-proxy
+      - PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-${APP_URL}:${APP_PORT:-36400}/m3u-proxy}
       - LOG_LEVEL=error # error, warn, info, debug
       - REDIS_ENABLED=true
       - REDIS_HOST=m3u-editor-redis

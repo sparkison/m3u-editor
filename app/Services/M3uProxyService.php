@@ -22,7 +22,7 @@ class M3uProxyService
 
     public function __construct()
     {
-        $this->apiBaseUrl = rtrim(config('proxy.m3u_proxy_url'), '/');
+        $this->apiBaseUrl = rtrim(config('proxy.m3u_proxy_host'), '/') . ':' . config('proxy.m3u_proxy_port');
         $this->apiToken = config('proxy.m3u_proxy_token');
     }
 
