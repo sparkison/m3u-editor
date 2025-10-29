@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-: ${REDIS_SERVER_PORT:=6379}
+export REDIS_SERVER_PORT="${REDIS_SERVER_PORT:-6379}"
 
 TEMPLATE=/etc/redis/redis.tmpl
 CONF=/etc/redis/redis.conf

@@ -15,20 +15,6 @@ ARG GIT_COMMIT
 ARG GIT_TAG
 
 ########################################
-# Node builder — builds frontend assets
-########################################
-FROM node:18-alpine AS node_builder
-WORKDIR /app
-
-# Copy only the files required for npm install to leverage Docker cache
-COPY package.json package-lock.json ./
-RUN npm ci --silent
-
-# Copy the rest of the app and run the frontend build
-COPY . ./
-RUN npm run build
-
-########################################
 # Composer builder — installs PHP dependencies
 ########################################
 FROM composer:2 AS composer
@@ -39,8 +25,30 @@ COPY composer.json composer.lock ./
 # Copy everything else to ensure autoload generation is correct
 COPY . /app
 
-# Install production dependencies only (no-dev) and optimize
-RUN composer install --no-dev --no-interaction --no-progress -o --prefer-dist
+# Some composer platform requirements (ext-intl, ext-pcntl) are provided by
+# the runtime image. To keep the composer stage portable across different
+# composer base images (alpine/debian) we skip compiling extensions here and
+# let the runtime image provide them. Run composer with ignored platform requirements
+RUN composer install --no-dev --no-interaction --no-progress -o --prefer-dist --ignore-platform-reqs
+
+########################################
+# Node builder — builds frontend assets
+########################################
+FROM node:18-alpine AS node_builder
+WORKDIR /app
+
+# Copy only the files required for npm install to leverage Docker cache
+COPY package.json package-lock.json ./
+RUN npm ci --silent
+
+# Copy the rest of the app
+COPY . ./
+
+# Copy vendor built by the composer stage so Vite can resolve vendor CSS files
+COPY --from=composer /app/vendor /app/vendor
+
+# Run the frontend build (Vite)
+RUN npm run build
 
 ########################################
 # Nginx-only image (serves static assets, proxies to php-fpm)
@@ -94,6 +102,10 @@ RUN apk update && apk add --no-cache gettext
 COPY docker/8.4/pgsql/postgresql.conf /etc/postgresql/postgresql.conf.tmpl
 COPY docker/8.4/pgsql/docker-entrypoint-pg.sh /usr/local/bin/docker-entrypoint-pg
 RUN chmod +x /usr/local/bin/docker-entrypoint-pg
+
+# Ensure PGDATA directory exists so Docker can mount volumes at container create
+RUN mkdir -p /var/lib/postgresql/data \
+    && chown -R postgres:postgres /var/lib/postgresql || true
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint-pg"]
 CMD ["postgres"]

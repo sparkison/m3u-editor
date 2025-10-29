@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Base compose file used to build the images that get pushed to Docker Hub.
 # Use this in CI to build and tag images (dev/experimental/latest).
 # This file always uses `build:` so it produces images that can be pushed.
