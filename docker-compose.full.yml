@@ -47,10 +47,10 @@ services:
       POSTGRES_PASSWORD: ${PG_PASSWORD:-m3ue}
       # Ensure PGDATA matches the layout inside the built Postgres image so
       # Docker mounts the named volume to the correct data directory.
-      PGDATA: /var/lib/postgresql/18/docker
+      PGDATA: /var/lib/postgresql/17/docker
     volumes:
       # Mount the named volume at the image's PGDATA path (not /var/lib/postgresql/data)
-      - m3ue_pgdata:/var/lib/postgresql/18/docker
+      - m3ue_pgdata:/var/lib/postgresql/17/docker
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-m3ue} -d ${PG_DATABASE:-m3ue} -h 127.0.0.1 || exit 1"]
       interval: 5s
