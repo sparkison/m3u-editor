@@ -147,6 +147,10 @@ RUN apk update && apk --no-cache add \
     php84-pecl-redis php84-pcntl \
     bash tzdata \
     && ln -s /usr/bin/php84 /usr/bin/php
+    # Disable PCOV by default because it overrides zend_execute_ex() and
+    # prevents PHP JIT from enabling. Keep the extension installed for
+    # dev/CI use, but default to disabled to avoid the warning.
+    RUN echo "pcov.enabled=0" > /etc/php84/conf.d/20-pcov.ini || true
 
 # PHP & supervisor configuration copied from the repo
 COPY ./docker/8.4/php.ini /etc/php84/conf.d/99-m3ue.ini
