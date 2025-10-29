@@ -43,6 +43,22 @@ COPY . /app
 RUN composer install --no-dev --no-interaction --no-progress -o --prefer-dist
 
 ########################################
+# Redis — minimal Alpine image with PHP-FPM
+########################################
+FROM redis:7-alpine as redis
+
+# Add envsubst (gettext) so we can template the redis config at container start
+RUN apk add --no-cache gettext
+
+COPY docker/8.4/redis/ /docker-entrypoint-redis/
+COPY docker/8.4/redis/redis.conf /etc/redis/redis.tmpl
+COPY docker/8.4/redis/docker-entrypoint.sh /usr/local/bin/docker-entrypoint-redis
+RUN chmod +x /usr/local/bin/docker-entrypoint-redis
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint-redis"]
+CMD ["/usr/local/bin/docker-entrypoint-redis"]
+
+########################################
 # Runtime — minimal Alpine image with PHP-FPM
 ########################################
 FROM alpine:3.21.3 AS runtime
@@ -79,9 +95,6 @@ RUN apk update && apk --no-cache add \
     php84-pecl-redis php84-pcntl \
     bash tzdata \
     && ln -s /usr/bin/php84 /usr/bin/php
-
-# Note: Redis is provided by a separate service/image. Redis config templating
-# is handled by the redis image's entrypoint (docker/8.4/redis/docker-entrypoint.sh).
 
 # PHP & supervisor configuration copied from the repo
 COPY ./docker/8.4/php.ini /etc/php84/conf.d/99-m3ue.ini
