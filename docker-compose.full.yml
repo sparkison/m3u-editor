@@ -28,6 +28,9 @@ services:
       - PROXY_HOST=m3u-proxy
       # Websocket Reverb port for reverse proxying
       - REVERB_PORT=${REVERB_PORT:-36800}
+    depends_on:
+      m3u-editor-fpm:
+        condition: service_healthy
     ports:
       # Expose the main app port
       - '${APP_PORT:-36400}:${APP_PORT:-36400}'
@@ -142,6 +145,11 @@ services:
       - ENABLE_TRANSCODING_POOLING=true
     #ports:
     #  - '${M3U_PROXY_PORT:-38085}:${M3U_PROXY_PORT:-38085}'
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/${FPMPORT:-9900}' >/dev/null 2>&1"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
     restart: unless-stopped
 
 volumes:

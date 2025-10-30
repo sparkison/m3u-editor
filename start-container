@@ -233,6 +233,7 @@ if [ "${DB_CONNECTION:-}" = "pgsql" ]; then
     DB_HOST=${DB_HOST:-postgres}
     DB_PORT=${DB_PORT:-${PG_PORT:-54320}}
     wait_for_tcp "$DB_HOST" "$DB_PORT" 60 || echo "Warning: Postgres not reachable at $DB_HOST:$DB_PORT"
+    echo ""
 fi
 
 # Wait for Redis if configured
@@ -240,6 +241,7 @@ if [ -n "${REDIS_HOST:-}" ]; then
     REDIS_HOST=${REDIS_HOST:-redis}
     REDIS_PORT=${REDIS_PORT:-${REDIS_SERVER_PORT:-36790}}
     wait_for_tcp "$REDIS_HOST" "$REDIS_PORT" 30 || echo "Warning: Redis not reachable at $REDIS_HOST:$REDIS_PORT"
+    echo ""
 fi
 
 # Run migrations
