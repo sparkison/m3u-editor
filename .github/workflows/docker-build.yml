@@ -71,7 +71,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./m3u-editor/Dockerfile
+          file: Dockerfile
           push: true
           tags: |
             sparkison/m3u-editor-fpm:${{ steps.meta.outputs.IMAGE_TAG }}
@@ -85,7 +85,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./m3u-editor/Dockerfile
+          file: Dockerfile
           push: true
           tags: |
             sparkison/m3u-editor-nginx:${{ steps.meta.outputs.IMAGE_TAG }}
@@ -96,7 +96,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./m3u-editor/Dockerfile
+          file: Dockerfile
           push: true
           tags: |
             sparkison/m3u-editor-postgres:${{ steps.meta.outputs.IMAGE_TAG }}
@@ -107,7 +107,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./m3u-editor/Dockerfile
+          file: Dockerfile
           push: true
           tags: |
             sparkison/m3u-editor-redis:${{ steps.meta.outputs.IMAGE_TAG }}
