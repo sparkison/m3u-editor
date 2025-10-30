@@ -94,17 +94,20 @@ services:
         GIT_TAG: ${GIT_TAG:-local}
     image: sparkison/m3u-editor-fpm:${IMAGE_TAG:-latest}
     environment:
+      # App settings
       - APP_ENV=${APP_ENV:-local}
       - APP_DEBUG=${APP_DEBUG:-false}
       - APP_URL=${APP_URL:-http://localhost} # Application URL/IP for accessing on LAN/WAN
       - APP_PORT=${APP_PORT:-36400}
       - FPMPORT=${FPMPORT:-9900}
+      # Database settings
       - DB_CONNECTION=pgsql # or sqlite
       - DB_HOST=m3u-editor-postgres
       - DB_PORT=${PG_PORT:-54320}
       - DB_DATABASE=${PG_DATABASE:-m3ue}
       - DB_USERNAME=${PG_USER:-m3ue}
       - DB_PASSWORD=${PG_PASSWORD:-m3ue}
+      # Reverb (Websockets) settings
       - REVERB_PORT=${REVERB_PORT:-36800}
       - REDIS_HOST=m3u-editor-redis
       - REDIS_PORT=${REDIS_SERVER_PORT:-36790}
@@ -124,6 +127,11 @@ services:
     #ports:
     #  - '${FPMPORT:-9900}:${FPMPORT:-9900}'
     #  - '${REVERB_PORT:-36800}:${REVERB_PORT:-36800}'
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/${FPMPORT:-9900}' >/dev/null 2>&1"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
     restart: unless-stopped
 
   m3u-proxy:
