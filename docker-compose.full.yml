@@ -147,7 +147,7 @@ services:
       - PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-http://localhost:36400/m3u-proxy}
       - LOG_LEVEL=error # error, warn, info, debug
       - REDIS_ENABLED=true
-      - REDIS_HOST=m3u-editor-redis
+      - REDIS_HOST=${REDIS_HOST:-m3u-editor-redis}
       - REDIS_SERVER_PORT=${REDIS_SERVER_PORT:-36790}
       - REDIS_DB=6 # Use a separate Redis DB for m3u-proxy caching, 1-5 used by editor
       - ENABLE_TRANSCODING_POOLING=true
