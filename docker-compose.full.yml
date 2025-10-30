@@ -51,9 +51,8 @@ services:
       POSTGRES_DB: ${PG_DATABASE:-m3ue}
       POSTGRES_USER: ${PG_USER:-m3ue}
       POSTGRES_PASSWORD: ${PG_PASSWORD:-m3ue}
-      # PGDATA should match the layout inside the built Postgres image so
+      # Ensure PGDATA matches the layout inside the built Postgres image so
       # Docker mounts the named volume to the correct data directory.
-      # Ensures backwards compatibility with existing volumes
       PGDATA: /var/lib/postgresql/17/docker
     volumes:
       # Mount the named volume at the image's PGDATA path (not /var/lib/postgresql/data)
