@@ -23,9 +23,15 @@ class M3uProxyService
 
     public function __construct()
     {
-        $this->apiBaseUrl = rtrim(config('proxy.m3u_proxy_host'), '/') . ':' . config('proxy.m3u_proxy_port');
-        $this->apiPublicUrl = rtrim(config('proxy.m3u_proxy_public_url'), '/');
+        // API configuration
         $this->apiToken = config('proxy.m3u_proxy_token');
+        $this->apiBaseUrl = rtrim(config('proxy.m3u_proxy_host'), '/');
+        if ($port = config('proxy.m3u_proxy_port') !== null) {
+            $this->apiBaseUrl .= ':' . $port;
+        }
+
+        // Public URL for clients
+        $this->apiPublicUrl = rtrim(config('proxy.m3u_proxy_public_url'), '/');
     }
 
     public function mode(): string
