@@ -1,15 +1,6 @@
 <?php
 
 return [
-    'url_override' => env('PROXY_URL_OVERRIDE', null),
-    'proxy_format' => env('PROXY_FORMAT', 'mpts'), // 'mpts' or 'hls'
-    'ffmpeg_path' => env('PROXY_FFMPEG_PATH', null),
-    'ffprobe_path' => env('PROXY_FFPROBE_PATH', null),
-    'ffmpeg_additional_args' => env('PROXY_FFMPEG_ADDITIONAL_ARGS', ''),
-    'ffmpeg_codec_video' => env('PROXY_FFMPEG_CODEC_VIDEO', null),
-    'ffmpeg_codec_audio' => env('PROXY_FFMPEG_CODEC_AUDIO', null),
-    'ffmpeg_codec_subtitles' => env('PROXY_FFMPEG_CODEC_SUBTITLES', null),
-
     // M3U Proxy Service Configuration
     // If M3U_PROXY_ENABLED=true, uses external proxy service at M3U_PROXY_URL
     // If M3U_PROXY_ENABLED=false/null, uses embedded proxy via nginx reverse proxy
@@ -21,6 +12,24 @@ return [
     'm3u_proxy_host' => env('M3U_PROXY_HOST', 'http://localhost'), // Auto-set in start-container based on mode
     'm3u_proxy_port' => env('M3U_PROXY_PORT', '8085'), // Auto-set in start-container based on mode
     'm3u_proxy_public_url' => env('M3U_PROXY_PUBLIC_URL', env('APP_URL') . ':' . env('APP_PORT', '36400') . '/m3u-proxy'),
+
+
+    /*--------------------------------------------------------------------------
+    | Deprecated Proxy Settings
+    |--------------------------------------------------------------------------
+    | The following settings are deprecated and replaced by the above settings.
+    | They are retained here for backward compatibility but should not be used
+    | in new configurations.
+    */
+
+    'url_override' => env('PROXY_URL_OVERRIDE', null),
+    'proxy_format' => env('PROXY_FORMAT', 'mpts'), // 'mpts' or 'hls'
+    'ffmpeg_path' => env('PROXY_FFMPEG_PATH', null),
+    'ffprobe_path' => env('PROXY_FFPROBE_PATH', null),
+    'ffmpeg_additional_args' => env('PROXY_FFMPEG_ADDITIONAL_ARGS', ''),
+    'ffmpeg_codec_video' => env('PROXY_FFMPEG_CODEC_VIDEO', null),
+    'ffmpeg_codec_audio' => env('PROXY_FFMPEG_CODEC_AUDIO', null),
+    'ffmpeg_codec_subtitles' => env('PROXY_FFMPEG_CODEC_SUBTITLES', null),
 
     /*
     |--------------------------------------------------------------------------
