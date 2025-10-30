@@ -19,30 +19,33 @@ Files
 -----
 
 - `docker-compose.base.yml` — CI-oriented compose that builds multiple image variants using build targets in the `Dockerfile`. It builds and tags:
-  - `sparkison/m3u-editor:${IMAGE_TAG}` (default points to the all-in-one target)
-  - `sparkison/m3u-editor:allinone`
-  - `sparkison/m3u-editor:php-fpm`
-  - `sparkison/m3u-editor:nginx`
-  - `sparkison/m3u-proxy:${IMAGE_TAG}`
+  - `sparkison/m3u-editor-nginx:${IMAGE_TAG}`
+  - `sparkison/m3u-editor-postgres:${IMAGE_TAG}`
+  - `sparkison/m3u-editor-redis:${IMAGE_TAG}`
+  - `sparkison/m3u-editor-fpm:${IMAGE_TAG}`
 
 - `docker-compose.full.yml` — Full-stack compose that runs `postgres`, `redis`, `m3u-proxy`, plus separate `php-fpm` and `nginx` services by default. This is the recommended modular layout for development and production-like testing.
 
-- `docker-compose.allinone.yml` — An overlay compose file that replaces the separate `php-fpm`+`nginx` services with the single `m3u-editor` all-in-one image (backwards compatibility). Use this in combination with `docker-compose.full.yml` when you want the legacy single-image behavior.
-- `docker-compose.allinone.yml` — An overlay compose file that replaces the separate `php-fpm` service with the single `m3u-editor` all-in-one image (backwards compatibility). Note: nginx is not bundled into the all-in-one image and must be run as the separate `nginx` service/image.
+- `docker-compose.full-gluetun.yml` — Full-stack compose that runs `gluetun` `postgres`, `redis`, `m3u-proxy`, plus separate `php-fpm` and `nginx`, with all services running inside the VPN network.
 
 - `docker-compose.images.yml` — Pull-only compose for users who prefer to use prebuilt images from Docker Hub (useful when supplying your own external Postgres/Redis).
 
 Helper scripts
 --------------
 
-- `docker/8.4/nginx/docker-entrypoint.sh` — entrypoint for the nginx image. It envsubst's the nginx templates (`nginx.tmpl` and `laravel.tmpl`) using environment variables and starts nginx. This allows runtime configuration of ports and proxy targets (e.g., FPMPORT, APP_PORT, M3U_PROXY_PORT).
+- `docker/8.4/nginx/docker-entrypoint.sh` — entrypoint for the NGINX image. It envsubst's the nginx templates (`nginx.tmpl` and `laravel.tmpl`) using environment variables and starts nginx. This allows runtime configuration of ports and proxy targets (e.g., FPMPORT, APP_PORT, M3U_PROXY_PORT).
+
+- `docker/8.4/pgsql/docker-entrypoint.sh` — entrypoint for the Postgres image. It envsubst's 
+
+- `docker/8.4/redis/docker-entrypoint.sh` — entrypoint for the Redis image. It envsubst's 
+
 
 Quick examples
 --------------
 
 Build and push images via GitHub Actions (recommended):
 
-The repo includes a sample workflow at `.github/workflows/docker-build.yml` which builds and pushes multi-arch images for the targets `allinone`, `php-fpm`, and `nginx`. It also tags the main image with `IMAGE_TAG` derived from the branch (main -> latest, experimental -> experimental, other branches -> dev-<branch>).
+The repo includes a sample workflow at `.github/workflows/docker-build.yml` which builds and pushes multi-arch images for the targets, `php-fpm`, and `nginx`, `redis`, and `postgres`. It also tags the images with `IMAGE_TAG` derived from the branch (main -> latest, experimental -> experimental, other branches -> <branch>).
 
 Manually build the variants locally (CI-like):
 
@@ -51,10 +54,11 @@ Manually build the variants locally (CI-like):
 IMAGE_TAG=experimental docker compose -f docker-compose.base.yml build --parallel
 
 # Push them to Docker Hub using docker CLI or `docker compose push` (CI usually does this automatically)
-docker push sparkison/m3u-editor:allinone
-docker push sparkison/m3u-editor:php-fpm
-docker push sparkison/m3u-editor:nginx
-docker push sparkison/m3u-editor:experimental
+docker push sparkison/m3u-editor-nginx
+docker push sparkison/m3u-editor-postgres
+docker push sparkison/m3u-editor-redis
+docker push sparkison/m3u-editor-fpm
+
 ```
 
 Run the modular full stack (separate services):
@@ -67,19 +71,12 @@ IMAGE_TAG=latest docker compose -f docker-compose.full.yml up -d
 IMAGE_TAG=local docker compose -f docker-compose.full.yml up --build -d
 ```
 
-Run using the legacy all-in-one image (single-image mode):
-
-```sh
-# Run full stack using the all-in-one image instead of separated services
-IMAGE_TAG=dev docker compose -f docker-compose.full.yml -f docker-compose.allinone.yml up -d
-```
-
 Use external Postgres/Redis
 --------------------------
 
-If you want to use your own Postgres or Redis instances (on the host or elsewhere):
+If you want to use your own NGINX, Postgres or Redis instances (on the host or elsewhere):
 
-- Omit the `postgres` and/or `redis` services from the compose file, or use `docker-compose.images.yml` and remove/comment those services.
+- Omit the `nginx`, `postgres` and/or `redis` services from the compose file, or use `docker-compose.images.yml` and remove/comment those services.
 - Set environment variables so the app uses them (for macOS, `host.docker.internal` is useful):
 
 ```env
