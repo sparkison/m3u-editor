@@ -70,7 +70,7 @@ jobs:
       - name: Build and push php-fpm image
         uses: docker/build-push-action@v5
         with:
-          context: ./m3u-editor
+          context: .
           file: ./m3u-editor/Dockerfile
           push: true
           tags: |
@@ -84,7 +84,7 @@ jobs:
       - name: Build and push nginx image
         uses: docker/build-push-action@v5
         with:
-          context: ./m3u-editor
+          context: .
           file: ./m3u-editor/Dockerfile
           push: true
           tags: |
@@ -95,7 +95,7 @@ jobs:
       - name: Build and push postgres image
         uses: docker/build-push-action@v5
         with:
-          context: ./m3u-editor
+          context: .
           file: ./m3u-editor/Dockerfile
           push: true
           tags: |
@@ -106,7 +106,7 @@ jobs:
       - name: Build and push redis image
         uses: docker/build-push-action@v5
         with:
-          context: ./m3u-editor
+          context: .
           file: ./m3u-editor/Dockerfile
           push: true
           tags: |
