@@ -12,8 +12,8 @@ services:
       # Provide your provider and credentials via env or an env file
       - VPN_SERVICE_PROVIDER=${VPN_SERVICE_PROVIDER:-your_vpn_provider}
       - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY:-your_wireguard_private_key}
+      - WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES:-your_wireguard_addresses}
       # Further Wireguard options can be specified as needed
-      #- WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES}
       #- SERVER_COUNTRIES=${SERVER_COUNTRIES}
       #- SERVER_HOSTNAMES=${SERVER_HOSTNAMES}
       # Optionally specify outbound subnets to route via the VPN
@@ -22,6 +22,9 @@ services:
       # Optionally enable proxy features if supported by the image
       - HTTP_PROXY=${GLUETUN_HTTP_PROXY:-false}
       - SOCKS5_PROXY=${GLUETUN_SOCKS5_PROXY:-false}
+    ports:
+      # Expose the main app port
+      - '${APP_PORT:-36400}:${APP_PORT:-36400}'
     restart: unless-stopped
 
   m3u-editor-nginx:
@@ -50,9 +53,9 @@ services:
         condition: service_started
       m3u-editor-fpm:
         condition: service_healthy
-    ports:
-      # Expose the main app port
-      - '${APP_PORT:-36400}:${APP_PORT:-36400}'
+    #ports:
+    #  # Expose the main app port
+    #  - '${APP_PORT:-36400}:${APP_PORT:-36400}'
     network_mode: "service:gluetun"
     restart: unless-stopped
 
