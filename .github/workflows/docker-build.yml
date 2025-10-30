@@ -16,11 +16,26 @@ on:
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-latest
+    # build each architecture on an appropriate runner (amd64 fast on ubuntu-latest,
+    # arm64 fast on ubuntu-22.04-arm). We build platform-specific images and tag
+    # them with a platform suffix; a later job will assemble the manifest lists.
     permissions:
       contents: read
       packages: write
       id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: amd64
+            runner: ubuntu-latest
+            platforms: linux/amd64
+            platform_short: amd64
+          - name: arm64
+            runner: ubuntu-22.04-arm
+            platforms: linux/arm64
+            platform_short: arm64
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - name: Checkout
@@ -74,9 +89,9 @@ jobs:
           file: Dockerfile
           push: true
           tags: |
-            sparkison/m3u-editor-fpm:${{ steps.meta.outputs.IMAGE_TAG }}
+            sparkison/m3u-editor-fpm:${{ steps.meta.outputs.IMAGE_TAG }}-${{ matrix.platform_short }}
           target: runtime
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.platforms }}
           build-args: |
             GIT_BRANCH=${{ github.ref_name }}
             GIT_COMMIT=${{ github.sha }}
@@ -88,9 +103,9 @@ jobs:
           file: Dockerfile
           push: true
           tags: |
-            sparkison/m3u-editor-nginx:${{ steps.meta.outputs.IMAGE_TAG }}
+            sparkison/m3u-editor-nginx:${{ steps.meta.outputs.IMAGE_TAG }}-${{ matrix.platform_short }}
           target: nginx
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.platforms }}
 
       - name: Build and push postgres image
         uses: docker/build-push-action@v5
@@ -99,9 +114,9 @@ jobs:
           file: Dockerfile
           push: true
           tags: |
-            sparkison/m3u-editor-postgres:${{ steps.meta.outputs.IMAGE_TAG }}
+            sparkison/m3u-editor-postgres:${{ steps.meta.outputs.IMAGE_TAG }}-${{ matrix.platform_short }}
           target: postgres
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.platforms }}
 
       - name: Build and push redis image
         uses: docker/build-push-action@v5
@@ -110,7 +125,80 @@ jobs:
           file: Dockerfile
           push: true
           tags: |
-            sparkison/m3u-editor-redis:${{ steps.meta.outputs.IMAGE_TAG }}
+            sparkison/m3u-editor-redis:${{ steps.meta.outputs.IMAGE_TAG }}-${{ matrix.platform_short }}
           target: redis
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.platforms }}
+
+  create-manifests:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Determine image tags
+        id: meta
+        run: |
+          # If workflow_dispatch provided an explicit tag, use it
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "IMAGE_TAG=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # If this run was triggered by a tag push, use the tag name
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAG_NAME=${GITHUB_REF#refs/tags/}
+            echo "IMAGE_TAG=${TAG_NAME}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          REF_NAME="${{ github.ref_name }}"
+          if [ "${REF_NAME}" = "main" ]; then
+            echo "IMAGE_TAG=latest" >> $GITHUB_OUTPUT
+          elif [ "${REF_NAME}" = "experimental" ]; then
+            echo "IMAGE_TAG=experimental" >> $GITHUB_OUTPUT
+          else
+            BRANCH_TAG=$(echo "${REF_NAME}" | tr / -)
+            echo "IMAGE_TAG=dev-${BRANCH_TAG}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create multi-arch manifest lists
+        run: |
+          set -euo pipefail
+          IMAGE_TAG=${{ steps.meta.outputs.IMAGE_TAG }}
+
+          # helper to create manifest for a given repo name
+          create_manifest() {
+            REPO="$1"
+            echo "Creating manifest for ${REPO}:${IMAGE_TAG}"
+            docker buildx imagetools create -t ${REPO}:${IMAGE_TAG} \
+              ${REPO}:${IMAGE_TAG}-amd64 ${REPO}:${IMAGE_TAG}-arm64 || {
+                echo "Failed to create manifest for ${REPO}:${IMAGE_TAG}" ; exit 1
+              }
+          }
+
+          create_manifest sparkison/m3u-editor-fpm
+          create_manifest sparkison/m3u-editor-nginx
+          create_manifest sparkison/m3u-editor-postgres
+          create_manifest sparkison/m3u-editor-redis
+
+      # Note: we intentionally do NOT build the legacy monolith `m3u-editor` or
+      # the `m3u-proxy` here. The editor monolith is unchanged and the proxy has
+      # its own CI pipeline.
 
