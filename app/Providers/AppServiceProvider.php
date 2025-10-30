@@ -70,7 +70,6 @@ class AppServiceProvider extends ServiceProvider
         try {
             foreach (['sqlite', 'jobs'] as $connection) {
                 // Check if the file exists
-                dump(database_path($connection . '.sqlite'));
                 if (File::exists(database_path($connection . '.sqlite')) === false) {
                     continue;
                 }
