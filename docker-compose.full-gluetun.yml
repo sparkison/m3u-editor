@@ -1,0 +1,215 @@
+name: m3u-editor
+services:
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    environment:
+      - VPN_TYPE=wireguard
+      # Provide your provider and credentials via env or an env file
+      - VPN_SERVICE_PROVIDER=${VPN_SERVICE_PROVIDER:-your_vpn_provider}
+      - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY:-your_wireguard_private_key}
+      # Further Wireguard options can be specified as needed
+      #- WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES}
+      #- SERVER_COUNTRIES=${SERVER_COUNTRIES}
+      #- SERVER_HOSTNAMES=${SERVER_HOSTNAMES}
+      # Optionally specify outbound subnets to route via the VPN
+      # - FIREWALL_OUTBOUND_SUBNETS=${FIREWALL_OUTBOUND_SUBNETS}
+      - UPDATER_PERIOD=24h
+      # Optionally enable proxy features if supported by the image
+      - HTTP_PROXY=${GLUETUN_HTTP_PROXY:-false}
+      - SOCKS5_PROXY=${GLUETUN_SOCKS5_PROXY:-false}
+    restart: unless-stopped
+
+  m3u-editor-nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: nginx
+      args:
+        GIT_BRANCH: ${GIT_BRANCH:-local}
+        GIT_COMMIT: ${GIT_COMMIT:-local}
+        GIT_TAG: ${GIT_TAG:-local}
+    image: sparkison/m3u-editor-nginx:${IMAGE_TAG:-latest}
+    environment:
+      # App reverse proxy setup
+      - FPMPORT=${FPMPORT:-9900} # Port that nginx uses to connect to fpm (m3u-editor-fpm)
+      - APP_URL=${APP_URL:-http://localhost} # Application URL/IP for accessing on LAN/WAN
+      - APP_PORT=${APP_PORT:-36400}
+      - APP_HOST=${APP_HOST:-127.0.0.1}
+      # M3U Proxy reverse proxy setup
+      - PROXY_PORT=${M3U_PROXY_PORT:-38085}
+      - PROXY_HOST=${PROXY_HOST:-http://127.0.0.1}
+      # Websocket Reverb port for reverse proxying
+      - REVERB_PORT=${REVERB_PORT:-36800}
+    depends_on:
+      gluetun:
+        condition: service_started
+      m3u-editor-fpm:
+        condition: service_healthy
+    ports:
+      # Expose the main app port
+      - '${APP_PORT:-36400}:${APP_PORT:-36400}'
+    network_mode: "service:gluetun"
+    restart: unless-stopped
+
+  m3u-editor-postgres:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: postgres
+      args:
+        GIT_BRANCH: ${GIT_BRANCH:-local}
+        GIT_COMMIT: ${GIT_COMMIT:-local}
+        GIT_TAG: ${GIT_TAG:-local}
+    image: sparkison/m3u-editor-postgres:${IMAGE_TAG:-latest}
+    environment:
+      PG_HBA_ALLOW_DOCKER_NETWORK: 'true'
+      PG_PORT: ${PG_PORT:-54320}
+      POSTGRES_DB: ${PG_DATABASE:-m3ue}
+      POSTGRES_USER: ${PG_USER:-m3ue}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-m3ue}
+      # Ensure PGDATA matches the layout inside the built Postgres image so
+      # Docker mounts the named volume to the correct data directory.
+      PGDATA: /var/lib/postgresql/17/docker
+    volumes:
+      # Mount the named volume at the image's PGDATA path (not /var/lib/postgresql/data)
+      - m3ue_pgdata:/var/lib/postgresql/17/docker
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -p ${PG_PORT:-54320} -U ${PG_USER:-m3ue} -d ${PG_DATABASE:-m3ue} -h 127.0.0.1 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    depends_on:
+      gluetun:
+        condition: service_started
+    network_mode: "service:gluetun"
+    restart: unless-stopped
+
+  m3u-editor-redis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: redis
+      args:
+        GIT_BRANCH: ${GIT_BRANCH:-local}
+        GIT_COMMIT: ${GIT_COMMIT:-local}
+        GIT_TAG: ${GIT_TAG:-local}
+    image: sparkison/m3u-editor-redis:${IMAGE_TAG:-latest}
+    environment:
+      - REDIS_SERVER_PORT=${REDIS_SERVER_PORT:-36790}
+    volumes:
+      - m3ue_redis_data:/data
+    #ports:
+    #  - '${REDIS_SERVER_PORT:-36790}:${REDIS_SERVER_PORT:-36790}'
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "${REDIS_SERVER_PORT:-36790}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    depends_on:
+      gluetun:
+        condition: service_started
+    network_mode: "service:gluetun"
+    restart: unless-stopped
+
+  m3u-editor-fpm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+      args:
+        GIT_BRANCH: ${GIT_BRANCH:-local}
+        GIT_COMMIT: ${GIT_COMMIT:-local}
+        GIT_TAG: ${GIT_TAG:-local}
+    image: sparkison/m3u-editor-fpm:${IMAGE_TAG:-latest}
+    environment:
+      # App settings
+      - APP_ENV=${APP_ENV:-local}
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - APP_URL=${APP_URL:-http://localhost} # Application URL/IP for accessing on LAN/WAN
+      - APP_PORT=${APP_PORT:-36400}
+      - FPMPORT=${FPMPORT:-9900}
+      # Database settings
+      - DB_CONNECTION=pgsql # or sqlite
+      - DB_HOST=${DB_HOST:-127.0.0.1}
+      - DB_PORT=${PG_PORT:-54320}
+      - DB_DATABASE=${PG_DATABASE:-m3ue}
+      - DB_USERNAME=${PG_USER:-m3ue}
+      - DB_PASSWORD=${PG_PASSWORD:-m3ue}
+      # Reverb (Websockets) settings
+      - REVERB_PORT=${REVERB_PORT:-36800}
+      - REDIS_HOST=${REDIS_HOST:-127.0.0.1}
+      - REDIS_PORT=${REDIS_SERVER_PORT:-36790}
+      - REVERB_PORT=${REVERB_PORT:-36800}
+      # Proxy settings
+      - M3U_PROXY_ENABLED=true
+      - M3U_PROXY_TOKEN=${M3U_PROXY_API_TOKEN:-changeme}
+      - M3U_PROXY_HOST=${M3U_PROXY_HOST:-http://127.0.0.1}
+      - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
+      # Make sure this matches your APP_URL and APP_PORT settings
+      # If using HTTPS, include the protocol here (e.g. https://yourdomain.com/m3u-proxy)
+      # Default format: <APP_URL>:<APP_PORT>/m3u-proxy
+      - M3U_PROXY_PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-http://localhost:36400/m3u-proxy}
+    depends_on:
+      gluetun:
+        condition: service_started
+      m3u-editor-postgres:
+        condition: service_healthy
+      m3u-editor-redis:
+        condition: service_healthy
+      m3u-proxy:
+        condition: service_healthy
+    volumes:
+      - ./data:/var/www/config
+    #ports:
+    #  - '${FPMPORT:-9900}:${FPMPORT:-9900}'
+    #  - '${REVERB_PORT:-36800}:${REVERB_PORT:-36800}'
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/${FPMPORT:-9900}' >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    network_mode: "service:gluetun"
+    restart: unless-stopped
+
+  m3u-proxy:
+    image: sparkison/m3u-proxy:${IMAGE_TAG:-latest}
+    build:
+      context: ../m3u-proxy
+      dockerfile: Dockerfile
+    environment:
+      - PORT=${M3U_PROXY_PORT:-38085}
+      - API_TOKEN=${M3U_PROXY_API_TOKEN:-changeme}
+      # HLS rewrite URL when using direct proxying (not required for transcoding)
+      # Use the NGINX reverse proxy URL so HLS playlists are correctly rewritten
+      # <APP_URL>:<APP_PORT>/m3u-proxy
+      # If using HTTPS, include the protocol here (e.g. https://yourdomain.com/m3u-proxy)
+      - PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-http://localhost:36400/m3u-proxy}
+      - LOG_LEVEL=error # error, warn, info, debug
+      - REDIS_ENABLED=true
+      - REDIS_HOST=${REDIS_HOST:-127.0.0.1}
+      - REDIS_SERVER_PORT=${REDIS_SERVER_PORT:-36790}
+      - REDIS_DB=6 # Use a separate Redis DB for m3u-proxy caching, 1-5 used by editor
+      - ENABLE_TRANSCODING_POOLING=true
+    depends_on:
+      gluetun:
+        condition: service_started
+      m3u-editor-redis:
+        condition: service_healthy
+    #ports:
+    #  - '${M3U_PROXY_PORT:-38085}:${M3U_PROXY_PORT:-38085}'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${M3U_PROXY_PORT:-38085}/health?api_token=${M3U_PROXY_API_TOKEN:-changeme}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    network_mode: "service:gluetun"
+    restart: unless-stopped
+
+volumes:
+  m3ue_pgdata:
+  m3ue_redis_data:
