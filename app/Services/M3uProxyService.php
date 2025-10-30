@@ -26,7 +26,7 @@ class M3uProxyService
         // API configuration
         $this->apiToken = config('proxy.m3u_proxy_token');
         $this->apiBaseUrl = rtrim(config('proxy.m3u_proxy_host'), '/');
-        if ($port = config('proxy.m3u_proxy_port') !== null) {
+        if ($port = config('proxy.m3u_proxy_port')) {
             $this->apiBaseUrl .= ':' . $port;
         }
 
