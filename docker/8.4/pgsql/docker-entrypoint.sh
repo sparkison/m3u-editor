@@ -5,13 +5,13 @@ set -e
 # and then exec the original postgres entrypoint from the base image.
 
 TEMPLATE="/etc/postgresql/postgresql.conf.tmpl"
+export PG_PORT="${PG_PORT:-54320}"
 
 if [ -f "$TEMPLATE" ]; then
   echo "Rendering postgresql.conf from template..."
   # Ensure PGDATA exists (the base image sets PGDATA, default /var/lib/postgresql/data)
   : "${PGDATA:=/var/lib/postgresql/data}"
   # Provide defaults for template variables so envsubst produces valid config
-  export PG_PORT="${PG_PORT:-54320}"
   export POSTGRES_MAX_CONNECTIONS="${POSTGRES_MAX_CONNECTIONS:-100}"
   export POSTGRES_SHARED_BUFFERS="${POSTGRES_SHARED_BUFFERS:-128MB}"
   mkdir -p "$PGDATA"
@@ -50,8 +50,10 @@ fi
 # This mirrors previous behaviour used in the monolith entrypoint and is
 if [ -f "${PGDATA:-/var/lib/postgresql/data}/PG_VERSION" ]; then
   echo "PGDATA already initialized — temporarily starting Postgres to validate DB/user..."
-  # Ensure PG_PORT is set (use default 5432 if not provided)
-  PG_PORT=${PG_PORT:-5432}
+  # Ensure PG_PORT is set (use default 54320 if not provided)
+  # We export PG_PORT near the top so explicit environment values (from compose)
+  # are preserved; fall back to the project default 54320 if unset.
+  PG_PORT=${PG_PORT:-54320}
   # Start postgres temporarily as the postgres user, bound to loopback only and on PG_PORT
   su - postgres -c "pg_ctl -D \"${PGDATA}\" -o \"-c listen_addresses='127.0.0.1' -c port=${PG_PORT}\" -w start" || true
 
