@@ -77,9 +77,9 @@ jobs:
           elif [ "${REF_NAME}" = "experimental" ]; then
             echo "IMAGE_TAG=experimental" >> $GITHUB_OUTPUT
           else
-            # fallback for branches: create a dev-<branch-name> tag (slashes -> dashes)
+            # fallback for branches: create a <branch-name> tag (slashes -> dashes)
             BRANCH_TAG=$(echo "${REF_NAME}" | tr / -)
-            echo "IMAGE_TAG=dev-${BRANCH_TAG}" >> $GITHUB_OUTPUT
+            echo "IMAGE_TAG=${BRANCH_TAG}" >> $GITHUB_OUTPUT
           fi
 
       - name: Build and push php-fpm image
