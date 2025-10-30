@@ -18,10 +18,10 @@ services:
       - FPMPORT=${FPMPORT:-9900} # Port that nginx uses to connect to fpm (m3u-editor-fpm)
       - APP_URL=${APP_URL:-http://localhost} # Application URL/IP for accessing on LAN/WAN
       - APP_PORT=${APP_PORT:-36400}
-      - APP_HOST=m3u-editor-fpm
+      - APP_HOST=${APP_HOST:-m3u-editor-fpm}
       # M3U Proxy reverse proxy setup
       - PROXY_PORT=${M3U_PROXY_PORT:-38085}
-      - PROXY_HOST=m3u-proxy
+      - PROXY_HOST=${M3U_PROXY_HOST:-m3u-proxy}
       # Websocket Reverb port for reverse proxying
       - REVERB_PORT=${REVERB_PORT:-36800}
     depends_on:
@@ -95,20 +95,19 @@ services:
       - FPMPORT=${FPMPORT:-9900}
       # Database settings
       - DB_CONNECTION=pgsql # or sqlite
-      - DB_HOST=m3u-editor-postgres
+      - DB_HOST=${PG_HOST:-m3u-editor-postgres}
       - DB_PORT=${PG_PORT:-54320}
       - DB_DATABASE=${PG_DATABASE:-m3ue}
       - DB_USERNAME=${PG_USER:-m3ue}
       - DB_PASSWORD=${PG_PASSWORD:-m3ue}
       # Reverb (Websockets) settings
-      - REVERB_PORT=${REVERB_PORT:-36800}
-      - REDIS_HOST=m3u-editor-redis
+      - REDIS_HOST=${REDIS_HOST:-m3u-editor-redis}
       - REDIS_PORT=${REDIS_SERVER_PORT:-36790}
       - REVERB_PORT=${REVERB_PORT:-36800}
       # Proxy settings
       - M3U_PROXY_ENABLED=true
       - M3U_PROXY_TOKEN=${M3U_PROXY_API_TOKEN:-changeme}
-      - M3U_PROXY_HOST=${M3U_PROXY_HOST:-http://m3u-proxy}
+      - M3U_PROXY_HOST=${M3U_PROXY_HOST:-m3u-proxy}
       - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
       # Make sure this matches your APP_URL and APP_PORT settings
       # If using HTTPS, include the protocol here (e.g. https://yourdomain.com/m3u-proxy)

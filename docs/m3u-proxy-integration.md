@@ -133,7 +133,7 @@ services:
       # Proxy settings
       - M3U_PROXY_ENABLED=true
       - M3U_PROXY_TOKEN=${M3U_PROXY_API_TOKEN:-changeme}
-      - M3U_PROXY_HOST=${M3U_PROXY_HOST:-http://m3u-proxy}
+      - M3U_PROXY_HOST=${M3U_PROXY_HOST:-m3u-proxy}
       - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
       # Make sure this matches your APP_URL and APP_PORT settings
       # If using HTTPS, include the protocol here (e.g. https://yourdomain.com/m3u-proxy)

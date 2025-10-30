@@ -7,7 +7,7 @@ return [
     // If M3U_PROXY_ENABLED=false/null disable proxy support
     'external_proxy_enabled' => env('M3U_PROXY_ENABLED', false),
     // Host and port for connecting to the proxy service from the application
-    'm3u_proxy_host' => env('M3U_PROXY_HOST', 'http://localhost'), // Auto-set in start-container based on mode
+    'm3u_proxy_host' => env('M3U_PROXY_HOST', 'localhost'), // Auto-set in start-container based on mode
     'm3u_proxy_port' => env('M3U_PROXY_PORT'), // Auto-set in start-container based on mode
     // Public URL for clients to access the proxy
     'm3u_proxy_public_url' => env('M3U_PROXY_PUBLIC_URL', env('APP_URL') . ':' . env('APP_PORT', '36400') . '/m3u-proxy'),

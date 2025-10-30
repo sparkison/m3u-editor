@@ -98,7 +98,7 @@ class Preferences extends SettingsPage
 
     public function form(Schema $schema): Schema
     {
-        $m3uProxyUrl = rtrim(config('proxy.m3u_proxy_host'), '/') . ':' . config('proxy.m3u_proxy_port');
+        $m3uProxyUrl = 'http://' . rtrim(config('proxy.m3u_proxy_host'), '/') . ':' . config('proxy.m3u_proxy_port');
         $m3uProxyPublicUrl = rtrim(config('proxy.m3u_proxy_public_url'), '/');
         $m3uToken = config('proxy.m3u_proxy_token', null);
         $m3uProxyDocs = $m3uProxyPublicUrl . '/docs';
