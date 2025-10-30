@@ -175,7 +175,7 @@ jobs:
             echo "IMAGE_TAG=experimental" >> $GITHUB_OUTPUT
           else
             BRANCH_TAG=$(echo "${REF_NAME}" | tr / -)
-            echo "IMAGE_TAG=dev-${BRANCH_TAG}" >> $GITHUB_OUTPUT
+            echo "IMAGE_TAG=${BRANCH_TAG}" >> $GITHUB_OUTPUT
           fi
 
       - name: Create multi-arch manifest lists
