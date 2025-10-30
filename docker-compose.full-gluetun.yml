@@ -45,7 +45,7 @@ services:
       - APP_HOST=${APP_HOST:-127.0.0.1}
       # M3U Proxy reverse proxy setup
       - PROXY_PORT=${M3U_PROXY_PORT:-38085}
-      - PROXY_HOST=${PROXY_HOST:-http://127.0.0.1}
+      - PROXY_HOST=${PROXY_HOST:-127.0.0.1}
       # Websocket Reverb port for reverse proxying
       - REVERB_PORT=${REVERB_PORT:-36800}
     depends_on:

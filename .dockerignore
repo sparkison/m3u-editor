@@ -10,6 +10,7 @@ storage/framework/testing/*
 storage/framework/views/*
 storage/app/private/*
 stubs
+data
 *.sh
 *.sqlite
 *.sql

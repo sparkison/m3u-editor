@@ -36,3 +36,4 @@ websockets.sh
 config/database
 config/logs
 config/env
+data/
