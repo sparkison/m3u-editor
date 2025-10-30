@@ -28,8 +28,6 @@ services:
       - PROXY_HOST=m3u-proxy
       # Websocket Reverb port for reverse proxying
       - REVERB_PORT=${REVERB_PORT:-36800}
-    depends_on:
-      - m3u-editor-fpm
     ports:
       # Expose the main app port
       - '${APP_PORT:-36400}:${APP_PORT:-36400}'
