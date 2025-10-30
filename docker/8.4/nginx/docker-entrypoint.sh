@@ -5,7 +5,6 @@ set -eu
 # (which reads environment variables) sees them even if not provided by compose.
 export NGINX_USER=${NGINX_USER:-nginx}
 export APP_PORT=${APP_PORT:-36400}
-export APP_URL=${APP_URL:-http://localhost}
 export APP_HOST=${APP_HOST:-m3u-editor-fpm}
 export FPMPORT=${FPMPORT:-9000}
 export REVERB_PORT=${REVERB_PORT:-36800}
@@ -22,7 +21,7 @@ if [ -f "$NGINX_TPL" ]; then
 fi
 
 if [ -f "$VHOST_TPL" ]; then
-  envsubst '${APP_PORT} ${APP_URL} ${APP_HOST} ${FPMPORT} ${PROXY_PORT} ${REVERB_PORT} ${PROXY_HOST}' < "$VHOST_TPL" > /etc/nginx/conf.d/default.conf
+  envsubst '${APP_PORT} ${APP_HOST} ${FPMPORT} ${PROXY_PORT} ${REVERB_PORT} ${PROXY_HOST}' < "$VHOST_TPL" > /etc/nginx/conf.d/default.conf
 fi
 
 # Create directories expected by nginx

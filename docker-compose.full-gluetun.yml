@@ -36,7 +36,6 @@ services:
     environment:
       # App reverse proxy setup
       - FPMPORT=${FPMPORT:-9900} # Port that nginx uses to connect to fpm (m3u-editor-fpm)
-      - APP_URL=${APP_URL:-http://localhost} # Application URL/IP for accessing on LAN/WAN
       - APP_PORT=${APP_PORT:-36400}
       - APP_HOST=${APP_HOST:-127.0.0.1}
       # M3U Proxy reverse proxy setup
