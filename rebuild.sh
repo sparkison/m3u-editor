@@ -6,6 +6,13 @@ ENV_FILE=".env.docker"
 FULL_COMPOSE="docker-compose.full.yml"
 VPN_COMPOSE="docker-compose.full-gluetun.yml"
 
+# Ensure .env.docker exists (copy from .env.example if missing)
+ENV_FILE=".env.docker"
+if [ ! -f "${ENV_FILE}" ]; then
+    echo "-- Missing environment file, creating now..."
+    cp "${ENV_FILE}.example" "${ENV_FILE}"
+fi
+
 print_menu() {
 	# print directly to the controlling terminal so the menu isn't captured
 	# by command substitution that collects the function's stdout
