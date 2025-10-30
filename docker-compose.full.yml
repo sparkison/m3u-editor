@@ -117,7 +117,10 @@ services:
       - M3U_PROXY_TOKEN=${M3U_PROXY_API_TOKEN:-changeme}
       - M3U_PROXY_HOST=${M3U_PROXY_HOST:-http://m3u-proxy}
       - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
-      - M3U_PROXY_PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-${APP_URL}:${APP_PORT:-36400}/m3u-proxy}
+      # Make sure this matches your APP_URL and APP_PORT settings
+      # If using HTTPS, include the protocol here (e.g. https://yourdomain.com/m3u-proxy)
+      # Default format: <APP_URL>:<APP_PORT>/m3u-proxy
+      - M3U_PROXY_PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-http://localhost:36400/m3u-proxy}
     depends_on:
       - m3u-editor-postgres
       - m3u-editor-redis
@@ -145,7 +148,8 @@ services:
       # HLS rewrite URL when using direct proxying (not required for transcoding)
       # Use the NGINX reverse proxy URL so HLS playlists are correctly rewritten
       # <APP_URL>:<APP_PORT>/m3u-proxy
-      - PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-${APP_URL}:${APP_PORT:-36400}/m3u-proxy}
+      # If using HTTPS, include the protocol here (e.g. https://yourdomain.com/m3u-proxy)
+      - PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-http://localhost:36400/m3u-proxy}
       - LOG_LEVEL=error # error, warn, info, debug
       - REDIS_ENABLED=true
       - REDIS_HOST=m3u-editor-redis
