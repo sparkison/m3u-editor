@@ -135,6 +135,8 @@ services:
       - REDIS_HOST=${REDIS_HOST:-127.0.0.1}
       - REDIS_PORT=${REDIS_SERVER_PORT:-36790}
       - REVERB_PORT=${REVERB_PORT:-36800}
+      - REVERB_HOST=${REVERB_HOST:-127.0.0.1}
+      - REVERB_SCHEME=${REVERB_SCHEME:-http} # http or https
       # Proxy settings
       - M3U_PROXY_ENABLED=true
       - M3U_PROXY_TOKEN=${M3U_PROXY_API_TOKEN:-changeme}

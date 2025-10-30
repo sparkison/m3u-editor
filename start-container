@@ -27,7 +27,6 @@ export APP_PORT="${APP_PORT:-36400}" # Default 36400
 
 # Websockets
 export REVERB_PORT="${REVERB_PORT:-36800}" # Default 36800
-export REVERB_HOST="localhost" # Accessing via containers local network interface
 
 # REVERB_APP_KEY is fixed for now so we can pre-compile assets on build
 # See resources/js/echo.js and config/broadcasting.php
