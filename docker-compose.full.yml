@@ -7,7 +7,8 @@
 name: m3u-editor
 
 services:
-  m3u-editor-nginx:
+  nginx:
+    container_name: m3u-editor-nginx
     build:
       context: .
       dockerfile: Dockerfile
@@ -31,7 +32,8 @@ services:
       - '${APP_PORT:-36400}:${APP_PORT:-36400}'
     restart: unless-stopped
 
-  m3u-editor-postgres:
+  postgres:
+    container_name: m3u-editor-postgres
     build:
       context: .
       dockerfile: Dockerfile
@@ -56,7 +58,8 @@ services:
       retries: 10
     restart: unless-stopped
 
-  m3u-editor-redis:
+  redis:
+    container_name: m3u-editor-redis
     build:
       context: .
       dockerfile: Dockerfile
@@ -75,7 +78,8 @@ services:
       retries: 15
     restart: unless-stopped
 
-  m3u-editor-fpm:
+  fpm:
+    container_name: m3u-editor-fpm
     build:
       context: .
       dockerfile: Dockerfile
@@ -133,7 +137,8 @@ services:
       retries: 10
     restart: unless-stopped
 
-  m3u-proxy:
+  proxy:
+    container_name: m3u-proxy
     image: sparkison/m3u-proxy:latest
     build:
       context: ../m3u-proxy
