@@ -88,6 +88,8 @@ export M3U_ENABLE_TRANSCODING_POOLING="true"
 
 # Websockets
 export REVERB_PORT="${REVERB_PORT:-36800}" # Default 36800
+export REVERB_HOST="${REVERB_HOST:-localhost}"
+export REVERB_SCHEME="${REVERB_SCHEME:-http}"
 
 # REVERB_APP_KEY is fixed for now so we can pre-compile assets on build
 # See resources/js/echo.js and config/broadcasting.php
