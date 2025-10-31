@@ -18,11 +18,17 @@ use Illuminate\Support\Facades\Log;
 class M3uProxyService
 {
     protected string $apiBaseUrl;
+    protected string $apiPublicUrl;
     protected string|null $apiToken;
 
     public function __construct()
     {
-        $this->apiBaseUrl = rtrim(config('proxy.m3u_proxy_url'), '/');
+        $this->apiBaseUrl = rtrim(config('proxy.m3u_proxy_host'), '/');
+        if ($port = config('proxy.m3u_proxy_port')) {
+            $this->apiBaseUrl .= ':' . $port;
+        }
+
+        $this->apiPublicUrl = rtrim(config('proxy.m3u_proxy_public_url'), '/');
         $this->apiToken = config('proxy.m3u_proxy_token');
     }
 
@@ -809,7 +815,7 @@ class M3uProxyService
     protected function buildTranscodeStreamUrl(string $streamId, $format = 'ts'): string
     {
         // NOTE: Format not used currently, but could be used to adjust URL structure if needed
-        return $this->apiBaseUrl . "/stream/{$streamId}";
+        return $this->apiPublicUrl . "/stream/{$streamId}";
     }
 
     /**
@@ -820,7 +826,7 @@ class M3uProxyService
      */
     protected function buildProxyUrl(string $streamId, $format = 'hls'): string
     {
-        $baseUrl = $this->apiBaseUrl;
+        $baseUrl = $this->apiPublicUrl;
         if ($format === 'hls') {
             // HLS format: /hls/{stream_id}/playlist.m3u8
             return $baseUrl . '/hls/' . $streamId . '/playlist.m3u8';

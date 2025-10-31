@@ -45,20 +45,8 @@ if [ "${M3U_PROXY_ENABLED}" = "true" ]; then
     # External mode - proxy through nginx to external container
     export M3U_PROXY_START_EMBEDDED="false"
     
-    # Parse external URL to get host and port for nginx proxy
-    EXTERNAL_URL="${M3U_PROXY_URL:-http://m3u-proxy:8085}"
-    # Extract host and port from URL (e.g., http://m3u-proxy:38085 -> m3u-proxy:38085)
-    export M3U_PROXY_NGINX_TARGET=$(echo "$EXTERNAL_URL" | sed 's|http[s]*://||')
-    
-    # Laravel will use APP_URL/m3u-proxy for browser-accessible URLs
-    if [[ "$APP_URL" == *"https"* ]]; then
-        export M3U_PROXY_URL="${APP_URL}/m3u-proxy"
-    else
-        export M3U_PROXY_URL="${APP_URL}:${APP_PORT}/m3u-proxy"
-    fi
-
-    # Need to set the `PUBLIC_URL` for the proxy to use for re-writing HLS URLs
-    export M3U_PROXY_PUBLIC_URL="${M3U_PROXY_URL}"
+    # Should be in the format: m3u-proxy:38085
+    export M3U_PROXY_NGINX_TARGET=${M3U_PROXY_HOST:-localhost}:${M3U_PROXY_PORT:-8085}
 
     # For external proxy, use provided token
     export M3U_PROXY_TOKEN="${M3U_PROXY_TOKEN}"
@@ -66,17 +54,6 @@ if [ "${M3U_PROXY_ENABLED}" = "true" ]; then
 else
     # Embedded mode - proxy through nginx to localhost
     export M3U_PROXY_NGINX_TARGET="127.0.0.1:${M3U_PROXY_PORT}"
-    
-    # Note: ROOT_PATH=/m3u-proxy is now the default in m3u-proxy config, no need to set it
-    # Include port unless using https
-    if [[ "$APP_URL" == *"https"* ]]; then
-        export M3U_PROXY_URL="${APP_URL}/m3u-proxy"
-    else
-        export M3U_PROXY_URL="${APP_URL}:${APP_PORT}/m3u-proxy"
-    fi
-
-    # Need to set the `PUBLIC_URL` for the proxy to use for re-writing HLS URLs
-    export M3U_PROXY_PUBLIC_URL="${M3U_PROXY_URL}"
 
     # M3U Proxy API key (for embedded proxy only)
     # Generate if not set
@@ -88,6 +65,17 @@ else
         echo "🔑 Using provided m3u proxy API token."
     fi
     echo "🔗 Embedded m3u-proxy mode enabled. Nginx will proxy /m3u-proxy/ to ${M3U_PROXY_NGINX_TARGET}"
+fi
+
+# Set M3U_PROXY_PUBLIC_URL, required for both modes
+# If M3U_PROXY_PUBLIC_URL is not set, construct it
+if [ -z "$M3U_PROXY_PUBLIC_URL" ]; then
+  # Laravel will use APP_URL/m3u-proxy for browser-accessible URLs
+  if [[ "$APP_URL" == *"https"* ]]; then
+      export M3U_PROXY_PUBLIC_URL="${APP_URL}/m3u-proxy"
+  else
+      export M3U_PROXY_PUBLIC_URL="${APP_URL}:${APP_PORT}/m3u-proxy"
+  fi
 fi
 
 # Redis pooling settings for embedded proxy

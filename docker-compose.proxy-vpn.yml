@@ -72,7 +72,10 @@ services:
       
       # M3U Proxy Configuration (External)
       - M3U_PROXY_ENABLED=true # Enable external m3u-proxy
-      - M3U_PROXY_URL=http://localhost:${PROXY_PORT:-38085}
+      - M3U_PROXY_PORT=${PROXY_PORT:-38085}
+      - M3U_PROXY_HOST=${M3U_PROXY_HOST:-127.0.0.1} # Internal network hostname of m3u-proxy container
+      # Public URL for m3u-proxy (used for rewriting stream URLs)
+      - M3U_PROXY_PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-http://localhost:36400/m3u-proxy}
       - M3U_PROXY_TOKEN=${M3U_PROXY_TOKEN:-changeme}
     volumes:
       # Persistent configuration data
@@ -130,7 +133,7 @@ services:
       # Set this to the public URL of your m3u-editor instance
       # Replace `m3u-editor` with your actual domain or LAN IP if needed so it is accessible to clients
       # NOTE: Make sure to add the `/m3u-proxy`
-      - PUBLIC_URL=http://localhost/m3u-proxy  # Change to your public URL if needed
+      - PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-http://localhost:36400/m3u-proxy}  # Change to your public URL if needed
       
       # Note: ROOT_PATH=/m3u-proxy is now the default, no need to set it explicitly
       # Only set ROOT_PATH= (empty) if you need to use the root path instead

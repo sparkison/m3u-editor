@@ -98,9 +98,13 @@ class Preferences extends SettingsPage
 
     public function form(Schema $schema): Schema
     {
-        $m3uProxyUrl = rtrim(config('proxy.m3u_proxy_url', ''), '/');
+        // $m3uProxyUrl = rtrim(config('proxy.m3u_proxy_host'), '/');
+        // if ($port = config('proxy.m3u_proxy_port')) {
+        //     $m3uProxyUrl .= ':' . $port;
+        // }
+        $m3uPublicUrl = rtrim(config('proxy.m3u_proxy_public_url'), '/');
         $m3uToken = config('proxy.m3u_proxy_token', null);
-        $m3uProxyDocs = $m3uProxyUrl . '/docs';
+        $m3uProxyDocs = $m3uPublicUrl . '/docs';
 
         $vodExample = PlaylistService::getVodExample();
         $seriesExample = PlaylistService::getEpisodeExample();
@@ -280,7 +284,7 @@ class Preferences extends SettingsPage
                                             ->color('gray')
                                             ->label('Get m3u proxy API key')
                                             ->icon('heroicon-m-key')
-                                            ->action(function () use ($m3uProxyUrl, $m3uToken) {
+                                            ->action(function () use ($m3uToken) {
                                                 Notification::make()
                                                     ->title('Your m3u proxy API key')
                                                     ->body($m3uToken)
