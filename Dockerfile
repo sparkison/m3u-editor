@@ -1,5 +1,5 @@
 # Alpine
-FROM alpine:3.21.3
+FROM alpine:3.21.3 as runtime
 
 # Git build arguments
 ARG GIT_BRANCH

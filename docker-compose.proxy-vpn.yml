@@ -29,7 +29,15 @@
 
 services:
   m3u-editor:
-    image: sparkison/m3u-editor:dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+      args:
+        GIT_BRANCH: ${GIT_BRANCH:-local}
+        GIT_COMMIT: ${GIT_COMMIT:-local}
+        GIT_TAG: ${GIT_TAG:-local}
+    image: sparkison/m3u-editor:${IMAGE_TAG:-latest}
     container_name: m3u-editor
     # CRITICAL: Use Gluetun's network stack
     # This routes all m3u-editor traffic through the VPN
@@ -58,7 +66,7 @@ services:
       - DB_PASSWORD=${PG_PASSWORD:-changeme}
 
       # Redis configuration
-      - REDIS_ENABLED=false # Disable embedded Redis
+      - REDIS_ENABLED=false # Disable embedded Redis instance
       - REDIS_SERVER_PORT=${REDIS_PORT:-6379}
       - REDIS_HOST=${REDIS_HOST:-127.0.0.1}
       
@@ -86,7 +94,7 @@ services:
   # M3U Proxy - Runs inside Gluetun's network namespace
   # All traffic from this container goes through the VPN
   m3u-proxy:
-    image: sparkison/m3u-proxy:latest
+    image: sparkison/m3u-proxy:${IMAGE_TAG:-latest}
     container_name: m3u-proxy
     # CRITICAL: Use Gluetun's network stack
     # This routes all m3u-proxy traffic through the VPN

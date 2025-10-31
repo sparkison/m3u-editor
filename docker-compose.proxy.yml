@@ -23,7 +23,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: sparkison/m3u-editor:latest
+      target: runtime
+      args:
+        GIT_BRANCH: ${GIT_BRANCH:-local}
+        GIT_COMMIT: ${GIT_COMMIT:-local}
+        GIT_TAG: ${GIT_TAG:-local}
+    image: sparkison/m3u-editor:${IMAGE_TAG:-latest}
     container_name: m3u-editor
     environment:
       # Timezone
@@ -78,7 +83,7 @@ services:
       retries: 3
       start_period: 60s
   m3u-proxy:
-    image: sparkison/m3u-proxy:latest
+    image: sparkison/m3u-proxy:${IMAGE_TAG:-latest}
     container_name: m3u-proxy
     environment:
       # API Authentication Token (must match M3U_PROXY_TOKEN above)
