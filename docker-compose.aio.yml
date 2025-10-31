@@ -1,0 +1,66 @@
+services:
+  m3u-editor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+      args:
+        GIT_BRANCH: ${GIT_BRANCH:-local}
+        GIT_COMMIT: ${GIT_COMMIT:-local}
+        GIT_TAG: ${GIT_TAG:-local}
+    image: sparkison/m3u-editor:${IMAGE_TAG:-latest}
+    container_name: m3u-editor
+    environment:
+      # Timezone
+      - TZ=Etc/UTC
+      
+      # Application URL (change to your domain or IP)
+      - APP_URL=${APP_URL:-http://localhost}
+      - APP_PORT=${APP_PORT:-36400}
+      
+      # Postgres Configuration
+      - ENABLE_POSTGRES=true # Use embedded Postgres, disable to use your own Postgres service
+      - PG_DATABASE=${PG_DATABASE:-m3ue}
+      - PG_USER=${PG_USER:-m3ue}
+      - PG_PASSWORD=${PG_PASSWORD:-changeme}
+      - PG_PORT=${PG_PORT:-5432}
+      
+      # Database Connection (m3u-editor)
+      - DB_CONNECTION=pgsql
+      - DB_HOST=localhost
+      - DB_PORT=${PG_PORT:-5432}
+      - DB_DATABASE=${PG_DATABASE:-m3ue}
+      - DB_USERNAME=${PG_USER:-m3ue}
+      - DB_PASSWORD=${PG_PASSWORD:-changeme}
+
+      # Redis configuration
+      - REDIS_ENABLED=true # Enable embedded Redis
+      - REDIS_SERVER_PORT=${REDIS_PORT:-63790}
+      - REDIS_HOST=${REDIS_HOST:-localhost}
+      
+      # M3U Proxy Configuration (External)
+      - M3U_PROXY_ENABLED=false # Disable external m3u-proxy
+      - M3U_PROXY_PORT=${PROXY_PORT:-38085}
+      - M3U_PROXY_HOST=${M3U_PROXY_HOST:-localhost} # Internal network hostname of m3u-proxy container
+      # Public URL for m3u-proxy (used for rewriting stream URLs)
+      - M3U_PROXY_PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-http://localhost:36400/m3u-proxy}
+      - M3U_PROXY_TOKEN=${M3U_PROXY_TOKEN:-changeme}
+    volumes:
+      # Persistent configuration data
+      - ./data:/var/www/config
+      
+      # PostgreSQL data persistence
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-36400}:${APP_PORT:-36400}"  # Main application port
+      # - "${PG_PORT:-5432}:${PG_PORT:-5432}"  # Uncomment to expose PostgreSQL
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:${APP_PORT:-36400}/up"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+volumes:
+  pgdata:
+    driver: local

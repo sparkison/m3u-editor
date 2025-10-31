@@ -45,7 +45,7 @@ services:
       - PG_PASSWORD=${PG_PASSWORD:-changeme}
       - PG_PORT=${PG_PORT:-5432}
       
-      # Database Connection (Laravel)
+      # Database Connection (m3u-editor)
       - DB_CONNECTION=pgsql
       - DB_HOST=localhost
       - DB_PORT=${PG_PORT:-5432}
