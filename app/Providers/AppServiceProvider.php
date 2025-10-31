@@ -68,6 +68,12 @@ class AppServiceProvider extends ServiceProvider
         // Don't kill the app if the database hasn't been created.
         try {
             foreach (['sqlite', 'jobs'] as $connection) {
+                // Check if the file exists
+                if (File::exists(database_path($connection . '.sqlite')) === false) {
+                    continue;
+                }
+
+                // Set SQLite pragmas
                 DB::connection($connection)
                     ->statement('
                         PRAGMA synchronous = NORMAL;
@@ -81,7 +87,8 @@ class AppServiceProvider extends ServiceProvider
                     ');
             }
         } catch (Throwable $throwable) {
-            return;
+            // Log the error
+            Log::error('Error setting SQLite pragmas: ' . $throwable->getMessage());
         }
 
         // Disable mass assignment protection (security handled by Filament)
