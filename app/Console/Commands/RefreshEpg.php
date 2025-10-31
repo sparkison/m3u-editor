@@ -40,18 +40,6 @@ class RefreshEpg extends Command
         } else {
             $this->info('Refreshing all EPGs');
 
-            // First, let's see if we have any EPGs that have processed, but errored out creating a cache
-            $failed = Epg::query()
-                ->where([
-                    ['status', Status::Failed],
-                    ['auto_sync', '=', true],
-                    ['is_cached', '=', false],
-                ])->whereNotNull('synced')->get();
-            foreach ($failed as $epg) {
-                $this->info("Attempting to re-cache EPG: {$epg->id}");
-                dispatch(new GenerateEpgCache($epg->uuid));
-            }
-
             // Next, let's get all EPGs that are not currently processing and check if they are due for a sync
             $epgs = Epg::query()->where([
                 ['status', '!=', Status::Processing],
