@@ -20,6 +20,9 @@
 
 services:
   m3u-editor:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: sparkison/m3u-editor:latest
     container_name: m3u-editor
     environment:
