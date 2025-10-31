@@ -82,18 +82,30 @@ services:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     depends_on:
-      - gluetun
-      - m3u-proxy
+      gluetun:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      m3u-proxy:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:36400/up"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:${APP_PORT:-36400}/up"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
       start_period: 60s
 
   # M3U Proxy - Runs inside Gluetun's network namespace
   # All traffic from this container goes through the VPN
   m3u-proxy:
+    build:
+      context: ../m3u-proxy
+      dockerfile: Dockerfile
+      target: runtime
+      args:
+        GIT_BRANCH: ${GIT_BRANCH:-local}
+        GIT_COMMIT: ${GIT_COMMIT:-local}
+        GIT_TAG: ${GIT_TAG:-local}
     image: sparkison/m3u-proxy:${IMAGE_TAG:-latest}
     container_name: m3u-proxy
     # CRITICAL: Use Gluetun's network stack
@@ -130,9 +142,17 @@ services:
     restart: unless-stopped
     devices:
       - /dev/dri:/dev/dri
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:${PROXY_PORT:-38085}/health?api_token=${M3U_PROXY_TOKEN:-changeme}"]
+      interval: 30s
+      timeout: 2s
+      retries: 12
+      start_period: 10s
     depends_on:
-      - gluetun
-      - redis
+      gluetun:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     # Note: healthcheck removed because network_mode: service:gluetun 
     # means we can't directly healthcheck this container
 
@@ -144,6 +164,11 @@ services:
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 2s
+      retries: 12
 
   # Gluetun VPN Container
   # All m3u-proxy traffic will be routed through this VPN tunnel

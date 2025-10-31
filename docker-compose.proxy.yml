@@ -75,14 +75,25 @@ services:
     networks:
       - m3u-network
     depends_on:
-      - m3u-proxy
+      m3u-proxy:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:36400/up"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:${APP_PORT:-36400}/up"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
       start_period: 60s
+
   m3u-proxy:
+    build:
+      context: ../m3u-proxy
+      dockerfile: Dockerfile
+      args:
+        GIT_BRANCH: ${GIT_BRANCH:-local}
+        GIT_COMMIT: ${GIT_COMMIT:-local}
+        GIT_TAG: ${GIT_TAG:-local}
     image: sparkison/m3u-proxy:${IMAGE_TAG:-latest}
     container_name: m3u-proxy
     environment:
@@ -120,12 +131,13 @@ services:
     networks:
       - m3u-network
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     devices:
       - /dev/dri:/dev/dri
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${PROXY_PORT:-38085}/health?api_token=${M3U_PROXY_TOKEN:-changeme}"]
-      interval: 3s
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:${PROXY_PORT:-38085}/health?api_token=${M3U_PROXY_TOKEN:-changeme}"]
+      interval: 30s
       timeout: 2s
       retries: 12
       start_period: 10s
@@ -152,7 +164,7 @@ services:
       - m3u-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 3s
+      interval: 30s
       timeout: 2s
       retries: 12
     

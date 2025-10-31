@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ENV_FILE=".env.docker"
-FULL_COMPOSE="docker-compose.proxy.yml"
+FULL_COMPOSE="docker-compose.yml"
 VPN_COMPOSE="docker-compose.proxy-vpn.yml"
 
 # Ensure .env.docker exists (copy from .env.example if missing)

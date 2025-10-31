@@ -238,6 +238,12 @@ echo "" > "${startup_log_file}"
 # Link environment file
 ln -sf "${env_file}" .env
 
+# Remove any stale Laravel bootstrap cache files that might reference dev-only
+# service providers (e.g. beyondcode/laravel-dump-server). These files can be
+# created during build stages and copied into the image; remove them here so
+# the runtime doesn't try to load providers that are not present in vendor.
+[ -d "bootstrap/cache" ] && rm -f bootstrap/cache/*.php || true
+
 # Link db files
 ln -sf "${db_file}" "database/database.sqlite"
 ln -sf "${db_file_jobs}" "database/jobs.sqlite"

@@ -3,11 +3,6 @@ ARG GIT_BRANCH
 ARG GIT_COMMIT
 ARG GIT_TAG
 
-# Set environment variables for git information
-ENV GIT_BRANCH=${GIT_BRANCH}
-ENV GIT_COMMIT=${GIT_COMMIT}
-ENV GIT_TAG=${GIT_TAG}
-
 ########################################
 # Composer builder — installs PHP dependencies
 ########################################
@@ -51,6 +46,11 @@ RUN npm run build
 # Main runtime image
 FROM alpine:3.21.3 as runtime
 WORKDIR /var/www/html
+
+# Set environment variables for git information
+ENV GIT_BRANCH=${GIT_BRANCH}
+ENV GIT_COMMIT=${GIT_COMMIT}
+ENV GIT_TAG=${GIT_TAG}
 
 ENV WWWGROUP="m3ue"
 ENV WWWUSER="m3ue"
@@ -165,14 +165,17 @@ RUN echo "GIT_BRANCH=${GIT_BRANCH}" > /var/www/html/.git-info && \
     echo "GIT_TAG=${GIT_TAG}" >> /var/www/html/.git-info && \
     echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> /var/www/html/.git-info
 
-# Copy the application files (from composer stage to bring vendor)
-COPY --from=composer /app /var/www/html
+# Copy only the composer-installed vendor directory from the composer stage.
+# Avoid copying the whole /app directory because the composer stage may
+# generate bootstrap/cache files (package discovery) that reference dev-only
+# providers (like beyondcode/laravel-dump-server). Copying the full /app
+# can accidentally include those cached files while the runtime vendor
+# doesn't include dev dependencies (composer install --no-dev), causing
+# "Class ... not found" errors at boot. Copying only vendor prevents that.
+COPY --from=composer /app/vendor /var/www/html/vendor
 
 # Copy built frontend assets from node builder
 COPY --from=node_builder /app/public/build /var/www/html/public/build
-    
-# Remove node_modules to save space after build
-RUN rm -rf node_modules
 
 # Setup user, group and permissions
 RUN addgroup $WWWGROUP \
