@@ -134,7 +134,7 @@ services:
     restart: unless-stopped
 
   m3u-proxy:
-    image: sparkison/m3u-proxy:${IMAGE_TAG:-latest}
+    image: sparkison/m3u-proxy:latest
     build:
       context: ../m3u-proxy
       dockerfile: Dockerfile
