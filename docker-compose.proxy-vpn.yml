@@ -72,7 +72,7 @@ services:
       
       # M3U Proxy Configuration (External)
       - M3U_PROXY_ENABLED=true # Enable external m3u-proxy
-      - M3U_PROXY_PORT=${PROXY_PORT:-38085}
+      - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
       - M3U_PROXY_HOST=${M3U_PROXY_HOST:-127.0.0.1} # Internal network hostname of m3u-proxy container
       # Public URL for m3u-proxy (used for rewriting stream URLs)
       - M3U_PROXY_PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-http://localhost:36400/m3u-proxy}
@@ -117,7 +117,7 @@ services:
     environment:
       # API Authentication Token (must match M3U_PROXY_TOKEN above)
       - API_TOKEN=${M3U_PROXY_TOKEN:-changeme}
-      - PORT=${PROXY_PORT:-38085}
+      - PORT=${M3U_PROXY_PORT:-38085}
 
       # Redis Configuration (for stream pooling)
       - REDIS_ENABLED=true
@@ -165,8 +165,6 @@ services:
     network_mode: "service:gluetun"
     restart: unless-stopped
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
-    volumes:
-      - redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 30s
@@ -204,11 +202,7 @@ volumes:
   # PostgreSQL data volume
   pgdata:
     driver: local
-    
-  # Redis data volume
-  redis-data:
-    driver: local
-    
+
   # Gluetun configuration volume
   gluetun-config:
     driver: local

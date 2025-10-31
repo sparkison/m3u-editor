@@ -60,8 +60,8 @@ services:
       
       # M3U Proxy Configuration (External)
       - M3U_PROXY_ENABLED=true # Enable external m3u-proxy
-      - M3U_PROXY_PORT=${PROXY_PORT:-38085}
-      - M3U_PROXY_HOST=${M3U_PROXY_HOST:-m3u-proxy} # Internal network hostname of m3u-proxy container
+      - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
+      - M3U_PROXY_HOST=${PROXY_HOST:-m3u-proxy} # Internal network hostname of m3u-proxy container
       # Public URL for m3u-proxy (used for rewriting stream URLs)
       - M3U_PROXY_PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-http://localhost:36400/m3u-proxy}
       - M3U_PROXY_TOKEN=${M3U_PROXY_TOKEN:-changeme}
@@ -102,7 +102,7 @@ services:
     environment:
       # API Authentication Token (must match M3U_PROXY_TOKEN above)
       - API_TOKEN=${M3U_PROXY_TOKEN:-changeme}
-      - PORT=${PROXY_PORT:-38085}
+      - PORT=${M3U_PROXY_PORT:-38085}
 
       # Redis Configuration (for stream pooling)
       - REDIS_ENABLED=true
@@ -161,8 +161,6 @@ services:
     restart: unless-stopped
     # Optional: Enable persistence
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
-    volumes:
-      - redis-data:/data
     networks:
       - m3u-network
     healthcheck:
@@ -187,8 +185,4 @@ networks:
 volumes:
   # PostgreSQL data volume
   pgdata:
-    driver: local
-    
-  # Redis data volume
-  redis-data:
     driver: local
