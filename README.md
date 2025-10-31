@@ -30,7 +30,15 @@ Check out the docs: [m3u editor docs](https://sparkison.github.io/m3u-editor-doc
 
 ## 🐳 Docker quick start
 
-View our [getting started](https://sparkison.github.io/m3u-editor-docs/docs/about/getting-started/) docs to get up and running in minutes! 🥳
+| Use Case                    | File                                                    | Description                                                                                            |
+| --------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| **All-in-One Deployment**   | [docker-compose.aio.yml](./docker-compose.aio.yml) | A simple, all-in-one solution — everything runs in a single container for quick setup. Hardware acceleration is not supported in this setup.  |
+| **Modular Deployment**      | [docker-compose.proxy.yml](./docker-compose.proxy.yml)         | ⭐ Recommended! Separate containers for **m3u-editor**, **m3u-proxy** (_the external proxy setup is required for hardware acceleration_), and **Redis** — perfect if you want more granular control. Postgres can be easily added as a seperate container as well. |
+| **Modular + VPN** | [docker-compose.proxy-vpn](./docker-compose.proxy-vpn.yml) | Example of modular deployment using Gluetun VPN.          |
+
+---
+
+View more in our [getting started](https://sparkison.github.io/m3u-editor-docs/docs/about/getting-started/) docs to get up and running in minutes! 🥳
 
 ## 📸 Screenshots
 
