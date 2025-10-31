@@ -10,6 +10,7 @@
 docker-config/
 .env
 .env.backup
+.env.docker
 .env.production
 .phpactor.json
 .phpunit.result.cache
@@ -35,3 +36,4 @@ websockets.sh
 config/database
 config/logs
 config/env
+data/
