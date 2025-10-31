@@ -47,7 +47,7 @@ services:
     depends_on:
       gluetun:
         condition: service_started
-      m3u-editor-fpm:
+      fpm:
         condition: service_healthy
     #ports:
     #  # Expose the main app port
@@ -122,7 +122,7 @@ services:
     image: sparkison/m3u-editor-fpm:${IMAGE_TAG:-latest}
     environment:
       # App settings
-      - APP_ENV=${APP_ENV:-local}
+      - APP_ENV=${APP_ENV:-production}
       - APP_DEBUG=${APP_DEBUG:-false}
       - APP_URL=${APP_URL:-http://localhost} # Application URL/IP for accessing on LAN/WAN
       - APP_PORT=${APP_PORT:-36400}
@@ -152,11 +152,9 @@ services:
     depends_on:
       gluetun:
         condition: service_started
-      m3u-editor-postgres:
+      postgres:
         condition: service_healthy
-      m3u-editor-redis:
-        condition: service_healthy
-      m3u-proxy:
+      redis:
         condition: service_healthy
     volumes:
       - ./data:/var/www/config
@@ -194,7 +192,7 @@ services:
     depends_on:
       gluetun:
         condition: service_started
-      m3u-editor-redis:
+      redis:
         condition: service_healthy
     #ports:
     #  - '${M3U_PROXY_PORT:-38085}:${M3U_PROXY_PORT:-38085}'

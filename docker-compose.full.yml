@@ -25,7 +25,7 @@ services:
       # Websocket Reverb port for reverse proxying
       - REVERB_PORT=${REVERB_PORT:-36800}
     depends_on:
-      m3u-editor-fpm:
+      fpm:
         condition: service_healthy
     ports:
       # Expose the main app port
@@ -91,7 +91,7 @@ services:
     image: sparkison/m3u-editor-fpm:${IMAGE_TAG:-latest}
     environment:
       # App settings
-      - APP_ENV=${APP_ENV:-local}
+      - APP_ENV=${APP_ENV:-production}
       - APP_DEBUG=${APP_DEBUG:-false}
       - APP_URL=${APP_URL:-http://localhost} # Application URL/IP for accessing on LAN/WAN
       - APP_PORT=${APP_PORT:-36400}
@@ -119,11 +119,9 @@ services:
       # Default format: <APP_URL>:<APP_PORT>/m3u-proxy
       - M3U_PROXY_PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-http://localhost:36400/m3u-proxy}
     depends_on:
-      m3u-editor-postgres:
+      postgres:
         condition: service_healthy
-      m3u-editor-redis:
-        condition: service_healthy
-      m3u-proxy:
+      redis:
         condition: service_healthy
     volumes:
       - ./data:/var/www/config
@@ -158,7 +156,7 @@ services:
       - REDIS_DB=6 # Use a separate Redis DB for m3u-proxy caching, 1-5 used by editor
       - ENABLE_TRANSCODING_POOLING=true
     depends_on:
-      m3u-editor-redis:
+      redis:
         condition: service_healthy
     #ports:
     #  - '${M3U_PROXY_PORT:-38085}:${M3U_PROXY_PORT:-38085}'
