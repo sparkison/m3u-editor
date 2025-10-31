@@ -233,14 +233,6 @@ class Channel extends Model
         try {
             $playlist = $this->playlist;
 
-            // Check playlist source type
-            if ($playlist->source_type === PlaylistSourceType::Emby) {
-                // Emby playlists already have metadata from EmbyService during sync
-                // No additional metadata fetching needed
-                Log::info('Skipping metadata fetch for Emby VOD', ['channel_id' => $this->id]);
-                return true;
-            }
-
             // For Xtream playlists, use XtreamService
             if (!$xtream) {
                 if (!$playlist->xtream && $playlist->source_type !== PlaylistSourceType::Xtream) {
