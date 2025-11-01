@@ -39,8 +39,8 @@ services:
       - REDIS_HOST=${REDIS_HOST:-localhost}
       
       # M3U Proxy Configuration (External)
-      - M3U_PROXY_ENABLED=false # Disable external m3u-proxy
-      - M3U_PROXY_PORT=${PROXY_PORT:-38085}
+      - M3U_PROXY_ENABLED=true # Use internal m3u-proxy instance
+      - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
       - M3U_PROXY_HOST=${M3U_PROXY_HOST:-localhost} # Internal network hostname of m3u-proxy container
       # Public URL for m3u-proxy (used for rewriting stream URLs)
       - M3U_PROXY_PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-http://localhost:36400/m3u-proxy}

@@ -71,7 +71,7 @@ services:
       - REDIS_HOST=${REDIS_HOST:-127.0.0.1}
       
       # M3U Proxy Configuration (External)
-      - M3U_PROXY_ENABLED=true # Enable external m3u-proxy
+      - M3U_PROXY_ENABLED=false # Enable external m3u-proxy
       - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
       - M3U_PROXY_HOST=${M3U_PROXY_HOST:-127.0.0.1} # Internal network hostname of m3u-proxy container
       # Public URL for m3u-proxy (used for rewriting stream URLs)

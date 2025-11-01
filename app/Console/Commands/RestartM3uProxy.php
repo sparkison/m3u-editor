@@ -29,7 +29,7 @@ class RestartM3uProxy extends Command
         $usingExternalProxy = config('proxy.external_proxy_enabled', false);
 
         if ($usingExternalProxy) {
-            $this->warn('⚠️  Using external m3u-proxy service (M3U_PROXY_ENABLED=true).');
+            $this->warn('⚠️  Using external m3u-proxy service (M3U_PROXY_ENABLED=false).');
             $this->info('💡 This command restarts the embedded proxy. Restart your external service manually.');
 
             return self::FAILURE;

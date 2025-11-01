@@ -49,7 +49,7 @@ services:
       - DB_USERNAME=${PG_USER:-m3ue}
       - DB_PASSWORD=${PG_PASSWORD:-secret}
       # M3U Proxy settings (external)
-      - M3U_PROXY_ENABLED=true
+      - M3U_PROXY_ENABLED=false # Disable embedded instance
       - M3U_PROXY_URL=http://m3u-proxy:8085
       - M3U_PROXY_TOKEN=${M3U_PROXY_TOKEN:-your-secure-token-here}
     volumes:
@@ -118,7 +118,7 @@ services:
       - APP_URL=http://localhost
       # ... (PostgreSQL settings same as above)
       # M3U Proxy settings (external, no Redis)
-      - M3U_PROXY_ENABLED=true
+      - M3U_PROXY_ENABLED=false # Disable embedded instance
       - M3U_PROXY_URL=http://m3u-proxy:8085
       - M3U_PROXY_TOKEN=${M3U_PROXY_TOKEN:-your-secure-token-here}
     volumes:
@@ -158,7 +158,7 @@ For simple setups or development only:
 
 ```bash
 # .env or docker-compose.yml
-M3U_PROXY_ENABLED=false  # or don't set it at all
+M3U_PROXY_ENABLED=true  # or don't set it at all
 # M3U_PROXY_URL is auto-set to ${APP_URL}/m3u-proxy
 ```
 
@@ -213,7 +213,7 @@ docker exec -it m3u-editor tail -100 /var/www/html/storage/logs/m3u-proxy.log
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `M3U_PROXY_ENABLED` | `false` | `false` = embedded proxy, `true` = external proxy |
+| `M3U_PROXY_ENABLED` | `true` | `true` = embedded proxy, `false` = external proxy |
 | `M3U_PROXY_URL` | auto-set | External: `http://m3u-proxy:8085`, Embedded: `${APP_URL}/m3u-proxy` |
 | `M3U_PROXY_TOKEN` | auto-generated | API token - must match `API_TOKEN` in m3u-proxy |
 
@@ -375,7 +375,7 @@ docker exec -it m3u-proxy redis-cli -h redis ping
 2. Update m3u-editor environment:
 ```yaml
 environment:
-  - M3U_PROXY_ENABLED=true
+  - M3U_PROXY_ENABLED=false
   - M3U_PROXY_URL=http://m3u-proxy:8085
   - M3U_PROXY_TOKEN=your-secure-token-here
 ```
@@ -396,7 +396,7 @@ docker exec -it m3u-editor php artisan m3u-proxy:status
 1. Update m3u-editor environment:
 ```yaml
 environment:
-  - M3U_PROXY_ENABLED=false  # or remove it
+  - M3U_PROXY_ENABLED=true  # or remove it
   # M3U_PROXY_URL will be auto-set
 ```
 
