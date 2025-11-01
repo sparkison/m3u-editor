@@ -37,7 +37,11 @@ services:
       # Application URL (change to your domain or IP)
       - APP_URL=${APP_URL:-http://localhost}
       - APP_PORT=${APP_PORT:-36400}
-      
+
+      # Web Server Configuration
+      # - NGINX_ENABLED=true # Set to false to disable embedded NGINX and use your own service
+      # - FPMPORT=9000 # Default FPM port
+
       # Postgres Configuration
       - ENABLE_POSTGRES=true # Use embedded Postgres, disable to use your own Postgres service
       - PG_DATABASE=${PG_DATABASE:-m3ue}
@@ -59,7 +63,7 @@ services:
       - REDIS_HOST=${REDIS_HOST:-redis}
       
       # M3U Proxy Configuration (External)
-      - M3U_PROXY_ENABLED=false # Enable external m3u-proxy
+      - M3U_PROXY_ENABLED=false # Disable embedded and use external m3u-proxy
       - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
       - M3U_PROXY_HOST=${M3U_PROXY_HOST:-m3u-proxy} # Internal network hostname of m3u-proxy container
       # Public URL for m3u-proxy (used for rewriting stream URLs)
