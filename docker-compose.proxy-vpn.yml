@@ -167,13 +167,15 @@ services:
     image: redis:alpine3.22
     container_name: m3u-redis
     network_mode: "service:gluetun"
+    volumes:
+      - redis-data:/data
     restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --port ${REDIS_PORT:-6379} --appendonly no --save "" --maxmemory 256mb --maxmemory-policy allkeys-lru
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 2s
-      retries: 12
+      test: ["CMD", "redis-cli", "-p", "${REDIS_PORT:-6379}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   # Gluetun VPN Container
   # All m3u-proxy traffic will be routed through this VPN tunnel
@@ -205,6 +207,10 @@ services:
 volumes:
   # PostgreSQL data volume
   pgdata:
+    driver: local
+
+  # Redis data volume
+  redis-data:
     driver: local
 
   # Gluetun configuration volume

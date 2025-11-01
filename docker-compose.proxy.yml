@@ -162,16 +162,18 @@ services:
   redis:
     image: redis:alpine3.22
     container_name: m3u-redis
+    volumes:
+      - redis-data:/data
     restart: unless-stopped
-    # Optional: Enable persistence
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --port ${REDIS_PORT:-6379} --appendonly no --save "" --maxmemory 256mb --maxmemory-policy allkeys-lru
     networks:
       - m3u-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 2s
-      retries: 12
+      test: ["CMD", "redis-cli", "-p", "${REDIS_PORT:-6379}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     
     # Optional: Resource limits
     # deploy:
@@ -187,6 +189,7 @@ networks:
     driver: bridge
 
 volumes:
-  # PostgreSQL data volume
   pgdata:
+    driver: local
+  redis-data:
     driver: local
