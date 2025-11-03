@@ -1,18 +1,56 @@
-# Alpine
-FROM alpine:3.21.3
-
 # Git build arguments
 ARG GIT_BRANCH
 ARG GIT_COMMIT
 ARG GIT_TAG
 
+########################################
+# Composer builder — installs PHP dependencies
+########################################
+FROM composer:2 AS composer
+WORKDIR /app
+
+# Copy composer metadata first for better caching
+COPY composer.json composer.lock ./
+# Copy everything else to ensure autoload generation is correct
+COPY . /app
+
+# Some composer platform requirements (ext-intl, ext-pcntl) are provided by
+# the runtime image. To keep the composer stage portable across different
+# composer base images (alpine/debian) we skip compiling extensions here and
+# let the runtime image provide them. Run composer with ignored platform requirements
+RUN composer install --no-dev --no-interaction --no-progress -o --prefer-dist --ignore-platform-reqs
+
+########################################
+# Node builder — builds frontend assets
+########################################
+FROM node:18-alpine AS node_builder
+WORKDIR /app
+
+# Copy only the files required for npm install to leverage Docker cache
+COPY package.json package-lock.json ./
+RUN npm ci --silent
+
+# Copy the rest of the app
+COPY . ./
+
+# Copy vendor built by the composer stage so Vite can resolve vendor CSS files
+COPY --from=composer /app/vendor /app/vendor
+
+# Run the frontend build (Vite)
+RUN npm run build
+
+########################################
+# Nginx-only image (serves static assets, proxies to php-fpm)
+########################################
+
+# Main runtime image
+FROM alpine:3.21.3 as runtime
+WORKDIR /var/www/html
+
 # Set environment variables for git information
 ENV GIT_BRANCH=${GIT_BRANCH}
 ENV GIT_COMMIT=${GIT_COMMIT}
 ENV GIT_TAG=${GIT_TAG}
-
-# Set the working directory
-WORKDIR /var/www/html
 
 ENV WWWGROUP="m3ue"
 ENV WWWUSER="m3ue"
@@ -100,11 +138,6 @@ RUN touch /var/run/supervisord.pid \
 
 COPY ./docker/8.4/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Install composer
-ENV COMPOSER_ALLOW_SUPERUSER=1
-ENV PATH=$PATH:/root/.composer/vendor/bin
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
-
 # Copy or create an nginx.conf if needed
 COPY ./docker/8.4/nginx/nginx.conf /etc/nginx/nginx.tmpl
 COPY ./docker/8.4/nginx/laravel.conf /etc/nginx/conf.d/laravel.tmpl
@@ -132,14 +165,17 @@ RUN echo "GIT_BRANCH=${GIT_BRANCH}" > /var/www/html/.git-info && \
     echo "GIT_TAG=${GIT_TAG}" >> /var/www/html/.git-info && \
     echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> /var/www/html/.git-info
 
-# Install composer dependencies
-RUN composer install --no-dev --no-interaction --no-progress -o
+# Copy only the composer-installed vendor directory from the composer stage.
+# Avoid copying the whole /app directory because the composer stage may
+# generate bootstrap/cache files (package discovery) that reference dev-only
+# providers (like beyondcode/laravel-dump-server). Copying the full /app
+# can accidentally include those cached files while the runtime vendor
+# doesn't include dev dependencies (composer install --no-dev), causing
+# "Class ... not found" errors at boot. Copying only vendor prevents that.
+COPY --from=composer /app/vendor /var/www/html/vendor
 
-# Install npm dependencies and build assets
-RUN npm install && npm run build
-
-# Remove node_modules to save space after build
-RUN rm -rf node_modules
+# Copy built frontend assets from node builder
+COPY --from=node_builder /app/public/build /var/www/html/public/build
 
 # Setup user, group and permissions
 RUN addgroup $WWWGROUP \

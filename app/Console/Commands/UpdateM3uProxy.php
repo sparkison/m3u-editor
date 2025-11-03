@@ -31,7 +31,7 @@ class UpdateM3uProxy extends Command
         $usingExternalProxy = config('proxy.external_proxy_enabled', false);
 
         if ($usingExternalProxy && ! $this->option('force')) {
-            $this->error('❌ Using external m3u-proxy service (M3U_PROXY_ENABLED=true).');
+            $this->error('❌ Using external m3u-proxy service (M3U_PROXY_ENABLED=false).');
             $this->info('💡 This command updates the embedded proxy. Use --force to update anyway.');
 
             return self::FAILURE;

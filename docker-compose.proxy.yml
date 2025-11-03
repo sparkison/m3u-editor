@@ -20,7 +20,15 @@
 
 services:
   m3u-editor:
-    image: sparkison/m3u-editor:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+      args:
+        GIT_BRANCH: ${GIT_BRANCH:-local}
+        GIT_COMMIT: ${GIT_COMMIT:-local}
+        GIT_TAG: ${GIT_TAG:-local}
+    image: sparkison/m3u-editor:${IMAGE_TAG:-latest}
     container_name: m3u-editor
     environment:
       # Timezone
@@ -28,25 +36,38 @@ services:
       
       # Application URL (change to your domain or IP)
       - APP_URL=${APP_URL:-http://localhost}
-      
-      # PostgreSQL Configuration
-      - ENABLE_POSTGRES=true
+      - APP_PORT=${APP_PORT:-36400}
+
+      # Web Server Configuration
+      # - NGINX_ENABLED=true # Set to false to disable embedded NGINX and use your own service
+      # - FPMPORT=9000 # Default FPM port
+
+      # Postgres Configuration
+      - ENABLE_POSTGRES=true # Use embedded Postgres, disable to use your own Postgres service
       - PG_DATABASE=${PG_DATABASE:-m3ue}
       - PG_USER=${PG_USER:-m3ue}
       - PG_PASSWORD=${PG_PASSWORD:-changeme}
       - PG_PORT=${PG_PORT:-5432}
       
-      # Database Connection (Laravel)
+      # Database Connection (m3u-editor)
       - DB_CONNECTION=pgsql
       - DB_HOST=localhost
       - DB_PORT=${PG_PORT:-5432}
       - DB_DATABASE=${PG_DATABASE:-m3ue}
       - DB_USERNAME=${PG_USER:-m3ue}
       - DB_PASSWORD=${PG_PASSWORD:-changeme}
+
+      # Redis configuration
+      - REDIS_ENABLED=false # Disable embedded Redis
+      - REDIS_SERVER_PORT=${REDIS_PORT:-6379}
+      - REDIS_HOST=${REDIS_HOST:-redis}
       
       # M3U Proxy Configuration (External)
-      - M3U_PROXY_ENABLED=true
-      - M3U_PROXY_URL=http://m3u-proxy:8085
+      - M3U_PROXY_ENABLED=false # Disable embedded and use external m3u-proxy
+      - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
+      - M3U_PROXY_HOST=${M3U_PROXY_HOST:-m3u-proxy} # Internal network hostname of m3u-proxy container
+      # Public URL for m3u-proxy (used for rewriting stream URLs)
+      - M3U_PROXY_PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-http://localhost:36400/m3u-proxy}
       - M3U_PROXY_TOKEN=${M3U_PROXY_TOKEN:-changeme}
     volumes:
       # Persistent configuration data
@@ -56,28 +77,42 @@ services:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     ports:
-      - "36400:36400"  # Main application port
-      # - "5432:5432"  # Uncomment to expose PostgreSQL
+      - "${APP_PORT:-36400}:${APP_PORT:-36400}"  # Main application port
+      # - "${PG_PORT:-5432}:${PG_PORT:-5432}"  # Uncomment to expose PostgreSQL
     networks:
       - m3u-network
     depends_on:
-      - m3u-proxy
+      m3u-proxy:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:36400/up"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:${APP_PORT:-36400}/up"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
       start_period: 60s
+
   m3u-proxy:
-    image: sparkison/m3u-proxy:latest
+    build:
+      context: ../m3u-proxy
+      dockerfile: Dockerfile
+      args:
+        GIT_BRANCH: ${GIT_BRANCH:-local}
+        GIT_COMMIT: ${GIT_COMMIT:-local}
+        GIT_TAG: ${GIT_TAG:-local}
+    image: sparkison/m3u-proxy:${IMAGE_TAG:-latest}
     container_name: m3u-proxy
     environment:
       # API Authentication Token (must match M3U_PROXY_TOKEN above)
       - API_TOKEN=${M3U_PROXY_TOKEN:-changeme}
-      
+      - PORT=${M3U_PROXY_PORT:-38085}
+
       # Redis Configuration (for stream pooling)
       - REDIS_ENABLED=true
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_DB=6 # 1-5 used by m3u-editor, so use 6 for m3u-proxy
       - ENABLE_REDIS_POOLING=true
       
       # Logging
@@ -87,7 +122,7 @@ services:
       # Set this to the public URL of your m3u-editor instance
       # Replace `m3u-editor` with your actual domain or LAN IP if needed so it is accessible to clients
       # NOTE: Make sure to add the `/m3u-proxy`
-      - PUBLIC_URL=http://m3u-editor/m3u-proxy  # Change to your public URL if needed
+      - PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-http://localhost:36400/m3u-proxy}  # Change to your public URL if needed
       
       # Note: ROOT_PATH=/m3u-proxy is now the default, no need to set it explicitly
       # Only set ROOT_PATH= (empty) if you need to use the root path instead
@@ -99,18 +134,19 @@ services:
     restart: unless-stopped
     # Don't expose port externally - only accessible via internal network
     # ports:
-    #   - "8085:8085"  # Uncomment only if you need direct external access
+    #   - "${PROXY_PORT:-38085}:${PROXY_PORT:-38085}"  # Uncomment only if you need direct external access
     networks:
       - m3u-network
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     devices:
       - /dev/dri:/dev/dri
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8085/health"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:${PROXY_PORT:-38085}/health?api_token=${M3U_PROXY_TOKEN:-changeme}"]
       interval: 30s
-      timeout: 10s
-      retries: 3
+      timeout: 2s
+      retries: 12
       start_period: 10s
     
     # Optional: Resource limits
@@ -125,19 +161,19 @@ services:
 
   redis:
     image: redis:alpine3.22
-    container_name: m3u-proxy-redis
-    restart: unless-stopped
-    # Optional: Enable persistence
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    container_name: m3u-redis
     volumes:
       - redis-data:/data
+    restart: unless-stopped
+    command: redis-server --port ${REDIS_PORT:-6379} --appendonly no --save "" --maxmemory 256mb --maxmemory-policy allkeys-lru
     networks:
       - m3u-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-p", "${REDIS_PORT:-6379}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 3
+      start_period: 10s
     
     # Optional: Resource limits
     # deploy:
@@ -153,10 +189,7 @@ networks:
     driver: bridge
 
 volumes:
-  # PostgreSQL data volume
   pgdata:
     driver: local
-    
-  # Redis data volume
   redis-data:
     driver: local

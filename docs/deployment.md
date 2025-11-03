@@ -5,7 +5,6 @@ This directory contains ready-to-use configuration files for deploying m3u-edito
 ## 📁 Files
 
 - **`docker-compose.proxy.yml`** - Complete Docker Compose configuration with m3u-editor, m3u-proxy, and Redis
-- **`.env.proxy.example`** - Environment variables template with secure defaults
 - **`m3u-proxy-integration.md`** - Complete integration guide and troubleshooting
 
 ## 🚀 Quick Start
@@ -18,7 +17,6 @@ mkdir m3u-editor && cd m3u-editor
 
 # Download docker-compose and env template
 curl -O https://raw.githubusercontent.com/sparkison/m3u-editor/main/docker-compose.proxy.yml
-curl -o .env https://raw.githubusercontent.com/sparkison/m3u-editor/main/.env.proxy.example
 ```
 
 ### 2. Generate Secure Tokens
@@ -43,10 +41,10 @@ Or manually edit `.env` and set:
 
 ```bash
 # Start all services
-docker-compose -f docker-compose.external-proxy.yml up -d
+docker-compose -f docker-compose.proxy.yml up -d
 
 # Wait for services to start (about 30 seconds)
-docker-compose -f docker-compose.external-proxy.yml ps
+docker-compose -f docker-compose.proxy.yml ps
 
 # Verify m3u-proxy is healthy
 docker exec -it m3u-editor php artisan m3u-proxy:status
@@ -62,7 +60,7 @@ Open your browser to the URL you set in `APP_URL` (default: http://localhost:364
 |---------|-----------|------|---------|
 | **m3u-editor** | m3u-editor | 36400 | Main Laravel application |
 | **m3u-proxy** | m3u-proxy | 8085* | Streaming proxy with transcoding |
-| **Redis** | m3u-proxy-redis | 6379* | Stream pooling and caching |
+| **Redis** | m3u-redis | 6379* | Stream pooling and caching |
 | **PostgreSQL** | (embedded) | 5432* | Database (inside m3u-editor) |
 
 \* Internal ports only (not exposed externally by default)
@@ -72,18 +70,18 @@ Open your browser to the URL you set in `APP_URL` (default: http://localhost:364
 ### View Logs
 ```bash
 # All services
-docker-compose -f docker-compose.external-proxy.yml logs -f
+docker-compose -f docker-compose.proxy.yml logs -f
 
 # Specific service
 docker logs m3u-proxy -f
 docker logs m3u-editor -f
-docker logs m3u-proxy-redis -f
+docker logs m3u-redis -f
 ```
 
 ### Restart Services
 ```bash
 # Restart all
-docker-compose -f docker-compose.external-proxy.yml restart
+docker-compose -f docker-compose.external-yml restart
 
 # Restart specific service
 docker restart m3u-proxy
@@ -92,16 +90,16 @@ docker restart m3u-proxy
 ### Stop Services
 ```bash
 # Stop all (preserves data)
-docker-compose -f docker-compose.external-proxy.yml down
+docker-compose -f docker-compose.proxy.yml down
 
 # Stop and remove volumes (WARNING: deletes all data)
-docker-compose -f docker-compose.external-proxy.yml down -v
+docker-compose -f docker-compose.proxy.yml down -v
 ```
 
 ### Check Status
 ```bash
 # Container status
-docker-compose -f docker-compose.external-proxy.yml ps
+docker-compose -f docker-compose.proxy.yml ps
 
 # M3U Proxy health
 docker exec -it m3u-editor php artisan m3u-proxy:status
@@ -120,17 +118,17 @@ APP_URL=https://m3u.yourdomain.com
 Then restart: `docker-compose restart`
 
 ### Expose PostgreSQL
-Uncomment in `docker-compose.external-proxy.yml`:
+Uncomment in `docker-compose.proxy.yml`:
 ```yaml
 ports:
   - "5432:5432"
 ```
 
 ### Adjust Resource Limits
-Uncomment and modify `deploy.resources` sections in `docker-compose.external-proxy.yml`
+Uncomment and modify `deploy.resources` sections in `docker-compose.proxy.yml`
 
 ### Change Ports
-Edit the `ports` section in `docker-compose.external-proxy.yml`:
+Edit the `ports` section in `docker-compose.proxy.yml`:
 ```yaml
 ports:
   - "8080:36400"  # Access via port 8080 instead
@@ -150,11 +148,11 @@ See [`m3u-proxy-integration.md`](./m3u-proxy-integration.md) for:
 ### Services Won't Start
 ```bash
 # Check logs
-docker-compose -f docker-compose.external-proxy.yml logs
+docker-compose -f docker-compose.proxy.yml logs
 
 # Rebuild and restart
-docker-compose -f docker-compose.external-proxy.yml down
-docker-compose -f docker-compose.external-proxy.yml up -d --build
+docker-compose -f docker-compose.proxy.yml down
+docker-compose -f docker-compose.proxy.yml up -d --build
 ```
 
 ### Token Authentication Fails
@@ -179,7 +177,7 @@ docker logs m3u-proxy-redis
 lsof -i :36400
 
 # Try different port
-# Edit docker-compose.external-proxy.yml ports section
+# Edit docker-compose.proxy.yml ports section
 ```
 
 ## 🔗 Links

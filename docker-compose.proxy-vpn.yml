@@ -29,7 +29,15 @@
 
 services:
   m3u-editor:
-    image: sparkison/m3u-editor:dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+      args:
+        GIT_BRANCH: ${GIT_BRANCH:-local}
+        GIT_COMMIT: ${GIT_COMMIT:-local}
+        GIT_TAG: ${GIT_TAG:-local}
+    image: sparkison/m3u-editor:${IMAGE_TAG:-latest}
     container_name: m3u-editor
     # CRITICAL: Use Gluetun's network stack
     # This routes all m3u-editor traffic through the VPN
@@ -40,26 +48,38 @@ services:
       
       # Application URL (change to your domain or IP)
       - APP_URL=${APP_URL:-http://localhost}
-      
-      # PostgreSQL Configuration
-      - ENABLE_POSTGRES=true
+      - APP_PORT=${APP_PORT:-36400}
+
+      # Web Server Configuration
+      # - NGINX_ENABLED=true # Set to false to disable embedded NGINX and use your own service
+      # - FPMPORT=9000 # Default FPM port
+
+      # Postgres Configuration
+      - ENABLE_POSTGRES=true # Use embedded Postgres, disable to use your own Postgres service
       - PG_DATABASE=${PG_DATABASE:-m3ue}
       - PG_USER=${PG_USER:-m3ue}
       - PG_PASSWORD=${PG_PASSWORD:-changeme}
       - PG_PORT=${PG_PORT:-5432}
       
-      # Database Connection (Laravel)
+      # Database Connection (m3u-editor)
       - DB_CONNECTION=pgsql
       - DB_HOST=localhost
       - DB_PORT=${PG_PORT:-5432}
       - DB_DATABASE=${PG_DATABASE:-m3ue}
       - DB_USERNAME=${PG_USER:-m3ue}
       - DB_PASSWORD=${PG_PASSWORD:-changeme}
+
+      # Redis configuration
+      - REDIS_ENABLED=false # Disable embedded Redis instance
+      - REDIS_SERVER_PORT=${REDIS_PORT:-6379}
+      - REDIS_HOST=${REDIS_HOST:-127.0.0.1}
       
-      # M3U Proxy Configuration (External via Gluetun)
-      # IMPORTANT: When m3u-proxy is behind Gluetun, we connect via gluetun container
-      - M3U_PROXY_ENABLED=true
-      - M3U_PROXY_URL=http://127.0.0.1:8085 # Access m3u-proxy via localhost since both use Gluetun's network
+      # M3U Proxy Configuration (External)
+      - M3U_PROXY_ENABLED=false # Disable embedded and use external m3u-proxy
+      - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
+      - M3U_PROXY_HOST=${M3U_PROXY_HOST:-127.0.0.1} # Internal network hostname of m3u-proxy container
+      # Public URL for m3u-proxy (used for rewriting stream URLs)
+      - M3U_PROXY_PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-http://localhost:36400/m3u-proxy}
       - M3U_PROXY_TOKEN=${M3U_PROXY_TOKEN:-changeme}
     volumes:
       # Persistent configuration data
@@ -69,44 +89,58 @@ services:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     depends_on:
-      - gluetun
-      - m3u-proxy
+      gluetun:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      m3u-proxy:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:36400/up"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:${APP_PORT:-36400}/up"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
       start_period: 60s
 
   # M3U Proxy - Runs inside Gluetun's network namespace
   # All traffic from this container goes through the VPN
   m3u-proxy:
-    image: sparkison/m3u-proxy:latest
+    build:
+      context: ../m3u-proxy
+      dockerfile: Dockerfile
+      target: runtime
+      args:
+        GIT_BRANCH: ${GIT_BRANCH:-local}
+        GIT_COMMIT: ${GIT_COMMIT:-local}
+        GIT_TAG: ${GIT_TAG:-local}
+    image: sparkison/m3u-proxy:${IMAGE_TAG:-latest}
     container_name: m3u-proxy
     # CRITICAL: Use Gluetun's network stack
     # This routes all m3u-proxy traffic through the VPN
     network_mode: "service:gluetun"
     environment:
-      - PORT=8085 # M3U Proxy listening port (change if needed)
       # API Authentication Token (must match M3U_PROXY_TOKEN above)
       - API_TOKEN=${M3U_PROXY_TOKEN:-changeme}
-      
+      - PORT=${M3U_PROXY_PORT:-38085}
+
       # Redis Configuration (for stream pooling)
-      # IMPORTANT: Since m3u-proxy uses gluetun's network, it can't use 'redis' hostname
-      # We need to use the Redis container's IP or connect via the m3u-network
-      # Solution: Redis connects to m3u-network, and we use host.docker.internal or static IP
       - REDIS_ENABLED=true
-      - REDIS_URL=redis://127.0.0.1:6379/0
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_HOST=${REDIS_HOST:-127.0.0.1}
+      - REDIS_DB=6 # 1-5 used by m3u-editor, so use 6 for m3u-proxy
       - ENABLE_REDIS_POOLING=true
       
       # Logging
       - LOG_LEVEL=INFO
-      
+
       # Public URL for re-writing HLS stream URLs
       # Set this to the public URL of your m3u-editor instance
       # Replace `m3u-editor` with your actual domain or LAN IP if needed so it is accessible to clients
       # NOTE: Make sure to add the `/m3u-proxy`
-      - PUBLIC_URL=http://m3u-editor/m3u-proxy  # Change to your public URL if needed
+      - PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-http://localhost:36400/m3u-proxy}  # Change to your public URL if needed
+      
+      # Note: ROOT_PATH=/m3u-proxy is now the default, no need to set it explicitly
+      # Only set ROOT_PATH= (empty) if you need to use the root path instead
       
       # Optional: Additional configuration
       # - REDIS_POOL_MAX_CONNECTIONS=50
@@ -115,20 +149,33 @@ services:
     restart: unless-stopped
     devices:
       - /dev/dri:/dev/dri
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:${PROXY_PORT:-38085}/health?api_token=${M3U_PROXY_TOKEN:-changeme}"]
+      interval: 30s
+      timeout: 2s
+      retries: 12
+      start_period: 10s
     depends_on:
-      - gluetun
-      - redis
+      gluetun:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     # Note: healthcheck removed because network_mode: service:gluetun 
     # means we can't directly healthcheck this container
 
   redis:
     image: redis:alpine3.22
-    container_name: m3u-proxy-redis
+    container_name: m3u-redis
     network_mode: "service:gluetun"
-    restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis-data:/data
+    restart: unless-stopped
+    command: redis-server --port ${REDIS_PORT:-6379} --appendonly no --save "" --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "${REDIS_PORT:-6379}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   # Gluetun VPN Container
   # All m3u-proxy traffic will be routed through this VPN tunnel
@@ -141,11 +188,11 @@ services:
       - /dev/net/tun:/dev/net/tun
       - /dev/dri:/dev/dri  # Hardware acceleration for m3u-proxy
     ports:
-      - 36400:36400  # M3U Editor port, change if needed
+      - ${APP_PORT:-36400}:${APP_PORT:-36400}  # M3U Editor port, change if needed
 
       # M3U Proxy port (exposed through Gluetun)
       # Uncomment if you need direct external access to m3u-proxy
-      # - "8085:8085" # Change if needed
+      # - "${PROXY_PORT:-38085}:${PROXY_PORT:-38085}" # Change if needed
       
       # Gluetun control server (optional, for VPN management)
       # - "8000:8000/tcp"  # HTTP control server
@@ -161,11 +208,11 @@ volumes:
   # PostgreSQL data volume
   pgdata:
     driver: local
-    
+
   # Redis data volume
   redis-data:
     driver: local
-    
+
   # Gluetun configuration volume
   gluetun-config:
     driver: local
