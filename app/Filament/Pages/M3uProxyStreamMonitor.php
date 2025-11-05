@@ -98,6 +98,32 @@ class M3uProxyStreamMonitor extends Page
         ];
     }
 
+    public function triggerFailover(string $streamId): void
+    {
+        try {
+            $success = $this->apiService->triggerFailover($streamId);
+            if ($success) {
+                Notification::make()
+                    ->title("Failover triggered for stream {$streamId}.")
+                    ->success()
+                    ->send();
+            } else {
+                Notification::make()
+                    ->title("Failed to trigger failover for stream {$streamId}.")
+                    ->danger()
+                    ->send();
+            }
+        } catch (Exception $e) {
+            Notification::make()
+                ->title('Error triggering failover.')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+        }
+
+        $this->refreshData();
+    }
+
     public function stopStream(string $streamId): void
     {
         try {

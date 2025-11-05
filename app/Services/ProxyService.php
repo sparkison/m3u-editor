@@ -22,7 +22,7 @@ class ProxyService
             $url = $proxyOverrideUrl;
         } else {
             // Default base URL
-            $url = url();
+            $url = url("");
         }
 
         // Normalize the base url
