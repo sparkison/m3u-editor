@@ -489,6 +489,42 @@ class M3uProxyService
     }
 
     /**
+     * Trigger a failover for a specific stream on the external proxy.
+     * Returns true on success.
+     */
+    public function triggerFailover(string $streamId): bool
+    {
+        if (empty($this->apiBaseUrl)) {
+            Log::warning('M3U Proxy base URL not configured');
+
+            return false;
+        }
+
+        try {
+            $endpoint = $this->apiBaseUrl . '/streams/' . $streamId . '/failover';
+            $response = Http::timeout(10)->acceptJson()
+                ->withHeaders($this->apiToken ? [
+                    'X-API-Token' => $this->apiToken,
+                ] : [])
+                ->post($endpoint);
+
+            if ($response->successful()) {
+                Log::info("Failover triggered successfully for stream {$streamId}");
+
+                return true;
+            }
+
+            Log::warning("Failed to trigger failover for stream {$streamId}: " . $response->body());
+
+            return false;
+        } catch (Exception $e) {
+            Log::error("Error triggering failover for stream {$streamId}: " . $e->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
      * Delete/stop a stream on the external proxy (used by the Filament UI).
      * Returns true on success.
      */
