@@ -178,9 +178,9 @@ class PlaylistGenerateController extends Controller
                     // This way we can perform additional stream analysis, check for stream limits, etc.
                     // When disabled, will return the raw URL from the channel (or the proxyfied URL if proxy enabled)
                     if (!(config('app.disable_m3u_xtream_format') ?? false)) {
-                        $urlPath = '/live';
+                        $urlPath = 'live';
                         if ($channel->is_vod) {
-                            $urlPath = '/movie';
+                            $urlPath = 'movie';
                             $extension = $channel->container_extension ?? 'mkv';
                         }
                         $url = $baseUrl . "/{$urlPath}/{$username}/{$password}/" . $channel->id . "." . $extension;
@@ -408,9 +408,9 @@ class PlaylistGenerateController extends Controller
             $sourceUrl = $channel->url_custom ?? $channel->url;
             $baseUrl = ProxyFacade::getBaseUrl();
             $extension = pathinfo($sourceUrl, PATHINFO_EXTENSION);
-            $urlPath = '/live';
+            $urlPath = 'live';
             if ($channel->is_vod) {
-                $urlPath = '/movie';
+                $urlPath = 'movie';
                 $extension = $channel->container_extension ?? 'mkv';
             }
             $url = rtrim($baseUrl . "/{$urlPath}/{$username}/{$password}/" . $channel->id . "." . $extension, '.');
