@@ -146,6 +146,10 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         ->name('api.channels.index');
     Route::patch('channel/{id}', [\App\Http\Controllers\ChannelController::class, 'update'])
         ->name('api.channels.update');
+    Route::get('channel/{id}/health', [\App\Http\Controllers\ChannelController::class, 'healthcheck'])
+        ->name('api.channels.healthcheck');
+    Route::get('channel/playlist/{uuid}/health/{search}', [\App\Http\Controllers\ChannelController::class, 'healthcheckByPlaylist'])
+        ->name('api.channels.healthcheck.search');
 });
 
 // Playlist API routes

@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Facades\PlaylistFacade;
 use App\Models\Channel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Redis;
 
 /**
  * @tags Channels
@@ -76,7 +78,7 @@ class ChannelController extends Controller
                     'logo' => $channel->logo ?? $channel->logo_internal,
                     'url' => $channel->url_custom ?? $channel->url,
                     'stream_id' => $channel->stream_id_custom ?? $channel->stream_id,
-                    'enabled'=> $channel->enabled,
+                    'enabled' => $channel->enabled,
                 ];
             });
 
@@ -87,6 +89,190 @@ class ChannelController extends Controller
                 'total' => $total,
                 'limit' => $limit,
                 'offset' => $offset,
+            ],
+        ]);
+    }
+
+    /**
+     * Health check for a specific channel
+     *
+     * Retrieve stream statistics for a specific channel by ID.
+     *
+     *
+     * @response 200 {
+     *   "success": true,
+     *   "data": {
+     *     "channel_id": 1,
+     *     "title": "ESPN HD",
+     *     "url": "https://example.com/stream.m3u8",
+     *     "stream_stats": [
+     *       {
+     *         "stream": {
+     *           "codec_type": "video",
+     *           "codec_name": "h264",
+     *           "width": 1920,
+     *           "height": 1080
+     *         }
+     *       }
+     *     ]
+     *   }
+     * }
+     * @response 404 {
+     *   "success": false,
+     *   "message": "Channel not found"
+     * }
+     * @response 403 {
+     *   "success": false,
+     *   "message": "You do not have permission to access this channel"
+     * }
+     */
+    public function healthcheck(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+
+        // Find the channel
+        $channel = Channel::find($id);
+
+        if (! $channel) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Channel not found',
+            ], 404);
+        }
+
+        // Check if the user owns the channel
+        if ($channel->user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to access this channel',
+            ], 403);
+        }
+
+        // Get stream stats
+        $streamStats = [];
+        try {
+            $streamStats = $channel->stream_stats;
+        } catch (\Exception $e) {
+            $streamStats = [
+                'error' => 'Unable to retrieve stream statistics',
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'channel_id' => $channel->id,
+                'title' => $channel->title_custom ?? $channel->title,
+                'name' => $channel->name_custom ?? $channel->name,
+                'url' => $channel->url_custom ?? $channel->url,
+                'stream_stats' => $streamStats,
+            ],
+        ]);
+    }
+
+    /**
+     * Health check for channels by playlist search
+     *
+     * Search for channels in a playlist and retrieve stream statistics.
+     * Searches across title, name, and stream_id fields.
+     *
+     *
+     * @response 200 {
+     *   "success": true,
+     *   "data": [
+     *     {
+     *       "channel_id": 1,
+     *       "title": "ESPN HD",
+     *       "url": "https://example.com/stream.m3u8",
+     *       "stream_stats": [
+     *         {
+     *           "stream": {
+     *             "codec_type": "video",
+     *             "codec_name": "h264",
+     *             "width": 1920,
+     *             "height": 1080
+     *           }
+     *         }
+     *       ]
+     *     }
+     *   ],
+     *   "meta": {
+     *     "total": 1,
+     *     "search": "ESPN"
+     *   }
+     * }
+     * @response 404 {
+     *   "success": false,
+     *   "message": "Playlist not found"
+     * }
+     * @response 403 {
+     *   "success": false,
+     *   "message": "You do not have permission to access this playlist"
+     * }
+     */
+    public function healthcheckByPlaylist(Request $request, string $uuid, string $search): JsonResponse
+    {
+        $user = $request->user();
+
+        // Find the playlist by UUID
+        $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
+
+        if (! $playlist) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Playlist not found',
+            ], 404);
+        }
+
+        // Check if the user owns the playlist
+        if ($playlist->user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to access this playlist',
+            ], 403);
+        }
+
+        // Search for channels in the playlist
+        // Search across title, name, and stream_id fields (both original and custom)
+        $channels = Channel::where('user_id', $user->id)
+            ->where('playlist_id', $playlist->id)
+            ->where(function ($query) use ($search) {
+                $query->where('title', 'LIKE', "%{$search}%")
+                    ->orWhere('title_custom', 'LIKE', "%{$search}%")
+                    ->orWhere('name', 'LIKE', "%{$search}%")
+                    ->orWhere('name_custom', 'LIKE', "%{$search}%")
+                    ->orWhere('stream_id', 'LIKE', "%{$search}%")
+                    ->orWhere('stream_id_custom', 'LIKE', "%{$search}%");
+            })
+            ->get();
+
+        // Get stream stats for each channel
+        $results = $channels->map(function ($channel) {
+            $stats = [];
+            try {
+                $stats = $channel->stream_stats;
+            } catch (\Exception $e) {
+                $stats = [
+                    'error' => 'Unable to retrieve stream statistics',
+                ];
+            }
+            return [
+                'channel_id' => $channel->id,
+                'title' => $channel->title_custom ?? $channel->title,
+                'name' => $channel->name_custom ?? $channel->name,
+                'url' => $channel->url_custom ?? $channel->url,
+                'stream_id' => $channel->stream_id_custom ?? $channel->stream_id,
+                'stream_stats' => $stats,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => $results,
+            'meta' => [
+                'total' => $results->count(),
+                'search' => $search,
+                'playlist_uuid' => $uuid,
             ],
         ]);
     }
@@ -213,7 +399,7 @@ class ChannelController extends Controller
                 'logo' => $channel->logo ?? $channel->logo_internal,
                 'url' => $channel->url_custom ?? $channel->url,
                 'stream_id' => $channel->stream_id_custom ?? $channel->stream_id,
-                'enabled'=> $channel->enabled,
+                'enabled' => $channel->enabled,
             ],
         ]);
     }
