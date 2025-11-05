@@ -27,7 +27,7 @@ export PG_PORT="${PG_PORT:-5432}" # Default 5432
 # M3U Proxy configuration
 # If M3U_PROXY_ENABLED=true, enable embedded proxy
 # If M3U_PROXY_ENABLED=false/unset, disable embedded proxy
-export M3U_PROXY_ENABLED="${M3U_PROXY_ENABLED:-false}"
+export M3U_PROXY_ENABLED="${M3U_PROXY_ENABLED:-true}"
 export M3U_PROXY_START_EMBEDDED="true" # Will be set to false if external proxy enabled
 export M3U_PROXY_HOST="${M3U_PROXY_HOST:-127.0.0.1}" # Bind to localhost for embedded
 export M3U_PROXY_PORT="${M3U_PROXY_PORT:-8085}"
