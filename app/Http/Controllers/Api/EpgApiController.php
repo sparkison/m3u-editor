@@ -243,7 +243,7 @@ class EpgApiController extends Controller
 
                     $logo = $channel->logo ?? $channel->logo_internal ?? '';
                     if ($logoProxyEnabled) {
-                        $logo = LogoProxyController::generateProxyUrl($logo);
+                        $logo = LogoProxyController::generateProxyUrl($logo, internal: true);
                     }
 
                     // Add the playlist channel info to the EPG channel map
@@ -263,7 +263,7 @@ class EpgApiController extends Controller
                     }
                     $icon = htmlspecialchars($icon);
                     if ($logoProxyEnabled) {
-                        $icon = LogoProxyController::generateProxyUrl($icon);
+                        $icon = LogoProxyController::generateProxyUrl($icon, internal: true);
                     }
 
                     // Keep track of which channels need a dummy EPG program
@@ -322,7 +322,7 @@ class EpgApiController extends Controller
                     $icon = url('/placeholder.png');
                 }
                 if ($logoProxyEnabled) {
-                    $icon = LogoProxyController::generateProxyUrl($icon);
+                    $icon = LogoProxyController::generateProxyUrl($icon, internal: true);
                 }
                 $playlistChannelData[$channelNo] = [
                     'id' => $channelNo,
