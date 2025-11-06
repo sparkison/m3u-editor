@@ -1261,7 +1261,7 @@ class PlaylistResource extends Resource
                 ->columnSpanFull()
                 ->collapsible()
                 ->collapsed($creating)
-                ->columns(2)
+                ->columns(3)
                 ->schema([
                     Toggle::make('auto_fetch_vod_metadata')
                         ->label('Fetch metadata')
@@ -1281,6 +1281,15 @@ class PlaylistResource extends Resource
                         )
                         ->default(false)
                         ->helperText('This will only sync stream files for enabled VOD channels.'),
+                    Toggle::make('include_vod_in_m3u')
+                        ->label('Include VOD in M3U output')
+                        ->inline(false)
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'Enable this to output your enabled VOD channels in the M3U file.'
+                        )
+                        ->default(false)
+                        ->helperText('When enabled, VOD channels will be included in the M3U output.'),
                 ])->hidden(fn(Get $get): bool => ! $get('xtream')),
         ];
 
