@@ -109,25 +109,19 @@ class EpgCacheService
             $cacheDir = $this->getCacheDir($epg);
             Storage::disk('local')->makeDirectory($cacheDir);
 
-            // Parse and save channels using streaming
-            Log::debug("Parsing and saving channels for {$epg->name}");
-            $channelCount = $this->parseAndSaveChannels($epg, $epgFilePath, $totalChannels);
-            Log::debug("Processed {$channelCount} channels");
+            // Parse and save channels and programmes in a single pass
+            Log::debug("Parsing EPG data for {$epg->name}");
+            $stats = $this->parseAndSaveEpgDataSinglePass($epg, $epgFilePath, $totalChannels, $totalProgrammes);
+            Log::debug("Processed {$stats['channels']} channels and {$stats['programmes']} programmes across {$stats['date_count']} dates");
 
-            // Parse and save programmes using streaming by date
-            Log::debug("Parsing and saving programmes for {$epg->name}");
-            $programmeStats = $this->parseAndSaveProgrammes($epg, $epgFilePath, $totalChannels, $totalProgrammes);
-            Log::debug("Processed {$programmeStats['total']} programmes across {$programmeStats['date_count']} dates");
-
-            // Save metadata
+                        // Save metadata
             $metadata = [
-                'epg_uuid' => $epg->uuid,
-                'epg_name' => $epg->name,
                 'cache_created' => time(),
                 'cache_version' => self::CACHE_VERSION,
-                'total_channels' => $channelCount,
-                'total_programmes' => $programmeStats['total'],
-                'programme_date_range' => $programmeStats['date_range'],
+                'epg_uuid' => $epg->uuid,
+                'total_channels' => $stats['channels'],
+                'total_programmes' => $stats['programmes'],
+                'programme_date_range' => $stats['date_range'],
             ];
 
             Storage::disk('local')->put(
@@ -141,8 +135,8 @@ class EpgCacheService
                 'cache_progress' => 100,
                 'cache_meta' => $metadata,
                 // Update counts
-                'channel_count' => $channelCount,
-                'programme_count' => $programmeStats['total'],
+                'channel_count' => $stats['channels'],
+                'programme_count' => $stats['programmes'],
             ]);
 
             Log::debug("EPG cache generated successfully", $metadata);
@@ -154,7 +148,309 @@ class EpgCacheService
     }
 
     /**
-     * Parse and save channels
+     * Parse and save EPG data in a single pass (optimized for performance)
+     * This method parses both channels and programmes in one pass through the file,
+     * reducing processing time by ~50% compared to double parsing.
+     */
+    private function parseAndSaveEpgDataSinglePass(Epg $epg, string $filePath, int $totalChannels, int $totalProgrammes): array
+    {
+        $reader = new XMLReader();
+        $reader->open('compress.zlib://' . $filePath);
+        
+        $channelCount = 0;
+        $programmeCount = 0;
+        $channelBatchSize = 5000; // Larger batch for fewer writes
+        $channelBatch = [];
+        $dateRangeTracker = ['min_date' => null, 'max_date' => null];
+        $processedDates = [];
+        $programmeFileHandles = []; // Keep file handles open for better performance
+        $lastProgressUpdate = 0;
+        $progressUpdateInterval = 5000; // Update progress every 5000 items instead of 50
+
+        try {
+            while (@$reader->read()) {
+                // Process channels
+                if ($reader->nodeType == XMLReader::ELEMENT && $reader->name === 'channel') {
+                    $channelId = trim($reader->getAttribute('id') ?: '');
+                    $innerXML = $reader->readOuterXml();
+                    $innerReader = new XMLReader();
+                    $innerReader->xml($innerXML);
+
+                    $channel = [
+                        'id' => $channelId,
+                        'display_name' => '',
+                        'icon' => '',
+                        'lang' => 'en'
+                    ];
+
+                    while (@$innerReader->read()) {
+                        if ($innerReader->nodeType == XMLReader::ELEMENT) {
+                            switch ($innerReader->name) {
+                                case 'display-name':
+                                    if (!$channel['display_name']) {
+                                        $channel['display_name'] = trim($innerReader->readString() ?: '');
+                                        $channel['lang'] = trim($innerReader->getAttribute('lang') ?: '') ?: 'en';
+                                    }
+                                    break;
+                                case 'icon':
+                                    $channel['icon'] = trim($innerReader->getAttribute('src') ?: '');
+                                    break;
+                            }
+                        }
+                    }
+                    $innerReader->close();
+
+                    if ($channelId) {
+                        $channelBatch[$channelId] = $channel;
+                        $channelCount++;
+
+                        // Save in larger batches for better performance
+                        if (count($channelBatch) >= $channelBatchSize) {
+                            $this->saveChannelBatchOptimized($epg, $channelBatch, $channelCount <= $channelBatchSize);
+                            $channelBatch = [];
+                        }
+                    }
+                }
+                // Process programmes
+                elseif ($reader->nodeType == XMLReader::ELEMENT && $reader->name === 'programme') {
+                    $programmeCount++;
+
+                    // Safety limit
+                    if ($programmeCount > self::MAX_PROGRAMMES) {
+                        Log::warning("Programme processing limit reached at {$programmeCount}");
+                        break;
+                    }
+
+                    $channelId = trim($reader->getAttribute('channel') ?: '');
+                    $start = trim($reader->getAttribute('start') ?: '');
+                    $stop = trim($reader->getAttribute('stop') ?: '');
+
+                    if (!$channelId || !$start) {
+                        continue;
+                    }
+
+                    $startDateTime = $this->parseXmltvDateTime($start);
+                    $stopDateTime = $stop ? $this->parseXmltvDateTime($stop) : null;
+
+                    if (!$startDateTime) {
+                        continue;
+                    }
+
+                    $date = $startDateTime->format('Y-m-d');
+                    
+                    // Track date range
+                    if ($dateRangeTracker['min_date'] === null || $date < $dateRangeTracker['min_date']) {
+                        $dateRangeTracker['min_date'] = $date;
+                    }
+                    if ($dateRangeTracker['max_date'] === null || $date > $dateRangeTracker['max_date']) {
+                        $dateRangeTracker['max_date'] = $date;
+                    }
+
+                    $innerXML = $reader->readOuterXml();
+                    $innerReader = new XMLReader();
+                    $innerReader->xml($innerXML);
+
+                    $programme = [
+                        'channel' => $channelId,
+                        'start' => $startDateTime->toISOString(),
+                        'stop' => $stopDateTime ? $stopDateTime->toISOString() : null,
+                        'title' => '',
+                        'subtitle' => '',
+                        'desc' => '',
+                        'category' => '',
+                        'episode_num' => '',
+                        'rating' => '',
+                        'icon' => '',
+                        'images' => [],
+                        'new' => false,
+                    ];
+
+                    while (@$innerReader->read()) {
+                        if ($innerReader->nodeType == XMLReader::ELEMENT) {
+                            switch ($innerReader->name) {
+                                case 'title':
+                                    $programme['title'] = trim($innerReader->readString() ?: '');
+                                    break;
+                                case 'sub-title':
+                                    $programme['subtitle'] = trim($innerReader->readString() ?: '');
+                                    break;
+                                case 'desc':
+                                    $programme['desc'] = trim($innerReader->readString() ?: '');
+                                    break;
+                                case 'category':
+                                    if (!$programme['category']) {
+                                        $programme['category'] = trim($innerReader->readString() ?: '');
+                                    }
+                                    break;
+                                case 'icon':
+                                    if (!$programme['icon']) {
+                                        $programme['icon'] = trim($innerReader->getAttribute('src') ?: '');
+                                    } else {
+                                        $imageUrl = trim($innerReader->getAttribute('src') ?: '');
+                                        if ($imageUrl) {
+                                            $imageData = [
+                                                'url' => $imageUrl,
+                                                'type' => trim($innerReader->getAttribute('type') ?: 'poster'),
+                                                'width' => (int) ($innerReader->getAttribute('width') ?: 0),
+                                                'height' => (int) ($innerReader->getAttribute('height') ?: 0),
+                                                'orient' => trim($innerReader->getAttribute('orient') ?: 'P'),
+                                                'size' => (int) ($innerReader->getAttribute('size') ?: 1),
+                                            ];
+                                            $programme['images'][] = $imageData;
+                                        }
+                                    }
+                                    break;
+                                case 'new':
+                                    $programme['new'] = true;
+                                    break;
+                                case 'episode-num':
+                                    $programme['episode_num'] = trim($innerReader->readString() ?: '');
+                                    break;
+                                case 'rating':
+                                    while (@$innerReader->read()) {
+                                        if ($innerReader->nodeType == XMLReader::ELEMENT && $innerReader->name === 'value') {
+                                            $programme['rating'] = trim($innerReader->readString() ?: '');
+                                            break;
+                                        } elseif ($innerReader->nodeType == XMLReader::END_ELEMENT && $innerReader->name === 'rating') {
+                                            break;
+                                        }
+                                    }
+                                    break;
+                            }
+                        }
+                    }
+                    $innerReader->close();
+
+                    if ($programme['title']) {
+                        // Use persistent file handles for better performance
+                        $this->directAppendProgrammeOptimized($epg, $date, $channelId, $programme, $programmeFileHandles);
+                        $processedDates[$date] = true;
+                    }
+
+                    // Update progress less frequently (every 5000 items instead of 50)
+                    $totalProcessed = $channelCount + $programmeCount;
+                    if ($totalProcessed - $lastProgressUpdate >= $progressUpdateInterval) {
+                        $estimatedTotal = $totalChannels + $totalProgrammes;
+                        $progress = $estimatedTotal > 0
+                            ? min(99, round(($totalProcessed / $estimatedTotal) * 99))
+                            : 99;
+                        $epg->update(['cache_progress' => $progress]);
+                        $lastProgressUpdate = $totalProcessed;
+                        
+                        // Garbage collection less frequently
+                        if (function_exists('gc_collect_cycles')) {
+                            gc_collect_cycles();
+                        }
+                    }
+                }
+            }
+
+            // Save any remaining channels
+            if (!empty($channelBatch)) {
+                $this->saveChannelBatchOptimized($epg, $channelBatch, $channelCount <= $channelBatchSize);
+            }
+
+            // Close all programme file handles
+            foreach ($programmeFileHandles as $handle) {
+                if (is_resource($handle)) {
+                    fclose($handle);
+                }
+            }
+
+        } finally {
+            $reader->close();
+        }
+
+        return [
+            'channels' => $channelCount,
+            'programmes' => $programmeCount,
+            'date_count' => count($processedDates),
+            'date_range' => $dateRangeTracker,
+        ];
+    }
+
+    /**
+     * Optimized channel batch save using JSONL append instead of merge
+     */
+    private function saveChannelBatchOptimized(Epg $epg, array $channelBatch, bool $isFirst): void
+    {
+        $channelsPath = $this->getCacheFilePath($epg, self::CHANNELS_FILE);
+        $fullPath = Storage::disk('local')->path($channelsPath);
+
+        // Ensure directory exists
+        $dir = dirname($fullPath);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
+        // Check if file already exists to determine if this is truly the first write
+        $fileExists = file_exists($fullPath);
+        
+        if (!$fileExists) {
+            // First write - create new file
+            file_put_contents($fullPath, json_encode($channelBatch, JSON_UNESCAPED_UNICODE), LOCK_EX);
+        } else {
+            // Subsequent batches - append using simple merge
+            // This is acceptable for channels as there are usually only thousands, not millions
+            try {
+                $existing = json_decode(file_get_contents($fullPath), true) ?: [];
+                $merged = array_merge($existing, $channelBatch);
+                file_put_contents($fullPath, json_encode($merged, JSON_UNESCAPED_UNICODE), LOCK_EX);
+            } catch (Exception $e) {
+                Log::error("Failed to merge channel batch: {$e->getMessage()}");
+                // Fallback: create new file if merge fails
+                file_put_contents($fullPath, json_encode($channelBatch, JSON_UNESCAPED_UNICODE), LOCK_EX);
+            }
+        }
+    }
+
+    /**
+     * Optimized direct append using persistent file handles
+     */
+    private function directAppendProgrammeOptimized(Epg $epg, string $date, string $channelId, array $programme, array &$fileHandles): void
+    {
+        $filename = "programmes-{$date}.jsonl";
+        
+        // Reuse file handle if already open
+        if (!isset($fileHandles[$date])) {
+            $programmesPath = $this->getCacheFilePath($epg, $filename);
+            $fullPath = Storage::disk('local')->path($programmesPath);
+
+            // Ensure directory exists
+            $dir = dirname($fullPath);
+            if (!is_dir($dir)) {
+                mkdir($dir, 0755, true);
+            }
+
+            $fileHandles[$date] = fopen($fullPath, 'a');
+            if (!$fileHandles[$date]) {
+                Log::error("Failed to open file handle for {$filename}");
+                return;
+            }
+        }
+
+        $record = [
+            'channel' => $channelId,
+            'programme' => $programme
+        ];
+
+        $line = json_encode($record, JSON_UNESCAPED_UNICODE) . "\n";
+        fwrite($fileHandles[$date], $line);
+        
+        // Close handles if we have too many open (prevent "too many open files" error)
+        if (count($fileHandles) > 50) {
+            foreach ($fileHandles as $d => $handle) {
+                if ($d !== $date && is_resource($handle)) {
+                    fclose($handle);
+                    unset($fileHandles[$d]);
+                }
+            }
+        }
+    }
+
+    /**
+     * Parse and save channels (DEPRECATED - kept for backward compatibility)
+     * Use parseAndSaveEpgDataSinglePass instead for better performance
      */
     private function parseAndSaveChannels(Epg $epg, string $filePath, int $totalChannels): int
     {
