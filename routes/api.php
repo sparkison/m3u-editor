@@ -26,8 +26,8 @@ Route::group(['prefix' => 'm3u-proxy'], function () {
         ->name('m3u-proxy.episode');
 
     // Player preview routes
-    Route::get('channel/{id}/player', [\App\Http\Controllers\Api\M3uProxyApiController::class, 'channelPlayer'])
+    Route::get('channel/{id}/player/{uuid?}', [\App\Http\Controllers\Api\M3uProxyApiController::class, 'channelPlayer'])
         ->name('m3u-proxy.channel.player');
-    Route::get('episode/{id}/player', [\App\Http\Controllers\Api\M3uProxyApiController::class, 'episodePlayer'])
+    Route::get('episode/{id}/player/{?uuid?}', [\App\Http\Controllers\Api\M3uProxyApiController::class, 'episodePlayer'])
         ->name('m3u-proxy.episode.player');
 });

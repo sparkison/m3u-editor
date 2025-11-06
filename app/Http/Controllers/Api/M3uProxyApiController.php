@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Facades\PlaylistFacade;
 use App\Http\Controllers\Controller;
 use App\Models\Channel;
 use App\Models\Episode;
@@ -80,16 +81,22 @@ class M3uProxyApiController extends Controller
      * 
      * @param  Request  $request
      * @param  int  $id
+     * @param  string|null  $uuid
      * 
      * @return StreamedResponse
      */
-    public function channelPlayer(Request $request, $id)
+    public function channelPlayer(Request $request, $id, $uuid = null)
     {
         $channel = Channel::query()->with([
             'playlist.streamProfile',
             'playlist.vodStreamProfile'
         ])->findOrFail($id);
-        $playlist = $channel->getEffectivePlaylist();
+
+        if ($uuid) {
+            $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
+        } else {
+            $playlist = $channel->getEffectivePlaylist();
+        }
 
         // Get stream profile from playlist if set
         $profile = null;
@@ -124,16 +131,22 @@ class M3uProxyApiController extends Controller
      * 
      * @param  Request  $request
      * @param  int  $id
+     * @param  string|null  $uuid
      * 
      * @return StreamedResponse
      */
-    public function episodePlayer(Request $request, $id)
+    public function episodePlayer(Request $request, $id, $uuid = null)
     {
         $episode = Episode::query()->with([
             'playlist.streamProfile',
             'playlist.vodStreamProfile'
         ])->findOrFail($id);
-        $playlist = $episode->playlist;
+
+        if ($uuid) {
+            $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
+        } else {
+            $playlist = $episode->playlist;
+        }
 
         // Get stream profile from playlist if set
         $profile = null;

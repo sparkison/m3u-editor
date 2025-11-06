@@ -243,7 +243,7 @@ class EpgApiController extends Controller
 
                     $logo = $channel->logo ?? $channel->logo_internal ?? '';
                     if ($logoProxyEnabled) {
-                        $logo = LogoProxyController::generateProxyUrl($logo);
+                        $logo = LogoProxyController::generateProxyUrl($logo, internal: true);
                     }
 
                     // Add the playlist channel info to the EPG channel map
@@ -263,7 +263,7 @@ class EpgApiController extends Controller
                     }
                     $icon = htmlspecialchars($icon);
                     if ($logoProxyEnabled) {
-                        $icon = LogoProxyController::generateProxyUrl($icon);
+                        $icon = LogoProxyController::generateProxyUrl($icon, internal: true);
                     }
 
                     // Keep track of which channels need a dummy EPG program
@@ -293,17 +293,12 @@ class EpgApiController extends Controller
                         $tvgId = $channel->stream_id_custom ?? $channel->stream_id;
                         break;
                 }
-
-                // Store channel data for pagination
                 
-                // if ($proxyEnabled) {
-                //     $url = route('m3u-proxy.channel.player', ['id' => $channel->id]);
-                // } else {
-                //     $url = PlaylistUrlService::getChannelUrl($channel, $playlist);
-                // }
-
                 // Always proxy the internal proxy so we can attempt to transcode the stream for better compatibility
-                $url = route('m3u-proxy.channel.player', ['id' => $channel->id]);
+                $url = route('m3u-proxy.channel.player', [
+                    'id' => $channel->id,
+                    'uuid' => $playlist->uuid,
+                ]);
 
                 // Determine the channel format based on URL or container extension
                 $originalUrl = $channel->url_custom ?? $channel->url;
@@ -327,7 +322,7 @@ class EpgApiController extends Controller
                     $icon = url('/placeholder.png');
                 }
                 if ($logoProxyEnabled) {
-                    $icon = LogoProxyController::generateProxyUrl($icon);
+                    $icon = LogoProxyController::generateProxyUrl($icon, internal: true);
                 }
                 $playlistChannelData[$channelNo] = [
                     'id' => $channelNo,
