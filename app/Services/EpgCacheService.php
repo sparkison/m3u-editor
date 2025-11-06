@@ -383,8 +383,11 @@ class EpgCacheService
             mkdir($dir, 0755, true);
         }
 
-        if ($isFirst) {
-            // First batch - create new file with JSON object start
+        // Check if file already exists to determine if this is truly the first write
+        $fileExists = file_exists($fullPath);
+        
+        if (!$fileExists) {
+            // First write - create new file
             file_put_contents($fullPath, json_encode($channelBatch, JSON_UNESCAPED_UNICODE), LOCK_EX);
         } else {
             // Subsequent batches - append using simple merge
@@ -395,6 +398,8 @@ class EpgCacheService
                 file_put_contents($fullPath, json_encode($merged, JSON_UNESCAPED_UNICODE), LOCK_EX);
             } catch (Exception $e) {
                 Log::error("Failed to merge channel batch: {$e->getMessage()}");
+                // Fallback: create new file if merge fails
+                file_put_contents($fullPath, json_encode($channelBatch, JSON_UNESCAPED_UNICODE), LOCK_EX);
             }
         }
     }
