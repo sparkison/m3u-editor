@@ -55,7 +55,9 @@ if [ "${M3U_PROXY_ENABLED}" = "true" ]; then
         export M3U_PROXY_TOKEN="${M3U_PROXY_TOKEN}"
         echo "🔑 Using provided m3u proxy API token."
     fi
-    echo "🔗 Embedded m3u-proxy mode enabled. Nginx will proxy /m3u-proxy/ to ${M3U_PROXY_NGINX_TARGET}"
+    if [ "$NGINX_ENABLED" = "true" ]; then
+       echo "🔗 Embedded m3u-proxy mode enabled. Nginx will proxy /m3u-proxy/ to ${M3U_PROXY_NGINX_TARGET}"
+    fi
 else
     # External mode - proxy through nginx to external container
     export M3U_PROXY_START_EMBEDDED="false"
@@ -65,7 +67,9 @@ else
 
     # For external proxy, use provided token
     export M3U_PROXY_TOKEN="${M3U_PROXY_TOKEN}"
-    echo "🔗 External m3u-proxy mode enabled. Nginx will proxy /m3u-proxy/ to ${M3U_PROXY_NGINX_TARGET}"
+    if [ "$NGINX_ENABLED" = "true" ]; then
+       echo "🔗 External m3u-proxy mode enabled. Nginx will proxy /m3u-proxy/ to ${M3U_PROXY_NGINX_TARGET}"
+    fi
 fi
 
 # Set M3U_PROXY_PUBLIC_URL, required for both modes
