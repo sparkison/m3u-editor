@@ -89,7 +89,7 @@ choose_from_arg_or_prompt() {
 run_compose() {
 	local file="$1"
 	echo "Building ${file} (no-cache) and starting..."
-	docker compose -f "$file" build --no-cache
+	docker compose --env-file "$ENV_FILE" -f "$file" build --no-cache
 	docker compose --env-file "$ENV_FILE" -f "$file" up --remove-orphans
 }
 
