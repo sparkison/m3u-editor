@@ -41,7 +41,9 @@ class ResetSyncProcess extends Command
         }
 
         // Flush the cache to prevent any stale data issues
-        $this->call('queue:clear');
+        $this->call('queue:clear', [
+            '--force' => true,
+        ]);
 
         foreach ($hungPlaylists->cursor() as $playlist) {
             $this->info("🔄 Resetting stuck Playlist(s): {$playlist->name}");

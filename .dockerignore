@@ -1,15 +1,79 @@
-docker-compose.yml
+# Docker files
+docker-compose*.yml
+Dockerfile*
+
+# Git
+.git
+.gitignore
+.gitattributes
+.github
+
+# Build artifacts & dependencies (will be built inside container)
 vendor
 node_modules
+.npm
+.composer
+
+# Storage directories with user data
 storage/app/private/*
 storage/app/public/*
 storage/framework/cache/*
 storage/framework/sessions/*
 storage/framework/testing/*
 storage/framework/views/*
-stubs
+storage/logs/*
+
+# Data directories
+data/
+db-dumps/
+database/*.sqlite*
+
+# Testing
+tests/
+stubs/
+.phpunit*
+phpunit.xml
+Pest.php
+
+# Scripts (keep artisan, exclude build scripts)
 *.sh
+rebuild.sh
+refresh.sh
+websockets.sh
+
+# Database files
 *.sqlite
+*.sqlite-shm
+*.sqlite-wal
 *.sql
+
+# Data files
 *.csv
 *.m3u
+
+# Documentation
+*.md
+README*
+docs/
+screenshots/
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env*
+!.env.example
+
+# Logs
+*.log
+
+# Build outputs (already built by multi-stage)
+public/build/*
+public/hot
