@@ -544,6 +544,9 @@ class Preferences extends SettingsPage
                                                 if (in_array('group', $pathStructure)) {
                                                     $preview .= '/' . $vodExample->group;
                                                 }
+                                                if (in_array('title', $pathStructure)) {
+                                                    $preview .= '/' . PlaylistService::makeFilesystemSafe($vodExample->title, $get('vod_stream_file_sync_replace_char') ?? ' ');
+                                                }
 
                                                 // Build filename preview
                                                 $filename = PlaylistService::makeFilesystemSafe($vodExample->title, $get('vod_stream_file_sync_replace_char') ?? ' ');
@@ -567,8 +570,10 @@ class Preferences extends SettingsPage
                                             ->live()
                                             ->inline()
                                             ->multiple()
+                                            ->grouped()
                                             ->options([
                                                 'group' => 'Group',
+                                                'title' => 'Title',
                                             ])
                                             ->dehydrateStateUsing(function ($state, Set $set) {
                                                 // Update the old boolean field for backwards compatibility

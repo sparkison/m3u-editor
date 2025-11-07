@@ -171,7 +171,7 @@ services:
       
       # Application URL (change to your domain or IP)
       # This should match your NGINX reverse proxy setup
-      - APP_URL=${APP_URL:-http://localhost:8080}
+      - APP_URL=${APP_URL:-http://localhost}
       - APP_PORT=${APP_PORT:-8080}
 
       # Web Server Configuration - DISABLE embedded NGINX
@@ -239,8 +239,7 @@ services:
     container_name: m3u-nginx
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./public:/var/www/html/public:ro # Mount public directory for static files
-      - ./data:/var/www/config:ro # For serving config files if needed
+      # - ./data:/var/www/config:ro # For serving config files if needed
     restart: unless-stopped
     ports:
       - "${NGINX_PORT:-8080}:80"  # HTTP
