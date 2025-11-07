@@ -107,7 +107,20 @@ class SyncVodStrmFiles implements ShouldQueue
                 }
 
                 // Build the filename
-                $fileName = $channel->title_custom ?? $channel->title;
+                $title = $channel->title_custom ?? $channel->title;
+                $fileName = $title;
+
+                // Create the VOD Title folder if enabled
+                if (in_array('title', $pathStructure)) {
+                    $title = $cleanSpecialChars
+                        ? PlaylistService::makeFilesystemSafe($title, $replaceChar)
+                        : PlaylistService::makeFilesystemSafe($title);
+                    $titlePath = $path . '/' . $title;
+                    if (! is_dir($titlePath)) {
+                        mkdir($titlePath, 0777, true);
+                    }
+                    $path = $titlePath;
+                }
 
                 // Add metadata to filename
                 if (in_array('year', $filenameMetadata) && ! empty($channel->year)) {

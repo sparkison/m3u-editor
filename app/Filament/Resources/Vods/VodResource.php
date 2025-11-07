@@ -1527,7 +1527,7 @@ class VodResource extends Resource
 
                                     // Use actual record data or fallback to example
                                     $groupName = $record?->group ?? 'Action';
-                                    $title = $record?->title ?? $record?->name ?? 'John Wick: Chapter 4 (2023)';
+                                    $title = $record?->title_custom ?? $record?->title ?? $record?->name ?? 'John Wick: Chapter 4 (2023)';
                                     $year = $record?->year ?? $record?->info['year'] ?? '2023';
                                     $tmdbId = $record?->info['tmdb_id'] ?? $record?->movie_data['tmdb_id'] ?? 603692;
 
@@ -1536,6 +1536,9 @@ class VodResource extends Resource
 
                                     if (in_array('group', $pathStructure)) {
                                         $preview .= '/' . $groupName;
+                                    }
+                                    if (in_array('title', $pathStructure)) {
+                                        $preview .= '/' . PlaylistService::makeFilesystemSafe($title, $get('vod_stream_file_sync_replace_char') ?? ' ');
                                     }
 
                                     // Build filename preview
@@ -1571,6 +1574,7 @@ class VodResource extends Resource
                                 ->grouped()
                                 ->options([
                                     'group' => 'Group',
+                                    'title' => 'Title',
                                 ])
                                 ->afterStateHydrated(function ($component, $state, $get) {
                                     // Convert old boolean field to array format
