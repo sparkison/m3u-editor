@@ -26,6 +26,7 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
         public ?int $playlist_id = null,
         public bool $overwrite_existing = false,
         public ?int $user_id = null,
+        public ?bool $sync_stream_files = true,
     ) {}
 
     /**
@@ -81,7 +82,10 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
         $playlist = $series->playlist;
 
         // Process the series
-        $results = $series->fetchMetadata($this->overwrite_existing);
+        $results = $series->fetchMetadata(
+            refresh: $this->overwrite_existing,
+            sync: $this->sync_stream_files
+        );
         if ($this->notify && $results !== false) {
             // Check if the playlist has .strm file sync enabled
             $sync_settings = $series->sync_settings;

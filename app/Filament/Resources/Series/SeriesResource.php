@@ -256,6 +256,7 @@ class SeriesResource extends Resource
                             ->dispatch(new ProcessM3uImportSeriesEpisodes(
                                 playlistSeries: $record,
                                 overwrite_existing: $data['overwrite_existing'] ?? false,
+                                sync_stream_files: false,
                             ));
                     })->after(function () {
                         Notification::make()
