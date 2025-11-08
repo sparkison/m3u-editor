@@ -104,13 +104,12 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
-     * Who can access the Filament admin panel in production?
+     * Who can access the Filament panel in production?
      * Allow all users by default.
      */
     public function canAccessPanel(Panel $panel): bool
     {
         return true;
-        // return str_ends_with($this->email, '@yourdomain.com') && $this->hasVerifiedEmail();
     }
 
     public function getFilamentAvatarUrl(): ?string

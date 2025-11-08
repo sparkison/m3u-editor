@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "fa7f6b3ebeaead864ac0993515c0b66d",
+    "content-hash": "fa7b6e8ee3890b0d905f1c15de57e6d5",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -2804,6 +2804,73 @@
                 "source": "https://github.com/kirschbaum-development/eloquent-power-joins/tree/4.2.9"
             },
             "time": "2025-10-25T11:39:00+00:00"
+        },
+        {
+            "name": "lab404/laravel-impersonate",
+            "version": "1.7.7",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/404labfr/laravel-impersonate.git",
+                "reference": "5033f3433a55ca8bb2cc3e4a018a39dd8a327a9f"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/404labfr/laravel-impersonate/zipball/5033f3433a55ca8bb2cc3e4a018a39dd8a327a9f",
+                "reference": "5033f3433a55ca8bb2cc3e4a018a39dd8a327a9f",
+                "shasum": ""
+            },
+            "require": {
+                "laravel/framework": "^6.0 | ^7.0 | ^8.0 | ^9.0 | ^10.0 | ^11.0 | ^12.0",
+                "php": "^7.2 | ^8.0"
+            },
+            "require-dev": {
+                "mockery/mockery": "^1.3.3",
+                "orchestra/testbench": "^4.0 | ^5.0 | ^6.0 | ^7.0 | ^8.0 | ^9.0 | ^10.0",
+                "phpunit/phpunit": "^7.5 | ^8.0 | ^9.0 | ^10.0 | ^11.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Lab404\\Impersonate\\ImpersonateServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "files": [
+                    "src/helpers.php"
+                ],
+                "psr-4": {
+                    "Lab404\\Impersonate\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Marceau Casals",
+                    "email": "marceau@casals.fr"
+                }
+            ],
+            "description": "Laravel Impersonate is a plugin that allows to you to authenticate as your users.",
+            "keywords": [
+                "auth",
+                "impersonate",
+                "impersonation",
+                "laravel",
+                "laravel-package",
+                "laravel-plugin",
+                "package",
+                "plugin",
+                "user"
+            ],
+            "support": {
+                "issues": "https://github.com/404labfr/laravel-impersonate/issues",
+                "source": "https://github.com/404labfr/laravel-impersonate/tree/1.7.7"
+            },
+            "time": "2025-02-24T16:18:38+00:00"
         },
         {
             "name": "laravel/framework",
@@ -8160,6 +8227,48 @@
                 }
             ],
             "time": "2025-01-13T13:04:43+00:00"
+        },
+        {
+            "name": "stechstudio/filament-impersonate",
+            "version": "4.0.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/stechstudio/filament-impersonate.git",
+                "reference": "4467c97308210f1a2c7bd8c4511bc6f976dd16e9"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/stechstudio/filament-impersonate/zipball/4467c97308210f1a2c7bd8c4511bc6f976dd16e9",
+                "reference": "4467c97308210f1a2c7bd8c4511bc6f976dd16e9",
+                "shasum": ""
+            },
+            "require": {
+                "filament/filament": "^4.0",
+                "lab404/laravel-impersonate": "^1.7"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "STS\\FilamentImpersonate\\FilamentImpersonateServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "STS\\FilamentImpersonate\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "A Filament package to impersonate your users.",
+            "support": {
+                "issues": "https://github.com/stechstudio/filament-impersonate/issues",
+                "source": "https://github.com/stechstudio/filament-impersonate/tree/4.0.1"
+            },
+            "time": "2025-08-13T20:47:08+00:00"
         },
         {
             "name": "symfony/clock",
