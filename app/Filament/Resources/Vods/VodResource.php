@@ -725,7 +725,7 @@ class VodResource extends Resource
                                 ->hidden(fn(Get $get) => $get('master_source') !== 'searched')
                                 ->getSearchResultsUsing(function (string $search) use ($existingFailoverIds) {
                                     $searchLower = strtolower($search);
-                                    $channels = Auth::user()->channels()
+                                    $channels = auth()->user()->channels()
                                         ->withoutEagerLoads()
                                         ->with('playlist')
                                         ->whereNotIn('id', $existingFailoverIds)
@@ -1197,7 +1197,7 @@ class VodResource extends Resource
                         ->getOptionLabelFromRecordUsing(fn($record) => "$record->name [{$record->epg->name}]")
                         ->getSearchResultsUsing(function (string $search) {
                             $searchLower = strtolower($search);
-                            $channels = Auth::user()->epgChannels()
+                            $channels = auth()->user()->epgChannels()
                                 ->withoutEagerLoads()
                                 ->with('epg')
                                 ->where(function ($query) use ($searchLower) {
@@ -1722,7 +1722,7 @@ class VodResource extends Resource
 
                                     // Always include the selected value if it exists
                                     $searchLower = strtolower($search);
-                                    $channels = Auth::user()->channels()
+                                    $channels = auth()->user()->channels()
                                         ->withoutEagerLoads()
                                         ->with('playlist')
                                         ->whereNotIn('id', $existingFailoverIds)

@@ -60,7 +60,7 @@ class MergedPlaylistResource extends Resource
     public static function getGlobalSearchEloquentQuery(): Builder
     {
         return parent::getGlobalSearchEloquentQuery()
-            ->where('user_id', Auth::id());
+            ->where('user_id', auth()->id());
     }
 
     public static function getNavigationSort(): ?int
@@ -441,7 +441,7 @@ class MergedPlaylistResource extends Resource
                                                     }
 
                                                     // Get unassigned auths
-                                                    $unassignedAuths = PlaylistAuth::where('user_id', Auth::id())
+                                                    $unassignedAuths = PlaylistAuth::where('user_id', auth()->id())
                                                         ->whereDoesntHave('assignedPlaylist')
                                                         ->get();
 

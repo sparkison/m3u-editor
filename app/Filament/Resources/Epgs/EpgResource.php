@@ -65,7 +65,7 @@ class EpgResource extends Resource
     public static function getGlobalSearchEloquentQuery(): Builder
     {
         return parent::getGlobalSearchEloquentQuery()
-            ->where('user_id', Auth::id());
+            ->where('user_id', auth()->id());
     }
 
     protected static ?string $label = 'EPG';

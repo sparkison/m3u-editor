@@ -180,7 +180,7 @@ class PlaylistAuthResource extends Resource
                             }
 
                             // Add all available playlists for current user
-                            $userId = Auth::id();
+                            $userId = auth()->id();
 
                             // Standard Playlists
                             $playlists = Playlist::where('user_id', $userId)->get();
