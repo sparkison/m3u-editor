@@ -850,8 +850,8 @@ class M3uProxyService
      */
     protected function buildTranscodeStreamUrl(string $streamId, $format = 'ts'): string
     {
-        // NOTE: Format not used currently, but could be used to adjust URL structure if needed
-        return $this->apiPublicUrl . "/stream/{$streamId}";
+        // Transcode route is the same logic as direct now
+        return $this->buildProxyUrl($streamId, $format);
     }
 
     /**
@@ -863,7 +863,7 @@ class M3uProxyService
     protected function buildProxyUrl(string $streamId, $format = 'hls'): string
     {
         $baseUrl = $this->apiPublicUrl;
-        if ($format === 'hls') {
+        if ($format === 'hls' || $format === 'm3u8') {
             // HLS format: /hls/{stream_id}/playlist.m3u8
             return $baseUrl . '/hls/' . $streamId . '/playlist.m3u8';
         }
