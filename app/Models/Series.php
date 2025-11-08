@@ -77,17 +77,17 @@ class Series extends Model
         return $this->hasMany(Episode::class)->where('enabled', true);
     }
 
-    public function fetchMetadata($refresh = false)
+    public function fetchMetadata($refresh = false, $sync = true)
     {
         try {
             $playlist = $this->playlist;
-            
+
             // For Xtream playlists, use XtreamService
             if (!$playlist->xtream && $playlist->source_type !== PlaylistSourceType::Xtream) {
                 // Not an Xtream playlist and not Emby, no metadata source available
                 return false;
             }
-            
+
             $xtream = XtreamService::make($playlist);
 
             if (!$xtream) {
@@ -233,8 +233,10 @@ class Series extends Model
                 // Update last fetched timestamp for the series
                 $this->update($update);
 
-                // Dispatch the job to sync .strm files
-                dispatch(new SyncSeriesStrmFiles(series: $this, notify: false));
+                if ($sync) {
+                    // Dispatch the job to sync .strm files
+                    dispatch(new SyncSeriesStrmFiles(series: $this, notify: false));
+                }
 
                 return $episodeCount;
             }
