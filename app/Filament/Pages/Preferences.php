@@ -53,6 +53,15 @@ class Preferences extends SettingsPage
 
     protected static ?string $title = 'Settings';
 
+    /**
+     * Check if the user can access this page.
+     * Only admin users can access the Preferences page.
+     */
+    public static function canAccess(): bool
+    {
+        return auth()->check() && auth()->user()->isAdmin();
+    }
+
     protected function getActions(): array
     {
         return [

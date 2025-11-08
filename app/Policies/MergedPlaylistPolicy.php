@@ -21,7 +21,7 @@ class MergedPlaylistPolicy
      */
     public function view(User $user, MergedPlaylist $mergedPlaylist): bool
     {
-        return $user->id === $mergedPlaylist->user_id;
+        return $user->isAdmin() || $user->id === $mergedPlaylist->user_id;
     }
 
     /**
@@ -37,7 +37,7 @@ class MergedPlaylistPolicy
      */
     public function update(User $user, MergedPlaylist $mergedPlaylist): bool
     {
-        return $user->id === $mergedPlaylist->user_id;
+        return $user->isAdmin() || $user->id === $mergedPlaylist->user_id;
     }
 
     /**
@@ -45,7 +45,7 @@ class MergedPlaylistPolicy
      */
     public function delete(User $user, MergedPlaylist $mergedPlaylist): bool
     {
-        return $user->id === $mergedPlaylist->user_id;
+        return $user->isAdmin() || $user->id === $mergedPlaylist->user_id;
     }
 
     /**
@@ -53,7 +53,7 @@ class MergedPlaylistPolicy
      */
     public function restore(User $user, MergedPlaylist $mergedPlaylist): bool
     {
-        return $user->id === $mergedPlaylist->user_id;
+        return $user->isAdmin() || $user->id === $mergedPlaylist->user_id;
     }
 
     /**
@@ -61,6 +61,6 @@ class MergedPlaylistPolicy
      */
     public function forceDelete(User $user, MergedPlaylist $mergedPlaylist): bool
     {
-        return $user->id === $mergedPlaylist->user_id;
+        return $user->isAdmin() || $user->id === $mergedPlaylist->user_id;
     }
 }

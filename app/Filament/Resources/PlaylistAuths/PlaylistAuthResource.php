@@ -29,9 +29,12 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use App\Traits\HasUserFiltering;
 
 class PlaylistAuthResource extends Resource
 {
+    use HasUserFiltering;
+
     protected static ?string $model = PlaylistAuth::class;
 
     protected static ?string $recordTitleAttribute = 'name';
@@ -40,12 +43,6 @@ class PlaylistAuthResource extends Resource
     public static function getGloballySearchableAttributes(): array
     {
         return ['name', 'username'];
-    }
-
-    public static function getGlobalSearchEloquentQuery(): Builder
-    {
-        return parent::getGlobalSearchEloquentQuery()
-            ->where('user_id', auth()->id());
     }
 
     public static function getNavigationSort(): ?int

@@ -65,9 +65,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Spatie\Tags\Tag;
+use App\Traits\HasUserFiltering;
 
 class ChannelResource extends Resource
 {
+    use HasUserFiltering;
+
     protected static ?string $model = Channel::class;
 
     protected static ?string $recordTitleAttribute = 'title';
@@ -79,15 +82,28 @@ class ChannelResource extends Resource
 
     public static function getGlobalSearchEloquentQuery(): Builder
     {
-        return parent::getGlobalSearchEloquentQuery()
-            ->where('user_id', auth()->id())
+        $query = parent::getGlobalSearchEloquentQuery()
             ->where('is_vod', false);
+        
+        // Filter by user_id for non-admin users
+        if (auth()->check() && !auth()->user()->isAdmin()) {
+            $query->where('user_id', auth()->id());
+        }
+        
+        return $query;
     }
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        $query = parent::getEloquentQuery()
             ->where('is_vod', false);
+        
+        // Filter by user_id for non-admin users
+        if (auth()->check() && !auth()->user()->isAdmin()) {
+            $query->where('user_id', auth()->id());
+        }
+        
+        return $query;
     }
 
     protected static string | \UnitEnum | null $navigationGroup = 'Channels & VOD';

@@ -29,9 +29,12 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Database\Eloquent\Collection;
+use App\Traits\HasUserFiltering;
 
 class EpgChannelResource extends Resource
 {
+    use HasUserFiltering;
+
     protected static ?string $model = EpgChannel::class;
 
     //    protected static ?string $recordTitleAttribute = 'name';
@@ -39,12 +42,6 @@ class EpgChannelResource extends Resource
     public static function getGloballySearchableAttributes(): array
     {
         return ['name', 'display_name'];
-    }
-
-    public static function getGlobalSearchEloquentQuery(): Builder
-    {
-        return parent::getGlobalSearchEloquentQuery()
-            ->where('user_id', auth()->id());
     }
 
     protected static ?string $label = 'EPG Channel';

@@ -156,4 +156,13 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     {
         return $this->hasMany(Series::class);
     }
+
+    /**
+     * Check if user is an admin.
+     * Admin users have full access to all resources in the system.
+     */
+    public function isAdmin(): bool
+    {
+        return in_array($this->email, config('dev.admin_emails', []));
+    }
 }

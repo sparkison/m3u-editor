@@ -72,9 +72,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
+use App\Traits\HasUserFiltering;
 
 class PlaylistResource extends Resource
 {
+    use HasUserFiltering;
+
     protected static ?string $model = Playlist::class;
 
     protected static ?string $recordTitleAttribute = 'name';
@@ -89,12 +92,6 @@ class PlaylistResource extends Resource
     public static function getGloballySearchableAttributes(): array
     {
         return ['name', 'url'];
-    }
-
-    public static function getGlobalSearchEloquentQuery(): Builder
-    {
-        return parent::getGlobalSearchEloquentQuery()
-            ->where('user_id', auth()->id());
     }
 
     public static function getNavigationSort(): ?int

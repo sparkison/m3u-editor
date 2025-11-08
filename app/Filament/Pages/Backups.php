@@ -25,6 +25,15 @@ class Backups extends BaseBackups
         return 2;
     }
 
+    /**
+     * Check if the user can access this page.
+     * Only admin users can access the Backups page.
+     */
+    public static function canAccess(): bool
+    {
+        return auth()->check() && auth()->user()->isAdmin();
+    }
+
     protected function getActions(): array
     {
         $data = [];

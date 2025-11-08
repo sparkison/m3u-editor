@@ -33,9 +33,12 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
+use App\Traits\HasUserFiltering;
 
 class EpgMapResource extends Resource
 {
+    use HasUserFiltering;
+
     protected static ?string $model = EpgMap::class;
 
     protected static ?string $label = 'EPG Map';

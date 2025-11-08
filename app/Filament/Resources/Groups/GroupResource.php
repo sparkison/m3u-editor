@@ -40,9 +40,12 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use App\Traits\HasUserFiltering;
 
 class GroupResource extends Resource
 {
+    use HasUserFiltering;
+
     protected static ?string $model = Group::class;
 
     protected static ?string $recordTitleAttribute = 'name';
@@ -50,12 +53,6 @@ class GroupResource extends Resource
     public static function getGloballySearchableAttributes(): array
     {
         return ['name', 'name_internal'];
-    }
-
-    public static function getGlobalSearchEloquentQuery(): Builder
-    {
-        return parent::getGlobalSearchEloquentQuery()
-            ->where('user_id', auth()->id());
     }
 
     protected static string | \UnitEnum | null $navigationGroup = 'Channels & VOD';

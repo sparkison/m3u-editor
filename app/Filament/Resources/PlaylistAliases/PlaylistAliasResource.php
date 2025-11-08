@@ -33,9 +33,12 @@ use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use App\Traits\HasUserFiltering;
 
 class PlaylistAliasResource extends Resource
 {
+    use HasUserFiltering;
+
     protected static ?string $model = PlaylistAlias::class;
 
     protected static ?string $recordTitleAttribute = 'name';

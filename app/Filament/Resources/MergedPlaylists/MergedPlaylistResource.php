@@ -44,9 +44,12 @@ use App\Services\EpgCacheService;
 use App\Services\ProxyService;
 use Filament\Forms\Components\Repeater;
 use Filament\Schemas\Components\Fieldset;
+use App\Traits\HasUserFiltering;
 
 class MergedPlaylistResource extends Resource
 {
+    use HasUserFiltering;
+
     protected static ?string $model = MergedPlaylist::class;
 
     protected static ?string $recordTitleAttribute = 'name';
@@ -55,12 +58,6 @@ class MergedPlaylistResource extends Resource
     public static function getGloballySearchableAttributes(): array
     {
         return ['name'];
-    }
-
-    public static function getGlobalSearchEloquentQuery(): Builder
-    {
-        return parent::getGlobalSearchEloquentQuery()
-            ->where('user_id', auth()->id());
     }
 
     public static function getNavigationSort(): ?int
