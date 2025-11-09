@@ -45,7 +45,7 @@ services:
     # Optional: Expose PostgreSQL port (uncomment if needed for external access)
     # ports:
     #   - "${PG_PORT:-5432}:5432"
-    
+
     # Optional: Resource limits
     deploy:
       resources:
@@ -75,7 +75,7 @@ services:
     # Optional: Expose Redis port (uncomment if needed for external access)
     # ports:
     #   - "${REDIS_PORT:-6379}:6379"
-    
+
     # Optional: Resource limits
     deploy:
       resources:
@@ -105,10 +105,10 @@ services:
       # Redis Configuration (for stream pooling)
       - REDIS_ENABLED=true
       - REDIS_PORT=${REDIS_PORT:-6379}
-      - REDIS_HOST=redis
+      - REDIS_HOST=m3u-redis
       - REDIS_DB=6 # 1-5 used by m3u-editor, so use 6 for m3u-proxy
       - ENABLE_REDIS_POOLING=true
-      
+
       # Logging
       - LOG_LEVEL=INFO
 
@@ -117,10 +117,10 @@ services:
       # Replace with your actual domain or LAN IP so it is accessible to clients
       # NOTE: Make sure to add the `/m3u-proxy` path
       - PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-http://localhost/m3u-proxy}  # Change to your public URL if needed
-      
+
       # Note: ROOT_PATH=/m3u-proxy is now the default, no need to set it explicitly
       # Only set ROOT_PATH= (empty) if you need to use the root path instead
-      
+
       # Optional: Additional configuration
       # - REDIS_POOL_MAX_CONNECTIONS=50
       # - STREAM_TIMEOUT=300
@@ -142,7 +142,7 @@ services:
       timeout: 2s
       retries: 12
       start_period: 10s
-    
+
     # Optional: Resource limits
     deploy:
       resources:
@@ -168,7 +168,7 @@ services:
     environment:
       # Timezone
       - TZ=Etc/UTC
-      
+
       # Application URL (change to your domain or IP)
       # This should match your NGINX reverse proxy setup
       - APP_URL=${APP_URL:-http://localhost}
@@ -180,10 +180,10 @@ services:
 
       # Postgres Configuration - DISABLE embedded Postgres
       - ENABLE_POSTGRES=false # Disable embedded Postgres, using external postgres service
-      
+
       # Database Connection (m3u-editor) - Connect to external postgres service
       - DB_CONNECTION=pgsql
-      - DB_HOST=postgres # Hostname of external postgres container
+      - DB_HOST=m3u-postgres # Hostname of external postgres container
       - DB_PORT=5432
       - DB_DATABASE=${PG_DATABASE:-m3ue}
       - DB_USERNAME=${PG_USER:-m3ue}
@@ -193,7 +193,7 @@ services:
       - REDIS_ENABLED=false # Disable embedded Redis, using external redis service
       - REDIS_SERVER_PORT=${REDIS_PORT:-6379}
       - REDIS_HOST=redis # Hostname of external redis container
-      
+
       # M3U Proxy Configuration - DISABLE embedded, use external service
       - M3U_PROXY_ENABLED=false # Disable embedded and use external m3u-proxy
       - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
@@ -222,7 +222,7 @@ services:
       timeout: 10s
       retries: 5
       start_period: 90s
-    
+
     # Optional: Resource limits
     deploy:
       resources:
@@ -257,7 +257,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-    
+
     # Optional: Resource limits
     deploy:
       resources:
