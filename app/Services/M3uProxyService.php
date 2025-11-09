@@ -584,10 +584,15 @@ class M3uProxyService
             if ($response->successful()) {
                 $data = $response->json() ?: [];
 
+                // Need to filter out streams not owned by this user
+                $playlistUuids = auth()->user()->getAllPlaylistUuids();
+                $streams = array_filter($data['streams'] ?? [], function ($stream) use ($playlistUuids) {
+                    return isset($stream['metadata']['playlist_uuid']) && in_array($stream['metadata']['playlist_uuid'], $playlistUuids);
+                });
                 return [
                     'success' => true,
-                    'streams' => $data['streams'] ?? [],
-                    'total' => $data['total'] ?? 0,
+                    'streams' => $streams ?? [],
+                    'total' =>  count($streams) ?? 0,
                 ];
             }
 

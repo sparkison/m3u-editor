@@ -134,6 +134,36 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
+     * Users merged playlists.
+     */
+    public function mergedPlaylists()
+    {
+        return $this->hasMany(MergedPlaylist::class);
+    }
+
+    /**
+     * Users playlist aliases.
+     */
+    public function playlistAliases()
+    {
+        return $this->hasMany(PlaylistAlias::class);
+    }
+
+    /**
+     * Get all playlist UUIDs for this user.
+     *
+     * @return array<string>
+     */
+    public function getAllPlaylistUuids(): array
+    {
+        $uuids = $this->playlists()->select('id', 'user_id', 'uuid')->pluck('uuid')->toArray();
+        $uuids = array_merge($uuids, $this->customPlaylists()->select('id', 'user_id', 'uuid')->pluck('uuid')->toArray());
+        $uuids = array_merge($uuids, $this->mergedPlaylists()->select('id', 'user_id', 'uuid')->pluck('uuid')->toArray());
+        $uuids = array_merge($uuids, $this->playlistAliases()->select('id', 'user_id', 'uuid')->pluck('uuid')->toArray());
+        return $uuids;
+    }
+
+    /**
      * Users epgs.
      */
     public function epgs()

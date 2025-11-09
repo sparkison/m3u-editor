@@ -31,7 +31,8 @@ class M3uProxyStreamMonitor extends Page
      */
     public static function canAccess(): bool
     {
-        return auth()->check() && auth()->user()->isAdmin();
+        return true; // Allow all users to access the stream monitor
+        // return auth()->check() && auth()->user()->isAdmin();
     }
 
     protected static string|\UnitEnum|null $navigationGroup = 'Proxy';
