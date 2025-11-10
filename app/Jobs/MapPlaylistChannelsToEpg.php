@@ -211,24 +211,62 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                         }
                     }
 
-                    // Get the EPG channel (check for direct match first)
-                    $epgChannel = $epg->channels()
-                        ->where('channel_id', '!=', '')
-                        ->where(function ($sub) use ($streamId, $name, $title) {
-                            $search1 = strtolower($streamId);
-                            $search2 = strtolower($name);
-                            $search3 = strtolower($title);
-                            return $sub
-                                ->whereRaw('LOWER(channel_id) = ?', [$search1])
-                                ->orWhereRaw('LOWER(channel_id) = ?', [$search2])
-                                ->orWhereRaw('LOWER(channel_id) = ?', [$search3]);
-                        })
-                        ->select('id', 'channel_id')
-                        ->first();
+                    // Get the EPG channel (check for direct match first with improved logic)
+                    $epgChannel = null;
+                    
+                    // Step 1: Try exact match on channel_id (highest priority)
+                    $search1 = strtolower(trim($streamId));
+                    $search2 = strtolower(trim($name));
+                    $search3 = strtolower(trim($title));
+                    
+                    // Build search terms array (only non-empty values)
+                    $searchTerms = array_filter([$search1, $search2, $search3], fn($term) => !empty($term));
+                    
+                    if (!empty($searchTerms)) {
+                        $epgChannel = $epg->channels()
+                            ->where('channel_id', '!=', '')
+                            ->where(function ($query) use ($searchTerms) {
+                                $first = true;
+                                foreach ($searchTerms as $term) {
+                                    if ($first) {
+                                        $query->whereRaw('LOWER(channel_id) = ?', [$term]);
+                                        $first = false;
+                                    } else {
+                                        $query->orWhereRaw('LOWER(channel_id) = ?', [$term]);
+                                    }
+                                }
+                            })
+                            ->select('id', 'channel_id', 'name', 'display_name')
+                            ->first();
+                    }
 
-                    // Of no direct match, attempt a similarity search
+                    // Step 2: Try exact match on name/display_name if no channel_id match
+                    if (!$epgChannel && !empty($searchTerms)) {
+                        $epgChannel = $epg->channels()
+                            ->where(function ($query) use ($searchTerms) {
+                                $first = true;
+                                foreach ($searchTerms as $term) {
+                                    if ($first) {
+                                        $query->whereRaw('LOWER(name) = ?', [$term])
+                                            ->orWhereRaw('LOWER(display_name) = ?', [$term]);
+                                        $first = false;
+                                    } else {
+                                        $query->orWhereRaw('LOWER(name) = ?', [$term])
+                                            ->orWhereRaw('LOWER(display_name) = ?', [$term]);
+                                    }
+                                }
+                            })
+                            ->select('id', 'channel_id', 'name', 'display_name')
+                            ->first();
+                    }
+
+                    // Step 3: If no exact match, attempt a similarity search (only for channels with significant content)
                     if (!$epgChannel) {
-                        $epgChannel = $this->similaritySearch->findMatchingEpgChannel($channel, $epg);
+                        // Only run similarity search if the channel name has enough content
+                        $channelNameForSearch = trim($title ?: $name);
+                        if (strlen($channelNameForSearch) >= 3) {
+                            $epgChannel = $this->similaritySearch->findMatchingEpgChannel($channel, $epg);
+                        }
                     }
 
                     // If EPG channel found, link it to the Playlist channel
