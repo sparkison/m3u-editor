@@ -1,9 +1,9 @@
-# M3U Editor with ALL External Services
+# M3U Editor with ALL External Services (Caddy Edition)
 # This is a full production setup with separate containers for all services
 #
 # Features:
 # - External PostgreSQL database container
-# - External Nginx reverse proxy container
+# - External Caddy reverse proxy container (alternative to Nginx)
 # - External m3u-proxy container for streaming
 # - External Redis container for stream pooling and caching
 # - All m3u-editor internal services DISABLED
@@ -170,13 +170,13 @@ services:
       - TZ=Etc/UTC
 
       # Application URL (change to your domain or IP)
-      # This should match your NGINX reverse proxy setup
+      # This should match your Caddy reverse proxy setup
       - APP_URL=${APP_URL:-http://localhost}
       - APP_PORT=${APP_PORT:-8080}
 
       # Web Server Configuration - DISABLE embedded NGINX
-      - NGINX_ENABLED=false # Disable embedded NGINX, using external nginx service
-      - FPMPORT=9000 # FPM port for external NGINX to connect to
+      - NGINX_ENABLED=false # Disable embedded NGINX, using external Caddy service
+      - FPMPORT=9000 # FPM port for external Caddy to connect to
 
       # Postgres Configuration - DISABLE embedded Postgres
       - ENABLE_POSTGRES=false # Disable embedded Postgres, using external postgres service
@@ -204,11 +204,11 @@ services:
     volumes:
       # Persistent configuration data
       - ./data:/var/www/config
-      # Share public directory with nginx for static file serving
+      # Share public directory with caddy for static file serving
       - app-public:/var/www/html/public
     restart: unless-stopped
-    # Don't expose port externally - only accessible via nginx
-    # Expose FPM port 9000 to nginx via internal network only
+    # Don't expose port externally - only accessible via caddy
+    # Expose FPM port 9000 to caddy via internal network only
     networks:
       - m3u-network
     depends_on:
@@ -235,19 +235,22 @@ services:
           cpus: '0.5'
           memory: 512M
 
-  # Nginx Reverse Proxy - External Web Server
-  nginx:
-    image: nginx:alpine
-    container_name: m3u-nginx
+  # Caddy Reverse Proxy - External Web Server
+  caddy:
+    image: caddy:2-alpine
+    container_name: m3u-caddy
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
       # Share public directory from m3u-editor container for static file serving
       - app-public:/var/www/html/public:ro
+      # Caddy data for certificates and other persistent data
+      - caddy-data:/data
+      - caddy-config:/config
       # - ./data:/var/www/config:ro # For serving config files if needed
     restart: unless-stopped
     ports:
       - "${APP_PORT:-36400}:80"  # HTTP
-      # - "${NGINX_SSL_PORT:-443}:443"  # HTTPS (uncomment and configure SSL)
+      # - "${CADDY_SSL_PORT:-443}:443"  # HTTPS (uncomment and configure SSL)
     networks:
       - m3u-network
     depends_on:
@@ -282,4 +285,8 @@ volumes:
   redis-data:
     driver: local
   app-public:
+    driver: local
+  caddy-data:
+    driver: local
+  caddy-config:
     driver: local

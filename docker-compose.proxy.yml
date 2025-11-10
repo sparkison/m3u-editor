@@ -140,8 +140,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-    devices:
-      - /dev/dri:/dev/dri
+    #devices:
+    #  - /dev/dri:/dev/dri
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:${PROXY_PORT:-38085}/health?api_token=${M3U_PROXY_TOKEN:-changeme}"]
       interval: 30s
