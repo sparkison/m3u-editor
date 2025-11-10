@@ -72,9 +72,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
+use App\Traits\HasUserFiltering;
 
 class PlaylistResource extends Resource
 {
+    use HasUserFiltering;
+
     protected static ?string $model = Playlist::class;
 
     protected static ?string $recordTitleAttribute = 'name';
@@ -89,12 +92,6 @@ class PlaylistResource extends Resource
     public static function getGloballySearchableAttributes(): array
     {
         return ['name', 'url'];
-    }
-
-    public static function getGlobalSearchEloquentQuery(): Builder
-    {
-        return parent::getGlobalSearchEloquentQuery()
-            ->where('user_id', Auth::id());
     }
 
     public static function getNavigationSort(): ?int
@@ -426,7 +423,7 @@ class PlaylistResource extends Resource
                                 ->options(function ($record) {
                                     return Playlist::where('id', '!=', $record->id)
                                         ->where('xtream', $record->xtream)
-                                        ->where('user_id', Auth::id())
+                                        ->where('user_id', auth()->id())
                                         ->orderBy('name')
                                         ->pluck('name', 'id')
                                         ->toArray();
@@ -1519,7 +1516,7 @@ class PlaylistResource extends Resource
                                             }
 
                                             // Get unassigned auths
-                                            $unassignedAuths = PlaylistAuth::where('user_id', Auth::id())
+                                            $unassignedAuths = PlaylistAuth::where('user_id', auth()->id())
                                                 ->whereDoesntHave('assignedPlaylist')
                                                 ->get();
 
@@ -1645,7 +1642,7 @@ class PlaylistResource extends Resource
                                     ->label('Select Existing Auth')
                                     ->helperText('Only unassigned auths are available. Each auth can only be assigned to one playlist at a time.')
                                     ->options(function () {
-                                        return PlaylistAuth::where('user_id', Auth::id())
+                                        return PlaylistAuth::where('user_id', auth()->id())
                                             ->whereDoesntHave('assignedPlaylist')
                                             ->pluck('name', 'id')
                                             ->toArray();

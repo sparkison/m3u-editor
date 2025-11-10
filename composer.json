@@ -30,6 +30,7 @@
         "spatie/laravel-backup": "^9.2",
         "spatie/laravel-tags": "^4.10",
         "spatie/temporary-directory": "^2.3",
+        "stechstudio/filament-impersonate": "^4.0",
         "wnx/laravel-backup-restore": "^1.6"
     },
     "require-dev": {

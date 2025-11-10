@@ -33,9 +33,12 @@ use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use App\Traits\HasUserFiltering;
 
 class PlaylistAliasResource extends Resource
 {
+    use HasUserFiltering;
+
     protected static ?string $model = PlaylistAlias::class;
 
     protected static ?string $recordTitleAttribute = 'name';
@@ -260,7 +263,7 @@ class PlaylistAliasResource extends Resource
                 ->schema([
                     Forms\Components\Select::make('playlist_id')
                         ->label('Playlist')
-                        ->options(fn() => Playlist::where('user_id', Auth::id())->pluck('name', 'id'))
+                        ->options(fn() => Playlist::where('user_id', auth()->id())->pluck('name', 'id'))
                         ->searchable()
                         ->live()
                         ->afterStateUpdated(function (Set $set, $state) {
@@ -277,7 +280,7 @@ class PlaylistAliasResource extends Resource
                         ->rules(['exists:playlists,id']),
                     Forms\Components\Select::make('custom_playlist_id')
                         ->label('Custom Playlist')
-                        ->options(fn() => CustomPlaylist::where('user_id', Auth::id())->pluck('name', 'id'))
+                        ->options(fn() => CustomPlaylist::where('user_id', auth()->id())->pluck('name', 'id'))
                         ->searchable()
                         ->live()
                         ->afterStateUpdated(function (Set $set, $state) {

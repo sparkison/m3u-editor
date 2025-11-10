@@ -170,7 +170,7 @@ class SeriesRelationManager extends RelationManager
                             ->getRecordSelect()
                             ->getSearchResultsUsing(function (string $search) {
                                 $searchLower = strtolower($search);
-                                $series = Auth::user()->series()
+                                $series = auth()->user()->series()
                                     ->withoutEagerLoads()
                                     ->with('playlist')
                                     ->where(function ($query) use ($searchLower) {

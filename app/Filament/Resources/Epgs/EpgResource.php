@@ -50,9 +50,12 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
+use App\Traits\HasUserFiltering;
 
 class EpgResource extends Resource
 {
+    use HasUserFiltering;
+
     protected static ?string $model = Epg::class;
 
     protected static ?string $recordTitleAttribute = 'name';
@@ -60,12 +63,6 @@ class EpgResource extends Resource
     public static function getGloballySearchableAttributes(): array
     {
         return ['name', 'url'];
-    }
-
-    public static function getGlobalSearchEloquentQuery(): Builder
-    {
-        return parent::getGlobalSearchEloquentQuery()
-            ->where('user_id', Auth::id());
     }
 
     protected static ?string $label = 'EPG';

@@ -65,9 +65,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Spatie\Tags\Tag;
+use App\Traits\HasUserFiltering;
 
 class ChannelResource extends Resource
 {
+    use HasUserFiltering;
+
     protected static ?string $model = Channel::class;
 
     protected static ?string $recordTitleAttribute = 'title';
@@ -79,15 +82,28 @@ class ChannelResource extends Resource
 
     public static function getGlobalSearchEloquentQuery(): Builder
     {
-        return parent::getGlobalSearchEloquentQuery()
-            ->where('user_id', auth()->id())
+        $query = parent::getGlobalSearchEloquentQuery()
             ->where('is_vod', false);
+        
+        // Filter by user_id for non-admin users
+        if (auth()->check() && !auth()->user()->isAdmin()) {
+            $query->where('user_id', auth()->id());
+        }
+        
+        return $query;
     }
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        $query = parent::getEloquentQuery()
             ->where('is_vod', false);
+        
+        // Filter by user_id for non-admin users
+        if (auth()->check() && !auth()->user()->isAdmin()) {
+            $query->where('user_id', auth()->id());
+        }
+        
+        return $query;
     }
 
     protected static string | \UnitEnum | null $navigationGroup = 'Channels & VOD';
@@ -593,7 +609,7 @@ class ChannelResource extends Resource
                                 ->hidden(fn(Get $get) => $get('master_source') !== 'searched')
                                 ->getSearchResultsUsing(function (string $search) use ($existingFailoverIds) {
                                     $searchLower = strtolower($search);
-                                    $channels = Auth::user()->channels()
+                                    $channels = auth()->user()->channels()
                                         ->withoutEagerLoads()
                                         ->with('playlist')
                                         ->whereNotIn('id', $existingFailoverIds)
@@ -1060,7 +1076,7 @@ class ChannelResource extends Resource
                         ->getOptionLabelFromRecordUsing(fn($record) => "$record->name [{$record->epg->name}]")
                         ->getSearchResultsUsing(function (string $search) {
                             $searchLower = strtolower($search);
-                            $channels = Auth::user()->epgChannels()
+                            $channels = auth()->user()->epgChannels()
                                 ->withoutEagerLoads()
                                 ->with('epg')
                                 ->where(function ($query) use ($searchLower) {
@@ -1144,7 +1160,7 @@ class ChannelResource extends Resource
 
                                     // Always include the selected value if it exists
                                     $searchLower = strtolower($search);
-                                    $channels = Auth::user()->channels()
+                                    $channels = auth()->user()->channels()
                                         ->withoutEagerLoads()
                                         ->with('playlist')
                                         ->whereNotIn('id', $existingFailoverIds)

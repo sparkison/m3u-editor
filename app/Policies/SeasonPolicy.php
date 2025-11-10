@@ -2,11 +2,10 @@
 
 namespace App\Policies;
 
-use App\Models\Playlist;
+use App\Models\Season;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
-class PlaylistPolicy
+class SeasonPolicy
 {
     /**
      * Determine whether the user can view any models.
@@ -19,9 +18,9 @@ class PlaylistPolicy
     /**
      * Determine whether the user can view the model.
      */
-    public function view(User $user, Playlist $playlist): bool
+    public function view(User $user, Season $season): bool
     {
-        return $user->isAdmin() || $user->id === $playlist->user_id;
+        return $user->isAdmin() || $user->id === $season->user_id;
     }
 
     /**
@@ -35,32 +34,32 @@ class PlaylistPolicy
     /**
      * Determine whether the user can update the model.
      */
-    public function update(User $user, Playlist $playlist): bool
+    public function update(User $user, Season $season): bool
     {
-        return $user->isAdmin() || $user->id === $playlist->user_id;
+        return $user->isAdmin() || $user->id === $season->user_id;
     }
 
     /**
      * Determine whether the user can delete the model.
      */
-    public function delete(User $user, Playlist $playlist): bool
+    public function delete(User $user, Season $season): bool
     {
-        return $user->isAdmin() || $user->id === $playlist->user_id;
+        return $user->isAdmin() || $user->id === $season->user_id;
     }
 
     /**
      * Determine whether the user can restore the model.
      */
-    public function restore(User $user, Playlist $playlist): bool
+    public function restore(User $user, Season $season): bool
     {
-        return $user->isAdmin() || $user->id === $playlist->user_id;
+        return $user->isAdmin() || $user->id === $season->user_id;
     }
 
     /**
      * Determine whether the user can permanently delete the model.
      */
-    public function forceDelete(User $user, Playlist $playlist): bool
+    public function forceDelete(User $user, Season $season): bool
     {
-        return $user->isAdmin() || $user->id === $playlist->user_id;
+        return $user->isAdmin() || $user->id === $season->user_id;
     }
 }

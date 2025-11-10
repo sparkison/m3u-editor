@@ -21,7 +21,7 @@ class CustomPlaylistPolicy
      */
     public function view(User $user, CustomPlaylist $customPlaylist): bool
     {
-        return $user->id === $customPlaylist->user_id;
+        return $user->isAdmin() || $user->id === $customPlaylist->user_id;
     }
 
     /**
@@ -37,7 +37,7 @@ class CustomPlaylistPolicy
      */
     public function update(User $user, CustomPlaylist $customPlaylist): bool
     {
-        return $user->id === $customPlaylist->user_id;
+        return $user->isAdmin() || $user->id === $customPlaylist->user_id;
     }
 
     /**
@@ -45,7 +45,7 @@ class CustomPlaylistPolicy
      */
     public function delete(User $user, CustomPlaylist $customPlaylist): bool
     {
-        return $user->id === $customPlaylist->user_id;
+        return $user->isAdmin() || $user->id === $customPlaylist->user_id;
     }
 
     /**
@@ -53,7 +53,7 @@ class CustomPlaylistPolicy
      */
     public function restore(User $user, CustomPlaylist $customPlaylist): bool
     {
-        return $user->id === $customPlaylist->user_id;
+        return $user->isAdmin() || $user->id === $customPlaylist->user_id;
     }
 
     /**
@@ -61,6 +61,6 @@ class CustomPlaylistPolicy
      */
     public function forceDelete(User $user, CustomPlaylist $customPlaylist): bool
     {
-        return $user->id === $customPlaylist->user_id;
+        return $user->isAdmin() || $user->id === $customPlaylist->user_id;
     }
 }

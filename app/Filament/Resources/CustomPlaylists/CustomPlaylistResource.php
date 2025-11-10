@@ -54,9 +54,12 @@ use Filament\Forms\Components\Repeater;
 use Filament\Forms\FormsComponent;
 use Filament\Schemas\Components\Fieldset;
 use Illuminate\Support\Facades\Redis;
+use App\Traits\HasUserFiltering;
 
 class CustomPlaylistResource extends Resource
 {
+    use HasUserFiltering;
+
     protected static ?string $model = CustomPlaylist::class;
 
     protected static ?string $recordTitleAttribute = 'name';
@@ -64,12 +67,6 @@ class CustomPlaylistResource extends Resource
     public static function getGloballySearchableAttributes(): array
     {
         return ['name'];
-    }
-
-    public static function getGlobalSearchEloquentQuery(): Builder
-    {
-        return parent::getGlobalSearchEloquentQuery()
-            ->where('user_id', Auth::id());
     }
 
     protected static string | \UnitEnum | null $navigationGroup = 'Playlist';
@@ -461,7 +458,7 @@ class CustomPlaylistResource extends Resource
                                                     }
 
                                                     // Get unassigned auths
-                                                    $unassignedAuths = PlaylistAuth::where('user_id', Auth::id())
+                                                    $unassignedAuths = PlaylistAuth::where('user_id', auth()->id())
                                                         ->whereDoesntHave('assignedPlaylist')
                                                         ->get();
 

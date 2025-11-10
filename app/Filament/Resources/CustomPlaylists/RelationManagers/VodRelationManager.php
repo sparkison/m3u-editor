@@ -197,7 +197,7 @@ class VodRelationManager extends RelationManager
                             ->getRecordSelect()
                             ->getSearchResultsUsing(function (string $search) {
                                 $searchLower = strtolower($search);
-                                $vods = Auth::user()->channels()
+                                $vods = auth()->user()->channels()
                                     ->withoutEagerLoads()
                                     ->with('playlist')
                                     ->where('is_vod', true) // Only VOD content

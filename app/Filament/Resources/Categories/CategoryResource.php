@@ -37,9 +37,12 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use App\Traits\HasUserFiltering;
 
 class CategoryResource extends Resource
 {
+    use HasUserFiltering;
+
     protected static ?string $model = Category::class;
 
     protected static ?string $recordTitleAttribute = 'name';

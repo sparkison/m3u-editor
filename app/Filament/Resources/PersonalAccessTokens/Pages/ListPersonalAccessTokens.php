@@ -41,7 +41,14 @@ class ListPersonalAccessTokens extends ListRecords
                 ->modalWidth('2xl')
                 ->modalIcon('heroicon-o-key')
                 ->modalDescription('Enter a name for the new API token, and select the permissions it should have. Permissions can be changed later.')
-                ->modalSubmitActionLabel('Create Token')
+                ->modalSubmitActionLabel('Create Token'),
+            Actions\Action::make('view_api_docs')
+                ->label('API Docs')
+                ->icon('heroicon-o-arrow-top-right-on-square')
+                ->iconPosition('after')
+                ->color('gray')
+                ->url('/docs/api')
+                ->openUrlInNewTab(true)
         ];
     }
 
