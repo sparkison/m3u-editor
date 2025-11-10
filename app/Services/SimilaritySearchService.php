@@ -17,7 +17,7 @@ class SimilaritySearchService
     private $embedSimThreshold = 0.75;     // Increased from 0.65 for stricter similarity
     private $minChannelLength = 3;         // Minimum length to consider for matching
 
-    // Words to ignore
+    // Words to ignore (reduced list - keep quality indicators that differentiate channels)
     private $stopWords = [
         "tv",
         "channel",
@@ -25,17 +25,10 @@ class SimilaritySearchService
         "television",
         "east",
         "west",
-        "hd",
-        "uhd",
-        "fhd",
         "us",
         "usa",
         "not",
         "24/7",
-        "1080p",
-        "720p",
-        "540p",
-        "480p",
         "arabic",
         "latino",
         "film",
@@ -103,12 +96,19 @@ class SimilaritySearchService
         // Step 2: Fetch EPG channels using fuzzy matching (more restrictive)
         // Only fetch candidates that have significant overlap with the search term
         $epgChannels = $epg->channels()
-            ->where(function ($query) use ($normalizedChan) {
+            ->where(function ($query) use ($normalizedChan, $fallbackName) {
                 // Use LIKE with at least 3 characters for better filtering
+                // Also try the original fallback name for cases where normalization is too aggressive
                 $searchTerm = strlen($normalizedChan) >= 5 ? substr($normalizedChan, 0, 5) : $normalizedChan;
+                $originalSearch = strtolower(substr($fallbackName, 0, min(10, strlen($fallbackName))));
+                
                 $query->whereRaw('LOWER(channel_id) like ?', ["%$searchTerm%"])
                     ->orWhereRaw('LOWER(name) like ?', ["%$searchTerm%"])
-                    ->orWhereRaw('LOWER(display_name) like ?', ["%$searchTerm%"]);
+                    ->orWhereRaw('LOWER(display_name) like ?', ["%$searchTerm%"])
+                    // Also search with original name (less normalized)
+                    ->orWhereRaw('LOWER(channel_id) like ?', ["%$originalSearch%"])
+                    ->orWhereRaw('LOWER(name) like ?', ["%$originalSearch%"])
+                    ->orWhereRaw('LOWER(display_name) like ?', ["%$originalSearch%"]);
                 
                 // Add search for additional_display_names JSONB column
                 $this->addJsonSearchCondition($query, $searchTerm);
@@ -128,62 +128,80 @@ class SimilaritySearchService
         }
 
         /**
-         * Levenshtein Distance for Fuzzy Matching
+         * Multi-Strategy Matching for Better Accuracy
          */
         foreach ($epgChannels->cursor() as $epgChannel) {
+            // Try matching with both normalized and less-normalized versions
             $normalizedEpg = empty($epgChannel->name)
                 ? $this->normalizeChannelName($epgChannel->channel_id)
                 : $this->normalizeChannelName($epgChannel->name);
             if (!$normalizedEpg) continue;
 
-            // Calculate fuzzy similarity
+            // Also try with less aggressive normalization (keep more info)
+            $epgNameOriginal = strtolower(trim($epgChannel->name ?? $epgChannel->channel_id));
+            $channelNameOriginal = strtolower(trim($fallbackName));
+
+            // Calculate fuzzy similarity with normalized names
             $score = levenshtein($normalizedChan, $normalizedEpg);
+            
+            // Also calculate with original names (can be more accurate for similar channels)
+            $scoreOriginal = levenshtein($channelNameOriginal, $epgNameOriginal);
+            
+            // Use the better score
+            $finalScore = min($score, $scoreOriginal);
             
             // Calculate similarity percentage for better filtering
             $maxLength = max(strlen($normalizedChan), strlen($normalizedEpg));
-            $similarityPercentage = $maxLength > 0 ? (1 - ($score / $maxLength)) * 100 : 0;
+            $similarityPercentage = $maxLength > 0 ? (1 - ($finalScore / $maxLength)) * 100 : 0;
 
             // Apply region-based bonus (convert to penalty for Levenshtein)
             $regionBonus = 0;
             if ($regionCode && stripos(strtolower($epgChannel->channel_id . ' ' . $epgChannel->name), $regionCode) !== false) {
-                $score = max(0, $score - 15); // Subtract to improve the match
+                $finalScore = max(0, $finalScore - 15); // Subtract to improve the match
                 $regionBonus = 15;
             }
 
             // Store candidate with metadata for better decision making
             $candidates[] = [
                 'channel' => $epgChannel,
-                'score' => $score,
+                'score' => $finalScore,
                 'similarity' => $similarityPercentage,
                 'region_bonus' => $regionBonus,
-                'normalized_name' => $normalizedEpg
+                'normalized_name' => $normalizedEpg,
+                'original_score' => $scoreOriginal,  // Track original score for debugging
             ];
 
-            if ($score < $bestScore) {
-                $bestScore = $score;
+            if ($finalScore < $bestScore) {
+                $bestScore = $finalScore;
                 $bestMatch = $epgChannel;
             }
 
             // Store candidate for embedding similarity if in borderline range
-            if ($score >= $this->bestFuzzyThreshold && $score < $this->upperFuzzyThreshold) {
+            if ($finalScore >= $this->bestFuzzyThreshold && $finalScore < $this->upperFuzzyThreshold) {
                 $bestEpgForEmbedding = $epgChannel;
             }
         }
 
-        // Filter out poor matches - require at least 60% similarity
+        // Filter out poor matches - require at least 50% similarity (lowered from 60% for better recall)
         $candidates = array_filter($candidates, function($candidate) {
-            return $candidate['similarity'] >= 60;
+            return $candidate['similarity'] >= 50;
         });
 
-        // Sort candidates by score (lower is better)
+        // Sort candidates by score (lower is better), then by similarity (higher is better)
         usort($candidates, function($a, $b) {
-            return $a['score'] <=> $b['score'];
+            // First compare by score
+            $scoreDiff = $a['score'] - $b['score'];
+            if ($scoreDiff != 0) {
+                return $scoreDiff;
+            }
+            // If scores are equal, prefer higher similarity
+            return $b['similarity'] - $a['similarity'];
         });
 
         // If we have a best match with Levenshtein < bestFuzzyThreshold and good similarity, return it
         if ($bestMatch && $bestScore < $this->bestFuzzyThreshold) {
             // Double check that this is actually a good match
-            if (!empty($candidates) && $candidates[0]['similarity'] >= 70) {
+            if (!empty($candidates) && $candidates[0]['similarity'] >= 60) {
                 if ($debug) {
                     Log::debug("Channel {$channel->id} '{$fallbackName}' matched with EPG channel_id={$bestMatch->channel_id} (score={$bestScore}, similarity={$candidates[0]['similarity']}%)");
                 }
