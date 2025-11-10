@@ -204,6 +204,8 @@ services:
     volumes:
       # Persistent configuration data
       - ./data:/var/www/config
+      # Share public directory with nginx for static file serving
+      - app-public:/var/www/html/public
     restart: unless-stopped
     # Don't expose port externally - only accessible via nginx
     # Expose FPM port 9000 to nginx via internal network only
@@ -239,10 +241,12 @@ services:
     container_name: m3u-nginx
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      # Share public directory from m3u-editor container for static file serving
+      - app-public:/var/www/html/public:ro
       # - ./data:/var/www/config:ro # For serving config files if needed
     restart: unless-stopped
     ports:
-      - "${NGINX_PORT:-8080}:80"  # HTTP
+      - "${APP_PORT:-36400}:80"  # HTTP
       # - "${NGINX_SSL_PORT:-443}:443"  # HTTPS (uncomment and configure SSL)
     networks:
       - m3u-network
@@ -276,4 +280,6 @@ volumes:
   postgres-data:
     driver: local
   redis-data:
+    driver: local
+  app-public:
     driver: local

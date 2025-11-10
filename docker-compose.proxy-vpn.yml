@@ -146,8 +146,8 @@ services:
       # - STREAM_TIMEOUT=300
       # - CLEANUP_INTERVAL=60
     restart: unless-stopped
-    devices:
-      - /dev/dri:/dev/dri
+    #devices:
+    #  - /dev/dri:/dev/dri
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:${PROXY_PORT:-38085}/health?api_token=${M3U_PROXY_TOKEN:-changeme}"]
       interval: 30s
@@ -185,7 +185,7 @@ services:
       - NET_ADMIN
     devices:
       - /dev/net/tun:/dev/net/tun
-      - /dev/dri:/dev/dri  # Hardware acceleration for m3u-proxy
+      #- /dev/dri:/dev/dri  # Hardware acceleration for m3u-proxy
     ports:
       - ${APP_PORT:-36400}:${APP_PORT:-36400}  # M3U Editor port, change if needed
 

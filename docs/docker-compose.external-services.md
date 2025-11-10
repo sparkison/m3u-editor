@@ -70,7 +70,6 @@ This configuration explicitly disables all internal services in m3u-editor:
 - Docker and Docker Compose installed
 - At least 2GB RAM available
 - Ports 8080 (or your chosen port) available
-- The `public` directory must exist in your project root (contains static assets)
 
 ### 2. Setup Environment
 
@@ -286,7 +285,10 @@ Persistent data is stored in Docker volumes:
 
 - `postgres-data` - PostgreSQL database
 - `redis-data` - Redis cache
+- `app-public` - Shared volume between m3u-editor and nginx for static files (CSS, JS, images, fonts)
 - `./data` - M3U Editor configuration (bind mount)
+
+**Note**: The `app-public` volume is automatically populated by the m3u-editor container at startup. This contains the compiled frontend assets (from the build process) and is shared with nginx for efficient static file serving. This design allows the setup to work in production without requiring local source files.
 
 ### Backup Volumes
 
@@ -395,21 +397,23 @@ docker exec m3u-nginx nc -zv m3u-editor 9000
 docker-compose -f docker-compose.external-all.yml logs m3u-editor
 ```
 
-4. Verify public directory is mounted:
+4. Verify shared volume is properly mounted:
 ```bash
 docker exec m3u-nginx ls -la /var/www/html/public
+docker exec m3u-editor ls -la /var/www/html/public
 ```
 
 ### Static Files Not Loading (CSS/JS/Images)
 
 **Symptoms**: Application loads but looks broken, no styling
 
-**Cause**: The `public` directory is not properly mounted to nginx
+**Cause**: The shared `app-public` volume is not properly populated or mounted
 
 **Solution**:
-1. Verify the public directory exists:
+1. Verify the shared volume exists and is populated:
 ```bash
-ls -la public/
+docker volume inspect m3u-editor_app-public
+docker exec m3u-editor ls -la /var/www/html/public/build
 ```
 
 2. Check nginx volume mounts:
@@ -417,8 +421,9 @@ ls -la public/
 docker inspect m3u-nginx | grep -A 10 Mounts
 ```
 
-3. Restart nginx:
+3. If the volume is empty, restart m3u-editor first, then nginx:
 ```bash
+docker-compose -f docker-compose.external-all.yml restart m3u-editor
 docker-compose -f docker-compose.external-all.yml restart nginx
 ```
 
