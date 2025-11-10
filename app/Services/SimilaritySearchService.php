@@ -12,9 +12,10 @@ use Illuminate\Support\Facades\DB;
 class SimilaritySearchService
 {
     // Configurable parameters
-    private $bestFuzzyThreshold = 40;
-    private $upperFuzzyThreshold = 70;
-    private $embedSimThreshold = 0.65;
+    private $bestFuzzyThreshold = 15;      // Reduced from 40 for stricter exact matches
+    private $upperFuzzyThreshold = 50;     // Reduced from 70 for better filtering
+    private $embedSimThreshold = 0.75;     // Increased from 0.65 for stricter similarity
+    private $minChannelLength = 3;         // Minimum length to consider for matching
 
     // Words to ignore
     private $stopWords = [
@@ -59,31 +60,51 @@ class SimilaritySearchService
         $fallbackName = trim($title ?: $name);
         $normalizedChan = $this->normalizeChannelName($fallbackName);
 
-        if (!$normalizedChan) {
+        if (!$normalizedChan || strlen($normalizedChan) < $this->minChannelLength) {
             if ($debug) {
-                Log::debug("Channel {$channel->id} '{$fallbackName}' => empty after normalization, skipping");
+                Log::debug("Channel {$channel->id} '{$fallbackName}' => empty or too short after normalization, skipping");
             }
             return null;
         }
 
-        // Fetch EPG channels
-        // Filter down a bit by using fuzzy matching
-        // We don't want to loop over every single channel, 
-        // so let's just grab the first few relevent matches
+        // Step 1: Try to find exact normalized matches first (highest priority)
+        $exactMatch = $epg->channels()
+            ->where(function ($query) use ($normalizedChan) {
+                $query->whereRaw('LOWER(REPLACE(REPLACE(REPLACE(channel_id, " ", ""), "-", ""), "_", "")) = ?', 
+                    [str_replace([' ', '-', '_'], '', $normalizedChan)])
+                    ->orWhereRaw('LOWER(REPLACE(REPLACE(REPLACE(name, " ", ""), "-", ""), "_", "")) = ?', 
+                        [str_replace([' ', '-', '_'], '', $normalizedChan)])
+                    ->orWhereRaw('LOWER(REPLACE(REPLACE(REPLACE(display_name, " ", ""), "-", ""), "_", "")) = ?', 
+                        [str_replace([' ', '-', '_'], '', $normalizedChan)]);
+            })
+            ->first();
+
+        if ($exactMatch) {
+            if ($debug) {
+                Log::debug("Channel {$channel->id} '{$fallbackName}' => EXACT match with EPG channel_id={$exactMatch->channel_id}");
+            }
+            return $exactMatch;
+        }
+
+        // Step 2: Fetch EPG channels using fuzzy matching (more restrictive)
+        // Only fetch candidates that have significant overlap with the search term
         $epgChannels = $epg->channels()
             ->where(function ($query) use ($normalizedChan) {
-                $query->whereRaw('LOWER(channel_id) like ?', ["%$normalizedChan%"])
-                    ->orWhereRaw('LOWER(name) like ?', ["%$normalizedChan%"])
-                    ->orWhereRaw('LOWER(display_name) like ?', ["%$normalizedChan%"]);
+                // Use LIKE with at least 3 characters for better filtering
+                $searchTerm = strlen($normalizedChan) >= 5 ? substr($normalizedChan, 0, 5) : $normalizedChan;
+                $query->whereRaw('LOWER(channel_id) like ?', ["%$searchTerm%"])
+                    ->orWhereRaw('LOWER(name) like ?', ["%$searchTerm%"])
+                    ->orWhereRaw('LOWER(display_name) like ?', ["%$searchTerm%"]);
                 
                 // Add search for additional_display_names JSONB column
-                $this->addJsonSearchCondition($query, $normalizedChan);
+                $this->addJsonSearchCondition($query, $searchTerm);
             });
 
         // Setup variables
         $bestScore = PHP_INT_MAX; // Levenshtein: lower is better
         $bestMatch = null;
         $bestEpgForEmbedding = null;
+        $candidates = []; // Store all candidates with scores for better decision making
 
         if ($epgChannels->count() === 0) {
             if ($debug) {
@@ -103,11 +124,26 @@ class SimilaritySearchService
 
             // Calculate fuzzy similarity
             $score = levenshtein($normalizedChan, $normalizedEpg);
+            
+            // Calculate similarity percentage for better filtering
+            $maxLength = max(strlen($normalizedChan), strlen($normalizedEpg));
+            $similarityPercentage = $maxLength > 0 ? (1 - ($score / $maxLength)) * 100 : 0;
 
             // Apply region-based bonus (convert to penalty for Levenshtein)
+            $regionBonus = 0;
             if ($regionCode && stripos(strtolower($epgChannel->channel_id . ' ' . $epgChannel->name), $regionCode) !== false) {
                 $score = max(0, $score - 15); // Subtract to improve the match
+                $regionBonus = 15;
             }
+
+            // Store candidate with metadata for better decision making
+            $candidates[] = [
+                'channel' => $epgChannel,
+                'score' => $score,
+                'similarity' => $similarityPercentage,
+                'region_bonus' => $regionBonus,
+                'normalized_name' => $normalizedEpg
+            ];
 
             if ($score < $bestScore) {
                 $bestScore = $score;
@@ -120,32 +156,63 @@ class SimilaritySearchService
             }
         }
 
-        // If we have a best match with Levenshtein < bestFuzzyThreshold, return it
+        // Filter out poor matches - require at least 60% similarity
+        $candidates = array_filter($candidates, function($candidate) {
+            return $candidate['similarity'] >= 60;
+        });
+
+        // Sort candidates by score (lower is better)
+        usort($candidates, function($a, $b) {
+            return $a['score'] <=> $b['score'];
+        });
+
+        // If we have a best match with Levenshtein < bestFuzzyThreshold and good similarity, return it
         if ($bestMatch && $bestScore < $this->bestFuzzyThreshold) {
-            if ($debug) {
-                Log::debug("Channel {$channel->id} '{$fallbackName}' matched with EPG channel_id={$bestMatch->channel_id} (score={$bestScore})");
+            // Double check that this is actually a good match
+            if (!empty($candidates) && $candidates[0]['similarity'] >= 70) {
+                if ($debug) {
+                    Log::debug("Channel {$channel->id} '{$fallbackName}' matched with EPG channel_id={$bestMatch->channel_id} (score={$bestScore}, similarity={$candidates[0]['similarity']}%)");
+                }
+                return $bestMatch;
             }
-            return $bestMatch;
         }
 
         // ** Cosine Similarity for Borderline Cases **
-        if ($bestEpgForEmbedding) {
+        if ($bestEpgForEmbedding && !empty($candidates)) {
             $chanVector = $this->textToVector($normalizedChan);
             $epgVector = $this->textToVector($this->normalizeChannelName($bestEpgForEmbedding->name));
-            if (empty($chanVector) || empty($epgVector)) {
-                return null;
-            }
-            $similarity = $this->cosineSimilarity($chanVector, $epgVector);
-            if ($similarity >= $this->embedSimThreshold) {
-                if ($debug) {
-                    Log::debug("Channel {$channel->id} '{$fallbackName}' matched via cosine similarity with channel_id={$bestEpgForEmbedding->channel_id} (cos-sim={$similarity})");
+            if (!empty($chanVector) && !empty($epgVector)) {
+                $similarity = $this->cosineSimilarity($chanVector, $epgVector);
+                
+                // Only accept if similarity is high enough
+                if ($similarity >= $this->embedSimThreshold) {
+                    // Additional check: ensure this is actually the best candidate
+                    $candidateFound = false;
+                    foreach ($candidates as $candidate) {
+                        if ($candidate['channel']->id === $bestEpgForEmbedding->id && $candidate['similarity'] >= 65) {
+                            $candidateFound = true;
+                            break;
+                        }
+                    }
+                    
+                    if ($candidateFound) {
+                        if ($debug) {
+                            Log::debug("Channel {$channel->id} '{$fallbackName}' matched via cosine similarity with channel_id={$bestEpgForEmbedding->channel_id} (cos-sim={$similarity})");
+                        }
+                        return $bestEpgForEmbedding;
+                    }
+                } else {
+                    if ($debug) {
+                        Log::debug("Channel {$channel->id} '{$fallbackName}' cosine-similarity with '{$bestEpgForEmbedding->name}' = {$similarity} (rejected, below threshold)");
+                    }
                 }
-                return $bestEpgForEmbedding;
-            } else {
-                if ($debug) {
-                    Log::debug("Channel {$channel->id} '{$fallbackName}' cosine-similarity with '{$bestEpgForEmbedding->name}' = {$similarity}");
-                }
             }
+        }
+
+        // If we have candidates, log why we didn't match
+        if ($debug && !empty($candidates)) {
+            $topCandidate = $candidates[0];
+            Log::debug("Channel {$channel->id} '{$fallbackName}' => No match found. Best candidate: '{$topCandidate['channel']->channel_id}' (score={$topCandidate['score']}, similarity={$topCandidate['similarity']}%)");
         }
 
         return null;
