@@ -262,22 +262,20 @@ class M3uProxyService
      * Request or build a channel stream URL from the external m3u-proxy server.
      *
      * @param  Playlist|CustomPlaylist|MergedPlaylist|PlaylistAlias  $playlist
-     * @param  int  $id
+     * @param  Channel  $channel
      * @param  Request|null  $request  Optional request for additional parameters (e.g. timeshift)
      * @param  StreamProfile|null  $profile  Optional stream profile to apply
      *
      * @throws Exception when base URL missing or API returns an error
      */
-    public function getChannelUrl($playlist, $id, ?Request $request = null, ?StreamProfile $profile = null): string
+    public function getChannelUrl($playlist, $channel, ?Request $request = null, ?StreamProfile $profile = null): string
     {
         if (empty($this->apiBaseUrl)) {
             throw new Exception('M3U Proxy base URL is not configured');
         }
 
-        $channel = Channel::find($id);
-        if (empty($channel)) {
-            throw new Exception('Channel not found');
-        }
+        // Get channel ID
+        $id = $channel->id;
 
         // Check if primary playlist has stream limits and if it's at capacity
         $primaryUrl = null;
@@ -400,21 +398,19 @@ class M3uProxyService
      * Request or build an episode stream URL from the external m3u-proxy server.
      *
      * @param  Playlist|CustomPlaylist|MergedPlaylist|PlaylistAlias  $playlist
-     * @param  int  $id
+     * @param  Episode  $episode
      * @param  StreamProfile|null  $profile  Optional stream profile to apply
      *
      * @throws Exception when base URL missing or API returns an error
      */
-    public function getEpisodeUrl($playlist, $id, ?StreamProfile $profile = null): string
+    public function getEpisodeUrl($playlist, $episode, ?StreamProfile $profile = null): string
     {
         if (empty($this->apiBaseUrl)) {
             throw new Exception('M3U Proxy base URL is not configured');
         }
 
-        $episode = Episode::find($id);
-        if (empty($episode)) {
-            throw new Exception('Episode not found');
-        }
+        // Get episode ID
+        $id = $episode->id;
 
         // Check if playlist has stream limits and if it's at capacity
         if ($playlist->available_streams !== 0) {
@@ -690,6 +686,7 @@ class M3uProxyService
             $payload = [
                 'url' => $url,
                 'metadata' => $metadata,
+                'strict_live_ts' => true, // Enforce strict live TS handling
             ];
 
             // Add failovers if provided

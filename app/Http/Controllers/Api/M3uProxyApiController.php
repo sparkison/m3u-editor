@@ -46,7 +46,7 @@ class M3uProxyApiController extends Controller
             $profile = $playlist->streamProfile;
         }
 
-        $url = app(M3uProxyService::class)->getChannelUrl($playlist, $id, $request, $profile);
+        $url = app(M3uProxyService::class)->getChannelUrl($playlist, $channel, $request, $profile);
 
         return redirect($url);
     }
@@ -71,7 +71,7 @@ class M3uProxyApiController extends Controller
         // For Series, use the VOD stream profile if set
         $profile = $playlist->vodStreamProfile;
 
-        $url = app(M3uProxyService::class)->getEpisodeUrl($playlist, $id, $profile);
+        $url = app(M3uProxyService::class)->getEpisodeUrl($playlist, $episode, $profile);
 
         return redirect($url);
     }
@@ -121,7 +121,7 @@ class M3uProxyApiController extends Controller
             $profile = $profileId ? StreamProfile::find($profileId) : null;
         }
 
-        $url = app(M3uProxyService::class)->getChannelUrl($playlist, $id, $request, $profile);
+        $url = app(M3uProxyService::class)->getChannelUrl($playlist, $channel, $request, $profile);
 
         return redirect($url);
     }
@@ -160,7 +160,7 @@ class M3uProxyApiController extends Controller
             $profile = $profileId ? StreamProfile::find($profileId) : null;
         }
 
-        $url = app(M3uProxyService::class)->getEpisodeUrl($playlist, $id, $profile);
+        $url = app(M3uProxyService::class)->getEpisodeUrl($playlist, $episode, $profile);
 
         return redirect($url);
     }
