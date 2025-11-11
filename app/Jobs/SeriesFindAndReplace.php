@@ -43,6 +43,7 @@ class SeriesFindAndReplace implements ShouldQueue
         if (!$this->series) {
             // Use chunking to process large datasets efficiently
             Series::query()
+                ->where('user_id', $this->user_id)
                 ->when(!$this->all_series && $this->series_id, fn($query) => $query->where('id', $this->series_id))
                 ->chunkById(1000, function ($series) use (&$updated) {
                     $updated += $this->processSeriesChunk($series);
