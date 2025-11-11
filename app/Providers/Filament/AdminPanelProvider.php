@@ -69,6 +69,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('')
+            // ->topbar(false)
             ->login(Login::class)
             ->loginRouteSlug(trim(config('app.login_path', 'login'), '/') ?? 'login')
             ->profile(EditProfile::class, isSimple: false)
