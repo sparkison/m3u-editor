@@ -215,9 +215,10 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                     $epgChannel = null;
                     
                     // Step 1: Try exact match on channel_id (highest priority)
-                    $search1 = strtolower(trim($streamId));
-                    $search2 = strtolower(trim($name));
-                    $search3 = strtolower(trim($title));
+                    // Use multibyte-safe lowercasing to avoid corrupting UTF-8 sequences
+                    $search1 = mb_strtolower(trim($streamId), 'UTF-8');
+                    $search2 = mb_strtolower(trim($name), 'UTF-8');
+                    $search3 = mb_strtolower(trim($title), 'UTF-8');
                     
                     // Build search terms array (only non-empty values)
                     $searchTerms = array_filter([$search1, $search2, $search3], fn($term) => !empty($term));
