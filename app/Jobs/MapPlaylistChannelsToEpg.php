@@ -52,6 +52,31 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
     }
 
     /**
+     * Sanitize a string to ensure valid UTF-8 encoding for PostgreSQL.
+     * 
+     * @param string|null $value
+     * @return string|null
+     */
+    private function sanitizeUtf8(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        // Remove invalid UTF-8 sequences
+        // mb_convert_encoding with 'UTF-8' to 'UTF-8' forces re-encoding and drops invalid bytes
+        $sanitized = mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+        
+        // Alternative: Use iconv with //IGNORE to skip invalid characters
+        // $sanitized = iconv('UTF-8', 'UTF-8//IGNORE', $value);
+        
+        // Remove any remaining control characters except newlines, tabs, and carriage returns
+        $sanitized = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $sanitized);
+        
+        return $sanitized;
+    }
+
+    /**
      * Execute the job.
      */
     public function handle(): void
@@ -172,10 +197,10 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                 $useRegex = $settings['use_regex'] ?? false;
                 foreach ($channels->cursor() as $channel) {
 
-                    // Get the title and stream id
-                    $streamId = trim($channel->stream_id_custom ?? $channel->stream_id);
-                    $name = trim($channel->name_custom ?? $channel->name);
-                    $title = trim($channel->title_custom ?? $channel->title);
+                    // Get the title and stream id - sanitize UTF-8 immediately
+                    $streamId = $this->sanitizeUtf8(trim($channel->stream_id_custom ?? $channel->stream_id));
+                    $name = $this->sanitizeUtf8(trim($channel->name_custom ?? $channel->name));
+                    $title = $this->sanitizeUtf8(trim($channel->title_custom ?? $channel->title));
 
                     // Get cleaned title and stream id
                     if (!empty($patterns)) {
@@ -275,9 +300,9 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                     if ($epgChannel) {
                         $mappedCount++;
                         yield [
-                            'title' => $channel->title,
-                            'name' => $channel->name,
-                            'group_internal' => $channel->group_internal,
+                            'title' => $this->sanitizeUtf8($channel->title),
+                            'name' => $this->sanitizeUtf8($channel->name),
+                            'group_internal' => $this->sanitizeUtf8($channel->group_internal),
                             'user_id' => $channel->user_id,
                             'playlist_id' => $channel->playlist_id,
                             'source_id' => $channel->source_id,
