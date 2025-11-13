@@ -30,11 +30,14 @@ class M3uProxyApiController extends Controller
      */
     public function channel(Request $request, $id, $playlist = null)
     {
-        $channel = Channel::query()->with([
-            'playlist.streamProfile',
-            'playlist.vodStreamProfile'
-        ])->findOrFail($id);
+        $channel = Channel::findOrFail($id);
         $playlist = $playlist ?? $channel->getEffectivePlaylist();
+
+        // Load stream profiles
+        $playlist->load([
+            'streamProfile',
+            'vodStreamProfile'
+        ]);
 
         // Get stream profile from playlist if set
         $profile = null;

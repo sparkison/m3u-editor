@@ -40,6 +40,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use App\Facades\PlaylistFacade;
 use App\Forms\Components\XtreamApiInfo;
+use App\Models\StreamProfile;
 use App\Services\EpgCacheService;
 use App\Services\ProxyService;
 use Filament\Forms\Components\Repeater;
@@ -341,6 +342,9 @@ class MergedPlaylistResource extends Resource
                             Select::make('stream_profile_id')
                                 ->label('Live Streaming Profile')
                                 ->relationship('streamProfile', 'name')
+                                ->options(function () {
+                                    return StreamProfile::where('user_id', auth()->id())->pluck('name', 'id');
+                                })
                                 ->searchable()
                                 ->preload()
                                 ->nullable()
@@ -349,6 +353,9 @@ class MergedPlaylistResource extends Resource
                             Select::make('vod_stream_profile_id')
                                 ->label('VOD and Series Streaming Profile')
                                 ->relationship('vodStreamProfile', 'name')
+                                ->options(function () {
+                                    return StreamProfile::where('user_id', auth()->id())->pluck('name', 'id');
+                                })
                                 ->searchable()
                                 ->preload()
                                 ->nullable()

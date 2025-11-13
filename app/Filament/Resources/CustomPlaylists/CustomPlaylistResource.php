@@ -46,6 +46,7 @@ use App\Facades\PlaylistFacade;
 use App\Filament\Resources\CustomPlaylists\Pages\ViewCustomPlaylist;
 use App\Forms\Components\XtreamApiInfo;
 use App\Models\SharedStream;
+use App\Models\StreamProfile;
 use App\Services\EpgCacheService;
 use App\Services\M3uProxyService;
 use App\Services\ProxyService;
@@ -376,6 +377,9 @@ class CustomPlaylistResource extends Resource
                             Select::make('stream_profile_id')
                                 ->label('Live Streaming Profile')
                                 ->relationship('streamProfile', 'name')
+                                ->options(function () {
+                                    return StreamProfile::where('user_id', auth()->id())->pluck('name', 'id');
+                                })
                                 ->searchable()
                                 ->preload()
                                 ->nullable()
@@ -384,6 +388,9 @@ class CustomPlaylistResource extends Resource
                             Select::make('vod_stream_profile_id')
                                 ->label('VOD and Series Streaming Profile')
                                 ->relationship('vodStreamProfile', 'name')
+                                ->options(function () {
+                                    return StreamProfile::where('user_id', auth()->id())->pluck('name', 'id');
+                                })
                                 ->searchable()
                                 ->preload()
                                 ->nullable()

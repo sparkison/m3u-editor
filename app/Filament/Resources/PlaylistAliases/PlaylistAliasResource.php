@@ -9,6 +9,7 @@ use App\Models\CustomPlaylist;
 use App\Models\Playlist;
 use App\Models\PlaylistAlias;
 use App\Models\SharedStream;
+use App\Models\StreamProfile;
 use App\Models\User;
 use App\Services\EpgCacheService;
 use App\Services\M3uProxyService;
@@ -391,6 +392,9 @@ class PlaylistAliasResource extends Resource
                             Forms\Components\Select::make('stream_profile_id')
                                 ->label('Live Streaming Profile')
                                 ->relationship('streamProfile', 'name')
+                                ->options(function () {
+                                    return StreamProfile::where('user_id', auth()->id())->pluck('name', 'id');
+                                })
                                 ->searchable()
                                 ->preload()
                                 ->nullable()
@@ -399,6 +403,9 @@ class PlaylistAliasResource extends Resource
                             Forms\Components\Select::make('vod_stream_profile_id')
                                 ->label('VOD and Series Streaming Profile')
                                 ->relationship('vodStreamProfile', 'name')
+                                ->options(function () {
+                                    return StreamProfile::where('user_id', auth()->id())->pluck('name', 'id');
+                                })
                                 ->searchable()
                                 ->preload()
                                 ->nullable()

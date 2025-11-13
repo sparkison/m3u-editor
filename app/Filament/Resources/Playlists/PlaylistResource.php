@@ -24,6 +24,7 @@ use App\Models\Playlist;
 use App\Models\PlaylistAuth;
 use App\Models\SharedStream;
 use App\Models\SourceGroup;
+use App\Models\StreamProfile;
 use App\Rules\CheckIfUrlOrLocalPath;
 use App\Rules\Cron;
 use App\Services\EpgCacheService;
@@ -1400,6 +1401,9 @@ class PlaylistResource extends Resource
                             Select::make('stream_profile_id')
                                 ->label('Live Streaming Profile')
                                 ->relationship('streamProfile', 'name')
+                                ->options(function () {
+                                    return StreamProfile::where('user_id', auth()->id())->pluck('name', 'id');
+                                })
                                 ->searchable()
                                 ->preload()
                                 ->nullable()
@@ -1408,6 +1412,9 @@ class PlaylistResource extends Resource
                             Select::make('vod_stream_profile_id')
                                 ->label('VOD and Series Streaming Profile')
                                 ->relationship('vodStreamProfile', 'name')
+                                ->options(function () {
+                                    return StreamProfile::where('user_id', auth()->id())->pluck('name', 'id');
+                                })
                                 ->searchable()
                                 ->preload()
                                 ->nullable()
