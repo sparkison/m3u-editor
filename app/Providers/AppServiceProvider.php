@@ -108,12 +108,12 @@ class AppServiceProvider extends ServiceProvider
      */
     private function setupMiddleware(): void
     {
+        // API rate limiter (for general API routes)
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by(optional($request->user())->id ?: $request->ip());
         });
-        RateLimiter::for('proxy', function (Request $request) {
-            return Limit::perMinute(60)->by(optional($request->user())->id ?: $request->ip());
-        });
+        
+        // Note: Proxy rate limiting is handled by ProxyRateLimitMiddleware for better performance
     }
 
     /**

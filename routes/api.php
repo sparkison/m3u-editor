@@ -16,7 +16,7 @@ Route::group(['prefix' => 'epg'], function () {
 /*
  * m3u-proxy API routes
  */
-Route::middleware(['throttle:proxy'])->prefix('m3u-proxy')->group(function () {
+Route::middleware(['proxy.throttle'])->prefix('m3u-proxy')->group(function () {
     // Main proxy routes
     Route::post('webhooks', [\App\Http\Controllers\Api\M3uProxyApiController::class, 'handleWebhook'])
         ->name('m3u-proxy.webhook');

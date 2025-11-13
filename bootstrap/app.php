@@ -17,6 +17,9 @@ return Application::configure(basePath: dirname(__DIR__))
             ->use([
                 \App\Http\Middleware\AutoLoginMiddleware::class,
             ])
+            ->alias([
+                'proxy.throttle' => \App\Http\Middleware\ProxyRateLimitMiddleware::class,
+            ])
             ->redirectGuestsTo('login')
             ->trustProxies(at: ['*'])
             ->validateCsrfTokens(except: [
