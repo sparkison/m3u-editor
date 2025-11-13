@@ -992,4 +992,73 @@ class M3uProxyService
             ];
         }
     }
+
+    /**
+     * Validate PUBLIC_URL configuration matches between m3u-editor and m3u-proxy
+     *
+     * @return array Array with 'valid', 'expected', 'actual', and optional 'error' keys
+     */
+    public function validatePublicUrl(): array
+    {
+        if (empty($this->apiBaseUrl)) {
+            return [
+                'valid' => false,
+                'error' => 'M3U Proxy base URL is not configured',
+                'expected' => $this->apiPublicUrl,
+                'actual' => null,
+            ];
+        }
+
+        try {
+            $endpoint = $this->apiBaseUrl . '/health';
+            $response = Http::timeout(5)->acceptJson()
+                ->withHeaders($this->apiToken ? [
+                    'X-API-Token' => $this->apiToken,
+                ] : [])
+                ->get($endpoint);
+
+            if ($response->successful()) {
+                $data = $response->json() ?: [];
+                $proxyPublicUrl = $data['public_url'] ?? null;
+
+                // Normalize URLs for comparison (remove trailing slashes)
+                $expectedUrl = rtrim($this->apiPublicUrl, '/');
+                $actualUrl = rtrim($proxyPublicUrl ?? '', '/');
+
+                $isValid = $expectedUrl === $actualUrl;
+
+                if (!$isValid) {
+                    Log::warning('PUBLIC_URL mismatch detected', [
+                        'expected' => $expectedUrl,
+                        'actual' => $actualUrl,
+                    ]);
+                }
+
+                return [
+                    'valid' => $isValid,
+                    'expected' => $expectedUrl,
+                    'actual' => $actualUrl,
+                    'status' => $data['status'] ?? 'unknown',
+                ];
+            }
+
+            Log::warning('Failed to validate PUBLIC_URL from m3u-proxy: HTTP ' . $response->status());
+
+            return [
+                'valid' => false,
+                'error' => 'M3U Proxy returned status ' . $response->status(),
+                'expected' => $this->apiPublicUrl,
+                'actual' => null,
+            ];
+        } catch (Exception $e) {
+            Log::warning('Failed to validate PUBLIC_URL from m3u-proxy: ' . $e->getMessage());
+
+            return [
+                'valid' => false,
+                'error' => 'Unable to connect to m3u-proxy: ' . $e->getMessage(),
+                'expected' => $this->apiPublicUrl,
+                'actual' => null,
+            ];
+        }
+    }
 }

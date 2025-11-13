@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\M3uProxyService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use Symfony\Component\Process\Process;
@@ -96,6 +97,36 @@ class M3uProxyStatus extends Command
             }
 
             return self::FAILURE;
+        }
+
+        // Validate PUBLIC_URL configuration
+        $this->newLine();
+        $this->info('🔗 PUBLIC_URL Validation:');
+
+        $proxyService = new M3uProxyService();
+        $validation = $proxyService->validatePublicUrl();
+
+        if ($validation['valid']) {
+            $this->info('✅ PUBLIC_URL configuration matches');
+            $this->table(
+                ['Configuration', 'Value'],
+                [
+                    ['m3u-editor PUBLIC_URL', $validation['expected']],
+                    ['m3u-proxy PUBLIC_URL', $validation['actual']],
+                ]
+            );
+        } else {
+            $this->error('❌ PUBLIC_URL mismatch detected!');
+            $this->table(
+                ['Configuration', 'Value'],
+                [
+                    ['m3u-editor PUBLIC_URL', $validation['expected'] ?? 'Not set'],
+                    ['m3u-proxy PUBLIC_URL', $validation['actual'] ?? 'Not set'],
+                ]
+            );
+            $this->newLine();
+            $this->warn('⚠️  HLS streams may not work correctly due to URL mismatch.');
+            $this->info('💡 Update M3U_PROXY_PUBLIC_URL in your .env file to match on both services.');
         }
 
         return self::SUCCESS;
