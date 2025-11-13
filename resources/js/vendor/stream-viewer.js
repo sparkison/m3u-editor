@@ -129,7 +129,12 @@ function streamPlayer() {
                     this.updateStatus(playerId, 'Connected');
                     this.updateStreamDetails(playerId);
                 });
-                
+
+                // Reset error counter on successful fragment load
+                this.hls.on(Hls.Events.FRAG_LOADED, () => {
+                    this.fragmentErrorCount = 0;
+                });
+
                 this.hls.on(Hls.Events.ERROR, (event, data) => {
                     console.error('HLS Error:', data);
                     

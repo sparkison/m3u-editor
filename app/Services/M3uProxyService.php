@@ -356,13 +356,14 @@ class M3uProxyService
             // First, check if there's already an active pooled transcoded stream for this channel
             // This allows multiple clients to share the same transcoded stream without consuming
             // additional provider connections
-            $existingStreamId = $this->findExistingPooledStream($id, $playlist->uuid);
+            $existingStreamId = $this->findExistingPooledStream($id, $playlist->uuid, $profile->id);
 
             if ($existingStreamId) {
                 Log::info('Reusing existing pooled transcoded stream', [
                     'stream_id' => $existingStreamId,
                     'channel_id' => $id,
                     'playlist_uuid' => $playlist->uuid,
+                    'profile_id' => $profile->id,
                 ]);
 
                 return $this->buildTranscodeStreamUrl($existingStreamId, $profile->format ?? 'ts');
@@ -373,6 +374,7 @@ class M3uProxyService
                 'id' => $id,
                 'type' => 'channel',
                 'playlist_uuid' => $playlist->uuid,
+                'profile_id' => $profile->id,
             ]);
 
             // Return transcoded stream URL
@@ -446,13 +448,14 @@ class M3uProxyService
             // First, check if there's already an active pooled transcoded stream for this episode
             // This allows multiple clients to share the same transcoded stream without consuming
             // additional provider connections
-            $existingStreamId = $this->findExistingPooledStream($id, $playlist->uuid);
+            $existingStreamId = $this->findExistingPooledStream($id, $playlist->uuid, $profile->id);
 
             if ($existingStreamId) {
                 Log::info('Reusing existing pooled transcoded stream', [
                     'stream_id' => $existingStreamId,
                     'episode_id' => $id,
                     'playlist_uuid' => $playlist->uuid,
+                    'profile_id' => $profile->id,
                 ]);
 
                 return $this->buildTranscodeStreamUrl($existingStreamId, $profile->format ?? 'ts');
@@ -463,6 +466,7 @@ class M3uProxyService
                 'id' => $id,
                 'type' => 'episode',
                 'playlist_uuid' => $playlist->uuid,
+                'profile_id' => $profile->id,
             ]);
 
             // Return transcoded stream URL
@@ -883,7 +887,7 @@ class M3uProxyService
      * @param string $playlistUuid Playlist UUID
      * @return string|null Stream ID if found, null otherwise
      */
-    protected function findExistingPooledStream(int $channelId, string $playlistUuid): ?string
+    protected function findExistingPooledStream(int $channelId, string $playlistUuid, ?int $profileId = null): ?string
     {
         try {
             // Query m3u-proxy for streams by metadata
@@ -905,23 +909,26 @@ class M3uProxyService
             $data = $response->json();
             $matchingStreams = $data['matching_streams'] ?? [];
 
-            // Find a stream for this channel+playlist that's transcoding
+            // Find a stream for this channel+playlist+profile that's transcoding
             foreach ($matchingStreams as $stream) {
                 $metadata = $stream['metadata'] ?? [];
 
                 // Check if this stream matches our criteria:
                 // 1. Same channel ID
                 // 2. Same playlist UUID
-                // 3. Is a transcoded stream (has transcoding metadata)
+                // 3. Same profile ID (if profile is specified)
+                // 4. Is a transcoded stream (has transcoding metadata)
                 if (
                     ($metadata['id'] ?? null) == $channelId &&
                     ($metadata['playlist_uuid'] ?? null) === $playlistUuid &&
-                    ($metadata['transcoding'] ?? null) === 'true'
+                    ($metadata['transcoding'] ?? null) === 'true' &&
+                    ($profileId === null || ($metadata['profile_id'] ?? null) == $profileId)
                 ) {
                     Log::info('Found existing pooled transcoded stream', [
                         'stream_id' => $stream['stream_id'],
                         'channel_id' => $channelId,
                         'playlist_uuid' => $playlistUuid,
+                        'profile_id' => $profileId,
                         'client_count' => $stream['client_count'],
                     ]);
 
