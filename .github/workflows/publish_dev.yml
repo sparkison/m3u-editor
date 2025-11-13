@@ -31,6 +31,8 @@ jobs:
             GIT_BRANCH=${{ github.ref_name }}
             GIT_COMMIT=${{ github.sha }}
             GIT_TAG=${{ github.ref_type == 'tag' && github.ref_name || '' }}
+            M3U_PROXY_REPO=https://github.com/${{ github.repository_owner }}/m3u-proxy.git
+            M3U_PROXY_BRANCH=dev
           provenance: false
           sbom: false
 
@@ -61,6 +63,8 @@ jobs:
             GIT_BRANCH=${{ github.ref_name }}
             GIT_COMMIT=${{ github.sha }}
             GIT_TAG=${{ github.ref_type == 'tag' && github.ref_name || '' }}
+            M3U_PROXY_REPO=https://github.com/${{ github.repository_owner }}/m3u-proxy.git
+            M3U_PROXY_BRANCH=dev
           provenance: false
           sbom: false
 

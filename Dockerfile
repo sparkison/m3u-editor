@@ -1,4 +1,14 @@
 ########################################
+# Build Arguments - Configurable at build time
+########################################
+# Allow customization of m3u-proxy repository and branch
+# Default: upstream sparkison/m3u-proxy (main branch)
+# Override: --build-arg M3U_PROXY_REPO=https://github.com/yourusername/m3u-proxy.git
+#           --build-arg M3U_PROXY_BRANCH=dev
+ARG M3U_PROXY_REPO=https://github.com/sparkison/m3u-proxy.git
+ARG M3U_PROXY_BRANCH=main
+
+########################################
 # Composer builder — installs PHP dependencies
 ########################################
 FROM composer:2 AS composer
@@ -46,6 +56,8 @@ WORKDIR /var/www/html
 ARG GIT_BRANCH
 ARG GIT_COMMIT
 ARG GIT_TAG
+ARG M3U_PROXY_REPO
+ARG M3U_PROXY_BRANCH
 
 # Set environment variables for git information
 ENV GIT_BRANCH=${GIT_BRANCH}
@@ -101,8 +113,12 @@ COPY ./docker/8.4/redis.conf /etc/redis/redis.tmpl
 RUN chmod 0644 /etc/redis/redis.tmpl
 
 # Clone and setup m3u-proxy (Python-based proxy service)
+# Uses build args M3U_PROXY_REPO and M3U_PROXY_BRANCH for flexibility
+# Default: sparkison/m3u-proxy (main)
+# Override at build time: --build-arg M3U_PROXY_REPO=https://github.com/hektyc/m3u-proxy.git --build-arg M3U_PROXY_BRANCH=dev
 RUN apk add --no-cache python3 py3-pip && \
-    git clone https://github.com/sparkison/m3u-proxy.git /opt/m3u-proxy && \
+    echo "Cloning m3u-proxy from: ${M3U_PROXY_REPO} (branch: ${M3U_PROXY_BRANCH})" && \
+    git clone -b ${M3U_PROXY_BRANCH} ${M3U_PROXY_REPO} /opt/m3u-proxy && \
     cd /opt/m3u-proxy && \
     python3 -m venv .venv && \
     .venv/bin/pip install --no-cache-dir -r requirements.txt

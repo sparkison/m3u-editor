@@ -573,19 +573,18 @@ if [ "${M3U_PROXY_ENABLED}" = "true" ]; then
   echo "🔍 Validating m3u-proxy integration..."
 
   # Check if m3u-proxy configuration is accessible
-  if php artisan config:show proxy.m3u_proxy_public_url > /dev/null 2>&1; then
-    LARAVEL_PUBLIC_URL=$(php artisan config:show proxy.m3u_proxy_public_url 2>/dev/null | grep -v "^$" | tail -1)
+  # Use config:get instead of config:show for more reliable output
+  LARAVEL_PUBLIC_URL=$(php artisan tinker --execute="echo config('proxy.m3u_proxy_public_url');" 2>/dev/null | grep -v "^$" | grep -v "Psy Shell" | tail -1)
 
-    # Compare Laravel config with environment variable
-    if [ -n "$LARAVEL_PUBLIC_URL" ] && [ "$LARAVEL_PUBLIC_URL" != "$M3U_PROXY_PUBLIC_URL" ]; then
-      echo "⚠️  WARNING: Configuration mismatch detected!"
-      echo "    Laravel config: ${LARAVEL_PUBLIC_URL}"
-      echo "    Environment:    ${M3U_PROXY_PUBLIC_URL}"
-      echo "    This may cause HLS streaming failures!"
-      echo "    Run 'php artisan config:clear' and restart the container."
-    else
-      echo "✅ m3u-proxy configuration validated"
-    fi
+  # Compare Laravel config with environment variable (only if Laravel config is set)
+  if [ -n "$LARAVEL_PUBLIC_URL" ] && [ "$LARAVEL_PUBLIC_URL" != "null" ] && [ "$LARAVEL_PUBLIC_URL" != "$M3U_PROXY_PUBLIC_URL" ]; then
+    echo "⚠️  WARNING: Configuration mismatch detected!"
+    echo "    Laravel config: ${LARAVEL_PUBLIC_URL}"
+    echo "    Environment:    ${M3U_PROXY_PUBLIC_URL}"
+    echo "    This may cause HLS streaming failures!"
+    echo "    Run 'php artisan config:clear' and restart the container."
+  else
+    echo "✅ m3u-proxy configuration validated"
   fi
 
   echo ""
