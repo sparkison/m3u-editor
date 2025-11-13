@@ -54,6 +54,7 @@ class Playlist extends Model
         'auto_merge_config' => 'array',
         'emby_config' => 'array',
         'custom_headers' => 'array',
+        'strict_live_ts' => 'boolean',
         'status' => Status::class,
         'id_channel_by' => PlaylistChannelId::class,
         'source_type' => PlaylistSourceType::class,

@@ -26,6 +26,7 @@ class PlaylistAlias extends Model
         'enable_proxy' => 'boolean',
         'priority' => 'integer',
         'custom_headers' => 'array',
+        'strict_live_ts' => 'boolean',
     ];
 
     public function user(): BelongsTo
