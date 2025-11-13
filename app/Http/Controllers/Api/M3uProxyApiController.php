@@ -65,11 +65,13 @@ class M3uProxyApiController extends Controller
      */
     public function episode(Request $request, $id, $playlist = null)
     {
-        $episode = Episode::query()->with([
-            'playlist.streamProfile',
-            'playlist.vodStreamProfile'
-        ])->findOrFail($id);
+        $episode = Episode::findOrFail($id);
         $playlist = $playlist ?? $episode->playlist;
+
+        // Load stream profiles
+        $playlist->load([
+            'vodStreamProfile'
+        ]);
 
         // For Series, use the VOD stream profile if set
         $profile = $playlist->vodStreamProfile;
@@ -90,16 +92,18 @@ class M3uProxyApiController extends Controller
      */
     public function channelPlayer(Request $request, $id, $uuid = null)
     {
-        $channel = Channel::query()->with([
-            'playlist.streamProfile',
-            'playlist.vodStreamProfile'
-        ])->findOrFail($id);
-
+        $channel = Channel::findOrFail($id);
         if ($uuid) {
             $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
         } else {
             $playlist = $channel->getEffectivePlaylist();
         }
+
+        // Load stream profiles
+        $playlist->load([
+            'streamProfile',
+            'vodStreamProfile'
+        ]);
 
         // Get stream profile from playlist if set
         $profile = null;
@@ -115,7 +119,6 @@ class M3uProxyApiController extends Controller
         if (! $profile) {
             // Use default profile set for the player
             $settings = app(GeneralSettings::class);
-
             if ($channel->is_vod) {
                 $profileId = $settings->default_vod_stream_profile_id ?? null;
             } else {
@@ -140,22 +143,20 @@ class M3uProxyApiController extends Controller
      */
     public function episodePlayer(Request $request, $id, $uuid = null)
     {
-        $episode = Episode::query()->with([
-            'playlist.streamProfile',
-            'playlist.vodStreamProfile'
-        ])->findOrFail($id);
-
+        $episode = Episode::findOrFail($id);
         if ($uuid) {
             $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
         } else {
             $playlist = $episode->playlist;
         }
 
+        // Load stream profiles
+        $playlist->load([
+            'vodStreamProfile'
+        ]);
+
         // Get stream profile from playlist if set
-        $profile = null;
-        if ($playlist->vod_stream_profile_id) {
-            $profile = $playlist->vodStreamProfile;
-        }
+        $profile = $playlist->vodStreamProfile;
         if (! $profile) {
             // Use default profile set for the player
             $settings = app(GeneralSettings::class);
