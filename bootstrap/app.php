@@ -23,7 +23,8 @@ return Application::configure(basePath: dirname(__DIR__))
                 'webhook/test',
                 'channel',
                 'channel/*',
-            ]);
+            ])
+            ->throttleWithRedis();
     })
     ->withExceptions(function (Exceptions $exceptions) {
         // TODO: Review global exception handling for MaxRetriesReachedException after StreamController refactor.

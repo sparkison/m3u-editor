@@ -16,7 +16,7 @@ Route::group(['prefix' => 'epg'], function () {
 /*
  * m3u-proxy API routes
  */
-Route::group(['prefix' => 'm3u-proxy'], function () {
+Route::middleware(['throttle:proxy'])->prefix('m3u-proxy')->group(function () {
     // Main proxy routes
     Route::post('webhooks', [\App\Http\Controllers\Api\M3uProxyApiController::class, 'handleWebhook'])
         ->name('m3u-proxy.webhook');
@@ -28,6 +28,6 @@ Route::group(['prefix' => 'm3u-proxy'], function () {
     // Player preview routes
     Route::get('channel/{id}/player/{uuid?}', [\App\Http\Controllers\Api\M3uProxyApiController::class, 'channelPlayer'])
         ->name('m3u-proxy.channel.player');
-    Route::get('episode/{id}/player/{?uuid?}', [\App\Http\Controllers\Api\M3uProxyApiController::class, 'episodePlayer'])
+    Route::get('episode/{id}/player/{uuid?}', [\App\Http\Controllers\Api\M3uProxyApiController::class, 'episodePlayer'])
         ->name('m3u-proxy.episode.player');
 });
