@@ -53,6 +53,15 @@ class Preferences extends SettingsPage
 
     protected static ?string $title = 'Settings';
 
+    /**
+     * Check if the user can access this page.
+     * Only admin users can access the Preferences page.
+     */
+    public static function canAccess(): bool
+    {
+        return auth()->check() && auth()->user()->isAdmin();
+    }
+
     protected function getActions(): array
     {
         return [
@@ -177,7 +186,7 @@ class Preferences extends SettingsPage
                                             ->columnSpan(2)
                                             ->searchable()
                                             ->options(function () {
-                                                return StreamProfile::where('user_id', Auth::id())->pluck('name', 'id');
+                                                return StreamProfile::where('user_id', auth()->id())->pluck('name', 'id');
                                             })
                                             ->hintAction(
                                                 Action::make('manage_profiles')
@@ -194,7 +203,7 @@ class Preferences extends SettingsPage
                                             ->columnSpan(2)
                                             ->searchable()
                                             ->options(function () {
-                                                return StreamProfile::where('user_id', Auth::id())->pluck('name', 'id');
+                                                return StreamProfile::where('user_id', auth()->id())->pluck('name', 'id');
                                             })
                                             ->hintAction(
                                                 Action::make('manage_profiles')
@@ -839,7 +848,7 @@ class Preferences extends SettingsPage
                                                     ->title('WebSocket Connection Test')
                                                     ->body($data['message'])
                                                     ->persistent()
-                                                    ->broadcast(Auth::user());
+                                                    ->broadcast(auth()->user());
                                             }),
                                         // Action::make('view_logs')
                                         //     ->label('View Logs')

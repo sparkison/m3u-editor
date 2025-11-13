@@ -104,13 +104,12 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
-     * Who can access the Filament admin panel in production?
+     * Who can access the Filament panel in production?
      * Allow all users by default.
      */
     public function canAccessPanel(Panel $panel): bool
     {
         return true;
-        // return str_ends_with($this->email, '@yourdomain.com') && $this->hasVerifiedEmail();
     }
 
     public function getFilamentAvatarUrl(): ?string
@@ -135,6 +134,36 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
+     * Users merged playlists.
+     */
+    public function mergedPlaylists()
+    {
+        return $this->hasMany(MergedPlaylist::class);
+    }
+
+    /**
+     * Users playlist aliases.
+     */
+    public function playlistAliases()
+    {
+        return $this->hasMany(PlaylistAlias::class);
+    }
+
+    /**
+     * Get all playlist UUIDs for this user.
+     *
+     * @return array<string>
+     */
+    public function getAllPlaylistUuids(): array
+    {
+        $uuids = $this->playlists()->select('id', 'user_id', 'uuid')->pluck('uuid')->toArray();
+        $uuids = array_merge($uuids, $this->customPlaylists()->select('id', 'user_id', 'uuid')->pluck('uuid')->toArray());
+        $uuids = array_merge($uuids, $this->mergedPlaylists()->select('id', 'user_id', 'uuid')->pluck('uuid')->toArray());
+        $uuids = array_merge($uuids, $this->playlistAliases()->select('id', 'user_id', 'uuid')->pluck('uuid')->toArray());
+        return $uuids;
+    }
+
+    /**
      * Users epgs.
      */
     public function epgs()
@@ -155,5 +184,14 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function series()
     {
         return $this->hasMany(Series::class);
+    }
+
+    /**
+     * Check if user is an admin.
+     * Admin users have full access to all resources in the system.
+     */
+    public function isAdmin(): bool
+    {
+        return in_array($this->email, config('dev.admin_emails', []));
     }
 }

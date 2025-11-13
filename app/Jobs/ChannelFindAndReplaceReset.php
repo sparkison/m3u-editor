@@ -53,6 +53,7 @@ class ChannelFindAndReplaceReset implements ShouldQueue
         if (!$this->channels) {
             // Use chunking to process large datasets efficiently
             Channel::query()
+                ->where('user_id', $this->user_id)
                 ->when(!$this->all_playlists && $this->playlist_id, fn($query) => $query->where('playlist_id', $this->playlist_id))
                 ->whereNotNull($customColumn) // Only get channels that have custom values to reset
                 ->chunkById(1000, function ($channels) use ($customColumn, &$totalUpdated) {

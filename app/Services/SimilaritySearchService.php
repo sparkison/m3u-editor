@@ -166,8 +166,8 @@ class SimilaritySearchService
             ->where(function ($query) use ($normalizedChan, $fallbackName) {
                 // Use LIKE with at least 3 characters for better filtering
                 // Also try the original fallback name for cases where normalization is too aggressive
-                $searchTerm = strlen($normalizedChan) >= 5 ? substr($normalizedChan, 0, 5) : $normalizedChan;
-                $originalSearch = mb_strtolower(substr($fallbackName, 0, min(self::ORIGINAL_SEARCH_PREFIX_LENGTH, strlen($fallbackName))), 'UTF-8');
+                $searchTerm = mb_strlen($normalizedChan, 'UTF-8') >= 5 ? mb_substr($normalizedChan, 0, 5, 'UTF-8') : $normalizedChan;
+                $originalSearch = mb_strtolower(mb_substr($fallbackName, 0, min(self::ORIGINAL_SEARCH_PREFIX_LENGTH, mb_strlen($fallbackName, 'UTF-8')), 'UTF-8'), 'UTF-8');
 
                 // Optimized query: search each column once with both search terms combined
                 $query->where(function ($subQuery) use ($searchTerm, $originalSearch) {
@@ -220,14 +220,17 @@ class SimilaritySearchService
             $finalScore = min($score, $scoreOriginal);
 
             // Calculate similarity percentage for better filtering
-            $maxLength = max(strlen($normalizedChan), strlen($normalizedEpg));
+            $maxLength = max(mb_strlen($normalizedChan, 'UTF-8'), mb_strlen($normalizedEpg, 'UTF-8'));
             $similarityPercentage = $maxLength > 0 ? (1 - ($finalScore / $maxLength)) * 100 : 0;
 
             // Apply region-based bonus (convert to penalty for Levenshtein)
             $regionBonus = 0;
-            if ($regionCode && stripos(mb_strtolower($epgChannel->channel_id.' '.$epgChannel->name, 'UTF-8'), $regionCode) !== false) {
-                $finalScore = max(0, $finalScore - 15); // Subtract to improve the match
-                $regionBonus = 15;
+            if ($regionCode) {
+                $haystack = mb_strtolower(($epgChannel->channel_id ?? '') . ' ' . ($epgChannel->name ?? ''), 'UTF-8');
+                if (mb_stripos($haystack, $regionCode, 0, 'UTF-8') !== false) {
+                    $finalScore = max(0, $finalScore - 15); // Subtract to improve the match
+                    $regionBonus = 15;
+                }
             }
 
             // Store candidate with metadata for better decision making
@@ -343,13 +346,26 @@ class SimilaritySearchService
         // This preserves HDraw², FHD+, etc.
         $name = preg_replace('/[^\w\s²³\+\-]/', '', $name);
 
-        // Remove stop words
+        // Work with UTF-8 and lowercase properly
+        $name = mb_strtolower($name, 'UTF-8');
+
+        // Remove brackets and parentheses (Unicode-aware)
+        $name = preg_replace('/\[.*?\]|\(.*?\)/u', '', $name);
+
+        // Remove special characters but keep letters & numbers from all scripts
+        $name = preg_replace('/[^\p{L}\p{N}\s]/u', '', $name);
+
+        // Normalize whitespace
+        $name = preg_replace('/\s+/u', ' ', $name);
+
+        // Remove stop words (they are lowercased English tokens)
         $tokens = explode(' ', $name);
-        $tokens = array_diff($tokens, $this->stopWords);
+        $tokens = array_filter($tokens, fn($t) => $t !== '');
+        $tokens = array_values(array_diff($tokens, $this->stopWords));
 
         // Optionally remove quality indicators
         if ($this->removeQualityIndicators) {
-            $tokens = array_diff($tokens, $this->qualityIndicators);
+            $tokens = array_values(array_diff($tokens, $this->qualityIndicators));
         }
 
         return trim(implode(' ', $tokens));

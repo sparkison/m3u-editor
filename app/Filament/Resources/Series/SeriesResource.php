@@ -56,9 +56,12 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use App\Traits\HasUserFiltering;
 
 class SeriesResource extends Resource
 {
+    use HasUserFiltering;
+
     protected static ?string $model = Series::class;
 
     protected static ?string $recordTitleAttribute = 'name';
@@ -66,12 +69,6 @@ class SeriesResource extends Resource
     public static function getGloballySearchableAttributes(): array
     {
         return ['name', 'plot', 'genre', 'release_date', 'director'];
-    }
-
-    public static function getGlobalSearchEloquentQuery(): Builder
-    {
-        return parent::getGlobalSearchEloquentQuery()
-            ->where('user_id', auth()->id());
     }
 
     protected static string|\UnitEnum|null $navigationGroup = 'Series';
@@ -256,6 +253,7 @@ class SeriesResource extends Resource
                             ->dispatch(new ProcessM3uImportSeriesEpisodes(
                                 playlistSeries: $record,
                                 overwrite_existing: $data['overwrite_existing'] ?? false,
+                                sync_stream_files: false,
                             ));
                     })->after(function () {
                         Notification::make()

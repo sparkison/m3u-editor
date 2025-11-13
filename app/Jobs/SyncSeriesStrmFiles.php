@@ -44,7 +44,10 @@ class SyncSeriesStrmFiles implements ShouldQueue
 
             // Process all series in chunks
             Series::query()
-                ->where('enabled', true)
+                ->where([
+                    ['enabled', true],
+                    ['user_id', $this->user_id],
+                ])
                 ->when($this->playlist_id, function ($query) {
                     $query->where('playlist_id', $this->playlist_id);
                 })

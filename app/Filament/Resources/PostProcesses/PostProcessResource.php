@@ -35,9 +35,12 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use App\Traits\HasUserFiltering;
 
 class PostProcessResource extends Resource
 {
+    use HasUserFiltering;
+
     protected static ?string $model = PostProcess::class;
 
     protected static ?string $recordTitleAttribute = 'name';
@@ -49,12 +52,6 @@ class PostProcessResource extends Resource
     public static function getGloballySearchableAttributes(): array
     {
         return ['name'];
-    }
-
-    public static function getGlobalSearchEloquentQuery(): Builder
-    {
-        return parent::getGlobalSearchEloquentQuery()
-            ->where('user_id', auth()->id());
     }
 
     public static function getNavigationSort(): ?int

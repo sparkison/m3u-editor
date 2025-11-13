@@ -25,6 +25,16 @@ class M3uProxyStreamMonitor extends Page
 
     protected static ?string $title = 'M3U Proxy Stream Monitor';
 
+    /**
+     * Check if the user can access this page.
+     * Only admin users can access the Preferences page.
+     */
+    public static function canAccess(): bool
+    {
+        return true; // Allow all users to access the stream monitor
+        // return auth()->check() && auth()->user()->isAdmin();
+    }
+
     protected static string|\UnitEnum|null $navigationGroup = 'Proxy';
 
     protected static ?int $navigationSort = 6;

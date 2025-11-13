@@ -55,7 +55,7 @@ class CreatePlaylist extends CreateRecord
                     // Create new auth and assign to playlist
                     if (!empty($data['auth_username']) && !empty($data['auth_password'])) {
                         $auth = PlaylistAuth::create([
-                            'user_id' => Auth::id(),
+                            'user_id' => auth()->id(),
                             'name' => $data['auth_name'] ?: 'Auth for ' . $this->record->name,
                             'username' => $data['auth_username'],
                             'password' => $data['auth_password'],

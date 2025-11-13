@@ -262,22 +262,20 @@ class M3uProxyService
      * Request or build a channel stream URL from the external m3u-proxy server.
      *
      * @param  Playlist|CustomPlaylist|MergedPlaylist|PlaylistAlias  $playlist
-     * @param  int  $id
+     * @param  Channel  $channel
      * @param  Request|null  $request  Optional request for additional parameters (e.g. timeshift)
      * @param  StreamProfile|null  $profile  Optional stream profile to apply
      *
      * @throws Exception when base URL missing or API returns an error
      */
-    public function getChannelUrl($playlist, $id, ?Request $request = null, ?StreamProfile $profile = null): string
+    public function getChannelUrl($playlist, $channel, ?Request $request = null, ?StreamProfile $profile = null): string
     {
         if (empty($this->apiBaseUrl)) {
             throw new Exception('M3U Proxy base URL is not configured');
         }
 
-        $channel = Channel::find($id);
-        if (empty($channel)) {
-            throw new Exception('Channel not found');
-        }
+        // Get channel ID
+        $id = $channel->id;
 
         // Check if primary playlist has stream limits and if it's at capacity
         $primaryUrl = null;
@@ -385,6 +383,7 @@ class M3uProxyService
                 'id' => $id,
                 'type' => 'channel',
                 'playlist_uuid' => $playlist->uuid,
+                'strict_live_ts' => $playlist->strict_live_ts,
             ]);
 
             // Get the format from the URL
@@ -400,21 +399,19 @@ class M3uProxyService
      * Request or build an episode stream URL from the external m3u-proxy server.
      *
      * @param  Playlist|CustomPlaylist|MergedPlaylist|PlaylistAlias  $playlist
-     * @param  int  $id
+     * @param  Episode  $episode
      * @param  StreamProfile|null  $profile  Optional stream profile to apply
      *
      * @throws Exception when base URL missing or API returns an error
      */
-    public function getEpisodeUrl($playlist, $id, ?StreamProfile $profile = null): string
+    public function getEpisodeUrl($playlist, $episode, ?StreamProfile $profile = null): string
     {
         if (empty($this->apiBaseUrl)) {
             throw new Exception('M3U Proxy base URL is not configured');
         }
 
-        $episode = Episode::find($id);
-        if (empty($episode)) {
-            throw new Exception('Episode not found');
-        }
+        // Get episode ID
+        $id = $episode->id;
 
         // Check if playlist has stream limits and if it's at capacity
         if ($playlist->available_streams !== 0) {
@@ -477,6 +474,7 @@ class M3uProxyService
                 'id' => $id,
                 'type' => 'episode',
                 'playlist_uuid' => $playlist->uuid,
+                'strict_live_ts' => $playlist->strict_live_ts,
             ]);
 
             // Get the format from the URL
@@ -584,10 +582,15 @@ class M3uProxyService
             if ($response->successful()) {
                 $data = $response->json() ?: [];
 
+                // Need to filter out streams not owned by this user
+                $playlistUuids = auth()->user()->getAllPlaylistUuids();
+                $streams = array_filter($data['streams'] ?? [], function ($stream) use ($playlistUuids) {
+                    return isset($stream['metadata']['playlist_uuid']) && in_array($stream['metadata']['playlist_uuid'], $playlistUuids);
+                });
                 return [
                     'success' => true,
-                    'streams' => $data['streams'] ?? [],
-                    'total' => $data['total'] ?? 0,
+                    'streams' => $streams ?? [],
+                    'total' =>  count($streams) ?? 0,
                 ];
             }
 
@@ -686,6 +689,12 @@ class M3uProxyService
                 'url' => $url,
                 'metadata' => $metadata,
             ];
+
+            // Handle strict_live_ts flag if set in metadata
+            if ($metadata['strict_live_ts'] ?? false) {
+                $payload['strict_live_ts'] = true;
+                unset($metadata['strict_live_ts']);
+            }
 
             // Add failovers if provided
             if (!empty($failovers)) {
@@ -850,8 +859,8 @@ class M3uProxyService
      */
     protected function buildTranscodeStreamUrl(string $streamId, $format = 'ts'): string
     {
-        // NOTE: Format not used currently, but could be used to adjust URL structure if needed
-        return $this->apiPublicUrl . "/stream/{$streamId}";
+        // Transcode route is the same logic as direct now
+        return $this->buildProxyUrl($streamId, $format);
     }
 
     /**
@@ -863,7 +872,7 @@ class M3uProxyService
     protected function buildProxyUrl(string $streamId, $format = 'hls'): string
     {
         $baseUrl = $this->apiPublicUrl;
-        if ($format === 'hls') {
+        if ($format === 'hls' || $format === 'm3u8') {
             // HLS format: /hls/{stream_id}/playlist.m3u8
             return $baseUrl . '/hls/' . $streamId . '/playlist.m3u8';
         }

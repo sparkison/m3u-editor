@@ -195,7 +195,7 @@ class ChannelsRelationManager extends RelationManager
                             ->getRecordSelect()
                             ->getSearchResultsUsing(function (string $search) {
                                 $searchLower = strtolower($search);
-                                $channels = Auth::user()->channels()
+                                $channels = auth()->user()->channels()
                                     ->withoutEagerLoads()
                                     ->with('playlist')
                                     ->where('is_vod', false) // Only live channels

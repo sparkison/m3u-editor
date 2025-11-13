@@ -21,7 +21,7 @@ class EpgPolicy
      */
     public function view(User $user, Epg $epg): bool
     {
-        return $user->id === $epg->user_id;
+        return $user->isAdmin() || $user->id === $epg->user_id;
     }
 
     /**
@@ -37,7 +37,7 @@ class EpgPolicy
      */
     public function update(User $user, Epg $epg): bool
     {
-        return $user->id === $epg->user_id;
+        return $user->isAdmin() || $user->id === $epg->user_id;
     }
 
     /**
@@ -45,7 +45,7 @@ class EpgPolicy
      */
     public function delete(User $user, Epg $epg): bool
     {
-        return $user->id === $epg->user_id;
+        return $user->isAdmin() || $user->id === $epg->user_id;
     }
 
     /**
@@ -53,7 +53,7 @@ class EpgPolicy
      */
     public function restore(User $user, Epg $epg): bool
     {
-        return $user->id === $epg->user_id;
+        return $user->isAdmin() || $user->id === $epg->user_id;
     }
 
     /**
@@ -61,6 +61,6 @@ class EpgPolicy
      */
     public function forceDelete(User $user, Epg $epg): bool
     {
-        return $user->id === $epg->user_id;
+        return $user->isAdmin() || $user->id === $epg->user_id;
     }
 }

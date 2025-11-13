@@ -172,10 +172,11 @@ class ListVod extends ListRecords
                             ->searchable(),
                     ])
                     ->action(function ($data) {
+                        $playlist = Playlist::find($data['playlist'] ?? null);
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new ProcessVodChannels(
                                 force: $data['overwrite_existing'] ?? false,
-                                playlist: $data['playlist'] ?? null,
+                                playlist: $playlist,
                             ));
                     })
                     ->after(function () {
@@ -202,9 +203,10 @@ class ListVod extends ListRecords
                             ->searchable(),
                     ])
                     ->action(function ($data) {
+                        $playlist = Playlist::find($data['playlist'] ?? null);
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new SyncVodStrmFiles(
-                                playlist: $data['playlist'] ?? null,
+                                playlist: $playlist,
                             ));
                     })->after(function () {
                         Notification::make()

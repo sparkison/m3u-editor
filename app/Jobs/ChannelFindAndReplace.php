@@ -62,6 +62,7 @@ class ChannelFindAndReplace implements ShouldQueue
         if (!$this->channels) {
             // Use chunking to process large datasets efficiently
             Channel::query()
+                ->where('user_id', $this->user_id)
                 ->when(!$this->all_playlists && $this->playlist_id, fn($query) => $query->where('playlist_id', $this->playlist_id))
                 ->chunkById(1000, function ($channels) use ($customColumn, &$updated) {
                     $updated += $this->processChannelChunk($channels, $customColumn);
