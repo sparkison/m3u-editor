@@ -15,11 +15,11 @@ class SimilaritySearchService
     private const ORIGINAL_SEARCH_PREFIX_LENGTH = 10;
 
     // Configurable parameters
-    private $bestFuzzyThreshold = 15;      // Reduced from 40 for stricter exact matches
+    private $bestFuzzyThreshold = 8;       // Stricter threshold for exact matches (reduced from 15)
 
-    private $upperFuzzyThreshold = 50;     // Reduced from 70 for better filtering
+    private $upperFuzzyThreshold = 25;     // Much stricter - only allow very similar names (reduced from 50)
 
-    private $embedSimThreshold = 0.75;     // Increased from 0.65 for stricter similarity
+    private $embedSimThreshold = 0.80;     // Higher similarity required (increased from 0.75)
 
     private $minChannelLength = 3;         // Minimum length to consider for matching
 
@@ -65,21 +65,56 @@ class SimilaritySearchService
     private $removeQualityIndicators = false;
 
     /**
+     * Sanitizes UTF-8 encoding in strings to prevent PostgreSQL errors.
+     *
+     * @param  string|null  $value
+     * @return string|null
+     */
+    private function sanitizeUtf8(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        // Convert to valid UTF-8, removing invalid sequences
+        $sanitized = mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+
+        // Remove control characters that can cause issues
+        $sanitized = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $sanitized);
+
+        return $sanitized;
+    }
+
+    /**
      * Find the best matching EPG channel for a given channel.
      *
      * @param  Channel  $channel
      * @param  Epg  $epg
      * @param  bool  $removeQualityIndicators  Whether to remove quality indicators during matching
+     * @param  int  $similarityThreshold  Minimum similarity percentage (0-100)
+     * @param  int  $fuzzyMaxDistance  Maximum Levenshtein distance for fuzzy matching
+     * @param  int  $exactMatchDistance  Maximum distance for exact matches
      */
-    public function findMatchingEpgChannel($channel, $epg = null, $removeQualityIndicators = false): ?EpgChannel
+    public function findMatchingEpgChannel(
+        $channel, 
+        $epg = null, 
+        $removeQualityIndicators = false,
+        $similarityThreshold = 70,
+        $fuzzyMaxDistance = 25,
+        $exactMatchDistance = 8
+    ): ?EpgChannel
     {
-        // Set the instance variable for use in normalizeChannelName
+        // Set the instance variables
         $this->removeQualityIndicators = $removeQualityIndicators;
+        $this->upperFuzzyThreshold = $fuzzyMaxDistance;
+        $this->bestFuzzyThreshold = $exactMatchDistance;
 
         $debug = false; // config('app.debug');
-        $regionCode = $epg->preferred_local ? strtolower($epg->preferred_local) : null;
-        $title = $channel->title_custom ?? $channel->title;
-        $name = $channel->name_custom ?? $channel->name;
+        $regionCode = $epg->preferred_local ? mb_strtolower($epg->preferred_local, 'UTF-8') : null;
+        
+        // Sanitize UTF-8 encoding immediately to prevent PostgreSQL errors
+        $title = $this->sanitizeUtf8($channel->title_custom ?? $channel->title);
+        $name = $this->sanitizeUtf8($channel->name_custom ?? $channel->name);
         $fallbackName = trim($title ?: $name);
         $normalizedChan = $this->normalizeChannelName($fallbackName);
 
@@ -93,7 +128,7 @@ class SimilaritySearchService
 
         // Step 1: Try to find exact normalized matches first (highest priority)
         // Normalize the search term once (remove spaces, dashes, underscores)
-        $normalizedSearch = strtolower(str_replace([' ', '-', '_'], '', $normalizedChan));
+        $normalizedSearch = mb_strtolower(str_replace([' ', '-', '_'], '', $normalizedChan), 'UTF-8');
 
         // Find candidates that could match when normalized
         // Use LIKE with wildcards to find potential matches, then verify in PHP
@@ -110,9 +145,9 @@ class SimilaritySearchService
 
         // Verify exact match after normalization in PHP (faster than DB REPLACE operations)
         foreach ($exactMatchCandidates as $candidate) {
-            $normalizedChannelId = strtolower(str_replace([' ', '-', '_'], '', $candidate->channel_id ?? ''));
-            $normalizedName = strtolower(str_replace([' ', '-', '_'], '', $candidate->name ?? ''));
-            $normalizedDisplayName = strtolower(str_replace([' ', '-', '_'], '', $candidate->display_name ?? ''));
+            $normalizedChannelId = mb_strtolower(str_replace([' ', '-', '_'], '', $candidate->channel_id ?? ''), 'UTF-8');
+            $normalizedName = mb_strtolower(str_replace([' ', '-', '_'], '', $candidate->name ?? ''), 'UTF-8');
+            $normalizedDisplayName = mb_strtolower(str_replace([' ', '-', '_'], '', $candidate->display_name ?? ''), 'UTF-8');
 
             if ($normalizedSearch === $normalizedChannelId ||
                 $normalizedSearch === $normalizedName ||
@@ -132,7 +167,7 @@ class SimilaritySearchService
                 // Use LIKE with at least 3 characters for better filtering
                 // Also try the original fallback name for cases where normalization is too aggressive
                 $searchTerm = strlen($normalizedChan) >= 5 ? substr($normalizedChan, 0, 5) : $normalizedChan;
-                $originalSearch = strtolower(substr($fallbackName, 0, min(self::ORIGINAL_SEARCH_PREFIX_LENGTH, strlen($fallbackName))));
+                $originalSearch = mb_strtolower(substr($fallbackName, 0, min(self::ORIGINAL_SEARCH_PREFIX_LENGTH, strlen($fallbackName))), 'UTF-8');
 
                 // Optimized query: search each column once with both search terms combined
                 $query->where(function ($subQuery) use ($searchTerm, $originalSearch) {
@@ -172,8 +207,8 @@ class SimilaritySearchService
             }
 
             // Also try with less aggressive normalization (keep more info)
-            $epgNameOriginal = strtolower(trim($epgChannel->name ?? $epgChannel->channel_id));
-            $channelNameOriginal = strtolower(trim($fallbackName));
+            $epgNameOriginal = mb_strtolower(trim($epgChannel->name ?? $epgChannel->channel_id), 'UTF-8');
+            $channelNameOriginal = mb_strtolower(trim($fallbackName), 'UTF-8');
 
             // Calculate fuzzy similarity with normalized names
             $score = levenshtein($normalizedChan, $normalizedEpg);
@@ -190,7 +225,7 @@ class SimilaritySearchService
 
             // Apply region-based bonus (convert to penalty for Levenshtein)
             $regionBonus = 0;
-            if ($regionCode && stripos(strtolower($epgChannel->channel_id.' '.$epgChannel->name), $regionCode) !== false) {
+            if ($regionCode && stripos(mb_strtolower($epgChannel->channel_id.' '.$epgChannel->name, 'UTF-8'), $regionCode) !== false) {
                 $finalScore = max(0, $finalScore - 15); // Subtract to improve the match
                 $regionBonus = 15;
             }
@@ -216,9 +251,10 @@ class SimilaritySearchService
             }
         }
 
-        // Filter out poor matches - require at least 50% similarity (lowered from 60% for better recall)
-        $candidates = array_filter($candidates, function ($candidate) {
-            return $candidate['similarity'] >= 50;
+        // Filter out poor matches - use configurable similarity threshold
+        // This prevents false positives like "Spiegel TV HD" matching "Spiegel Geschichte SD"
+        $candidates = array_filter($candidates, function ($candidate) use ($similarityThreshold) {
+            return $candidate['similarity'] >= $similarityThreshold;
         });
 
         // Sort candidates by score (lower is better), then by similarity (higher is better)
@@ -297,11 +333,15 @@ class SimilaritySearchService
         if (! $name) {
             return '';
         }
-        $name = strtolower($name);
-        // Remove brackets and parentheses
-        $name = preg_replace('/\[.*?\]|\(.*?\)/', '', $name);
-        // Remove special characters
-        $name = preg_replace('/[^\w\s]/', '', $name);
+        $name = mb_strtolower($name, 'UTF-8');
+        
+        // Remove brackets and parentheses CONTENT but keep the channel name intact
+        $name = preg_replace('/\[.*?\]/', '', $name);
+        $name = preg_replace('/\(.*?\)/', '', $name);
+        
+        // Only remove truly special characters, but keep: ², ³, +, numbers
+        // This preserves HDraw², FHD+, etc.
+        $name = preg_replace('/[^\w\s²³\+\-]/', '', $name);
 
         // Remove stop words
         $tokens = explode(' ', $name);
