@@ -588,12 +588,14 @@ if [ "${M3U_PROXY_ENABLED}" = "true" ]; then
   fi
 
   echo ""
-
-  # Register webhook for real-time cache invalidation
-  echo "🔗 Registering m3u-proxy webhook for cache invalidation..."
-  php artisan m3u-proxy:register-webhook
-  echo ""
 fi
+
+# Register webhook for real-time cache invalidation
+# This works for both embedded and external m3u-proxy modes
+# The artisan command will check if m3u-proxy is configured before attempting registration
+echo "🔗 Registering m3u-proxy webhook for cache invalidation..."
+php artisan m3u-proxy:register-webhook
+echo ""
 
 # Ensure composer dir is writable
 [ ! -d /.composer ] && mkdir /.composer
