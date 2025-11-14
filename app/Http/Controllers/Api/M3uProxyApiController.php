@@ -46,6 +46,18 @@ class M3uProxyApiController extends Controller
             $profile = $playlist->streamProfile;
         }
 
+        // If no profile set, use default profile from settings
+        // This ensures consistent behavior across all clients (preview player, external players, etc.)
+        if (! $profile) {
+            $settings = app(GeneralSettings::class);
+            if ($channel->is_vod) {
+                $profileId = $settings->default_vod_stream_profile_id ?? null;
+            } else {
+                $profileId = $settings->default_stream_profile_id ?? null;
+            }
+            $profile = $profileId ? StreamProfile::find($profileId) : null;
+        }
+
         $url = app(M3uProxyService::class)->getChannelUrl($playlist, $channel, $request, $profile);
 
         return redirect($url);
