@@ -24,7 +24,7 @@ jobs:
         id: meta-amd64
         uses: docker/metadata-action@v5
         with:
-          images: sparkison/m3u-editor
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/m3u-editor
           tags: |
             type=semver,pattern={{version}},suffix=-amd64
             type=raw,value=latest,suffix=-amd64
@@ -66,7 +66,7 @@ jobs:
         id: meta-arm64
         uses: docker/metadata-action@v5
         with:
-          images: sparkison/m3u-editor
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/m3u-editor
           tags: |
             type=semver,pattern={{version}},suffix=-arm64
             type=raw,value=latest,suffix=-arm64
@@ -112,22 +112,22 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: sparkison/m3u-editor
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/m3u-editor
           tags: |
             type=semver,pattern={{version}}
-            type=raw,value=latest 
+            type=raw,value=latest
             # The 'latest' tag for the manifest will combine 'latest-amd64' and 'latest-arm64'
 
       - name: Create and push semver manifest list
         run: |
-          docker manifest create sparkison/m3u-editor:${{ steps.meta.outputs.version }} \
-            sparkison/m3u-editor:${{ steps.meta.outputs.version }}-amd64 \
-            sparkison/m3u-editor:${{ steps.meta.outputs.version }}-arm64
-          docker manifest push sparkison/m3u-editor:${{ steps.meta.outputs.version }}
-      
+          docker manifest create ${{ secrets.DOCKERHUB_USERNAME }}/m3u-editor:${{ steps.meta.outputs.version }} \
+            ${{ secrets.DOCKERHUB_USERNAME }}/m3u-editor:${{ steps.meta.outputs.version }}-amd64 \
+            ${{ secrets.DOCKERHUB_USERNAME }}/m3u-editor:${{ steps.meta.outputs.version }}-arm64
+          docker manifest push ${{ secrets.DOCKERHUB_USERNAME }}/m3u-editor:${{ steps.meta.outputs.version }}
+
       - name: Create and push latest manifest list
         run: |
-          docker manifest create sparkison/m3u-editor:latest \
-            sparkison/m3u-editor:latest-amd64 \
-            sparkison/m3u-editor:latest-arm64
-          docker manifest push sparkison/m3u-editor:latest
+          docker manifest create ${{ secrets.DOCKERHUB_USERNAME }}/m3u-editor:latest \
+            ${{ secrets.DOCKERHUB_USERNAME }}/m3u-editor:latest-amd64 \
+            ${{ secrets.DOCKERHUB_USERNAME }}/m3u-editor:latest-arm64
+          docker manifest push ${{ secrets.DOCKERHUB_USERNAME }}/m3u-editor:latest

@@ -19,18 +19,20 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      
+
       - name: Build and push amd64
         uses: docker/build-push-action@v5
         with:
           context: .
           platforms: linux/amd64
           push: true
-          tags: sparkison/m3u-editor:dev-amd64
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/m3u-editor:dev-amd64
           build-args: |
             GIT_BRANCH=${{ github.ref_name }}
             GIT_COMMIT=${{ github.sha }}
             GIT_TAG=${{ github.ref_type == 'tag' && github.ref_name || '' }}
+            M3U_PROXY_REPO=https://github.com/${{ github.repository_owner }}/m3u-proxy.git
+            M3U_PROXY_BRANCH=dev
           provenance: false
           sbom: false
 
@@ -49,18 +51,20 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      
+
       - name: Build and push arm64
         uses: docker/build-push-action@v5
         with:
           context: .
           platforms: linux/arm64
           push: true
-          tags: sparkison/m3u-editor:dev-arm64
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/m3u-editor:dev-arm64
           build-args: |
             GIT_BRANCH=${{ github.ref_name }}
             GIT_COMMIT=${{ github.sha }}
             GIT_TAG=${{ github.ref_type == 'tag' && github.ref_name || '' }}
+            M3U_PROXY_REPO=https://github.com/${{ github.repository_owner }}/m3u-proxy.git
+            M3U_PROXY_BRANCH=dev
           provenance: false
           sbom: false
 
@@ -86,9 +90,9 @@ jobs:
 
       - name: Create manifest list
         run: |
-          docker manifest create sparkison/m3u-editor:dev \
-            sparkison/m3u-editor:dev-amd64 \
-            sparkison/m3u-editor:dev-arm64
-      
+          docker manifest create ${{ secrets.DOCKERHUB_USERNAME }}/m3u-editor:dev \
+            ${{ secrets.DOCKERHUB_USERNAME }}/m3u-editor:dev-amd64 \
+            ${{ secrets.DOCKERHUB_USERNAME }}/m3u-editor:dev-arm64
+
       - name: Push manifest list
-        run: docker manifest push sparkison/m3u-editor:dev
+        run: docker manifest push ${{ secrets.DOCKERHUB_USERNAME }}/m3u-editor:dev

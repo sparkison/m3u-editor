@@ -277,7 +277,26 @@ class M3uProxyService
         // Get channel ID
         $id = $channel->id;
 
+        // IMPORTANT: Check for existing pooled stream BEFORE capacity check
+        // If a pooled stream exists, we can reuse it without consuming additional capacity
+        $existingStreamId = null;
+        if ($profile) {
+            $existingStreamId = $this->findExistingPooledStream($id, $playlist->uuid, $profile->id);
+
+            if ($existingStreamId) {
+                Log::info('Reusing existing pooled transcoded stream (bypassing capacity check)', [
+                    'stream_id' => $existingStreamId,
+                    'channel_id' => $id,
+                    'playlist_uuid' => $playlist->uuid,
+                    'profile_id' => $profile->id,
+                ]);
+
+                return $this->buildTranscodeStreamUrl($existingStreamId, $profile->format ?? 'ts');
+            }
+        }
+
         // Check if primary playlist has stream limits and if it's at capacity
+        // Only check capacity if we're about to create a NEW stream (no existing pooled stream found)
         $primaryUrl = null;
         if ($playlist->available_streams !== 0) {
             $activeStreams = self::getActiveStreamsCountByMetadata('playlist_uuid', $playlist->uuid);
@@ -353,26 +372,15 @@ class M3uProxyService
 
         // Use appropriate endpoint based on whether transcoding profile is provided
         if ($profile) {
-            // First, check if there's already an active pooled transcoded stream for this channel
-            // This allows multiple clients to share the same transcoded stream without consuming
-            // additional provider connections
-            $existingStreamId = $this->findExistingPooledStream($id, $playlist->uuid);
+            // Note: We already checked for existing pooled stream at the top of this method
+            // (before capacity check) to avoid blocking reuse of existing streams.
+            // If we reach here, no existing stream was found, so create a new one.
 
-            if ($existingStreamId) {
-                Log::info('Reusing existing pooled transcoded stream', [
-                    'stream_id' => $existingStreamId,
-                    'channel_id' => $id,
-                    'playlist_uuid' => $playlist->uuid,
-                ]);
-
-                return $this->buildTranscodeStreamUrl($existingStreamId, $profile->format ?? 'ts');
-            }
-
-            // No existing pooled stream found, create a new transcoded stream
             $streamId = $this->createTranscodedStream($primaryUrl, $profile, $failovers, $userAgent, $headers, [
                 'id' => $id,
                 'type' => 'channel',
                 'playlist_uuid' => $playlist->uuid,
+                'profile_id' => $profile->id,
             ]);
 
             // Return transcoded stream URL
@@ -447,13 +455,14 @@ class M3uProxyService
             // First, check if there's already an active pooled transcoded stream for this episode
             // This allows multiple clients to share the same transcoded stream without consuming
             // additional provider connections
-            $existingStreamId = $this->findExistingPooledStream($id, $playlist->uuid);
+            $existingStreamId = $this->findExistingPooledStream($id, $playlist->uuid, $profile->id);
 
             if ($existingStreamId) {
                 Log::info('Reusing existing pooled transcoded stream', [
                     'stream_id' => $existingStreamId,
                     'episode_id' => $id,
                     'playlist_uuid' => $playlist->uuid,
+                    'profile_id' => $profile->id,
                 ]);
 
                 return $this->buildTranscodeStreamUrl($existingStreamId, $profile->format ?? 'ts');
@@ -464,6 +473,7 @@ class M3uProxyService
                 'id' => $id,
                 'type' => 'episode',
                 'playlist_uuid' => $playlist->uuid,
+                'profile_id' => $profile->id,
             ]);
 
             // Return transcoded stream URL
@@ -890,7 +900,7 @@ class M3uProxyService
      * @param string $playlistUuid Playlist UUID
      * @return string|null Stream ID if found, null otherwise
      */
-    protected function findExistingPooledStream(int $channelId, string $playlistUuid): ?string
+    protected function findExistingPooledStream(int $channelId, string $playlistUuid, ?int $profileId = null): ?string
     {
         try {
             // Query m3u-proxy for streams by metadata
@@ -912,23 +922,26 @@ class M3uProxyService
             $data = $response->json();
             $matchingStreams = $data['matching_streams'] ?? [];
 
-            // Find a stream for this channel+playlist that's transcoding
+            // Find a stream for this channel+playlist+profile that's transcoding
             foreach ($matchingStreams as $stream) {
                 $metadata = $stream['metadata'] ?? [];
 
                 // Check if this stream matches our criteria:
                 // 1. Same channel ID
                 // 2. Same playlist UUID
-                // 3. Is a transcoded stream (has transcoding metadata)
+                // 3. Same profile ID (if profile is specified)
+                // 4. Is a transcoded stream (has transcoding metadata)
                 if (
                     ($metadata['id'] ?? null) == $channelId &&
                     ($metadata['playlist_uuid'] ?? null) === $playlistUuid &&
-                    ($metadata['transcoding'] ?? null) === 'true'
+                    ($metadata['transcoding'] ?? null) === 'true' &&
+                    ($profileId === null || ($metadata['profile_id'] ?? null) == $profileId)
                 ) {
                     Log::info('Found existing pooled transcoded stream', [
                         'stream_id' => $stream['stream_id'],
                         'channel_id' => $channelId,
                         'playlist_uuid' => $playlistUuid,
+                        'profile_id' => $profileId,
                         'client_count' => $stream['client_count'],
                     ]);
 
@@ -989,6 +1002,75 @@ class M3uProxyService
                 'success' => false,
                 'error' => 'Unable to connect to m3u-proxy: ' . $e->getMessage(),
                 'info' => [],
+            ];
+        }
+    }
+
+    /**
+     * Validate PUBLIC_URL configuration matches between m3u-editor and m3u-proxy
+     *
+     * @return array Array with 'valid', 'expected', 'actual', and optional 'error' keys
+     */
+    public function validatePublicUrl(): array
+    {
+        if (empty($this->apiBaseUrl)) {
+            return [
+                'valid' => false,
+                'error' => 'M3U Proxy base URL is not configured',
+                'expected' => $this->apiPublicUrl,
+                'actual' => null,
+            ];
+        }
+
+        try {
+            $endpoint = $this->apiBaseUrl . '/health';
+            $response = Http::timeout(5)->acceptJson()
+                ->withHeaders($this->apiToken ? [
+                    'X-API-Token' => $this->apiToken,
+                ] : [])
+                ->get($endpoint);
+
+            if ($response->successful()) {
+                $data = $response->json() ?: [];
+                $proxyPublicUrl = $data['public_url'] ?? null;
+
+                // Normalize URLs for comparison (remove trailing slashes)
+                $expectedUrl = rtrim($this->apiPublicUrl, '/');
+                $actualUrl = rtrim($proxyPublicUrl ?? '', '/');
+
+                $isValid = $expectedUrl === $actualUrl;
+
+                if (!$isValid) {
+                    Log::warning('PUBLIC_URL mismatch detected', [
+                        'expected' => $expectedUrl,
+                        'actual' => $actualUrl,
+                    ]);
+                }
+
+                return [
+                    'valid' => $isValid,
+                    'expected' => $expectedUrl,
+                    'actual' => $actualUrl,
+                    'status' => $data['status'] ?? 'unknown',
+                ];
+            }
+
+            Log::warning('Failed to validate PUBLIC_URL from m3u-proxy: HTTP ' . $response->status());
+
+            return [
+                'valid' => false,
+                'error' => 'M3U Proxy returned status ' . $response->status(),
+                'expected' => $this->apiPublicUrl,
+                'actual' => null,
+            ];
+        } catch (Exception $e) {
+            Log::warning('Failed to validate PUBLIC_URL from m3u-proxy: ' . $e->getMessage());
+
+            return [
+                'valid' => false,
+                'error' => 'Unable to connect to m3u-proxy: ' . $e->getMessage(),
+                'expected' => $this->apiPublicUrl,
+                'actual' => null,
             ];
         }
     }

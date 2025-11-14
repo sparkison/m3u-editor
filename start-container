@@ -74,14 +74,130 @@ fi
 
 # Set M3U_PROXY_PUBLIC_URL, required for both modes
 # If M3U_PROXY_PUBLIC_URL is not set, construct it
+# NOTE: PUBLIC_URL should include the /m3u-proxy path since that's how NGINX routes to the service
+# The embedded m3u-proxy has ROOT_PATH=/m3u-proxy configured to handle this
 if [ -z "$M3U_PROXY_PUBLIC_URL" ]; then
-  # Laravel will use APP_URL/m3u-proxy for browser-accessible URLs
-  if [[ "$APP_URL" == *"https"* ]]; then
-      export M3U_PROXY_PUBLIC_URL="${APP_URL}/m3u-proxy"
+  # Auto-generate PUBLIC_URL based on APP_URL and APP_PORT
+  # This is a best-guess - users should set M3U_PROXY_PUBLIC_URL explicitly for production
+
+  # Remove trailing slash from APP_URL
+  APP_URL_CLEAN="${APP_URL%/}"
+
+  # Check if APP_URL already includes a port
+  if [[ "$APP_URL_CLEAN" =~ :[0-9]+$ ]]; then
+    # APP_URL already has a port (e.g., http://example.com:8080)
+    export M3U_PROXY_PUBLIC_URL="${APP_URL_CLEAN}/m3u-proxy"
+    echo "⚠️  M3U_PROXY_PUBLIC_URL auto-generated: ${M3U_PROXY_PUBLIC_URL}"
+    echo "    (APP_URL already includes port)"
+  elif [[ "$APP_URL_CLEAN" == *"https"* ]]; then
+    # HTTPS - assume standard port 443, no need to add port
+    export M3U_PROXY_PUBLIC_URL="${APP_URL_CLEAN}/m3u-proxy"
+    echo "⚠️  M3U_PROXY_PUBLIC_URL auto-generated: ${M3U_PROXY_PUBLIC_URL}"
+    echo "    (HTTPS - using standard port 443)"
+  elif [ "$APP_PORT" = "80" ]; then
+    # HTTP with standard port 80, no need to add port
+    export M3U_PROXY_PUBLIC_URL="${APP_URL_CLEAN}/m3u-proxy"
+    echo "⚠️  M3U_PROXY_PUBLIC_URL auto-generated: ${M3U_PROXY_PUBLIC_URL}"
+    echo "    (HTTP - using standard port 80)"
   else
-      export M3U_PROXY_PUBLIC_URL="${APP_URL}:${APP_PORT}/m3u-proxy"
+    # HTTP with non-standard port, add port to URL
+    export M3U_PROXY_PUBLIC_URL="${APP_URL_CLEAN}:${APP_PORT}/m3u-proxy"
+    echo "⚠️  M3U_PROXY_PUBLIC_URL auto-generated: ${M3U_PROXY_PUBLIC_URL}"
+    echo "    (HTTP - using port ${APP_PORT})"
   fi
+
+  echo ""
+  echo "⚠️  WARNING: M3U_PROXY_PUBLIC_URL was auto-generated!"
+  echo "    For production or reverse proxy setups, set M3U_PROXY_PUBLIC_URL explicitly."
+  echo "    Example: M3U_PROXY_PUBLIC_URL=https://your-domain.com/m3u-proxy"
+  echo "    Run 'php artisan m3u-proxy:status' to validate configuration."
+  echo ""
+else
+  echo "✅ M3U_PROXY_PUBLIC_URL explicitly set: ${M3U_PROXY_PUBLIC_URL}"
 fi
+
+# Validate PUBLIC_URL configuration to prevent common mismatches
+echo ""
+echo "🔍 Validating M3U Proxy configuration..."
+
+# Check if PUBLIC_URL ends with /m3u-proxy (expected for AIO)
+if [[ ! "$M3U_PROXY_PUBLIC_URL" == *"/m3u-proxy" ]]; then
+  echo "⚠️  WARNING: M3U_PROXY_PUBLIC_URL does not end with '/m3u-proxy'"
+  echo "    Current value: ${M3U_PROXY_PUBLIC_URL}"
+  echo "    Expected format: http://your-domain.com/m3u-proxy"
+  echo "    This may cause HLS streaming failures!"
+fi
+
+# Check if embedded mode is enabled but HOST is not localhost
+if [ "${M3U_PROXY_ENABLED}" = "true" ] && [[ "$M3U_PROXY_HOST" != "localhost" ]] && [[ "$M3U_PROXY_HOST" != "127.0.0.1" ]]; then
+  echo "⚠️  WARNING: Embedded mode enabled but M3U_PROXY_HOST is not localhost"
+  echo "    Current value: ${M3U_PROXY_HOST}"
+  echo "    For AIO/embedded mode, M3U_PROXY_HOST should be 'localhost' or '127.0.0.1'"
+fi
+
+# Check if PUBLIC_URL uses localhost but might be accessed externally
+if [[ "$M3U_PROXY_PUBLIC_URL" == *"localhost"* ]] || [[ "$M3U_PROXY_PUBLIC_URL" == *"127.0.0.1"* ]]; then
+  echo "⚠️  NOTICE: M3U_PROXY_PUBLIC_URL uses localhost/127.0.0.1"
+  echo "    This will only work for local access."
+  echo "    For external/LAN access, set M3U_PROXY_PUBLIC_URL to your server's IP or domain."
+  echo "    Example: M3U_PROXY_PUBLIC_URL=http://192.168.1.100:36400/m3u-proxy"
+fi
+
+echo "✅ Configuration validation complete"
+echo ""
+
+# Configure HLS segment storage (persistent location)
+# Default to storage/app/hls-segments for persistence across container restarts
+export HLS_TEMP_DIR="${HLS_TEMP_DIR:-/var/www/html/storage/app/hls-segments}"
+export HLS_GC_ENABLED="${HLS_GC_ENABLED:-true}"
+export HLS_GC_INTERVAL="${HLS_GC_INTERVAL:-600}"           # 10 minutes
+export HLS_GC_AGE_THRESHOLD="${HLS_GC_AGE_THRESHOLD:-7200}" # 2 hours (increased from default 1 hour)
+
+echo ""
+echo "🎬 Configuring HLS segment storage..."
+echo "   HLS_TEMP_DIR: ${HLS_TEMP_DIR}"
+echo "   HLS_GC_ENABLED: ${HLS_GC_ENABLED}"
+echo "   HLS_GC_INTERVAL: ${HLS_GC_INTERVAL}s"
+echo "   HLS_GC_AGE_THRESHOLD: ${HLS_GC_AGE_THRESHOLD}s"
+
+# Create HLS storage directory if it doesn't exist
+if [ ! -d "$HLS_TEMP_DIR" ]; then
+    echo "   Creating HLS storage directory..."
+    mkdir -p "$HLS_TEMP_DIR"
+    chown -R $WWWUSER:$WWWGROUP "$HLS_TEMP_DIR"
+    chmod 755 "$HLS_TEMP_DIR"
+    echo "   ✅ Created: $HLS_TEMP_DIR"
+else
+    echo "   ✅ Directory exists: $HLS_TEMP_DIR"
+    # Ensure correct permissions
+    chown -R $WWWUSER:$WWWGROUP "$HLS_TEMP_DIR"
+    chmod 755 "$HLS_TEMP_DIR"
+fi
+
+# Check available disk space for HLS storage
+AVAILABLE_SPACE_KB=$(df -k "$HLS_TEMP_DIR" | tail -1 | awk '{print $4}')
+AVAILABLE_SPACE_MB=$((AVAILABLE_SPACE_KB / 1024))
+AVAILABLE_SPACE_GB=$((AVAILABLE_SPACE_MB / 1024))
+
+echo "   Available disk space: ${AVAILABLE_SPACE_GB}GB (${AVAILABLE_SPACE_MB}MB)"
+
+# Warn if less than 2GB available
+if [ "$AVAILABLE_SPACE_MB" -lt 2048 ]; then
+    echo "   ⚠️  WARNING: Low disk space for HLS segments!"
+    echo "      Available: ${AVAILABLE_SPACE_MB}MB"
+    echo "      Recommended: At least 2GB for HLS streaming"
+    echo "      HLS streams may fail if disk fills up!"
+fi
+
+# Warn if less than 500MB available (critical)
+if [ "$AVAILABLE_SPACE_MB" -lt 512 ]; then
+    echo "   🔴 CRITICAL: Very low disk space!"
+    echo "      HLS streaming will likely fail!"
+    echo "      Free up disk space immediately!"
+fi
+
+echo "✅ HLS storage configured"
+echo ""
 
 # Redis pooling settings for embedded proxy
 # Variables are ignored if using external proxy
@@ -450,6 +566,36 @@ php artisan migrate --force
 
 echo "🔄 Resetting any stuck sync processes..."
 php artisan app:reset-sync-process
+
+# Validate m3u-proxy configuration after Laravel is ready
+if [ "${M3U_PROXY_ENABLED}" = "true" ]; then
+  echo ""
+  echo "🔍 Validating m3u-proxy integration..."
+
+  # Check if m3u-proxy configuration is accessible
+  # Use config:get instead of config:show for more reliable output
+  LARAVEL_PUBLIC_URL=$(php artisan tinker --execute="echo config('proxy.m3u_proxy_public_url');" 2>/dev/null | grep -v "^$" | grep -v "Psy Shell" | tail -1)
+
+  # Compare Laravel config with environment variable (only if Laravel config is set)
+  if [ -n "$LARAVEL_PUBLIC_URL" ] && [ "$LARAVEL_PUBLIC_URL" != "null" ] && [ "$LARAVEL_PUBLIC_URL" != "$M3U_PROXY_PUBLIC_URL" ]; then
+    echo "⚠️  WARNING: Configuration mismatch detected!"
+    echo "    Laravel config: ${LARAVEL_PUBLIC_URL}"
+    echo "    Environment:    ${M3U_PROXY_PUBLIC_URL}"
+    echo "    This may cause HLS streaming failures!"
+    echo "    Run 'php artisan config:clear' and restart the container."
+  else
+    echo "✅ m3u-proxy configuration validated"
+  fi
+
+  echo ""
+fi
+
+# Register webhook for real-time cache invalidation
+# This works for both embedded and external m3u-proxy modes
+# The artisan command will check if m3u-proxy is configured before attempting registration
+echo "🔗 Registering m3u-proxy webhook for cache invalidation..."
+php artisan m3u-proxy:register-webhook
+echo ""
 
 # Ensure composer dir is writable
 [ ! -d /.composer ] && mkdir /.composer
