@@ -290,7 +290,7 @@ class EpgMapResource extends Resource
                         ->label('Prioritize name/display name matching')
                         ->columnSpanFull()
                         ->inline(true)
-                        ->default(true)
+                        ->default(false)
                         ->helperText('When enabled, exact matches on channel name/display name will be prioritized over channel_id matches. Enable this if your EPG has duplicate channel_ids for different quality versions (e.g., DasErsteHD for "Das Erste HDraw", "Das Erste HDraw²", etc.). Disable if your EPG uses unique channel_ids.'),
                     
                     Fieldset::make('Matching Thresholds')
