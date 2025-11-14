@@ -277,7 +277,26 @@ class M3uProxyService
         // Get channel ID
         $id = $channel->id;
 
+        // IMPORTANT: Check for existing pooled stream BEFORE capacity check
+        // If a pooled stream exists, we can reuse it without consuming additional capacity
+        $existingStreamId = null;
+        if ($profile) {
+            $existingStreamId = $this->findExistingPooledStream($id, $playlist->uuid, $profile->id);
+
+            if ($existingStreamId) {
+                Log::info('Reusing existing pooled transcoded stream (bypassing capacity check)', [
+                    'stream_id' => $existingStreamId,
+                    'channel_id' => $id,
+                    'playlist_uuid' => $playlist->uuid,
+                    'profile_id' => $profile->id,
+                ]);
+
+                return $this->buildTranscodeStreamUrl($existingStreamId, $profile->format ?? 'ts');
+            }
+        }
+
         // Check if primary playlist has stream limits and if it's at capacity
+        // Only check capacity if we're about to create a NEW stream (no existing pooled stream found)
         $primaryUrl = null;
         if ($playlist->available_streams !== 0) {
             $activeStreams = self::getActiveStreamsCountByMetadata('playlist_uuid', $playlist->uuid);
@@ -353,23 +372,10 @@ class M3uProxyService
 
         // Use appropriate endpoint based on whether transcoding profile is provided
         if ($profile) {
-            // First, check if there's already an active pooled transcoded stream for this channel
-            // This allows multiple clients to share the same transcoded stream without consuming
-            // additional provider connections
-            $existingStreamId = $this->findExistingPooledStream($id, $playlist->uuid, $profile->id);
+            // Note: We already checked for existing pooled stream at the top of this method
+            // (before capacity check) to avoid blocking reuse of existing streams.
+            // If we reach here, no existing stream was found, so create a new one.
 
-            if ($existingStreamId) {
-                Log::info('Reusing existing pooled transcoded stream', [
-                    'stream_id' => $existingStreamId,
-                    'channel_id' => $id,
-                    'playlist_uuid' => $playlist->uuid,
-                    'profile_id' => $profile->id,
-                ]);
-
-                return $this->buildTranscodeStreamUrl($existingStreamId, $profile->format ?? 'ts');
-            }
-
-            // No existing pooled stream found, create a new transcoded stream
             $streamId = $this->createTranscodedStream($primaryUrl, $profile, $failovers, $userAgent, $headers, [
                 'id' => $id,
                 'type' => 'channel',
