@@ -80,7 +80,7 @@ RUN apk update && apk --no-cache add \
     git \
     bash \
     tzdata \
-    # ffmpeg
+    # FFmpeg 6.1 from Alpine 3.21 (stable)
     ffmpeg \
     # nginx + php-fpm
     nginx \
