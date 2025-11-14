@@ -31,10 +31,16 @@ class M3uProxyApiController extends Controller
     public function channel(Request $request, $id, $playlist = null)
     {
         $channel = Channel::query()->with([
-            'playlist.streamProfile',
-            'playlist.vodStreamProfile'
+            'playlist',
+            'customPlaylist'
         ])->findOrFail($id);
         $playlist = $playlist ?? $channel->getEffectivePlaylist();
+
+        // Load the stream profile relationships explicitly after getting the effective playlist
+        // This ensures the relationship constraints are properly applied
+        if ($playlist) {
+            $playlist->load('streamProfile', 'vodStreamProfile');
+        }
 
         // Get stream profile from playlist if set
         $profile = null;
@@ -46,16 +52,23 @@ class M3uProxyApiController extends Controller
             $profile = $playlist->streamProfile;
         }
 
-        // If no profile set, use default profile from settings
-        // This ensures consistent behavior across all clients (preview player, external players, etc.)
+        // IMPORTANT: Only apply default profile fallback for HLS sources
+        // MPEG-TS and other formats should use direct streaming unless explicitly configured
         if (! $profile) {
-            $settings = app(GeneralSettings::class);
-            if ($channel->is_vod) {
-                $profileId = $settings->default_vod_stream_profile_id ?? null;
-            } else {
-                $profileId = $settings->default_stream_profile_id ?? null;
+            $sourceUrl = $channel->url_custom ?? $channel->url;
+            $isHlsSource = str_ends_with(strtolower($sourceUrl), '.m3u8');
+
+            // Only apply default profile if source is HLS
+            if ($isHlsSource) {
+                $settings = app(GeneralSettings::class);
+                if ($channel->is_vod) {
+                    $profileId = $settings->default_vod_stream_profile_id ?? null;
+                } else {
+                    $profileId = $settings->default_stream_profile_id ?? null;
+                }
+                $profile = $profileId ? StreamProfile::find($profileId) : null;
             }
-            $profile = $profileId ? StreamProfile::find($profileId) : null;
+            // For non-HLS sources (MPEG-TS, etc.), leave $profile as null for direct streaming
         }
 
         $url = app(M3uProxyService::class)->getChannelUrl($playlist, $channel, $request, $profile);
@@ -75,10 +88,14 @@ class M3uProxyApiController extends Controller
     public function episode(Request $request, $id, $playlist = null)
     {
         $episode = Episode::query()->with([
-            'playlist.streamProfile',
-            'playlist.vodStreamProfile'
+            'playlist'
         ])->findOrFail($id);
         $playlist = $playlist ?? $episode->playlist;
+
+        // Load the stream profile relationships explicitly after getting the playlist
+        if ($playlist) {
+            $playlist->load('streamProfile', 'vodStreamProfile');
+        }
 
         // For Series, use the VOD stream profile if set
         $profile = $playlist->vodStreamProfile;
@@ -100,14 +117,19 @@ class M3uProxyApiController extends Controller
     public function channelPlayer(Request $request, $id, $uuid = null)
     {
         $channel = Channel::query()->with([
-            'playlist.streamProfile',
-            'playlist.vodStreamProfile'
+            'playlist',
+            'customPlaylist'
         ])->findOrFail($id);
 
         if ($uuid) {
             $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
         } else {
             $playlist = $channel->getEffectivePlaylist();
+        }
+
+        // Load the stream profile relationships explicitly after getting the effective playlist
+        if ($playlist) {
+            $playlist->load('streamProfile', 'vodStreamProfile');
         }
 
         // Get stream profile from playlist if set
@@ -121,6 +143,7 @@ class M3uProxyApiController extends Controller
         }
 
         // If no profile set, use default profile for the player
+        // Preview player should always try to transcode for better compatibility
         if (! $profile) {
             // Use default profile set for the player
             $settings = app(GeneralSettings::class);
@@ -150,14 +173,18 @@ class M3uProxyApiController extends Controller
     public function episodePlayer(Request $request, $id, $uuid = null)
     {
         $episode = Episode::query()->with([
-            'playlist.streamProfile',
-            'playlist.vodStreamProfile'
+            'playlist'
         ])->findOrFail($id);
 
         if ($uuid) {
             $playlist = PlaylistFacade::resolvePlaylistByUuid($uuid);
         } else {
             $playlist = $episode->playlist;
+        }
+
+        // Load the stream profile relationships explicitly after getting the playlist
+        if ($playlist) {
+            $playlist->load('streamProfile', 'vodStreamProfile');
         }
 
         // Get stream profile from playlist if set
