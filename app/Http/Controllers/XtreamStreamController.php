@@ -20,10 +20,10 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 class XtreamStreamController extends Controller
 {
     /**
-     * Authenticates a playlist using either PlaylistAuth credentials or the original method 
+     * Authenticates a playlist using either PlaylistAuth credentials or the original method
      * (username = playlist owner's name, password = playlist UUID).
      */
-    private function findAuthenticatedPlaylistAndStreamModel(string $username, string $password, int $streamId, string $streamType): array
+    private function findAuthenticatedPlaylistAndStreamModel(string $username, string $password, string|int $streamId, string $streamType): array
     {
         $streamModel = null;
         $playlist = null;
@@ -107,7 +107,7 @@ class XtreamStreamController extends Controller
      * Validates if a stream (Channel or Episode) exists, is enabled, and belongs to the given authenticated playlist.
      * Returns the stream Model (Channel or Episode) if valid, otherwise null.
      */
-    private function getValidatedStreamFromPlaylist(Model $playlist, int $streamId, string $streamType): ?Model
+    private function getValidatedStreamFromPlaylist(Model $playlist, string|int $streamId, string $streamType): ?Model
     {
         // Live and VOD streams are handled the same
         if ($streamType === 'live' || $streamType === 'vod' || $streamType === 'timeshift') {
@@ -143,10 +143,10 @@ class XtreamStreamController extends Controller
 
     /**
      * Handle direct stream requests.
-     * 
+     *
      * Determine best path when `/live/`, `/movie/`, or `/series/` is not specified.
      */
-    public function handleDirect(Request $request, string $username, string $password, int $streamId, ?string $format = null)
+    public function handleDirect(Request $request, string $username, string $password, string|int $streamId, ?string $format = null)
     {
         // If no live or VOD stream type specified, determine stream type by model
         $model = Channel::find($streamId);
@@ -190,7 +190,7 @@ class XtreamStreamController extends Controller
     /**
      * Live stream requests.
      */
-    public function handleLive(Request $request, string $username, string $password, int $streamId, ?string $format = null)
+    public function handleLive(Request $request, string $username, string $password, string|int $streamId, ?string $format = null)
     {
         $format = $format ?? 'ts'; // Default to 'ts' if no format provided
         list($playlist, $channel) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'live');
@@ -232,7 +232,7 @@ class XtreamStreamController extends Controller
     /**
      * Series episode stream requests.
      */
-    public function handleSeries(Request $request, string $username, string $password, int $streamId, ?string $format = null)
+    public function handleSeries(Request $request, string $username, string $password, string|int $streamId, ?string $format = null)
     {
         $format = $format ?? 'mp4'; // Default to 'mp4' if no format provided
         list($playlist, $episode) = $this->findAuthenticatedPlaylistAndStreamModel($username, $password, $streamId, 'episode');
@@ -275,7 +275,7 @@ class XtreamStreamController extends Controller
      * 
      * @unauthenticated
      */
-    public function handleTimeshift(Request $request, string $username, string $password, int $duration, string $date, int $streamId, ?string $format = null)
+    public function handleTimeshift(Request $request, string $username, string $password, int $duration, string $date, string|int $streamId, ?string $format = null)
     {
         $format = $format ?? 'ts'; // Default to 'ts' if no format provided
 
