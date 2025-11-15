@@ -2,7 +2,9 @@
 # Build Arguments - Configurable at build time
 ########################################
 # Allow customization of m3u-proxy repository and branch
-# Default: upstream sparkison/m3u-proxy (main branch)
+# NOTE: GitHub Actions workflow automatically overrides these with dynamic values
+# based on the repository owner (e.g., hektyc/m3u-proxy for hektyc/m3u-editor)
+# Default: upstream sparkison/m3u-proxy (main branch) - used for manual builds
 # Override: --build-arg M3U_PROXY_REPO=https://github.com/yourusername/m3u-proxy.git
 #           --build-arg M3U_PROXY_BRANCH=dev
 ARG M3U_PROXY_REPO=https://github.com/sparkison/m3u-proxy.git
