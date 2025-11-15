@@ -72,7 +72,9 @@ class AppServiceProvider extends ServiceProvider
         // ✅ DYNAMIC HTTPS DETECTION: Detect actual protocol from request headers
         // This allows the app to work correctly with both HTTP and HTTPS access
         // when behind a reverse proxy with SSL termination
-        $this->configureDynamicHttpsDetection();
+        if (app()->runningInConsole() === false && request()->headers->has('X-Forwarded-Proto')) {
+            $this->configureDynamicHttpsDetection();
+        }
 
         // Setup the middleware
         $this->setupMiddleware();
