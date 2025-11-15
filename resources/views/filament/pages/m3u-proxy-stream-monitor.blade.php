@@ -157,6 +157,11 @@
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
                                         {{ $stream['format'] }}
                                     </span>
+                                    @if($stream['transcoding'])
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                                            {{ $stream['transcoding_format'] ?? 'N/A' }}
+                                        </span>
+                                    @endif
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ 
                                         $stream['status'] === 'active' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' : 
                                         ($stream['status'] === 'idle' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200') 
