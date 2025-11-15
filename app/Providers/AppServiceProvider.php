@@ -69,11 +69,10 @@ class AppServiceProvider extends ServiceProvider
         // Disable mass assignment protection (security handled by Filament)
         Model::unguard();
 
-        // Check if app url contains https, and if so, force https
-        if (Str::contains(config('app.url'), 'https')) {
-            URL::forceScheme('https');
-            request()->server->set('HTTPS', request()->header('X-Forwarded-Proto', 'https') == 'https' ? 'on' : 'off');
-        }
+        // ✅ DYNAMIC HTTPS DETECTION: Detect actual protocol from request headers
+        // This allows the app to work correctly with both HTTP and HTTPS access
+        // when behind a reverse proxy with SSL termination
+        $this->configureDynamicHttpsDetection();
 
         // Setup the middleware
         $this->setupMiddleware();
@@ -101,6 +100,103 @@ class AppServiceProvider extends ServiceProvider
 
         // Livewire components
         $this->registerLivewireComponents();
+    }
+
+    /**
+     * Configure dynamic HTTPS detection based on actual request headers.
+     *
+     * This allows the application to work correctly when accessed via both
+     * HTTP and HTTPS, especially when behind a reverse proxy with SSL termination.
+     *
+     * The detection logic:
+     * 1. Check reverse proxy headers (X-Forwarded-Proto, X-Forwarded-Scheme, etc.)
+     * 2. If HTTPS detected via headers → force HTTPS for asset URLs
+     * 3. If HTTP detected or no reverse proxy → use HTTP for asset URLs
+     *
+     * This prevents mixed content blocking when:
+     * - APP_URL=https://domain.com but accessed via http://domain.com
+     * - APP_URL=http://domain.com but accessed via https://domain.com
+     */
+    private function configureDynamicHttpsDetection(): void
+    {
+        // Detect HTTPS from reverse proxy headers
+        $isHttps = $this->detectHttpsFromHeaders();
+
+        if ($isHttps) {
+            // Force HTTPS scheme for all generated URLs (assets, routes, etc.)
+            URL::forceScheme('https');
+
+            // Set HTTPS server variable for Laravel to recognize HTTPS context
+            request()->server->set('HTTPS', 'on');
+        } else {
+            // Force HTTP scheme for all generated URLs
+            URL::forceScheme('http');
+
+            // Ensure HTTPS server variable is off
+            request()->server->set('HTTPS', 'off');
+        }
+    }
+
+    /**
+     * Detect if the current request is HTTPS based on reverse proxy headers.
+     *
+     * Supports all major reverse proxies:
+     * - NGINX, Caddy, Traefik, Apache (X-Forwarded-Proto)
+     * - NGINX Proxy Manager (X-Forwarded-Scheme)
+     * - Cloudflare, AWS ELB (X-Forwarded-Ssl)
+     * - Microsoft IIS, Azure (Front-End-Https)
+     * - RFC 7239 compliant proxies (Forwarded header)
+     *
+     * @return bool True if HTTPS detected, false otherwise
+     */
+    private function detectHttpsFromHeaders(): bool
+    {
+        $request = request();
+
+        // Check X-Forwarded-Proto header (most common)
+        $forwardedProto = $request->header('X-Forwarded-Proto');
+        if ($forwardedProto && strtolower($forwardedProto) === 'https') {
+            return true;
+        }
+
+        // Check X-Forwarded-Scheme header (NGINX Proxy Manager)
+        $forwardedScheme = $request->header('X-Forwarded-Scheme');
+        if ($forwardedScheme && strtolower($forwardedScheme) === 'https') {
+            return true;
+        }
+
+        // Check X-Forwarded-Ssl header (Cloudflare, AWS ELB)
+        $forwardedSsl = $request->header('X-Forwarded-Ssl');
+        if ($forwardedSsl && strtolower($forwardedSsl) === 'on') {
+            return true;
+        }
+
+        // Check Front-End-Https header (Microsoft IIS, Azure)
+        $frontEndHttps = $request->header('Front-End-Https');
+        if ($frontEndHttps && strtolower($frontEndHttps) === 'on') {
+            return true;
+        }
+
+        // Check Forwarded header (RFC 7239 standard)
+        $forwarded = $request->header('Forwarded');
+        if ($forwarded && str_contains(strtolower($forwarded), 'proto=https')) {
+            return true;
+        }
+
+        // Check X-Forwarded-Port header (port 443 = HTTPS)
+        $forwardedPort = $request->header('X-Forwarded-Port');
+        if ($forwardedPort && $forwardedPort === '443') {
+            return true;
+        }
+
+        // Fallback: Check if APP_URL contains https
+        // This ensures backward compatibility when no reverse proxy is used
+        if (Str::contains(config('app.url'), 'https')) {
+            return true;
+        }
+
+        // No HTTPS detected
+        return false;
     }
 
     /**

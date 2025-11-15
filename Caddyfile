@@ -52,17 +52,26 @@
     handle @m3u_proxy {
         # Remove /m3u-proxy prefix when forwarding to proxy
         uri strip_prefix /m3u-proxy
-        
+
         reverse_proxy m3u-proxy:38085 {
             # Headers for streaming
             header_up Host {host}
             header_up X-Real-IP {remote_host}
             header_up X-Forwarded-For {remote_host}
-            header_up X-Forwarded-Proto {scheme}
-            
+
+            # ✅ FIX: Preserve X-Forwarded-Proto from upstream reverse proxy
+            # Caddy automatically preserves incoming headers, but we ensure it's set
+            # If not present from upstream, use current scheme
+            header_up X-Forwarded-Proto {header.X-Forwarded-Proto}
+            header_up >X-Forwarded-Proto {scheme}
+
+            # Also preserve other HTTPS detection headers for universal support
+            header_up X-Forwarded-Ssl {header.X-Forwarded-Ssl}
+            header_up X-Forwarded-Port {header.X-Forwarded-Port}
+
             # Disable buffering for streaming
             flush_interval -1
-            
+
             # Timeouts for streaming
             transport http {
                 read_timeout 300s
