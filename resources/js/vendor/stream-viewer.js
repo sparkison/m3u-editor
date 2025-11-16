@@ -5,6 +5,7 @@ function streamPlayer() {
         hls: null,
         mpegts: null,
         streamMetadata: {
+            format: null,
             codec: null,
             resolution: null,
             audioCodec: null,
@@ -67,6 +68,9 @@ function streamPlayer() {
         },
         
         initHlsPlayer(video, url, playerId) {
+            // Set stream format
+            this.streamMetadata.format = 'HLS';
+
             if (typeof Hls !== 'undefined' && Hls.isSupported()) {
                 console.log('Creating HLS player with configuration...');
                 this.hls = new Hls({
@@ -124,11 +128,14 @@ function streamPlayer() {
                             }
                         }
                     }
-                    
+
                     this.hideLoading(playerId);
                     this.updateStatus(playerId, 'Connected');
                     this.updateStreamDetails(playerId);
                 });
+
+                // Also set up native events for Safari HLS
+                this.setupNativeEvents(video, playerId);
 
                 // Reset error counter on successful fragment load
                 this.hls.on(Hls.Events.FRAG_LOADED, () => {
@@ -214,6 +221,7 @@ function streamPlayer() {
                 
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 console.log('Using Safari native HLS support');
+                this.streamMetadata.format = 'HLS (Native)';
                 video.src = url;
                 this.setupNativeEvents(video, playerId);
             } else {
@@ -223,7 +231,10 @@ function streamPlayer() {
         
         initMpegTsPlayer(video, url, playerId) {
             console.log('MPEG-TS libraries available:', typeof mpegts !== 'undefined', mpegts?.getFeatureList().mseLivePlayback);
-            
+
+            // Set stream format
+            this.streamMetadata.format = 'MPEG-TS';
+
             // Set some defaults for MPEG-TS streams
             this.streamMetadata.codec = '...';
             this.streamMetadata.audioCodec = '...';
@@ -306,13 +317,16 @@ function streamPlayer() {
 
         initNativePlayer(video, url, playerId) {
             console.log('Initializing native player for:', playerId);
-            
+
+            // Set stream format
+            this.streamMetadata.format = 'Native';
+
             // Configure video element for optimal audio track detection
             video.muted = false;
             video.volume = 0.5;
             video.controls = true;
             video.preload = 'metadata';
-            
+
             video.src = url;
             this.setupNativeEvents(video, playerId);
         },
@@ -413,6 +427,12 @@ function streamPlayer() {
             if (!detailsEl) return;
 
             let detailsHtml = '';
+
+            // Stream Format (always show first)
+            if (this.streamMetadata.format) {
+                detailsHtml += `<div class="flex justify-between gap-1"><span>Stream Format:</span><span class="font-mono font-semibold text-blue-400">${this.streamMetadata.format}</span></div>`;
+            }
+
             if (this.streamMetadata.resolution) {
                 detailsHtml += `<div class="flex justify-between gap-1"><span>Resolution:</span><span class="font-mono">${this.streamMetadata.resolution}</span></div>`;
             }
@@ -604,6 +624,7 @@ function streamPlayer() {
             
             // Reset stream metadata
             this.streamMetadata = {
+                format: null,
                 codec: null,
                 resolution: null,
                 audioCodec: null,
