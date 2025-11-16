@@ -73,11 +73,10 @@ ENV GIT_TAG=${GIT_TAG}
 ENV WWWGROUP="m3ue"
 ENV WWWUSER="m3ue"
 
-# Add Alpine edge repository for FFmpeg 8.0
-RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
-
-# Install basic packages
-RUN apk update && apk --no-cache add \
+# Install basic packages and FFmpeg 8.0 from Alpine edge
+RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositories && \
+    echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories && \
+    apk update && apk --no-cache add \
     coreutils \
     openssl \
     supervisor \
