@@ -9,6 +9,7 @@ use App\Models\CustomPlaylist;
 use App\Models\Playlist;
 use App\Models\PlaylistAlias;
 use App\Models\SharedStream;
+use App\Models\StreamProfile;
 use App\Models\User;
 use App\Services\EpgCacheService;
 use App\Services\M3uProxyService;
@@ -367,16 +368,33 @@ class PlaylistAliasResource extends Resource
                         ->hidden(fn(Get $get): bool => !$get('enable_proxy')),
                     Forms\Components\TextInput::make('server_timezone')
                         ->label('Provider Timezone')
-                        ->columnSpanFull()
                         ->helperText('The portal/provider timezone (DST-aware). Needed to correctly use timeshift functionality when playlist proxy is enabled.')
                         ->placeholder('Etc/UTC')
                         ->hidden(fn(Get $get): bool => !$get('enable_proxy')),
+                    Forms\Components\Toggle::make('strict_live_ts')
+                        ->label('Enable Strict Live TS Handling')
+                        ->hintAction(
+                            Actions\Action::make('learn_more_strict_live_ts')
+                                ->label('Learn More')
+                                ->icon('heroicon-o-arrow-top-right-on-square')
+                                ->iconPosition('after')
+                                ->size('sm')
+                                ->url('https://github.com/sparkison/m3u-proxy/blob/master/docs/STRICT_LIVE_TS_MODE.md')
+                                ->openUrlInNewTab(true)
+                        )
+                        ->helperText('Enhanced stability for live MPEG-TS streams with PVR clients like Kodi and HDHomeRun (only used when not using transcoding profiles).')
+                        ->inline(false)
+                        ->default(false)
+                        ->hidden(fn(Get $get): bool => ! $get('enable_proxy')),
                     Schemas\Components\Fieldset::make('Transcoding Settings (optional)')
                         ->columnSpanFull()
                         ->schema([
                             Forms\Components\Select::make('stream_profile_id')
                                 ->label('Live Streaming Profile')
                                 ->relationship('streamProfile', 'name')
+                                ->options(function () {
+                                    return StreamProfile::where('user_id', auth()->id())->pluck('name', 'id');
+                                })
                                 ->searchable()
                                 ->preload()
                                 ->nullable()
@@ -385,9 +403,16 @@ class PlaylistAliasResource extends Resource
                             Forms\Components\Select::make('vod_stream_profile_id')
                                 ->label('VOD and Series Streaming Profile')
                                 ->relationship('vodStreamProfile', 'name')
+                                ->options(function () {
+                                    return StreamProfile::where('user_id', auth()->id())->pluck('name', 'id');
+                                })
                                 ->searchable()
                                 ->preload()
                                 ->nullable()
+                                ->hintIcon(
+                                    'heroicon-m-question-mark-circle',
+                                    tooltip: 'Time seeking is not supported when transcoding VOD or Series streams. This is a limitation of live-transcoding. Leave empty to allow time seeking.'
+                                )
                                 ->helperText('Select a transcoding profile to apply to VOD and Series streams from this playlist. Leave empty for direct stream proxying.')
                                 ->placeholder('Leave empty for direct stream proxying'),
                         ])->hidden(fn(Get $get): bool => ! $get('enable_proxy')),

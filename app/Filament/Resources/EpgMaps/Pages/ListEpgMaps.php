@@ -11,6 +11,7 @@ use Filament\Actions;
 use Filament\Forms;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
+use Filament\Support\Enums\Width;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -45,6 +46,7 @@ class ListEpgMaps extends ListRecords
                 ->requiresConfirmation()
                 ->icon('heroicon-o-link')
                 ->modalIcon('heroicon-o-link')
+                ->modalWidth(Width::FourExtraLarge)
                 ->modalDescription('Map the selected EPG to the selected Playlist channels.')
                 ->modalSubmitActionLabel('Map now'),
         ];

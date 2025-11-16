@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Facades\LogoFacade;
 use App\Models\Channel;
 use App\Models\Episode;
+use App\Models\StreamProfile;
 use App\Services\M3uProxyService;
 use App\Services\ProxyService;
 use Carbon\Carbon;
@@ -254,6 +255,17 @@ class M3uProxyStreamMonitor extends Page
                 ];
             }, $streamClients);
 
+            $transcoding = $stream['metadata']['transcoding'] ?? false;
+            $transcodingFormat = null;
+            if ($transcoding) {
+                $profile = StreamProfile::find($stream['metadata']['profile_id'] ?? null);
+                if ($profile) {
+                    $transcodingFormat = $profile->format === 'm3u8'
+                        ? 'HLS'
+                        : strtoupper($profile->format);
+                }
+            }
+
             $streams[] = [
                 'stream_id' => $streamId,
                 'source_url' => $this->truncateUrl($stream['original_url']),
@@ -271,6 +283,8 @@ class M3uProxyStreamMonitor extends Page
                 'has_failover' => $stream['has_failover'],
                 'error_count' => $stream['error_count'],
                 'segments_served' => $stream['total_segments_served'],
+                'transcoding' => $transcoding,
+                'transcoding_format' => $transcodingFormat,
             ];
         }
 

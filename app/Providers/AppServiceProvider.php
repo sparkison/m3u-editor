@@ -66,42 +66,21 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Don't kill the app if the database hasn't been created.
-        try {
-            foreach (['sqlite', 'jobs'] as $connection) {
-                // Check if the file exists
-                if (File::exists(database_path($connection . '.sqlite')) === false) {
-                    continue;
-                }
-
-                // Set SQLite pragmas
-                DB::connection($connection)
-                    ->statement('
-                        PRAGMA synchronous = NORMAL;
-                        PRAGMA mmap_size = 134217728; -- 128 megabytes
-                        PRAGMA cache_size = 1000000000;
-                        PRAGMA foreign_keys = true;
-                        PRAGMA busy_timeout = 5000;
-                        PRAGMA temp_store = memory;
-                        PRAGMA auto_vacuum = incremental;
-                        PRAGMA incremental_vacuum;
-                    ');
-            }
-        } catch (Throwable $throwable) {
-            // Log the error
-            Log::error('Error setting SQLite pragmas: ' . $throwable->getMessage());
-        }
-
         // Disable mass assignment protection (security handled by Filament)
         Model::unguard();
 
         // ✅ DYNAMIC HTTPS DETECTION: Detect actual protocol from request headers
         // This allows the app to work correctly with both HTTP and HTTPS access
         // when behind a reverse proxy with SSL termination
-        $this->configureDynamicHttpsDetection();
+        if (app()->runningInConsole() === false && request()->headers->has('X-Forwarded-Proto')) {
+            $this->configureDynamicHttpsDetection();
+        }
 
         // Setup the middleware
         $this->setupMiddleware();
+
+        // Set WAL mode on SQLite connections
+        $this->setWalModeOnSqlite();
 
         // Setup the gates
         $this->setupGates();
@@ -227,9 +206,44 @@ class AppServiceProvider extends ServiceProvider
      */
     private function setupMiddleware(): void
     {
+        // API rate limiter (for general API routes)
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by(optional($request->user())->id ?: $request->ip());
         });
+        
+        // Note: Proxy rate limiting is handled by ProxyRateLimitMiddleware for better performance
+    }
+
+    /**
+     * Set WAL mode on SQLite connections.
+     */
+    private function setWalModeOnSqlite(): void
+    {
+        // Don't kill the app if the database hasn't been created.
+        try {
+            foreach (['sqlite', 'jobs'] as $connection) {
+                // Check if the file exists
+                if (File::exists(database_path($connection . '.sqlite')) === false) {
+                    continue;
+                }
+
+                // Set SQLite pragmas
+                DB::connection($connection)
+                    ->statement('
+                        PRAGMA synchronous = NORMAL;
+                        PRAGMA mmap_size = 134217728; -- 128 megabytes
+                        PRAGMA cache_size = 1000000000;
+                        PRAGMA foreign_keys = true;
+                        PRAGMA busy_timeout = 5000;
+                        PRAGMA temp_store = memory;
+                        PRAGMA auto_vacuum = incremental;
+                        PRAGMA incremental_vacuum;
+                    ');
+            }
+        } catch (Throwable $throwable) {
+            // Log the error
+            Log::error('Error setting SQLite pragmas: ' . $throwable->getMessage());
+        }
     }
 
     /**

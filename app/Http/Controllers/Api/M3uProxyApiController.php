@@ -147,7 +147,6 @@ class M3uProxyApiController extends Controller
         if (! $profile) {
             // Use default profile set for the player
             $settings = app(GeneralSettings::class);
-
             if ($channel->is_vod) {
                 $profileId = $settings->default_vod_stream_profile_id ?? null;
             } else {
@@ -188,10 +187,7 @@ class M3uProxyApiController extends Controller
         }
 
         // Get stream profile from playlist if set
-        $profile = null;
-        if ($playlist->vod_stream_profile_id) {
-            $profile = $playlist->vodStreamProfile;
-        }
+        $profile = $playlist->vodStreamProfile;
         if (! $profile) {
             // Use default profile set for the player
             $settings = app(GeneralSettings::class);

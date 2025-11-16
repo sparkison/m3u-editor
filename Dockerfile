@@ -58,8 +58,12 @@ WORKDIR /var/www/html
 ARG GIT_BRANCH
 ARG GIT_COMMIT
 ARG GIT_TAG
-ARG M3U_PROXY_REPO
-ARG M3U_PROXY_BRANCH
+# Allow customization of m3u-proxy repository and branch
+# Default: upstream sparkison/m3u-proxy (master branch)
+# Override: --build-arg M3U_PROXY_REPO=https://github.com/yourusername/m3u-proxy.git
+#           --build-arg M3U_PROXY_BRANCH=dev
+ARG M3U_PROXY_REPO=https://github.com/sparkison/m3u-proxy.git
+ARG M3U_PROXY_BRANCH=master
 
 # Set environment variables for git information
 ENV GIT_BRANCH=${GIT_BRANCH}
@@ -88,7 +92,7 @@ RUN apk update && apk --no-cache add \
     git \
     bash \
     tzdata \
-    # ffmpeg
+    # FFmpeg 6.1 from Alpine 3.21 (stable)
     ffmpeg \
     # nginx + php-fpm
     nginx \
@@ -116,7 +120,7 @@ RUN chmod 0644 /etc/redis/redis.tmpl
 
 # Clone and setup m3u-proxy (Python-based proxy service)
 # Uses build args M3U_PROXY_REPO and M3U_PROXY_BRANCH for flexibility
-# Default: sparkison/m3u-proxy (main)
+# Default: sparkison/m3u-proxy (master)
 # Override at build time: --build-arg M3U_PROXY_REPO=https://github.com/hektyc/m3u-proxy.git --build-arg M3U_PROXY_BRANCH=dev
 RUN apk add --no-cache python3 py3-pip && \
     echo "Cloning m3u-proxy from: ${M3U_PROXY_REPO} (branch: ${M3U_PROXY_BRANCH})" && \

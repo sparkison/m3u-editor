@@ -208,19 +208,19 @@ class EpgApiController extends Controller
                 ->select('channels.*')
                 ->get();
 
-
             // Get the stream profile to use for the floating player
+            // Prefer playlist profiles over globals
             $settings = app(GeneralSettings::class);
-            $vodProfileId = $settings->default_vod_stream_profile_id ?? null;
-            $liveProfileId = $settings->default_stream_profile_id ?? null;
-            $vodProfile = $vodProfileId ? StreamProfile::find($vodProfileId) : null;
-            $liveProfile = $liveProfileId ? StreamProfile::find($liveProfileId) : null;
+            $vodProfile = $playlist->vodStreamProfile;
+            $liveProfile = $playlist->streamProfile;
 
             if (! $vodProfile) {
-                $vodProfile = $playlist->vodStreamProfile;
+                $vodProfileId = $settings->default_vod_stream_profile_id ?? null;
+                $vodProfile = $vodProfileId ? StreamProfile::find($vodProfileId) : null;
             }
             if (! $liveProfile) {
-                $liveProfile = $playlist->streamProfile;
+                $liveProfileId = $settings->default_stream_profile_id ?? null;
+                $liveProfile = $liveProfileId ? StreamProfile::find($liveProfileId) : null;
             }
 
             // Check the proxy format

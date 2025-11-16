@@ -391,6 +391,7 @@ class M3uProxyService
                 'id' => $id,
                 'type' => 'channel',
                 'playlist_uuid' => $playlist->uuid,
+                'strict_live_ts' => $playlist->strict_live_ts,
             ]);
 
             // Get the format from the URL
@@ -483,6 +484,7 @@ class M3uProxyService
                 'id' => $id,
                 'type' => 'episode',
                 'playlist_uuid' => $playlist->uuid,
+                'strict_live_ts' => $playlist->strict_live_ts,
             ]);
 
             // Get the format from the URL
@@ -696,8 +698,13 @@ class M3uProxyService
             $payload = [
                 'url' => $url,
                 'metadata' => $metadata,
-                'strict_live_ts' => true, // Enforce strict live TS handling
             ];
+
+            // Handle strict_live_ts flag if set in metadata
+            if ($metadata['strict_live_ts'] ?? false) {
+                $payload['strict_live_ts'] = true;
+                unset($metadata['strict_live_ts']);
+            }
 
             // Add failovers if provided
             if (!empty($failovers)) {
