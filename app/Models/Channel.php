@@ -152,13 +152,35 @@ class Channel extends Model
         // 3. No default profile is set in settings
         $useDirectStreaming = !$proxyEnabled && !$hasStreamProfile && !$profile;
 
+        // Debug logging
+        \Log::info('Channel::getFloatingPlayerAttributes', [
+            'channel_id' => $this->id,
+            'channel_name' => $this->name,
+            'playlist_id' => $playlist?->id,
+            'playlist_name' => $playlist?->name,
+            'proxyEnabled' => $proxyEnabled,
+            'hasStreamProfile' => $hasStreamProfile,
+            'playlist_stream_profile_id' => $playlist?->stream_profile_id,
+            'playlist_vod_stream_profile_id' => $playlist?->vod_stream_profile_id,
+            'defaultProfile' => $profile?->id,
+            'defaultProfileName' => $profile?->name,
+            'useDirectStreaming' => $useDirectStreaming,
+            'originalUrl' => $originalUrl,
+        ]);
+
         if ($useDirectStreaming) {
             // Direct streaming from provider - use source URL
             $url = $originalUrl;
+            \Log::info('Using DIRECT streaming', ['url' => $url]);
         } else {
             // Proxy through m3u-proxy for transcoding/compatibility
             // This also prevents CORS and mixed-content issues
             $url = route('m3u-proxy.channel.player', ['id' => $this->id]);
+            \Log::info('Using PROXY streaming', ['url' => $url, 'reason' => [
+                'proxyEnabled' => $proxyEnabled,
+                'hasStreamProfile' => $hasStreamProfile,
+                'hasDefaultProfile' => !is_null($profile),
+            ]]);
 
             // If a profile is set, use its format
             if ($profile) {
