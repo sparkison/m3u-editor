@@ -7,11 +7,12 @@ return new class extends Migration
 {
     /**
      * Run the migrations.
-     * 
+     *
      * Fixes VBV underflow issues by:
      * 1. Increasing VBV buffer from 2500k to 10000k (4 seconds at 2500k maxrate)
      * 2. Removing CRF mode from profiles that use maxrate (conflicting rate control)
-     * 3. Ensuring proper CBR mode configuration
+     * 3. Changing preset from 'faster' to 'medium' for better rate control
+     * 4. Ensuring proper CBR mode configuration
      */
     public function up(): void
     {
@@ -31,7 +32,15 @@ return new class extends Migration
                 'updated_at' => now(),
             ]);
 
-        // Fix #2: Remove CRF mode from profiles that have both CRF and maxrate
+        // Fix #2: Update preset from 'faster' to 'medium' for better rate control
+        DB::table('stream_profiles')
+            ->where('args', 'LIKE', '%-preset faster%')
+            ->update([
+                'args' => DB::raw("REPLACE(args, '-preset faster', '-preset medium')"),
+                'updated_at' => now(),
+            ]);
+
+        // Fix #3: Remove CRF mode from profiles that have both CRF and maxrate
         // This is a more complex replacement that requires careful handling
         $profiles = DB::table('stream_profiles')
             ->where('args', 'LIKE', '%-crf%')
@@ -40,16 +49,16 @@ return new class extends Migration
 
         foreach ($profiles as $profile) {
             $args = $profile->args;
-            
+
             // Replace -crf {crf|XX} with -b:v {bitrate|2000k}
             $args = preg_replace('/-crf\s+\{crf\|[0-9]+\}/', '-b:v {bitrate|2000k}', $args);
-            
+
             // Update audio bitrate from 192k to 128k for consistency
             $args = str_replace('-b:a {audio_bitrate|192k}', '-b:a {audio_bitrate|128k}', $args);
-            
+
             // Remove -hls_segment_filename if present (not needed, FFmpeg auto-generates)
             $args = preg_replace('/-hls_segment_filename\s+\S+\s+/', '', $args);
-            
+
             DB::table('stream_profiles')
                 ->where('id', $profile->id)
                 ->update([

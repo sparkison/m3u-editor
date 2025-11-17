@@ -27,14 +27,14 @@ class ListStreamProfiles extends ListRecords
                             'user_id' => auth()->id(),
                             'name' => 'Default Live Profile',
                             'description' => 'Optimized for live streaming content with CBR encoding.',
-                            'args' => '-fflags +genpts+discardcorrupt+igndts -i {input_url} -c:v libx264 -preset faster -b:v {bitrate|2000k} -maxrate {maxrate|2500k} -bufsize {bufsize|10000k} -c:a aac -b:a {audio_bitrate|128k} -f mpegts {output_args|pipe:1}',
+                            'args' => '-fflags +genpts+discardcorrupt+igndts -i {input_url} -c:v libx264 -preset medium -b:v {bitrate|2000k} -maxrate {maxrate|2500k} -bufsize {bufsize|10000k} -c:a aac -b:a {audio_bitrate|128k} -f mpegts {output_args|pipe:1}',
                             'format' => 'ts',
                         ],
                         [
                             'user_id' => auth()->id(),
                             'name' => 'Default HLS Profile',
                             'description' => 'Optimized for live streaming with low latency, better buffering, and CBR encoding.',
-                            'args' => '-fflags +genpts+discardcorrupt+igndts -i {input_url} -c:v libx264 -preset faster -b:v {bitrate|2000k} -maxrate {maxrate|2500k} -bufsize {bufsize|10000k} -c:a aac -b:a {audio_bitrate|128k} -hls_time 2 -hls_list_size 30 -hls_flags program_date_time -f hls {output_args|index.m3u8}',
+                            'args' => '-fflags +genpts+discardcorrupt+igndts -i {input_url} -c:v libx264 -preset medium -b:v {bitrate|2000k} -maxrate {maxrate|2500k} -bufsize {bufsize|10000k} -c:a aac -b:a {audio_bitrate|128k} -hls_time 2 -hls_list_size 30 -hls_flags program_date_time -f hls {output_args|index.m3u8}',
                             'format' => 'm3u8',
                         ],
 

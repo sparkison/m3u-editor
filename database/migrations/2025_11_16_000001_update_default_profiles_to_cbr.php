@@ -11,6 +11,7 @@ return new class extends Migration
      * Updates existing default stream profiles from CRF mode to CBR mode
      * to prevent VBV underflow errors during live streaming.
      * VBV buffer increased to 10000k (4 seconds at 2500k maxrate) for optimal stability.
+     * Preset changed to 'medium' for better bitrate consistency and rate control.
      */
     public function up(): void
     {
@@ -20,7 +21,7 @@ return new class extends Migration
             ->where('format', 'ts')
             ->update([
                 'description' => 'Optimized for live streaming content with CBR encoding.',
-                'args' => '-fflags +genpts+discardcorrupt+igndts -i {input_url} -c:v libx264 -preset faster -b:v {bitrate|2000k} -maxrate {maxrate|2500k} -bufsize {bufsize|10000k} -c:a aac -b:a {audio_bitrate|128k} -f mpegts {output_args|pipe:1}',
+                'args' => '-fflags +genpts+discardcorrupt+igndts -i {input_url} -c:v libx264 -preset medium -b:v {bitrate|2000k} -maxrate {maxrate|2500k} -bufsize {bufsize|10000k} -c:a aac -b:a {audio_bitrate|128k} -f mpegts {output_args|pipe:1}',
                 'updated_at' => now(),
             ]);
 
@@ -30,7 +31,7 @@ return new class extends Migration
             ->where('format', 'm3u8')
             ->update([
                 'description' => 'Optimized for live streaming with low latency, better buffering, and CBR encoding.',
-                'args' => '-fflags +genpts+discardcorrupt+igndts -i {input_url} -c:v libx264 -preset faster -b:v {bitrate|2000k} -maxrate {maxrate|2500k} -bufsize {bufsize|10000k} -c:a aac -b:a {audio_bitrate|128k} -hls_time 2 -hls_list_size 30 -hls_flags program_date_time -f hls {output_args|index.m3u8}',
+                'args' => '-fflags +genpts+discardcorrupt+igndts -i {input_url} -c:v libx264 -preset medium -b:v {bitrate|2000k} -maxrate {maxrate|2500k} -bufsize {bufsize|10000k} -c:a aac -b:a {audio_bitrate|128k} -hls_time 2 -hls_list_size 30 -hls_flags program_date_time -f hls {output_args|index.m3u8}',
                 'updated_at' => now(),
             ]);
     }
