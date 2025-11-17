@@ -310,19 +310,11 @@ class EpgApiController extends Controller
                         break;
                 }
 
-                // Always proxy the internal proxy so we can attempt to transcode the stream for better compatibility
-                $url = route('m3u-proxy.channel.player', [
-                    'id' => $channel->id,
-                    'uuid' => $playlist->uuid,
-                ]);
-
-                // Determine the channel format based on URL or container extension
-                $originalUrl = $channel->url_custom ?? $channel->url;
-                if (Str::endsWith($originalUrl, '.m3u8') || Str::endsWith($originalUrl, '.ts')) {
-                    $channelFormat = 'ts';
-                } else {
-                    $channelFormat = $channel->container_extension ?? 'ts';
-                }
+                // Use getFloatingPlayerAttributes() to determine the correct URL and format
+                // This respects the playlist's proxy settings and stream profile configuration
+                $playerAttributes = $channel->getFloatingPlayerAttributes();
+                $url = $playerAttributes['url'];
+                $channelFormat = $playerAttributes['format'];
 
                 // Get the icon
                 $icon = '';
