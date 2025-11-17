@@ -3,6 +3,8 @@
 namespace App\Filament\Resources\StreamProfiles;
 
 use App\Models\StreamProfile;
+use App\Rules\ValidateFfmpegVariables;
+use App\Rules\ValidateVbvParameters;
 use BackedEnum;
 use Filament\Actions;
 use Filament\Actions\Action;
@@ -56,9 +58,24 @@ class StreamProfileResource extends Resource
                             ->url('https://github.com/sparkison/m3u-proxy/blob/master/docs/PROFILE_VARIABLES.md')
                             ->openUrlInNewTab(true)
                     )
-                    ->default('-i {input_url} -c:v libx264 -preset faster -crf {crf|23} -maxrate {maxrate|2500k} -bufsize {bufsize|5000k} -c:a aac -b:a {audio_bitrate|192k} -f mpegts {output_args|pipe:1}')
-                    ->placeholder('-i {input_url} -c:v libx264 -preset faster -crf {crf|23} -maxrate {maxrate|2500k} -bufsize {bufsize|5000k} -c:a aac -b:a {audio_bitrate|192k} -f mpegts {output_args|pipe:1}')
-                    ->helperText('FFmpeg arguments for transcoding. Use placeholders like {crf|23} for configurable parameters with defaults. Hardware acceleration will be applied automatically by the proxy server.'),
+                    ->default('-i {input_url} -c:v libx264 -preset medium -b:v {bitrate|2000k} -maxrate {maxrate|2500k} -bufsize {bufsize|10000k} -c:a aac -b:a {audio_bitrate|128k} -f mpegts {output_args|pipe:1}')
+                    ->placeholder('-i {input_url} -c:v libx264 -preset medium -b:v {bitrate|2000k} -maxrate {maxrate|2500k} -bufsize {bufsize|10000k} -c:a aac -b:a {audio_bitrate|128k} -f mpegts {output_args|pipe:1}')
+                    ->helperText('FFmpeg arguments for transcoding. Use placeholders like {bitrate|2000k} for configurable parameters with defaults. Hardware acceleration will be applied automatically by the proxy server.')
+                    ->rules([
+                        new ValidateFfmpegVariables(),
+                        new ValidateVbvParameters(),
+                    ])
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(function ($state, $set) {
+                        // Get warnings (non-blocking issues)
+                        $warnings = ValidateVbvParameters::getWarnings($state ?? '');
+                        if (!empty($warnings)) {
+                            // Store warnings to display in helper text
+                            $set('_vbv_warnings', $warnings);
+                        } else {
+                            $set('_vbv_warnings', null);
+                        }
+                    }),
                 Select::make('format')
                     ->label('Stream Format')
                     ->searchable()
