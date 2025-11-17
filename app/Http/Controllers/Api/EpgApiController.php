@@ -208,21 +208,6 @@ class EpgApiController extends Controller
                 ->select('channels.*')
                 ->get();
 
-            // Get the stream profile to use for the floating player
-            // Prefer playlist profiles over globals
-            $settings = app(GeneralSettings::class);
-            $vodProfile = $playlist->vodStreamProfile;
-            $liveProfile = $playlist->streamProfile;
-
-            if (! $vodProfile) {
-                $vodProfileId = $settings->default_vod_stream_profile_id ?? null;
-                $vodProfile = $vodProfileId ? StreamProfile::find($vodProfileId) : null;
-            }
-            if (! $liveProfile) {
-                $liveProfileId = $settings->default_stream_profile_id ?? null;
-                $liveProfile = $liveProfileId ? StreamProfile::find($liveProfileId) : null;
-            }
-
             // Check the proxy format
             $proxyEnabled = $playlist->enable_proxy;
             $logoProxyEnabled = $playlist->enable_logo_proxy;
@@ -336,9 +321,7 @@ class EpgApiController extends Controller
                     'id' => $channelNo,
                     'database_id' => $channel->id, // Add the actual database ID for editing
                     'url' => $url,
-                    'format' => $channel->is_vod
-                        ? ($vodProfile->format ?? $channelFormat)
-                        : ($liveProfile->format ?? $channelFormat),
+                    'format' => $channelFormat, // Format already determined by getFloatingPlayerAttributes()
                     'tvg_id' => $tvgId,
                     'display_name' => $channel->title_custom ?? $channel->title,
                     'title' => $channel->name_custom ?? $channel->name,
