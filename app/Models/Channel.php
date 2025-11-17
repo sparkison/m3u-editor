@@ -121,7 +121,17 @@ class Channel extends Model
         // Get the effective playlist to check proxy settings
         $playlist = $this->getEffectivePlaylist();
         $proxyEnabled = $playlist ? $playlist->enable_proxy : false;
-        $hasStreamProfile = $playlist && ($this->is_vod ? $playlist->vodStreamProfile : $playlist->streamProfile);
+
+        // Check if playlist has a stream profile assigned by checking the foreign key directly
+        // This avoids N+1 queries and works even if the relationship isn't loaded
+        $hasStreamProfile = false;
+        if ($playlist) {
+            if ($this->is_vod) {
+                $hasStreamProfile = !empty($playlist->vod_stream_profile_id);
+            } else {
+                $hasStreamProfile = !empty($playlist->stream_profile_id);
+            }
+        }
 
         // Determine the source URL and format
         $originalUrl = $this->url_custom ?? $this->url;

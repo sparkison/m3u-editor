@@ -75,7 +75,10 @@ class Episode extends Model
         // Get the playlist to check proxy settings
         $playlist = $this->playlist;
         $proxyEnabled = $playlist ? $playlist->enable_proxy : false;
-        $hasStreamProfile = $playlist ? $playlist->vodStreamProfile : false;
+
+        // Check if playlist has a VOD stream profile assigned by checking the foreign key directly
+        // This avoids N+1 queries and works even if the relationship isn't loaded
+        $hasStreamProfile = $playlist ? !empty($playlist->vod_stream_profile_id) : false;
 
         // Determine the source URL and format
         $originalUrl = $this->url;
