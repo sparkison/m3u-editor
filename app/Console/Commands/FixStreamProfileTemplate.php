@@ -49,10 +49,11 @@ class FixStreamProfileTemplate extends Command
         }
 
         // Set the correct template based on format
+        // Using CBR mode with 4-second VBV buffer for optimal stability
         if ($profile->format === 'm3u8') {
-            $template = '-fflags +genpts+discardcorrupt+igndts -i {input_url} -c:v libx264 -preset faster -crf {crf|23} -maxrate {maxrate|2500k} -bufsize {bufsize|5000k} -c:a aac -b:a {audio_bitrate|192k} -hls_time 2 -hls_list_size 30 -hls_flags program_date_time -hls_segment_filename segment_%03d.ts -f hls {output_args|index.m3u8}';
+            $template = '-fflags +genpts+discardcorrupt+igndts -i {input_url} -c:v libx264 -preset faster -b:v {bitrate|2000k} -maxrate {maxrate|2500k} -bufsize {bufsize|10000k} -c:a aac -b:a {audio_bitrate|128k} -hls_time 2 -hls_list_size 30 -hls_flags program_date_time -f hls {output_args|index.m3u8}';
         } else {
-            $template = '-fflags +genpts+discardcorrupt+igndts -i {input_url} -c:v libx264 -preset faster -crf {crf|23} -maxrate {maxrate|2500k} -bufsize {bufsize|5000k} -c:a aac -b:a {audio_bitrate|192k} -f mpegts {output_args|pipe:1}';
+            $template = '-fflags +genpts+discardcorrupt+igndts -i {input_url} -c:v libx264 -preset faster -b:v {bitrate|2000k} -maxrate {maxrate|2500k} -bufsize {bufsize|10000k} -c:a aac -b:a {audio_bitrate|128k} -f mpegts {output_args|pipe:1}';
         }
 
         $profile->args = $template;
