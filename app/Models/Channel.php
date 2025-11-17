@@ -118,22 +118,49 @@ class Channel extends Model
         }
         $profile = $profileId ? StreamProfile::find($profileId) : null;
 
-        // Always proxy the internal player so we can attempt to transcode the stream for better compatibility
-        // This also prevents CORS and mixed-content issues
-        $url = route('m3u-proxy.channel.player', ['id' => $this->id]);
+        // Get the effective playlist to check proxy settings
+        $playlist = $this->getEffectivePlaylist();
+        $proxyEnabled = $playlist ? $playlist->enable_proxy : false;
+        $hasStreamProfile = $playlist && ($this->is_vod ? $playlist->vodStreamProfile : $playlist->streamProfile);
 
-        // Determine the channel format based on URL or container extension
+        // Determine the source URL and format
         $originalUrl = $this->url_custom ?? $this->url;
         $format = pathinfo($originalUrl, PATHINFO_EXTENSION);
         if (empty($format)) {
             $format = $this->container_extension ?? 'ts';
         }
 
+        // Normalize format for player compatibility
+        if ($format === 'm3u8') {
+            $format = 'hls';
+        }
+
+        // Decide whether to use direct streaming or proxy
+        // Use direct streaming if:
+        // 1. Proxy is disabled on the playlist AND
+        // 2. No stream profile is assigned to the playlist AND
+        // 3. No default profile is set in settings
+        $useDirectStreaming = !$proxyEnabled && !$hasStreamProfile && !$profile;
+
+        if ($useDirectStreaming) {
+            // Direct streaming from provider - use source URL
+            $url = $originalUrl;
+        } else {
+            // Proxy through m3u-proxy for transcoding/compatibility
+            // This also prevents CORS and mixed-content issues
+            $url = route('m3u-proxy.channel.player', ['id' => $this->id]);
+
+            // If a profile is set, use its format
+            if ($profile) {
+                $format = $profile->format ?? $format;
+            }
+        }
+
         return [
             'id' => $this->id,
             'title' => $this->name_custom ?? $this->name,
             'url' => $url,
-            'format' => $profile->format ?? $format,
+            'format' => $format,
             'type' => 'channel',
         ];
     }
