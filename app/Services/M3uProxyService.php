@@ -307,8 +307,13 @@ class M3uProxyService
             if ($activeStreams >= $playlist->available_streams) {
                 // Primary playlist is at capacity, check failovers
                 $failoverChannels = $channel->failoverChannels()
-                    ->select(['channels.id', 'channels.url', 'channels.url_custom'])
-                    ->get();
+                    ->select([
+                        'channels.id',
+                        'channels.url',
+                        'channels.url_custom',
+                        'channels.playlist_id',
+                        'channels.custom_playlist_id',
+                    ])->get();
 
                 foreach ($failoverChannels as $failoverChannel) {
                     $failoverPlaylist = $failoverChannel->getEffectivePlaylist();
