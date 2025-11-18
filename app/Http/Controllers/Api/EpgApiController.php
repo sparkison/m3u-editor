@@ -208,6 +208,21 @@ class EpgApiController extends Controller
                 ->select('channels.*')
                 ->get();
 
+            // Get the stream profile to use for the floating player
+            // Prefer playlist profiles over globals
+            $settings = app(GeneralSettings::class);
+            $vodProfile = $playlist->vodStreamProfile;
+            $liveProfile = $playlist->streamProfile;
+
+            if (! $vodProfile) {
+                $vodProfileId = $settings->default_vod_stream_profile_id ?? null;
+                $vodProfile = $vodProfileId ? StreamProfile::find($vodProfileId) : null;
+            }
+            if (! $liveProfile) {
+                $liveProfileId = $settings->default_stream_profile_id ?? null;
+                $liveProfile = $liveProfileId ? StreamProfile::find($liveProfileId) : null;
+            }
+
             // Check the proxy format
             $proxyEnabled = $playlist->enable_proxy;
             $logoProxyEnabled = $playlist->enable_logo_proxy;
@@ -295,11 +310,19 @@ class EpgApiController extends Controller
                         break;
                 }
 
-                // Use getFloatingPlayerAttributes() to determine the correct URL and format
-                // This respects the playlist's proxy settings and stream profile configuration
-                $playerAttributes = $channel->getFloatingPlayerAttributes();
-                $url = $playerAttributes['url'];
-                $channelFormat = $playerAttributes['format'];
+                // Always proxy the internal proxy so we can attempt to transcode the stream for better compatibility
+                $url = route('m3u-proxy.channel.player', [
+                    'id' => $channel->id,
+                    'uuid' => $playlist->uuid,
+                ]);
+
+                // Determine the channel format based on URL or container extension
+                $originalUrl = $channel->url_custom ?? $channel->url;
+                if (Str::endsWith($originalUrl, '.m3u8') || Str::endsWith($originalUrl, '.ts')) {
+                    $channelFormat = 'ts';
+                } else {
+                    $channelFormat = $channel->container_extension ?? 'ts';
+                }
 
                 // Get the icon
                 $icon = '';
@@ -321,7 +344,9 @@ class EpgApiController extends Controller
                     'id' => $channelNo,
                     'database_id' => $channel->id, // Add the actual database ID for editing
                     'url' => $url,
-                    'format' => $channelFormat, // Format already determined by getFloatingPlayerAttributes()
+                    'format' => $channel->is_vod
+                        ? ($vodProfile->format ?? $channelFormat)
+                        : ($liveProfile->format ?? $channelFormat),
                     'tvg_id' => $tvgId,
                     'display_name' => $channel->title_custom ?? $channel->title,
                     'title' => $channel->name_custom ?? $channel->name,

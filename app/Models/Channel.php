@@ -118,86 +118,22 @@ class Channel extends Model
         }
         $profile = $profileId ? StreamProfile::find($profileId) : null;
 
-        // Get the effective playlist to check proxy settings
-        $playlist = $this->getEffectivePlaylist();
-        $proxyEnabled = $playlist ? $playlist->enable_proxy : false;
+        // Always proxy the internal player so we can attempt to transcode the stream for better compatibility
+        // This also prevents CORS and mixed-content issues
+        $url = route('m3u-proxy.channel.player', ['id' => $this->id]);
 
-        // Check if playlist has a stream profile assigned by checking the foreign key directly
-        // This avoids N+1 queries and works even if the relationship isn't loaded
-        $hasStreamProfile = false;
-        if ($playlist) {
-            if ($this->is_vod) {
-                $hasStreamProfile = !empty($playlist->vod_stream_profile_id);
-            } else {
-                $hasStreamProfile = !empty($playlist->stream_profile_id);
-            }
-        }
-
-        // Determine the source URL and format
+        // Determine the channel format based on URL or container extension
         $originalUrl = $this->url_custom ?? $this->url;
         $format = pathinfo($originalUrl, PATHINFO_EXTENSION);
         if (empty($format)) {
             $format = $this->container_extension ?? 'ts';
         }
 
-        // Normalize format for player compatibility
-        if ($format === 'm3u8') {
-            $format = 'hls';
-        }
-
-        // Decide whether to use direct streaming or proxy
-        // Use direct streaming if:
-        // 1. Proxy is disabled on the playlist AND
-        // 2. No stream profile is assigned to the playlist AND
-        // 3. No default profile is set in settings
-        $useDirectStreaming = !$proxyEnabled && !$hasStreamProfile && !$profile;
-
-        // Debug logging
-        \Log::info('Channel::getFloatingPlayerAttributes', [
-            'channel_id' => $this->id,
-            'channel_name' => $this->name,
-            'playlist_id' => $playlist?->id,
-            'playlist_name' => $playlist?->name,
-            'proxyEnabled' => $proxyEnabled,
-            'hasStreamProfile' => $hasStreamProfile,
-            'playlist_stream_profile_id' => $playlist?->stream_profile_id,
-            'playlist_vod_stream_profile_id' => $playlist?->vod_stream_profile_id,
-            'defaultProfile' => $profile?->id,
-            'defaultProfileName' => $profile?->name,
-            'useDirectStreaming' => $useDirectStreaming,
-            'originalUrl' => $originalUrl,
-        ]);
-
-        // Always use m3u-proxy for the preview player to handle CORS and compatibility
-        // The difference is whether we transcode (with profile) or passthrough (without profile)
-        $url = route('m3u-proxy.channel.player', ['id' => $this->id]);
-
-        if ($useDirectStreaming) {
-            \Log::info('Using m3u-proxy in PASSTHROUGH mode (no transcoding)', [
-                'url' => $url,
-                'original_url' => $originalUrl,
-            ]);
-        } else {
-            \Log::info('Using m3u-proxy in TRANSCODE mode', [
-                'url' => $url,
-                'reason' => [
-                    'proxyEnabled' => $proxyEnabled,
-                    'hasStreamProfile' => $hasStreamProfile,
-                    'hasDefaultProfile' => !is_null($profile),
-                ],
-            ]);
-
-            // If a profile is set, use its format
-            if ($profile) {
-                $format = $profile->format ?? $format;
-            }
-        }
-
         return [
             'id' => $this->id,
             'title' => $this->name_custom ?? $this->name,
             'url' => $url,
-            'format' => $format,
+            'format' => $profile->format ?? $format,
             'type' => 'channel',
         ];
     }

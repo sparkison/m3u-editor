@@ -60,21 +60,15 @@ function multiStreamManager() {
         },
 
         openStream(channelData) {
-            // DEBUG: Log the channel data received
-            console.log('🎬 openStream called with channelData:', channelData);
-            console.log('📺 Channel URL:', channelData.url);
-            console.log('📝 Channel format:', channelData.format);
-            console.log('🎯 Channel type:', channelData.type);
-
             // Check if we already have a player for this channel
             const existingPlayer = this.players.find(p => p.url === channelData.url);
             if (existingPlayer) {
                 this.bringToFront(existingPlayer.id);
                 return;
             }
-
+            
             const playerId = 'floating-player-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-
+            
             const player = {
                 id: playerId,
                 title: channelData.title || channelData.name || 'Unknown Channel',
@@ -88,7 +82,6 @@ function multiStreamManager() {
                 streamPlayer: null
             };
 
-            console.log('✅ Created player with URL:', player.url);
             this.players.push(player);
         },
 

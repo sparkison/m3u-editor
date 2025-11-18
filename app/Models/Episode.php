@@ -72,51 +72,21 @@ class Episode extends Model
         $profileId = $settings->default_vod_stream_profile_id ?? null;
         $profile = $profileId ? StreamProfile::find($profileId) : null;
 
-        // Get the playlist to check proxy settings
-        $playlist = $this->playlist;
-        $proxyEnabled = $playlist ? $playlist->enable_proxy : false;
+        // Always proxy the internal proxy so we can attempt to transcode the stream for better compatibility
+        $url = route('m3u-proxy.episode.player', ['id' => $this->id]);
 
-        // Check if playlist has a VOD stream profile assigned by checking the foreign key directly
-        // This avoids N+1 queries and works even if the relationship isn't loaded
-        $hasStreamProfile = $playlist ? !empty($playlist->vod_stream_profile_id) : false;
-
-        // Determine the source URL and format
+        // Determine the channel format based on URL or container extension
         $originalUrl = $this->url;
         $format = pathinfo($originalUrl, PATHINFO_EXTENSION);
         if (empty($format)) {
             $format = $this->container_extension ?? 'ts';
         }
 
-        // Normalize format for player compatibility
-        if ($format === 'm3u8') {
-            $format = 'hls';
-        }
-
-        // Decide whether to use direct streaming or proxy
-        // Use direct streaming if:
-        // 1. Proxy is disabled on the playlist AND
-        // 2. No VOD stream profile is assigned to the playlist AND
-        // 3. No default VOD profile is set in settings
-        $useDirectStreaming = !$proxyEnabled && !$hasStreamProfile && !$profile;
-
-        if ($useDirectStreaming) {
-            // Direct streaming from provider - use source URL
-            $url = $originalUrl;
-        } else {
-            // Proxy through m3u-proxy for transcoding/compatibility
-            $url = route('m3u-proxy.episode.player', ['id' => $this->id]);
-
-            // If a profile is set, use its format
-            if ($profile) {
-                $format = $profile->format ?? $format;
-            }
-        }
-
         return [
             'id' => 'episode-' . $this->id,
             'title' => $this->title,
             'url' => $url,
-            'format' => $format,
+            'format' => $profile->format ?? $format,
             'type' => 'episode',
         ];
     }
