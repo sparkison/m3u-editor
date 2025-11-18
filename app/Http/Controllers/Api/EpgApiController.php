@@ -318,7 +318,9 @@ class EpgApiController extends Controller
 
                 // Determine the channel format based on URL or container extension
                 $originalUrl = $channel->url_custom ?? $channel->url;
-                if (Str::endsWith($originalUrl, '.m3u8') || Str::endsWith($originalUrl, '.ts')) {
+                if (Str::endsWith($originalUrl, '.m3u8')) {
+                    $channelFormat = 'hls';
+                } elseif (Str::endsWith($originalUrl, '.ts')) {
                     $channelFormat = 'ts';
                 } else {
                     $channelFormat = $channel->container_extension ?? 'ts';
