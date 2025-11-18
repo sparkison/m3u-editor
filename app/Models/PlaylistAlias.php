@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\PlaylistChannelId;
 use App\Services\XtreamService;
 use App\Traits\ShortUrlTrait;
+use App\Traits\HasCustomHeaders;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -18,6 +19,7 @@ class PlaylistAlias extends Model
 {
     use HasFactory;
     use ShortUrlTrait;
+    use HasCustomHeaders;
 
     protected $casts = [
         'xtream_config' => 'array',
@@ -26,6 +28,7 @@ class PlaylistAlias extends Model
         'enable_proxy' => 'boolean',
         'priority' => 'integer',
         'custom_headers' => 'array',
+        'enable_custom_headers' => 'boolean',
         'strict_live_ts' => 'boolean',
     ];
 

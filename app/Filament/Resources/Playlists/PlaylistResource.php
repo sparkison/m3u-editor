@@ -1425,27 +1425,35 @@ class PlaylistResource extends Resource
                                 ->helperText('Select a transcoding profile to apply to VOD and Series streams from this playlist. Leave empty for direct stream proxying.')
                                 ->placeholder('Leave empty for direct stream proxying'),
                         ])->hidden(fn(Get $get): bool => ! $get('enable_proxy')),
-
-                    Fieldset::make('HTTP Headers (optional)')
+                ]),
+            Section::make('HTTP Headers')
+                ->description('Custom HTTP headers to include with stream requests')
+                ->columnSpanFull()
+                ->collapsible()
+                ->collapsed($creating)
+                ->schema([
+                    Toggle::make('enable_custom_headers')
+                        ->label('Enable Custom Headers')
+                        ->helperText('When enabled, custom headers will be included with all stream requests (direct or proxied).')
+                        ->live()
+                        ->columnSpanFull(),
+                    Repeater::make('custom_headers')
+                        ->label('Custom Headers')
+                        ->helperText('Add custom headers to include when streaming. Examples: User-Agent, Referer, Origin, Authorization, etc.')
                         ->columnSpanFull()
+                        ->columns(2)
+                        ->default([])
                         ->schema([
-                            Repeater::make('custom_headers')
-                                ->hiddenLabel()
-                                ->helperText('Custom headers to use when streaming via the proxy.')
-                                ->columnSpanFull()
-                                ->columns(2)
-                                ->default([])
-                                ->schema([
-                                    TextInput::make('header')
-                                        ->label('Header')
-                                        ->required()
-                                        ->placeholder('e.g. Authorization'),
-                                    TextInput::make('value')
-                                        ->label('Value')
-                                        ->required()
-                                        ->placeholder('e.g. Bearer abc123'),
-                                ])
-                        ])->hidden(fn(Get $get): bool => ! $get('enable_proxy'))
+                            TextInput::make('header')
+                                ->label('Header')
+                                ->required()
+                                ->placeholder('e.g. User-Agent'),
+                            TextInput::make('value')
+                                ->label('Value')
+                                ->required()
+                                ->placeholder('e.g. VLC/3.0.21'),
+                        ])
+                        ->hidden(fn(Get $get): bool => ! $get('enable_custom_headers'))
                 ]),
             Section::make('EPG Output')
                 ->description('EPG output options')

@@ -168,19 +168,24 @@ class Channel extends Model
             'originalUrl' => $originalUrl,
         ]);
 
+        // Always use m3u-proxy for the preview player to handle CORS and compatibility
+        // The difference is whether we transcode (with profile) or passthrough (without profile)
+        $url = route('m3u-proxy.channel.player', ['id' => $this->id]);
+
         if ($useDirectStreaming) {
-            // Direct streaming from provider - use source URL
-            $url = $originalUrl;
-            \Log::info('Using DIRECT streaming', ['url' => $url]);
+            \Log::info('Using m3u-proxy in PASSTHROUGH mode (no transcoding)', [
+                'url' => $url,
+                'original_url' => $originalUrl,
+            ]);
         } else {
-            // Proxy through m3u-proxy for transcoding/compatibility
-            // This also prevents CORS and mixed-content issues
-            $url = route('m3u-proxy.channel.player', ['id' => $this->id]);
-            \Log::info('Using PROXY streaming', ['url' => $url, 'reason' => [
-                'proxyEnabled' => $proxyEnabled,
-                'hasStreamProfile' => $hasStreamProfile,
-                'hasDefaultProfile' => !is_null($profile),
-            ]]);
+            \Log::info('Using m3u-proxy in TRANSCODE mode', [
+                'url' => $url,
+                'reason' => [
+                    'proxyEnabled' => $proxyEnabled,
+                    'hasStreamProfile' => $hasStreamProfile,
+                    'hasDefaultProfile' => !is_null($profile),
+                ],
+            ]);
 
             // If a profile is set, use its format
             if ($profile) {

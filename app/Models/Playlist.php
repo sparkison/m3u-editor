@@ -7,6 +7,7 @@ use App\Enums\PlaylistSourceType;
 use App\Enums\Status;
 use App\Services\XtreamService;
 use App\Traits\ShortUrlTrait;
+use App\Traits\HasCustomHeaders;
 use AshAllenDesign\ShortURL\Models\ShortURL;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -22,6 +23,7 @@ class Playlist extends Model
 {
     use HasFactory;
     use ShortUrlTrait;
+    use HasCustomHeaders;
 
     /**
      * The attributes that should be cast to native types.
@@ -54,6 +56,7 @@ class Playlist extends Model
         'auto_merge_config' => 'array',
         'emby_config' => 'array',
         'custom_headers' => 'array',
+        'enable_custom_headers' => 'boolean',
         'strict_live_ts' => 'boolean',
         'status' => Status::class,
         'id_channel_by' => PlaylistChannelId::class,

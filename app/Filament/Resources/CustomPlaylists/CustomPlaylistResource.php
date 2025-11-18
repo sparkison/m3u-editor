@@ -401,27 +401,32 @@ class CustomPlaylistResource extends Resource
                                 ->helperText('Select a transcoding profile to apply to VOD and Series streams from this playlist. Leave empty for direct stream proxying.')
                                 ->placeholder('Leave empty for direct stream proxying'),
                         ])->hidden(fn(Get $get): bool => ! $get('enable_proxy')),
-
-                    Fieldset::make('HTTP Headers (optional)')
+                ]),
+            Fieldset::make('HTTP Headers')
+                ->columnSpanFull()
+                ->schema([
+                    Toggle::make('enable_custom_headers')
+                        ->label('Enable Custom Headers')
+                        ->helperText('When enabled, custom headers will be included with all stream requests (direct or proxied).')
+                        ->live()
+                        ->columnSpanFull(),
+                    Repeater::make('custom_headers')
+                        ->label('Custom Headers')
+                        ->helperText('Add custom headers to include when streaming. Examples: User-Agent, Referer, Origin, Authorization, etc.')
                         ->columnSpanFull()
+                        ->columns(2)
+                        ->default([])
                         ->schema([
-                            Repeater::make('custom_headers')
-                                ->hiddenLabel()
-                                ->helperText('Add any custom headers to include when streaming a channel/episode.')
-                                ->columnSpanFull()
-                                ->columns(2)
-                                ->default([])
-                                ->schema([
-                                    TextInput::make('header')
-                                        ->label('Header')
-                                        ->required()
-                                        ->placeholder('e.g. Authorization'),
-                                    TextInput::make('value')
-                                        ->label('Value')
-                                        ->required()
-                                        ->placeholder('e.g. Bearer abc123'),
-                                ])
-                        ])->hidden(fn(Get $get): bool => !$get('enable_proxy'))
+                            TextInput::make('header')
+                                ->label('Header')
+                                ->required()
+                                ->placeholder('e.g. User-Agent'),
+                            TextInput::make('value')
+                                ->label('Value')
+                                ->required()
+                                ->placeholder('e.g. VLC/3.0.21'),
+                        ])
+                        ->hidden(fn(Get $get): bool => ! $get('enable_custom_headers'))
                 ])
         ];
         return [

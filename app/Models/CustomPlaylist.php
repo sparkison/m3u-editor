@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\PlaylistChannelId;
 use App\Traits\ShortUrlTrait;
+use App\Traits\HasCustomHeaders;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,6 +18,7 @@ class CustomPlaylist extends Model
     use HasFactory;
     use ShortUrlTrait;
     use HasTags;
+    use HasCustomHeaders;
 
     /**
      * The attributes that should be cast to native types.
@@ -33,6 +35,7 @@ class CustomPlaylist extends Model
         'include_series_in_m3u' => 'boolean',
         'include_vod_in_m3u' => 'boolean',
         'custom_headers' => 'array',
+        'enable_custom_headers' => 'boolean',
         'strict_live_ts' => 'boolean',
         'id_channel_by' => PlaylistChannelId::class
     ];

@@ -416,26 +416,33 @@ class PlaylistAliasResource extends Resource
                                 ->helperText('Select a transcoding profile to apply to VOD and Series streams from this playlist. Leave empty for direct stream proxying.')
                                 ->placeholder('Leave empty for direct stream proxying'),
                         ])->hidden(fn(Get $get): bool => ! $get('enable_proxy')),
-                    Schemas\Components\Fieldset::make('HTTP Headers (optional)')
+                ])->columnSpanFull(),
+
+            Schemas\Components\Fieldset::make('HTTP Headers')
+                ->columnSpanFull()
+                ->schema([
+                    Forms\Components\Toggle::make('enable_custom_headers')
+                        ->label('Enable Custom Headers')
+                        ->helperText('When enabled, custom headers will be included with all stream requests (direct or proxied).')
+                        ->live()
+                        ->columnSpanFull(),
+                    Forms\Components\Repeater::make('custom_headers')
+                        ->label('Custom Headers')
+                        ->helperText('Add custom headers to include when streaming. Examples: User-Agent, Referer, Origin, Authorization, etc.')
                         ->columnSpanFull()
+                        ->columns(2)
+                        ->default([])
                         ->schema([
-                            Forms\Components\Repeater::make('custom_headers')
-                                ->hiddenLabel()
-                                ->helperText('Add any custom headers to include when streaming a channel/episode.')
-                                ->columnSpanFull()
-                                ->columns(2)
-                                ->default([])
-                                ->schema([
-                                    Forms\Components\TextInput::make('header')
-                                        ->label('Header')
-                                        ->required()
-                                        ->placeholder('e.g. Authorization'),
-                                    Forms\Components\TextInput::make('value')
-                                        ->label('Value')
-                                        ->required()
-                                        ->placeholder('e.g. Bearer abc123'),
-                                ])
-                        ])->hidden(fn(Get $get): bool => !$get('enable_proxy')),
+                            Forms\Components\TextInput::make('header')
+                                ->label('Header')
+                                ->required()
+                                ->placeholder('e.g. User-Agent'),
+                            Forms\Components\TextInput::make('value')
+                                ->label('Value')
+                                ->required()
+                                ->placeholder('e.g. VLC/3.0.21'),
+                        ])
+                        ->hidden(fn(Get $get): bool => ! $get('enable_custom_headers'))
                 ])->columnSpanFull(),
 
             Schemas\Components\Fieldset::make('Auth (optional)')

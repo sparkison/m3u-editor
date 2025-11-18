@@ -372,8 +372,8 @@ class M3uProxyService
             ->values()
             ->toArray();
 
-        // Get any custom headers for the current playlist
-        $headers = $playlist->custom_headers ?? [];
+        // Get any custom headers for the current playlist (only if enabled and valid)
+        $headers = $playlist->hasValidCustomHeaders() ? $playlist->custom_headers : [];
 
         // Use appropriate endpoint based on whether transcoding profile is provided
         if ($profile) {
@@ -449,8 +449,8 @@ class M3uProxyService
 
         $userAgent = $playlist->user_agent;
 
-        // Get any custom headers for the current playlist
-        $headers = $playlist->custom_headers ?? [];
+        // Get any custom headers for the current playlist (only if enabled and valid)
+        $headers = $playlist->hasValidCustomHeaders() ? $playlist->custom_headers : [];
 
         // Episodes typically don't have failovers, but we'll support it if needed
         $failoverUrls = [];
