@@ -186,19 +186,13 @@ class SimilaritySearchService
         $bestMatch = null;
         $bestEpgForEmbedding = null;
         $candidates = []; // Store all candidates with scores for better decision making
-
-        if ($epgChannels->count() === 0) {
-            if ($debug) {
-                Log::debug("Channel {$channel->id} '{$fallbackName}' => no EPG channels found, skipping");
-            }
-
-            return null;
-        }
+        $hasEpgChannels = false; // Track if the query returned any rows without issuing a separate COUNT(*) query
 
         /**
          * Multi-Strategy Matching for Better Accuracy
          */
         foreach ($epgChannels->cursor() as $epgChannel) {
+            $hasEpgChannels = true;
             // Try matching with both normalized and less-normalized versions
             $normalizedEpg = empty($epgChannel->name)
                 ? $this->normalizeChannelName($epgChannel->channel_id)
@@ -253,6 +247,15 @@ class SimilaritySearchService
             if ($finalScore >= $this->bestFuzzyThreshold && $finalScore < $this->upperFuzzyThreshold) {
                 $bestEpgForEmbedding = $epgChannel;
             }
+        }
+
+        // If the query returned no EPG channels at all, short-circuit here
+        if (! $hasEpgChannels) {
+            if ($debug) {
+                Log::debug("Channel {$channel->id} '{$fallbackName}' => no EPG channels found, skipping");
+            }
+
+            return null;
         }
 
         // Filter out poor matches - use configurable similarity threshold
