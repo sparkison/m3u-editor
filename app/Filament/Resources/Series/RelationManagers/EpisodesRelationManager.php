@@ -149,7 +149,8 @@ class EpisodesRelationManager extends RelationManager
                 Action::make('play')
                     ->tooltip('Play Episode')
                     ->action(function ($record, $livewire) {
-                        $livewire->dispatch('openFloatingStream', $record->getFloatingPlayerAttributes());
+                        $livewire->dispatch('openFloatingStream', $record->getFloatingPlayerAttributes())->to('stream-player');
+                        $livewire->dispatchBrowserEvent('openFloatingStream', $record->getFloatingPlayerAttributes());
                     })
                     ->icon('heroicon-s-play-circle')
                     ->button()

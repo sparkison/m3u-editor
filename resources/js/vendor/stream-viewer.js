@@ -144,11 +144,23 @@ function streamPlayer() {
 
                 this.hls.on(Hls.Events.ERROR, (event, data) => {
                     console.error('HLS Error:', data);
-                    
+
+                    // Check for 503 Service Unavailable errors
+                    const is503Error = data.response && data.response.code === 503;
+                    const isManifestLoadError = data.details && (data.details.includes('MANIFEST_LOAD_ERROR') || data.details.includes('LEVEL_LOAD_ERROR'));
+
+                    // If we get 503 on manifest/playlist loading, show user-friendly error and stop retrying
+                    if (is503Error && isManifestLoadError) {
+                        console.log('HLS 503 Service Unavailable error - streaming service is down or overloaded');
+                        this.cleanup();
+                        this.showError(playerId, 'Streaming service is temporarily unavailable. The service may be down or overloaded. Please try again in a few moments.');
+                        return;
+                    }
+
                     // Check for authentication/authorization errors (403, 401)
                     const isAuthError = data.response && (data.response.code === 403 || data.response.code === 401);
                     const isFragLoadError = data.details && data.details.includes('FRAG_LOAD_ERROR');
-                    
+
                     // If we get auth errors on fragment loading, immediately fall back to native
                     if (isAuthError && isFragLoadError) {
                         console.log('HLS Authentication error on fragments, falling back to native player immediately');
@@ -163,7 +175,15 @@ function streamPlayer() {
                         switch(data.type) {
                             case Hls.ErrorTypes.NETWORK_ERROR:
                                 console.log('HLS Network error, trying to recover...');
-                                this.hls.startLoad();
+                                // Don't cleanup on network errors - let HLS.js retry
+                                // Only show error if it persists after retries
+                                if (data.details && data.details.includes('MANIFEST_LOAD_ERROR')) {
+                                    // Manifest failed after all retries
+                                    this.showError(playerId, 'Failed to load stream playlist. The stream may be offline or the service may be down.');
+                                } else {
+                                    // Try to recover
+                                    this.hls.startLoad();
+                                }
                                 break;
                             case Hls.ErrorTypes.MEDIA_ERROR:
                                 console.log('HLS Media error, trying to recover...');
@@ -177,20 +197,23 @@ function streamPlayer() {
                         }
                     } else {
                         console.warn('Non-fatal HLS error:', data.details);
-                        // For segment loading errors, let's show the specific error
+                        // For segment loading errors, track but don't immediately fail
                         if (data.details && data.details.includes('FRAG_LOAD_ERROR')) {
                             // If we've had multiple fragment errors, fall back
                             if (!this.fragmentErrorCount) this.fragmentErrorCount = 0;
                             this.fragmentErrorCount++;
-                            
-                            if (this.fragmentErrorCount >= 3) {
+
+                            if (this.fragmentErrorCount >= 6) {
                                 console.log('Multiple fragment errors, falling back to native player');
                                 this.cleanup();
                                 this.initNativePlayer(video, url, playerId);
                                 return;
                             }
-                            
-                            this.showError(playerId, `Segment loading failed: ${data.response?.code || 'Network error'}`);
+
+                            // Only show error if we're getting close to the limit
+                            if (this.fragmentErrorCount >= 3) {
+                                this.showError(playerId, `Stream buffering issues (${this.fragmentErrorCount}/6 errors). Retrying...`);
+                            }
                         }
                     }
                 });
@@ -409,11 +432,21 @@ function streamPlayer() {
             const loadingEl = document.getElementById(playerId + '-loading');
             const errorEl = document.getElementById(playerId + '-error');
             const errorMessageEl = document.getElementById(playerId + '-error-message');
-            
+
             if (loadingEl) loadingEl.style.display = 'none';
-            if (errorEl) errorEl.style.display = 'flex';
-            if (errorMessageEl) errorMessageEl.textContent = message;
-            
+            if (errorEl) {
+                errorEl.style.display = 'flex';
+
+                // Update error message text
+                if (errorMessageEl) {
+                    errorMessageEl.textContent = message;
+                } else {
+                    // Fallback if error message element doesn't exist
+                    const errorText = errorEl.querySelector('p');
+                    if (errorText) errorText.textContent = message;
+                }
+            }
+
             this.updateStatus(playerId, 'Error');
         },
         

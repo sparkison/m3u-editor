@@ -32,13 +32,24 @@ function multiStreamManager() {
                 return;
             }
             
-            // Listen for new stream requests
+            // Listen for new stream requests (both CustomEvent and Livewire browser events)
             window.addEventListener('openFloatingStream', (event) => {
                 let detail = event.detail;
                 if (Array.isArray(detail)) {
                     detail = detail[0];
                 }
                 console.log('Received openFloatingStream event:', detail);
+                event.stopPropagation(); // Prevent event bubbling
+                this.openStream(detail);
+            });
+
+            // Also listen for Livewire browser events
+            document.addEventListener('openFloatingStream', (event) => {
+                let detail = event.detail;
+                if (Array.isArray(detail)) {
+                    detail = detail[0];
+                }
+                console.log('Received openFloatingStream browser event:', detail);
                 event.stopPropagation(); // Prevent event bubbling
                 this.openStream(detail);
             });

@@ -401,7 +401,8 @@ class ChannelResource extends Resource
             Action::make('play')
                 ->tooltip('Play Channel')
                 ->action(function ($record, $livewire) {
-                    $livewire->dispatch('openFloatingStream', $record->getFloatingPlayerAttributes());
+                    $livewire->dispatch('openFloatingStream', $record->getFloatingPlayerAttributes())->to('stream-player');
+                    $livewire->dispatchBrowserEvent('openFloatingStream', $record->getFloatingPlayerAttributes());
                 })
                 ->icon('heroicon-s-play-circle')
                 ->button()

@@ -125,15 +125,16 @@
                 </div>
 
                 <!-- Error Overlay -->
-                <div 
+                <div
                     :id="player.id + '-video-error'"
                     class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 hidden"
                 >
-                    <div class="text-center text-white p-4">
+                    <div class="text-center text-white p-4 max-w-md">
                         <x-heroicon-o-exclamation-triangle class="w-8 h-8 mx-auto mb-2 text-red-400" />
-                        <p class="text-sm">Failed to load stream</p>
-                        <button 
-                            class="mt-2 px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-xs transition-colors"
+                        <h4 class="text-sm font-medium mb-1">Playback Error</h4>
+                        <p :id="player.id + '-video-error-message'" class="text-xs text-gray-300 mb-3">Failed to load stream</p>
+                        <button
+                            class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-xs transition-colors"
                             @click="
                                 const videoEl = document.getElementById(player.id + '-video');
                                 if (videoEl && videoEl._streamPlayer) {
