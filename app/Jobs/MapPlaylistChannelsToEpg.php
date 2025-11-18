@@ -52,31 +52,6 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
     }
 
     /**
-     * Sanitize a string to ensure valid UTF-8 encoding for PostgreSQL.
-     * 
-     * @param string|null $value
-     * @return string|null
-     */
-    private function sanitizeUtf8(?string $value): ?string
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        // Remove invalid UTF-8 sequences
-        // mb_convert_encoding with 'UTF-8' to 'UTF-8' forces re-encoding and drops invalid bytes
-        $sanitized = mb_convert_encoding($value, 'UTF-8', 'UTF-8');
-
-        // Alternative: Use iconv with //IGNORE to skip invalid characters
-        // $sanitized = iconv('UTF-8', 'UTF-8//IGNORE', $value);
-
-        // Remove any remaining control characters except newlines, tabs, and carriage returns
-        $sanitized = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $sanitized);
-
-        return $sanitized;
-    }
-
-    /**
      * Execute the job.
      */
     public function handle(): void
@@ -436,6 +411,31 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
                 'processing' => false,
             ]);
         }
+    }
+
+    /**
+     * Sanitize a string to ensure valid UTF-8 encoding for PostgreSQL.
+     * 
+     * @param string|null $value
+     * @return string|null
+     */
+    private function sanitizeUtf8(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        // Remove invalid UTF-8 sequences
+        // mb_convert_encoding with 'UTF-8' to 'UTF-8' forces re-encoding and drops invalid bytes
+        $sanitized = mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+
+        // Alternative: Use iconv with //IGNORE to skip invalid characters
+        // $sanitized = iconv('UTF-8', 'UTF-8//IGNORE', $value);
+
+        // Remove any remaining control characters except newlines, tabs, and carriage returns
+        $sanitized = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $sanitized);
+
+        return $sanitized;
     }
 
     /**

@@ -69,17 +69,16 @@ class AppServiceProvider extends ServiceProvider
         // Disable mass assignment protection (security handled by Filament)
         Model::unguard();
 
-        // When running in console (e.g. queued jobs, Artisan commands), there is
-        // no HTTP request context for URL generation. Force the root URL,
-        // including the configured port, so route()/url() use the correct base.
+        // App URL generation based on context
         if (app()->runningInConsole()) {
+            // When running in console (e.g. queued jobs, Artisan commands), there is
+            // no HTTP request context for URL generation. Force the root URL,
+            // including the configured port, so route()/url() use the correct base.
             $this->configureConsoleBaseUrl();
-        }
-
-        // ✅ DYNAMIC HTTPS DETECTION: Detect actual protocol from request headers
-        // This allows the app to work correctly with both HTTP and HTTPS access
-        // when behind a reverse proxy with SSL termination
-        if (app()->runningInConsole() === false && request()->headers->has('X-Forwarded-Proto')) {
+        } else if (request()->hasHeader('X-Forwarded-Proto')) {
+            // Detect actual protocol from request headers
+            // This allows the app to work correctly with both HTTP and HTTPS access
+            // when behind a reverse proxy with SSL termination
             $this->configureDynamicHttpsDetection();
         }
 
@@ -240,7 +239,7 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by(optional($request->user())->id ?: $request->ip());
         });
-        
+
         // Note: Proxy rate limiting is handled by ProxyRateLimitMiddleware for better performance
     }
 
