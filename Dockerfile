@@ -94,14 +94,9 @@ RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/rep
     git \
     bash \
     tzdata \
-    # FFmpeg 8.0 from Alpine edge
+    # FFmpeg 8.0 from Alpine edge (only used for ffprobe - metadata inspection)
     ffmpeg@edge \
-    # Hardware acceleration drivers for Intel/AMD GPUs (universal)
-    mesa-dri-gallium \
-    mesa-va-gallium \
-    libva \
-    libva-utils \
-    # Additional tools for hardware detection
+    # Hardware detection tools (for AIO mode GPU detection)
     pciutils \
     lshw \
     # nginx + php-fpm
@@ -111,14 +106,6 @@ RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/rep
     php84-posix \
     php84-openssl \
     php84-dev
-
-# Install Intel-specific drivers only on x86_64 architecture
-RUN if [ "$(uname -m)" = "x86_64" ]; then \
-    apk add --no-cache \
-    intel-media-driver \
-    libva-intel-driver \
-    linux-firmware-i915; \
-    fi
 
 # Install PostgreSQL server & client
 RUN apk update && apk add --no-cache \
