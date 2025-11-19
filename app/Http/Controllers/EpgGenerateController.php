@@ -101,6 +101,7 @@ class EpgGenerateController extends Controller
         $dummyEpgEnabled = $playlist->dummy_epg;
         $dummyEpgLength = (int)($playlist->dummy_epg_length ?? 120); // Default to 120 minutes if not set
         $proxyEnabled = $playlist->enable_proxy;
+        $logoProxyEnabled = $playlist->enable_logo_proxy;
 
         // Generate `<channel>` tags for each channel
         foreach ($channels as $channel) {
@@ -158,7 +159,7 @@ class EpgGenerateController extends Controller
                 if (empty($icon)) {
                     $icon = url('/placeholder.png');
                 }
-                if ($proxyEnabled) {
+                if ($logoProxyEnabled) {
                     $icon = LogoProxyController::generateProxyUrl($icon);
                 }
 
@@ -179,7 +180,7 @@ class EpgGenerateController extends Controller
                     $icon = url('/placeholder.png');
                 }
                 $icon = htmlspecialchars($icon);
-                if ($proxyEnabled) {
+                if ($logoProxyEnabled) {
                     $icon = LogoProxyController::generateProxyUrl($icon);
                 }
 
@@ -287,7 +288,7 @@ class EpgGenerateController extends Controller
                                 }
                                 if ($programme['icon']) {
                                     $icon = htmlspecialchars($programme['icon']);
-                                    if ($proxyEnabled) {
+                                    if ($logoProxyEnabled) {
                                         $icon = LogoProxyController::generateProxyUrl($icon);
                                     }
                                     echo '    <icon src="' . $icon . '"/>' . PHP_EOL;
@@ -295,12 +296,12 @@ class EpgGenerateController extends Controller
                                 // Program artwork images (NEW)
                                 if (!empty($programme['images'] ?? null) && is_array($programme['images'])) {
                                     foreach ($programme['images'] as $image) {
-                                        $rawUrl = $image['url'] ?? '';
-                                        $proxiedUrl = $proxyEnabled && $rawUrl
+                                        $rawUrl = htmlspecialchars($image['url'] ?? '');
+                                        $proxiedUrl = $logoProxyEnabled && $rawUrl
                                             ? LogoProxyController::generateProxyUrl($rawUrl)
                                             : $rawUrl;
 
-                                        $url = htmlspecialchars($proxiedUrl, ENT_XML1);
+                                        $url = $proxiedUrl;
                                         $type = htmlspecialchars($image['type'], ENT_XML1);
                                         $width = htmlspecialchars($image['width'], ENT_XML1);
                                         $height = htmlspecialchars($image['height'], ENT_XML1);
