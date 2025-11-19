@@ -987,9 +987,13 @@ class PlaylistResource extends Resource
                                         ->password()
                                         ->revealable(),
                                     Select::make('xtream_config.output')
-                                        ->label('Output')
+                                        ->label('Input Stream Format')
                                         ->required()
                                         ->columnSpan(1)
+                                        ->hintIcon(
+                                            'heroicon-s-information-circle',
+                                            tooltip: 'This is the format that will be used for the imported streams. If you change this later, the playlist will need to be synced for the changes to be applied.',
+                                        )
                                         ->options([
                                             'ts' => 'MPEG-TS (.ts)',
                                             'm3u8' => 'HLS (.m3u8)',
