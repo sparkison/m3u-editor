@@ -1592,7 +1592,7 @@ class PlaylistResource extends Resource
                 'auth' => 'heroicon-m-key',
                 'type' => 'heroicon-m-document-text',
                 'scheduling' => 'heroicon-m-calendar',
-                'processing' => 'heroicon-m-rectangle-stack',
+                'processing' => 'heroicon-m-arrow-path',
                 'output' => 'heroicon-m-arrow-up-right',
                 default => null,
             };
