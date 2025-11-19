@@ -846,6 +846,7 @@ class M3uProxyService
                         'profile' => $profile->getProfileIdentifier(),
                         'format' => $profile->format,
                         'url' => $url,
+                        'payload' => $payload,
                     ]);
 
                     return $data['stream_id'];

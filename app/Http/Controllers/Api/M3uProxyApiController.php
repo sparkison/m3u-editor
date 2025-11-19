@@ -52,25 +52,6 @@ class M3uProxyApiController extends Controller
             $profile = $playlist->streamProfile;
         }
 
-        // IMPORTANT: Only apply default profile fallback for HLS sources
-        // MPEG-TS and other formats should use direct streaming unless explicitly configured
-        if (! $profile) {
-            $sourceUrl = $channel->url_custom ?? $channel->url;
-            $isHlsSource = str_ends_with(strtolower($sourceUrl), '.m3u8');
-
-            // Only apply default profile if source is HLS
-            if ($isHlsSource) {
-                $settings = app(GeneralSettings::class);
-                if ($channel->is_vod) {
-                    $profileId = $settings->default_vod_stream_profile_id ?? null;
-                } else {
-                    $profileId = $settings->default_stream_profile_id ?? null;
-                }
-                $profile = $profileId ? StreamProfile::find($profileId) : null;
-            }
-            // For non-HLS sources (MPEG-TS, etc.), leave $profile as null for direct streaming
-        }
-
         $url = app(M3uProxyService::class)->getChannelUrl($playlist, $channel, $request, $profile);
 
         return redirect($url);
