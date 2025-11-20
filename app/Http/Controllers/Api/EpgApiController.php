@@ -37,14 +37,10 @@ class EpgApiController extends Controller
         $perPage = (int) $request->get('per_page', 50);
         $search = $request->get('search', null);
 
-        // Date parameters
-        $startDateInput = $request->get('start_date', Carbon::now()->format('Y-m-d'));
-        $endDateInput = $request->get('end_date', $startDateInput);
-        $startDate = Carbon::parse($startDateInput)->format('Y-m-d');
-        $endDate = Carbon::parse($endDateInput)->format('Y-m-d');
-        if (Carbon::parse($startDate)->gt(Carbon::parse($endDate))) {
-            [$startDate, $endDate] = [$endDate, $startDate];
-        }
+        // Get parsed date range
+        $dateRange = $this->parseDateRange($request);
+        $startDate = $dateRange['start'];
+        $endDate = $dateRange['end'];
 
         Log::debug('EPG API Request', [
             'uuid' => $uuid,
@@ -172,14 +168,10 @@ class EpgApiController extends Controller
         $search = $request->get('search', null);
         $vod = (bool) $request->get('vod', false);
 
-        // Date parameters
-        $startDateInput = $request->get('start_date', Carbon::now()->format('Y-m-d'));
-        $endDateInput = $request->get('end_date', $startDateInput);
-        $startDate = Carbon::parse($startDateInput)->format('Y-m-d');
-        $endDate = Carbon::parse($endDateInput)->format('Y-m-d');
-        if (Carbon::parse($startDate)->gt(Carbon::parse($endDate))) {
-            [$startDate, $endDate] = [$endDate, $startDate];
-        }
+        // Get parsed date range
+        $dateRange = $this->parseDateRange($request);
+        $startDate = $dateRange['start'];
+        $endDate = $dateRange['end'];
 
         // Debug logging
         Log::debug('EPG API Request for Playlist', [
@@ -544,5 +536,30 @@ class EpgApiController extends Controller
                 'error' => 'Failed to retrieve EPG data: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Parse and validate date range from request
+     *
+     * @param  Request  $request
+     * @return array{start: string, end: string} Array with 'start' and 'end' date strings in Y-m-d format
+     */
+    private function parseDateRange(Request $request): array
+    {
+        // Date parameters - parse once and reuse Carbon instances
+        $startDateInput = $request->get('start_date', Carbon::now()->format('Y-m-d'));
+        $endDateInput = $request->get('end_date', $startDateInput);
+        $startDateCarbon = Carbon::parse($startDateInput);
+        $endDateCarbon = Carbon::parse($endDateInput);
+        
+        // Swap dates if start is after end
+        if ($startDateCarbon->gt($endDateCarbon)) {
+            [$startDateCarbon, $endDateCarbon] = [$endDateCarbon, $startDateCarbon];
+        }
+        
+        return [
+            'start' => $startDateCarbon->format('Y-m-d'),
+            'end' => $endDateCarbon->format('Y-m-d'),
+        ];
     }
 }
