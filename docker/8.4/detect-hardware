@@ -22,7 +22,7 @@ GEAR="🔰"
 WARN="⚠️"
 
 echo ""
-echo "${SEARCH} Running hardware acceleration check..."
+echo "${SEARCH}  Running hardware acceleration check..."
 echo ""
 
 # Function to check if command exists
@@ -32,7 +32,7 @@ command_exists() {
 
 # Function to detect GPU
 detect_gpu() {
-    echo "${SEARCH} Checking for GPU acceleration devices..."
+    echo "${SEARCH}  Checking for GPU acceleration devices..."
 
     local gpu_info=""
 
@@ -57,10 +57,10 @@ detect_gpu() {
     fi
 
     if [ -n "$gpu_info" ]; then
-        echo "${SEARCH} Hardware detection: $gpu_info"
+        echo "${SEARCH}  Hardware detection: $gpu_info"
         GPU_DETECTED="$gpu_info"
     else
-        echo "${INFO} No GPU detected via lspci or /sys"
+        echo "${INFO}  No GPU detected via lspci or /sys"
         GPU_DETECTED="None"
     fi
 
@@ -69,7 +69,7 @@ detect_gpu() {
 
 # Function to check DRI devices
 check_dri_devices() {
-    echo "${SEARCH} Checking for VAAPI device nodes (Intel/AMD)..."
+    echo "${SEARCH}  Checking for VAAPI device nodes (Intel/AMD)..."
 
     local dri_accessible=0
     local dri_total=0
@@ -80,11 +80,11 @@ check_dri_devices() {
         if [ -e "$device" ]; then
             dri_total=$((dri_total + 1))
             if [ -r "$device" ] && [ -w "$device" ]; then
-                echo "${CHECK} Device $device is accessible."
+                echo "${CHECK}  Device $device is accessible."
                 dri_accessible=$((dri_accessible + 1))
                 has_render=true
             else
-                echo "${WARN} Device $device exists but is not accessible."
+                echo "${WARN}  Device $device exists but is not accessible."
             fi
         fi
     done
@@ -94,26 +94,26 @@ check_dri_devices() {
         if [ -e "$device" ]; then
             dri_total=$((dri_total + 1))
             if [ -r "$device" ]; then
-                echo "${CHECK} Device $device is accessible."
+                echo "${CHECK}  Device $device is accessible."
                 dri_accessible=$((dri_accessible + 1))
             else
-                echo "${WARN} Device $device exists but is not accessible."
+                echo "${WARN}  Device $device exists but is not accessible."
             fi
         fi
     done
 
     if [ $dri_total -eq 0 ]; then
-        echo "${INFO} No DRI device nodes found under /dev/dri."
+        echo "${INFO}  No DRI device nodes found under /dev/dri."
         DRI_STATUS="NOT_FOUND"
     elif [ $dri_accessible -eq $dri_total ]; then
-        echo "${CHECK} User $(whoami) has access to all DRI devices ($dri_accessible/$dri_total)"
+        echo "${CHECK}  User $(whoami) has access to all DRI devices ($dri_accessible/$dri_total)"
         if [ "$has_render" = true ]; then
             echo "   VAAPI hardware acceleration should work properly."
         fi
         DRI_STATUS="FULL_ACCESS"
         DRI_COUNT="$dri_accessible/$dri_total"
     else
-        echo "${WARN} User $(whoami) has partial access to DRI devices ($dri_accessible/$dri_total)"
+        echo "${WARN}  User $(whoami) has partial access to DRI devices ($dri_accessible/$dri_total)"
         DRI_STATUS="PARTIAL_ACCESS"
         DRI_COUNT="$dri_accessible/$dri_total"
     fi
@@ -123,13 +123,13 @@ check_dri_devices() {
 
 # Function to check NVIDIA devices
 check_nvidia_devices() {
-    echo "${SEARCH} Checking for NVIDIA device nodes..."
+    echo "${SEARCH}  Checking for NVIDIA device nodes..."
 
     if [ -e "/dev/nvidia0" ] || [ -e "/dev/nvidiactl" ]; then
-        echo "${CHECK} NVIDIA device nodes found."
+        echo "${CHECK}  NVIDIA device nodes found."
         NVIDIA_STATUS="FOUND"
     else
-        echo "${INFO} No NVIDIA device nodes found under /dev."
+        echo "${INFO}  No NVIDIA device nodes found under /dev."
         NVIDIA_STATUS="NOT_FOUND"
     fi
 
@@ -140,7 +140,7 @@ check_nvidia_devices() {
 
 # Function to check user groups
 check_user_groups() {
-    echo "${SEARCH} Checking user group memberships and device access..."
+    echo "${SEARCH}  Checking user group memberships and device access..."
 
     local current_user=$(whoami)
     local user_groups=$(groups 2>/dev/null || echo "")
@@ -148,33 +148,33 @@ check_user_groups() {
     # Check for video group
     if echo "$user_groups" | grep -q "video"; then
         local video_gid=$(getent group video | cut -d: -f3 2>/dev/null || echo "unknown")
-        echo "${INFO} User $current_user is in the 'video' group (GID $video_gid)."
+        echo "${INFO}  User $current_user is in the 'video' group (GID $video_gid)."
         VIDEO_GROUP="YES"
     else
-        echo "${INFO} User $current_user is NOT in the 'video' group."
+        echo "${INFO}  User $current_user is NOT in the 'video' group."
         VIDEO_GROUP="NO"
     fi
 
     # Check for render group
     if echo "$user_groups" | grep -q "render"; then
         local render_gid=$(getent group render | cut -d: -f3 2>/dev/null || echo "unknown")
-        echo "${INFO} User $current_user is in the 'render' group (GID $render_gid)."
+        echo "${INFO}  User $current_user is in the 'render' group (GID $render_gid)."
         RENDER_GROUP="YES"
     else
-        echo "${INFO} User $current_user is NOT in the 'render' group."
+        echo "${INFO}  User $current_user is NOT in the 'render' group."
         RENDER_GROUP="NO"
     fi
 
     # Check device access for primary renderD128
     if [ -e "/dev/dri/renderD128" ]; then
         if [ -r "/dev/dri/renderD128" ] && [ -w "/dev/dri/renderD128" ]; then
-            echo "${CHECK} User $current_user has full access to /dev/dri/renderD128"
+            echo "${CHECK}  User $current_user has full access to /dev/dri/renderD128"
             RENDER_ACCESS="FULL"
         elif [ -r "/dev/dri/renderD128" ]; then
-            echo "${WARN} User $current_user has read-only access to /dev/dri/renderD128"
+            echo "${WARN}  User $current_user has read-only access to /dev/dri/renderD128"
             RENDER_ACCESS="READ_ONLY"
         else
-            echo "${CROSS} User $current_user has NO access to /dev/dri/renderD128"
+            echo "${CROSS}  User $current_user has NO access to /dev/dri/renderD128"
             RENDER_ACCESS="NONE"
         fi
     fi
@@ -184,10 +184,10 @@ check_user_groups() {
 
 # Function to check FFmpeg hardware acceleration
 check_ffmpeg_hwaccel() {
-    echo "${SEARCH} Checking FFmpeg hardware acceleration capabilities..."
+    echo "${SEARCH}  Checking FFmpeg hardware acceleration capabilities..."
 
     if ! command_exists ffmpeg; then
-        echo "${CROSS} FFmpeg not found in PATH"
+        echo "${CROSS}  FFmpeg not found in PATH"
         FFMPEG_STATUS="NOT_FOUND"
         echo ""
         return
@@ -195,20 +195,20 @@ check_ffmpeg_hwaccel() {
 
     # Get FFmpeg version
     local ffmpeg_version=$(ffmpeg -version 2>/dev/null | head -n 1 || echo "Unknown")
-    echo "${INFO} FFmpeg version: $ffmpeg_version"
+    echo "${INFO}  FFmpeg version: $ffmpeg_version"
 
     # Get available hwaccel methods
     local hwaccels=$(ffmpeg -hwaccels 2>/dev/null | tail -n +2 || echo "")
 
     if [ -z "$hwaccels" ]; then
-        echo "${CROSS} Could not detect FFmpeg hardware acceleration methods"
+        echo "${CROSS}  Could not detect FFmpeg hardware acceleration methods"
         FFMPEG_STATUS="ERROR"
         echo ""
         return
     fi
 
     echo ""
-    echo "${SEARCH} Available FFmpeg hardware acceleration methods:"
+    echo "${SEARCH}  Available FFmpeg hardware acceleration methods:"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
     # Categorize hwaccel methods
@@ -265,7 +265,7 @@ check_ffmpeg_hwaccel() {
 
         if [ "$is_compatible" = true ]; then
             compatible_methods="${compatible_methods}${method},"
-            echo "  ${CHECK} $method - $description"
+            echo "  ${CHECK}  $method - $description"
         else
             other_methods="${other_methods}${method},"
         fi
@@ -273,11 +273,11 @@ check_ffmpeg_hwaccel() {
 
     # Show other methods
     if [ -n "$other_methods" ]; then
-        echo "  ${INFO} Other available methods (not compatible with detected hardware):"
+        echo "  ${INFO}  Other available methods (not compatible with detected hardware):"
         IFS=',' read -ra METHODS <<< "$other_methods"
         for method in "${METHODS[@]}"; do
             [ -z "$method" ] && continue
-            echo "    ${INFO} $method"
+            echo "    ${INFO}  $method"
         done
     fi
 
@@ -293,22 +293,22 @@ print_summary() {
 
     # GPU Info
     if [ "$GPU_DETECTED" != "None" ]; then
-        echo "${GEAR} GPU: $GPU_DETECTED"
+        echo "${GEAR}  GPU: $GPU_DETECTED"
     else
-        echo "${INFO} GPU: Not detected"
+        echo "${INFO}  GPU: Not detected"
     fi
 
     # DRI Device Access
     if [ "$DRI_STATUS" = "FULL_ACCESS" ]; then
-        echo "${CHECK} Device access: ALL DRI DEVICES ACCESSIBLE ($DRI_COUNT)"
+        echo "${CHECK}  Device access: ALL DRI DEVICES ACCESSIBLE ($DRI_COUNT)"
         echo "   VAAPI hardware acceleration should work properly."
     elif [ "$DRI_STATUS" = "PARTIAL_ACCESS" ]; then
-        echo "${WARN} Device access: PARTIAL DRI ACCESS ($DRI_COUNT)"
+        echo "${WARN}  Device access: PARTIAL DRI ACCESS ($DRI_COUNT)"
         echo "   Some hardware acceleration features may not work."
     elif [ "$DRI_STATUS" = "NOT_FOUND" ]; then
-        echo "${CROSS} Device access: NO DRI DEVICES FOUND"
+        echo "${CROSS}  Device access: NO DRI DEVICES FOUND"
         echo "   Hardware acceleration NOT available."
-        echo "   ${INFO} To enable: Add '--device=/dev/dri:/dev/dri' to docker run command"
+        echo "   ${INFO}  To enable: Add '--device=/dev/dri:/dev/dri' to docker run command"
     fi
 
     # FFmpeg Status
@@ -319,23 +319,23 @@ print_summary() {
 
             case "$method" in
                 vaapi)
-                    echo "${CHECK} FFmpeg VAAPI acceleration: AVAILABLE"
+                    echo "${CHECK}  FFmpeg VAAPI acceleration: AVAILABLE"
                     echo "   Recommended for: General video transcoding with Intel/AMD GPUs"
                     ;;
                 qsv)
-                    echo "${CHECK} FFmpeg QSV acceleration: AVAILABLE"
+                    echo "${CHECK}  FFmpeg QSV acceleration: AVAILABLE"
                     echo "   Recommended for: High-performance Intel QuickSync transcoding"
                     ;;
                 cuda|nvdec)
-                    echo "${CHECK} FFmpeg NVIDIA acceleration: AVAILABLE"
+                    echo "${CHECK}  FFmpeg NVIDIA acceleration: AVAILABLE"
                     echo "   Recommended for: NVIDIA GPU transcoding"
                     ;;
             esac
         done
     elif [ "$FFMPEG_STATUS" = "NOT_FOUND" ]; then
-        echo "${CROSS} FFmpeg: NOT FOUND"
+        echo "${CROSS}  FFmpeg: NOT FOUND"
     else
-        echo "${INFO} FFmpeg: No compatible hardware acceleration detected"
+        echo "${INFO}  FFmpeg: No compatible hardware acceleration detected"
     fi
 
     echo "📋 =================================================="
@@ -360,5 +360,5 @@ check_user_groups
 check_ffmpeg_hwaccel
 print_summary
 
-echo "${CHECK} GPU detection script complete."
+echo "${CHECK}  GPU detection script complete."
 echo ""
