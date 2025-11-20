@@ -423,7 +423,6 @@ class PlaylistResource extends Resource
                                 ->label('Target Playlist')
                                 ->options(function ($record) {
                                     return Playlist::where('id', '!=', $record->id)
-                                        ->where('xtream', $record->xtream)
                                         ->where('user_id', auth()->id())
                                         ->orderBy('name')
                                         ->pluck('name', 'id')
