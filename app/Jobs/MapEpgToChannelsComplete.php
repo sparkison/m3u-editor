@@ -41,6 +41,20 @@ class MapEpgToChannelsComplete implements ShouldQueue
         $completedIn = $this->start->diffInSeconds(now());
         $completedInRounded = round($completedIn, 2);
 
+        // Calculate the actual mapped count from Job records before deletion
+        $actualMappedCount = 0;
+        if ($this->mappedCount === 0) {
+            // Count was not provided, calculate from Job records
+            $jobs = Job::where('batch_no', $this->batchNo)->get();
+            foreach ($jobs as $job) {
+                if (isset($job->payload) && is_array($job->payload)) {
+                    $actualMappedCount += count($job->payload);
+                }
+            }
+        } else {
+            $actualMappedCount = $this->mappedCount;
+        }
+
         // Clear out the jobs
         Job::where('batch_no', $this->batchNo)->delete();
 
@@ -54,7 +68,7 @@ class MapEpgToChannelsComplete implements ShouldQueue
                 'errors' => null,
                 'sync_time' => $completedIn,
                 'channel_count' => $this->channelCount,
-                'mapped_count' => $this->mappedCount,
+                'mapped_count' => $actualMappedCount,
                 'progress' => 100,
                 'processing' => false,
             ]);
@@ -63,7 +77,7 @@ class MapEpgToChannelsComplete implements ShouldQueue
         // Notify the user
         $epg = $this->epg;
         $title = "Completed processing EPG channel mapping";
-        $body = "EPG \"{$epg->name}\" channel mapping completed. Mapping took {$completedInRounded} seconds.";
+        $body = "EPG \"{$epg->name}\" channel mapping completed. Mapped {$actualMappedCount} of {$this->channelCount} channels. Mapping took {$completedInRounded} seconds.";
         Notification::make()
             ->success()
             ->title($title)->body($body)

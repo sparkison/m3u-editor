@@ -27,6 +27,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\LazyCollection;
 use Illuminate\Support\Facades\Log;
 use JsonMachine\Items;
+use M3uParser\Tag\ExtGrp;
 
 class ProcessM3uImport implements ShouldQueue
 {
@@ -663,6 +664,11 @@ class ProcessM3uImport implements ShouldQueue
                         $extvlcopt = [];
                         $kodidrop = [];
                         foreach ($item->getExtTags() as $extTag) {
+                            if ($extTag instanceof ExtGrp) {
+                                // Set group, will be overridden by ExtInf `group-title` attribute, if present
+                                $channel['group'] = $extTag->getValue();
+                                $channel['group_internal'] = $extTag->getValue();
+                            }
                             if ($extTag instanceof ExtInf) {
                                 $channel['title'] = $extTag->getTitle();
                                 foreach ($attributes as $key => $attribute) {

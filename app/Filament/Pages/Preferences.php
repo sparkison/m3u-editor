@@ -236,7 +236,7 @@ class Preferences extends SettingsPage
                                                             $details .= " Standalone external proxy service\n\n";
                                                         } else {
                                                             $details .= "**Deployment Mode:** ⚠️ {$mode}\n\n";
-                                                            $details .= " Embedded\n\n";
+                                                            $details .= " Embedded proxy service\n\n";
                                                         }
 
                                                         // Hardware Acceleration
@@ -247,6 +247,10 @@ class Preferences extends SettingsPage
                                                             $details .= "- Device: {$info['hardware_acceleration']['device']}\n";
                                                         }
                                                         $details .= "\n";
+
+                                                        // FFmpeg Version
+                                                        $ffmpegVersion = $info['ffmpeg_version'] ?? 'Unknown';
+                                                        $details .= "**FFmpeg Version:** \n\n{$ffmpegVersion}\n\n";
 
                                                         // Transcoding is available in all modes
                                                         $details .= "**Transcoding:** ✅ Available\n";

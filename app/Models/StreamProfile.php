@@ -12,19 +12,6 @@ class StreamProfile extends Model
     use HasFactory;
 
     /**
-     * The attributes that are mass assignable.
-     *
-     * @var array
-     */
-    protected $fillable = [
-        'user_id',
-        'name',
-        'description',
-        'args',
-        'format',
-    ];
-
-    /**
      * The attributes that should be cast to native types.
      *
      * @var array

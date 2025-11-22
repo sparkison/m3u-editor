@@ -601,6 +601,13 @@ echo ""
 [ ! -d /.composer ] && mkdir /.composer
 chmod -R ugo+rw /.composer
 
+# Run hardware detection if enabled
+if [ "${HARDWARE_DETECTION_ENABLED:-true}" = "true" ]; then
+    if [ -x "/usr/local/bin/detect-hardware" ]; then
+        /usr/local/bin/detect-hardware
+    fi
+fi
+
 # If passed custom commands, execute them, else run supervisord
 if [ $# -gt 0 ]; then
     if [ "$SUPERVISOR_PHP_USER" = "root" ]; then
@@ -612,7 +619,7 @@ else
     echo ""
     echo "🚀 Starting services..."
     echo ""
-    
+
     # Start supervisord
     exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
 fi

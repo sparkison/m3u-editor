@@ -137,6 +137,24 @@ services:
     #   - "${PROXY_PORT:-38085}:${PROXY_PORT:-38085}"  # Uncomment only if you need direct external access
     networks:
       - m3u-network
+
+    # Hardware Acceleration (Uncomment for Intel/AMD GPU support)
+    # For Intel QuickSync (QSV) or AMD VAAPI hardware acceleration:
+    # devices:
+    #   - /dev/dri:/dev/dri
+    # group_add:
+    #   - video    # GID 44 - required for GPU access
+    #   - render   # GID 18 - required for GPU access
+    # environment:
+    #   - LIBVA_DRIVER_NAME=iHD  # Use 'iHD' for Intel gen8+, 'i965' for gen5-gen9.5
+
+    # Hardware Acceleration (Uncomment for NVIDIA GPU support)
+    # For NVIDIA NVENC/NVDEC hardware acceleration:
+    # runtime: nvidia
+    # environment:
+    #   - NVIDIA_VISIBLE_DEVICES=all
+    #   - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
+
     depends_on:
       redis:
         condition: service_healthy

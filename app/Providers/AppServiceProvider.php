@@ -69,10 +69,16 @@ class AppServiceProvider extends ServiceProvider
         // Disable mass assignment protection (security handled by Filament)
         Model::unguard();
 
-        // ✅ DYNAMIC HTTPS DETECTION: Detect actual protocol from request headers
-        // This allows the app to work correctly with both HTTP and HTTPS access
-        // when behind a reverse proxy with SSL termination
-        if (app()->runningInConsole() === false && request()->headers->has('X-Forwarded-Proto')) {
+        // App URL generation based on context
+        if (app()->runningInConsole()) {
+            // When running in console (e.g. queued jobs, Artisan commands), there is
+            // no HTTP request context for URL generation. Force the root URL,
+            // including the configured port, so route()/url() use the correct base.
+            $this->configureConsoleBaseUrl();
+        } else if (request()->hasHeader('X-Forwarded-Proto')) {
+            // Detect actual protocol from request headers
+            // This allows the app to work correctly with both HTTP and HTTPS access
+            // when behind a reverse proxy with SSL termination
             $this->configureDynamicHttpsDetection();
         }
 
@@ -137,6 +143,29 @@ class AppServiceProvider extends ServiceProvider
             // Ensure HTTPS server variable is off
             request()->server->set('HTTPS', 'off');
         }
+    }
+
+    /**
+     * Configure a sensible base URL for console/CLI contexts where there is
+     * no incoming HTTP request. This ensures that route() and url() include
+     * the correct host and port when generating absolute URLs (e.g. for
+     * Schedules Direct artwork proxies written into EPG files).
+     */
+    private function configureConsoleBaseUrl(): void
+    {
+        $baseUrl = rtrim((string) config('app.url'), '/');
+        if ($baseUrl === '') {
+            return;
+        }
+
+        $configuredPort = config('app.port');
+        $hasPortInUrl = parse_url($baseUrl, PHP_URL_PORT) !== null;
+
+        if ($configuredPort && ! $hasPortInUrl) {
+            $baseUrl .= ':' . $configuredPort;
+        }
+
+        URL::forceRootUrl($baseUrl);
     }
 
     /**
@@ -210,7 +239,7 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by(optional($request->user())->id ?: $request->ip());
         });
-        
+
         // Note: Proxy rate limiting is handled by ProxyRateLimitMiddleware for better performance
     }
 
@@ -286,6 +315,13 @@ class AppServiceProvider extends ServiceProvider
                 }
                 if ($playlist->isDirty('short_urls_enabled')) {
                     $playlist->generateShortUrl();
+                }
+                if (($playlist->xtream_config['url'] ?? false) && Str::endsWith($playlist->xtream_config['url'], '/')) {
+                    // Remove trailing slash from Xtream URL
+                    $playlist->xtream_config = [
+                        ...$playlist->xtream_config,
+                        'url' => rtrim($playlist->xtream_config['url'], '/'),
+                    ];
                 }
                 if ($playlist->isDirty('uuid')) {
                     // If changing the UUID, remove the old short URLs and generate new ones

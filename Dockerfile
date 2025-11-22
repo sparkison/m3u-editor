@@ -94,8 +94,11 @@ RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/rep
     git \
     bash \
     tzdata \
-    # FFmpeg 8.0 from Alpine edge
+    # FFmpeg 8.0 from Alpine edge (only used for ffprobe - metadata inspection)
     ffmpeg@edge \
+    # Hardware detection tools (for AIO mode GPU detection)
+    pciutils \
+    lshw \
     # nginx + php-fpm
     nginx \
     php84-cli \
@@ -172,6 +175,10 @@ COPY ./docker/8.4/www.conf /etc/php84/php-fpm.d/www.tmpl
 # Configure container startup script
 COPY start-container /usr/local/bin/start-container
 RUN chmod +x /usr/local/bin/start-container
+
+# Copy hardware detection script
+COPY ./docker/8.4/detect-hardware /usr/local/bin/detect-hardware
+RUN chmod +x /usr/local/bin/detect-hardware
 
 # Pull app code
 # RUN git clone https://github.com/sparkison/m3u-editor.git /tmp/m3u-editor \
