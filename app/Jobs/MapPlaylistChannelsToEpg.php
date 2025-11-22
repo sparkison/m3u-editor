@@ -3,7 +3,6 @@
 namespace App\Jobs;
 
 use App\Enums\Status;
-use App\Services\SimilaritySearchService;
 use Throwable;
 use Exception;
 use App\Models\Channel;
@@ -29,9 +28,6 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
     // Giving a timeout of 120 minutes to the Job to process the mapping
     public $timeout = 60 * 120;
 
-    // Similarity search service
-    protected SimilaritySearchService $similaritySearch;
-
     /**
      * Create a new job instance.
      */
@@ -43,9 +39,7 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
         public ?bool  $recurring = false,
         public ?int   $epgMapId = null,
         public ?array $settings = null,
-    ) {
-        $this->similaritySearch = new SimilaritySearchService();
-    }
+    ) {}
 
     /**
      * Execute the job.
