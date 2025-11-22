@@ -8,6 +8,8 @@ use App\Filament\Resources\Playlists\Pages\CreatePlaylist;
 use App\Filament\Resources\Playlists\Pages\EditPlaylist;
 use App\Filament\Resources\Playlists\Pages\ListPlaylists;
 use App\Filament\Resources\Playlists\Pages\ViewPlaylist;
+use App\Filament\Tables\CategoriesTable;
+use App\Filament\Tables\SourceGroupsTable;
 use App\Jobs\CopyAttributesToPlaylist;
 use App\Jobs\DuplicatePlaylist;
 use App\Jobs\ProcessM3uImport;
@@ -74,6 +76,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
 use App\Traits\HasUserFiltering;
+use Filament\Forms\Components\ModalTableSelect;
 
 class PlaylistResource extends Resource
 {
@@ -1168,16 +1171,33 @@ class PlaylistResource extends Resource
 
                     Fieldset::make('Channel & VOD processing')
                         ->schema([
-                            Select::make('import_prefs.selected_groups')
+                            ModalTableSelect::make('import_prefs.selected_groups')
+                                ->tableConfiguration(SourceGroupsTable::class)
                                 ->label('Groups to import')
                                 ->columnSpan(1)
-                                ->searchable()
                                 ->multiple()
                                 ->helperText('NOTE: If the list is empty, sync the playlist and check again once complete.')
-                                ->options(
-                                    fn($record): array => SourceGroup::where('playlist_id', $record->id)
-                                        ->get()->pluck('name', 'name')->toArray()
-                                ),
+                                ->tableArguments(fn($record): array => [
+                                    'playlist_id' => $record?->id,
+                                ])
+                                ->getOptionLabelFromRecordUsing(fn($record) => $record->name)
+                                ->getOptionLabelsUsing(fn(array $values): array => 
+                                    SourceGroup::whereIn('id', $values)->pluck('name', 'id')->toArray()
+                                )
+                                ->saveRelationshipsUsing(function ($component, $state) {
+                                    // Convert IDs to names for storage
+                                    if (is_array($state)) {
+                                        $names = SourceGroup::whereIn('id', $state)->pluck('name')->toArray();
+                                        $component->state($names);
+                                    }
+                                })
+                                ->afterStateHydrated(function ($component, $state) {
+                                    // Convert names to IDs for display
+                                    if (is_array($state) && !empty($state)) {
+                                        $ids = SourceGroup::whereIn('name', $state)->pluck('id')->toArray();
+                                        $component->state($ids);
+                                    }
+                                }),
                             TagsInput::make('import_prefs.included_group_prefixes')
                                 ->label(fn(Get $get) => ! $get('import_prefs.use_regex') ? 'Group prefixes to import' : 'Regex patterns to import')
                                 ->helperText('Press [tab] or [return] to add item.')
@@ -1195,16 +1215,33 @@ class PlaylistResource extends Resource
 
                     Fieldset::make('Series processing')
                         ->schema([
-                            Select::make('import_prefs.selected_categories')
+                            ModalTableSelect::make('import_prefs.selected_categories')
+                                ->tableConfiguration(CategoriesTable::class)
                                 ->label('Categories to import')
                                 ->columnSpan(1)
-                                ->searchable()
                                 ->multiple()
                                 ->helperText('NOTE: If the list is empty, sync the playlist and check again once complete.')
-                                ->options(
-                                    fn($record): array => Category::where('playlist_id', $record->id)
-                                        ->get()->pluck('name', 'name')->toArray()
-                                ),
+                                ->tableArguments(fn($record): array => [
+                                    'playlist_id' => $record?->id,
+                                ])
+                                ->getOptionLabelFromRecordUsing(fn($record) => $record->name)
+                                ->getOptionLabelsUsing(fn(array $values): array => 
+                                    Category::whereIn('id', $values)->pluck('name', 'id')->toArray()
+                                )
+                                ->saveRelationshipsUsing(function ($component, $state) {
+                                    // Convert IDs to names for storage
+                                    if (is_array($state)) {
+                                        $names = Category::whereIn('id', $state)->pluck('name')->toArray();
+                                        $component->state($names);
+                                    }
+                                })
+                                ->afterStateHydrated(function ($component, $state) {
+                                    // Convert names to IDs for display
+                                    if (is_array($state) && !empty($state)) {
+                                        $ids = Category::whereIn('name', $state)->pluck('id')->toArray();
+                                        $component->state($ids);
+                                    }
+                                }),
                             TagsInput::make('import_prefs.included_category_prefixes')
                                 ->label(fn(Get $get) => ! $get('import_prefs.use_regex') ? 'Category prefixes to import' : 'Regex patterns to import')
                                 ->helperText('Press [tab] or [return] to add item.')

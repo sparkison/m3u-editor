@@ -1,0 +1,47 @@
+<?php
+
+namespace App\Filament\Tables;
+
+use App\Models\Category;
+use Filament\Tables;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+
+class CategoriesTable
+{
+    public static function configure(Table $table): Table
+    {
+        return $table
+            ->query(fn(): Builder => Category::query()->where('user_id', auth()->id()))
+            ->modifyQueryUsing(function (Builder $query) use ($table): Builder {
+                $arguments = $table->getArguments();
+
+                if ($playlistId = $arguments['playlist_id'] ?? null) {
+                    $query->where('playlist_id', $playlistId);
+                }
+
+                return $query;
+            })
+            ->columns([
+                TextColumn::make('name')
+                    ->label('Category Name')
+                    ->searchable()
+                    ->sortable(),
+            ])
+            ->filters([
+                //
+            ])
+            ->headerActions([
+                //
+            ])
+            ->recordActions([
+                //
+            ])
+            ->toolbarActions([
+                \Filament\Actions\BulkActionGroup::make([
+                    //
+                ]),
+            ]);
+    }
+}
