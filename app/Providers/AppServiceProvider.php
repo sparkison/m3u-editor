@@ -316,6 +316,13 @@ class AppServiceProvider extends ServiceProvider
                 if ($playlist->isDirty('short_urls_enabled')) {
                     $playlist->generateShortUrl();
                 }
+                if (($playlist->xtream_config['url'] ?? false) && Str::endsWith($playlist->xtream_config['url'], '/')) {
+                    // Remove trailing slash from Xtream URL
+                    $playlist->xtream_config = [
+                        ...$playlist->xtream_config,
+                        'url' => rtrim($playlist->xtream_config['url'], '/'),
+                    ];
+                }
                 if ($playlist->isDirty('uuid')) {
                     // If changing the UUID, remove the old short URLs and generate new ones
                     if ($playlist->short_urls_enabled) {

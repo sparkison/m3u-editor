@@ -37,9 +37,10 @@ class EpgApiController extends Controller
         $perPage = (int) $request->get('per_page', 50);
         $search = $request->get('search', null);
 
-        // Date parameters
-        $startDate = $request->get('start_date', Carbon::now()->format('Y-m-d'));
-        $endDate = $request->get('end_date', Carbon::parse($startDate)->format('Y-m-d'));
+        // Get parsed date range
+        $dateRange = $this->parseDateRange($request);
+        $startDate = $dateRange['start'];
+        $endDate = $dateRange['end'];
 
         Log::debug('EPG API Request', [
             'uuid' => $uuid,
@@ -92,8 +93,8 @@ class EpgApiController extends Controller
                 ];
             }
 
-            // Get cached programmes for the requested date and channels
-            $programmes = $cacheService->getCachedProgrammes($epg, $startDate, $channelIds);
+            // Get cached programmes for the requested date range and channels
+            $programmes = $cacheService->getCachedProgrammesRange($epg, $startDate, $endDate, $channelIds);
 
             // Get cache metadata
             $metadata = $cacheService->getCacheMetadata($epg);
@@ -167,9 +168,10 @@ class EpgApiController extends Controller
         $search = $request->get('search', null);
         $vod = (bool) $request->get('vod', false);
 
-        // Date parameters
-        $startDate = $request->get('start_date', Carbon::now()->format('Y-m-d'));
-        $endDate = $request->get('end_date', Carbon::parse($startDate)->format('Y-m-d'));
+        // Get parsed date range
+        $dateRange = $this->parseDateRange($request);
+        $startDate = $dateRange['start'];
+        $endDate = $dateRange['end'];
 
         // Debug logging
         Log::debug('EPG API Request for Playlist', [
@@ -420,8 +422,8 @@ class EpgApiController extends Controller
                         continue;
                     }
 
-                    // Get programmes from cache
-                    $epgProgrammes = $cacheService->getCachedProgrammes($epg, $startDate, $neededEpgChannelIds);
+                    // Get programmes from cache for requested date range
+                    $epgProgrammes = $cacheService->getCachedProgrammesRange($epg, $startDate, $endDate, $neededEpgChannelIds);
 
                     // Map programmes to playlist channels
                     foreach ($epgProgrammes as $epgChannelId => $channelProgrammes) {
@@ -534,5 +536,30 @@ class EpgApiController extends Controller
                 'error' => 'Failed to retrieve EPG data: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Parse and validate date range from request
+     *
+     * @param  Request  $request
+     * @return array{start: string, end: string} Array with 'start' and 'end' date strings in Y-m-d format
+     */
+    private function parseDateRange(Request $request): array
+    {
+        // Date parameters - parse once and reuse Carbon instances
+        $startDateInput = $request->get('start_date', Carbon::now()->format('Y-m-d'));
+        $endDateInput = $request->get('end_date', $startDateInput);
+        $startDateCarbon = Carbon::parse($startDateInput);
+        $endDateCarbon = Carbon::parse($endDateInput);
+        
+        // Swap dates if start is after end
+        if ($startDateCarbon->gt($endDateCarbon)) {
+            [$startDateCarbon, $endDateCarbon] = [$endDateCarbon, $startDateCarbon];
+        }
+        
+        return [
+            'start' => $startDateCarbon->format('Y-m-d'),
+            'end' => $endDateCarbon->format('Y-m-d'),
+        ];
     }
 }
