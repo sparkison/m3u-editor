@@ -32,6 +32,8 @@ class SourceGroupsTable
             ->filters([
                 //
             ])
+            ->paginated([15, 25, 50, 100])
+            ->defaultPaginationPageOption(15)
             ->headerActions([
                 //
             ])

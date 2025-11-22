@@ -1180,8 +1180,16 @@ class PlaylistResource extends Resource
                                 ->tableArguments(fn($record): array => [
                                     'playlist_id' => $record?->id,
                                 ])
+                                ->selectAction(
+                                    fn(Action $action) => $action
+                                        ->label('Select groups')
+                                        ->modalHeading('Search groups')
+                                        ->modalSubmitActionLabel('Confirm selection')
+                                        ->button(),
+                                )
                                 ->getOptionLabelFromRecordUsing(fn($record) => $record->name)
-                                ->getOptionLabelsUsing(fn(array $values): array => 
+                                ->getOptionLabelsUsing(
+                                    fn(array $values): array =>
                                     SourceGroup::whereIn('id', $values)->pluck('name', 'id')->toArray()
                                 )
                                 ->saveRelationshipsUsing(function ($component, $state) {
@@ -1224,8 +1232,16 @@ class PlaylistResource extends Resource
                                 ->tableArguments(fn($record): array => [
                                     'playlist_id' => $record?->id,
                                 ])
+                                ->selectAction(
+                                    fn(Action $action) => $action
+                                        ->label('Select categories')
+                                        ->modalHeading('Search categories')
+                                        ->modalSubmitActionLabel('Confirm selection')
+                                        ->button(),
+                                )
                                 ->getOptionLabelFromRecordUsing(fn($record) => $record->name)
-                                ->getOptionLabelsUsing(fn(array $values): array => 
+                                ->getOptionLabelsUsing(
+                                    fn(array $values): array =>
                                     Category::whereIn('id', $values)->pluck('name', 'id')->toArray()
                                 )
                                 ->saveRelationshipsUsing(function ($component, $state) {
