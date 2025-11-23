@@ -1188,23 +1188,25 @@ class PlaylistResource extends Resource
                                         ->button(),
                                 )
                                 ->getOptionLabelFromRecordUsing(fn($record) => $record->name)
-                                ->getOptionLabelsUsing(
-                                    fn(array $values): array =>
+                                ->getOptionLabelsUsing(fn(array $values): array => 
                                     SourceGroup::whereIn('id', $values)->pluck('name', 'id')->toArray()
                                 )
-                                ->saveRelationshipsUsing(function ($component, $state) {
-                                    // Convert IDs to names for storage
-                                    if (is_array($state)) {
-                                        $names = SourceGroup::whereIn('id', $state)->pluck('name')->toArray();
-                                        $component->state($names);
+                                ->afterStateHydrated(function ($component, $state) {
+                                    // Convert names to IDs for display when loading existing data
+                                    if (is_array($state) && !empty($state)) {
+                                        // Check if first item is a string (name) - need to convert to IDs
+                                        if (is_string($state[0] ?? null)) {
+                                            $ids = SourceGroup::whereIn('name', $state)->pluck('id')->toArray();
+                                            $component->state($ids);
+                                        }
                                     }
                                 })
-                                ->afterStateHydrated(function ($component, $state) {
-                                    // Convert names to IDs for display
+                                ->dehydrateStateUsing(function ($state) {
+                                    // Convert IDs back to names for storage
                                     if (is_array($state) && !empty($state)) {
-                                        $ids = SourceGroup::whereIn('name', $state)->pluck('id')->toArray();
-                                        $component->state($ids);
+                                        return SourceGroup::whereIn('id', $state)->pluck('name')->toArray();
                                     }
+                                    return $state;
                                 }),
                             TagsInput::make('import_prefs.included_group_prefixes')
                                 ->label(fn(Get $get) => ! $get('import_prefs.use_regex') ? 'Group prefixes to import' : 'Regex patterns to import')
@@ -1240,23 +1242,25 @@ class PlaylistResource extends Resource
                                         ->button(),
                                 )
                                 ->getOptionLabelFromRecordUsing(fn($record) => $record->name)
-                                ->getOptionLabelsUsing(
-                                    fn(array $values): array =>
+                                ->getOptionLabelsUsing(fn(array $values): array => 
                                     Category::whereIn('id', $values)->pluck('name', 'id')->toArray()
                                 )
-                                ->saveRelationshipsUsing(function ($component, $state) {
-                                    // Convert IDs to names for storage
-                                    if (is_array($state)) {
-                                        $names = Category::whereIn('id', $state)->pluck('name')->toArray();
-                                        $component->state($names);
+                                ->afterStateHydrated(function ($component, $state) {
+                                    // Convert names to IDs for display when loading existing data
+                                    if (is_array($state) && !empty($state)) {
+                                        // Check if first item is a string (name) - need to convert to IDs
+                                        if (is_string($state[0] ?? null)) {
+                                            $ids = Category::whereIn('name', $state)->pluck('id')->toArray();
+                                            $component->state($ids);
+                                        }
                                     }
                                 })
-                                ->afterStateHydrated(function ($component, $state) {
-                                    // Convert names to IDs for display
+                                ->dehydrateStateUsing(function ($state) {
+                                    // Convert IDs back to names for storage
                                     if (is_array($state) && !empty($state)) {
-                                        $ids = Category::whereIn('name', $state)->pluck('id')->toArray();
-                                        $component->state($ids);
+                                        return Category::whereIn('id', $state)->pluck('name')->toArray();
                                     }
+                                    return $state;
                                 }),
                             TagsInput::make('import_prefs.included_category_prefixes')
                                 ->label(fn(Get $get) => ! $get('import_prefs.use_regex') ? 'Category prefixes to import' : 'Regex patterns to import')
