@@ -1188,8 +1188,12 @@ class PlaylistResource extends Resource
                                         ->button(),
                                 )
                                 ->getOptionLabelFromRecordUsing(fn($record) => $record->name)
-                                ->getOptionLabelsUsing(fn(array $values): array => 
-                                    SourceGroup::whereIn('id', $values)->pluck('name', 'id')->toArray()
+                                ->getOptionLabelsUsing(
+                                    fn(array $values): array =>
+                                    SourceGroup::whereIn('id', $values)
+                                        ->distinct()
+                                        ->pluck('name', 'id')
+                                        ->toArray()
                                 )
                                 ->afterStateHydrated(function ($component, $state) {
                                     // Convert names to IDs for display when loading existing data
@@ -1204,7 +1208,7 @@ class PlaylistResource extends Resource
                                 ->dehydrateStateUsing(function ($state) {
                                     // Convert IDs back to names for storage
                                     if (is_array($state) && !empty($state)) {
-                                        return SourceGroup::whereIn('id', $state)->pluck('name')->toArray();
+                                        return SourceGroup::whereIn('id', $state)->distinct()->pluck('name')->toArray();
                                     }
                                     return $state;
                                 }),
@@ -1242,8 +1246,12 @@ class PlaylistResource extends Resource
                                         ->button(),
                                 )
                                 ->getOptionLabelFromRecordUsing(fn($record) => $record->name)
-                                ->getOptionLabelsUsing(fn(array $values): array => 
-                                    Category::whereIn('id', $values)->pluck('name', 'id')->toArray()
+                                ->getOptionLabelsUsing(
+                                    fn(array $values): array =>
+                                    Category::whereIn('id', $values)
+                                        ->distinct()
+                                        ->pluck('name', 'id')
+                                        ->toArray()
                                 )
                                 ->afterStateHydrated(function ($component, $state) {
                                     // Convert names to IDs for display when loading existing data
@@ -1258,7 +1266,7 @@ class PlaylistResource extends Resource
                                 ->dehydrateStateUsing(function ($state) {
                                     // Convert IDs back to names for storage
                                     if (is_array($state) && !empty($state)) {
-                                        return Category::whereIn('id', $state)->pluck('name')->toArray();
+                                        return Category::whereIn('id', $state)->distinct()->pluck('name')->toArray();
                                     }
                                     return $state;
                                 }),
