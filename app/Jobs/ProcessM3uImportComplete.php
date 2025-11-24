@@ -145,12 +145,16 @@ class ProcessM3uImportComplete implements ShouldQueue
                                     'status' => 'canceled',
                                 ]
                             ]);
+
+                            /*
+                             * NOTE: Make sure to clone the collections as they will be deleted below
+                             */
                             $this->createSyncLogEntries(
                                 $sync,
-                                $newChannels,
-                                $removedChannels,
-                                $newGroups,
-                                $removedGroups
+                                $newChannels->clone(),
+                                $removedChannels->clone(),
+                                $newGroups->clone(),
+                                $removedGroups->clone()
                             );
                         }
 
@@ -198,10 +202,10 @@ class ProcessM3uImportComplete implements ShouldQueue
                 ]);
                 $this->createSyncLogEntries(
                     $sync,
-                    $newChannels,
-                    $removedChannels,
-                    $newGroups,
-                    $removedGroups
+                    $newChannels->clone(),
+                    $removedChannels->clone(),
+                    $newGroups->clone(),
+                    $removedGroups->clone()
                 );
             }
         }
