@@ -1188,27 +1188,37 @@ class PlaylistResource extends Resource
                                         ->button(),
                                 )
                                 ->getOptionLabelFromRecordUsing(fn($record) => $record->name)
-                                ->getOptionLabelsUsing(
-                                    fn(array $values): array =>
-                                    SourceGroup::whereIn('id', $values)
-                                        ->distinct()
-                                        ->pluck('name', 'id')
-                                        ->toArray()
-                                )
-                                ->afterStateHydrated(function ($component, $state) {
+                                ->getOptionLabelsUsing(function (array $values, $record): array {
+                                    // Values are IDs, return id => name pairs
+                                    return SourceGroup::where('playlist_id', $record?->id)
+                                        ->whereIn('id', $values)
+                                        ->pluck('name', 'id')  // id => name
+                                        ->toArray();
+                                })
+                                ->afterStateHydrated(function ($component, $state, $record) {
                                     // Convert names to IDs for display when loading existing data
                                     if (is_array($state) && !empty($state)) {
                                         // Check if first item is a string (name) - need to convert to IDs
                                         if (is_string($state[0] ?? null)) {
-                                            $ids = SourceGroup::whereIn('name', $state)->pluck('id')->toArray();
+                                            $ids = SourceGroup::where('playlist_id', $record?->id)
+                                                ->whereIn('name', $state)
+                                                ->pluck('id')
+                                                ->unique()
+                                                ->values()
+                                                ->toArray();
                                             $component->state($ids);
                                         }
                                     }
                                 })
-                                ->dehydrateStateUsing(function ($state) {
+                                ->dehydrateStateUsing(function ($state, $record) {
                                     // Convert IDs back to names for storage
                                     if (is_array($state) && !empty($state)) {
-                                        return SourceGroup::whereIn('id', $state)->distinct()->pluck('name')->toArray();
+                                        return SourceGroup::where('playlist_id', $record?->id)
+                                            ->whereIn('id', $state)
+                                            ->pluck('name')
+                                            ->unique()
+                                            ->values()
+                                            ->toArray();
                                     }
                                     return $state;
                                 }),
@@ -1246,27 +1256,37 @@ class PlaylistResource extends Resource
                                         ->button(),
                                 )
                                 ->getOptionLabelFromRecordUsing(fn($record) => $record->name)
-                                ->getOptionLabelsUsing(
-                                    fn(array $values): array =>
-                                    Category::whereIn('id', $values)
-                                        ->distinct()
-                                        ->pluck('name', 'id')
-                                        ->toArray()
-                                )
-                                ->afterStateHydrated(function ($component, $state) {
+                                ->getOptionLabelsUsing(function (array $values, $record): array {
+                                    // Values are IDs, return id => name pairs
+                                    return Category::where('playlist_id', $record?->id)
+                                        ->whereIn('id', $values)
+                                        ->pluck('name', 'id')  // id => name
+                                        ->toArray();
+                                })
+                                ->afterStateHydrated(function ($component, $state, $record) {
                                     // Convert names to IDs for display when loading existing data
                                     if (is_array($state) && !empty($state)) {
                                         // Check if first item is a string (name) - need to convert to IDs
                                         if (is_string($state[0] ?? null)) {
-                                            $ids = Category::whereIn('name', $state)->pluck('id')->toArray();
+                                            $ids = Category::where('playlist_id', $record?->id)
+                                                ->whereIn('name', $state)
+                                                ->pluck('id')
+                                                ->unique()
+                                                ->values()
+                                                ->toArray();
                                             $component->state($ids);
                                         }
                                     }
                                 })
-                                ->dehydrateStateUsing(function ($state) {
+                                ->dehydrateStateUsing(function ($state, $record) {
                                     // Convert IDs back to names for storage
                                     if (is_array($state) && !empty($state)) {
-                                        return Category::whereIn('id', $state)->distinct()->pluck('name')->toArray();
+                                        return Category::where('playlist_id', $record?->id)
+                                            ->whereIn('id', $state)
+                                            ->pluck('name')
+                                            ->unique()
+                                            ->values()
+                                            ->toArray();
                                     }
                                     return $state;
                                 }),

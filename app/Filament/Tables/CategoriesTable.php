@@ -13,7 +13,7 @@ class CategoriesTable
     public static function configure(Table $table): Table
     {
         return $table
-            ->query(fn(): Builder => Category::query()->where('user_id', auth()->id()))
+            ->query(fn(): Builder => Category::query()->where('user_id', auth()->id())->orderBy('name'))
             ->modifyQueryUsing(function (Builder $query) use ($table): Builder {
                 $arguments = $table->getArguments();
 

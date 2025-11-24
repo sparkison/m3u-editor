@@ -13,7 +13,7 @@ class SourceGroupsTable
     public static function configure(Table $table): Table
     {
         return $table
-            ->query(fn(): Builder => SourceGroup::query())
+            ->query(fn(): Builder => SourceGroup::query()->orderBy('name'))
             ->modifyQueryUsing(function (Builder $query) use ($table): Builder {
                 $arguments = $table->getArguments();
 
