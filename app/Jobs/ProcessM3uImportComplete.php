@@ -218,6 +218,12 @@ class ProcessM3uImportComplete implements ShouldQueue
         $newGroups->update(['new' => false]);
         $newChannels->update(['new' => false]);
 
+        // Finally, clean up orphaned channels (non-custom channels with null or non-existent group_id)
+        Channel::where('playlist_id', $playlist->id)
+            ->where('is_custom', false)
+            ->whereNull('group_id')
+            ->delete();
+
         // Clear out the jobs
         Job::where('batch_no', $this->batchNo)->delete();
 
