@@ -219,7 +219,7 @@ class ProcessM3uImportComplete implements ShouldQueue
         $newChannels->update(['new' => false]);
 
         // Clear out the jobs
-        Job::where('batch_no', $this->batchNo);
+        Job::where('batch_no', $this->batchNo)->delete();
 
         // Check if creating EPG
         $createEpg = $playlist->xtream
