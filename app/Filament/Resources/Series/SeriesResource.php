@@ -120,10 +120,10 @@ class SeriesResource extends Resource
                 ->description((fn($record) => Str::limit($record->plot, 200)))
                 ->wrap()
                 ->extraAttributes(['style' => 'min-width: 350px;'])
-                ->searchable()
                 ->searchable(query: function (Builder $query, string $search): Builder {
                     return $query->orWhereRaw('LOWER(series.name) LIKE ?', ['%' . strtolower($search) . '%']);
-                }),
+                })
+                ->sortable(),
             TextInputColumn::make('sort')
                 ->label('Sort Order')
                 ->rules(['min:0'])

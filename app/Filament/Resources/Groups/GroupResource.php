@@ -94,6 +94,11 @@ class GroupResource extends Resource
                     ->rules(['min:0', 'max:255'])
                     ->placeholder(fn($record) => $record->name_internal)
                     ->searchable()
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query
+                            ->orderBy('name_internal', $direction)
+                            ->orderBy('name', $direction);
+                    })
                     ->toggleable(),
                 TextInputColumn::make('sort_order')
                     ->label('Sort Order')

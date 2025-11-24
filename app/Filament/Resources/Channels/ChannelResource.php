@@ -84,12 +84,12 @@ class ChannelResource extends Resource
     {
         $query = parent::getGlobalSearchEloquentQuery()
             ->where('is_vod', false);
-        
+
         // Filter by user_id for non-admin users
         if (auth()->check() && !auth()->user()->isAdmin()) {
             $query->where('user_id', auth()->id());
         }
-        
+
         return $query;
     }
 
@@ -97,12 +97,12 @@ class ChannelResource extends Resource
     {
         $query = parent::getEloquentQuery()
             ->where('is_vod', false);
-        
+
         // Filter by user_id for non-admin users
         if (auth()->check() && !auth()->user()->isAdmin()) {
             $query->where('user_id', auth()->id());
         }
-        
+
         return $query;
     }
 
@@ -167,6 +167,11 @@ class ChannelResource extends Resource
             TextColumn::make('info')
                 ->label('Info')
                 ->wrap()
+                ->sortable(query: function (Builder $query, string $direction): Builder {
+                    return $query
+                        ->orderBy('title_custom', $direction)
+                        ->orderBy('title', $direction);
+                })
                 ->getStateUsing(function ($record) {
                     $info = $record->info;
                     $title = $record->title_custom ?: $record->title;
@@ -203,6 +208,11 @@ class ChannelResource extends Resource
                 ->tooltip(fn($record) => $record->stream_id)
                 ->placeholder(fn($record) => $record->stream_id)
                 ->searchable()
+                ->sortable(query: function (Builder $query, string $direction): Builder {
+                    return $query
+                        ->orderBy('stream_id_custom', $direction)
+                        ->orderBy('stream_id', $direction);
+                })
                 ->toggleable(),
             TextInputColumn::make('title_custom')
                 ->label('Title')
@@ -210,6 +220,11 @@ class ChannelResource extends Resource
                 ->tooltip(fn($record) => $record->title)
                 ->placeholder(fn($record) => $record->title)
                 ->searchable()
+                ->sortable(query: function (Builder $query, string $direction): Builder {
+                    return $query
+                        ->orderBy('title_custom', $direction)
+                        ->orderBy('title', $direction);
+                })
                 ->toggleable(),
             TextInputColumn::make('name_custom')
                 ->label('Name')
@@ -218,6 +233,11 @@ class ChannelResource extends Resource
                 ->placeholder(fn($record) => $record->name)
                 ->searchable(query: function (Builder $query, string $search): Builder {
                     return $query->orWhereRaw('LOWER(channels.name_custom) LIKE ?', ['%' . strtolower($search) . '%']);
+                })
+                ->sortable(query: function (Builder $query, string $direction): Builder {
+                    return $query
+                        ->orderBy('name_custom', $direction)
+                        ->orderBy('name', $direction);
                 })
                 ->toggleable(),
             TextInputColumn::make('channel')
