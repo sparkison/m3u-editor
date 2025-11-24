@@ -35,6 +35,7 @@ class EpgApiController extends Controller
         // Pagination parameters
         $page = (int) $request->get('page', 1);
         $perPage = (int) $request->get('per_page', 50);
+        $offset = max(0, ($page - 1) * $perPage);
         $search = $request->get('search', null);
 
         // Get parsed date range
@@ -71,7 +72,7 @@ class EpgApiController extends Controller
                     });
                 })
                 ->limit($perPage)
-                ->offset(($page - 1) * $perPage)
+                ->offset($offset)
                 ->get();
 
             // Get the channel IDs from database records to fetch cache data
@@ -82,6 +83,7 @@ class EpgApiController extends Controller
 
             // Build ordered channels array using database order
             $channels = [];
+            $channelIndex = $offset;
             foreach ($epgChannels as $epgChannel) {
                 $channelId = $epgChannel->channel_id;
                 $channels[$channelId] = [
@@ -90,6 +92,7 @@ class EpgApiController extends Controller
                     'display_name' => $epgChannel->display_name ?? $epgChannel->name ?? $channelId,
                     'icon' => $epgChannel->icon ?? url('/placeholder.png'),
                     'lang' => $epgChannel->lang ?? 'en',
+                    'sort_index' => $channelIndex++,
                 ];
             }
 
@@ -165,6 +168,7 @@ class EpgApiController extends Controller
         // Pagination parameters
         $page = (int) $request->get('page', 1);
         $perPage = (int) $request->get('per_page', 50);
+        $skip = max(0, ($page - 1) * $perPage);
         $search = $request->get('search', null);
         $vod = (bool) $request->get('vod', false);
 
@@ -206,7 +210,7 @@ class EpgApiController extends Controller
                     });
                 })
                 ->limit($perPage)
-                ->offset(($page - 1) * $perPage)
+                ->offset($skip)
                 ->select('channels.*')
                 ->get();
 
@@ -240,6 +244,7 @@ class EpgApiController extends Controller
             $epgIds = [];
             $dummyEpgChannels = [];
             $playlistChannelData = [];
+            $channelSortIndex = $skip;
             foreach ($playlistChannels as $channel) {
                 $epgData = $channel->epgChannel ?? null;
                 $channelNo = $channel->channel;
@@ -357,6 +362,7 @@ class EpgApiController extends Controller
                     'icon' => $icon,
                     'has_epg' => $epgData !== null,
                     'epg_channel_id' => $epgData->channel_id ?? null,
+                    'sort_index' => $channelSortIndex++,
                 ];
             }
 
@@ -374,7 +380,6 @@ class EpgApiController extends Controller
                 return $query->where('channels.is_vod', false);
             })->where('enabled', true)->count();
 
-            $skip = ($page - 1) * $perPage;
             $channels = $playlistChannelData;
 
             // Get EPG data from cache for the paginated channels

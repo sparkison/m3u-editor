@@ -167,7 +167,7 @@
                                         <span x-show="!isMobile">Channels</span>
                                         <span x-show="isMobile">Ch.</span>
                                     </span>
-                                    <span class="text-xs text-gray-500 dark:text-gray-400 ml-1" x-text="`(${Object.keys(epgData?.channels || {}).length})`"></span>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400 ml-1" x-text="`(${channelOrder.length})`"></span>
                                 </div>
                                 <!-- Search Status Indicator -->
                                 <div x-show="isSearchActive && !isMobile" class="flex items-center space-x-1">
@@ -213,15 +213,15 @@
                     virtualScrollTop: 0,
                     get itemHeight() { return isMobile ? 48 : 60; },
                     get containerHeight() { return isMobile ? 452 : 552; },
-                    get totalChannels() { return Object.keys(epgData?.channels || {}).length; },
+                    get totalChannels() { return channelOrder.length; },
                     get startIndex() { return Math.max(0, Math.floor(this.virtualScrollTop / this.itemHeight) - 5); },
                     get endIndex() { return Math.min(this.totalChannels, this.startIndex + Math.ceil(this.containerHeight / this.itemHeight) + 15); },
                     get visibleChannels() {
                         if (!epgData?.channels) return [];
-                        const channelEntries = Object.entries(epgData.channels);
-                        return channelEntries.slice(this.startIndex, this.endIndex).map(([id, channel], index) => ({
+                        const orderedIds = channelOrder.slice(this.startIndex, this.endIndex);
+                        return orderedIds.map((id, index) => ({
                             id,
-                            channel,
+                            channel: epgData.channels[id],
                             absoluteIndex: this.startIndex + index,
                             top: (this.startIndex + index) * this.itemHeight
                         }));
@@ -306,7 +306,7 @@
                             </div>
 
                             <!-- No Results Message -->
-                            <div x-show="isSearchActive && Object.keys(epgData?.channels || {}).length === 0 && !loadingMore && !loading" :class="isMobile ? 'px-2 py-6' : 'px-4 py-8'" class="text-center">
+                            <div x-show="isSearchActive && channelOrder.length === 0 && !loadingMore && !loading" :class="isMobile ? 'px-2 py-6' : 'px-4 py-8'" class="text-center">
                                 <div class="flex flex-col items-center space-y-2">
                                     <x-heroicon-m-magnifying-glass :class="isMobile ? 'w-6 h-6' : 'w-8 h-8'" class="text-gray-400 dark:text-gray-500" />
                                     <div :class="isMobile ? 'text-xs' : 'text-sm'" class="font-medium text-gray-600 dark:text-gray-400">No channels found</div>

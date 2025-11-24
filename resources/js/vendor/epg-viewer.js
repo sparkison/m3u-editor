@@ -27,6 +27,7 @@ function epgViewer(config) {
         hasMore: true,
         allChannels: {},
         allProgrammes: {},
+        channelOrder: [],
 
         // Pre-built channels with programmes for efficient template access
         processedChannels: {},
@@ -129,6 +130,7 @@ function epgViewer(config) {
             this.allChannels = {};
             this.allProgrammes = {};
             this.processedChannels = {};
+            this.channelOrder = [];
 
             try {
                 await this.loadPage(1);
@@ -345,13 +347,56 @@ function epgViewer(config) {
             Object.assign(this.allChannels, newChannels);
             Object.assign(this.allProgrammes, newProgrammes);
 
-            // Process the new channels synchronously to maintain DOM alignment
-            for (const [channelId, channelData] of Object.entries(newChannels)) {
+            const sortedEntries = Object.entries(newChannels).sort(([idA, dataA], [idB, dataB]) => {
+                const sortA = (dataA?.sort_index ?? Number.MAX_SAFE_INTEGER);
+                const sortB = (dataB?.sort_index ?? Number.MAX_SAFE_INTEGER);
+                if (sortA !== sortB) {
+                    return sortA - sortB;
+                }
+
+                const nameA = (dataA?.display_name || '').toLowerCase();
+                const nameB = (dataB?.display_name || '').toLowerCase();
+                if (nameA && nameB) {
+                    const comparison = nameA.localeCompare(nameB);
+                    if (comparison !== 0) {
+                        return comparison;
+                    }
+                }
+
+                return String(idA).localeCompare(String(idB));
+            });
+
+            for (const [channelId, channelData] of sortedEntries) {
+                const existingChannel = this.processedChannels[channelId];
+
                 this.processedChannels[channelId] = {
                     ...channelData,
                     programmes: this.allProgrammes[channelId] || []
                 };
+
+                if (!existingChannel) {
+                    this.channelOrder.push(channelId);
+                }
             }
+
+            this.channelOrder.sort((idA, idB) => {
+                const sortA = (this.processedChannels[idA]?.sort_index ?? Number.MAX_SAFE_INTEGER);
+                const sortB = (this.processedChannels[idB]?.sort_index ?? Number.MAX_SAFE_INTEGER);
+                if (sortA !== sortB) {
+                    return sortA - sortB;
+                }
+
+                const nameA = (this.processedChannels[idA]?.display_name || '').toLowerCase();
+                const nameB = (this.processedChannels[idB]?.display_name || '').toLowerCase();
+                if (nameA && nameB) {
+                    const comparison = nameA.localeCompare(nameB);
+                    if (comparison !== 0) {
+                        return comparison;
+                    }
+                }
+
+                return String(idA).localeCompare(String(idB));
+            });
         },
 
         getTooltipContent(programme) {
