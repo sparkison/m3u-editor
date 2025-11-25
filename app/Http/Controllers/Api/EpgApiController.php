@@ -367,6 +367,7 @@ class EpgApiController extends Controller
                     'icon' => $icon,
                     'has_epg' => $epgData !== null,
                     'epg_channel_id' => $epgData->channel_id ?? null,
+                    'tvg_shift' => (int) ($channel->tvg_shift ?? 0), // EPG time shift in hours
                     'sort_index' => $channelSortIndex++,
                 ];
             }
@@ -451,7 +452,33 @@ class EpgApiController extends Controller
 
                                 // Only include programmes for channels in current page
                                 if (isset($channels[$playlistChannelId])) {
-                                    $programmes[$playlistChannelId] = $channelProgrammes;
+                                    // Apply tvg_shift offset if set
+                                    $tvgShift = $channels[$playlistChannelId]['tvg_shift'] ?? 0;
+
+                                    if ($tvgShift !== 0) {
+                                        // Offset all programme times by tvg_shift hours
+                                        $shiftedProgrammes = array_map(function ($programme) use ($tvgShift) {
+                                            $shiftedProgramme = $programme;
+
+                                            // Shift start time
+                                            if (isset($programme['start'])) {
+                                                $startTime = Carbon::parse($programme['start']);
+                                                $shiftedProgramme['start'] = $startTime->addHours($tvgShift)->toIso8601String();
+                                            }
+
+                                            // Shift stop time
+                                            if (isset($programme['stop'])) {
+                                                $stopTime = Carbon::parse($programme['stop']);
+                                                $shiftedProgramme['stop'] = $stopTime->addHours($tvgShift)->toIso8601String();
+                                            }
+
+                                            return $shiftedProgramme;
+                                        }, $channelProgrammes);
+
+                                        $programmes[$playlistChannelId] = $shiftedProgrammes;
+                                    } else {
+                                        $programmes[$playlistChannelId] = $channelProgrammes;
+                                    }
                                 }
                             }
                         }
