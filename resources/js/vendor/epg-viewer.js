@@ -459,11 +459,22 @@ function epgViewer(config) {
             const start = new Date(programme.start);
             const stop = programme.stop ? new Date(programme.stop) : new Date(start.getTime() + 30 * 60 * 1000);
 
-            const dayStart = new Date(start);
-            dayStart.setHours(0, 0, 0, 0);
+            // Get the start of the currently viewed day (not the programme's day)
+            const [year, month, day] = this.currentDate.split('-').map(Number);
+            const dayStart = new Date(year, month - 1, day, 0, 0, 0, 0);
+            const dayEnd = new Date(year, month - 1, day, 23, 59, 59, 999);
 
-            const startHours = (start - dayStart) / (1000 * 60 * 60);
-            const durationHours = (stop - start) / (1000 * 60 * 60);
+            // Clip programme times to the current day boundaries
+            const clippedStart = start < dayStart ? dayStart : start;
+            const clippedStop = stop > dayEnd ? dayEnd : stop;
+
+            // If programme is completely outside the current day, hide it
+            if (stop < dayStart || start > dayEnd) {
+                return 'display: none;';
+            }
+
+            const startHours = (clippedStart - dayStart) / (1000 * 60 * 60);
+            const durationHours = (clippedStop - clippedStart) / (1000 * 60 * 60);
 
             // 100px per hour
             const pixelsPerHour = 100;

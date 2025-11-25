@@ -97,7 +97,12 @@ class EpgApiController extends Controller
             }
 
             // Get cached programmes for the requested date range and channels
-            $programmes = $cacheService->getCachedProgrammesRange($epg, $startDate, $endDate, $channelIds);
+            $programmes = $cacheService->getCachedProgrammesRange(
+                $epg,
+                $startDate,
+                $endDate,
+                $channelIds
+            );
 
             // Get cache metadata
             $metadata = $cacheService->getCacheMetadata($epg);
@@ -428,7 +433,12 @@ class EpgApiController extends Controller
                     }
 
                     // Get programmes from cache for requested date range
-                    $epgProgrammes = $cacheService->getCachedProgrammesRange($epg, $startDate, $endDate, $neededEpgChannelIds);
+                    $epgProgrammes = $cacheService->getCachedProgrammesRange(
+                        $epg,
+                        $startDate,
+                        $endDate,
+                        $neededEpgChannelIds
+                    );
 
                     // Map programmes to playlist channels
                     foreach ($epgProgrammes as $epgChannelId => $channelProgrammes) {
@@ -556,12 +566,18 @@ class EpgApiController extends Controller
         $endDateInput = $request->get('end_date', $startDateInput);
         $startDateCarbon = Carbon::parse($startDateInput);
         $endDateCarbon = Carbon::parse($endDateInput);
-        
+
         // Swap dates if start is after end
         if ($startDateCarbon->gt($endDateCarbon)) {
             [$startDateCarbon, $endDateCarbon] = [$endDateCarbon, $startDateCarbon];
         }
-        
+
+        // If starte and end date are the same, add some buffer before/after for programme overlap
+        if ($startDateCarbon->gte($endDateCarbon)) {
+            $startDateCarbon->subDay();
+            $endDateCarbon->addDay();
+        }
+
         return [
             'start' => $startDateCarbon->format('Y-m-d'),
             'end' => $endDateCarbon->format('Y-m-d'),
