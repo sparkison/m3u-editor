@@ -142,6 +142,7 @@ class AdminPanelProvider extends PanelProvider
                 Authenticate::class,
             ])
             ->viteTheme('resources/css/app.css')
+            ->unsavedChangesAlerts()
             ->spa()
             ->spaUrlExceptions(fn(): array => [
                 '*/playlist.m3u',
