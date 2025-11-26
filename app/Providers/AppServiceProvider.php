@@ -627,10 +627,10 @@ class AppServiceProvider extends ServiceProvider
         \Filament\Infolists\Components\ImageEntry::configureUsing(fn(\Filament\Infolists\Components\ImageEntry $imageEntry) => $imageEntry
             ->visibility('public'));
 
-        // Preserve v3 table filter behavior (not deferred)
-        \Filament\Tables\Table::configureUsing(fn(\Filament\Tables\Table $table) => $table
-            ->deferFilters(false)
-            ->paginationPageOptions([5, 10, 25, 50, 'all']));
+        // // Preserve v3 table filter behavior (not deferred)
+        // \Filament\Tables\Table::configureUsing(fn(\Filament\Tables\Table $table) => $table
+        //     ->deferFilters(false)
+        //     ->paginationPageOptions([5, 10, 25, 50, 'all']));
 
         // Preserve v3 layout component behavior (column span full)
         \Filament\Schemas\Components\Fieldset::configureUsing(fn(\Filament\Schemas\Components\Fieldset $fieldset) => $fieldset
