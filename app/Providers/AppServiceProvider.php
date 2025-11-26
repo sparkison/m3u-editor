@@ -306,6 +306,13 @@ class AppServiceProvider extends ServiceProvider
                 if (!$playlist->sync_interval) {
                     $playlist->sync_interval = '0 0 * * *';
                 }
+                if (($playlist->xtream_config['url'] ?? false) && Str::endsWith($playlist->xtream_config['url'], '/')) {
+                    // Remove trailing slash from Xtream URL
+                    $playlist->xtream_config = [
+                        ...$playlist->xtream_config,
+                        'url' => rtrim($playlist->xtream_config['url'], '/'),
+                    ];
+                }
                 $playlist->uuid = Str::orderedUuid()->toString();
                 return $playlist;
             });
@@ -313,15 +320,15 @@ class AppServiceProvider extends ServiceProvider
                 if (!$playlist->sync_interval) {
                     $playlist->sync_interval = '0 0 * * *';
                 }
-                if ($playlist->isDirty('short_urls_enabled')) {
-                    $playlist->generateShortUrl();
-                }
                 if (($playlist->xtream_config['url'] ?? false) && Str::endsWith($playlist->xtream_config['url'], '/')) {
                     // Remove trailing slash from Xtream URL
                     $playlist->xtream_config = [
                         ...$playlist->xtream_config,
                         'url' => rtrim($playlist->xtream_config['url'], '/'),
                     ];
+                }
+                if ($playlist->isDirty('short_urls_enabled')) {
+                    $playlist->generateShortUrl();
                 }
                 if ($playlist->isDirty('uuid')) {
                     // If changing the UUID, remove the old short URLs and generate new ones
@@ -471,21 +478,35 @@ class AppServiceProvider extends ServiceProvider
                 if (!$playlistAlias->user_id) {
                     $playlistAlias->user_id = auth()->id();
                 }
+                if (($playlistAlias->xtream_config['url'] ?? false) && Str::endsWith($playlistAlias->xtream_config['url'], '/')) {
+                    // Remove trailing slash from Xtream URL
+                    $playlistAlias->xtream_config = [
+                        ...$playlistAlias->xtream_config,
+                        'url' => rtrim($playlistAlias->xtream_config['url'], '/'),
+                    ];
+                }
                 $playlistAlias->uuid = Str::orderedUuid()->toString();
                 return $playlistAlias;
             });
-            PlaylistAlias::updating(function (PlaylistAlias $playlist) {
-                if ($playlist->isDirty('short_urls_enabled')) {
-                    $playlist->generateShortUrl();
+            PlaylistAlias::updating(function (PlaylistAlias $playlistAlias) {
+                if (($playlistAlias->xtream_config['url'] ?? false) && Str::endsWith($playlistAlias->xtream_config['url'], '/')) {
+                    // Remove trailing slash from Xtream URL
+                    $playlistAlias->xtream_config = [
+                        ...$playlistAlias->xtream_config,
+                        'url' => rtrim($playlistAlias->xtream_config['url'], '/'),
+                    ];
                 }
-                if ($playlist->isDirty('uuid')) {
+                if ($playlistAlias->isDirty('short_urls_enabled')) {
+                    $playlistAlias->generateShortUrl();
+                }
+                if ($playlistAlias->isDirty('uuid')) {
                     // If changing the UUID, remove the old short URLs and generate new ones
-                    if ($playlist->short_urls_enabled) {
-                        $playlist->removeShortUrls();
-                        $playlist->generateShortUrl();
+                    if ($playlistAlias->short_urls_enabled) {
+                        $playlistAlias->removeShortUrls();
+                        $playlistAlias->generateShortUrl();
                     }
                 }
-                return $playlist;
+                return $playlistAlias;
             });
             PlaylistAlias::deleting(function (PlaylistAlias $playlistAlias) {
                 // Remove short URLs
