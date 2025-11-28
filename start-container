@@ -41,6 +41,10 @@ export SUPERVISOR_PHP_USER="root"
 export APP_URL="${APP_URL:-http://localhost}"
 export APP_PORT="${APP_PORT:-36400}" # Default 36400
 
+# Xtream API endpoint port (separate nginx instance for Xtream-only access)
+export XTREAM_PORT="${XTREAM_PORT:-36401}" # Default 36401
+export XTREAM_ONLY_ENABLED="${XTREAM_ONLY_ENABLED:-false}" # Default disabled
+
 # Set proxy reverse proxy target and token based on mode
 if [ "${M3U_PROXY_ENABLED}" = "true" ]; then
     # Embedded mode - proxy through nginx to localhost
@@ -261,6 +265,16 @@ if [ -f /etc/nginx/conf.d/laravel.tmpl ]; then
         echo "⚡️ Starting app at: $APP_URL:$APP_PORT"
     fi
     envsubst '${APP_PORT} ${APP_URL} ${FPMPORT} ${M3U_PROXY_PORT} ${REVERB_PORT} ${M3U_PROXY_NGINX_TARGET}' < /etc/nginx/conf.d/laravel.tmpl > /etc/nginx/conf.d/laravel.conf
+fi
+if [ -f /etc/nginx/conf.d/xtream.tmpl ]; then
+    if [ "${XTREAM_ONLY_ENABLED}" = "true" ]; then
+        echo "⚡️ Starting Xtream API only endpoint at port: $XTREAM_PORT (proxying to 127.0.0.1:$APP_PORT)"
+        envsubst '${APP_PORT} ${XTREAM_PORT}' < /etc/nginx/conf.d/xtream.tmpl > /etc/nginx/conf.d/xtream.conf
+    else
+        echo "⚠️  Xtream API only endpoint disabled (set XTREAM_ONLY_ENABLED=true to enable)"
+        # Remove any existing xtream config if disabled
+        rm -f /etc/nginx/conf.d/xtream.conf
+    fi
 fi
 
 # Check for configuration directories and files

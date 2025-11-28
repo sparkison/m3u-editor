@@ -165,6 +165,7 @@ COPY ./docker/8.4/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 # Copy or create an nginx.conf if needed
 COPY ./docker/8.4/nginx/nginx.conf /etc/nginx/nginx.tmpl
 COPY ./docker/8.4/nginx/laravel.conf /etc/nginx/conf.d/laravel.tmpl
+COPY ./docker/8.4/nginx/xtream.conf /etc/nginx/conf.d/xtream.tmpl
 
 # Configure PHP-FPM
 COPY ./docker/8.4/www.conf /etc/php84/php-fpm.d/www.tmpl
