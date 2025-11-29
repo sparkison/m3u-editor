@@ -47,7 +47,7 @@ class PlaylistGenerateController extends Controller
             $auths = $playlist->playlistAuths()->where('enabled', true)->get();
         } else {
             $auths = $playlist->username && $playlist->password
-                ? collect([$playlist->only(['username', 'password'])])
+                ? collect([(object) $playlist->only(['username', 'password'])])
                 : collect();
         }
 
@@ -341,7 +341,7 @@ class PlaylistGenerateController extends Controller
         // Check auth
         if ($playlist instanceof PlaylistAlias) {
             if ($playlist->username && $playlist->password) {
-                $auths = collect([$playlist->only(['username', 'password'])]);
+                $auths = collect([(object) $playlist->only(['username', 'password'])]);
             } else {
                 $auths = collect();
             }
