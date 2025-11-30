@@ -59,7 +59,7 @@ class GeneralSettings extends Settings
     public ?bool $stream_file_sync_include_season = false;
     public ?string $stream_file_sync_location = null;
     public ?array $stream_file_sync_path_structure = null;
-    
+
     // Stream file sync filename options
     public ?array $stream_file_sync_filename_metadata = null;
     public ?bool $stream_file_sync_filename_year = false;
@@ -77,7 +77,7 @@ class GeneralSettings extends Settings
     public ?bool $vod_stream_file_sync_include_season = false;
     public ?string $vod_stream_file_sync_location = null;
     public ?array $vod_stream_file_sync_path_structure = null;
-    
+
     // VOD stream file sync filename options
     public ?array $vod_stream_file_sync_filename_metadata = null;
     public ?bool $vod_stream_file_sync_filename_year = false;
@@ -91,6 +91,8 @@ class GeneralSettings extends Settings
 
     // Video player proxy options
     public ?bool $force_video_player_proxy = false;
+    // Resolve m3u-proxy public URL at request time when not explicitly configured
+    public ?bool $m3u_proxy_public_url_auto_resolve = false;
     public ?int $default_stream_profile_id = null;
     public ?int $default_vod_stream_profile_id = null;
 

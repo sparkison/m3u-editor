@@ -10,6 +10,7 @@ use App\Models\Playlist;
 use App\Models\PlaylistAlias;
 use App\Models\StreamProfile;
 use Exception;
+use App\Settings\GeneralSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -18,7 +19,7 @@ use Illuminate\Support\Facades\Log;
 class M3uProxyService
 {
     protected string $apiBaseUrl;
-    protected string $apiPublicUrl;
+    protected string|null $apiPublicUrl;
     protected string|null $apiToken;
 
     public function __construct()
@@ -28,7 +29,7 @@ class M3uProxyService
             $this->apiBaseUrl .= ':' . $port;
         }
 
-        $this->apiPublicUrl = rtrim(config('proxy.m3u_proxy_public_url'), '/');
+        $this->apiPublicUrl = config('proxy.m3u_proxy_public_url') ? rtrim(config('proxy.m3u_proxy_public_url'), '/') : null;
         $this->apiToken = config('proxy.m3u_proxy_token');
     }
 
@@ -885,7 +886,7 @@ class M3uProxyService
      */
     protected function buildProxyUrl(string $streamId, $format = 'hls'): string
     {
-        $baseUrl = $this->apiPublicUrl;
+        $baseUrl = $this->getPublicUrl();
         if ($format === 'hls' || $format === 'm3u8') {
             // HLS format: /hls/{stream_id}/playlist.m3u8
             return $baseUrl . '/hls/' . $streamId . '/playlist.m3u8';
@@ -893,6 +894,55 @@ class M3uProxyService
 
         // Direct stream format: /stream/{stream_id}
         return $baseUrl . '/stream/' . $streamId;
+    }
+
+    /**
+     * Resolve the public-facing URL for the m3u-proxy service.
+     *
+     * Resolution order:
+     * 1. If auto-resolve enabled and we have an HTTP request, compute from request host + root path
+     * 2. Explicit config/provided 'm3u_proxy_public_url'
+     * 3. Fall back to the apiBaseUrl (internal host) as a last resort
+     *
+     * This method is intentionally run-time (not only at construction) so URLs can be
+     * resolved per-request when desired.
+     *
+     * @return string
+     */
+    protected function getPublicUrl(): string
+    {
+        // 1) request-time resolution (if explicitly enabled and we are in a HTTP context)
+        // Allow the admin setting (GeneralSettings) to control request-time resolution
+        $autoResolve = false;
+        try {
+            $settings = app(GeneralSettings::class);
+            $autoResolve = (bool) ($settings->m3u_proxy_public_url_auto_resolve ?? false);
+        } catch (\Throwable $e) {
+            // ignore - app may not have settings in some contexts
+        }
+        if ($autoResolve && !app()->runningInConsole()) {
+            try {
+                $req = request();
+                if ($req) {
+                    $host = $req->getSchemeAndHttpHost();
+                    // Append root path + /m3u-proxy, which is an NGINX route that
+                    // proxies to the m3u-proxy service.
+                    return rtrim($host, '/') . '/m3u-proxy';
+                }
+            } catch (\Exception $e) {
+                // ignore and fall back
+            }
+        }
+
+        // 2) explicit config
+        if (!empty($this->apiPublicUrl)) {
+            return $this->apiPublicUrl;
+        }
+
+        // 3) fallback to internal api base URL if nothing else available
+        // Note: apiBaseUrl is typically an internal address (localhost/127.0.0.1) and
+        // may not be reachable by external clients — prefer a configured value.
+        return $this->apiBaseUrl;
     }
 
     /**
@@ -1021,7 +1071,7 @@ class M3uProxyService
             return [
                 'valid' => false,
                 'error' => 'M3U Proxy base URL is not configured',
-                'expected' => $this->apiPublicUrl,
+                'expected' => $this->getPublicUrl(),
                 'actual' => null,
             ];
         }
@@ -1064,7 +1114,7 @@ class M3uProxyService
             return [
                 'valid' => false,
                 'error' => 'M3U Proxy returned status ' . $response->status(),
-                'expected' => $this->apiPublicUrl,
+                'expected' => $this->getPublicUrl(),
                 'actual' => null,
             ];
         } catch (Exception $e) {
@@ -1073,7 +1123,7 @@ class M3uProxyService
             return [
                 'valid' => false,
                 'error' => 'Unable to connect to m3u-proxy: ' . $e->getMessage(),
-                'expected' => $this->apiPublicUrl,
+                'expected' => $this->getPublicUrl(),
                 'actual' => null,
             ];
         }

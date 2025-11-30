@@ -181,6 +181,16 @@ class Preferences extends SettingsPage
                                     ->columnSpanFull()
                                     ->columns(4)
                                     ->schema([
+                                        Toggle::make('m3u_proxy_public_url_auto_resolve')
+                                            ->label('Resolve proxy public URL dynamically at request time')
+                                            ->columnSpanFull()
+                                            ->hintIcon(
+                                                'heroicon-m-question-mark-circle',
+                                                tooltip: 'When enabled, the application will resolve the public-facing proxy URL using the incoming request host/scheme instead of the M3U_PROXY_PUBLIC_URL variable.'
+                                            )
+                                            ->helperText('Useful for multi-host access (VPN/Tailscale/etc.)')
+                                            ->default(false),
+
                                         Select::make('default_stream_profile_id')
                                             ->label('Default Transcoding Profile')
                                             ->columnSpan(2)
