@@ -382,6 +382,21 @@ class PlaylistService
             }
         }
 
+        // Method 1b: Direct authentication with PlaylistAlias credentials
+        $alias = PlaylistAlias::where('enabled', true)
+            ->where('username', $username)
+            ->where('password', $password)
+            ->with(['user', 'playlist', 'customPlaylist'])
+            ->first();
+        
+        if ($alias) {
+            return [
+                $alias,
+                'alias_auth',
+                $username,
+                $password
+            ];
+        }
         // Method 2: Fall back to original authentication:
         //      (username = playlist owner, password = playlist UUID)
         if (!$playlist) {
