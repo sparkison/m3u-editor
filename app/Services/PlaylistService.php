@@ -171,7 +171,7 @@ class PlaylistService
                 ? (object) ['username' => $playlist->username, 'password' => $playlist->password]
                 : null;
         }
-        $auth = null;
+        $auth = '';
         if ($playlistAuth) {
             $auth = '?username=' . $playlistAuth->username . '&password=' . $playlistAuth->password;
         }
@@ -184,6 +184,7 @@ class PlaylistService
 
         // Example structure: http://localhost:8888/proxy/hls/manifest.m3u8?d=YOUR_M3U_EDITOR_PLAYLIST_URL&api_password=YOUR_PROXY_API_PASSWORD
         $playlistRoute = route('playlist.generate', ['uuid' => $playlist->uuid]);
+        $playlistRoute .= $auth;
         $m3uUrl = $proxyUrl . '/proxy/hls/manifest.m3u8?d=' . urlencode($playlistRoute);
 
         // Check if we're adding user-agent headers
@@ -193,11 +194,6 @@ class PlaylistService
             $m3uUrl .= '&h_user-agent=' . urlencode($settings['mediaflow_proxy_user_agent']);
         }
         $m3uUrl .= '&api_password=' . $settings['mediaflow_proxy_password'];
-
-        // If auth set, append auth parameters to the URLs
-        if ($auth) {
-            $m3uUrl .= $auth;
-        }
 
         // Return the results
         return [
