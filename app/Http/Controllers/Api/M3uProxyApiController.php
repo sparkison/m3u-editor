@@ -15,6 +15,8 @@ use App\Services\M3uProxyService;
 use App\Settings\GeneralSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class M3uProxyApiController extends Controller
@@ -26,7 +28,7 @@ class M3uProxyApiController extends Controller
      * @param  int  $id
      * @param  string|null  $uuid  Optional playlist UUID for context
      * 
-     * @return \Illuminate\Http\RedirectResponse
+     * @return Response|RedirectResponse
      */
     public function channel(Request $request, $id, $uuid = null)
     {
@@ -74,7 +76,7 @@ class M3uProxyApiController extends Controller
      * @param  int  $id
      * @param  string|null  $uuid  Optional playlist UUID for context
      * 
-     * @return \Illuminate\Http\RedirectResponse
+     * @return Response|RedirectResponse
      */
     public function episode(Request $request, $id, $uuid = null)
     {
@@ -113,7 +115,7 @@ class M3uProxyApiController extends Controller
      * @param  int  $id
      * @param  string|null  $uuid
      * 
-     * @return StreamedResponse
+     * @return RedirectResponse
      */
     public function channelPlayer(Request $request, $id, $uuid = null)
     {
@@ -168,7 +170,7 @@ class M3uProxyApiController extends Controller
      * @param  int  $id
      * @param  string|null  $uuid
      * 
-     * @return StreamedResponse
+     * @return RedirectResponse
      */
     public function episodePlayer(Request $request, $id, $uuid = null)
     {

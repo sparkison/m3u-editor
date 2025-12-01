@@ -112,12 +112,6 @@ services:
       # Logging
       - LOG_LEVEL=INFO
 
-      # Public URL for re-writing HLS stream URLs
-      # Set this to the public URL of your m3u-editor instance
-      # Replace with your actual domain or LAN IP so it is accessible to clients
-      # NOTE: Make sure to add the `/m3u-proxy` path
-      - PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-http://localhost/m3u-proxy}  # Change to your public URL if needed
-
       # Note: ROOT_PATH=/m3u-proxy is now the default, no need to set it explicitly
       # Only set ROOT_PATH= (empty) if you need to use the root path instead
 
@@ -198,8 +192,6 @@ services:
       - M3U_PROXY_ENABLED=false # Disable embedded and use external m3u-proxy
       - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
       - M3U_PROXY_HOST=m3u-proxy # Internal network hostname of m3u-proxy container
-      # Public URL for m3u-proxy (used for rewriting stream URLs)
-      - M3U_PROXY_PUBLIC_URL=${M3U_PROXY_PUBLIC_URL:-http://localhost:8080/m3u-proxy}
       - M3U_PROXY_TOKEN=${M3U_PROXY_TOKEN:-changeme}
     volumes:
       # Persistent configuration data
