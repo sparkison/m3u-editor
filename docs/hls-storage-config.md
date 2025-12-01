@@ -141,7 +141,6 @@ services:
       
       # M3U Proxy
       - M3U_PROXY_ENABLED=true
-      - M3U_PROXY_PUBLIC_URL=http://10.76.23.92:36400/m3u-proxy
       - M3U_PROXY_TOKEN=your-secure-token
 ```
 

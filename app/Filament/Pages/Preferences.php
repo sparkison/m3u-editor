@@ -107,12 +107,11 @@ class Preferences extends SettingsPage
 
     public function form(Schema $schema): Schema
     {
-        // $m3uProxyUrl = rtrim(config('proxy.m3u_proxy_host'), '/');
-        // if ($port = config('proxy.m3u_proxy_port')) {
-        //     $m3uProxyUrl .= ':' . $port;
-        // }
         $m3uPublicUrl = rtrim(config('proxy.m3u_proxy_public_url'), '/');
         $m3uToken = config('proxy.m3u_proxy_token', null);
+        if (empty($m3uPublicUrl)) {
+            $m3uPublicUrl = url('/m3u-proxy');
+        }
         $m3uProxyDocs = $m3uPublicUrl . '/docs';
 
         $vodExample = PlaylistService::getVodExample();

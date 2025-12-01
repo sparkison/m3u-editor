@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Facades\ProxyFacade;
 use App\Models\Channel;
 use App\Models\CustomPlaylist;
 use App\Models\Episode;
@@ -902,7 +903,7 @@ class M3uProxyService
      * Resolution order:
      * 1. If auto-resolve enabled and we have an HTTP request, compute from request host + root path
      * 2. Explicit config/provided 'm3u_proxy_public_url'
-     * 3. Fall back to the apiBaseUrl (internal host) as a last resort
+     * 3. Fall back to the APP_URL + /m3u-proxy (built-in reverse proxy route)
      *
      * This method is intentionally run-time (not only at construction) so URLs can be
      * resolved per-request when desired.
@@ -939,10 +940,10 @@ class M3uProxyService
             return $this->apiPublicUrl;
         }
 
-        // 3) fallback to internal api base URL if nothing else available
-        // Note: apiBaseUrl is typically an internal address (localhost/127.0.0.1) and
-        // may not be reachable by external clients — prefer a configured value.
-        return $this->apiBaseUrl;
+        // 3) Smart fallback: Use APP_URL + /m3u-proxy if available (works with reverse proxy)
+        // This allows the proxy to work without requiring explicit PUBLIC_URL configuration.
+        // Works automatically in Docker containers with NGINX reverse proxy.
+        return ProxyFacade::getBaseUrl() . '/m3u-proxy';
     }
 
     /**

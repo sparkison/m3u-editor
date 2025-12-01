@@ -86,11 +86,6 @@ echo "M3U_PROXY_TOKEN=$(openssl rand -hex 32)" >> .env
 nano .env
 ```
 
-**Important**: Make sure `APP_URL` and `M3U_PROXY_PUBLIC_URL` include the correct port!
-- `APP_URL=http://localhost`
-- `APP_PORT=8080`
-- `M3U_PROXY_PUBLIC_URL=http://localhost:8080/m3u-proxy`
-
 ### 3. Start Services
 
 ```bash
@@ -161,7 +156,6 @@ REDIS_PORT=6379
 
 # M3U Proxy
 M3U_PROXY_PORT=38085
-M3U_PROXY_PUBLIC_URL=http://localhost/m3u-proxy
 M3U_PROXY_TOKEN=<generate-secure-token>
 ```
 
@@ -207,7 +201,6 @@ nginx:
 
 ```bash
 APP_URL=https://your-domain.com
-M3U_PROXY_PUBLIC_URL=https://your-domain.com/m3u-proxy
 ```
 
 ## Monitoring and Logs
@@ -431,15 +424,14 @@ docker-compose -f docker-compose.external-all.yml restart nginx
 
 **Symptoms**: Can't access application, wrong URLs generated
 
-**Cause**: Mismatch between `APP_URL`, `APP_PORT`, `NGINX_PORT`, and `M3U_PROXY_PUBLIC_URL`
+**Cause**: Mismatch between `APP_URL`, `APP_PORT`, and `NGINX_PORT`
 
 **Solution**: Ensure consistency in `.env`:
 ```bash
 # If using port 8080
-APP_URL=http://localhost:8080
+APP_URL=http://localhost
 APP_PORT=8080
 NGINX_PORT=8080
-M3U_PROXY_PUBLIC_URL=http://localhost:8080/m3u-proxy
 ```
 
 After changing, restart services:
@@ -465,8 +457,6 @@ docker-compose -f docker-compose.external-all.yml logs m3u-proxy
 M3U_TOKEN=$(grep M3U_PROXY_TOKEN .env | cut -d= -f2)
 curl "http://localhost:8080/m3u-proxy/health?api_token=$M3U_TOKEN"
 ```
-
-4. Verify `M3U_PROXY_PUBLIC_URL` matches your setup and is accessible from client devices
 
 ## Performance Tuning
 
