@@ -269,7 +269,16 @@ class EpgApiController extends Controller
                         $epgChannelMap[$epgId][$epgData->channel_id] = [];
                     }
 
-                    $logo = $channel->logo ?? $channel->logo_internal ?? '';
+                    $logo = url('/placeholder.png');
+                    if ($channel->logo) {
+                        // Logo override takes precedence
+                        $logo = $channel->logo;
+                    } elseif ($channel->logo_type === ChannelLogoType::Epg && $channel->epgChannel && $channel->epgChannel->icon) {
+                        $logo = $channel->epgChannel->icon;
+                    } elseif ($channel->logo_type === ChannelLogoType::Channel && ($channel->logo || $channel->logo_internal)) {
+                        $logo = $channel->logo ?? $channel->logo_internal ?? '';
+                        $logo = filter_var($logo, FILTER_VALIDATE_URL) ? $logo : url('/placeholder.png');
+                    }
                     if ($logoProxyEnabled) {
                         $logo = LogoProxyController::generateProxyUrl($logo, internal: true);
                     }
