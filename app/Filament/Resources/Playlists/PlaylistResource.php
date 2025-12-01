@@ -8,7 +8,7 @@ use App\Filament\Resources\Playlists\Pages\CreatePlaylist;
 use App\Filament\Resources\Playlists\Pages\EditPlaylist;
 use App\Filament\Resources\Playlists\Pages\ListPlaylists;
 use App\Filament\Resources\Playlists\Pages\ViewPlaylist;
-use App\Filament\Tables\CategoriesTable;
+use App\Filament\Tables\SourceCategoriesTable;
 use App\Filament\Tables\SourceGroupsTable;
 use App\Jobs\CopyAttributesToPlaylist;
 use App\Jobs\DuplicatePlaylist;
@@ -25,6 +25,7 @@ use App\Models\Category;
 use App\Models\Playlist;
 use App\Models\PlaylistAuth;
 use App\Models\SharedStream;
+use App\Models\SourceCategory;
 use App\Models\SourceGroup;
 use App\Models\StreamProfile;
 use App\Rules\CheckIfUrlOrLocalPath;
@@ -1255,7 +1256,7 @@ class PlaylistResource extends Resource
                     Fieldset::make('Series processing')
                         ->schema([
                             ModalTableSelect::make('import_prefs.selected_categories')
-                                ->tableConfiguration(CategoriesTable::class)
+                                ->tableConfiguration(SourceCategoriesTable::class)
                                 ->label('Categories to import')
                                 ->columnSpan(1)
                                 ->multiple()
@@ -1286,7 +1287,7 @@ class PlaylistResource extends Resource
                                 ->getOptionLabelFromRecordUsing(fn($record) => $record->name)
                                 ->getOptionLabelsUsing(function (array $values, $record): array {
                                     // Values are IDs, return id => name pairs
-                                    return Category::where('playlist_id', $record?->id)
+                                    return SourceCategory::where('playlist_id', $record?->id)
                                         ->whereIn('id', $values)
                                         ->pluck('name', 'id')  // id => name
                                         ->toArray();
@@ -1296,7 +1297,7 @@ class PlaylistResource extends Resource
                                     if (is_array($state) && !empty($state)) {
                                         // Check if first item is a string (name) - need to convert to IDs
                                         if (is_string($state[0] ?? null)) {
-                                            $ids = Category::where('playlist_id', $record?->id)
+                                            $ids = SourceCategory::where('playlist_id', $record?->id)
                                                 ->whereIn('name', $state)
                                                 ->pluck('id')
                                                 ->unique()

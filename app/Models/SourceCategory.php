@@ -4,9 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class SourceGroup extends Model
+class SourceCategory extends Model
 {
-    protected $table  = 'source_groups';
+    protected $table  = 'source_categories';
+
 
     public function playlist()
     {

@@ -332,25 +332,7 @@ class ProcessM3uImportComplete implements ShouldQueue
                 ->delete();
         }
 
-        // Determine if syncing series metadata as well
-        $syncSeriesMetadata = $playlist->auto_fetch_series_metadata
-            && $playlist->series()->where('enabled', true)->exists();
-
-        if ($syncSeriesMetadata) {
-            // Process series import
-            dispatch(new ProcessM3uImportSeries(
-                playlist: $playlist,
-                force: true,
-                isNew: $this->isNew,
-                batchNo: $this->batchNo,
-            ));
-            Notification::make()
-                ->info()
-                ->title('Fetching Series Metadata')
-                ->body('Fetching series metadata now. This may take a while depending on how many series you have enabled. If stream file syncing is enabled, it will also be ran. Please check back later.')
-                ->broadcast($playlist->user)
-                ->sendToDatabase($playlist->user);
-        }
+        $this->seriesCleanup($playlist);
 
         $syncVod = ($playlist->auto_sync_vod_stream_files || $playlist->auto_fetch_vod_metadata)
             && $playlist->channels()->where([
@@ -390,6 +372,38 @@ class ProcessM3uImportComplete implements ShouldQueue
 
         // Fire the playlist synced event
         event(new SyncCompleted($playlist));
+    }
+
+    /**
+     * Handle series cleanup and importing after playlist import completes.
+     */
+    private function seriesCleanup($playlist)
+    {
+        // First, we need to remove any invalid categories/series/episodes
+        foreach ($playlist->categories()->where('import_batch_no', '!=', $this->batchNo)->cursor() as $category) {
+            $category->series()->delete(); // will cascade to episodes
+            $category->delete();
+        }
+
+        // Determine if syncing series metadata
+        $syncSeriesMetadata = $playlist->auto_fetch_series_metadata
+            && $playlist->series()->where('enabled', true)->exists();
+
+        if ($syncSeriesMetadata) {
+            // Process series import
+            dispatch(new ProcessM3uImportSeries(
+                playlist: $playlist,
+                force: true,
+                isNew: $this->isNew,
+                batchNo: $this->batchNo,
+            ));
+            Notification::make()
+                ->info()
+                ->title('Fetching Series Metadata')
+                ->body('Fetching series metadata now. This may take a while depending on how many series you have enabled. If stream file syncing is enabled, it will also be ran. Please check back later.')
+                ->broadcast($playlist->user)
+                ->sendToDatabase($playlist->user);
+        }
     }
 
     /**

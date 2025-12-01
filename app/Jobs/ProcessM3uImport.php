@@ -13,6 +13,7 @@ use App\Models\Category;
 use App\Models\Group;
 use App\Models\Job;
 use App\Models\Playlist;
+use App\Models\SourceCategory;
 use App\Models\SourceGroup;
 use Carbon\Carbon;
 use M3uParser\M3uParser;
@@ -960,18 +961,40 @@ class ProcessM3uImport implements ShouldQueue
         // Create the series categories (needed for pre-processing)
         if ($seriesCategories && $seriesCategories->count() > 0) {
             foreach ($seriesCategories as $category) {
-                $sc = Category::where([
+                // Need to create a source category entry
+                $sc = SourceCategory::where([
                     'playlist_id' => $playlist->id,
                     'source_category_id' => $category['category_id'],
                 ])->first();
                 if (!$sc) {
-                    Category::create([
+                    SourceCategory::create([
                         'playlist_id' => $playlist->id,
                         'name' => $category['category_name'],
-                        'name_internal' => $category['category_name'],
                         'source_category_id' => $category['category_id'],
-                        'user_id' => $playlist->user_id,
                     ]);
+                }
+
+                // Only create category if not preprocessing, or if the category is selected
+                if (!$this->preprocess || $this->shouldIncludeSeries($category['category_name'] ?? '')) {
+                    $cat = Category::where([
+                        'playlist_id' => $playlist->id,
+                        'source_category_id' => $category['category_id'],
+                    ])->first();
+                    if (!$cat) {
+                        $cat = Category::create([
+                            'playlist_id' => $playlist->id,
+                            'name' => $category['category_name'],
+                            'name_internal' => $category['category_name'],
+                            'source_category_id' => $category['category_id'],
+                            'user_id' => $playlist->user_id,
+                            'import_batch_no' => $batchNo,
+                        ]);
+                    } else {
+                        $cat->update([
+                            'name_internal' => $category['category_name'],
+                            'import_batch_no' => $batchNo,
+                        ]);
+                    }
                 }
             }
         }

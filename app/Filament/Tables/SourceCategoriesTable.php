@@ -2,18 +2,18 @@
 
 namespace App\Filament\Tables;
 
-use App\Models\Category;
+use App\Models\SourceCategory;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
-class CategoriesTable
+class SourceCategoriesTable
 {
     public static function configure(Table $table): Table
     {
         return $table
-            ->query(fn(): Builder => Category::query())
+            ->query(fn(): Builder => SourceCategory::query())
             ->modifyQueryUsing(function (Builder $query) use ($table): Builder {
                 $arguments = $table->getArguments();
 
@@ -21,7 +21,7 @@ class CategoriesTable
                     $query->where('playlist_id', $playlistId);
                 }
 
-                return $query->where('user_id', auth()->id());
+                return $query;
             })
             ->columns([
                 TextColumn::make('name')
