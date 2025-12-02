@@ -43,20 +43,23 @@ class PlaylistGenerateController extends Controller
         }
 
         // Check auth
-        if ($type !== 'alias') {
-            $auths = $playlist->playlistAuths()->where('enabled', true)->get();
+        if ($playlist instanceof PlaylistAlias) {
+            $auth = $playlist->authObject;
+            if ($auth) {
+                $auths = collect([$auth]);
+            } else {
+                $auths = collect();
+            }
         } else {
-            $auths = $playlist->username && $playlist->password
-                ? collect([$playlist->only(['username', 'password'])])
-                : collect();
+            $auths = $playlist->playlistAuths()->where('enabled', true)->get();
         }
 
         $usedAuth = null;
         if ($auths->isNotEmpty()) {
             $authenticated = false;
             foreach ($auths as $auth) {
-                $authUsername = is_array($auth) ? $auth['username'] : $auth->username;
-                $authPassword = is_array($auth) ? $auth['password'] : $auth->password;
+                $authUsername = $auth->username;
+                $authPassword = $auth->password;
 
                 if (
                     $request->get('username') === $authUsername &&
@@ -104,8 +107,8 @@ class PlaylistGenerateController extends Controller
 
                 // Set the auth details
                 if ($usedAuth) {
-                    $username = is_array($usedAuth) ? $usedAuth['username'] : $usedAuth->username;
-                    $password = is_array($usedAuth) ? $usedAuth['password'] : $usedAuth->password;
+                    $username = $usedAuth->username;
+                    $password = $usedAuth->password;
                 } else {
                     $username = $playlist->user->name;
                     $password = $playlist->uuid;
@@ -343,19 +346,21 @@ class PlaylistGenerateController extends Controller
 
         // Check auth
         if ($playlist instanceof PlaylistAlias) {
-            if ($playlist->username && $playlist->password) {
-                $auths = collect([$playlist->only(['username', 'password'])]);
+            $auth = $playlist->authObject;
+            if ($auth) {
+                $auths = collect([$auth]);
             } else {
                 $auths = collect();
             }
         } else {
             $auths = $playlist->playlistAuths()->where('enabled', true)->get();
         }
+
         if ($auths->isNotEmpty()) {
             $authenticated = false;
             foreach ($auths as $auth) {
-                $authUsername = is_array($auth) ? $auth['username'] : $auth->username;
-                $authPassword = is_array($auth) ? $auth['password'] : $auth->password;
+                $authUsername = $auth->username;
+                $authPassword = $auth->password;
 
                 if (
                     $request->get('username') === $authUsername &&
