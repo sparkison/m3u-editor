@@ -55,9 +55,12 @@ class PlaylistGenerateController extends Controller
         if ($auths->isNotEmpty()) {
             $authenticated = false;
             foreach ($auths as $auth) {
+                $authUsername = is_array($auth) ? $auth['username'] : $auth->username;
+                $authPassword = is_array($auth) ? $auth['password'] : $auth->password;
+
                 if (
-                    $request->get('username') === $auth->username &&
-                    $request->get('password') === $auth->password
+                    $request->get('username') === $authUsername &&
+                    $request->get('password') === $authPassword
                 ) {
                     $authenticated = true;
                     $usedAuth = $auth;
@@ -101,8 +104,8 @@ class PlaylistGenerateController extends Controller
 
                 // Set the auth details
                 if ($usedAuth) {
-                    $username = $usedAuth->username;
-                    $password = $usedAuth->password;
+                    $username = is_array($usedAuth) ? $usedAuth['username'] : $usedAuth->username;
+                    $password = is_array($usedAuth) ? $usedAuth['password'] : $usedAuth->password;
                 } else {
                     $username = $playlist->user->name;
                     $password = $playlist->uuid;
@@ -351,11 +354,15 @@ class PlaylistGenerateController extends Controller
         if ($auths->isNotEmpty()) {
             $authenticated = false;
             foreach ($auths as $auth) {
+                $authUsername = is_array($auth) ? $auth['username'] : $auth->username;
+                $authPassword = is_array($auth) ? $auth['password'] : $auth->password;
+
                 if (
-                    $request->get('username') === $auth->username &&
-                    $request->get('password') === $auth->password
+                    $request->get('username') === $authUsername &&
+                    $request->get('password') === $authPassword
                 ) {
                     $authenticated = true;
+                    $usedAuth = $auth;
                     break;
                 }
             }
