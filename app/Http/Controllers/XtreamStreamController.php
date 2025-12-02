@@ -302,6 +302,6 @@ class XtreamStreamController extends Controller
             $streamUrl = PlaylistUrlService::getChannelUrl($channel, $playlist);
             $streamUrl = PlaylistService::generateTimeshiftUrl($request, $streamUrl, $playlist);
             return Redirect::to($streamUrl);
-}
+        }
     }
 }
