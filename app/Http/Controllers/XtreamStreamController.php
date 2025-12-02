@@ -198,7 +198,7 @@ class XtreamStreamController extends Controller
             if ($playlist->enable_proxy) {
                 return app()->call('App\\Http\\Controllers\\Api\\M3uProxyApiController@channel', [
                     'id'   => $streamId,
-                    'uuid' => $playlist->uuid,   // ← CAMBIO CLAVE
+                    'uuid' => $playlist->uuid,
                 ]);
             } else {
                 return Redirect::to(PlaylistUrlService::getChannelUrl($channel, $playlist));
@@ -219,7 +219,7 @@ class XtreamStreamController extends Controller
             if ($playlist->enable_proxy) {
                 return app()->call('App\\Http\\Controllers\\Api\\M3uProxyApiController@channel', [
                     'id'   => $streamId,
-                    'uuid' => $playlist->uuid,   // ← CAMBIO CLAVE
+                    'uuid' => $playlist->uuid,
                 ]);
             } else {
                 return Redirect::to(PlaylistUrlService::getChannelUrl($channel, $playlist));
@@ -240,7 +240,7 @@ class XtreamStreamController extends Controller
             if ($playlist->enable_proxy) {
                 return app()->call('App\\Http\\Controllers\\Api\\M3uProxyApiController@episode', [
                     'id'   => $streamId,
-                    'uuid' => $playlist->uuid,   // ← CAMBIO CLAVE
+                    'uuid' => $playlist->uuid,
                 ]);
             } else {
                 return Redirect::to(PlaylistUrlService::getEpisodeUrl($episode, $playlist));
@@ -296,7 +296,7 @@ class XtreamStreamController extends Controller
         if ($playlist->enable_proxy) {
             return app()->call('App\\Http\\Controllers\\Api\\M3uProxyApiController@channel', [
                 'id'   => $streamId,
-                'uuid' => $playlist->uuid,   // ← CAMBIO CLAVE
+                'uuid' => $playlist->uuid,
             ]);
         } else {
             $streamUrl = PlaylistUrlService::getChannelUrl($channel, $playlist);
