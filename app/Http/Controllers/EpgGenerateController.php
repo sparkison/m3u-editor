@@ -90,6 +90,9 @@ class EpgGenerateController extends Controller
         $dummyEpgChannels = [];
         $channels = $playlist->channels()
             ->where('enabled', true)
+            ->when(!$playlist->include_vod_in_epg, function ($q) {
+                $q->where('channels.is_vod', false);
+            })
             ->orderBy('sort')
             ->orderBy('channel')
             ->orderBy('title')
