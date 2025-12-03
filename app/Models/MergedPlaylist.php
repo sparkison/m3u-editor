@@ -32,6 +32,7 @@ class MergedPlaylist extends Model
         'short_urls_enabled' => 'boolean',
         'include_series_in_m3u' => 'boolean',
         'include_vod_in_m3u' => 'boolean',
+        'include_vod_in_epg' => 'boolean',
         'custom_headers' => 'array',
         'strict_live_ts' => 'boolean',
         'id_channel_by' => PlaylistChannelId::class
