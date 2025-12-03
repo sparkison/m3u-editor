@@ -33,6 +33,7 @@ DockerfileDev
 .rr.yaml
 rr
 websockets.sh
+<<<<<<< HEAD
 config/database
 config/logs
 config/env
@@ -46,3 +47,7 @@ data/
 *ANALYSIS*.md
 *SUMMARY*.md
 *FIXES*.md
+=======
+
+data
+>>>>>>> 834382e5 (fix: Add 'data' directory to .gitignore and ensure newline at end of file)
