@@ -193,18 +193,17 @@ class RunPostProcess implements ShouldQueue
                 }
 
                 // Check if we have a raw JSON body to send
-                $rawJson = $metadata['raw_json'] ?? null;
                 if ($post && $noBody) {
                     // POST request without body (e.g., for triggering Emby/Jellyfin tasks)
                     // Use withBody with empty string to avoid Laravel sending []
                     $response = Http::withHeaders($headers)
                         ->withBody('', 'text/plain')
                         ->post($url);
-                } elseif ($post && $jsonBody && !empty($rawJson)) {
-                    // Replace placeholders in raw JSON with actual values
-                    $jsonContent = $this->replacePlaceholders($rawJson, $modelType);
+                } elseif ($post && $jsonBody) {
+                    // Set content type to application/json, and encode vars as JSON
                     $headers['Content-Type'] = 'application/json';
-                    
+                    $jsonContent = json_encode($queryVars);
+
                     // Make the request with raw JSON body
                     $response = Http::withHeaders($headers)
                         ->withBody($jsonContent, 'application/json')

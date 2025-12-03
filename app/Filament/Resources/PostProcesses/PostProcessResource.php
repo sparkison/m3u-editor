@@ -236,90 +236,95 @@ class PostProcessResource extends Resource
                         ->default(false)
                         ->live()
                         ->helperText('Send as GET or POST request.'),
-                    Toggle::make('metadata.no_body')
-                        ->label('Send without body')
-                        ->default(false)
-                        ->helperText('When enabled, the POST request will be sent without any body content. Useful for APIs that only need a POST trigger (e.g., Emby/Jellyfin scheduled tasks).')
-                        ->hidden(fn(Get $get) => !$get('metadata.post'))
-                        ->live(),
-                    Toggle::make('metadata.json_body')
-                        ->label('Send as JSON body')
-                        ->default(false)
-                        ->helperText('When enabled, variables will be sent as a JSON body instead of form data. Only applies to POST requests.')
-                        ->hidden(fn(Get $get) => !$get('metadata.post') || $get('metadata.no_body')),
-                    Repeater::make('metadata.headers')
-                        ->label('Custom Headers')
-                        ->schema([
-                            TextInput::make('header_name')
-                                ->label('Header name')
-                                ->placeholder('X-Emby-Token')
-                                ->helperText('Name of the HTTP header.')
-                                ->datalist([
-                                    'X-Emby-Token',
-                                    'X-Api-Key',
-                                    'Authorization',
-                                    'X-Custom-Header',
-                                ])
-                                ->required(),
-                            TextInput::make('header_value')
-                                ->label('Header value')
-                                ->placeholder('your-api-key-here')
-                                ->helperText('Value for this header.')
-                                ->required(),
-                        ])
-                        ->columns(2)
-                        ->columnSpanFull()
-                        ->collapsed()
-                        ->addActionLabel('Add header'),
-                    Repeater::make('metadata.post_vars')
-                        ->label('GET/POST variables')
-                        ->schema([
-                            TextInput::make('variable_name')
-                                ->label('Variable name')
-                                ->placeholder('variable_name')
-                                ->helperText('Name of the variable to send as GET/POST variable to your webhook URL.')
-                                ->datalist([
-                                    'name',
-                                    'uuid',
-                                    'url',
-                                ])
-                                ->alphaDash()
-                                ->ascii()
-                                ->required(),
-                            Select::make('value')
-                                ->label('Value')
-                                ->required()
-                                ->options([
-                                    // Shared fields
-                                    'id' => 'ID',
-                                    'uuid' => 'UUID',
-                                    'name' => 'Name',
-                                    'url' => 'URL',
-                                    'status' => 'Status',
 
-                                    // Playlist sync fields
-                                    'time' => 'Sync time',
-                                    'added_groups' => '# Groups added (Playlist only)',
-                                    'removed_groups' => '# Groups removed (Playlist only)',
-                                    'added_channels' => '# Channels added (Playlist only)',
-                                    'removed_channels' => '# Channels removed (Playlist only)',
-                                    'added_group_names' => 'Group names added (Playlist only)',
-                                    'removed_group_names' => 'Group names removed (Playlist only)',
-                                    'added_channel_names' => 'Channel names added (Playlist only)',
-                                    'removed_channel_names' => 'Channel names removed (Playlist only)',
-                                ])->helperText('Value to use for this variable.'),
-                        ])
-                        ->columns(2)
-                        ->columnSpanFull()
-                        ->addActionLabel('Add GET/POST variable')
-                        ->hidden(fn(Get $get) => $get('metadata.post') && $get('metadata.no_body')),
-                    Textarea::make('metadata.raw_json')
-                        ->label('Custom JSON Body')
-                        ->placeholder('{"key": "value", "playlist": "{{name}}", "uuid": "{{uuid}}"}')
-                        ->helperText('Custom JSON body to send. Use {{variable}} placeholders for dynamic values (e.g., {{name}}, {{uuid}}, {{url}}). This overrides the variables above when provided.')
-                        ->columnSpanFull()
-                        ->rows(4)
-                        ->hidden(fn(Get $get) => !$get('metadata.post') || !$get('metadata.json_body') || $get('metadata.no_body')),
+                    Fieldset::make('Headers')
+                        ->schema([
+                            Repeater::make('metadata.headers')
+                                ->label('Custom Headers')
+                                ->schema([
+                                    TextInput::make('header_name')
+                                        ->label('Header name')
+                                        ->placeholder('X-Emby-Token')
+                                        ->helperText('Name of the HTTP header.')
+                                        ->datalist([
+                                            'X-Emby-Token',
+                                            'X-Api-Key',
+                                            'Authorization',
+                                            'X-Custom-Header',
+                                        ])
+                                        ->required(),
+                                    TextInput::make('header_value')
+                                        ->label('Header value')
+                                        ->placeholder('your-api-key-here')
+                                        ->helperText('Value for this header.')
+                                        ->required(),
+                                ])
+                                ->columns(2)
+                                ->columnSpanFull()
+                                ->collapsed()
+                                ->addActionLabel('Add header'),
+                        ]),
+
+                    Fieldset::make('Body')
+                        ->schema([
+                            Toggle::make('metadata.no_body')
+                                ->label('Send without body')
+                                ->default(false)
+                                ->inline(false)
+                                ->helperText('When enabled, the POST request will be sent without any body content. Useful for APIs that only need a POST trigger (e.g., Emby/Jellyfin scheduled tasks).')
+                                ->hidden(fn(Get $get) => !$get('metadata.post'))
+                                ->live(),
+                            Toggle::make('metadata.json_body')
+                                ->label('Send as JSON body')
+                                ->default(false)
+                                ->inline(false)
+                                ->live()
+                                ->helperText('When enabled, variables will be sent as a JSON body instead of form data. Only applies to POST requests.')
+                                ->hidden(fn(Get $get) => !$get('metadata.post') || $get('metadata.no_body')),
+
+                            Repeater::make('metadata.post_vars')
+                                ->label('GET/POST variables')
+                                ->schema([
+                                    TextInput::make('variable_name')
+                                        ->label('Variable name')
+                                        ->placeholder('variable_name')
+                                        ->helperText('Name of the variable to send as GET/POST variable to your webhook URL.')
+                                        ->datalist([
+                                            'name',
+                                            'uuid',
+                                            'url',
+                                        ])
+                                        ->alphaDash()
+                                        ->ascii()
+                                        ->required(),
+                                    Select::make('value')
+                                        ->label('Value')
+                                        ->required()
+                                        ->options([
+                                            // Shared fields
+                                            'id' => 'ID',
+                                            'uuid' => 'UUID',
+                                            'name' => 'Name',
+                                            'url' => 'URL',
+                                            'status' => 'Status',
+
+                                            // Playlist sync fields
+                                            'time' => 'Sync time',
+                                            'added_groups' => '# Groups added (Playlist only)',
+                                            'removed_groups' => '# Groups removed (Playlist only)',
+                                            'added_channels' => '# Channels added (Playlist only)',
+                                            'removed_channels' => '# Channels removed (Playlist only)',
+                                            'added_group_names' => 'Group names added (Playlist only)',
+                                            'removed_group_names' => 'Group names removed (Playlist only)',
+                                            'added_channel_names' => 'Channel names added (Playlist only)',
+                                            'removed_channel_names' => 'Channel names removed (Playlist only)',
+                                        ])->helperText('Value to use for this variable.'),
+                                ])
+                                ->columns(2)
+                                ->columnSpanFull()
+                                ->addActionLabel('Add GET/POST variable')
+                                ->hidden(fn(Get $get) => $get('metadata.post') && $get('metadata.no_body')),
+                        ]),
                 ])->hidden(fn(Get $get) => $get('metadata.local') !== 'url'),
             Fieldset::make('Script Options')
                 ->schema([
@@ -476,11 +481,11 @@ class PostProcessResource extends Resource
             $operation === 'create'
                 ? Grid::make()->schema($schema)->columns(2)
                 : Section::make('Configuration')
-                    ->icon('heroicon-s-pencil-square')
-                    ->collapsible()
-                    ->collapsed(true)
-                    ->compact()
-                    ->schema($schema)->columns(2),
+                ->icon('heroicon-s-pencil-square')
+                ->collapsible()
+                ->collapsed(true)
+                ->compact()
+                ->schema($schema)->columns(2),
         ];
     }
 }
