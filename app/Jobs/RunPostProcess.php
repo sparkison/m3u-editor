@@ -167,6 +167,7 @@ class RunPostProcess implements ShouldQueue
                 $method = $post ? 'post' : 'get';
                 $url = $metadata['path'];
                 $jsonBody = (bool)($metadata['json_body'] ?? false);
+                $noBody = (bool)($metadata['no_body'] ?? false);
                 $queryVars = [];
                 $vars = $metadata['post_vars'] ?? [];
                 foreach ($vars as $var) {
@@ -193,7 +194,14 @@ class RunPostProcess implements ShouldQueue
 
                 // Check if we have a raw JSON body to send
                 $rawJson = $metadata['raw_json'] ?? null;
-                if ($post && $jsonBody && !empty($rawJson)) {
+                if ($post && $noBody) {
+                    // POST request without body (e.g., for triggering Emby/Jellyfin tasks)
+                    // Use withBody with empty string to avoid Laravel sending []
+                    $response = Http::withHeaders($headers)
+                        ->withBody('', 'text/plain')
+                        ->throw()
+                        ->post($url);
+                } elseif ($post && $jsonBody && !empty($rawJson)) {
                     // Replace placeholders in raw JSON with actual values
                     $jsonContent = $this->replacePlaceholders($rawJson, $modelType);
                     $headers['Content-Type'] = 'application/json';
@@ -212,10 +220,10 @@ class RunPostProcess implements ShouldQueue
                         ->throw()
                         ->post($url, $queryVars);
                 } elseif ($post) {
-                    // POST request without body (e.g., for triggering actions)
+                    // POST request with empty variables (sends as form data)
                     $response = Http::withHeaders($headers)
                         ->throw()
-                        ->post($url);
+                        ->post($url, $queryVars);
                 } else {
                     // GET request with query parameters
                     $response = Http::withHeaders($headers)->throw()->get($url, $queryVars);
