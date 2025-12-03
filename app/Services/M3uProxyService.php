@@ -898,6 +898,19 @@ class M3uProxyService
     }
 
     /**
+     * Get the base URL for the m3u-proxy API.
+     */
+    public function getApiBaseUrl(): string
+    {
+        return $this->apiBaseUrl;
+    }
+
+    public function getApiToken(): ?string
+    {
+        return $this->apiToken;
+    }
+
+    /**
      * Resolve the public-facing URL for the m3u-proxy service.
      *
      * Resolution order:
@@ -910,7 +923,7 @@ class M3uProxyService
      *
      * @return string
      */
-    protected function getPublicUrl(): string
+    public function getPublicUrl(): string
     {
         // 1) request-time resolution (if explicitly enabled and we are in a HTTP context)
         // Allow the admin setting (GeneralSettings) to control request-time resolution

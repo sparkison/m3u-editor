@@ -220,10 +220,10 @@ class M3uProxyApiController extends Controller
 
         // Invalidate caches based on event type
         switch ($eventType) {
-            case 'CLIENT_CONNECTED':
-            case 'CLIENT_DISCONNECTED':
-            case 'STREAM_STARTED':
-            case 'STREAM_ENDED':
+            case 'client_connected':
+            case 'client_disconnected':
+            case 'stream_started':
+            case 'stream_stopped':
                 $this->invalidateStreamCaches($data);
                 break;
         }

@@ -32,16 +32,6 @@ class RegisterM3uProxyWebhook extends Command
         $this->info('🔗 Registering m3u-editor webhook with m3u-proxy...');
 
         $service = new M3uProxyService();
-        
-        if (empty($service->apiBaseUrl)) {
-            $this->error('❌ M3U Proxy API URL is not configured');
-            return self::FAILURE;
-        }
-
-        if (empty($service->apiToken)) {
-            $this->error('❌ M3U Proxy API token is not configured');
-            return self::FAILURE;
-        }
 
         // Construct webhook URL - use APP_URL instead of apiPublicUrl
         // because m3u-proxy needs to call back to Laravel, not to itself
@@ -49,21 +39,22 @@ class RegisterM3uProxyWebhook extends Command
         $webhookUrl = $appUrl . '/api/m3u-proxy/webhooks';
 
         $this->info("Webhook URL: {$webhookUrl}");
-        $this->info("M3U Proxy API: {$service->apiBaseUrl}");
 
         try {
+            $publicUrl = $service->getPublicUrl();
+
             // Check if webhook already exists
-            $listEndpoint = $service->apiBaseUrl . '/webhooks';
+            $listEndpoint = $publicUrl . '/webhooks';
             $listResponse = Http::timeout(5)->acceptJson()
                 ->withHeaders([
-                    'X-API-Token' => $service->apiToken,
+                    'X-API-Token' => $service->getApiToken(),
                 ])
                 ->get($listEndpoint);
 
             if ($listResponse->successful()) {
                 $data = $listResponse->json();
                 $webhooks = $data['webhooks'] ?? [];
-                
+
                 // Check if our webhook is already registered
                 $alreadyRegistered = false;
                 foreach ($webhooks as $webhook) {
@@ -80,12 +71,12 @@ class RegisterM3uProxyWebhook extends Command
 
                 if ($alreadyRegistered && $this->option('force')) {
                     $this->warn('⚠️  Webhook already registered, removing and re-registering...');
-                    
+
                     // Remove existing webhook
-                    $deleteEndpoint = $service->apiBaseUrl . '/webhooks';
+                    $deleteEndpoint = $service->getApiBaseUrl() . '/webhooks';
                     $deleteResponse = Http::timeout(5)->acceptJson()
                         ->withHeaders([
-                            'X-API-Token' => $service->apiToken,
+                            'X-API-Token' => $service->getApiToken(),
                         ])
                         ->delete($deleteEndpoint, [
                             'webhook_url' => $webhookUrl,
@@ -98,14 +89,14 @@ class RegisterM3uProxyWebhook extends Command
             }
 
             // Register webhook
-            $registerEndpoint = $service->apiBaseUrl . '/webhooks';
+            $registerEndpoint = $service->getApiBaseUrl() . '/webhooks';
             $payload = [
                 'url' => $webhookUrl,
                 'events' => [
-                    'CLIENT_CONNECTED',
-                    'CLIENT_DISCONNECTED',
-                    'STREAM_STARTED',
-                    'STREAM_ENDED',
+                    'client_connected',
+                    'client_disconnected',
+                    'stream_started',
+                    'stream_stopped',
                 ],
                 'timeout' => 5,
                 'retry_attempts' => 2,
@@ -115,13 +106,13 @@ class RegisterM3uProxyWebhook extends Command
 
             $response = Http::timeout(10)->acceptJson()
                 ->withHeaders([
-                    'X-API-Token' => $service->apiToken,
+                    'X-API-Token' => $service->getApiToken(),
                 ])
                 ->post($registerEndpoint, $payload);
 
             if ($response->successful()) {
                 $this->info('✅ Webhook registered successfully!');
-                
+
                 Log::info('M3U Proxy webhook registered', [
                     'webhook_url' => $webhookUrl,
                     'events' => $payload['events'],
@@ -132,7 +123,6 @@ class RegisterM3uProxyWebhook extends Command
 
             $this->error('❌ Failed to register webhook: ' . $response->body());
             return self::FAILURE;
-
         } catch (\Exception $e) {
             $this->error('❌ Error registering webhook: ' . $e->getMessage());
             Log::error('Failed to register m3u-proxy webhook', [
@@ -143,4 +133,3 @@ class RegisterM3uProxyWebhook extends Command
         }
     }
 }
-
