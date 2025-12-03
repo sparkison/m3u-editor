@@ -93,6 +93,11 @@ class PlaylistAlias extends Model
         $effectivePlaylist = $this->getEffectivePlaylist();
         return $effectivePlaylist ? (int)($effectivePlaylist->dummy_epg_length ?? 120) : 120;
     }
+    public function getIncludeVodInEpgAttribute(): bool
+    {
+        $effectivePlaylist = $this->getEffectivePlaylist();
+        return $effectivePlaylist ? (bool)($effectivePlaylist->include_vod_in_epg ?? false) : false;
+    }
     public function getIdChannelByAttribute(): PlaylistChannelId
     {
         $effectivePlaylist = $this->getEffectivePlaylist();
