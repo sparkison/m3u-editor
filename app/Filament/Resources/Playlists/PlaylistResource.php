@@ -1604,6 +1604,16 @@ class PlaylistResource extends Resource
                         ->type('number')
                         ->default(120)
                         ->hidden(fn(Get $get): bool => ! $get('dummy_epg')),
+                    Toggle::make('include_vod_in_epg')
+                        ->label('Include VOD in EPG')
+                        ->columnSpan(1)
+                        ->inline(false)
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'Enable this to include VOD channels in the EPG output. Disable to reduce EPG file size.'
+                        )
+                        ->default(false)
+                        ->helperText('When enabled, VOD channels will be included in the EPG output.'),
                 ]),
         ];
 
