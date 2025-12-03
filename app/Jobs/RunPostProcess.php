@@ -166,8 +166,6 @@ class RunPostProcess implements ShouldQueue
                 $post = ((bool)$metadata['post']) ?? false;
                 $method = $post ? 'post' : 'get';
                 $url = $metadata['path'];
-                $jsonBody = (bool)($metadata['json_body'] ?? false);
-                $noBody = (bool)($metadata['no_body'] ?? false);
                 $queryVars = [];
                 $vars = $metadata['post_vars'] ?? [];
                 foreach ($vars as $var) {
@@ -183,53 +181,15 @@ class RunPostProcess implements ShouldQueue
                     $queryVars[$var['variable_name']] = $value;
                 }
 
-                // Build custom headers
-                $headers = [
+                // Make the request
+                $response = Http::withHeaders([
                     'Accept' => 'application/json',
-                ];
-                $customHeaders = $metadata['headers'] ?? [];
-                foreach ($customHeaders as $header) {
-                    $headers[$header['header_name']] = $header['header_value'];
-                }
-
-                // Check if we have a raw JSON body to send
-                $rawJson = $metadata['raw_json'] ?? null;
-                if ($post && $noBody) {
-                    // POST request without body (e.g., for triggering Emby/Jellyfin tasks)
-                    // Use withBody with empty string to avoid Laravel sending []
-                    $response = Http::withHeaders($headers)
-                        ->withBody('', 'text/plain')
-                        ->post($url);
-                } elseif ($post && $jsonBody && !empty($rawJson)) {
-                    // Replace placeholders in raw JSON with actual values
-                    $jsonContent = $this->replacePlaceholders($rawJson, $modelType);
-                    $headers['Content-Type'] = 'application/json';
-                    
-                    // Make the request with raw JSON body
-                    $response = Http::withHeaders($headers)
-                        ->withBody($jsonContent, 'application/json')
-                        ->post($url);
-                } elseif ($post && !empty($queryVars)) {
-                    // Send variables as form data or JSON based on jsonBody setting
-                    if ($jsonBody) {
-                        $headers['Content-Type'] = 'application/json';
-                    }
-                    $response = Http::withHeaders($headers)
-                        ->post($url, $queryVars);
-                } elseif ($post) {
-                    // POST request with empty variables (sends as form data)
-                    $response = Http::withHeaders($headers)
-                        ->post($url, $queryVars);
-                } else {
-                    // GET request with query parameters
-                    $response = Http::withHeaders($headers)->get($url, $queryVars);
-                }
+                ])->throw()->$method($url, $queryVars);
 
                 // If results ok, log the results
-                if ($response->successful()) {
+                if ($response->ok()) {
                     $title = "Post processing for \"$name\" completed successfully";
-                    $responseBody = $response->body();
-                    $body = !empty($responseBody) ? $responseBody : "Request completed successfully (HTTP {$response->status()})";
+                    $body = $response->body() ?? '';
                     PostProcessLog::create([
                         'name' => $name,
                         'type' => $postProcess->event,
@@ -245,8 +205,7 @@ class RunPostProcess implements ShouldQueue
                         ->sendToDatabase($user);
                 } else {
                     $title = "Error running post processing for \"$name\"";
-                    $responseBody = $response->body();
-                    $body = !empty($responseBody) ? $responseBody : "Request failed (HTTP {$response->status()})";
+                    $body = $response->body() ?? '';
                     PostProcessLog::create([
                         'name' => $name,
                         'type' => $postProcess->event,
@@ -449,39 +408,5 @@ class RunPostProcess implements ShouldQueue
             'removed_channel_names' => $this->model->removed_channel_names ?? null,
             default => null,
         };
-    }
-
-    /**
-     * Replace placeholders in a string with actual model values
-     * Placeholders are in the format {{field_name}}
-     */
-    protected function replacePlaceholders(string $content, string $modelType): string
-    {
-        // Define available placeholders and their values
-        $placeholders = [
-            'id' => $this->model->id,
-            'uuid' => $this->model->uuid,
-            'name' => $this->model->name,
-            'url' => $modelType === Epg::class
-                ? route('epg.file', ['uuid' => $this->model->uuid])
-                : PlaylistFacade::getUrls($this->model)['m3u'],
-            'status' => $this->model->status?->value ?? $this->model->status ?? '',
-            'time' => $this->model->sync_time ?? '',
-            'added_groups' => $this->model->added_groups ?? 0,
-            'removed_groups' => $this->model->removed_groups ?? 0,
-            'added_channels' => $this->model->added_channels ?? 0,
-            'removed_channels' => $this->model->removed_channels ?? 0,
-            'added_group_names' => $this->model->added_group_names ?? '',
-            'removed_group_names' => $this->model->removed_group_names ?? '',
-            'added_channel_names' => $this->model->added_channel_names ?? '',
-            'removed_channel_names' => $this->model->removed_channel_names ?? '',
-        ];
-
-        // Replace all placeholders
-        foreach ($placeholders as $key => $value) {
-            $content = str_replace('{{' . $key . '}}', $value, $content);
-        }
-
-        return $content;
     }
 }
