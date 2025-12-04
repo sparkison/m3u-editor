@@ -107,11 +107,11 @@ class PlaylistGenerateController extends Controller
 
                 // Set the auth details
                 if ($usedAuth) {
-                    $username = $usedAuth->username;
-                    $password = $usedAuth->password;
+                    $username = urlencode($usedAuth->username);
+                    $password = urlencode($usedAuth->password);
                 } else {
-                    $username = $playlist->user->name;
-                    $password = $playlist->uuid;
+                    $username = urlencode($playlist->user->name);
+                    $password = urlencode($playlist->uuid);
                 }
 
                 // Output the enabled channels

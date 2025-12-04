@@ -386,6 +386,9 @@ class XtreamApiController extends Controller
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
+        $urlSafePass = urlencode($password);
+        $urlSafeUser = urlencode($username);
+
         $baseUrl = ProxyFacade::getBaseUrl();
         $action = $request->input('action', 'panel');
         if (
@@ -583,7 +586,7 @@ class XtreamApiController extends Controller
                         'tv_archive_duration' => $channel->shift ?? 0,
                         'custom_sid' => '',
                         'thumbnail' => '',
-                        'direct_source' => $baseUrl . "/live/{$username}/{$password}/" . $channel->id . "." . $extension,
+                        'direct_source' => $baseUrl . "/live/{$urlSafeUser}/{$urlSafePass}/" . $channel->id . "." . $extension,
                     ];
                 }
             }
@@ -685,7 +688,7 @@ class XtreamApiController extends Controller
                         'tmdb_id' => (int)$tmdb,
                         'container_extension' => $channel->container_extension ?? 'mkv',
                         'custom_sid' => '',
-                        'direct_source' => $baseUrl . "/movie/{$username}/{$password}/" . $channel->id . "." . $extension,
+                        'direct_source' => $baseUrl . "/movie/{$urlSafeUser}/{$urlSafePass}/" . $channel->id . "." . $extension,
                     ];
                 }
             }
@@ -887,7 +890,7 @@ class XtreamApiController extends Controller
                                 'season' => $episode->season,
                                 'custom_sid' => $episode->custom_sid ?? '',
                                 'stream_id' => $episode->id,
-                                'direct_source' => $baseUrl . "/series/{$username}/{$password}/" . $episode->id . ".{$containerExtension}"
+                                'direct_source' => $baseUrl . "/series/{$urlSafeUser}/{$urlSafePass}/" . $episode->id . ".{$containerExtension}"
                             ];
                         }
                     }
@@ -1141,7 +1144,7 @@ class XtreamApiController extends Controller
                 'category_ids' => ($channel->group_id ? [$channel->group_id] : []),
                 'container_extension' => $extension,
                 'custom_sid' => $movieData['custom_sid'] ?? '',
-                'direct_source' => $baseUrl . "/movie/{$username}/{$password}/" . $channel->id . '.' . $extension,
+                'direct_source' => $baseUrl . "/movie/{$urlSafeUser}/{$urlSafePass}/" . $channel->id . '.' . $extension,
             ];
 
             return response()->json([

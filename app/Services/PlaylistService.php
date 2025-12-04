@@ -64,7 +64,7 @@ class PlaylistService
         }
         $auth = null;
         if ($playlistAuth) {
-            $auth = '?username=' . $playlistAuth->username . '&password=' . $playlistAuth->password;
+            $auth = '?username=' . urlencode($playlistAuth->username) . '&password=' . urlencode($playlistAuth->password);
         }
 
         // Get the base URLs
