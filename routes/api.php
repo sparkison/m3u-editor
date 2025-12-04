@@ -17,6 +17,11 @@ Route::group(['prefix' => 'epg'], function () {
  * m3u-proxy API routes
  */
 Route::middleware(['proxy.throttle'])->prefix('m3u-proxy')->group(function () {
+    // Failover resolver - called by m3u-proxy to validate failover URLs
+    Route::post('failover-resolver', [\App\Http\Controllers\Api\M3uProxyApiController::class, 'resolveFailoverUrl'])
+        ->name('m3u-proxy.failover-resolver')
+        ->withoutMiddleware('proxy.throttle');
+    
     // Player preview routes
     Route::get('channel/{id}/player/{uuid?}', [\App\Http\Controllers\Api\M3uProxyApiController::class, 'channelPlayer'])
         ->name('m3u-proxy.channel.player');

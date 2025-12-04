@@ -13,6 +13,7 @@ use App\Models\PlaylistAlias;
 use App\Models\StreamProfile;
 use App\Services\M3uProxyService;
 use App\Settings\GeneralSettings;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -201,6 +202,57 @@ class M3uProxyApiController extends Controller
         $url = app(M3uProxyService::class)->getEpisodeUrl($playlist, $episode, $profile);
 
         return redirect($url);
+    }
+
+    /**
+     * Validate failover URLs for smart failover handling.
+     * This endpoint is called by m3u-proxy during failover to get a viable failover URL
+     * based on playlist capacity.
+     * 
+     * Request format:
+     * { 
+     *   "current_url": "http://example.com/stream",
+     *   "metadata": {
+     *      "id": 123,
+     *      "playlist_uuid": "abc-def-ghi",
+     *   }
+     * }
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function resolveFailoverUrl(Request $request)
+    {
+        try {
+            $currentUrl = $request->input('current_url');
+            $metadata = $request->input('metadata', []);
+            $channelId = $metadata['id'] ?? null;
+            $playlistUuid = $metadata['playlist_uuid'] ?? null;
+
+            if (! ($channelId && $currentUrl)) {
+                return response()->json([
+                    'next_url' => null,
+                    'error' => 'Missing channel_id or current_url'
+                ], 400);
+            }
+
+            // Use the M3uProxyService to validate the failover URLs
+            $result = app(M3uProxyService::class)
+                ->resolveFailoverUrl(
+                    $channelId,
+                    $playlistUuid,
+                    $currentUrl
+                );
+
+            return response()->json($result);
+        } catch (Exception $e) {
+            Log::error('Error resolving failover: ' . $e->getMessage(), $request->all());
+
+            return response()->json([
+                'next_url' => null,
+                'error' => 'Validation failed: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**

@@ -367,12 +367,6 @@ class M3uProxyService
         }
 
         $userAgent = $playlist->user_agent;
-        $failovers = $channel->failoverChannels()
-            ->select(['channels.id', 'channels.url', 'channels.url_custom'])->get()
-            ->map(fn($ch) => PlaylistUrlService::getChannelUrl($ch, $playlist))
-            ->filter()
-            ->values()
-            ->toArray();
 
         // Get any custom headers for the current playlist
         $headers = $playlist->custom_headers ?? [];
@@ -383,7 +377,7 @@ class M3uProxyService
             // (before capacity check) to avoid blocking reuse of existing streams.
             // If we reach here, no existing stream was found, so create a new one.
 
-            $streamId = $this->createTranscodedStream($primaryUrl, $profile, $failovers, $userAgent, $headers, [
+            $streamId = $this->createTranscodedStream($primaryUrl, $profile, true, $userAgent, $headers, [
                 'id' => $id,
                 'type' => 'channel',
                 'playlist_uuid' => $playlist->uuid,
@@ -394,7 +388,7 @@ class M3uProxyService
             return $this->buildTranscodeStreamUrl($streamId, $profile->format ?? 'ts');
         } else {
             // Use direct streaming endpoint
-            $streamId = $this->createStream($primaryUrl, $failovers, $userAgent, $headers, [
+            $streamId = $this->createStream($primaryUrl, true, $userAgent, $headers, [
                 'id' => $id,
                 'type' => 'channel',
                 'playlist_uuid' => $playlist->uuid,
@@ -454,9 +448,6 @@ class M3uProxyService
         // Get any custom headers for the current playlist
         $headers = $playlist->custom_headers ?? [];
 
-        // Episodes typically don't have failovers, but we'll support it if needed
-        $failoverUrls = [];
-
         // Use appropriate endpoint based on whether transcoding profile is provided
         if ($profile) {
             // First, check if there's already an active pooled transcoded stream for this episode
@@ -476,7 +467,7 @@ class M3uProxyService
             }
 
             // No existing pooled stream found, create a new transcoded stream
-            $streamId = $this->createTranscodedStream($url, $profile, $failoverUrls, $userAgent, $headers, [
+            $streamId = $this->createTranscodedStream($url, $profile, false, $userAgent, $headers, [
                 'id' => $id,
                 'type' => 'episode',
                 'playlist_uuid' => $playlist->uuid,
@@ -487,7 +478,7 @@ class M3uProxyService
             return $this->buildTranscodeStreamUrl($streamId, $profile->format ?? 'ts');
         } else {
             // Use direct streaming endpoint
-            $streamId = $this->createStream($url, $failoverUrls, $userAgent, $headers, [
+            $streamId = $this->createStream($url, false, $userAgent, $headers, [
                 'id' => $id,
                 'type' => 'episode',
                 'playlist_uuid' => $playlist->uuid,
@@ -683,7 +674,7 @@ class M3uProxyService
      * Returns the stream ID.
      *
      * @param  string  $url  Primary stream URL
-     * @param  array  $failovers  Array of failover URLs
+     * @param  bool  $failovers  Whether to enable failover URLs
      * @param  string|null  $userAgent  Custom user agent
      * @param  array|null  $headers  Custom headers to send with the stream request
      * @param  array|null  $metadata  Additional metadata (e.g. ['id' => 123, 'type' => 'channel'])
@@ -693,7 +684,7 @@ class M3uProxyService
      */
     protected function createStream(
         string $url,
-        array $failovers = [],
+        bool $failovers = false,
         ?string $userAgent = null,
         ?array $headers = [],
         ?array $metadata = [],
@@ -713,9 +704,10 @@ class M3uProxyService
                 unset($metadata['strict_live_ts']);
             }
 
-            // Add failovers if provided
-            if (!empty($failovers)) {
-                $payload['failover_urls'] = $failovers;
+            // If using failovers, provide the callback URL for smart failover handling
+            if ($failovers) {
+                // Include the failover resolver URL for smart failover handling
+                $payload['failover_resolver_url'] = $this->getFailoverResolverUrl();
             }
 
             // Add user agent if provided
@@ -774,7 +766,7 @@ class M3uProxyService
      *
      * @param  string  $url  The stream URL to transcode
      * @param  StreamProfile  $profile  The transcoding profile to use
-     * @param  array  $failovers  Optional failover URLs
+     * @param  bool  $failovers  Whether to enable failover URLs
      * @param  string|null  $userAgent  Optional user agent
      * @param  array|null  $headers  Custom headers to send with the stream request
      * @param  array|null  $metadata  Stream metadata
@@ -785,7 +777,7 @@ class M3uProxyService
     protected function createTranscodedStream(
         string $url,
         StreamProfile $profile,
-        array $failovers = [],
+        bool $failovers = false,
         ?string $userAgent = null,
         ?array $headers = [],
         ?array $metadata = [],
@@ -800,9 +792,10 @@ class M3uProxyService
                 'metadata' => $metadata
             ];
 
-            // Add failovers if provided
-            if (!empty($failovers)) {
-                $payload['failover_urls'] = $failovers;
+            // If using failovers, provide the callback URL for smart failover handling
+            if ($failovers) {
+                // Include the failover resolver URL for smart failover handling
+                $payload['failover_resolver_url'] = $this->getFailoverResolverUrl();
             }
 
             // Add user agent if provided
@@ -1141,5 +1134,120 @@ class M3uProxyService
                 'actual' => null,
             ];
         }
+    }
+
+    /**
+     * Validate and resolve failover URLs for smart failover handling.
+     * This is called by m3u-proxy during failover to get a viable failover URL.
+     * 
+     * Uses the same capacity checking logic as getChannelUrl to determine which
+     * failover channels have available capacity.
+     *
+     * @param  int  $channelId  The original channel ID from stream metadata
+     * @param  string  $playlistUuid  The original playlist UUID from stream metadata
+     * @param  string  $currentUrl  The current URL being used
+     * @return array  Array with 'next_url' (single best option) and optional 'error' keys
+     *
+     * The response contains:
+     * - next_url: The best failover URL to use (or null if none viable)
+     * - error: Optional error message if validation fails
+     *
+     * This is a lightweight, low-overhead check that uses the same logic as getChannelUrl
+     * to prevent wasted connection attempts to playlists that are already at capacity.
+     */
+    public function resolveFailoverUrl(int $channelId, string $playlistUuid, string $currentUrl): array
+    {
+        try {
+            // Get the original channel to access its failover relationships
+            $channel = Channel::findOrFail($channelId);
+            $nextUrl = null;
+
+            // Get all failover channels with their relationships
+            $failoverChannels = $channel->failoverChannels()
+                ->select([
+                    'channels.id',
+                    'channels.url',
+                    'channels.url_custom',
+                    'channels.playlist_id',
+                    'channels.custom_playlist_id',
+                ])->get();
+
+            // Find the first valid failover URL that has capacity
+            foreach ($failoverChannels as $failoverChannel) {
+                $failoverPlaylist = $failoverChannel->getEffectivePlaylist();
+                if (!$failoverPlaylist) {
+                    continue;
+                }
+
+                // Get the url
+                $url = PlaylistUrlService::getChannelUrl($failoverChannel, $failoverPlaylist);
+
+                // Check if the url is the current URL (skip it)
+                if ($url === $currentUrl) {
+                    Log::debug('Failover URL matches current URL, skipping', [
+                        'url' => substr($url, 0, 100),
+                        'playlist_uuid' => $failoverPlaylist->uuid
+                    ]);
+                    continue;
+                }
+
+                // Check if playlist has capacity limits
+                if ($failoverPlaylist->available_streams === 0) {
+                    // No limits on this playlist, it's viable
+                    $nextUrl = $url;
+
+                    // Break on first url, no need to continue checking Playlist limits
+                    break;
+                }
+
+                // Check if playlist is at capacity
+                $activeStreams = self::getActiveStreamsCountByMetadata('playlist_uuid', $failoverPlaylist->uuid);
+                if ($activeStreams < $failoverPlaylist->available_streams) {
+                    // Still has capacity, it's viable!
+                    $nextUrl = $url;
+
+                    break;
+                } else {
+                    // At capacity, skip this URL
+                    Log::debug('Failover URL playlist at capacity, skipping', [
+                        'url' => substr($url, 0, 100),
+                        'playlist_uuid' => $failoverPlaylist->uuid,
+                        'active' => $activeStreams,
+                        'limit' => $failoverPlaylist->available_streams,
+                    ]);
+                }
+            }
+
+            // Return the first viable URL as the best option, plus the full list
+            return [
+                'next_url' => $nextUrl,
+            ];
+        } catch (Exception $e) {
+            Log::warning('Error resolving failover url: ' . $e->getMessage(), [
+                'channel_id' => $channelId,
+                'playlist_uuid' => $playlistUuid,
+            ]);
+
+            // Return all URLs as fallback if something goes wrong
+            return [
+                'next_url' => $currentUrl,
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Get the failover resolver URL for smart failover handling.
+     * This URL is passed to m3u-proxy so it can call back to validate failover channels
+     * before attempting to stream from them.
+     *
+     * The m3u-proxy will POST to this endpoint with failover metadata to check if
+     * a failover is viable (i.e., the target playlist isn't at capacity).
+     *
+     * @return string The failover resolver endpoint URL
+     */
+    public function getFailoverResolverUrl(): string
+    {
+        return route('m3u-proxy.failover-resolver');
     }
 }
