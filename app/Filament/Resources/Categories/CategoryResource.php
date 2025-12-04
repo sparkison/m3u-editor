@@ -114,10 +114,6 @@ class CategoryResource extends Resource
                     ->description(fn(Category $record): string => "Enabled: {$record->enabled_series_count}")
                     ->toggleable()
                     ->sortable(),
-                TextColumn::make('playlist.name')
-                    ->numeric()
-                    ->toggleable()
-                    ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

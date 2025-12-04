@@ -130,10 +130,6 @@ class GroupResource extends Resource
                     ->description(fn(Group $record): string => "Enabled: {$record->enabled_vod_channels_count}")
                     ->toggleable()
                     ->sortable(),
-                TextColumn::make('playlist.name')
-                    ->numeric()
-                    ->toggleable()
-                    ->sortable(),
                 IconColumn::make('custom')
                     ->label('Custom')
                     ->icon(fn(string $state): string => match ($state) {
