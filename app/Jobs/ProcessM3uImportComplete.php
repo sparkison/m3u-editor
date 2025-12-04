@@ -283,17 +283,6 @@ class ProcessM3uImportComplete implements ShouldQueue
             }
         }
 
-        // Update the playlist
-        $playlist->update([
-            'status' => Status::Completed,
-            'channels' => 0, // not using...
-            'synced' => now(),
-            'errors' => null,
-            'sync_time' => $completedIn,
-            'progress' => 100,
-            'processing' => false
-        ]);
-
         // Send notification
         if ($this->maxHit) {
             $limit = config('dev.max_channels');
@@ -340,6 +329,20 @@ class ProcessM3uImportComplete implements ShouldQueue
                 ['is_vod', true]
             ])->exists();
 
+        // Determine if we should set final status now or wait for Series/VOD to complete
+        $waitingForMore = $this->runningSeriesImport || $syncVod;
+
+        // Update the playlist - only set to Completed if nothing else is running
+        $playlist->update([
+            'status' => $waitingForMore ? Status::Processing : Status::Completed,
+            'channels' => 0, // not using...
+            'synced' => now(),
+            'errors' => null,
+            'sync_time' => $completedIn,
+            'progress' => 100,
+            'processing' => $waitingForMore,
+        ]);
+
         if ($syncVod) {
             // Check if syncing stream files too
             $syncStreamFiles = $playlist->auto_sync_vod_stream_files;
@@ -368,6 +371,10 @@ class ProcessM3uImportComplete implements ShouldQueue
 
         if ($this->runningSeriesImport) {
             return; // Exit early if series import is enabled, sync complete event will be fired after series import completes
+        }
+
+        if ($syncVod) {
+            return; // Exit early if VOD import is running, sync complete event will be fired after VOD import completes
         }
 
         // Fire the playlist synced event

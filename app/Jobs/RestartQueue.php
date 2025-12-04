@@ -41,6 +41,7 @@ class RestartQueue implements ShouldQueue
                     'processing' => false,
                     'progress' => 0,
                     'series_progress' => 0,
+                    'vod_progress' => 0,
                     'channels' => 0,
                     'synced' => null,
                     'errors' => null,

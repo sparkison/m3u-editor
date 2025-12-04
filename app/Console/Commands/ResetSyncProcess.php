@@ -59,6 +59,7 @@ class ResetSyncProcess extends Command
                     'errors' => null,
                     'progress' => 0,
                     'series_progress' => 0,
+                    'vod_progress' => 0,
                 ]);
             }
 

@@ -30,23 +30,32 @@ class ProcessM3uImportSeriesComplete implements ShouldQueue
      */
     public function handle(): void
     {
-        // Update the playlist status to synced
-        $this->playlist->update([
-            'processing' => false,
-            'status' => Status::Completed,
+        $playlist = $this->playlist;
+        
+        // Check if VOD sync is still running
+        $vodStillRunning = $playlist->vod_progress < 100 
+            && ($playlist->auto_fetch_vod_metadata || $playlist->auto_sync_vod_stream_files);
+
+        // Update the playlist status
+        $playlist->update([
+            'processing' => $vodStillRunning,
+            'status' => $vodStillRunning ? Status::Processing : Status::Completed,
             'errors' => null,
             'progress' => 100,
             'series_progress' => 100,
         ]);
-        $message = "Series sync completed successfully for playlist \"{$this->playlist->name}\".";
+        
+        $message = "Series sync completed successfully for playlist \"{$playlist->name}\".";
         Notification::make()
             ->success()
             ->title('Series Sync Completed')
             ->body($message)
-            ->broadcast($this->playlist->user)
-            ->sendToDatabase($this->playlist->user);
+            ->broadcast($playlist->user)
+            ->sendToDatabase($playlist->user);
 
-        // Fire the playlist synced event
-        event(new SyncCompleted($this->playlist));
+        // Only fire sync completed event if VOD is not still running
+        if (!$vodStillRunning) {
+            event(new SyncCompleted($playlist));
+        }
     }
 }
