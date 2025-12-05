@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Facade;
 /**
  * @method static string getProxyUrlForChannel(string $id, string|null $playlistUuid = null)
  * @method static string getProxyUrlForEpisode(string $id, string|null $playlistUuid = null)
- * @method static string getBaseUrl()
+ * @method static string getBaseUrl($path = '')
  */
 class ProxyFacade extends Facade
 {

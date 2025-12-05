@@ -1249,5 +1249,6 @@ class M3uProxyService
     public function getFailoverResolverUrl(): string
     {
         return route('m3u-proxy.failover-resolver');
+        // return ProxyFacade::getBaseUrl('/api/m3u-proxy/failover-resolver');
     }
 }
