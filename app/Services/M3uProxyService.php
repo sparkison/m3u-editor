@@ -371,13 +371,16 @@ class M3uProxyService
         // Get any custom headers for the current playlist
         $headers = $playlist->custom_headers ?? [];
 
+        // See if channel has any failovers
+        $hasFailovers = $channel->failoverChannels()->count() > 0;
+
         // Use appropriate endpoint based on whether transcoding profile is provided
         if ($profile) {
             // Note: We already checked for existing pooled stream at the top of this method
             // (before capacity check) to avoid blocking reuse of existing streams.
             // If we reach here, no existing stream was found, so create a new one.
 
-            $streamId = $this->createTranscodedStream($primaryUrl, $profile, true, $userAgent, $headers, [
+            $streamId = $this->createTranscodedStream($primaryUrl, $profile, $hasFailovers, $userAgent, $headers, [
                 'id' => $id,
                 'type' => 'channel',
                 'playlist_uuid' => $playlist->uuid,
@@ -388,7 +391,7 @@ class M3uProxyService
             return $this->buildTranscodeStreamUrl($streamId, $profile->format ?? 'ts');
         } else {
             // Use direct streaming endpoint
-            $streamId = $this->createStream($primaryUrl, true, $userAgent, $headers, [
+            $streamId = $this->createStream($primaryUrl, $hasFailovers, $userAgent, $headers, [
                 'id' => $id,
                 'type' => 'channel',
                 'playlist_uuid' => $playlist->uuid,
@@ -1146,6 +1149,7 @@ class M3uProxyService
      * @param  int  $channelId  The original channel ID from stream metadata
      * @param  string  $playlistUuid  The original playlist UUID from stream metadata
      * @param  string  $currentUrl  The current URL being used
+     * @param  int  $index  The failover index being requested
      * @return array  Array with 'next_url' (single best option) and optional 'error' keys
      *
      * The response contains:
@@ -1155,7 +1159,7 @@ class M3uProxyService
      * This is a lightweight, low-overhead check that uses the same logic as getChannelUrl
      * to prevent wasted connection attempts to playlists that are already at capacity.
      */
-    public function resolveFailoverUrl(int $channelId, string $playlistUuid, string $currentUrl): array
+    public function resolveFailoverUrl(int $channelId, string $playlistUuid, string $currentUrl, int $index): array
     {
         try {
             // Get the original channel to access its failover relationships
@@ -1173,9 +1177,20 @@ class M3uProxyService
                 ])->get();
 
             // Find the first valid failover URL that has capacity
-            foreach ($failoverChannels as $failoverChannel) {
+            foreach ($failoverChannels as $idx => $failoverChannel) {
                 $failoverPlaylist = $failoverChannel->getEffectivePlaylist();
                 if (!$failoverPlaylist) {
+                    continue;
+                }
+
+                // Before proceeding, see if the failover index is less than the desired index
+                if ($idx < $index) {
+                    // If the index is higher than the current loop, chances are it has already been attempted, continue to the next...
+                    Log::debug('Channel already attempted, skipping', [
+                        'playlist_uuid' => $failoverPlaylist->uuid,
+                        'index' => $idx,
+                        'requested_index' => $index,
+                    ]);
                     continue;
                 }
 
@@ -1248,7 +1263,10 @@ class M3uProxyService
      */
     public function getFailoverResolverUrl(): string
     {
-        return route('m3u-proxy.failover-resolver');
-        // return ProxyFacade::getBaseUrl('/api/m3u-proxy/failover-resolver');
+        // Use ProxyFacade to build the URL, which takes into account the `PROXY_URL_OVERRIDE`, if set.
+        return ProxyFacade::getBaseUrl() . '/api/m3u-proxy/failover-resolver';
+
+        // Alternative:  return the built-in route.
+        // return route('m3u-proxy.failover-resolver');
     }
 }

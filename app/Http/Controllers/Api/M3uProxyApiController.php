@@ -226,6 +226,7 @@ class M3uProxyApiController extends Controller
         try {
             $currentUrl = $request->input('current_url');
             $metadata = $request->input('metadata', []);
+            $failoverCount = $request->input('current_failover_index', 0);
             $channelId = $metadata['id'] ?? null;
             $playlistUuid = $metadata['playlist_uuid'] ?? null;
 
@@ -241,7 +242,8 @@ class M3uProxyApiController extends Controller
                 ->resolveFailoverUrl(
                     $channelId,
                     $playlistUuid,
-                    $currentUrl
+                    $currentUrl,
+                    index: $failoverCount
                 );
 
             return response()->json($result);
