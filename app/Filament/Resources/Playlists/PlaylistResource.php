@@ -207,6 +207,11 @@ class PlaylistResource extends Resource
                     ->sortable()
                     ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
                     ->toggleable(),
+                ProgressColumn::make('vod_progress')
+                    ->label('VOD Sync')
+                    ->sortable()
+                    ->poll(fn($record) => $record->vod_progress < 100 ? '3s' : null)
+                    ->toggleable(),
                 ToggleColumn::make('enable_proxy')
                     ->label('Proxy')
                     ->toggleable()
@@ -324,7 +329,8 @@ class PlaylistResource extends Resource
                         ->action(function ($record) {
                             $record->update([
                                 'status' => Status::Processing,
-                                'progress' => 0,
+                                'processing' => true,
+                                'vod_progress' => 0,
                             ]);
                             app('Illuminate\Contracts\Bus\Dispatcher')
                                 ->dispatch(new ProcessVodChannels(playlist: $record));
@@ -540,6 +546,7 @@ class PlaylistResource extends Resource
                                 'processing' => false,
                                 'progress' => 0,
                                 'series_progress' => 0,
+                                'vod_progress' => 0,
                                 'channels' => 0,
                                 'synced' => null,
                                 'errors' => null,
@@ -614,6 +621,7 @@ class PlaylistResource extends Resource
                                     'processing' => false,
                                     'progress' => 0,
                                     'series_progress' => 0,
+                                    'vod_progress' => 0,
                                     'channels' => 0,
                                     'synced' => null,
                                     'errors' => null,
@@ -717,7 +725,8 @@ class PlaylistResource extends Resource
                     ->action(function ($record) {
                         $record->update([
                             'status' => Status::Processing,
-                            'progress' => 0,
+                            'processing' => true,
+                            'vod_progress' => 0,
                         ]);
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new ProcessVodChannels(playlist: $record));
@@ -819,6 +828,7 @@ class PlaylistResource extends Resource
                             'processing' => false,
                             'progress' => 0,
                             'series_progress' => 0,
+                            'vod_progress' => 0,
                             'channels' => 0,
                             'synced' => null,
                             'errors' => null,

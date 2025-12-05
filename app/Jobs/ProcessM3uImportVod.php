@@ -33,7 +33,7 @@ class ProcessM3uImportVod implements ShouldQueue
             dispatch(new ProcessVodChannels(
                 playlist: $playlist,
                 updateProgress: false // Don't update playlist progress
-            ));
+            ))->onConnection('redis')->onQueue('import');
         }
 
         // Sync stream files, if enabled
@@ -41,7 +41,7 @@ class ProcessM3uImportVod implements ShouldQueue
             // Process stream file syncing
             dispatch(new SyncVodStrmFiles(
                 playlist: $playlist
-            ));
+            ))->onConnection('redis')->onQueue('import');
         }
 
         // All done! Nothing else to do ;)

@@ -132,6 +132,7 @@ class ProcessM3uImport implements ShouldQueue
             'errors' => null,
             'progress' => 0,
             'series_progress' => 0,
+            'vod_progress' => 0,
         ]);
 
         // Determine if using Xtream API or M3U+
