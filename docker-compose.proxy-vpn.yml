@@ -29,14 +29,6 @@
 
 services:
   m3u-editor:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runtime
-      args:
-        GIT_BRANCH: ${GIT_BRANCH:-local}
-        GIT_COMMIT: ${GIT_COMMIT:-local}
-        GIT_TAG: ${GIT_TAG:-local}
     image: sparkison/m3u-editor:${IMAGE_TAG:-latest}
     container_name: m3u-editor
     # CRITICAL: Use Gluetun's network stack
@@ -103,13 +95,6 @@ services:
   # M3U Proxy - Runs inside Gluetun's network namespace
   # All traffic from this container goes through the VPN
   m3u-proxy:
-    build:
-      context: ../m3u-proxy
-      dockerfile: Dockerfile
-      args:
-        GIT_BRANCH: ${GIT_BRANCH:-local}
-        GIT_COMMIT: ${GIT_COMMIT:-local}
-        GIT_TAG: ${GIT_TAG:-local}
     image: sparkison/m3u-proxy:${IMAGE_TAG:-latest}
     container_name: m3u-proxy
     # CRITICAL: Use Gluetun's network stack

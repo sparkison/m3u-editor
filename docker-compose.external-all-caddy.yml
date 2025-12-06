@@ -88,13 +88,6 @@ services:
 
   # M3U Proxy - External Streaming Service
   m3u-proxy:
-    build:
-      context: ../m3u-proxy
-      dockerfile: Dockerfile
-      args:
-        GIT_BRANCH: ${GIT_BRANCH:-local}
-        GIT_COMMIT: ${GIT_COMMIT:-local}
-        GIT_TAG: ${GIT_TAG:-local}
     image: sparkison/m3u-proxy:${IMAGE_TAG:-latest}
     container_name: m3u-proxy
     environment:
@@ -149,14 +142,6 @@ services:
 
   # M3U Editor Application - All Internal Services Disabled
   m3u-editor:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runtime
-      args:
-        GIT_BRANCH: ${GIT_BRANCH:-local}
-        GIT_COMMIT: ${GIT_COMMIT:-local}
-        GIT_TAG: ${GIT_TAG:-local}
     image: sparkison/m3u-editor:${IMAGE_TAG:-latest}
     container_name: m3u-editor
     environment:

@@ -20,14 +20,6 @@
 
 services:
   m3u-editor:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runtime
-      args:
-        GIT_BRANCH: ${GIT_BRANCH:-local}
-        GIT_COMMIT: ${GIT_COMMIT:-local}
-        GIT_TAG: ${GIT_TAG:-local}
     image: sparkison/m3u-editor:${IMAGE_TAG:-latest}
     container_name: m3u-editor
     environment:
@@ -92,13 +84,6 @@ services:
       start_period: 60s
 
   m3u-proxy:
-    build:
-      context: ../m3u-proxy
-      dockerfile: Dockerfile
-      args:
-        GIT_BRANCH: ${GIT_BRANCH:-local}
-        GIT_COMMIT: ${GIT_COMMIT:-local}
-        GIT_TAG: ${GIT_TAG:-local}
     image: sparkison/m3u-proxy:${IMAGE_TAG:-latest}
     container_name: m3u-proxy
     environment:

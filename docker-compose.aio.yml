@@ -1,13 +1,5 @@
 services:
   m3u-editor:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runtime
-      args:
-        GIT_BRANCH: ${GIT_BRANCH:-local}
-        GIT_COMMIT: ${GIT_COMMIT:-local}
-        GIT_TAG: ${GIT_TAG:-local}
     image: sparkison/m3u-editor:${IMAGE_TAG:-latest}
     container_name: m3u-editor
     environment:

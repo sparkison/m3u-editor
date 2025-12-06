@@ -246,7 +246,16 @@ function streamPlayer() {
                 this.mpegts = mpegts.createPlayer({
                     type: 'mpegts',
                     url: url,
-                    isLive: true
+                    isLive: true,
+                    enableWorker: true,
+                    enableStashBuffer: false,
+                    liveBufferLatencyChasing: true,
+                    liveSync: true,
+                    cors: true,
+                    autoCleanupSourceBuffer: true,
+                    autoCleanupMaxBackwardDuration: 10,
+                    autoCleanupMinBackwardDuration: 5,
+                    reuseRedirectedURL: true,
                 });
                 
                 // Attach media element and load
