@@ -93,6 +93,11 @@ class GeneralSettings extends Settings
     public ?bool $force_video_player_proxy = false;
     // Resolve m3u-proxy public URL at request time when not explicitly configured
     public ?bool $m3u_proxy_public_url_auto_resolve = false;
+
+    // Failover resolver settings
+    public ?bool $enable_failover_resolver = false;
+    public ?string $failover_resolver_url = null;
+
     public ?int $default_stream_profile_id = null;
     public ?int $default_vod_stream_profile_id = null;
 

@@ -114,6 +114,11 @@ class Preferences extends SettingsPage
         }
         $m3uProxyDocs = $m3uPublicUrl . '/docs';
 
+        // Setup the service
+        $service = new M3uProxyService();
+        $mode = $service->mode();
+        $embedded = $mode === 'embedded';
+
         $vodExample = PlaylistService::getVodExample();
         $seriesExample = PlaylistService::getEpisodeExample();
 
@@ -180,65 +185,143 @@ class Preferences extends SettingsPage
                                     ->columnSpanFull()
                                     ->columns(4)
                                     ->schema([
-                                        Toggle::make('m3u_proxy_public_url_auto_resolve')
-                                            ->label('Resolve proxy public URL dynamically at request time')
-                                            ->columnSpanFull()
-                                            ->hintIcon(
-                                                'heroicon-m-question-mark-circle',
-                                                tooltip: 'When enabled, the application will resolve the public-facing proxy URL using the incoming request host/scheme instead of the M3U_PROXY_PUBLIC_URL variable.'
-                                            )
-                                            ->helperText('Useful for multi-host access (VPN/Tailscale/etc.)')
-                                            ->default(false),
+                                        Fieldset::make('URL resolution')
+                                            ->schema([
+                                                Toggle::make('m3u_proxy_public_url_auto_resolve')
+                                                    ->label('Resolve proxy public URL dynamically at request time')
+                                                    ->columnSpanFull()
+                                                    ->hintIcon(
+                                                        'heroicon-m-question-mark-circle',
+                                                        tooltip: 'When enabled, the application will resolve the public-facing proxy URL using the incoming request host/scheme instead of the M3U_PROXY_PUBLIC_URL variable.'
+                                                    )
+                                                    ->helperText('Useful for multi-host access (VPN/Tailscale/etc.)')
+                                                    ->default(false),
+                                            ]),
 
-                                        Select::make('default_stream_profile_id')
-                                            ->label('Default Transcoding Profile')
-                                            ->columnSpan(2)
-                                            ->searchable()
-                                            ->options(function () {
-                                                return StreamProfile::where('user_id', auth()->id())->pluck('name', 'id');
-                                            })
-                                            ->hintAction(
-                                                Action::make('manage_profiles')
-                                                    ->label('Manage Profiles')
-                                                    ->icon('heroicon-o-arrow-top-right-on-square')
-                                                    ->iconPosition('after')
-                                                    ->size('sm')
-                                                    ->url('/stream-profiles')
-                                                    ->openUrlInNewTab(false)
-                                            )
-                                            ->helperText('The default transcoding profile used for the in-app player for Live content. Leave empty to disable transcoding (some streams may not be playable in the player).'),
-                                        Select::make('default_vod_stream_profile_id')
-                                            ->label('VOD and Series Transcoding Profile')
-                                            ->columnSpan(2)
-                                            ->searchable()
-                                            ->options(function () {
-                                                return StreamProfile::where('user_id', auth()->id())->pluck('name', 'id');
-                                            })
-                                            ->hintAction(
-                                                Action::make('manage_profiles')
-                                                    ->label('Manage Profiles')
-                                                    ->icon('heroicon-o-arrow-top-right-on-square')
-                                                    ->iconPosition('after')
-                                                    ->size('sm')
-                                                    ->url('/stream-profiles')
-                                                    ->openUrlInNewTab(false)
-                                            )
-                                            ->helperText('The default transcoding profile used for the in-app player for VOD/Series content. Leave empty to disable transcoding (some streams may not be playable in the player).'),
+                                        Fieldset::make('Failover settings')
+                                            ->schema([
+                                                Toggle::make('enable_failover_resolver')
+                                                    ->label('Enable advanced failover logic')
+                                                    ->columnSpanFull()
+                                                    ->hintIcon(
+                                                        'heroicon-m-question-mark-circle',
+                                                        tooltip: 'When enabled, the proxy will make a call to the editor to determine which failover to use based on available capacity. When disabled, a list of failover URLs will be sent to the proxy and it will loop through them without any capacity checks when a stream failure occurs.'
+                                                    )
+                                                    ->live()
+                                                    ->disabled(fn() => ! empty(config('proxy.resolver_url')))
+                                                    ->hint(fn() => ! empty(config('proxy.resolver_url')) ? 'Already set by environment variable!' : null)
+                                                    ->default(fn() => ! empty(config('proxy.resolver_url')))
+                                                    ->afterStateHydrated(function (Toggle $component, $state) use ($embedded) {
+                                                        if (! empty(config('proxy.resolver_url')) || $embedded) {
+                                                            $component->state((bool) $embedded ?: config('proxy.resolver_url'));
+                                                        }
+                                                    })
+                                                    ->dehydrated(fn() => empty(config('proxy.resolver_url')))
+                                                    ->helperText('Use to enable advanced failover checking and resolution.'),
+
+                                                TextInput::make('failover_resolver_url')
+                                                    ->label('Failover Resolver URL')
+                                                    ->columnSpanFull()
+                                                    ->url()
+                                                    ->prefixIcon('heroicon-m-link')
+                                                    ->disabled(fn() => ! empty(config('proxy.resolver_url')))
+                                                    ->hint(fn() => ! empty(config('proxy.resolver_url')) ? 'Already set by environment variable!' : null)
+                                                    ->default(fn() => ! empty(config('proxy.resolver_url')) ? config('proxy.resolver_url') : '')
+                                                    ->afterStateHydrated(function (TextInput $component, $state) {
+                                                        if (! empty(config('proxy.resolver_url'))) {
+                                                            $component->state((string) config('proxy.resolver_url'));
+                                                        }
+                                                    })
+                                                    ->required(fn($get) => !! $get('enable_failover_resolver'))
+                                                    ->hidden(fn($get) => ! $get('enable_failover_resolver'))
+                                                    ->dehydrated(fn() => empty(config('proxy.resolver_url')))
+                                                    ->placeholder(fn() => $embedded ? 'http://127.0.0.1:' . config('app.port') : 'http://m3u-editor:36400')
+                                                    ->helperText(fn() => $embedded
+                                                        ? 'For embedded mode, you should use localhost, e.g.: "http://127.0.0.1:36400" or "http://localhost:36400".'
+                                                        : 'Domain the proxy can use to access the editor for faillover resolution, e.g.: "http://m3u-editor:36400", "http://192.168.0.101:36400", "http://your-domain.dev", etc.'),
+
+                                                Action::make('test_failover_connection')
+                                                    ->label('Test failover resolver connection')
+                                                    ->icon('heroicon-m-signal')
+                                                    ->action(function () use ($service) {
+                                                        $result = $service->testResolver();
+
+                                                        if ($result['success']) {
+                                                            Notification::make()
+                                                                ->success()
+                                                                ->title('Connection Successful')
+                                                                ->body(Str::markdown(
+                                                                    "**Proxy can reach the editor!**\n\n" .
+                                                                        "URL tested: `{$result['url_tested']}`\n\n"
+                                                                ))
+                                                                ->duration(8000)
+                                                                ->send();
+                                                        } else {
+                                                            Notification::make()
+                                                                ->danger()
+                                                                ->title('Connection Failed')
+                                                                ->body(Str::markdown(
+                                                                    "**The proxy cannot reach the editor**\n\n" .
+                                                                        $result['message'] . "\n\n" .
+                                                                        "Please verify the Failover Resolver URL is correct and accessible from the proxy container/service."
+                                                                ))
+                                                                ->duration(10000)
+                                                                ->send();
+                                                        }
+                                                    })->hidden(fn($get) => ! $get('enable_failover_resolver')),
+                                            ]),
+
+                                        Fieldset::make('In-app player transcoding settings')
+                                            ->schema([
+                                                Select::make('default_stream_profile_id')
+                                                    ->label('Default Live Transcoding Profile')
+                                                    ->columnSpan(2)
+                                                    ->searchable()
+                                                    ->options(function () {
+                                                        return StreamProfile::where('user_id', auth()->id())->pluck('name', 'id');
+                                                    })
+                                                    ->hintAction(
+                                                        Action::make('manage_profiles')
+                                                            ->label('Manage Profiles')
+                                                            ->icon('heroicon-o-arrow-top-right-on-square')
+                                                            ->iconPosition('after')
+                                                            ->size('sm')
+                                                            ->url('/stream-profiles')
+                                                            ->openUrlInNewTab(false)
+                                                    )
+                                                    ->helperText('The default transcoding profile used for the in-app player for Live content. Leave empty to disable transcoding (some streams may not be playable in the player).'),
+                                                Select::make('default_vod_stream_profile_id')
+                                                    ->label('VOD and Series Transcoding Profile')
+                                                    ->columnSpan(2)
+                                                    ->searchable()
+                                                    ->options(function () {
+                                                        return StreamProfile::where('user_id', auth()->id())->pluck('name', 'id');
+                                                    })
+                                                    ->hintAction(
+                                                        Action::make('manage_profiles')
+                                                            ->label('Manage Profiles')
+                                                            ->icon('heroicon-o-arrow-top-right-on-square')
+                                                            ->iconPosition('after')
+                                                            ->size('sm')
+                                                            ->url('/stream-profiles')
+                                                            ->openUrlInNewTab(false)
+                                                    )
+                                                    ->helperText('The default transcoding profile used for the in-app player for VOD/Series content. Leave empty to disable transcoding (some streams may not be playable in the player).'),
+                                            ]),
 
                                         Action::make('test_connection')
                                             ->color('gray')
                                             ->label('Test m3u proxy connection')
                                             ->icon('heroicon-m-signal')
-                                            ->action(function () {
+                                            ->action(function () use ($service, $mode) {
                                                 try {
-                                                    $service = new M3uProxyService();
                                                     $result = $service->getProxyInfo();
 
                                                     if ($result['success']) {
                                                         $info = $result['info'];
 
                                                         // Build a nice detailed message
-                                                        $mode = ucfirst($service->mode());
+                                                        $mode = ucfirst($mode);
                                                         $details = "**Version:** {$info['version']}\n\n";
                                                         if ($service->mode() === 'external') {
                                                             $details .= "**Deployment Mode:** ✅ {$mode}\n\n";
@@ -892,48 +975,6 @@ class Preferences extends SettingsPage
                             ]),
                     ])->contained(false),
             ]);
-    }
-
-    /**
-     * Create a Select component for codec selection with dynamic options based on hardware acceleration method.
-     *
-     * @param  string  $label  The label for the codec type (e.g., 'video', 'audio', 'subtitle').
-     * @param  string  $field  The field name for the codec in the settings.
-     * @param  \Filament\Schemas\Schema  $schema  The form instance to which this component belongs.
-     */
-    private function makeCodecSelect(
-        string $label,
-        string $field,
-        Schema $schema
-    ): Select {
-        $configKey = "proxy.{$field}";
-        $configValue = config($configKey);
-
-        return Select::make($field)
-            ->label(ucwords($label) . ' codec')
-            ->helperText("Transcode {$label} streams to this codec.\nLeave blank to copy the original.")
-            ->allowHtml()
-            ->searchable()
-            ->live()
-            ->noSearchResultsMessage('No codecs found.')
-            ->options(function (Get $get) use ($label) {
-                $accelerationMethod = $get('hardware_acceleration_method');
-                switch ($label) {
-                    case 'video':
-                        return FfmpegCodecService::getVideoCodecs($accelerationMethod);
-                    case 'audio':
-                        return FfmpegCodecService::getAudioCodecs($accelerationMethod);
-                    case 'subtitle':
-                        return FfmpegCodecService::getSubtitleCodecs($accelerationMethod);
-                    default:
-                        return [];
-                }
-            })
-            ->placeholder(fn() => empty($configValue) ? 'copy' : $configValue)
-            ->suffixIcon(fn() => ! empty($configValue) ? 'heroicon-m-lock-closed' : null)
-            ->disabled(fn() => ! empty($configValue))
-            ->hint(fn() => ! empty($configValue) ? 'Already set by environment variable!' : null)
-            ->dehydrated(fn() => empty($configValue));
     }
 
     public function getSavedNotification(): ?Notification
