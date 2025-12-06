@@ -71,6 +71,9 @@ services:
       - M3U_PROXY_PORT=${M3U_PROXY_PORT:-38085}
       - M3U_PROXY_HOST=${M3U_PROXY_HOST:-127.0.0.1} # Internal network hostname of m3u-proxy container
       - M3U_PROXY_TOKEN=${M3U_PROXY_TOKEN:-changeme}
+      # Failover Resolver URL - used by m3u-proxy to check failover viability
+      # Needs to be accessible from m3u-proxy container
+      - M3U_PROXY_FAILOVER_RESOLVER_URL=${M3U_PROXY_FAILOVER_RESOLVER_URL:-http://127.0.0.1:${APP_PORT:-36400}}
     volumes:
       # Persistent configuration data
       - ./data:/var/www/config

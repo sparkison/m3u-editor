@@ -1263,9 +1263,22 @@ class M3uProxyService
      */
     public function getFailoverResolverUrl(): string
     {
-        // Use ProxyFacade to build the URL, which takes into account the `PROXY_URL_OVERRIDE`, if set.
-        return ProxyFacade::getBaseUrl() . '/api/m3u-proxy/failover-resolver';
+        $path = '/api/m3u-proxy/failover-resolver';
 
+        // If proxy is running embedded mode, we can use 127.0.0.1/APP_PORT
+        if ($this->mode() === 'embedded') {
+            $appUrl = '127.0.0.1:' . config('app.port', 36400);
+            return $appUrl . $path;
+        }
+
+        // If explicit resolver URL is set in config, use that
+        if (config('proxy.resolver_url')) {
+            return rtrim(config('proxy.resolver_url'), '/') . $path;
+        }
+
+        // Fallback: use ProxyFacade to build the URL, which takes into account the `PROXY_URL_OVERRIDE`, if set.
+        return ProxyFacade::getBaseUrl() . $path;
+        
         // Alternative:  return the built-in route.
         // return route('m3u-proxy.failover-resolver');
     }

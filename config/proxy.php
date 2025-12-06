@@ -13,6 +13,7 @@ return [
     'm3u_proxy_public_url' => env('M3U_PROXY_PUBLIC_URL'), // Public URL for the proxy (auto-set in start-container)
 
     'url_override' => env('PROXY_URL_OVERRIDE', null),
+    'resolver_url' => env('M3U_PROXY_FAILOVER_RESOLVER_URL', null),
 
     /* Deprecated Proxy Settings - use M3U_PROXY_* env vars instead */
 
