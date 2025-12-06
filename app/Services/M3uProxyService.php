@@ -34,9 +34,20 @@ class M3uProxyService
         $this->apiToken = config('proxy.m3u_proxy_token');
     }
 
+    /**
+     * Get the current proxy mode: 'embedded' or 'external'
+     */
     public function mode(): string
     {
         return config('proxy.external_proxy_enabled') ? 'external' : 'embedded';
+    }
+
+    /**
+     * Check if failover resolver URL should be used
+     */
+    public function usingResolver(): bool
+    {
+        return $this->mode() === 'embedded' || config('proxy.resolver_url') !== null;
     }
 
     /**
@@ -1259,27 +1270,26 @@ class M3uProxyService
      * The m3u-proxy will POST to this endpoint with failover metadata to check if
      * a failover is viable (i.e., the target playlist isn't at capacity).
      *
-     * @return string The failover resolver endpoint URL
+     * @return string|null The failover resolver endpoint URL, or null if not configured
      */
-    public function getFailoverResolverUrl(): string
+    public function getFailoverResolverUrl(): string|null
     {
+        // Build the failover resolver path
         $path = '/api/m3u-proxy/failover-resolver';
 
-        // If proxy is running embedded mode, we can use 127.0.0.1/APP_PORT
+        // If proxy is running embedded mode, we can use 127.0.0.1:APP_PORT to reach it directly
         if ($this->mode() === 'embedded') {
             $appUrl = '127.0.0.1:' . config('app.port', 36400);
             return $appUrl . $path;
         }
 
         // If explicit resolver URL is set in config, use that
-        if (config('proxy.resolver_url')) {
-            return rtrim(config('proxy.resolver_url'), '/') . $path;
+        $resolverUrl = rtrim(config('proxy.resolver_url', ''), '/');
+        if ($resolverUrl && $resolverUrl !== '') {
+            return $resolverUrl . $path;
         }
 
-        // Fallback: use ProxyFacade to build the URL, which takes into account the `PROXY_URL_OVERRIDE`, if set.
-        return ProxyFacade::getBaseUrl() . $path;
-        
-        // Alternative:  return the built-in route.
-        // return route('m3u-proxy.failover-resolver');
+        // If here, return null
+        return null;
     }
 }
