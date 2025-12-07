@@ -38,3 +38,11 @@ Schedule::command('app:run-scheduled-backups')
 Schedule::command('app:logo-cleanup --force')
     ->daily()
     ->withoutOverlapping();
+
+// Prune failed jobs
+Schedule::command('queue:prune-failed --hours=48')
+    ->daily();
+
+// Prune old notifications
+Schedule::command('app:prune-old-notifications --days=30')
+    ->daily();
