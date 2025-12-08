@@ -50,8 +50,8 @@ class ProcessM3uImport implements ShouldQueue
     // Delete the job if the model is missing
     public $deleteWhenMissingModels = true;
 
-    // Giving a timeout of 10 minutes to the Job to process the file
-    public $timeout = 60 * 10;
+    // Giving a timeout of 60 minutes to the Job to process the file
+    public $timeout = 60 * 60;
 
     // Preprocess the playlist
     public bool $preprocess;

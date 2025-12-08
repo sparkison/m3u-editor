@@ -40,8 +40,8 @@ class ProcessEpgImport implements ShouldQueue
     // Delete the job if the model is missing
     public $deleteWhenMissingModels = true;
 
-    // Giving a timeout of 10 minutes to the Job to process the file
-    public $timeout = 60 * 10;
+    // Giving a timeout of 30 minutes to the Job to process the file
+    public $timeout = 60 * 30;
 
     /**
      * Sanitize UTF-8 string to remove invalid sequences
