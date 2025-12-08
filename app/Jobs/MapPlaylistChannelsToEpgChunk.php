@@ -61,7 +61,6 @@ class MapPlaylistChannelsToEpgChunk implements ShouldQueue
 
         // Fetch the channels
         $channels = Channel::whereIn('id', $this->channelIds);
-        dump($channels->get());
 
         // Process each channel
         $patterns = $this->settings['exclude_prefixes'] ?? [];
