@@ -916,10 +916,8 @@ class VodResource extends Resource
                 BulkAction::make('enable')
                     ->label('Enable selected')
                     ->action(function (Collection $records): void {
-                        foreach ($records as $record) {
-                            $record->update([
-                                'enabled' => true,
-                            ]);
+                        foreach ($records->chunk(100) as $chunk) {
+                            Channel::whereIn('id', $chunk->pluck('id'))->update(['enabled' => true]);
                         }
                     })->after(function () {
                         Notification::make()
@@ -938,10 +936,8 @@ class VodResource extends Resource
                 BulkAction::make('disable')
                     ->label('Disable selected')
                     ->action(function (Collection $records): void {
-                        foreach ($records as $record) {
-                            $record->update([
-                                'enabled' => false,
-                            ]);
+                        foreach ($records->chunk(100) as $chunk) {
+                            Channel::whereIn('id', $chunk->pluck('id'))->update(['enabled' => false]);
                         }
                     })->after(function () {
                         Notification::make()
