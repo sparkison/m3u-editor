@@ -107,11 +107,11 @@ class ChannelResource extends Resource
         return $query;
     }
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Channels & VOD';
+    protected static string | \UnitEnum | null $navigationGroup = 'Live';
 
-    protected static ?string $navigationLabel = 'Live Channels';
+    protected static ?string $navigationLabel = 'Channels';
 
-    protected static ?string $modelLabel = 'Live Channel';
+    protected static ?string $modelLabel = 'Channel';
 
     protected static ?string $pluralModelLabel = 'Live Channels';
 

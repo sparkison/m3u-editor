@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Filament\Resources\Groups\Pages;
+namespace App\Filament\Resources\VodGroups\Pages;
 
 use Filament\Actions\CreateAction;
-use App\Filament\Resources\Groups\GroupResource;
+use App\Filament\Resources\VodGroups\VodGroupResource;
 use App\Models\Group;
 use App\Models\Playlist;
 use Filament\Actions;
@@ -13,9 +13,9 @@ use Filament\Schemas\Components\Tabs\Tab;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
-class ListGroups extends ListRecords
+class ListVodGroups extends ListRecords
 {
-    protected static string $resource = GroupResource::class;
+    protected static string $resource = VodGroupResource::class;
 
     protected ?string $subheading = 'Manage channel groups.';
 
@@ -26,7 +26,7 @@ class ListGroups extends ListRecords
                 ->using(function (array $data, string $model): Model {
                     $data['user_id'] = auth()->id();
                     $data['custom'] = true;
-                    $data['type'] = 'live';
+                    $data['type'] = 'vod';
 
                     return $model::create($data);
                 })
@@ -46,7 +46,7 @@ class ListGroups extends ListRecords
     {
         return static::getResource()::getEloquentQuery()
             ->where('user_id', auth()->id())
-            ->where('type', 'live');
+            ->where('type', 'vod');
     }
 
     public function getTabs(): array
@@ -70,9 +70,9 @@ class ListGroups extends ListRecords
             $playlist->id => Tab::make($playlist->name)
                 ->modifyQueryUsing(fn($query) => $query->where([
                     ['playlist_id', $playlist->id],
-                    ['type', 'live'],
+                    ['type', 'vod']
                 ]))
-                ->badge($playlist->liveGroups()->count())
+                ->badge($playlist->vodGroups()->count())
         ])->toArray();
     }
 }

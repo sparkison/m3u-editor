@@ -72,7 +72,7 @@ class Playlist extends Model
 
     public function isProcessing(): bool
     {
-        return collect($this->processing)->values()->contains(true);
+        return collect($this->processing ?? [])->values()->contains(true);
     }
 
     public function isProcessingLive(): bool
@@ -143,6 +143,16 @@ class Playlist extends Model
     public function groups(): HasMany
     {
         return $this->hasMany(Group::class);
+    }
+
+    public function liveGroups(): HasMany
+    {
+        return $this->groups()->where('type', 'live');
+    }
+
+    public function vodGroups(): HasMany
+    {
+        return $this->groups()->where('type', 'vod');
     }
 
     public function sourceGroups(): HasMany

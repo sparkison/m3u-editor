@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Resources\Groups;
+namespace App\Filament\Resources\VodGroups;
 
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextInputColumn;
@@ -17,10 +17,10 @@ use Filament\Actions\DeleteAction;
 use Filament\Tables\Enums\RecordActionsPosition;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\BulkAction;
-use App\Filament\Resources\Groups\RelationManagers\ChannelsRelationManager;
-use App\Filament\Resources\Groups\RelationManagers\VodRelationManager;
-use App\Filament\Resources\Groups\Pages\ListGroups;
-use App\Filament\Resources\Groups\Pages\ViewGroup;
+use App\Filament\Resources\VodGroups\RelationManagers\ChannelsRelationManager;
+use App\Filament\Resources\VodGroups\RelationManagers\VodRelationManager;
+use App\Filament\Resources\VodGroups\Pages\ListVodGroups;
+use App\Filament\Resources\VodGroups\Pages\ViewVodGroup;
 use Filament\Schemas\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Forms\Components\TextInput;
@@ -40,7 +40,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use App\Traits\HasUserFiltering;
 
-class GroupResource extends Resource
+class VodGroupResource extends Resource
 {
     use HasUserFiltering;
 
@@ -56,7 +56,7 @@ class GroupResource extends Resource
         return ['name', 'name_internal'];
     }
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Live';
+    protected static string | \UnitEnum | null $navigationGroup = 'VOD';
 
     public static function getNavigationSort(): ?int
     {
@@ -74,9 +74,9 @@ class GroupResource extends Resource
         return $table->persistFiltersInSession()
             ->persistSortInSession()
             ->modifyQueryUsing(function (Builder $query) {
-                $query->withCount('live_channels')
-                    ->withCount('enabled_live_channels')
-                    ->where('type', 'live');
+                $query->withCount('vod_channels')
+                    ->withCount('enabled_vod_channels')
+                    ->where('type', 'vod');
             })
             ->filtersTriggerAction(function ($action) {
                 return $action->button()->label('Filters');
@@ -120,9 +120,9 @@ class GroupResource extends Resource
                     ->label('Default name')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('live_channels_count')
-                    ->label('Live Channels')
-                    ->description(fn(Group $record): string => "Enabled: {$record->enabled_live_channels_count}")
+                TextColumn::make('vod_channels_count')
+                    ->label('VOD Channels')
+                    ->description(fn(Group $record): string => "Enabled: {$record->enabled_vod_channels_count}")
                     ->toggleable()
                     ->sortable(),
                 IconColumn::make('custom')
@@ -481,17 +481,17 @@ class GroupResource extends Resource
     public static function getRelations(): array
     {
         return [
-            ChannelsRelationManager::class,
+            VodRelationManager::class,
         ];
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => ListGroups::route('/'),
-            // 'create' => Pages\CreateGroup::route('/create'),
-            'view' => ViewGroup::route('/{record}'),
-            // 'edit' => Pages\EditGroup::route('/{record}/edit'),
+            'index' => ListVodGroups::route('/'),
+            // 'create' => Pages\CreateVodGroup::route('/create'),
+            'view' => ViewVodGroup::route('/{record}'),
+            // 'edit' => Pages\EditVodGroup::route('/{record}/edit'),
         ];
     }
 

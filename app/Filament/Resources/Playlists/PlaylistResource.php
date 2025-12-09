@@ -310,9 +310,11 @@ class PlaylistResource extends Resource
                         ->action(function (Playlist $record) {
                             // Clear processing flag
                             $record->update([
-                                'live_processing' => false,
-                                'vod_processing' => false,
-                                'series_processing' => false,
+                                'processing' => [
+                                    'live_processing' => false,
+                                    'vod_processing' => false,
+                                    'series_processing' => false,
+                                ]
                             ]);
 
                             Notification::make()
@@ -748,9 +750,11 @@ class PlaylistResource extends Resource
                     ->action(function ($record) {
                         // Clear processing flag
                         $record->update([
-                            'live_processing' => false,
-                            'vod_processing' => false,
-                            'series_processing' => false,
+                            'processing' => [
+                                'live_processing' => false,
+                                'vod_processing' => false,
+                                'series_processing' => false,
+                            ]
                         ]);
 
                         Notification::make()
