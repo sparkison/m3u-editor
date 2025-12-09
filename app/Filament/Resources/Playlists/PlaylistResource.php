@@ -198,7 +198,12 @@ class PlaylistResource extends Resource
                     ->toggleable()
                     ->color(fn(Status $state) => $state->getColor()),
                 ProgressColumn::make('progress')
-                    ->label('Channel Sync')
+                    ->label('Live Sync')
+                    ->sortable()
+                    ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
+                    ->toggleable(),
+                ProgressColumn::make('vod_progress')
+                    ->label('VOD Sync')
                     ->sortable()
                     ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
                     ->toggleable(),
@@ -276,6 +281,7 @@ class PlaylistResource extends Resource
                             $record->update([
                                 'status' => Status::Processing,
                                 'progress' => 0,
+                                'vod_progress' => 0,
                             ]);
                             app('Illuminate\Contracts\Bus\Dispatcher')
                                 ->dispatch(new ProcessM3uImport($record, force: true));

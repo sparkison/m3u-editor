@@ -13,7 +13,8 @@ return new class extends Migration
     {
         Schema::table('groups', function (Blueprint $table) {
             $table->string('type')
-                ->nullable();
+                ->nullable()
+                ->after('name_internal');
         });
     }
 
@@ -23,7 +24,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('groups', function (Blueprint $table) {
-            //
+            $table->dropColumn('type');
         });
     }
 };

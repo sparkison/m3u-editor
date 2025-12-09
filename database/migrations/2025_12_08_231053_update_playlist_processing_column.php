@@ -28,7 +28,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('playlist', function (Blueprint $table) {
+        Schema::table('playlists', function (Blueprint $table) {
             $table->dropColumn('processing');
             $table->boolean('processing')->default(false);
         });

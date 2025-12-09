@@ -49,6 +49,8 @@ class ProcessM3uImportComplete implements ShouldQueue
         public bool $maxHit = false,
         public bool $isNew = false,
         public bool $runningSeriesImport = false,
+        public bool $runningLiveImport = true, // Default to true for live imports
+        public bool $runningVodImport = true, // Default to true for VOD imports
     ) {
         // Set the invalidate import settings from config
         $this->invalidateImport = config('dev.invalidate_import', null);
@@ -288,19 +290,25 @@ class ProcessM3uImportComplete implements ShouldQueue
         }
 
         // Update the playlist
-        $playlist->update([
+        $update = [
             'status' => Status::Completed,
             'channels' => 0, // not using...
             'synced' => now(),
             'errors' => null,
             'sync_time' => $completedIn,
-            'progress' => 100,
             'processing' => [
                 ...$playlist->processing ?? [],
                 'live_processing' => false,
                 'vod_processing' => false,
             ]
-        ]);
+        ];
+        if ($this->runningLiveImport) {
+            $update['progress'] = 100; // Only set if Live import was run as well
+        }
+        if ($this->runningVodImport) {
+            $update['vod_progress'] = 100; // Only set if VOD import was run as well
+        }
+        $playlist->update($update);
 
         // Send notification
         if ($this->maxHit) {
