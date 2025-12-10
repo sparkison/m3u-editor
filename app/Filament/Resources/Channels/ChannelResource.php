@@ -511,7 +511,11 @@ class ChannelResource extends Resource
                             ->live()
                             ->label('Group')
                             ->helperText(fn(Get $get) => $get('playlist') === null ? 'Select a playlist first...' : 'Select the group you would like to move the items to.')
-                            ->options(fn(Get $get) => Group::where(['user_id' => auth()->id(), 'playlist_id' => $get('playlist')])->get(['name', 'id'])->pluck('name', 'id'))
+                            ->options(fn(Get $get) => Group::where([
+                                'type' => 'live',
+                                'user_id' => auth()->id(),
+                                'playlist_id' => $get('playlist')
+                            ])->get(['name', 'id'])->pluck('name', 'id'))
                             ->searchable()
                             ->disabled(fn(Get $get) => $get('playlist') === null),
                     ])

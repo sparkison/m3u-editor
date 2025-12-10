@@ -84,7 +84,11 @@ class ViewVodGroup extends ViewRecord
                             ->live()
                             ->label('Group')
                             ->helperText('Select the group you would like to move the channels to.')
-                            ->options(fn(Get $get, $record) => Group::where(['user_id' => auth()->id(), 'playlist_id' => $record->playlist_id])->get(['name', 'id'])->pluck('name', 'id'))
+                            ->options(fn(Get $get, $record) => Group::where([
+                                'type' => 'vod',
+                                'user_id' => auth()->id(),
+                                'playlist_id' => $record->playlist_id
+                            ])->get(['name', 'id'])->pluck('name', 'id'))
                             ->searchable(),
                     ])
                     ->action(function ($record, array $data): void {

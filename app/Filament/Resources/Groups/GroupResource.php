@@ -214,7 +214,11 @@ class GroupResource extends Resource
                                 ->live()
                                 ->label('Group')
                                 ->helperText('Select the group you would like to move the channels to.')
-                                ->options(fn(Get $get, $record) => Group::where(['user_id' => auth()->id(), 'playlist_id' => $record->playlist_id])->get(['name', 'id'])->pluck('name', 'id'))
+                                ->options(fn(Get $get, $record) => Group::where([
+                                    'type' => 'live',
+                                    'user_id' => auth()->id(),
+                                    'playlist_id' => $record->playlist_id
+                                ])->get(['name', 'id'])->pluck('name', 'id'))
                                 ->searchable(),
                         ])
                         ->action(function ($record, array $data): void {
@@ -348,7 +352,7 @@ class GroupResource extends Resource
                                 ->options(
                                     fn() => Group::query()
                                         ->with(['playlist'])
-                                        ->where(['user_id' => auth()->id()])
+                                        ->where(['user_id' => auth()->id(), 'type' => 'live'])
                                         ->get(['name', 'id', 'playlist_id'])
                                         ->transform(fn($group) => [
                                             'id' => $group->id,
