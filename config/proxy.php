@@ -1,126 +1,22 @@
 <?php
 
 return [
-    // M3U Proxy Service Configuration
-    // If M3U_PROXY_ENABLED=false/null, uses external proxy service at M3U_PROXY_URL
+    /*
+     * M3U Proxy Service Configuration
+     */
+
+    // If M3U_PROXY_ENABLED=false/null, uses external proxy service
     // If M3U_PROXY_ENABLED=true, uses embedded proxy via nginx reverse proxy
     'embedded_proxy_enabled' => env('M3U_PROXY_ENABLED', true), // true = embedded service, false/null = external service
     'external_proxy_enabled' => ! env('M3U_PROXY_ENABLED', false), // opposite of above for convenience
-    // 'm3u_proxy_url' => env('M3U_PROXY_URL'), // Auto-set in start-container based on mode
+    
     'm3u_proxy_host' => env('M3U_PROXY_HOST', 'localhost'), // Host for proxy (embedded and external)
     'm3u_proxy_port' => env('M3U_PROXY_PORT', 8085), // Port for proxy (embedded and external)
     'm3u_proxy_token' => env('M3U_PROXY_TOKEN'), // API token for authenticating with the proxy service
     'm3u_proxy_public_url' => env('M3U_PROXY_PUBLIC_URL'), // Public URL for the proxy (auto-set in start-container)
+    'resolver_url' => env('M3U_PROXY_FAILOVER_RESOLVER_URL', null), // Base URL for the editor that the proxy can use to resolve URLs if needed (for smart failover with capacity checks)
 
+    // Logo Proxy Configuration
     'url_override' => env('PROXY_URL_OVERRIDE', null),
     'url_override_include_logos' => env('PROXY_URL_OVERRIDE_INCLUDE_LOGOS', true),
-    'resolver_url' => env('M3U_PROXY_FAILOVER_RESOLVER_URL', null),
-
-    /* Deprecated Proxy Settings - use M3U_PROXY_* env vars instead */
-
-    'proxy_format' => env('PROXY_FORMAT', 'mpts'), // 'mpts' or 'hls'
-    'ffmpeg_path' => env('PROXY_FFMPEG_PATH', null),
-    'ffprobe_path' => env('PROXY_FFPROBE_PATH', null),
-    'ffmpeg_additional_args' => env('PROXY_FFMPEG_ADDITIONAL_ARGS', ''),
-    'ffmpeg_codec_video' => env('PROXY_FFMPEG_CODEC_VIDEO', null),
-    'ffmpeg_codec_audio' => env('PROXY_FFMPEG_CODEC_AUDIO', null),
-    'ffmpeg_codec_subtitles' => env('PROXY_FFMPEG_CODEC_SUBTITLES', null),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Shared Streaming Configuration (xTeVe-like proxy functionality)
-    |--------------------------------------------------------------------------
-    |
-    | These settings control the shared streaming functionality that allows
-    | multiple clients to share the same upstream stream, reducing server load.
-    |
-    */
-    'shared_streaming' => [
-        // Enable shared streaming functionality
-        'enabled' => env('SHARED_STREAMING_ENABLED', true),
-
-        // Maximum concurrent shared streams
-        'max_concurrent_streams' => env('SHARED_MAX_CONCURRENT_STREAMS', 50),
-
-        // Buffer configuration
-        'buffer' => [
-            // Default buffer size per stream (in segments for HLS, bytes for TS)
-            'default_size' => env('SHARED_BUFFER_SIZE', 30),
-
-            // Maximum buffer size per stream
-            'max_size' => env('SHARED_BUFFER_MAX_SIZE', 100),
-
-            // Buffer cleanup interval (seconds)
-            'cleanup_interval' => env('SHARED_BUFFER_CLEANUP_INTERVAL', 300),
-
-            // Maximum age of buffer segments (seconds)
-            'max_age' => env('SHARED_BUFFER_MAX_AGE', 3600),
-
-            // Number of segments to keep in buffer
-            'segments' => env('SHARED_BUFFER_SEGMENTS', 10),
-
-            // Segment retention time (seconds)
-            'segment_retention' => env('SHARED_BUFFER_SEGMENT_RETENTION', 300),
-        ],
-
-        // Stream monitoring
-        'monitoring' => [
-            // Health check interval (seconds)
-            'health_check_interval' => env('SHARED_HEALTH_CHECK_INTERVAL', 60),
-
-            // Stream timeout (seconds) - streams without clients
-            'stream_timeout' => env('SHARED_STREAM_TIMEOUT', 300),
-
-            // Maximum allowed unhealthy duration (seconds)
-            'max_unhealthy_duration' => env('SHARED_MAX_UNHEALTHY_DURATION', 600),
-
-            // Client timeout (seconds) - for monitoring client activity
-            'client_timeout' => env('SHARED_CLIENT_TIMEOUT', 30),
-
-            // Bandwidth monitoring threshold (kbps)
-            'bandwidth_threshold' => env('SHARED_BANDWIDTH_THRESHOLD', 50000),
-
-            // Log status interval (seconds) - how often to log stream status
-            'log_status_interval' => env('SHARED_LOG_STATUS_INTERVAL', 300),
-        ],
-
-        // Stream cleanup configuration
-        'cleanup' => [
-            // Grace period for clientless streams (seconds) before stopping them
-            'clientless_grace_period' => env('SHARED_CLIENTLESS_GRACE_PERIOD', 15),
-        ],
-
-        // Client management
-        'clients' => [
-            // Maximum clients per stream
-            'max_per_stream' => env('SHARED_MAX_CLIENTS_PER_STREAM', 100),
-
-            // Client timeout (seconds) - inactive clients
-            'timeout' => env('SHARED_CLIENT_TIMEOUT', 60),
-
-            // Client heartbeat interval (seconds)
-            'heartbeat_interval' => env('SHARED_CLIENT_HEARTBEAT_INTERVAL', 30),
-        ],
-
-        // Redis configuration for shared streaming
-        'redis' => [
-            // Redis key prefix for shared streaming data
-            'prefix' => env('SHARED_REDIS_PREFIX', 'shared_stream:'),
-
-            // Default TTL for Redis keys (seconds)
-            'default_ttl' => env('SHARED_REDIS_TTL', 86400),
-        ],
-
-        // Storage paths
-        'storage' => [
-            // Base directory for shared stream buffers
-            'buffer_path' => env('SHARED_BUFFER_PATH', 'shared_streams'),
-
-            // Temporary files directory
-            'temp_path' => env('SHARED_TEMP_PATH', 'shared_streams/temp'),
-
-            // Maximum total disk usage for all buffers (bytes)
-            'max_total_disk_usage' => env('SHARED_MAX_DISK_USAGE', 2147483648), // 2GB
-        ],
-    ],
 ];

@@ -198,7 +198,6 @@ For simple setups or development only:
 ```bash
 # .env or docker-compose.yml
 M3U_PROXY_ENABLED=true  # or don't set it at all
-# M3U_PROXY_URL is auto-set to ${APP_URL}/m3u-proxy
 ```
 
 **Access:** `${APP_URL}/m3u-proxy/` (e.g., `http://m3ueditor.test/m3u-proxy/`)
@@ -253,7 +252,8 @@ docker exec -it m3u-editor tail -100 /var/www/html/storage/logs/m3u-proxy.log
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `M3U_PROXY_ENABLED` | `true` | `true` = embedded proxy, `false` = external proxy |
-| `M3U_PROXY_URL` | auto-set | External: `http://m3u-proxy:8085`, Embedded: `${APP_URL}/m3u-proxy` |
+| `M3U_PROXY_HOST` | `localhost` | host used to access the proxy instance |
+| `M3U_PROXY_PORT` | `8085` | proxy port |
 | `M3U_PROXY_TOKEN` | auto-generated | API token - must match `API_TOKEN` in m3u-proxy |
 
 #### M3U Proxy Container Variables
@@ -267,14 +267,6 @@ docker exec -it m3u-editor tail -100 /var/www/html/storage/logs/m3u-proxy.log
 | `LOG_LEVEL` | `INFO` | Logging level: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | `ROOT_PATH` | `/m3u-proxy` | API root path - default optimized for m3u-editor integration |
 | `DOCS_URL` | `/docs` | Swagger UI path (relative to ROOT_PATH) |
-
-#### Embedded Mode Only Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `M3U_PROXY_HOST` | `127.0.0.1` | Bind address (embedded only) |
-| `M3U_PROXY_PORT` | `8085` | Internal port (embedded only) |
-| `M3U_PROXY_LOG_LEVEL` | `ERROR` | Log level (embedded only) |
 
 **Authentication:** When using API token authentication, see [M3U Proxy Authentication](https://github.com/sparkison/m3u-proxy/blob/master/docs/AUTHENTICATION.md)
 
@@ -340,8 +332,8 @@ docker exec -it m3u-editor supervisorctl restart m3u-proxy
 **Port Already in Use:**
 Change the port:
 ```bash
-M3U_PROXY_PORT=8086
-M3U_PROXY_URL=http://localhost:8086
+M3U_PROXY_PORT=8085
+M3U_PROXY_HOST=m3u-proxy
 ```
 
 Then restart the container.
@@ -415,7 +407,8 @@ docker exec -it m3u-proxy redis-cli -h redis ping
 ```yaml
 environment:
   - M3U_PROXY_ENABLED=false
-  - M3U_PROXY_URL=http://m3u-proxy:8085
+  - M3U_PROXY_PORT=8086
+  - M3U_PROXY_HOST=m3u-proxy
   - M3U_PROXY_TOKEN=your-secure-token-here
 ```
 
@@ -436,7 +429,8 @@ docker exec -it m3u-editor php artisan m3u-proxy:status
 ```yaml
 environment:
   - M3U_PROXY_ENABLED=true  # or remove it
-  # M3U_PROXY_URL will be auto-set
+  #- M3U_PROXY_PORT=8085
+  #- M3U_PROXY_HOST=localhost
 ```
 
 2. Remove m3u-proxy and redis services from docker-compose.yml
