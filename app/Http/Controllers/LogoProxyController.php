@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Settings\GeneralSettings;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -64,8 +65,23 @@ class LogoProxyController extends Controller
      */
     public static function generateProxyUrl(string $originalUrl, $internal = false): string
     {
+        // Get the config values (takes priority over settings values)
         $proxyUrlOverride = config('proxy.url_override');
         $includeLogosInOverride = config('proxy.url_override_include_logos', true);
+
+        // See if override settings apply
+        try {
+            $settings = app(GeneralSettings::class);
+            if (!$proxyUrlOverride || empty($proxyUrlOverride)) {
+                // Get from settings if not set in config
+                $proxyUrlOverride = $settings->url_override ?? null;
+            }
+            if (config('proxy.url_override_include_logos') === null) {
+                // Get from settings if not set in config
+                $includeLogosInOverride = $settings->url_override_include_logos;
+            }
+        } catch (\Exception $e) {
+        }
 
         if (empty($originalUrl) || ! filter_var($originalUrl, FILTER_VALIDATE_URL)) {
             $url = '/placeholder.png';

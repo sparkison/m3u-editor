@@ -30,9 +30,18 @@ class PlaylistService
         }
 
         // Check if override URL is set in config
-        $urlOverride = config('proxy.url_override');
-        if ($urlOverride) {
-            return rtrim($urlOverride, '/') . ($path ? '/' . ltrim($path, '/') : '');
+        $proxyUrlOverride = config('proxy.url_override');
+
+        // See if override settings apply
+        if (!$proxyUrlOverride || empty($proxyUrlOverride)) {
+            try {
+                $settings = app(GeneralSettings::class);
+                $proxyUrlOverride = $settings->url_override ?? null;
+            } catch (\Exception $e) {
+            }
+        }
+        if ($proxyUrlOverride) {
+            return rtrim($proxyUrlOverride, '/') . ($path ? '/' . ltrim($path, '/') : '');
         }
 
         // Manually construct base URL to ensure port is included (if not using HTTPS)
@@ -384,7 +393,7 @@ class PlaylistService
             ->where('password', $password)
             ->with(['user', 'playlist', 'customPlaylist'])
             ->first();
-        
+
         if ($alias) {
             return [
                 $alias,

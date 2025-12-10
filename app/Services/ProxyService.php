@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Settings\GeneralSettings;
+
 class ProxyService
 {
     /**
@@ -17,13 +19,19 @@ class ProxyService
     public function __construct()
     {
         // See if proxy override is enabled
-        $proxyOverrideUrl = config('proxy.url_override');
-        if (!empty($proxyOverrideUrl)) {
-            $url = $proxyOverrideUrl;
-        } else {
-            // Default base URL
-            $url = url("");
+        $proxyUrlOverride = config('proxy.url_override');
+
+        // See if override settings apply
+        if (!$proxyUrlOverride || empty($proxyUrlOverride)) {
+            try {
+                $settings = app(GeneralSettings::class);
+                $proxyUrlOverride = $settings->url_override ?? null;
+            } catch (\Exception $e) {
+            }
         }
+
+        // Use the override URL or default to application URL
+        $url = $proxyUrlOverride ?? url("");
 
         // Normalize the base url
         $this->baseUrl = rtrim($url, '/');

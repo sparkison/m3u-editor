@@ -18,5 +18,5 @@ return [
 
     // Logo Proxy Configuration
     'url_override' => env('PROXY_URL_OVERRIDE', null),
-    'url_override_include_logos' => env('PROXY_URL_OVERRIDE_INCLUDE_LOGOS', true),
+    'url_override_include_logos' => env('PROXY_URL_OVERRIDE_INCLUDE_LOGOS', default: null),
 ];

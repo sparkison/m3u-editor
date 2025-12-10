@@ -198,6 +198,52 @@ class Preferences extends SettingsPage
                                                     ->default(false),
                                             ]),
 
+                                        Fieldset::make('Proxy URL override')
+                                            ->schema([
+                                                TextInput::make('url_override')
+                                                    ->label('Override URL')
+                                                    ->columnSpanFull()
+                                                    ->url()
+                                                    ->live()
+                                                    ->hintIcon(
+                                                        'heroicon-m-question-mark-circle',
+                                                        tooltip: 'If you would like the proxied streams to use a different base URL than the configured app url. Useful for local network access or when using a different domain for streaming.'
+                                                    )
+                                                    ->disabled(fn() => ! empty(config('proxy.url_override')))
+                                                    ->hint(fn() => ! empty(config('proxy.url_override')) ? 'Already set by environment variable!' : null)
+                                                    ->prefixIcon('heroicon-m-link')
+                                                    ->disabled(fn() => ! empty(config('proxy.url_override')))
+                                                    ->hint(fn() => ! empty(config('proxy.url_override')) ? 'Already set by environment variable!' : null)
+                                                    ->default(fn() => ! empty(config('proxy.url_override')) ? config('proxy.url_override') : '')
+                                                    ->afterStateHydrated(function (TextInput $component, $state) {
+                                                        if (! empty(config('proxy.url_override'))) {
+                                                            $component->state((string) config('proxy.url_override'));
+                                                        }
+                                                    })
+                                                    ->dehydrated(fn() => empty(config('proxy.url_override')))
+                                                    ->placeholder('http://192.168.0.123:36400')
+                                                    ->helperText(fn() => 'Leave empty to use the configured app url (default).'),
+
+                                                Toggle::make('url_override_include_logos')
+                                                    ->label('Include logos in proxy URL override')
+                                                    ->columnSpanFull()
+                                                    ->hintIcon(
+                                                        'heroicon-m-question-mark-circle',
+                                                        tooltip: 'This is useful for Plex which need HTTPS for logo images. When using a domain with HTTPS for the frontend, but proxy URL override points to a local HTTP address, Plex may not load the logos due to HTTPS requirements. By enabling this option you can keep the stream proxy override for local access while logos still use the HTTPS domain URL that Plex requires.'
+                                                    )
+                                                    ->disabled(fn() => config('proxy.url_override_include_logos') !== null)
+                                                    ->hint(fn() => config('proxy.url_override_include_logos') !== null ? 'Already set by environment variable!' : null)
+                                                    ->default(fn() => config('proxy.url_override_include_logos') !== null)
+                                                    ->afterStateHydrated(function (Toggle $component, $state) {
+                                                        if (config('proxy.url_override_include_logos') !== null) {
+                                                            $component->state((bool)  config('proxy.url_override_include_logos'));
+                                                        }
+                                                    })
+                                                    ->hidden(fn($get) => empty(config('proxy.url_override')) && empty($get('url_override')))
+                                                    ->dehydrated(fn() => empty(config('proxy.url_override_include_logos')))
+                                                    ->helperText('Whether or not to use the URL override for logos and images too (default is enabled).'),
+                                            ]),
+
                                         Fieldset::make('Failover settings')
                                             ->schema([
                                                 Toggle::make('enable_failover_resolver')
