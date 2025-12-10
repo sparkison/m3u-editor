@@ -247,6 +247,7 @@ class M3uProxyStreamMonitor extends Page
 
                 return [
                     'ip' => $client['ip_address'],
+                    'username' => $client['username'] ?? null,
                     'connected_at' => $connectedAt->format('Y-m-d H:i:s'),
                     'duration' => $connectedAt->diffForHumans(null, true),
                     'bytes_received' => $this->formatBytes($client['bytes_served']),

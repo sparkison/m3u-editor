@@ -44,13 +44,18 @@ class ProxyService
      *
      * @param string|int $id
      * @param string|null $playlistUuid Optional playlist UUID for context (e.g., merged playlists)
+     * @param string|null $username Optional username for context
+     * 
      * @return string
      */
-    public function getProxyUrlForChannel($id, $playlistUuid = null)
+    public function getProxyUrlForChannel($id, $playlistUuid = null, $username = null)
     {
         $url = $this->baseUrl . '/api/m3u-proxy/channel/' . $id;
         if ($playlistUuid) {
             $url .= '/' . $playlistUuid;
+        }
+        if ($username) {
+            $url .= '?username=' . urlencode($username);
         }
         return $url;
     }
@@ -60,13 +65,17 @@ class ProxyService
      *
      * @param string|int $id
      * @param string|null $playlistUuid Optional playlist UUID for context (e.g., merged playlists)
+     * @param string|null $username Optional username for context
      * @return string
      */
-    public function getProxyUrlForEpisode($id, $playlistUuid = null)
+    public function getProxyUrlForEpisode($id, $playlistUuid = null, $username = null)
     {
         $url = $this->baseUrl . '/api/m3u-proxy/episode/' . $id;
         if ($playlistUuid) {
             $url .= '/' . $playlistUuid;
+        }
+        if ($username) {
+            $url .= '?username=' . urlencode($username);
         }
         return $url;
     }

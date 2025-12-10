@@ -38,6 +38,9 @@ class M3uProxyApiController extends Controller
             'customPlaylist'
         ])->findOrFail($id);
 
+        // See if username is passed in request
+        $username = $request->input('username', null);
+
         // If UUID provided, resolve that specific playlist (e.g., merged playlist)
         // Otherwise fall back to the channel's effective playlist
         if ($uuid) {
@@ -65,8 +68,17 @@ class M3uProxyApiController extends Controller
             $profile = $playlist->streamProfile;
         }
 
-        $url = app(M3uProxyService::class)->getChannelUrl($playlist, $channel, $request, $profile);
+        $url = app(M3uProxyService::class)
+            ->getChannelUrl(
+                $playlist,
+                $channel,
+                $request,
+                $profile
+            );
 
+        if ($username) {
+            $url .= '?username=' . urlencode($username);
+        }
         return redirect($url);
     }
 
@@ -84,6 +96,9 @@ class M3uProxyApiController extends Controller
         $episode = Episode::query()->with([
             'playlist'
         ])->findOrFail($id);
+
+        // See if username is passed in request
+        $username = $request->input('username', null);
 
         // If UUID provided, resolve that specific playlist (e.g., merged playlist)
         // Otherwise fall back to the episode's playlist
@@ -104,8 +119,16 @@ class M3uProxyApiController extends Controller
         // For Series, use the VOD stream profile if set
         $profile = $playlist->vodStreamProfile;
 
-        $url = app(M3uProxyService::class)->getEpisodeUrl($playlist, $episode, $profile);
+        $url = app(M3uProxyService::class)
+            ->getEpisodeUrl(
+                $playlist,
+                $episode,
+                $profile
+            );
 
+        if ($username) {
+            $url .= '?username=' . urlencode($username);
+        }
         return redirect($url);
     }
 
@@ -159,8 +182,16 @@ class M3uProxyApiController extends Controller
             $profile = $profileId ? StreamProfile::find($profileId) : null;
         }
 
-        $url = app(M3uProxyService::class)->getChannelUrl($playlist, $channel, $request, $profile);
+        $url = app(M3uProxyService::class)
+            ->getChannelUrl(
+                $playlist,
+                $channel,
+                $request,
+                $profile
+            );
 
+        $username = 'm3u editor'; // Static username for preview
+        $url .= "?username=" . urlencode($username);
         return redirect($url);
     }
 
@@ -199,8 +230,15 @@ class M3uProxyApiController extends Controller
             $profile = $profileId ? StreamProfile::find($profileId) : null;
         }
 
-        $url = app(M3uProxyService::class)->getEpisodeUrl($playlist, $episode, $profile);
+        $url = app(M3uProxyService::class)
+            ->getEpisodeUrl(
+                $playlist,
+                $episode,
+                $profile
+            );
 
+        $username = 'm3u editor'; // Static username for preview
+        $url .= "?username=" . urlencode($username);
         return redirect($url);
     }
 
