@@ -20,9 +20,13 @@ class SourceGroupsTable
                 if ($playlistId = $arguments['playlist_id'] ?? null) {
                     $query->where('playlist_id', $playlistId);
                 }
+                if ($type = $arguments['type'] ?? null) {
+                    $query->where('type', $type);
+                }
 
                 return $query;
             })
+            ->defaultSort('name', 'asc')
             ->columns([
                 TextColumn::make('name')
                     ->label('Group Name')

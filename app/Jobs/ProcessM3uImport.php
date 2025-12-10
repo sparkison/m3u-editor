@@ -65,6 +65,12 @@ class ProcessM3uImport implements ShouldQueue
     // Included group prefixes for import
     public array $includedGroupPrefixes;
 
+    // Selected groups for import
+    public array $selectedVodGroups;
+
+    // Included group prefixes for import
+    public array $includedVodGroupPrefixes;
+
     // Available groups for the playlist
     public array $groups = [];
 
@@ -93,11 +99,18 @@ class ProcessM3uImport implements ShouldQueue
         public ?bool    $force = false,
         public ?bool    $isNew = false,
     ) {
+        // General processing settings
         $this->maxItems = config('dev.max_channels') + 1; // Maximum number of channels allowed for m3u import   
         $this->preprocess = $playlist->import_prefs['preprocess'] ?? false;
         $this->useRegex = $playlist->import_prefs['use_regex'] ?? false;
+
+        // Selected live groups for import
         $this->selectedGroups = $playlist->import_prefs['selected_groups'] ?? [];
         $this->includedGroupPrefixes = $playlist->import_prefs['included_group_prefixes'] ?? [];
+
+        // Selected VOD groups for import
+        $this->selectedVodGroups = $playlist->import_prefs['selected_vod_groups'] ?? [];
+        $this->includedVodGroupPrefixes = $playlist->import_prefs['included_vod_group_prefixes'] ?? [];
 
         // Selected categories for import
         $this->selectedCategories = $playlist->import_prefs['selected_categories'] ?? [];
@@ -459,7 +472,7 @@ class ProcessM3uImport implements ShouldQueue
                         $category = $vodCategories->firstWhere('category_id', $item->category_id);
 
                         // Determine if the channel should be included
-                        if ($this->preprocess && !$this->shouldIncludeChannel($category['category_name'] ?? '')) {
+                        if ($this->preprocess && !$this->shouldIncludeVod($category['category_name'] ?? '')) {
                             continue;
                         }
                         $extension = $item->container_extension ?? "mp4";
@@ -1020,16 +1033,37 @@ class ProcessM3uImport implements ShouldQueue
             });
         }
 
+        // Check if we should cleanup older source groups before creating new ones
+        if (config('dev.cleanup_source_groups')) {
+            // NOTE: Source groups used to be one type for Live and VOD both (merged).
+            //       Now we process them separately to allow for different groupings.
+            //       To support existing setups, we need to clear out Live groups that are VOD only, and vice versa.
+            //       We'll run this before creating the source groups in case there is overlap, the group is re-added.
+            foreach ($liveGroups->chunk(10) as $chunk) {
+                SourceGroup::where('type', 'vod')
+                    ->where('playlist_id', $playlistId)
+                    ->whereIn('name', $chunk->values())
+                    ->delete();
+            }
+            foreach ($vodGroups->chunk(10) as $chunk) {
+                SourceGroup::where('type', 'live')
+                    ->where('playlist_id', $playlistId)
+                    ->whereIn('name', $chunk->values())
+                    ->delete();
+            }
+        }
+
         // Create the source groups
         foreach ($liveGroups->chunk(50) as $chunk) {
             SourceGroup::upsert(
                 collect($chunk)->map(function ($groupName) use ($playlistId) {
                     return [
                         'name' => $groupName,
-                        'playlist_id' => $playlistId
+                        'playlist_id' => $playlistId,
+                        'type' => 'live',
                     ];
                 })->toArray(),
-                uniqueBy: ['name', 'playlist_id'],
+                uniqueBy: ['name', 'playlist_id', 'type'],
                 update: []
             );
         }
@@ -1038,10 +1072,11 @@ class ProcessM3uImport implements ShouldQueue
                 collect($chunk)->map(function ($groupName) use ($playlistId) {
                     return [
                         'name' => $groupName,
-                        'playlist_id' => $playlistId
+                        'playlist_id' => $playlistId,
+                        'type' => 'vod',
                     ];
                 })->toArray(),
-                uniqueBy: ['name', 'playlist_id'],
+                uniqueBy: ['name', 'playlist_id', 'type'],
                 update: []
             );
         }
@@ -1342,9 +1377,10 @@ class ProcessM3uImport implements ShouldQueue
                     return [
                         'name' => $groupName,
                         'playlist_id' => $playlistId,
+                        'type' => 'live',
                     ];
                 })->toArray(),
-                uniqueBy: ['name', 'playlist_id'],
+                uniqueBy: ['name', 'playlist_id', 'type'],
                 update: []
             );
         }
@@ -1464,6 +1500,43 @@ class ProcessM3uImport implements ShouldQueue
             // ...if group not selected, check if group starts with any of the included prefixes
             // (only check if the group isn't directly included already)
             foreach ($this->includedGroupPrefixes as $pattern) {
+                if ($this->useRegex) {
+                    // Escape existing delimiters in user input
+                    $delimiter = '/';
+                    $escapedPattern = str_replace($delimiter, '\\' . $delimiter, $pattern);
+                    $finalPattern = $delimiter . $escapedPattern . $delimiter . 'u';
+                    if (preg_match($finalPattern, $groupName)) {
+                        return true;
+                    }
+                } else {
+                    // Use simple string prefix matching
+                    if (str_starts_with($groupName, $pattern)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Determine if the VOD channel should be included
+     *
+     * @param string $groupName
+     */
+    private function shouldIncludeVod($groupName): bool
+    {
+        // Check if group is selected...
+        if (in_array(
+            $groupName,
+            $this->selectedVodGroups
+        )) {
+            // Group selected directly
+            return true;
+        } else {
+            // ...if group not selected, check if group starts with any of the included prefixes
+            // (only check if the group isn't directly included already)
+            foreach ($this->includedVodGroupPrefixes as $pattern) {
                 if ($this->useRegex) {
                     // Escape existing delimiters in user input
                     $delimiter = '/';

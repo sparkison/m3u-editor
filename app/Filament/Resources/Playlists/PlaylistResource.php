@@ -1167,21 +1167,22 @@ class PlaylistResource extends Resource
                         ->helperText('When enabled, groups will be included based on regex pattern match instead of prefix.')
                         ->hidden(fn(Get $get): bool => ! $get('import_prefs.preprocess') || ! $get('status')),
 
-                    Fieldset::make('Channel & VOD processing')
+                    Fieldset::make('Live channel processing')
                         ->schema([
                             ModalTableSelect::make('import_prefs.selected_groups')
                                 ->tableConfiguration(SourceGroupsTable::class)
-                                ->label('Groups to import')
+                                ->label('Live groups to import')
                                 ->columnSpan(1)
                                 ->multiple()
                                 ->helperText('NOTE: If the list is empty, sync the playlist and check again once complete.')
                                 ->tableArguments(fn($record): array => [
                                     'playlist_id' => $record?->id,
+                                    'type' => 'live',
                                 ])
                                 ->selectAction(
                                     fn(Action $action) => $action
-                                        ->label('Select groups')
-                                        ->modalHeading('Search groups')
+                                        ->label('Select live groups')
+                                        ->modalHeading('Search live groups')
                                         ->modalSubmitActionLabel('Confirm selection')
                                         ->button(),
                                 )
@@ -1195,13 +1196,14 @@ class PlaylistResource extends Resource
                                         })
                                         ->requiresConfirmation()
                                         ->modalHeading('Clear selection')
-                                        ->modalDescription('Are you sure you want to clear all selected groups?')
+                                        ->modalDescription('Are you sure you want to clear all selected live groups?')
                                         ->modalSubmitActionLabel('Clear')
                                 )
                                 ->getOptionLabelFromRecordUsing(fn($record) => $record->name)
                                 ->getOptionLabelsUsing(function (array $values, $record): array {
                                     // Values are IDs, return id => name pairs
                                     return SourceGroup::where('playlist_id', $record?->id)
+                                        ->where('type', 'live')
                                         ->whereIn('id', $values)
                                         ->pluck('name', 'id')  // id => name
                                         ->toArray();
@@ -1212,6 +1214,7 @@ class PlaylistResource extends Resource
                                         // Check if first item is a string (name) - need to convert to IDs
                                         if (is_string($state[0] ?? null)) {
                                             $ids = SourceGroup::where('playlist_id', $record?->id)
+                                                ->where('type', 'live')
                                                 ->whereIn('name', $state)
                                                 ->pluck('id')
                                                 ->unique()
@@ -1225,6 +1228,7 @@ class PlaylistResource extends Resource
                                     // Convert IDs back to names for storage
                                     if (is_array($state) && !empty($state)) {
                                         return SourceGroup::where('playlist_id', $record?->id)
+                                            ->where('type', 'live')
                                             ->whereIn('id', $state)
                                             ->pluck('name')
                                             ->unique()
@@ -1234,7 +1238,7 @@ class PlaylistResource extends Resource
                                     return $state;
                                 }),
                             TagsInput::make('import_prefs.included_group_prefixes')
-                                ->label(fn(Get $get) => ! $get('import_prefs.use_regex') ? 'Group prefixes to import' : 'Regex patterns to import')
+                                ->label(fn(Get $get) => ! $get('import_prefs.use_regex') ? 'Live group prefixes to import' : 'Regex patterns to import')
                                 ->helperText('Press [tab] or [return] to add item.')
                                 ->columnSpan(1)
                                 ->suggestions([
@@ -1247,6 +1251,92 @@ class PlaylistResource extends Resource
                                 ])
                                 ->splitKeys(['Tab', 'Return']),
                         ])->hidden(fn(Get $get): bool => ! $get('import_prefs.preprocess') || ! $get('status')),
+
+                    Fieldset::make('VOD processing')
+                        ->schema([
+                            ModalTableSelect::make('import_prefs.selected_vod_groups')
+                                ->tableConfiguration(SourceGroupsTable::class)
+                                ->label('VOD groups to import')
+                                ->columnSpan(1)
+                                ->multiple()
+                                ->helperText('NOTE: If the list is empty, sync the playlist and check again once complete.')
+                                ->tableArguments(fn($record): array => [
+                                    'playlist_id' => $record?->id,
+                                    'type' => 'vod',
+                                ])
+                                ->selectAction(
+                                    fn(Action $action) => $action
+                                        ->label('Select VOD groups')
+                                        ->modalHeading('Search VOD groups')
+                                        ->modalSubmitActionLabel('Confirm selection')
+                                        ->button(),
+                                )
+                                ->hintAction(
+                                    Action::make('clear_groups')
+                                        ->label('Clear all')
+                                        ->icon('heroicon-o-x-mark')
+                                        ->color('danger')
+                                        ->action(function (Set $set) {
+                                            $set('import_prefs.selected_vod_groups', []);
+                                        })
+                                        ->requiresConfirmation()
+                                        ->modalHeading('Clear selection')
+                                        ->modalDescription('Are you sure you want to clear all selected VOD groups?')
+                                        ->modalSubmitActionLabel('Clear')
+                                )
+                                ->getOptionLabelFromRecordUsing(fn($record) => $record->name)
+                                ->getOptionLabelsUsing(function (array $values, $record): array {
+                                    // Values are IDs, return id => name pairs
+                                    return SourceGroup::where('playlist_id', $record?->id)
+                                        ->where('type', 'vod')
+                                        ->whereIn('id', $values)
+                                        ->pluck('name', 'id')  // id => name
+                                        ->toArray();
+                                })
+                                ->afterStateHydrated(function ($component, $state, $record) {
+                                    // Convert names to IDs for display when loading existing data
+                                    if (is_array($state) && !empty($state)) {
+                                        // Check if first item is a string (name) - need to convert to IDs
+                                        if (is_string($state[0] ?? null)) {
+                                            $ids = SourceGroup::where('playlist_id', $record?->id)
+                                                ->where('type', 'vod')
+                                                ->whereIn('name', $state)
+                                                ->pluck('id')
+                                                ->unique()
+                                                ->values()
+                                                ->toArray();
+                                            $component->state($ids);
+                                        }
+                                    }
+                                })
+                                ->dehydrateStateUsing(function ($state, $record) {
+                                    // Convert IDs back to names for storage
+                                    if (is_array($state) && !empty($state)) {
+                                        return SourceGroup::where('playlist_id', $record?->id)
+                                            ->where('type', 'vod')
+                                            ->whereIn('id', $state)
+                                            ->pluck('name')
+                                            ->unique()
+                                            ->values()
+                                            ->toArray();
+                                    }
+                                    return $state;
+                                }),
+                            TagsInput::make('import_prefs.included_vod_group_prefixes')
+                                ->label(fn(Get $get) => ! $get('import_prefs.use_regex') ? 'VOD group prefixes to import' : 'Regex patterns to import')
+                                ->helperText('Press [tab] or [return] to add item.')
+                                ->columnSpan(1)
+                                ->suggestions([
+                                    'US -',
+                                    'UK -',
+                                    'CA -',
+                                    '^(US|UK|CA)',
+                                    'Sports.*HD$',
+                                    '\[.*\]',
+                                ])
+                                ->splitKeys(['Tab', 'Return']),
+                        ])->hidden(fn(Get $get): bool => ! $get('import_prefs.preprocess') || ! $get('status')),
+
 
                     Fieldset::make('Series processing')
                         ->schema([

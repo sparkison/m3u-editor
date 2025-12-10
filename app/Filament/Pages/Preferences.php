@@ -140,7 +140,7 @@ class Preferences extends SettingsPage
                                                     ->label('Show breadcrumbs')
                                                     ->helperText('Show breadcrumbs under the page titles'),
                                                 Toggle::make('output_wan_address')
-                                                    ->label('Output WAN address for streams')
+                                                    ->label('Output WAN address in menu')
                                                     ->helperText('When enabled, the application will output the WAN address of the server m3u-editor is currently running on.')
                                                     ->default(function () {
                                                         return config('dev.show_wan_details') !== null

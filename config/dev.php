@@ -3,8 +3,8 @@
 return [
     'author' => 'Shaun Parkison',
     'version' => '0.7.11',
-    'dev_version' => '0.8.14-dev',
-    'experimental_version' => '0.8.14-exp',
+    'dev_version' => '0.8.15-dev',
+    'experimental_version' => '0.8.15-exp',
     'repo' => 'sparkison/m3u-editor',
     'docs_url' => 'https://sparkison.github.io/m3u-editor-docs',
     'donate' => 'https://buymeacoffee.com/shparkison',
@@ -18,6 +18,7 @@ return [
     'tvgid' => [
         'regex' => env('TVGID_REGEX', '/[^a-zA-Z0-9_\-\.]/'),
     ],
+    'cleanup_source_groups' => env('CLEANUP_SOURCE_GROUPS', true), // Clean up source groups that are no longer used (allow ability to disable for new installs)
     'disable_sync_logs' => env('DISABLE_SYNC_LOGS', false), // Disable sync logs for performance
     'max_channels' => env('MAX_CHANNELS', 50000), // Maximum number of channels allowed for m3u import
     'invalidate_import' => env('INVALIDATE_IMPORT', null), // Invalidate import if number of "new" channels is less than the current count (minus `INVALIDATE_IMPORT_THRESHOLD`)

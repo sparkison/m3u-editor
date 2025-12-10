@@ -25,7 +25,7 @@ return new class extends Migration
                 // Need to replicate this group for VOD
                 $vodGroup = $group->replicate();
                 $vodGroup->type = 'vod';
-                $vodGroup->push();
+                $vodGroup->pushQuietly();
 
                 Channel::where('is_vod', true)
                     ->where('group_id', $group->id)

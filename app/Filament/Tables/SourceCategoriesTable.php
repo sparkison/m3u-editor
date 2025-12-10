@@ -23,6 +23,7 @@ class SourceCategoriesTable
 
                 return $query;
             })
+            ->defaultSort('name', 'asc')
             ->columns([
                 TextColumn::make('name')
                     ->label('Category Name')
