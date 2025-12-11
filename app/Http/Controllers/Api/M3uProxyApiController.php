@@ -76,12 +76,7 @@ class M3uProxyApiController extends Controller
                 $profile
             );
 
-        // Pass username via X-Username header for auth tracking in proxy
-        $headers = [];
-        if ($username) {
-            $headers['X-Username'] = $username;
-        }
-        return redirect($url)->withHeaders($headers);
+        return redirect($url);
     }
 
     /**
@@ -128,12 +123,7 @@ class M3uProxyApiController extends Controller
                 $profile
             );
 
-        // Pass username via X-Username header for auth tracking in proxy
-        $headers = [];
-        if ($username) {
-            $headers['X-Username'] = $username;
-        }
-        return redirect($url)->withHeaders($headers);
+        return redirect($url);
     }
 
     /**
@@ -194,10 +184,7 @@ class M3uProxyApiController extends Controller
                 $profile
             );
 
-        // Pass username via X-Username header for auth tracking in proxy
-        return redirect($url)->withHeaders([
-            'X-Username' => 'm3u editor', // Static username for preview
-        ]);
+        return redirect($url);
     }
 
     /**
@@ -242,10 +229,7 @@ class M3uProxyApiController extends Controller
                 $profile
             );
 
-        // Pass username via X-Username header for auth tracking in proxy
-        return redirect($url)->withHeaders([
-            'X-Username' => 'm3u editor', // Static username for preview
-        ]);
+        return redirect($url);
     }
 
     /**
