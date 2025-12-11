@@ -198,8 +198,7 @@ class PlaylistGenerateController extends Controller
                         // Pass the playlist UUID for merged/custom playlists so the correct context is used
                         $url = ProxyFacade::getProxyUrlForChannel(
                             $channel->id,
-                            $playlist->uuid,
-                            $username
+                            $playlist->uuid
                         );
                     }
                     $url = rtrim($url, '.');
@@ -280,7 +279,6 @@ class PlaylistGenerateController extends Controller
                                 $url = ProxyFacade::getProxyUrlForEpisode(
                                     $episode->id,
                                     $playlist->uuid,
-                                    $username
                                 );
                             }
                             $url = rtrim($url, '.');
