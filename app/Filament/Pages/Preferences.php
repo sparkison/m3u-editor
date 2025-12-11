@@ -269,6 +269,7 @@ class Preferences extends SettingsPage
                                                     ->label('Failover Resolver URL')
                                                     ->columnSpanFull()
                                                     ->url()
+                                                    ->live()
                                                     ->prefixIcon('heroicon-m-link')
                                                     ->disabled(fn() => ! empty(config('proxy.resolver_url')))
                                                     ->hint(fn() => ! empty(config('proxy.resolver_url')) ? 'Already set by environment variable!' : null)
@@ -289,8 +290,11 @@ class Preferences extends SettingsPage
                                                 Action::make('test_failover_connection')
                                                     ->label('Test failover resolver connection')
                                                     ->icon('heroicon-m-signal')
-                                                    ->action(function () use ($service) {
-                                                        $result = $service->testResolver();
+                                                    ->action(function ($get) use ($service) {
+                                                        $configUrl = config('proxy.resolver_url');
+                                                        $url = $configUrl ?? $get('failover_resolver_url');
+                                                        $url = rtrim($url, '/');
+                                                        $result = $service->testResolver($url);
 
                                                         if ($result['success']) {
                                                             Notification::make()

@@ -81,8 +81,11 @@ class M3uProxyService
     /**
      * Test the resolver URL by asking the proxy to verify it can reach the editor.
      * Returns an array with 'success' boolean and 'message' string.
+     * 
+     * @param  string|null  $url  Optional URL to test instead of the configured failover resolver
+     * 
      */
-    public function testResolver(): array
+    public function testResolver($url = null): array
     {
         if (empty($this->apiBaseUrl)) {
             return [
@@ -91,7 +94,7 @@ class M3uProxyService
             ];
         }
 
-        if (empty($this->failoverResolverUrl)) {
+        if (empty(!$url || $this->failoverResolverUrl)) {
             return [
                 'success' => false,
                 'message' => 'Failover resolver URL is not configured',
@@ -106,7 +109,7 @@ class M3uProxyService
                     'X-API-Token' => $this->apiToken,
                 ] : [])
                 ->post($endpoint, [
-                    'url' => $this->failoverResolverUrl . '/up', // Use the Laravel health check endpoint
+                    'url' => ($url ?? $this->failoverResolverUrl) . '/up', // Use the Laravel health check endpoint
                 ]);
 
             if ($response->successful()) {

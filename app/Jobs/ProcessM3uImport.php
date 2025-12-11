@@ -128,7 +128,7 @@ class ProcessM3uImport implements ShouldQueue
     {
         if (!$this->force) {
             // Don't update if currently processing
-            if ($this->playlist->isProcessingLive() || $this->playlist->isProcessingVod()) {
+            if ($this->playlist->isProcessing()) {
                 return;
             }
 
@@ -140,16 +140,18 @@ class ProcessM3uImport implements ShouldQueue
 
         // Update the playlist status to processing
         $this->playlist->update([
-            'processing' => [
-                ...$this->playlist->processing ?? [],
-                'live_processing' => true,
-                'vod_processing' => true,
-            ],
-            'status' => Status::Processing,
+            'status' => Status::Failed,
+            'synced' => now(),
             'errors' => null,
             'progress' => 0,
             'vod_progress' => 0,
             'series_progress' => 0,
+            'processing' => [
+                ...$this->playlist->processing ?? [],
+                'live_processing' => false,
+                'vod_processing' => false,
+                'series_processing' => false,
+            ]
         ]);
 
         // Determine if using Xtream API or M3U+
@@ -189,10 +191,12 @@ class ProcessM3uImport implements ShouldQueue
             'errors' => $error,
             'progress' => 0,
             'vod_progress' => 0,
+            'series_progress' => 0,
             'processing' => [
                 ...$this->playlist->processing ?? [],
                 'live_processing' => false,
                 'vod_processing' => false,
+                'series_processing' => false,
             ]
         ]);
 
@@ -919,16 +923,16 @@ class ProcessM3uImport implements ShouldQueue
         }
 
         // Determine if we should create the channels and groups in the database
-        $preProcessing = $this->preprocess
+        $preProcessingLive = $this->preprocess
             && count($this->selectedGroups) === 0
             && count($this->includedGroupPrefixes) === 0;
 
         // Process live streams collection
         if ($liveStreamsEnabled && $liveCollection) {
-            $liveCollection->groupBy('group')->chunk(10)->each(function (LazyCollection $grouped) use ($userId, $playlistId, $batchNo, $preProcessing, &$groupOrder, &$liveGroups) {
-                $grouped->each(function ($channels, $groupName) use ($userId, $playlistId, $batchNo, $preProcessing, &$groupOrder, &$liveGroups) {
+            $liveCollection->groupBy('group')->chunk(10)->each(function (LazyCollection $grouped) use ($userId, $playlistId, $batchNo, $preProcessingLive, &$groupOrder, &$liveGroups) {
+                $grouped->each(function ($channels, $groupName) use ($userId, $playlistId, $batchNo, $preProcessingLive, &$groupOrder, &$liveGroups) {
                     // Add group and associated channels
-                    if (!$preProcessing) {
+                    if (!$preProcessingLive) {
                         $group = Group::where([
                             'name_internal' => $groupName ?? '',
                             'playlist_id' => $playlistId,
@@ -978,12 +982,17 @@ class ProcessM3uImport implements ShouldQueue
             });
         }
 
+        // Determine if we should create the channels and groups in the database
+        $preProcessingVod = $this->preprocess
+            && count($this->selectedVodGroups) === 0
+            && count($this->includedVodGroupPrefixes) === 0;
+
         // Process VOD streams collection
         if ($vodStreamsEnabled && $vodCollection) {
-            $vodCollection->groupBy('group')->chunk(10)->each(function (LazyCollection $grouped) use ($userId, $playlistId, $batchNo, $preProcessing, &$groupOrder, &$vodGroups) {
-                $grouped->each(function ($channels, $groupName) use ($userId, $playlistId, $batchNo, $preProcessing, &$groupOrder, &$vodGroups) {
+            $vodCollection->groupBy('group')->chunk(10)->each(function (LazyCollection $grouped) use ($userId, $playlistId, $batchNo, $preProcessingVod, &$groupOrder, &$vodGroups) {
+                $grouped->each(function ($channels, $groupName) use ($userId, $playlistId, $batchNo, $preProcessingVod, &$groupOrder, &$vodGroups) {
                     // Add group and associated channels
-                    if (!$preProcessing) {
+                    if (!$preProcessingVod) {
                         $group = Group::where([
                             'name_internal' => $groupName ?? '',
                             'playlist_id' => $playlistId,
@@ -1123,7 +1132,7 @@ class ProcessM3uImport implements ShouldQueue
         }
 
         // Check if preprocessing, and no prefixes or groups selected yet
-        if ($preProcessing) {
+        if ($preProcessingLive && $preProcessingVod) {
             // Flag as complete and notify user
             $completedIn = $start->diffInSeconds(now());
             $completedInRounded = round($completedIn, 2);
@@ -1207,6 +1216,7 @@ class ProcessM3uImport implements ShouldQueue
         );
 
         // Add series processing to the chain, if passed in
+        // This will run after the main channel import is complete
         if ($seriesCategories) {
             $categoryCount = $seriesCategories->count();
             $seriesCategories->each(function ($category, $index) use (&$jobs, $playlistId, $batchNo, $categoryCount) {

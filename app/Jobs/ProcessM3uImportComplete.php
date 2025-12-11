@@ -242,7 +242,7 @@ class ProcessM3uImportComplete implements ShouldQueue
             try {
                 $baseUrl = str($playlist->xtream_config['url'])->replace(' ', '%20')->toString();
                 $username = urlencode($playlist->xtream_config['username']);
-                $password = $playlist->xtream_config['password'];
+                $password = urlencode($playlist->xtream_config['password']);
                 $epgUrl = "$baseUrl/xmltv.php?username=$username&password=$password";
 
                 // Make sure EPG doesn't already exist
@@ -303,10 +303,10 @@ class ProcessM3uImportComplete implements ShouldQueue
             ]
         ];
         if ($this->runningLiveImport) {
-            $update['progress'] = 100; // Only set if Live import was run as well
+            $update['progress'] = 100; // Only set if Live import was run
         }
         if ($this->runningVodImport) {
-            $update['vod_progress'] = 100; // Only set if VOD import was run as well
+            $update['vod_progress'] = 100; // Only set if VOD import was run
         }
         $playlist->update($update);
 

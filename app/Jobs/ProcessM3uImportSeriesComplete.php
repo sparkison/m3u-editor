@@ -31,6 +31,7 @@ class ProcessM3uImportSeriesComplete implements ShouldQueue
     public function handle(): void
     {
         // Update the playlist status to synced
+        $this->playlist->refresh();
         $this->playlist->update([
             'processing' => [
                 ...$this->playlist->processing ?? [],
