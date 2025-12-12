@@ -256,10 +256,10 @@ class Preferences extends SettingsPage
                                                     ->live()
                                                     ->disabled(fn() => ! empty(config('proxy.resolver_url')))
                                                     ->hint(fn() => ! empty(config('proxy.resolver_url')) ? 'Already set by environment variable!' : null)
-                                                    ->default(fn() => ! empty(config('proxy.resolver_url')))
-                                                    ->afterStateHydrated(function (Toggle $component, $state) use ($embedded) {
-                                                        if (! empty(config('proxy.resolver_url')) || $embedded) {
-                                                            $component->state((bool) $embedded ?: config('proxy.resolver_url'));
+                                                    ->default(false)
+                                                    ->afterStateHydrated(function (Toggle $component, $state) {
+                                                        if (! empty(config('proxy.resolver_url'))) {
+                                                            $component->state((bool) config('proxy.resolver_url'));
                                                         }
                                                     })
                                                     ->dehydrated(fn() => empty(config('proxy.resolver_url')))
