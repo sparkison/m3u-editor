@@ -31,7 +31,9 @@ class ProxyService
         }
 
         // Use the override URL or default to application URL
-        $url = $proxyUrlOverride ?? url("");
+        $url = $proxyUrlOverride && filter_var($proxyUrlOverride, FILTER_VALIDATE_URL)
+            ? $proxyUrlOverride
+            : url("");
 
         // Normalize the base url
         $this->baseUrl = rtrim($url, '/');
