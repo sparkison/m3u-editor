@@ -260,7 +260,7 @@ class SyncMediaServer implements ShouldQueue
 
         // Extract runtime in minutes and convert to formatted duration
         $runtimeTicks = $movie['RunTimeTicks'] ?? 0;
-        $runtimeSeconds = $service->ticksToSeconds($runtimeTicks);
+        $runtimeSeconds = $service->ticksToSeconds($runtimeTicks) ?? 0;
         $runtimeMinutes = (int) ($runtimeSeconds / 60);
         $duration = gmdate('H:i:s', $runtimeSeconds);
 
@@ -394,6 +394,9 @@ class SyncMediaServer implements ShouldQueue
     ): void {
         $seriesId = $seriesData['Id'];
         $genres = $service->extractGenres($seriesData);
+        if (empty($genres)) {
+            $genres = ['Uncategorized'];
+        }
 
         // Ensure category exists for the first genre
         $category = $this->ensureCategory($playlist, $genres[0]);
