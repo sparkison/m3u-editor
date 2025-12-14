@@ -150,24 +150,28 @@ class ProcessVodChannels implements ShouldQueue
             ->broadcast($playlist->user)
             ->sendToDatabase($playlist->user);
 
-        // Get channel IDs and chunk them
-        $channelIds = $query->pluck('id')->toArray();
-        $chunks = array_chunk($channelIds, self::CHUNK_SIZE);
-        $totalChunks = count($chunks);
+        // Calculate total chunks without loading all IDs into memory
+        $totalChunks = (int) ceil($total / self::CHUNK_SIZE);
 
         Log::info("Starting chunked VOD processing for playlist ID {$playlist->id}: {$total} channels in {$totalChunks} chunks");
 
-        // Build the job chain
+        // Build the job chain using lazy collection to avoid memory issues
+        // Use cursor/generator approach - only load CHUNK_SIZE IDs at a time
         $jobs = [];
-        foreach ($chunks as $index => $chunkIds) {
+        $chunkIndex = 0;
+
+        // Use chunk() on the query builder which processes in batches without loading all into memory
+        $query->select('id')->orderBy('id')->chunk(self::CHUNK_SIZE, function ($channels) use (&$jobs, &$chunkIndex, $playlist, $totalChunks) {
+            $chunkIds = $channels->pluck('id')->toArray();
             $jobs[] = new ProcessVodChannelsChunk(
                 playlist: $playlist,
                 channelIds: $chunkIds,
-                chunkIndex: $index,
+                chunkIndex: $chunkIndex,
                 totalChunks: $totalChunks,
                 force: $this->force,
             );
-        }
+            $chunkIndex++;
+        });
 
         // Add the completion job at the end
         $jobs[] = new ProcessVodChannelsComplete(
