@@ -393,6 +393,9 @@ class SyncMediaServer implements ShouldQueue
     ): void {
         $seriesId = $seriesData['Id'];
         $genres = $service->extractGenres($seriesData);
+        if (empty($genres)) {
+            $genres = ['Uncategorized'];
+        }
 
         // Ensure category exists for the first genre
         $category = $this->ensureCategory($playlist, $genres[0]);
