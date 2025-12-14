@@ -260,7 +260,7 @@ class SyncMediaServer implements ShouldQueue
 
         // Extract runtime in minutes and convert to formatted duration
         $runtimeTicks = $movie['RunTimeTicks'] ?? 0;
-        $runtimeSeconds = $service->ticksToSeconds($runtimeTicks);
+        $runtimeSeconds = $service->ticksToSeconds($runtimeTicks) ?? 0;
         $runtimeMinutes = (int) ($runtimeSeconds / 60);
         $duration = gmdate('H:i:s', $runtimeSeconds);
 
