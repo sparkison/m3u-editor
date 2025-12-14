@@ -3,7 +3,6 @@
 namespace App\Jobs;
 
 use App\Enums\Status;
-use App\Events\SyncCompleted;
 use App\Models\Channel;
 use App\Models\Playlist;
 use App\Services\XtreamService;
@@ -204,9 +203,6 @@ class ProcessVodChannels implements ShouldQueue
                         'vod_processing' => false,
                     ],
                 ]);
-
-                // Fire the sync completed event
-                event(new SyncCompleted($playlist));
             })->dispatch();
     }
 }

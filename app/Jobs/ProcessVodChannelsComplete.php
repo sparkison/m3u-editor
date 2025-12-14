@@ -3,7 +3,6 @@
 namespace App\Jobs;
 
 use App\Enums\Status;
-use App\Events\SyncCompleted;
 use App\Models\Playlist;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -53,8 +52,5 @@ class ProcessVodChannelsComplete implements ShouldQueue
             ->body($message)
             ->broadcast($this->playlist->user)
             ->sendToDatabase($this->playlist->user);
-
-        // Fire the playlist synced event
-        event(new SyncCompleted($this->playlist));
     }
 }
