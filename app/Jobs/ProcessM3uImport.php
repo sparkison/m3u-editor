@@ -15,6 +15,7 @@ use App\Models\Job;
 use App\Models\Playlist;
 use App\Models\SourceCategory;
 use App\Models\SourceGroup;
+use App\Traits\ProviderRequestDelay;
 use Carbon\Carbon;
 use M3uParser\M3uParser;
 use Filament\Notifications\Notification;
@@ -33,6 +34,7 @@ use M3uParser\Tag\ExtGrp;
 class ProcessM3uImport implements ShouldQueue
 {
     use Queueable;
+    use ProviderRequestDelay;
 
     // Don't retry the job on failure
     public $tries = 1;
@@ -248,6 +250,7 @@ class ProcessM3uImport implements ShouldQueue
             $userAgent = empty($playlist->user_agent) ? $this->userAgent : $playlist->user_agent;
 
             // Get the user info
+            $this->applyProviderRequestDelay();
             $userInfoResponse = Http::withUserAgent($userAgent)
                 ->withOptions(['verify' => $verify])
                 ->timeout(30)
@@ -260,6 +263,7 @@ class ProcessM3uImport implements ShouldQueue
 
             // If including Live streams, get the categories and streams
             if ($liveStreamsEnabled) {
+                $this->applyProviderRequestDelay();
                 $categoriesResponse = Http::withUserAgent($userAgent)
                     ->withOptions(['verify' => $verify])
                     ->timeout(60) // set timeout to one minute
@@ -282,6 +286,7 @@ class ProcessM3uImport implements ShouldQueue
                 if (Storage::disk('local')->exists($liveFp)) {
                     Storage::disk('local')->delete($liveFp);
                 }
+                $this->applyProviderRequestDelay();
                 $liveResponse = Http::withUserAgent($userAgent)
                     ->sink($liveFp) // Save the response to a file for later processing
                     ->withOptions(['verify' => $verify])
@@ -298,6 +303,7 @@ class ProcessM3uImport implements ShouldQueue
 
             // If including VOD, get the categories and streams
             if ($vodStreamsEnabled) {
+                $this->applyProviderRequestDelay();
                 $vodCategoriesResponse = Http::withUserAgent($userAgent)
                     ->withOptions(['verify' => $verify])
                     ->timeout(60) // set timeout to one minute
@@ -320,6 +326,7 @@ class ProcessM3uImport implements ShouldQueue
                 if (Storage::disk('local')->exists($vodFp)) {
                     Storage::disk('local')->delete($vodFp);
                 }
+                $this->applyProviderRequestDelay();
                 $vodResponse = Http::withUserAgent($userAgent)
                     ->sink($vodFp) // Save the response to a file for later processing
                     ->withOptions(['verify' => $verify])
@@ -336,6 +343,7 @@ class ProcessM3uImport implements ShouldQueue
 
             // If including Series streams, get the categories and streams
             if ($seriesStreamsEnabled) {
+                $this->applyProviderRequestDelay();
                 $seriesCategoriesResponse = Http::withUserAgent($userAgent)
                     ->withOptions(['verify' => $verify])
                     ->timeout(60) // set timeout to one minute
@@ -585,6 +593,7 @@ class ProcessM3uImport implements ShouldQueue
                 // We need to grab the file contents first and set to temp file
                 $verify = !$playlist->disable_ssl_verification;
                 $userAgent = empty($playlist->user_agent) ? $this->userAgent : $playlist->user_agent;
+                $this->applyProviderRequestDelay();
                 $response = Http::withUserAgent($userAgent)
                     ->withOptions(['verify' => $verify])
                     ->timeout(60 * 5) // set timeout to five minues

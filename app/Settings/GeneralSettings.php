@@ -101,6 +101,11 @@ class GeneralSettings extends Settings
     public ?int $auto_backup_database_max_backups = 5;
 
 
+    // Provider request delay options
+    public ?bool $enable_provider_request_delay = false;
+    public ?int $provider_request_delay_ms = 500;
+
+
     public static function group(): string
     {
         return 'general';

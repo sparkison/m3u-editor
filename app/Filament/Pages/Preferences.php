@@ -505,6 +505,26 @@ class Preferences extends SettingsPage
 
                         Tab::make('Sync Options')
                             ->schema([
+                                Section::make('Provider Request Delay')
+                                    ->description('Add a delay between requests to providers to avoid rate limiting.')
+                                    ->columnSpan('full')
+                                    ->columns(1)
+                                    ->collapsible(false)
+                                    ->schema([
+                                        Toggle::make('enable_provider_request_delay')
+                                            ->label('Enable request delay')
+                                            ->live()
+                                            ->helperText('When enabled, a delay will be added between requests to the provider during playlist and EPG syncs.'),
+                                        TextInput::make('provider_request_delay_ms')
+                                            ->label('Request delay (milliseconds)')
+                                            ->numeric()
+                                            ->minValue(100)
+                                            ->maxValue(10000)
+                                            ->step(100)
+                                            ->suffix('ms')
+                                            ->hidden(fn($get) => ! $get('enable_provider_request_delay'))
+                                            ->helperText('Delay in milliseconds between requests. Recommended: 500-2000ms. Higher values reduce load on provider but increase sync time.'),
+                                    ]),
                                 Section::make('Sync Invalidation')
                                     ->description('Prevent sync from proceeding if conditions are met.')
                                     ->columnSpan('full')
