@@ -6,6 +6,7 @@ use App\Enums\Status;
 use App\Models\Category;
 use App\Models\Playlist;
 use App\Models\Series;
+use App\Traits\ProviderRequestDelay;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -15,6 +16,7 @@ use JsonMachine\Items;
 class ProcessM3uImportSeriesChunk implements ShouldQueue
 {
     use Queueable;
+    use ProviderRequestDelay;
 
     // Don't retry the job on failure
     public $tries = 1;
@@ -104,6 +106,7 @@ class ProcessM3uImportSeriesChunk implements ShouldQueue
 
         // Get the series streams for this category
         $seriesStreamsUrl = "$baseUrl/player_api.php?username=$user&password=$password&action=get_series&category_id={$sourceCategoryId}";
+        $this->applyProviderRequestDelay();
         $seriesStreamsResponse = Http::withUserAgent($userAgent)
             ->withOptions(['verify' => $verify])
             ->timeout(60) // set timeout to 1 minute
