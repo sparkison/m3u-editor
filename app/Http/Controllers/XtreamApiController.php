@@ -915,6 +915,7 @@ class XtreamApiController extends Controller
                     ->where('is_vod', false)
                     ->pluck('id');
 
+                // Get custom tags assigned to channels
                 $tags = $playlist->groupTags()
                     ->whereIn('id', function ($query) use ($channelIds) {
                         $query->select('tag_id')
@@ -929,6 +930,36 @@ class XtreamApiController extends Controller
                         'category_name' => $tag->name,
                         'parent_id' => 0,
                     ];
+                }
+
+                // Also get original groups for channels without custom tags (fallback)
+                $channelsWithTags = Channel::whereIn('id', $channelIds)
+                    ->whereHas('tags', function ($query) use ($playlist) {
+                        $query->where('type', $playlist->uuid);
+                    })
+                    ->pluck('id');
+
+                $channelsWithoutTags = $channelIds->diff($channelsWithTags);
+
+                if ($channelsWithoutTags->isNotEmpty()) {
+                    $fallbackGroups = \App\Models\Group::whereIn('id', function ($query) use ($channelsWithoutTags) {
+                        $query->select('group_id')
+                            ->from('channels')
+                            ->whereIn('id', $channelsWithoutTags)
+                            ->whereNotNull('group_id');
+                    })->get();
+
+                    foreach ($fallbackGroups as $group) {
+                        // Avoid duplicate category_ids
+                        $existingIds = array_column($liveCategories, 'category_id');
+                        if (!in_array((string)$group->id, $existingIds)) {
+                            $liveCategories[] = [
+                                'category_id' => (string)$group->id,
+                                'category_name' => $group->name,
+                                'parent_id' => 0,
+                            ];
+                        }
+                    }
                 }
             } else {
                 // For regular Playlist and MergedPlaylist, use the groups() relationship
@@ -968,6 +999,7 @@ class XtreamApiController extends Controller
                     ->where('is_vod', true)
                     ->pluck('id');
 
+                // Get custom tags assigned to channels
                 $tags = $playlist->groupTags()
                     ->whereIn('id', function ($query) use ($channelIds) {
                         $query->select('tag_id')
@@ -982,6 +1014,36 @@ class XtreamApiController extends Controller
                         'category_name' => $tag->name,
                         'parent_id' => 0,
                     ];
+                }
+
+                // Also get original groups for channels without custom tags (fallback)
+                $channelsWithTags = Channel::whereIn('id', $channelIds)
+                    ->whereHas('tags', function ($query) use ($playlist) {
+                        $query->where('type', $playlist->uuid);
+                    })
+                    ->pluck('id');
+
+                $channelsWithoutTags = $channelIds->diff($channelsWithTags);
+
+                if ($channelsWithoutTags->isNotEmpty()) {
+                    $fallbackGroups = \App\Models\Group::whereIn('id', function ($query) use ($channelsWithoutTags) {
+                        $query->select('group_id')
+                            ->from('channels')
+                            ->whereIn('id', $channelsWithoutTags)
+                            ->whereNotNull('group_id');
+                    })->get();
+
+                    foreach ($fallbackGroups as $group) {
+                        // Avoid duplicate category_ids
+                        $existingIds = array_column($vodCategories, 'category_id');
+                        if (!in_array((string)$group->id, $existingIds)) {
+                            $vodCategories[] = [
+                                'category_id' => (string)$group->id,
+                                'category_name' => $group->name,
+                                'parent_id' => 0,
+                            ];
+                        }
+                    }
                 }
             } else {
                 // For regular Playlist and MergedPlaylist, use the groups() relationship
@@ -1016,11 +1078,12 @@ class XtreamApiController extends Controller
             $seriesCategories = [];
 
             if ($playlist instanceof CustomPlaylist || ($playlist instanceof PlaylistAlias && $playlist->custom_playlist_id)) {
-                // For CustomPlaylist, get unique tags (groups) from channels with live content
+                // For CustomPlaylist, get unique tags (categories) from series
                 $seriesIds = $playlist->series()
                     ->where('enabled', true)
                     ->pluck('id');
 
+                // Get custom tags assigned to series
                 $tags = $playlist->categoryTags()
                     ->whereIn('id', function ($query) use ($seriesIds) {
                         $query->select('tag_id')
@@ -1035,6 +1098,36 @@ class XtreamApiController extends Controller
                         'category_name' => $tag->name,
                         'parent_id' => 0,
                     ];
+                }
+
+                // Also get original categories for series without custom tags (fallback)
+                $seriesWithTags = Series::whereIn('id', $seriesIds)
+                    ->whereHas('tags', function ($query) use ($playlist) {
+                        $query->where('type', $playlist->uuid . '-category');
+                    })
+                    ->pluck('id');
+
+                $seriesWithoutTags = $seriesIds->diff($seriesWithTags);
+
+                if ($seriesWithoutTags->isNotEmpty()) {
+                    $fallbackCategories = \App\Models\Category::whereIn('id', function ($query) use ($seriesWithoutTags) {
+                        $query->select('category_id')
+                            ->from('series')
+                            ->whereIn('id', $seriesWithoutTags)
+                            ->whereNotNull('category_id');
+                    })->get();
+
+                    foreach ($fallbackCategories as $category) {
+                        // Avoid duplicate category_ids
+                        $existingIds = array_column($seriesCategories, 'category_id');
+                        if (!in_array((string)$category->id, $existingIds)) {
+                            $seriesCategories[] = [
+                                'category_id' => (string)$category->id,
+                                'category_name' => $category->name,
+                                'parent_id' => 0,
+                            ];
+                        }
+                    }
                 }
             } else {
                 // Get categories from series only
