@@ -250,7 +250,7 @@ class ProcessM3uImport implements ShouldQueue
             $userAgent = empty($playlist->user_agent) ? $this->userAgent : $playlist->user_agent;
 
             // Get the user info with provider throttling
-            $userInfoResponse = $this->withProviderThrottling(fn () => Http::withUserAgent($userAgent)
+            $userInfoResponse = $this->withProviderThrottling(fn() => Http::withUserAgent($userAgent)
                 ->withOptions(['verify' => $verify])
                 ->timeout(30)
                 ->throw()->get($userInfo));
@@ -262,7 +262,7 @@ class ProcessM3uImport implements ShouldQueue
 
             // If including Live streams, get the categories and streams
             if ($liveStreamsEnabled) {
-                $categoriesResponse = $this->withProviderThrottling(fn () => Http::withUserAgent($userAgent)
+                $categoriesResponse = $this->withProviderThrottling(fn() => Http::withUserAgent($userAgent)
                     ->withOptions(['verify' => $verify])
                     ->timeout(60) // set timeout to one minute
                     ->throw()->get($liveCategories));
@@ -284,7 +284,7 @@ class ProcessM3uImport implements ShouldQueue
                 if (Storage::disk('local')->exists($liveFp)) {
                     Storage::disk('local')->delete($liveFp);
                 }
-                $liveResponse = $this->withProviderThrottling(fn () => Http::withUserAgent($userAgent)
+                $liveResponse = $this->withProviderThrottling(fn() => Http::withUserAgent($userAgent)
                     ->sink($liveFp) // Save the response to a file for later processing
                     ->withOptions(['verify' => $verify])
                     ->timeout(60 * 5)
@@ -300,7 +300,7 @@ class ProcessM3uImport implements ShouldQueue
 
             // If including VOD, get the categories and streams
             if ($vodStreamsEnabled) {
-                $vodCategoriesResponse = $this->withProviderThrottling(fn () => Http::withUserAgent($userAgent)
+                $vodCategoriesResponse = $this->withProviderThrottling(fn() => Http::withUserAgent($userAgent)
                     ->withOptions(['verify' => $verify])
                     ->timeout(60) // set timeout to one minute
                     ->throw()->get($vodCategories));
@@ -322,7 +322,7 @@ class ProcessM3uImport implements ShouldQueue
                 if (Storage::disk('local')->exists($vodFp)) {
                     Storage::disk('local')->delete($vodFp);
                 }
-                $vodResponse = $this->withProviderThrottling(fn () => Http::withUserAgent($userAgent)
+                $vodResponse = $this->withProviderThrottling(fn() => Http::withUserAgent($userAgent)
                     ->sink($vodFp) // Save the response to a file for later processing
                     ->withOptions(['verify' => $verify])
                     ->timeout(60 * 5)
@@ -338,7 +338,7 @@ class ProcessM3uImport implements ShouldQueue
 
             // If including Series streams, get the categories and streams
             if ($seriesStreamsEnabled) {
-                $seriesCategoriesResponse = $this->withProviderThrottling(fn () => Http::withUserAgent($userAgent)
+                $seriesCategoriesResponse = $this->withProviderThrottling(fn() => Http::withUserAgent($userAgent)
                     ->withOptions(['verify' => $verify])
                     ->timeout(60) // set timeout to one minute
                     ->throw()->get($seriesCategories));
@@ -355,10 +355,10 @@ class ProcessM3uImport implements ShouldQueue
 
             // Get the groups
             $liveGroups = $liveStreamsEnabled && !is_string($liveCategories)
-                ? $liveCategories->pluck('category_name')
+                ? $liveCategories
                 : collect([]);
             $vodGroups = $vodStreamsEnabled && !is_string($vodCategories)
-                ? $vodCategories->pluck('category_name')
+                ? $vodCategories
                 : collect([]);
 
             // Setup common field values
@@ -587,7 +587,7 @@ class ProcessM3uImport implements ShouldQueue
                 // We need to grab the file contents first and set to temp file
                 $verify = !$playlist->disable_ssl_verification;
                 $userAgent = empty($playlist->user_agent) ? $this->userAgent : $playlist->user_agent;
-                $response = $this->withProviderThrottling(fn () => Http::withUserAgent($userAgent)
+                $response = $this->withProviderThrottling(fn() => Http::withUserAgent($userAgent)
                     ->withOptions(['verify' => $verify])
                     ->timeout(60 * 5) // set timeout to five minues
                     ->throw()->get($url->toString()));
@@ -1053,13 +1053,13 @@ class ProcessM3uImport implements ShouldQueue
             foreach ($liveGroups->chunk(10) as $chunk) {
                 SourceGroup::where('type', 'vod')
                     ->where('playlist_id', $playlistId)
-                    ->whereIn('name', $chunk->values())
+                    ->whereIn('name', $chunk->pluck('category_name'))
                     ->delete();
             }
             foreach ($vodGroups->chunk(10) as $chunk) {
                 SourceGroup::where('type', 'live')
                     ->where('playlist_id', $playlistId)
-                    ->whereIn('name', $chunk->values())
+                    ->whereIn('name', $chunk->pluck('category_name'))
                     ->delete();
             }
         }
@@ -1067,28 +1067,30 @@ class ProcessM3uImport implements ShouldQueue
         // Create the source groups
         foreach ($liveGroups->chunk(50) as $chunk) {
             SourceGroup::upsert(
-                collect($chunk)->map(function ($groupName) use ($playlistId) {
+                collect($chunk)->map(function ($group) use ($playlistId) {
                     return [
-                        'name' => $groupName,
+                        'name' => $group['category_name'],
                         'playlist_id' => $playlistId,
+                        'source_group_id' => $group['category_id'],
                         'type' => 'live',
                     ];
                 })->toArray(),
                 uniqueBy: ['name', 'playlist_id', 'type'],
-                update: []
+                update: ['source_group_id'] // not used yet, but keep updated for future use
             );
         }
         foreach ($vodGroups->chunk(50) as $chunk) {
             SourceGroup::upsert(
-                collect($chunk)->map(function ($groupName) use ($playlistId) {
+                collect($chunk)->map(function ($group) use ($playlistId) {
                     return [
-                        'name' => $groupName,
+                        'name' => $group['category_name'],
                         'playlist_id' => $playlistId,
+                        'source_group_id' => $group['category_id'],
                         'type' => 'vod',
                     ];
                 })->toArray(),
                 uniqueBy: ['name', 'playlist_id', 'type'],
-                update: []
+                update: ['source_group_id'] // not used yet, but keep updated for future use
             );
         }
 
@@ -1105,6 +1107,13 @@ class ProcessM3uImport implements ShouldQueue
                         'playlist_id' => $playlist->id,
                         'name' => $category['category_name'],
                         'source_category_id' => $category['category_id'],
+                    ]);
+                } else {
+                    // Update name in case it has changed
+                    // NOTE: this could cause pre-processing to remove previously selected categories if the name changes,
+                    //       which means this now works the same as Source Categories in that regard...
+                    $sc->update([
+                        'name' => $category['category_name'],
                     ]);
                 }
 
