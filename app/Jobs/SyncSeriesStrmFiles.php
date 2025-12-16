@@ -4,6 +4,8 @@ namespace App\Jobs;
 
 use App\Facades\ProxyFacade;
 use App\Models\Series;
+use App\Models\SeriesEpisode;
+use App\Models\StrmFileMapping;
 use App\Models\User;
 use App\Services\PlaylistService;
 use App\Settings\GeneralSettings;
@@ -133,8 +135,9 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 return;
             }
 
-            // Get the path info
-            $path = rtrim($sync_settings['sync_location'], '/');
+            // Get the path info - store original sync location for tracking
+            $syncLocation = rtrim($sync_settings['sync_location'], '/');
+            $path = $syncLocation;
             if (! is_dir($path)) {
                 if ($this->notify) {
                     Notification::make()
@@ -182,23 +185,39 @@ class SyncSeriesStrmFiles implements ShouldQueue
                     ? PlaylistService::makeFilesystemSafe($catName, $replaceChar)
                     : PlaylistService::makeFilesystemSafe($catName);
                 $path .= '/' . $cleanName;
-                if (! is_dir($path)) {
-                    mkdir($path, 0777, true);
-                }
             }
 
             // See if the series is enabled, if not, skip, else create the folder
             if (in_array('series', $pathStructure)) {
-                // Create the series folder
+                // Create the series folder with Trash Guides format support
                 // Remove any special characters from the series name
                 $seriesName = $applyNameFilter($series->name);
-                $cleanName = $cleanSpecialChars
-                    ? PlaylistService::makeFilesystemSafe($seriesName, $replaceChar)
-                    : PlaylistService::makeFilesystemSafe($seriesName);
-                $path .= '/' . $cleanName;
-                if (! is_dir($path)) {
-                    mkdir($path, 0777, true);
+                $seriesFolder = $seriesName;
+
+                // Add year to folder name if available
+                if (! empty($series->release_date)) {
+                    $year = substr($series->release_date, 0, 4);
+                    if (strpos($seriesFolder, "({$year})") === false) {
+                        $seriesFolder .= " ({$year})";
+                    }
                 }
+
+                // Add TVDB/TMDB/IMDB ID to folder name for Trash Guides compatibility
+                $tvdbId = $series->metadata['tvdb_id'] ?? $series->metadata['tvdb'] ?? null;
+                $tmdbId = $series->metadata['tmdb_id'] ?? $series->metadata['tmdb'] ?? null;
+                $imdbId = $series->metadata['imdb_id'] ?? $series->metadata['imdb'] ?? null;
+                if (! empty($tvdbId)) {
+                    $seriesFolder .= " {tvdb-{$tvdbId}}";
+                } elseif (! empty($tmdbId)) {
+                    $seriesFolder .= " {tmdb-{$tmdbId}}";
+                } elseif (! empty($imdbId)) {
+                    $seriesFolder .= " {imdb-{$imdbId}}";
+                }
+
+                $cleanName = $cleanSpecialChars
+                    ? PlaylistService::makeFilesystemSafe($seriesFolder, $replaceChar)
+                    : PlaylistService::makeFilesystemSafe($seriesFolder);
+                $path .= '/' . $cleanName;
             }
 
             // Get filename metadata settings
@@ -244,12 +263,9 @@ class SyncSeriesStrmFiles implements ShouldQueue
 
                 $fileName = "{$fileName}.strm";
 
-                // Create the season folder
+                // Build the season folder path
                 if (in_array('season', $pathStructure)) {
                     $seasonPath = $path . '/Season ' . str_pad($season, 2, '0', STR_PAD_LEFT);
-                    if (! is_dir($seasonPath)) {
-                        mkdir($seasonPath, 0777, true);
-                    }
                     $filePath = $seasonPath . '/' . $fileName;
                 } else {
                     $filePath = $path . '/' . $fileName;
@@ -260,16 +276,26 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 $url = rtrim("/series/{$playlist->user->name}/{$playlist->uuid}/" . $ep->id . "." . $containerExtension, '.');
                 $url = PlaylistService::getBaseUrl($url);
 
-                // Check if the file already exists
-                if (file_exists($filePath)) {
-                    // If the file exists, check if the URL is the same
-                    $currentUrl = file_get_contents($filePath);
-                    if ($currentUrl === $url) {
-                        // Skip if the URL is the same
-                        continue;
-                    }
-                }
-                file_put_contents($filePath, $url);
+                // Build path options for tracking changes
+                $pathOptions = [
+                    'path_structure' => $pathStructure,
+                    'filename_metadata' => $filenameMetadata,
+                    'tmdb_id_format' => $tmdbIdFormat,
+                    'clean_special_chars' => $cleanSpecialChars,
+                    'replace_char' => $replaceChar,
+                    'remove_consecutive_chars' => $removeConsecutiveChars,
+                    'name_filter_enabled' => $nameFilterEnabled,
+                    'name_filter_patterns' => $nameFilterPatterns,
+                ];
+
+                // Use intelligent sync - handles create, rename, and URL updates
+                StrmFileMapping::syncFile(
+                    $ep,
+                    $syncLocation,
+                    $filePath,
+                    $url,
+                    $pathOptions
+                );
             }
 
             // Notify the user

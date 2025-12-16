@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Facades\ProxyFacade;
 use App\Models\Channel;
 use App\Models\Playlist;
+use App\Models\StrmFileMapping;
 use App\Services\PlaylistService;
 use App\Settings\GeneralSettings;
 use Filament\Notifications\Notification;
@@ -71,8 +72,9 @@ class SyncVodStrmFiles implements ShouldQueue
                     continue;
                 }
 
-                // Get the path info
-                $path = rtrim($sync_settings['sync_location'], '/');
+                // Get the path info - store original sync location for tracking
+                $syncLocation = rtrim($sync_settings['sync_location'], '/');
+                $path = $syncLocation;
                 if (! is_dir($path)) {
                     if ($this->notify) {
                         Notification::make()
@@ -113,14 +115,12 @@ class SyncVodStrmFiles implements ShouldQueue
 
                 // Create the group folder if enabled
                 if (in_array('group', $pathStructure)) {
-                    $groupName = $applyNameFilter($channel->group);
+                    $groupName = $channel->group->name ?? $channel->group->name_internal ?? 'Uncategorized';
+                    $groupName = $applyNameFilter($groupName);
                     $group = $cleanSpecialChars
                         ? PlaylistService::makeFilesystemSafe($groupName, $replaceChar)
                         : PlaylistService::makeFilesystemSafe($groupName);
                     $groupPath = $path . '/' . $group;
-                    if (! is_dir($groupPath)) {
-                        mkdir($groupPath, 0777, true);
-                    }
                     $path = $groupPath;
                 }
 
@@ -129,15 +129,28 @@ class SyncVodStrmFiles implements ShouldQueue
                 $title = $applyNameFilter($title);
                 $fileName = $title;
 
-                // Create the VOD Title folder if enabled
-                if (in_array('title', $pathStructure)) {
-                    $title = $cleanSpecialChars
-                        ? PlaylistService::makeFilesystemSafe($title, $replaceChar)
-                        : PlaylistService::makeFilesystemSafe($title);
-                    $titlePath = $path . '/' . $title;
-                    if (! is_dir($titlePath)) {
-                        mkdir($titlePath, 0777, true);
+                // Track if title folder is created (for TMDB ID placement logic)
+                $titleFolderCreated = in_array('title', $pathStructure);
+
+                // Create the VOD Title folder if enabled (with Trash Guides format support)
+                if ($titleFolderCreated) {
+                    $titleFolder = $title;
+
+                    // Add year to folder name if available
+                    if (! empty($channel->year) && strpos($titleFolder, "({$channel->year})") === false) {
+                        $titleFolder .= " ({$channel->year})";
                     }
+
+                    // Add TMDB ID to folder name for Trash Guides compatibility
+                    $tmdbId = $channel->info['tmdb_id'] ?? $channel->movie_data['tmdb_id'] ?? null;
+                    if (! empty($tmdbId)) {
+                        $titleFolder .= " {tmdb-{$tmdbId}}";
+                    }
+
+                    $titleFolder = $cleanSpecialChars
+                        ? PlaylistService::makeFilesystemSafe($titleFolder, $replaceChar)
+                        : PlaylistService::makeFilesystemSafe($titleFolder);
+                    $titlePath = $path . '/' . $titleFolder;
                     $path = $titlePath;
                 }
 
@@ -149,7 +162,9 @@ class SyncVodStrmFiles implements ShouldQueue
                     }
                 }
 
-                if (in_array('tmdb_id', $filenameMetadata)) {
+                // Only add TMDB ID to filename if title folder is NOT created
+                // (If title folder exists, TMDB ID is already in the folder name)
+                if (in_array('tmdb_id', $filenameMetadata) && ! $titleFolderCreated) {
                     $tmdbId = $channel->info['tmdb_id'] ?? $channel->movie_data['tmdb_id'] ?? null;
                     if (! empty($tmdbId)) {
                         $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
@@ -177,16 +192,26 @@ class SyncVodStrmFiles implements ShouldQueue
                 $url = rtrim("/movie/{$playlist->user->name}/{$playlist->uuid}/" . $channel->id . "." . $extension, '.');
                 $url = PlaylistService::getBaseUrl($url);
 
-                // Check if the file already exists
-                if (file_exists($filePath)) {
-                    // If the file exists, check if the URL is the same
-                    $currentUrl = file_get_contents($filePath);
-                    if ($currentUrl === $url) {
-                        // Skip if the URL is the same
-                        continue;
-                    }
-                }
-                file_put_contents($filePath, $url);
+                // Build path options for tracking changes
+                $pathOptions = [
+                    'path_structure' => $pathStructure,
+                    'filename_metadata' => $filenameMetadata,
+                    'tmdb_id_format' => $tmdbIdFormat,
+                    'clean_special_chars' => $cleanSpecialChars,
+                    'replace_char' => $replaceChar,
+                    'remove_consecutive_chars' => $removeConsecutiveChars,
+                    'name_filter_enabled' => $nameFilterEnabled,
+                    'name_filter_patterns' => $nameFilterPatterns,
+                ];
+
+                // Use intelligent sync - handles create, rename, and URL updates
+                StrmFileMapping::syncFile(
+                    $channel,
+                    $syncLocation,
+                    $filePath,
+                    $url,
+                    $pathOptions
+                );
             }
         } catch (\Exception $e) {
             // Log the exception or handle it as needed
