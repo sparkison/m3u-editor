@@ -35,6 +35,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use App\Traits\HasUserFiltering;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
 
 class PlaylistAliasResource extends Resource
 {
@@ -298,6 +300,124 @@ class PlaylistAliasResource extends Resource
                         ->dehydrated(true)
                         ->rules(['exists:custom_playlists,id'])
                 ]),
+
+            Schemas\Components\Fieldset::make('Xtream API Config')
+                ->columns(2)
+                ->schema([
+                    Forms\Components\Select::make('xtream_config_count')
+                        ->label('How many playlists are there?')
+                        ->options([
+                            1 => '1',
+                            2 => '2',
+                            3 => '3',
+                            4 => '4',
+                            5 => '5',
+                            6 => '6',
+                        ])
+                        ->default(1)
+                        ->live()
+                        ->dehydrated(false)
+                        ->hidden(fn (Get $get): bool => ! (bool) $get('custom_playlist_id'))
+                        ->afterStateHydrated(function (Get $get, Set $set, $state, ?PlaylistAlias $record) {
+                            $raw = $record?->xtream_config ?? $get('xtream_config');
+                            $configs = [];
+
+                            if (is_array($raw) && array_key_exists('url', $raw)) {
+                                $configs = [$raw];
+                            } elseif (is_array($raw)) {
+                                foreach ($raw as $item) {
+                                    if (is_array($item) && array_key_exists('url', $item)) {
+                                        $configs[] = $item;
+                                    }
+                                }
+                            }
+
+                            $count = count($configs);
+                            if ($count === 0) {
+                                $count = 1;
+                                $configs = [[]];
+                            }
+
+                            $count = max(1, min(6, $count));
+                            $set('xtream_config', array_slice($configs, 0, $count));
+                            $set('xtream_config_count', $count);
+                        })
+                        ->afterStateUpdated(function (Get $get, Set $set, $state) {
+                            $count = (int) $state;
+                            $count = max(1, min(6, $count));
+
+                            $raw = $get('xtream_config');
+                            $configs = [];
+                            if (is_array($raw) && array_key_exists('url', $raw)) {
+                                $configs = [$raw];
+                            } elseif (is_array($raw)) {
+                                $configs = $raw;
+                            }
+
+                            $configs = array_values($configs);
+                            $configs = array_slice($configs, 0, $count);
+                            while (count($configs) < $count) {
+                                $configs[] = [];
+                            }
+                            $set('xtream_config', $configs);
+                        })
+                        ->columnSpan(2),
+
+                    Tabs::make('xtream_config_tabs')
+                        ->contained(false)
+                        ->columnSpan(2)
+                        ->tabs(function (Get $get) {
+                            $count = (int) ($get('xtream_config_count') ?? 1);
+                            $count = max(1, min(6, $count));
+
+                            $tabs = [];
+                            for ($i = 0; $i < $count; $i++) {
+                                $index = $i + 1;
+                                $tabs[] = Tab::make("Playlist {$index}")
+                                    ->columns(2)
+                                    ->schema([
+                                        Forms\Components\TextInput::make("xtream_config.{$i}.url")
+                                            ->label('Xtream API URL')
+                                            ->live()
+                                            ->helperText('Enter the full url, using <url>:<port> format - without trailing slash (/).')
+                                            ->prefixIcon('heroicon-m-globe-alt')
+                                            ->maxLength(255)
+                                            ->url()
+                                            ->columnSpan(2)
+                                            ->required(),
+                                        Forms\Components\TextInput::make("xtream_config.{$i}.username")
+                                            ->label('Xtream API Username')
+                                            ->live()
+                                            ->required()
+                                            ->columnSpan(1)
+                                            ->afterStateUpdated(function (Get $get, Set $set) use ($i) {
+                                                // Auto-fill alias auth credentials when proxy is enabled and only one upstream config is in use.
+                                                $count = (int) ($get('xtream_config_count') ?? 1);
+                                                if ($get('enable_proxy') && $count === 1 && !$get('username') && !$get('password')) {
+                                                    $set('username', (string)($get("xtream_config.{$i}.username") ?? ''));
+                                                    $set('password', (string)($get("xtream_config.{$i}.password") ?? ''));
+                                                }
+                                            }),
+                                        Forms\Components\TextInput::make("xtream_config.{$i}.password")
+                                            ->label('Xtream API Password')
+                                            ->live()
+                                            ->required()
+                                            ->columnSpan(1)
+                                            ->password()
+                                            ->revealable()
+                                            ->afterStateUpdated(function (Get $get, Set $set) use ($i) {
+                                                // Auto-fill alias auth credentials when proxy is enabled and only one upstream config is in use.
+                                                $count = (int) ($get('xtream_config_count') ?? 1);
+                                                if ($get('enable_proxy') && $count === 1 && !$get('username') && !$get('password')) {
+                                                    $set('username', (string)($get("xtream_config.{$i}.username") ?? ''));
+                                                    $set('password', (string)($get("xtream_config.{$i}.password") ?? ''));
+                                                }
+                                            }),
+                                    ]);
+                            }
+                            return $tabs;
+                        }),
+                    ]),   
 
             Schemas\Components\Fieldset::make('Xtream API Config')
                 ->columns(2)
