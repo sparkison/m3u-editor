@@ -64,15 +64,20 @@ class PlaylistAlias extends Model
             return null;
         }
 
-        $needle = rtrim((string) $url, '/');
+        // Normalize URL for comparison
+        $needle = rtrim(strtolower((string) $url), '/');
 
         foreach ($this->getXtreamConfigs() as $cfg) {
-            $cfgUrl = rtrim((string) ($cfg['url'] ?? ''), '/');
+            // Normalize config URL
+            $cfgUrl = rtrim((string) strtolower($cfg['url'] ?? ''), '/');
+            
+            // If URLs match, return this config
             if ($cfgUrl !== '' && $cfgUrl === $needle) {
                 return $cfg;
             }
         }
 
+        // No matching config found
         return null;
     }
 
@@ -297,23 +302,9 @@ class PlaylistAlias extends Model
             ];
         }
 
-        // Optional convenience:
-        // If proxy is enabled and the alias has exactly one Xtream config, reuse its credentials.
-        // This keeps existing configs working while avoiding conflicts for multi-config Custom Playlists.
-        $configs = $this->getXtreamConfigs();
-        if ($this->enable_proxy && count($configs) === 1) {
-            $cfg = $configs[0];
-            if (!empty($cfg['username']) && !empty($cfg['password'])) {
-                return (object)[
-                    'username' => (string) $cfg['username'],
-                    'password' => (string) $cfg['password'],
-                ];
-            }
-        }
-
         return null;
     }
-    
+
     /**
      * Fetch the Xtream status for this alias
      */
