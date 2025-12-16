@@ -20,7 +20,6 @@ class Group extends Model
         'id' => 'integer',
         'user_id' => 'integer',
         'playlist_id' => 'integer',
-        'sort_order' => 'integer',
     ];
 
     public function user(): BelongsTo
