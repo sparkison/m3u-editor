@@ -105,6 +105,41 @@ class PlaylistGenerateController extends Controller
                     ->select('channels.*')
                     ->get();
 
+                // For custom playlists, re-sort by custom group order (if assigned), falling back to original group order
+                if ($type === 'custom' && $channels->isNotEmpty()) {
+                    $playlistUuid = $playlist->uuid;
+                    $channels = $channels->sort(function ($a, $b) use ($playlistUuid) {
+                        // Get custom tag order for both channels
+                        $aTag = $a->tags->where('type', $playlistUuid)->first();
+                        $bTag = $b->tags->where('type', $playlistUuid)->first();
+
+                        $aOrder = $aTag ? ($aTag->order_column ?? 999999) : ($a->group->sort_order ?? 999999);
+                        $bOrder = $bTag ? ($bTag->order_column ?? 999999) : ($b->group->sort_order ?? 999999);
+
+                        // Primary sort by group/tag order
+                        if ($aOrder !== $bOrder) {
+                            return $aOrder <=> $bOrder;
+                        }
+
+                        // Secondary sort by channel sort
+                        $aSort = $a->sort ?? 999999;
+                        $bSort = $b->sort ?? 999999;
+                        if ($aSort !== $bSort) {
+                            return $aSort <=> $bSort;
+                        }
+
+                        // Tertiary sort by channel number
+                        $aCh = $a->channel ?? '';
+                        $bCh = $b->channel ?? '';
+                        if ($aCh !== $bCh) {
+                            return $aCh <=> $bCh;
+                        }
+
+                        // Final sort by title
+                        return ($a->title ?? '') <=> ($b->title ?? '');
+                    })->values();
+                }
+
                 // Set the auth details
                 if ($usedAuth) {
                     $username = urlencode($usedAuth->username);
