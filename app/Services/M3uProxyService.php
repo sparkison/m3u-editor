@@ -24,6 +24,7 @@ class M3uProxyService
     protected string|null $apiToken;
     protected bool $autoResolve;
     protected bool $usingFailoverResolver;
+    protected bool $stopOldestOnLimit;
     protected string|null $failoverResolverUrl;
 
     public function __construct()
@@ -35,6 +36,9 @@ class M3uProxyService
 
         $this->apiPublicUrl = config('proxy.m3u_proxy_public_url') ? rtrim(config('proxy.m3u_proxy_public_url'), '/') : null;
         $this->apiToken = config('proxy.m3u_proxy_token');
+
+        // Default to not stopping oldest on limit
+        $this->stopOldestOnLimit = false;
 
         // Configure URL resolver settings
         $this->autoResolve = false;
@@ -48,7 +52,7 @@ class M3uProxyService
         try {
             // Load settings from GeneralSettings
             $settings = app(GeneralSettings::class);
-
+            $this->stopOldestOnLimit = (bool) ($settings->proxy_stop_oldest_on_limit ?? false);
             $this->autoResolve = (bool) ($settings->m3u_proxy_public_url_auto_resolve ?? false);
             $this->usingFailoverResolver = (bool) ($settings->enable_failover_resolver ?? false);
             $this->failoverResolverUrl = rtrim($settings->failover_resolver_url ?? '', '/');
@@ -428,6 +432,87 @@ class M3uProxyService
     }
 
     /**
+     * Stop the OLDEST stream for a specific playlist.
+     * 
+     * This implements a "latest wins" behavior - when a playlist reaches its
+     * connection limit, stop the oldest stream to make room for the new one.
+     * 
+     * Only deletes ONE stream (the oldest), unlike stopPlaylistStreams which deletes all.
+     * 
+     * @param string $playlistUuid The playlist UUID
+     * @param int|null $excludeChannelId Optional channel ID to exclude (keep this stream)
+     * @return array Result with deleted_count and success status
+     */
+    public static function stopOldestPlaylistStream(string $playlistUuid, ?int $excludeChannelId = null): array
+    {
+        $service = new self();
+
+        if (empty($service->apiBaseUrl)) {
+            return [
+                'success' => false,
+                'message' => 'M3U Proxy base URL is not configured',
+                'deleted_count' => 0,
+            ];
+        }
+
+        try {
+            $endpoint = $service->apiBaseUrl . '/streams/oldest-by-metadata';
+            $params = [
+                'field' => 'playlist_uuid',
+                'value' => $playlistUuid,
+            ];
+
+            if ($excludeChannelId !== null) {
+                $params['exclude_channel_id'] = (string) $excludeChannelId;
+            }
+
+            $response = Http::timeout(5)->acceptJson()
+                ->withHeaders($service->apiToken ? [
+                    'X-API-Token' => $service->apiToken,
+                ] : [])
+                ->delete($endpoint, $params);
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                // Invalidate cache since we stopped a stream
+                if ($data['deleted_count'] > 0) {
+                    self::invalidateMetadataCache('playlist_uuid', $playlistUuid);
+                }
+
+                Log::info('Successfully stopped oldest stream for playlist', [
+                    'playlist_uuid' => $playlistUuid,
+                    'exclude_channel_id' => $excludeChannelId,
+                    'deleted_stream' => $data['deleted_stream'] ?? null,
+                    'stream_age_seconds' => $data['stream_age_seconds'] ?? null,
+                ]);
+
+                return [
+                    'success' => true,
+                    'message' => $data['message'] ?? 'Oldest stream stopped successfully',
+                    'deleted_count' => $data['deleted_count'] ?? 0,
+                    'deleted_stream' => $data['deleted_stream'] ?? null,
+                    'stream_age_seconds' => $data['stream_age_seconds'] ?? null,
+                ];
+            }
+
+            Log::warning('Failed to stop oldest stream: HTTP ' . $response->status());
+            return [
+                'success' => false,
+                'message' => 'HTTP error: ' . $response->status(),
+                'deleted_count' => 0,
+            ];
+        } catch (Exception $e) {
+            Log::warning("Failed to stop oldest stream for playlist ({$playlistUuid}): " . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+                'deleted_count' => 0,
+            ];
+        }
+    }
+
+    /**
      * Check if an episode is currently active (being streamed) via m3u-proxy.
      */
     public static function isEpisodeActive(Episode $episode): bool
@@ -496,48 +581,70 @@ class M3uProxyService
             $originalUuid = $playlist->uuid;
 
             if ($activeStreams >= $playlist->available_streams) {
-                // Primary playlist is at capacity, check failovers
-                $failoverChannels = $channel->failoverChannels()
-                    ->select([
-                        'channels.id',
-                        'channels.url',
-                        'channels.url_custom',
-                        'channels.playlist_id',
-                        'channels.custom_playlist_id',
-                    ])->get();
+                // Check if "stop oldest on limit" is enabled in settings
+                if ($this->stopOldestOnLimit) {
+                    // Stop the oldest stream to make room for the new one (latest wins)
+                    $stopResult = self::stopOldestPlaylistStream($playlist->uuid, $id);
 
-                foreach ($failoverChannels as $failoverChannel) {
-                    $failoverPlaylist = $failoverChannel->getEffectivePlaylist();
+                    if ($stopResult['deleted_count'] > 0) {
+                        Log::info('Stopped oldest stream to free capacity for new channel request', [
+                            'channel_id' => $id,
+                            'playlist_uuid' => $playlist->uuid,
+                            'stopped_stream' => $stopResult['deleted_stream'] ?? null,
+                            'stream_age_seconds' => $stopResult['stream_age_seconds'] ?? null,
+                        ]);
 
-                    // Check if failover playlist has limits and capacity
-                    if ($failoverPlaylist->available_streams === 0) {
-                        // No limits on this failover playlist, use it
-                        $playlist = $failoverPlaylist;
-                        $primaryUrl = PlaylistUrlService::getChannelUrl($failoverChannel, $playlist);
-                        break;
-                    } else {
-                        // Check if failover playlist has capacity
-                        $failoverActiveStreams = self::getActiveStreamsCountByMetadata('playlist_uuid', $failoverPlaylist->uuid);
-
-                        if ($failoverActiveStreams < $failoverPlaylist->available_streams) {
-                            // Found available failover playlist
-                            $playlist = $failoverPlaylist;
-                            $primaryUrl = PlaylistUrlService::getChannelUrl($failoverChannel, $playlist);
-                            break;
-                        }
+                        // Short delay to allow proxy to clean up
+                        usleep(100000); // 100ms
+                        $activeStreams = self::getActiveStreamsCountByMetadata('playlist_uuid', $playlist->uuid);
                     }
                 }
 
-                // If we still have the original playlist, all are at capacity
-                if ($playlist->uuid === $originalUuid) {
-                    Log::info('Channel stream request denied - all playlists at capacity', [
-                        'channel_id' => $id,
-                        'primary_playlist' => $playlist->uuid,
-                        'primary_limit' => $playlist->available_streams,
-                        'primary_active' => $activeStreams
-                    ]);
+                // If still at capacity (either setting disabled or stop failed), check failovers
+                if ($activeStreams >= $playlist->available_streams) {
+                    // Primary playlist is at capacity, check failovers
+                    $failoverChannels = $channel->failoverChannels()
+                        ->select([
+                            'channels.id',
+                            'channels.url',
+                            'channels.url_custom',
+                            'channels.playlist_id',
+                            'channels.custom_playlist_id',
+                        ])->get();
 
-                    abort(503, 'All playlists have reached their maximum stream limit. Please try again later.');
+                    foreach ($failoverChannels as $failoverChannel) {
+                        $failoverPlaylist = $failoverChannel->getEffectivePlaylist();
+
+                        // Check if failover playlist has limits and capacity
+                        if ($failoverPlaylist->available_streams === 0) {
+                            // No limits on this failover playlist, use it
+                            $playlist = $failoverPlaylist;
+                            $primaryUrl = PlaylistUrlService::getChannelUrl($failoverChannel, $playlist);
+                            break;
+                        } else {
+                            // Check if failover playlist has capacity
+                            $failoverActiveStreams = self::getActiveStreamsCountByMetadata('playlist_uuid', $failoverPlaylist->uuid);
+
+                            if ($failoverActiveStreams < $failoverPlaylist->available_streams) {
+                                // Found available failover playlist
+                                $playlist = $failoverPlaylist;
+                                $primaryUrl = PlaylistUrlService::getChannelUrl($failoverChannel, $playlist);
+                                break;
+                            }
+                        }
+                    }
+
+                    // If we still have the original playlist, all are at capacity
+                    if ($playlist->uuid === $originalUuid) {
+                        Log::info('Channel stream request denied - all playlists at capacity', [
+                            'channel_id' => $id,
+                            'primary_playlist' => $playlist->uuid,
+                            'primary_limit' => $playlist->available_streams,
+                            'primary_active' => $activeStreams
+                        ]);
+
+                        abort(503, 'All playlists have reached their maximum stream limit. Please try again later.');
+                    }
                 }
             }
         }
@@ -633,14 +740,36 @@ class M3uProxyService
             $activeStreams = self::getCachedActiveStreamsCountByMetadata('playlist_uuid', $playlist->uuid, 1);
 
             if ($activeStreams >= $playlist->available_streams) {
-                Log::info('Episode stream request denied - playlist at capacity', [
-                    'episode_id' => $id,
-                    'playlist' => $playlist->uuid,
-                    'limit' => $playlist->available_streams,
-                    'active' => $activeStreams
-                ]);
+                // Check if "stop oldest on limit" is enabled in settings
+                if ($this->stopOldestOnLimit) {
+                    // Stop the oldest stream to make room for the new one (latest wins)
+                    $stopResult = self::stopOldestPlaylistStream($playlist->uuid, $id);
 
-                abort(503, 'Playlist has reached its maximum stream limit. Please try again later.');
+                    if ($stopResult['deleted_count'] > 0) {
+                        Log::info('Stopped oldest stream to free capacity for new episode request', [
+                            'episode_id' => $id,
+                            'playlist_uuid' => $playlist->uuid,
+                            'stopped_stream' => $stopResult['deleted_stream'] ?? null,
+                            'stream_age_seconds' => $stopResult['stream_age_seconds'] ?? null,
+                        ]);
+
+                        // Short delay to allow proxy to clean up
+                        usleep(100000); // 100ms
+                        $activeStreams = self::getCachedActiveStreamsCountByMetadata('playlist_uuid', $playlist->uuid, 0);
+                    }
+                }
+
+                // If still at capacity (either setting disabled or stop failed), deny the request
+                if ($activeStreams >= $playlist->available_streams) {
+                    Log::info('Episode stream request denied - playlist at capacity', [
+                        'episode_id' => $id,
+                        'playlist' => $playlist->uuid,
+                        'limit' => $playlist->available_streams,
+                        'active' => $activeStreams
+                    ]);
+
+                    abort(503, 'Playlist has reached its maximum stream limit. Please try again later.');
+                }
             }
         }
 
