@@ -17,7 +17,7 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, HasAvatar
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, HasApiTokens;
+    use HasApiTokens, HasFactory, Notifiable;
 
     /**
      * The attributes that should be hidden for serialization.
@@ -30,22 +30,6 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         'app_authentication_secret',
         'app_authentication_recovery_codes',
     ];
-
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
-    protected function casts(): array
-    {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-            // 'avatar_url' => 'array'
-            'app_authentication_secret' => 'encrypted',
-            'app_authentication_recovery_codes' => 'encrypted:array',
-        ];
-    }
 
     public function getAppAuthenticationSecret(): ?string
     {
@@ -149,6 +133,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         $uuids = array_merge($uuids, $this->customPlaylists()->select('id', 'user_id', 'uuid')->pluck('uuid')->toArray());
         $uuids = array_merge($uuids, $this->mergedPlaylists()->select('id', 'user_id', 'uuid')->pluck('uuid')->toArray());
         $uuids = array_merge($uuids, $this->playlistAliases()->select('id', 'user_id', 'uuid')->pluck('uuid')->toArray());
+
         return $uuids;
     }
 
@@ -182,5 +167,21 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function isAdmin(): bool
     {
         return in_array($this->email, config('dev.admin_emails', []));
+    }
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+            // 'avatar_url' => 'array'
+            'app_authentication_secret' => 'encrypted',
+            'app_authentication_recovery_codes' => 'encrypted:array',
+        ];
     }
 }

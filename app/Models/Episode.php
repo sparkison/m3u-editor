@@ -3,14 +3,13 @@
 namespace App\Models;
 
 use App\Settings\GeneralSettings;
-use Exception;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process as SymfonyProcess;
-use Illuminate\Support\Str;
 
 class Episode extends Model
 {
@@ -83,7 +82,7 @@ class Episode extends Model
         }
 
         return [
-            'id' => 'episode-' . $this->id,
+            'id' => 'episode-'.$this->id,
             'title' => $this->title,
             'url' => $url,
             'format' => $profile->format ?? $format,
@@ -120,6 +119,7 @@ class Episode extends Model
             );
             if ($hasErrors) {
                 Log::error("Error running ffprobe for episode \"{$this->title}\": {$errors}");
+
                 return [];
             }
             $json = json_decode($output, true);
@@ -143,11 +143,13 @@ class Episode extends Model
                         ];
                     }
                 }
+
                 return $streamStats;
             }
         } catch (Exception $e) {
             Log::error("Error running ffprobe for episode \"{$this->title}\": {$e->getMessage()}");
         }
+
         return [];
     }
 
@@ -156,7 +158,7 @@ class Episode extends Model
      */
     public function getAddedAttribute($value)
     {
-        if (!$value) {
+        if (! $value) {
             return null;
         }
 

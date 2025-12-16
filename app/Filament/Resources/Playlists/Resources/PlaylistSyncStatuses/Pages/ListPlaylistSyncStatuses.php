@@ -10,6 +10,13 @@ class ListPlaylistSyncStatuses extends ListRecords
 {
     protected static string $resource = PlaylistSyncStatusResource::class;
 
+    public function getTitle(): string
+    {
+        $playlist = $this->getParentRecord();
+
+        return "Sync Logs for {$playlist->name}";
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -23,12 +30,6 @@ class ListPlaylistSyncStatuses extends ListRecords
             // Sync statuses are typically created automatically by the system
             // Actions\CreateAction::make(),
         ];
-    }
-
-    public function getTitle(): string
-    {
-        $playlist = $this->getParentRecord();
-        return "Sync Logs for {$playlist->name}";
     }
 
     protected function getHeaderWidgets(): array

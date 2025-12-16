@@ -6,6 +6,7 @@ use App\Enums\Status;
 use App\Models\Channel;
 use App\Models\Playlist;
 use App\Services\XtreamService;
+use Exception;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -17,14 +18,14 @@ class ProcessVodChannels implements ShouldQueue
 {
     use Queueable;
 
+    // Number of channels to process per chunk
+    public const CHUNK_SIZE = 100;
+
     // Don't retry the job on failure
     public $tries = 1;
 
     // Timeout for initial setup (not for processing all channels)
     public $timeout = 60 * 5;
-
-    // Number of channels to process per chunk
-    public const CHUNK_SIZE = 100;
 
     /**
      * Create a new job instance.
@@ -49,12 +50,14 @@ class ProcessVodChannels implements ShouldQueue
         }
         if ($playlist === null) {
             Log::error('Unable to process VOD channels: Playlist is null');
+
             return;
         }
 
         // If processing a single channel, use direct processing
         if ($this->channel) {
             $this->processSingleChannel($xtream, $playlist);
+
             return;
         }
 
@@ -71,25 +74,26 @@ class ProcessVodChannels implements ShouldQueue
             playlist: $playlist,
             retryLimit: 5
         );
-        if (!$xtream) {
-            Log::error('Xtream service initialization failed for playlist ID ' . $playlist->id);
+        if (! $xtream) {
+            Log::error('Xtream service initialization failed for playlist ID '.$playlist->id);
+
             return;
         }
 
         try {
             $this->channel->fetchMetadata($xtream);
-            Log::info('Completed processing VOD data for channel ID ' . $this->channel->id);
+            Log::info('Completed processing VOD data for channel ID '.$this->channel->id);
             Notification::make()
                 ->title('VOD Channel Processed')
-                ->body('Successfully processed VOD data for channel: ' . $this->channel->name)
+                ->body('Successfully processed VOD data for channel: '.$this->channel->name)
                 ->success()
                 ->broadcast($playlist->user)
                 ->sendToDatabase($playlist->user);
-        } catch (\Exception $e) {
-            Log::error('Failed to process VOD data for channel ID ' . $this->channel->id . ': ' . $e->getMessage());
+        } catch (Exception $e) {
+            Log::error('Failed to process VOD data for channel ID '.$this->channel->id.': '.$e->getMessage());
             Notification::make()
                 ->title('VOD Processing Error')
-                ->body('Failed to process VOD data for channel: ' . $this->channel->name . '. Error: ' . $e->getMessage())
+                ->body('Failed to process VOD data for channel: '.$this->channel->name.'. Error: '.$e->getMessage())
                 ->danger()
                 ->broadcast($playlist->user)
                 ->sendToDatabase($playlist->user);
@@ -108,7 +112,7 @@ class ProcessVodChannels implements ShouldQueue
                 ['enabled', true],
                 ['source_id', '!=', null],
             ])
-            ->when(!$this->force, function ($query) {
+            ->when(! $this->force, function ($query) {
                 return $query->where(function ($query) {
                     $query->whereNull('info')
                         ->orWhereNull('movie_data');
@@ -118,7 +122,7 @@ class ProcessVodChannels implements ShouldQueue
         $total = $query->count();
 
         if ($total === 0) {
-            Log::info('No VOD channels to process for playlist ID ' . $playlist->id);
+            Log::info('No VOD channels to process for playlist ID '.$playlist->id);
             $playlist->update([
                 'processing' => [
                     ...$playlist->processing ?? [],
@@ -127,6 +131,7 @@ class ProcessVodChannels implements ShouldQueue
                 'status' => Status::Completed,
                 'vod_progress' => 100,
             ]);
+
             return;
         }
 

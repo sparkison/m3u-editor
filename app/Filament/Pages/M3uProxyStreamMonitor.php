@@ -7,13 +7,13 @@ use App\Models\Channel;
 use App\Models\Episode;
 use App\Models\StreamProfile;
 use App\Services\M3uProxyService;
-use App\Services\ProxyService;
 use Carbon\Carbon;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Enums\Size;
+use UnitEnum;
 
 /**
  * Shared Stream Monitor (External API-backed)
@@ -22,26 +22,6 @@ use Filament\Support\Enums\Size;
  */
 class M3uProxyStreamMonitor extends Page
 {
-    protected static ?string $navigationLabel = 'Stream Monitor';
-
-    protected static ?string $title = 'M3U Proxy Stream Monitor';
-
-    /**
-     * Check if the user can access this page.
-     * Only admin users can access the Preferences page.
-     */
-    public static function canAccess(): bool
-    {
-        return true; // Allow all users to access the stream monitor
-        // return auth()->check() && auth()->user()->isAdmin();
-    }
-
-    protected static string|\UnitEnum|null $navigationGroup = 'Proxy';
-
-    protected static ?int $navigationSort = 6;
-
-    protected string $view = 'filament.pages.m3u-proxy-stream-monitor';
-
     public $streams = [];
 
     public $globalStats = [];
@@ -52,7 +32,27 @@ class M3uProxyStreamMonitor extends Page
 
     public $connectionError = null;
 
+    protected static ?string $navigationLabel = 'Stream Monitor';
+
+    protected static ?string $title = 'M3U Proxy Stream Monitor';
+
+    protected static string|UnitEnum|null $navigationGroup = 'Proxy';
+
+    protected static ?int $navigationSort = 6;
+
+    protected string $view = 'filament.pages.m3u-proxy-stream-monitor';
+
     protected M3uProxyService $apiService;
+
+    /**
+     * Check if the user can access this page.
+     * Only admin users can access the Preferences page.
+     */
+    public static function canAccess(): bool
+    {
+        return true; // Allow all users to access the stream monitor
+        // return auth()->check() && auth()->user()->isAdmin();
+    }
 
     public function boot(): void
     {
@@ -68,9 +68,9 @@ class M3uProxyStreamMonitor extends Page
     {
         $this->streams = $this->getActiveStreams();
 
-        $totalClients = array_sum(array_map(fn($s) => $s['client_count'] ?? 0, $this->streams));
-        $totalBandwidth = array_sum(array_map(fn($s) => $s['bandwidth_kbps'] ?? 0, $this->streams));
-        $activeStreams = count(array_filter($this->streams, fn($s) => $s['status'] === 'active'));
+        $totalClients = array_sum(array_map(fn ($s) => $s['client_count'] ?? 0, $this->streams));
+        $totalBandwidth = array_sum(array_map(fn ($s) => $s['bandwidth_kbps'] ?? 0, $this->streams));
+        $activeStreams = count(array_filter($this->streams, fn ($s) => $s['status'] === 'active'));
 
         $this->globalStats = [
             'total_streams' => count($this->streams),
@@ -83,30 +83,6 @@ class M3uProxyStreamMonitor extends Page
         ];
 
         $this->systemStats = []; // populate if external API provides system metrics
-    }
-
-    protected function getHeaderActions(): array
-    {
-        return [
-            Action::make('refresh')
-                ->label('Refresh')
-                ->icon('heroicon-o-arrow-path')
-                ->size(Size::Small)
-                ->action('refreshData'),
-
-            // Action::make('cleanup')
-            //     ->label('Cleanup Streams')
-            //     ->icon('heroicon-o-trash')
-            //     ->size(Size::Small)
-            //     ->color('danger')
-            //     ->requiresConfirmation()
-            //     ->modalDescription('This will stop all inactive streams via external API.')
-            //     ->action(function (): void {
-            //         // If external API exposes a cleanup endpoint add call here
-            //         Notification::make()->title('Cleanup requested.')->success()->send();
-            //         $this->refreshData();
-            //     }),
-        ];
     }
 
     public function triggerFailover(string $streamId): void
@@ -159,6 +135,41 @@ class M3uProxyStreamMonitor extends Page
         }
 
         $this->refreshData();
+    }
+
+    public function getViewData(): array
+    {
+        return [
+            'streams' => $this->streams,
+            'globalStats' => $this->globalStats,
+            'systemStats' => $this->systemStats,
+            'refreshInterval' => $this->refreshInterval,
+            'connectionError' => $this->connectionError,
+        ];
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('refresh')
+                ->label('Refresh')
+                ->icon('heroicon-o-arrow-path')
+                ->size(Size::Small)
+                ->action('refreshData'),
+
+            // Action::make('cleanup')
+            //     ->label('Cleanup Streams')
+            //     ->icon('heroicon-o-trash')
+            //     ->size(Size::Small)
+            //     ->color('danger')
+            //     ->requiresConfirmation()
+            //     ->modalDescription('This will stop all inactive streams via external API.')
+            //     ->action(function (): void {
+            //         // If external API exposes a cleanup endpoint add call here
+            //         Notification::make()->title('Cleanup requested.')->success()->send();
+            //         $this->refreshData();
+            //     }),
+        ];
     }
 
     protected function getActiveStreams(): array
@@ -263,7 +274,7 @@ class M3uProxyStreamMonitor extends Page
                 if ($profile) {
                     $transcodingFormat = $profile->format === 'm3u8'
                         ? 'HLS'
-                        : strtoupper($profile->format);
+                        : mb_strtoupper($profile->format);
                 }
             }
 
@@ -271,7 +282,7 @@ class M3uProxyStreamMonitor extends Page
                 'stream_id' => $streamId,
                 'source_url' => $this->truncateUrl($stream['original_url']),
                 'current_url' => $stream['current_url'],
-                'format' => strtoupper($stream['stream_type']),
+                'format' => mb_strtoupper($stream['stream_type']),
                 'status' => $stream['is_active'] && $stream['client_count'] > 0 ? 'active' : 'idle',
                 'client_count' => $stream['client_count'],
                 'bandwidth_kbps' => $bandwidthKbps,
@@ -295,11 +306,11 @@ class M3uProxyStreamMonitor extends Page
     // Reuse helper methods from original monitor
     protected function truncateUrl(string $url, int $maxLength = 50): string
     {
-        if (strlen($url) <= $maxLength) {
+        if (mb_strlen($url) <= $maxLength) {
             return $url;
         }
 
-        return substr($url, 0, $maxLength - 3) . '...';
+        return mb_substr($url, 0, $maxLength - 3).'...';
     }
 
     protected function formatBytes(int $bytes, int $precision = 2): string
@@ -310,17 +321,6 @@ class M3uProxyStreamMonitor extends Page
             $bytes /= 1024;
         }
 
-        return round($bytes, $precision) . ' ' . $units[$i];
-    }
-
-    public function getViewData(): array
-    {
-        return [
-            'streams' => $this->streams,
-            'globalStats' => $this->globalStats,
-            'systemStats' => $this->systemStats,
-            'refreshInterval' => $this->refreshInterval,
-            'connectionError' => $this->connectionError,
-        ];
+        return round($bytes, $precision).' '.$units[$i];
     }
 }

@@ -4,9 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Facades\PlaylistFacade;
 use App\Models\Channel;
+use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Redis;
 
 /**
  * @tags Channels
@@ -152,7 +152,7 @@ class ChannelController extends Controller
         $streamStats = [];
         try {
             $streamStats = $channel->stream_stats;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $streamStats = [
                 'error' => 'Unable to retrieve stream statistics',
             ];
@@ -251,11 +251,12 @@ class ChannelController extends Controller
             $stats = [];
             try {
                 $stats = $channel->stream_stats;
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $stats = [
                     'error' => 'Unable to retrieve stream statistics',
                 ];
             }
+
             return [
                 'channel_id' => $channel->id,
                 'title' => $channel->title_custom ?? $channel->title,

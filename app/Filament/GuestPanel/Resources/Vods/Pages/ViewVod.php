@@ -2,7 +2,6 @@
 
 namespace App\Filament\GuestPanel\Resources\Vods\Pages;
 
-use App\Facades\PlaylistFacade;
 use App\Filament\GuestPanel\Pages\Concerns\HasPlaylist;
 use App\Filament\GuestPanel\Resources\Vods\VodResource;
 use Filament\Actions;
@@ -21,18 +20,6 @@ class ViewVod extends ViewRecord
     public function getTitle(): string|Htmlable
     {
         return $this->record->name;
-    }
-
-    protected function getHeaderActions(): array
-    {
-        return [
-            Actions\Action::make('back')
-                ->label('Back to VOD')
-                ->url(VodResource::getUrl('index'))
-                ->icon('heroicon-s-arrow-left')
-                ->color('gray')
-                ->size('sm'),
-        ];
     }
 
     public function infolist(Schemas\Schema $schema): Schemas\Schema
@@ -64,5 +51,17 @@ class ViewVod extends ViewRecord
                             ->label('Group'),
                     ]),
             ]);
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Actions\Action::make('back')
+                ->label('Back to VOD')
+                ->url(VodResource::getUrl('index'))
+                ->icon('heroicon-s-arrow-left')
+                ->color('gray')
+                ->size('sm'),
+        ];
     }
 }

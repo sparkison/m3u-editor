@@ -8,9 +8,7 @@ use Illuminate\Http\JsonResponse;
 
 class SystemInfoController extends Controller
 {
-    public function __construct(private GitInfoService $gitInfoService)
-    {
-    }
+    public function __construct(private GitInfoService $gitInfoService) {}
 
     /**
      * Get comprehensive system information including git details.
@@ -18,13 +16,13 @@ class SystemInfoController extends Controller
     public function getSystemInfo(): JsonResponse
     {
         $gitInfo = $this->gitInfoService->getGitInfo();
-        
+
         return response()->json([
             'git' => [
                 'source' => $gitInfo['source'],
                 'branch' => $gitInfo['branch'],
                 'commit' => $gitInfo['commit'],
-                'commit_short' => $gitInfo['commit'] ? substr($gitInfo['commit'], 0, 8) : null,
+                'commit_short' => $gitInfo['commit'] ? mb_substr($gitInfo['commit'], 0, 8) : null,
                 'tag' => $gitInfo['tag'],
                 'build_date' => $gitInfo['build_date'],
                 'is_production' => $this->gitInfoService->isProduction(),

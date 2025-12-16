@@ -65,27 +65,6 @@ class SimilaritySearchService
     private $removeQualityIndicators = false;
 
     /**
-     * Sanitizes UTF-8 encoding in strings to prevent PostgreSQL errors.
-     *
-     * @param  string|null  $value
-     * @return string|null
-     */
-    private function sanitizeUtf8(?string $value): ?string
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        // Convert to valid UTF-8, removing invalid sequences
-        $sanitized = mb_convert_encoding($value, 'UTF-8', 'UTF-8');
-
-        // Remove control characters that can cause issues
-        $sanitized = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $sanitized);
-
-        return $sanitized;
-    }
-
-    /**
      * Find the best matching EPG channel for a given channel.
      *
      * @param  Channel  $channel
@@ -114,10 +93,10 @@ class SimilaritySearchService
         // Sanitize UTF-8 encoding immediately to prevent PostgreSQL errors
         $title = $this->sanitizeUtf8($channel->title_custom ?? $channel->title);
         $name = $this->sanitizeUtf8($channel->name_custom ?? $channel->name);
-        $fallbackName = trim($title ?: $name);
+        $fallbackName = mb_trim($title ?: $name);
         $normalizedChan = $this->normalizeChannelName($fallbackName);
 
-        if (! $normalizedChan || strlen($normalizedChan) < $this->minChannelLength) {
+        if (! $normalizedChan || mb_strlen($normalizedChan) < $this->minChannelLength) {
             if ($debug) {
                 Log::debug("Channel {$channel->id} '{$fallbackName}' => empty or too short after normalization, skipping");
             }
@@ -202,8 +181,8 @@ class SimilaritySearchService
             }
 
             // Also try with less aggressive normalization (keep more info)
-            $epgNameOriginal = mb_strtolower(trim($epgChannel->name ?? $epgChannel->channel_id), 'UTF-8');
-            $channelNameOriginal = mb_strtolower(trim($fallbackName), 'UTF-8');
+            $epgNameOriginal = mb_strtolower(mb_trim($epgChannel->name ?? $epgChannel->channel_id), 'UTF-8');
+            $channelNameOriginal = mb_strtolower(mb_trim($fallbackName), 'UTF-8');
 
             // Calculate fuzzy similarity with normalized names
             $score = levenshtein($normalizedChan, $normalizedEpg);
@@ -221,7 +200,7 @@ class SimilaritySearchService
             // Apply region-based bonus (convert to penalty for Levenshtein)
             $regionBonus = 0;
             if ($regionCode) {
-                $haystack = mb_strtolower(($epgChannel->channel_id ?? '') . ' ' . ($epgChannel->name ?? ''), 'UTF-8');
+                $haystack = mb_strtolower(($epgChannel->channel_id ?? '').' '.($epgChannel->name ?? ''), 'UTF-8');
                 if (mb_stripos($haystack, $regionCode, 0, 'UTF-8') !== false) {
                     $finalScore = max(0, $finalScore - 15); // Subtract to improve the match
                     $regionBonus = 15;
@@ -331,6 +310,24 @@ class SimilaritySearchService
     }
 
     /**
+     * Sanitizes UTF-8 encoding in strings to prevent PostgreSQL errors.
+     */
+    private function sanitizeUtf8(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        // Convert to valid UTF-8, removing invalid sequences
+        $sanitized = mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+
+        // Remove control characters that can cause issues
+        $sanitized = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $sanitized);
+
+        return $sanitized;
+    }
+
+    /**
      * Normalize a channel name for similarity comparison.
      *
      * @param  string  $name
@@ -364,7 +361,7 @@ class SimilaritySearchService
 
         // Remove stop words (they are lowercased English tokens)
         $tokens = explode(' ', $name);
-        $tokens = array_filter($tokens, fn($t) => $t !== '');
+        $tokens = array_filter($tokens, fn ($t) => $t !== '');
         $tokens = array_values(array_diff($tokens, $this->stopWords));
 
         // Optionally remove quality indicators
@@ -372,7 +369,7 @@ class SimilaritySearchService
             $tokens = array_values(array_diff($tokens, $this->qualityIndicators));
         }
 
-        return trim(implode(' ', $tokens));
+        return mb_trim(implode(' ', $tokens));
     }
 
     /**
@@ -407,7 +404,7 @@ class SimilaritySearchService
             $magB += $countB ** 2;
         }
 
-        if ($magA == 0 || $magB == 0) {
+        if ($magA === 0 || $magB === 0) {
             return 0;
         }
 

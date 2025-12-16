@@ -78,7 +78,7 @@ class MergeChannels implements ShouldQueue
         $groupedChannels = $allChannels->groupBy(function ($channel) {
             $streamId = $channel->stream_id_custom ?: $channel->stream_id;
 
-            return strtolower(trim($streamId));
+            return mb_strtolower(mb_trim($streamId));
         });
 
         // Process each group of channels with the same stream ID
@@ -133,6 +133,25 @@ class MergeChannels implements ShouldQueue
         $this->sendCompletionNotification($processed, $deactivatedCount);
     }
 
+    protected function sendCompletionNotification($processed, $deactivatedCount = 0)
+    {
+        if ($processed > 0) {
+            $body = "Merged {$processed} channels successfully.";
+            if ($deactivatedCount > 0) {
+                $body .= " {$deactivatedCount} failover channels were deactivated.";
+            }
+        } else {
+            $body = 'No channels were merged.';
+        }
+
+        Notification::make()
+            ->title('Channel merge complete')
+            ->body($body)
+            ->success()
+            ->broadcast($this->user)
+            ->sendToDatabase($this->user);
+    }
+
     /**
      * Select the master channel from a group based on priority rules
      */
@@ -161,24 +180,24 @@ class MergeChannels implements ShouldQueue
 
             // No preferred playlist or none found with highest res: return first highest resolution channel
             return $highestResChannels->sortBy('id')->first();
-        } else {
-            // Simple selection without resolution check
-
-            // If preferred playlist is set, try to use it first
-            if ($this->playlistId) {
-                $preferredChannels = $group->where('playlist_id', $this->playlistId);
-                if ($preferredChannels->isNotEmpty()) {
-                    // Return first channel from preferred playlist (sorted by ID for consistency)
-                    return $preferredChannels->sortBy('id')->first();
-                }
-            }
-
-            // No preferred playlist or none found: use playlist priority order, then ID for consistency
-            return $group->sortBy([
-                fn ($channel) => $playlistPriority[$channel->playlist_id] ?? 999,
-                fn ($channel) => $channel->id,
-            ])->first();
         }
+        // Simple selection without resolution check
+
+        // If preferred playlist is set, try to use it first
+        if ($this->playlistId) {
+            $preferredChannels = $group->where('playlist_id', $this->playlistId);
+            if ($preferredChannels->isNotEmpty()) {
+                // Return first channel from preferred playlist (sorted by ID for consistency)
+                return $preferredChannels->sortBy('id')->first();
+            }
+        }
+
+        // No preferred playlist or none found: use playlist priority order, then ID for consistency
+        return $group->sortBy([
+            fn ($channel) => $playlistPriority[$channel->playlist_id] ?? 999,
+            fn ($channel) => $channel->id,
+        ])->first();
+
     }
 
     private function getResolution($channel)
@@ -191,24 +210,5 @@ class MergeChannels implements ShouldQueue
         }
 
         return 0;
-    }
-
-    protected function sendCompletionNotification($processed, $deactivatedCount = 0)
-    {
-        if ($processed > 0) {
-            $body = "Merged {$processed} channels successfully.";
-            if ($deactivatedCount > 0) {
-                $body .= " {$deactivatedCount} failover channels were deactivated.";
-            }
-        } else {
-            $body = 'No channels were merged.';
-        }
-
-        Notification::make()
-            ->title('Channel merge complete')
-            ->body($body)
-            ->success()
-            ->broadcast($this->user)
-            ->sendToDatabase($this->user);
     }
 }

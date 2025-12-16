@@ -23,7 +23,7 @@ class ChannelImporter extends Importer
                 ->helperText('Select the playlist this import is associated with.')
                 ->options(Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
                 ->preload()
-                ->searchable()
+                ->searchable(),
         ];
     }
 
@@ -44,6 +44,7 @@ class ChannelImporter extends Importer
                     if (blank($state)) {
                         return null;
                     }
+
                     return $state;
                 }),
             ImportColumn::make('enabled')
@@ -51,9 +52,20 @@ class ChannelImporter extends Importer
                 ->rules(['required', 'boolean'])
                 ->ignoreBlankState()
                 ->castStateUsing(function (string $state): ?bool {
-                    return boolval($state);
+                    return (bool) $state;
                 }),
         ];
+    }
+
+    public static function getCompletedNotificationBody(Import $import): string
+    {
+        $body = 'Your channel import has completed and '.number_format($import->successful_rows).' '.str('row')->plural($import->successful_rows).' imported.';
+
+        if ($failedRowsCount = $import->getFailedRowsCount()) {
+            $body .= ' '.number_format($failedRowsCount).' '.str('row')->plural($failedRowsCount).' failed to import.';
+        }
+
+        return $body;
     }
 
     public function resolveRecord(): ?Model
@@ -63,16 +75,5 @@ class ChannelImporter extends Importer
             'group' => $this->data['group'],
             'playlist_id' => $this->options['playlist'],
         ])->first();
-    }
-
-    public static function getCompletedNotificationBody(Import $import): string
-    {
-        $body = 'Your channel import has completed and ' . number_format($import->successful_rows) . ' ' . str('row')->plural($import->successful_rows) . ' imported.';
-
-        if ($failedRowsCount = $import->getFailedRowsCount()) {
-            $body .= ' ' . number_format($failedRowsCount) . ' ' . str('row')->plural($failedRowsCount) . ' failed to import.';
-        }
-
-        return $body;
     }
 }

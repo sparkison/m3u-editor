@@ -2,30 +2,32 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ChannelLogoType;
 use App\Models\Category;
 use App\Models\Channel;
+use App\Models\Episode;
 use App\Models\Group;
 use App\Models\Playlist;
 use App\Models\PlaylistAuth;
+use App\Models\Season;
 use App\Models\Series;
 use App\Models\User;
-use App\Models\Season;
-use App\Models\Episode;
-use App\Enums\ChannelLogoType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Tests\TestCase;
-use Carbon\Carbon;
 
 class XtreamApiControllerTest extends TestCase
 {
     use RefreshDatabase;
 
     protected User $user;
+
     protected Playlist $playlist;
+
     protected string $username;
+
     protected string $password;
 
     protected function setUp(): void
@@ -35,7 +37,7 @@ class XtreamApiControllerTest extends TestCase
         $this->user = User::factory()->create();
         // Create a unique playlist for each test setup to avoid interference
         $this->playlist = Playlist::factory()->for($this->user)->create();
-        $this->username = 'testuser_' . Str::random(5); // Unique username for auth
+        $this->username = 'testuser_'.Str::random(5); // Unique username for auth
         $this->password = 'testpass';
 
         // Create PlaylistAuth and attach it to the playlist using the polymorphic relationship
@@ -49,49 +51,6 @@ class XtreamApiControllerTest extends TestCase
 
         // Attach the auth to the playlist using the morphToMany relationship
         $this->playlist->playlistAuths()->attach($playlistAuth);
-    }
-
-    // Helper to build URL for Xtream API actions
-    private function getXtreamApiUrl(string $action, array $params = []): string
-    {
-        $queryParams = array_merge([
-            'username' => $this->username,
-            'password' => $this->password,
-            'action' => $action,
-        ], $params);
-
-        // Assuming 'playlist.xtream.api' is the correct route name from existing tests
-        return route('playlist.xtream.api', ['uuid' => $this->playlist->uuid]) . '?' . http_build_query($queryParams);
-    }
-
-    // Standard setup for authenticated requests to panel action (from existing tests, slightly adapted)
-    private function setupAuthenticatedPanelRequest(User &$user = null, Playlist &$playlist = null, array $playlistAuthCredentials = [])
-    {
-        $user = $user ?? $this->user; // Use class property if not provided
-        $playlist = $playlist ?? $this->playlist; // Use class property if not provided
-
-        $authUsername = $playlistAuthCredentials['username'] ?? $this->username;
-        $authPassword = $playlistAuthCredentials['password'] ?? $this->password;
-
-        // PlaylistAuth is already created in setUp generally, but this allows override for specific panel tests
-        $existingAuth = $playlist->playlistAuths->where('username', $authUsername)->first();
-        if (!$existingAuth) {
-            $playlistAuth = PlaylistAuth::create([
-                'name' => 'Test Auth Override',
-                'username' => $authUsername,
-                'password' => $authPassword,
-                'enabled' => true,
-                'user_id' => $user->id,
-            ]);
-            $playlist->playlistAuths()->attach($playlistAuth);
-        }
-
-        return $this->getJson(route('playlist.xtream.api', [
-            'uuid' => $playlist->uuid,
-            'action' => 'panel',
-            'username' => $authUsername,
-            'password' => $authPassword,
-        ]));
     }
 
     public function test_panel_action_with_valid_playlist_auth_returns_correct_structure(): void
@@ -132,7 +91,7 @@ class XtreamApiControllerTest extends TestCase
                 'time_now',
             ],
         ]);
-        $response->assertJsonPath('server_info.server_software', config('app.name') . ' Xtream API');
+        $response->assertJsonPath('server_info.server_software', config('app.name').' Xtream API');
     }
 
     public function test_panel_action_with_invalid_playlist_auth_returns_unauthorized(): void
@@ -274,15 +233,15 @@ class XtreamApiControllerTest extends TestCase
                 'category_id',
                 'tv_archive',
                 'direct_source',
-                'tv_archive_duration'
-            ]
+                'tv_archive_duration',
+            ],
         ]);
         // Check specific icon for channel 1
         $this->assertEquals('https://m3ueditor.test/icon1.png', $response->json('0.stream_icon'));
         // Check direct_source for the first channel
         $jsonResponse = $response->json();
-        if (!empty($jsonResponse)) {
-            $expectedDirectSource = url("/live/{$this->username}/{$this->password}/" . $enabledChannel1->id) . ".ts";
+        if (! empty($jsonResponse)) {
+            $expectedDirectSource = url("/live/{$this->username}/{$this->password}/".$enabledChannel1->id).'.ts';
             $this->assertEquals($expectedDirectSource, $jsonResponse[0]['direct_source']);
         }
     }
@@ -326,8 +285,8 @@ class XtreamApiControllerTest extends TestCase
                 'backdrop_path',
                 'youtube_trailer',
                 'episode_run_time',
-                'category_id'
-            ]
+                'category_id',
+            ],
         ]);
         $this->assertEquals('https://m3ueditor.test/cover1.jpg', $response->json('0.cover'));
     }
@@ -366,18 +325,17 @@ class XtreamApiControllerTest extends TestCase
         $firstSeasonNumber = $firstSeason->season_number;
         $firstEpisode = $firstSeason->episodes()->orderBy('episode_num')->first();
 
-        $response->assertJsonPath("episodes.{$firstSeasonNumber}.0.id", (string)$firstEpisode->id);
+        $response->assertJsonPath("episodes.{$firstSeasonNumber}.0.id", (string) $firstEpisode->id);
         $response->assertJsonPath("episodes.{$firstSeasonNumber}.0.title", $firstEpisode->title);
         $response->assertJsonPath("episodes.{$firstSeasonNumber}.0.container_extension", $firstEpisode->container_extension ?? 'mp4');
         $response->assertJsonPath("episodes.{$firstSeasonNumber}.0.stream_id", $firstEpisode->id); // stream_id is base64 encoded
 
         // $expectedUrlPath = "/series/{$this->playlist->uuid}/{$this->username}/{$this->password}/{$series->id}-{$firstEpisode->id}.{$firstEpisode->container_extension}";
-        $expectedDirectSource = url("/series/{$this->username}/{$this->password}/" . $firstEpisode->id . ".{$firstEpisode->container_extension}");
+        $expectedDirectSource = url("/series/{$this->username}/{$this->password}/".$firstEpisode->id.".{$firstEpisode->container_extension}");
         $actualDirectSource = $response->json("episodes.{$firstSeasonNumber}.0.direct_source");
-        $this->assertNotNull($actualDirectSource, "Direct source URL is null.");
+        $this->assertNotNull($actualDirectSource, 'Direct source URL is null.');
         // $this->assertStringContainsString($expectedUrlPath, $actualDirectSource);
         $this->assertEquals($expectedDirectSource, $actualDirectSource);
-
 
         $response->assertJsonStructure([
             'info' => ['name', 'cover', 'plot', 'cast', 'director', 'genre', 'releaseDate', 'last_modified', 'rating', 'rating_5based', 'backdrop_path', 'youtube_trailer', 'episode_run_time', 'category_id'],
@@ -392,11 +350,11 @@ class XtreamApiControllerTest extends TestCase
                         'added',
                         'season',
                         'stream_id',
-                        'direct_source'
-                    ]
-                ]
+                        'direct_source',
+                    ],
+                ],
             ],
-            'movie_data' => ['stream_id', 'name', 'title', 'year', 'episode_run_time', 'plot', 'cast', 'director', 'genre', 'releaseDate', 'last_modified', 'rating', 'rating_5based', 'cover_big', 'youtube_trailer', 'backdrop_path']
+            'movie_data' => ['stream_id', 'name', 'title', 'year', 'episode_run_time', 'plot', 'cast', 'director', 'genre', 'releaseDate', 'last_modified', 'rating', 'rating_5based', 'cover_big', 'youtube_trailer', 'backdrop_path'],
         ]);
     }
 
@@ -421,7 +379,7 @@ class XtreamApiControllerTest extends TestCase
             ->assertJsonPath('movie_data.name', $movieSeries->name);
 
         $response->assertJsonCount(1, 'episodes.1');
-        $response->assertJsonPath('episodes.1.0.id', (string)$movieSeries->id);
+        $response->assertJsonPath('episodes.1.0.id', (string) $movieSeries->id);
         $response->assertJsonPath('episodes.1.0.title', $movieSeries->name);
         $response->assertJsonPath('episodes.1.0.container_extension', 'mp4');
         $response->assertJsonPath('episodes.1.0.stream_id', $movieSeries->id);
@@ -429,9 +387,9 @@ class XtreamApiControllerTest extends TestCase
         $response->assertJsonPath('episodes.1.0.info.movie_image', 'https://m3ueditor.test/movie_cover.jpg');
 
         // $expectedUrlPath = "/series/{$this->playlist->uuid}/{$this->username}/{$this->password}/{$movieSeries->id}.{$movieSeries->container_extension}";
-        $expectedDirectSource = url("/series/{$this->username}/{$this->password}/" . $movieSeries->id . ".mp4");
+        $expectedDirectSource = url("/series/{$this->username}/{$this->password}/".$movieSeries->id.'.mp4');
         $actualDirectSource = $response->json('episodes.1.0.direct_source');
-        $this->assertNotNull($actualDirectSource, "Direct source URL is null for movie.");
+        $this->assertNotNull($actualDirectSource, 'Direct source URL is null for movie.');
         // $this->assertStringContainsString($expectedUrlPath, $actualDirectSource);
         $this->assertEquals($expectedDirectSource, $actualDirectSource);
     }
@@ -499,7 +457,7 @@ class XtreamApiControllerTest extends TestCase
 
     public function test_get_short_epg_action_with_missing_stream_id_returns_error(): void
     {
-        $response = $this->getJson(route('xtream.api.player') . '?' . http_build_query([
+        $response = $this->getJson(route('xtream.api.player').'?'.http_build_query([
             'username' => $this->username,
             'password' => $this->password,
             'action' => 'get_short_epg',
@@ -507,13 +465,13 @@ class XtreamApiControllerTest extends TestCase
 
         $response->assertStatus(400)
             ->assertJson([
-                'error' => 'stream_id parameter is required for get_short_epg action'
+                'error' => 'stream_id parameter is required for get_short_epg action',
             ]);
     }
 
     public function test_get_short_epg_action_with_non_existent_channel_returns_error(): void
     {
-        $response = $this->getJson(route('xtream.api.player') . '?' . http_build_query([
+        $response = $this->getJson(route('xtream.api.player').'?'.http_build_query([
             'username' => $this->username,
             'password' => $this->password,
             'action' => 'get_short_epg',
@@ -522,7 +480,7 @@ class XtreamApiControllerTest extends TestCase
 
         $response->assertStatus(404)
             ->assertJson([
-                'error' => 'Channel not found'
+                'error' => 'Channel not found',
             ]);
     }
 
@@ -535,7 +493,7 @@ class XtreamApiControllerTest extends TestCase
             'user_id' => $this->user->id,
         ]);
 
-        $response = $this->getJson(route('xtream.api.player') . '?' . http_build_query([
+        $response = $this->getJson(route('xtream.api.player').'?'.http_build_query([
             'username' => $this->username,
             'password' => $this->password,
             'action' => 'get_short_epg',
@@ -544,13 +502,13 @@ class XtreamApiControllerTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJson([
-                'epg_listings' => []
+                'epg_listings' => [],
             ]);
     }
 
     public function test_get_simple_date_table_action_with_missing_stream_id_returns_error(): void
     {
-        $response = $this->getJson(route('xtream.api.player') . '?' . http_build_query([
+        $response = $this->getJson(route('xtream.api.player').'?'.http_build_query([
             'username' => $this->username,
             'password' => $this->password,
             'action' => 'get_simple_date_table',
@@ -558,13 +516,13 @@ class XtreamApiControllerTest extends TestCase
 
         $response->assertStatus(400)
             ->assertJson([
-                'error' => 'stream_id parameter is required for get_simple_date_table action'
+                'error' => 'stream_id parameter is required for get_simple_date_table action',
             ]);
     }
 
     public function test_get_simple_date_table_action_with_non_existent_channel_returns_error(): void
     {
-        $response = $this->getJson(route('xtream.api.player') . '?' . http_build_query([
+        $response = $this->getJson(route('xtream.api.player').'?'.http_build_query([
             'username' => $this->username,
             'password' => $this->password,
             'action' => 'get_simple_date_table',
@@ -573,7 +531,7 @@ class XtreamApiControllerTest extends TestCase
 
         $response->assertStatus(404)
             ->assertJson([
-                'error' => 'Channel not found'
+                'error' => 'Channel not found',
             ]);
     }
 
@@ -586,7 +544,7 @@ class XtreamApiControllerTest extends TestCase
             'user_id' => $this->user->id,
         ]);
 
-        $response = $this->getJson(route('xtream.api.player') . '?' . http_build_query([
+        $response = $this->getJson(route('xtream.api.player').'?'.http_build_query([
             'username' => $this->username,
             'password' => $this->password,
             'action' => 'get_simple_date_table',
@@ -595,7 +553,7 @@ class XtreamApiControllerTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJson([
-                'epg_listings' => []
+                'epg_listings' => [],
             ]);
     }
 
@@ -609,7 +567,7 @@ class XtreamApiControllerTest extends TestCase
         ]);
 
         // Test with limit parameter
-        $response = $this->getJson(route('xtream.api.player') . '?' . http_build_query([
+        $response = $this->getJson(route('xtream.api.player').'?'.http_build_query([
             'username' => $this->username,
             'password' => $this->password,
             'action' => 'get_short_epg',
@@ -619,11 +577,11 @@ class XtreamApiControllerTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'epg_listings'
+                'epg_listings',
             ]);
 
         // Test default limit (should be 4)
-        $response = $this->getJson(route('xtream.api.player') . '?' . http_build_query([
+        $response = $this->getJson(route('xtream.api.player').'?'.http_build_query([
             'username' => $this->username,
             'password' => $this->password,
             'action' => 'get_short_epg',
@@ -632,7 +590,7 @@ class XtreamApiControllerTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'epg_listings'
+                'epg_listings',
             ]);
     }
 
@@ -642,7 +600,7 @@ class XtreamApiControllerTest extends TestCase
         // Create a channel
         $channel = Channel::factory()->create([
             'enabled' => true,
-            'url' => 'https://test-stream.com/live/stream123.ts'
+            'url' => 'https://test-stream.com/live/stream123.ts',
         ]);
 
         // Attach the channel to the playlist
@@ -655,7 +613,7 @@ class XtreamApiControllerTest extends TestCase
             'duration' => 60, // 60 minutes
             'date' => '2024-12-01:15-30-00', // YYYY-MM-DD:HH-MM-SS format
             'streamId' => $channel->id,
-            'format' => 'ts'
+            'format' => 'ts',
         ]));
 
         // Should redirect to stream URL (since proxy is likely disabled in test)
@@ -667,7 +625,7 @@ class XtreamApiControllerTest extends TestCase
         // Create a channel
         $channel = Channel::factory()->create([
             'enabled' => true,
-            'url' => 'https://test-stream.com/live/stream123.ts'
+            'url' => 'https://test-stream.com/live/stream123.ts',
         ]);
 
         // Attach the channel to the playlist
@@ -680,7 +638,7 @@ class XtreamApiControllerTest extends TestCase
             'duration' => 60,
             'date' => '2024-12-01:15-30-00',
             'streamId' => $channel->id,
-            'format' => 'ts'
+            'format' => 'ts',
         ]));
 
         $response->assertStatus(403)
@@ -692,7 +650,7 @@ class XtreamApiControllerTest extends TestCase
         // Create a disabled channel
         $channel = Channel::factory()->create([
             'enabled' => false,
-            'url' => 'https://test-stream.com/live/stream123.ts'
+            'url' => 'https://test-stream.com/live/stream123.ts',
         ]);
 
         // Attach the channel to the playlist
@@ -704,7 +662,7 @@ class XtreamApiControllerTest extends TestCase
             'duration' => 60,
             'date' => '2024-12-01:15-30-00',
             'streamId' => $channel->id,
-            'format' => 'ts'
+            'format' => 'ts',
         ]));
 
         $response->assertStatus(403)
@@ -719,10 +677,53 @@ class XtreamApiControllerTest extends TestCase
             'duration' => 60,
             'date' => '2024-12-01:15-30-00',
             'streamId' => 99999, // Non-existent channel ID
-            'format' => 'ts'
+            'format' => 'ts',
         ]));
 
         $response->assertStatus(403)
             ->assertJson(['error' => 'Unauthorized or stream not found']);
+    }
+
+    // Helper to build URL for Xtream API actions
+    private function getXtreamApiUrl(string $action, array $params = []): string
+    {
+        $queryParams = array_merge([
+            'username' => $this->username,
+            'password' => $this->password,
+            'action' => $action,
+        ], $params);
+
+        // Assuming 'playlist.xtream.api' is the correct route name from existing tests
+        return route('playlist.xtream.api', ['uuid' => $this->playlist->uuid]).'?'.http_build_query($queryParams);
+    }
+
+    // Standard setup for authenticated requests to panel action (from existing tests, slightly adapted)
+    private function setupAuthenticatedPanelRequest(?User &$user = null, ?Playlist &$playlist = null, array $playlistAuthCredentials = [])
+    {
+        $user = $user ?? $this->user; // Use class property if not provided
+        $playlist = $playlist ?? $this->playlist; // Use class property if not provided
+
+        $authUsername = $playlistAuthCredentials['username'] ?? $this->username;
+        $authPassword = $playlistAuthCredentials['password'] ?? $this->password;
+
+        // PlaylistAuth is already created in setUp generally, but this allows override for specific panel tests
+        $existingAuth = $playlist->playlistAuths->where('username', $authUsername)->first();
+        if (! $existingAuth) {
+            $playlistAuth = PlaylistAuth::create([
+                'name' => 'Test Auth Override',
+                'username' => $authUsername,
+                'password' => $authPassword,
+                'enabled' => true,
+                'user_id' => $user->id,
+            ]);
+            $playlist->playlistAuths()->attach($playlistAuth);
+        }
+
+        return $this->getJson(route('playlist.xtream.api', [
+            'uuid' => $playlist->uuid,
+            'action' => 'panel',
+            'username' => $authUsername,
+            'password' => $authPassword,
+        ]));
     }
 }

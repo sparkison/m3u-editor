@@ -15,8 +15,8 @@ use Spatie\Tags\HasTags;
 class CustomPlaylist extends Model
 {
     use HasFactory;
-    use ShortUrlTrait;
     use HasTags;
+    use ShortUrlTrait;
 
     /**
      * The attributes that should be cast to native types.
@@ -34,7 +34,7 @@ class CustomPlaylist extends Model
         'include_vod_in_m3u' => 'boolean',
         'custom_headers' => 'array',
         'strict_live_ts' => 'boolean',
-        'id_channel_by' => PlaylistChannelId::class
+        'id_channel_by' => PlaylistChannelId::class,
     ];
 
     public function user(): BelongsTo
@@ -122,7 +122,7 @@ class CustomPlaylist extends Model
     public function categoryTags(): MorphToMany
     {
         return $this->morphToMany(\Spatie\Tags\Tag::class, 'taggable')
-            ->where('type', $this->uuid . '-category');
+            ->where('type', $this->uuid.'-category');
     }
 
     // public function playlists(): HasManyThrough

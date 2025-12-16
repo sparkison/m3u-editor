@@ -2,55 +2,50 @@
 
 namespace App\Filament\Resources\Epgs;
 
-use Filament\Schemas\Schema;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Columns\ToggleColumn;
-use Filament\Actions\ActionGroup;
-use Filament\Actions\Action;
-use App\Jobs\ProcessEpgImport;
-use App\Jobs\GenerateEpgCache;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\EditAction;
-use Filament\Actions\ViewAction;
-use Filament\Tables\Enums\RecordActionsPosition;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\BulkAction;
-use Filament\Actions\DeleteBulkAction;
-use App\Filament\Resources\Epgs\Pages\ListEpgs;
-use App\Filament\Resources\Epgs\Pages\ViewEpg;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\ToggleButtons;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Grid;
-use Filament\Forms\Components\Select;
-use Exception;
-use Filament\Schemas\Components\Actions;
-use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\DateTimePicker;
 use App\Enums\EpgSourceType;
 use App\Enums\Status;
 use App\Filament\Resources\EpgResource\Pages;
-use App\Filament\Resources\EpgResource\RelationManagers;
+use App\Filament\Resources\Epgs\Pages\ListEpgs;
+use App\Filament\Resources\Epgs\Pages\ViewEpg;
+use App\Jobs\GenerateEpgCache;
+use App\Jobs\ProcessEpgImport;
 use App\Models\Epg;
 use App\Rules\CheckIfUrlOrLocalPath;
 use App\Rules\Cron;
 use App\Services\SchedulesDirectService;
+use App\Traits\HasUserFiltering;
 use Cron\CronExpression;
+use Exception;
+use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\BulkAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Forms;
-use Filament\Forms\Set;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\ToggleButtons;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ToggleColumn;
+use Filament\Tables\Enums\RecordActionsPosition;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Illuminate\Support\Facades\Auth;
 use RyanChandler\FilamentProgressColumn\ProgressColumn;
-use App\Traits\HasUserFiltering;
+use UnitEnum;
 
 class EpgResource extends Resource
 {
@@ -60,15 +55,16 @@ class EpgResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
+    protected static ?string $label = 'EPG';
+
+    protected static ?string $pluralLabel = 'EPGs';
+
+    protected static string|UnitEnum|null $navigationGroup = 'EPG';
+
     public static function getGloballySearchableAttributes(): array
     {
         return ['name', 'url'];
     }
-
-    protected static ?string $label = 'EPG';
-    protected static ?string $pluralLabel = 'EPGs';
-
-    protected static string | \UnitEnum | null $navigationGroup = 'EPG';
 
     public static function getNavigationSort(): ?int
     {
@@ -110,24 +106,24 @@ class EpgResource extends Resource
                     ->sortable()
                     ->toggleable()
                     ->badge()
-                    ->color(fn(Status $state) => $state->getColor()),
+                    ->color(fn (Status $state) => $state->getColor()),
                 ProgressColumn::make('progress')
                     ->label('Sync Progress')
                     ->tooltip('Progress of EPG import/sync')
                     ->sortable()
-                    ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
+                    ->poll(fn ($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
                     ->toggleable(),
                 ProgressColumn::make('cache_progress')
                     ->label('Cache Progress')
                     ->tooltip('Progress of EPG cache generation')
                     ->sortable()
-                    ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
+                    ->poll(fn ($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
                     ->toggleable(),
                 ProgressColumn::make('sd_progress')
                     ->label('SD Progress')
                     ->tooltip('Progress of Schedules Direct import (if using)')
                     ->sortable()
-                    ->poll(fn($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
+                    ->poll(fn ($record) => $record->status === Status::Processing || $record->status === Status::Pending ? '3s' : null)
                     ->toggleable(),
                 IconColumn::make('is_cached')
                     ->label('Cached')
@@ -151,12 +147,13 @@ class EpgResource extends Resource
                         if ($record->auto_sync && $record->sync_interval && CronExpression::isValidExpression($record->sync_interval)) {
                             return (new CronExpression($record->sync_interval))->getNextRunDate()->format('Y-m-d H:i:s');
                         }
+
                         return 'N/A';
                     })
                     ->sortable(),
                 TextColumn::make('sync_time')
                     ->label('Sync Time')
-                    ->formatStateUsing(fn(string $state): string => gmdate('H:i:s', (int)$state))
+                    ->formatStateUsing(fn (string $state): string => gmdate('H:i:s', (int) $state))
                     ->toggleable()
                     ->sortable(),
                 TextColumn::make('created_at')
@@ -193,7 +190,7 @@ class EpgResource extends Resource
                                 ->duration(10000)
                                 ->send();
                         })
-                        ->disabled(fn($record): bool => $record->status === Status::Processing)
+                        ->disabled(fn ($record): bool => $record->status === Status::Processing)
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
@@ -217,14 +214,14 @@ class EpgResource extends Resource
                                 ->duration(5000)
                                 ->send();
                         })
-                        ->disabled(fn($record) => $record->status === Status::Processing)
+                        ->disabled(fn ($record) => $record->status === Status::Processing)
                         ->requiresConfirmation()
                         ->modalDescription('Generate EPG Cache now? This will create a cache for the EPG data.')
                         ->modalSubmitActionLabel('Yes, generate cache now'),
                     Action::make('Download EPG')
                         ->label('Download EPG')
                         ->icon('heroicon-o-arrow-down-tray')
-                        ->url(fn($record) => route('epg.file', ['uuid' => $record->uuid]))
+                        ->url(fn ($record) => route('epg.file', ['uuid' => $record->uuid]))
                         ->openUrlInNewTab(),
                     Action::make('reset')
                         ->label('Reset status')
@@ -317,7 +314,7 @@ class EpgResource extends Resource
                     DeleteBulkAction::make(),
                 ]),
             ])->checkIfRecordIsSelectableUsing(
-                fn($record): bool => $record->status !== Status::Processing,
+                fn ($record): bool => $record->status !== Status::Processing,
             );
     }
 
@@ -375,19 +372,19 @@ class EpgResource extends Resource
                         ->url('https://www.schedulesdirect.org/')
                         ->openUrlInNewTab(true),
                 ])
-                ->visible(fn(Get $get): bool => $get('source_type') === EpgSourceType::SCHEDULES_DIRECT->value)
+                ->visible(fn (Get $get): bool => $get('source_type') === EpgSourceType::SCHEDULES_DIRECT->value)
                 ->schema([
                     Grid::make()
                         ->columns(2)
                         ->schema([
                             TextInput::make('sd_username')
                                 ->label('Username')
-                                ->required(fn(Get $get): bool => $get('source_type') === EpgSourceType::SCHEDULES_DIRECT->value),
+                                ->required(fn (Get $get): bool => $get('source_type') === EpgSourceType::SCHEDULES_DIRECT->value),
                             TextInput::make('sd_password')
                                 ->label('Password')
                                 ->password()
                                 ->revealable()
-                                ->required(fn(Get $get): bool => $get('source_type') === EpgSourceType::SCHEDULES_DIRECT->value),
+                                ->required(fn (Get $get): bool => $get('source_type') === EpgSourceType::SCHEDULES_DIRECT->value),
                         ]),
 
                     Grid::make()
@@ -395,7 +392,7 @@ class EpgResource extends Resource
                         ->schema([
                             Select::make('sd_country')
                                 ->label('Country')
-                                ->required(fn(Get $get): bool => $get('source_type') === EpgSourceType::SCHEDULES_DIRECT->value)
+                                ->required(fn (Get $get): bool => $get('source_type') === EpgSourceType::SCHEDULES_DIRECT->value)
                                 ->options([
                                     'USA' => 'United States',
                                     'CAN' => 'Canada',
@@ -404,7 +401,7 @@ class EpgResource extends Resource
                                 ->live(),
                             TextInput::make('sd_postal_code')
                                 ->label('Postal Code')
-                                ->required(fn(Get $get): bool => $get('source_type') === EpgSourceType::SCHEDULES_DIRECT->value),
+                                ->required(fn (Get $get): bool => $get('source_type') === EpgSourceType::SCHEDULES_DIRECT->value),
                         ]),
 
                     Grid::make()
@@ -420,7 +417,7 @@ class EpgResource extends Resource
                                     $username = $get('sd_username');
                                     $password = $get('sd_password');
 
-                                    if (!$country || !$postalCode || !$username || !$password) {
+                                    if (! $country || ! $postalCode || ! $username || ! $password) {
                                         return [];
                                     }
 
@@ -450,9 +447,9 @@ class EpgResource extends Resource
                                         $headends = $service->getHeadends($authData['token'], $country, $postalCode);
                                         foreach ($headends as $headend) {
                                             foreach ($headend['lineups'] as $lineup) {
-                                                if (stripos($lineup['name'], $search) !== false) {
+                                                if (mb_stripos($lineup['name'], $search) !== false) {
                                                     // Don't duplicate if already in account
-                                                    if (!isset($options[$lineup['lineup']])) {
+                                                    if (! isset($options[$lineup['lineup']])) {
                                                         $options[$lineup['lineup']] = "{$lineup['name']} ({$headend['transport']})";
                                                     }
                                                 }
@@ -471,7 +468,7 @@ class EpgResource extends Resource
                                         $username = $get('sd_username');
                                         $password = $get('sd_password');
 
-                                        if (!$country || !$postalCode || !$username || !$password) {
+                                        if (! $country || ! $postalCode || ! $username || ! $password) {
                                             return $value;
                                         }
 
@@ -487,6 +484,7 @@ class EpgResource extends Resource
                                                 }
                                             }
                                         }
+
                                         return $value;
                                     } catch (Exception $e) {
                                         return $value;
@@ -499,7 +497,7 @@ class EpgResource extends Resource
                                 ->minValue(1)
                                 ->maxValue(14)
                                 ->helperText('Number of days to import from Schedules Direct (1-14)')
-                                ->required(fn(Get $get): bool => $get('source_type') === EpgSourceType::SCHEDULES_DIRECT->value),
+                                ->required(fn (Get $get): bool => $get('source_type') === EpgSourceType::SCHEDULES_DIRECT->value),
                         ]),
 
                     Toggle::make('sd_metadata.enabled')
@@ -507,7 +505,7 @@ class EpgResource extends Resource
                         ->helperText('Enable to import additional program images (NOTE: this can significantly increase import time)')
                         ->default(false)
                         ->columnSpanFull()
-                        ->visible(fn(Get $get): bool => $get('source_type') === EpgSourceType::SCHEDULES_DIRECT->value),
+                        ->visible(fn (Get $get): bool => $get('source_type') === EpgSourceType::SCHEDULES_DIRECT->value),
 
                     Grid::make()
                         ->columns(2)
@@ -521,12 +519,13 @@ class EpgResource extends Resource
                                         $username = $get('sd_username');
                                         $password = $get('sd_password');
 
-                                        if (!$username || !$password) {
+                                        if (! $username || ! $password) {
                                             Notification::make()
                                                 ->danger()
                                                 ->title('Missing credentials')
                                                 ->body('Please enter username and password first')
                                                 ->send();
+
                                             return;
                                         }
 
@@ -536,7 +535,7 @@ class EpgResource extends Resource
                                             Notification::make()
                                                 ->success()
                                                 ->title('Connection successful!')
-                                                ->body("Token expires: " . date('Y-m-d H:i:s', $authData['expires']))
+                                                ->body('Token expires: '.date('Y-m-d H:i:s', $authData['expires']))
                                                 ->send();
                                         } catch (Exception $e) {
                                             Notification::make()
@@ -556,12 +555,13 @@ class EpgResource extends Resource
                                         $username = $get('sd_username');
                                         $password = $get('sd_password');
 
-                                        if (!$country || !$postalCode || !$username || !$password) {
+                                        if (! $country || ! $postalCode || ! $username || ! $password) {
                                             Notification::make()
                                                 ->warning()
                                                 ->title('Missing information')
                                                 ->body('Please fill in all required fields first')
                                                 ->send();
+
                                             return;
                                         }
 
@@ -653,14 +653,14 @@ class EpgResource extends Resource
                         ->url('https://github.com/XMLTV/xmltv/blob/master/xmltv.dtd')
                         ->openUrlInNewTab(true),
                 ])
-                ->visible(fn(Get $get): bool => $get('source_type') === EpgSourceType::URL->value || !$get('source_type'))
+                ->visible(fn (Get $get): bool => $get('source_type') === EpgSourceType::URL->value || ! $get('source_type'))
                 ->schema([
                     TextInput::make('url')
                         ->label('URL or Local file path')
                         ->prefixIcon('heroicon-m-globe-alt')
                         ->helperText('Enter the URL of the XMLTV guide data. If this is a local file, you can enter a full or relative path. If changing URL, the guide data will be re-imported. Use with caution as this could lead to data loss if the new guide differs from the old one.')
                         ->requiredWithout('uploads')
-                        ->required(fn(Get $get): bool => $get('source_type') === EpgSourceType::URL->value && !$get('uploads'))
+                        ->required(fn (Get $get): bool => $get('source_type') === EpgSourceType::URL->value && ! $get('uploads'))
                         ->rules([new CheckIfUrlOrLocalPath()])
                         ->maxLength(255),
                     FileUpload::make('uploads')
@@ -669,7 +669,7 @@ class EpgResource extends Resource
                         ->directory('epg')
                         ->helperText('Upload the XMLTV file for the EPG. This will be used to import the guide data.')
                         ->rules(['file'])
-                        ->required(fn(Get $get): bool => $get('source_type') === EpgSourceType::URL->value && !$get('url')),
+                        ->required(fn (Get $get): bool => $get('source_type') === EpgSourceType::URL->value && ! $get('url')),
 
                     Grid::make()
                         ->columns(3)
@@ -686,9 +686,8 @@ class EpgResource extends Resource
                                 ->columnSpan(1)
                                 ->inline(false)
                                 ->default(false),
-                        ])
+                        ]),
                 ]),
-
 
             Section::make('Scheduling')
                 ->description('Auto sync and scheduling options')
@@ -714,10 +713,10 @@ class EpgResource extends Resource
                                 ->url('https://crontab.guru')
                                 ->openUrlInNewTab(true)
                         )
-                        ->helperText(fn($get) => $get('sync_interval') && CronExpression::isValidExpression($get('sync_interval'))
-                            ? 'Next scheduled sync: ' . (new CronExpression($get('sync_interval')))->getNextRunDate()->format('Y-m-d H:i:s')
+                        ->helperText(fn ($get) => $get('sync_interval') && CronExpression::isValidExpression($get('sync_interval'))
+                            ? 'Next scheduled sync: '.(new CronExpression($get('sync_interval')))->getNextRunDate()->format('Y-m-d H:i:s')
                             : 'Specify the CRON schedule for automatic sync, e.g. "0 3 * * *".')
-                        ->hidden(fn(Get $get): bool => !$get('auto_sync')),
+                        ->hidden(fn (Get $get): bool => ! $get('auto_sync')),
                     DateTimePicker::make('synced')
                         ->columnSpanFull()
                         ->suffix(config('app.timezone'))
@@ -737,7 +736,7 @@ class EpgResource extends Resource
                         ->placeholder('en')
                         ->helperText('Entered your desired locale - if you\'re not sure what to put here, look at your EPG source. If you see entries like "CHANNEL.en", then "en" would be a good choice if you prefer english. This is used when mapping the EPG to a playlist. If the EPG has multiple locales, this will be used as the preferred locale when a direct match is not found.')
                         ->maxLength(10),
-                ])
+                ]),
         ];
     }
 }

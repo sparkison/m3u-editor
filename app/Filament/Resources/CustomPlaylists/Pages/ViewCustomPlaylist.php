@@ -10,10 +10,7 @@ use App\Livewire\PlaylistEpgUrl;
 use App\Livewire\PlaylistInfo;
 use App\Livewire\PlaylistM3uUrl;
 use App\Livewire\XtreamApiInfo;
-use App\Services\EpgCacheService;
-use Filament\Actions;
 use Filament\Actions\EditAction;
-use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Livewire;
@@ -25,16 +22,6 @@ use Filament\Schemas\Schema;
 class ViewCustomPlaylist extends ViewRecord
 {
     protected static string $resource = CustomPlaylistResource::class;
-
-    protected function getHeaderActions(): array
-    {
-        return [
-            EditAction::make()
-                ->label('Edit Playlist')
-                ->color('gray')
-                ->icon('heroicon-m-pencil'),
-        ];
-    }
 
     public function infolist(Schema $schema): Schema
     {
@@ -93,6 +80,16 @@ class ViewCustomPlaylist extends ViewRecord
     {
         return [
             //
+        ];
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            EditAction::make()
+                ->label('Edit Playlist')
+                ->color('gray')
+                ->icon('heroicon-m-pencil'),
         ];
     }
 }

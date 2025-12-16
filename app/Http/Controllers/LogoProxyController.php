@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Settings\GeneralSettings;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Http;
@@ -14,13 +15,60 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class LogoProxyController extends Controller
 {
     /**
+     * Generate a proxy URL for a given logo URL
+     */
+    public static function generateProxyUrl(string $originalUrl, $internal = false): string
+    {
+        // Get the config values (takes priority over settings values)
+        $proxyUrlOverride = config('proxy.url_override');
+        $includeLogosInOverride = config('proxy.url_override_include_logos', true);
+
+        // See if override settings apply
+        try {
+            $settings = app(GeneralSettings::class);
+            if (! $proxyUrlOverride || empty($proxyUrlOverride)) {
+                // Get from settings if not set in config
+                $proxyUrlOverride = $settings->url_override ?? null;
+            }
+            if (config('proxy.url_override_include_logos') === null) {
+                // Get from settings if not set in config
+                $includeLogosInOverride = $settings->url_override_include_logos;
+            }
+        } catch (Exception $e) {
+        }
+
+        if (empty($originalUrl) || ! filter_var($originalUrl, FILTER_VALIDATE_URL)) {
+            $url = '/placeholder.png';
+        } else {
+            $encodedUrl = mb_rtrim(strtr(base64_encode($originalUrl), '+/', '-_'), '=');
+            // Use override URL only if enabled, not internal request, AND logos are included in override
+            $url = $proxyUrlOverride && ! $internal && $includeLogosInOverride
+                ? mb_rtrim($proxyUrlOverride, '/')."/logo-proxy/{$encodedUrl}"
+                : url("/logo-proxy/{$encodedUrl}");
+        }
+
+        return $url;
+    }
+
+    public static function getCacheSize(): string
+    {
+        $totalSize = 0;
+        $logoFiles = Storage::disk('local')->files('cached-logos');
+        foreach ($logoFiles as $file) {
+            $totalSize += Storage::disk('local')->size($file);
+        }
+
+        return self::humanFileSize($totalSize);
+    }
+
+    /**
      * Serve a cached logo from an encoded URL
      */
     public function serveLogo(Request $request, string $encodedUrl): Response|StreamedResponse
     {
         try {
             // Decode the URL
-            $originalUrl = base64_decode(strtr($encodedUrl, '-_', '+/') . str_repeat('=', (4 - strlen($encodedUrl) % 4) % 4));
+            $originalUrl = base64_decode(strtr($encodedUrl, '-_', '+/').str_repeat('=', (4 - mb_strlen($encodedUrl) % 4) % 4));
 
             // Validate the decoded URL
             if (! filter_var($originalUrl, FILTER_VALIDATE_URL)) {
@@ -28,7 +76,7 @@ class LogoProxyController extends Controller
             }
 
             // Generate a cache key based on the original URL
-            $cacheKey = 'logo_' . md5($originalUrl);
+            $cacheKey = 'logo_'.md5($originalUrl);
             $cacheFile = "cached-logos/{$cacheKey}";
 
             // Make sure the cache directory exists
@@ -50,7 +98,7 @@ class LogoProxyController extends Controller
             Storage::disk('local')->put($cacheFile, $logoData['content']);
 
             return $this->serveFromCache($cacheFile, $logoData['content_type']);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Logo proxy error', [
                 'encoded_url' => $encodedUrl,
                 'error' => $e->getMessage(),
@@ -61,39 +109,52 @@ class LogoProxyController extends Controller
     }
 
     /**
-     * Generate a proxy URL for a given logo URL
+     * Clear expired cache entries
      */
-    public static function generateProxyUrl(string $originalUrl, $internal = false): string
+    public function clearExpiredCache(): int
     {
-        // Get the config values (takes priority over settings values)
-        $proxyUrlOverride = config('proxy.url_override');
-        $includeLogosInOverride = config('proxy.url_override_include_logos', true);
+        $cleared = 0;
+        $logoFiles = Storage::disk('local')->files('cached-logos');
 
-        // See if override settings apply
-        try {
-            $settings = app(GeneralSettings::class);
-            if (!$proxyUrlOverride || empty($proxyUrlOverride)) {
-                // Get from settings if not set in config
-                $proxyUrlOverride = $settings->url_override ?? null;
+        foreach ($logoFiles as $file) {
+            // Get file last modified timestamp
+            $lastModified = Carbon::createFromTimestamp(Storage::disk('local')->lastModified($file));
+
+            // If no metadata or file is older than X days, delete it
+            if (now()->diffInDays($lastModified) > config('app.logo_cache_expiry_days', 30)) {
+                Storage::disk('local')->delete($file);
+                $cleared++;
             }
-            if (config('proxy.url_override_include_logos') === null) {
-                // Get from settings if not set in config
-                $includeLogosInOverride = $settings->url_override_include_logos;
-            }
-        } catch (\Exception $e) {
         }
 
-        if (empty($originalUrl) || ! filter_var($originalUrl, FILTER_VALIDATE_URL)) {
-            $url = '/placeholder.png';
-        } else {
-            $encodedUrl = rtrim(strtr(base64_encode($originalUrl), '+/', '-_'), '=');
-            // Use override URL only if enabled, not internal request, AND logos are included in override
-            $url = $proxyUrlOverride && ! $internal && $includeLogosInOverride
-                ? rtrim($proxyUrlOverride, '/') . "/logo-proxy/{$encodedUrl}"
-                : url("/logo-proxy/{$encodedUrl}");
+        return $cleared;
+    }
+
+    /**
+     * Clear the entire logo cache
+     */
+    public function clearCache(): int
+    {
+        $cleared = 0;
+        $logoFiles = Storage::disk('local')->files('cached-logos');
+        foreach ($logoFiles as $file) {
+            Storage::disk('local')->delete($file);
+            $cleared++;
         }
 
-        return $url;
+        return $cleared;
+    }
+
+    private static function humanFileSize(int $bytes): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $i = 0;
+        while ($bytes >= 1024 && $i < count($units) - 1) {
+            $bytes /= 1024;
+            $i++;
+        }
+
+        return round($bytes, 2).' '.$units[$i];
     }
 
     /**
@@ -121,7 +182,7 @@ class LogoProxyController extends Controller
             $content = $response->body();
 
             // Check file size (limit to 5MB)
-            if (strlen($content) > 5 * 1024 * 1024) {
+            if (mb_strlen($content) > 5 * 1024 * 1024) {
                 return null;
             }
 
@@ -129,7 +190,7 @@ class LogoProxyController extends Controller
                 'content' => $content,
                 'content_type' => $contentType,
             ];
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::warning('Failed to fetch remote logo', [
                 'url' => $url,
                 'error' => $e->getMessage(),
@@ -201,7 +262,7 @@ class LogoProxyController extends Controller
 
         // Fallback to common image types if detection fails
         if (! $mimeType || ! str_starts_with($mimeType, 'image/')) {
-            $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+            $extension = mb_strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
 
             return match ($extension) {
                 'jpg', 'jpeg' => 'image/jpeg',
@@ -214,65 +275,5 @@ class LogoProxyController extends Controller
         }
 
         return $mimeType;
-    }
-
-    /**
-     * Clear expired cache entries
-     */
-    public function clearExpiredCache(): int
-    {
-        $cleared = 0;
-        $logoFiles = Storage::disk('local')->files('cached-logos');
-
-        foreach ($logoFiles as $file) {
-            // Get file last modified timestamp
-            $lastModified = Carbon::createFromTimestamp(Storage::disk('local')->lastModified($file));
-
-            // If no metadata or file is older than X days, delete it
-            if (now()->diffInDays($lastModified) > config('app.logo_cache_expiry_days', 30)) {
-                Storage::disk('local')->delete($file);
-                $cleared++;
-            }
-        }
-
-        return $cleared;
-    }
-
-    /**
-     * Clear the entire logo cache
-     */
-    public function clearCache(): int
-    {
-        $cleared = 0;
-        $logoFiles = Storage::disk('local')->files('cached-logos');
-        foreach ($logoFiles as $file) {
-            Storage::disk('local')->delete($file);
-            $cleared++;
-        }
-
-        return $cleared;
-    }
-
-    public static function getCacheSize(): string
-    {
-        $totalSize = 0;
-        $logoFiles = Storage::disk('local')->files('cached-logos');
-        foreach ($logoFiles as $file) {
-            $totalSize += Storage::disk('local')->size($file);
-        }
-
-        return self::humanFileSize($totalSize);
-    }
-
-    private static function humanFileSize(int $bytes): string
-    {
-        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
-        $i = 0;
-        while ($bytes >= 1024 && $i < count($units) - 1) {
-            $bytes /= 1024;
-            $i++;
-        }
-
-        return round($bytes, 2) . ' ' . $units[$i];
     }
 }

@@ -2,24 +2,86 @@
 
 namespace App\Filament\Resources\Playlists\Resources\PlaylistSyncStatuses\RelationManagers;
 
-use Filament\Schemas\Schema;
-use Filament\Tables\Columns\Layout\Split;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\Layout\Panel;
-use Filament\Tables\Columns\Layout\Stack;
-use Filament\Schemas\Components\Tabs\Tab;
 use App\Models\PlaylistSyncStatusLog;
 use App\Tables\Columns\SyncStats;
-use Filament\Forms;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Schema;
 use Filament\Tables;
+use Filament\Tables\Columns\Layout\Panel;
+use Filament\Tables\Columns\Layout\Split;
+use Filament\Tables\Columns\Layout\Stack;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class LogsRelationManager extends RelationManager
 {
     protected static string $relationship = 'logs';
+
+    public static function setupTabs(int $syncId): array
+    {
+        // Change count based on view
+        $addedChannels = PlaylistSyncStatusLog::query()
+            ->where([
+                'playlist_sync_status_id' => $syncId,
+                'type' => 'channel',
+                'status' => 'added',
+            ])->count();
+        $removedChannels = PlaylistSyncStatusLog::query()
+            ->where([
+                'playlist_sync_status_id' => $syncId,
+                'type' => 'channel',
+                'status' => 'removed',
+            ])->count();
+        $addedGroups = PlaylistSyncStatusLog::query()
+            ->where([
+                'playlist_sync_status_id' => $syncId,
+                'type' => 'group',
+                'status' => 'added',
+            ])->count();
+        $removedGroups = PlaylistSyncStatusLog::query()
+            ->where([
+                'playlist_sync_status_id' => $syncId,
+                'type' => 'group',
+                'status' => 'removed',
+            ])->count();
+
+        // Return tabs
+        return [
+            'added_channels' => Tab::make('Added Channels')
+                ->badge($addedChannels)
+                ->badgeColor('success')
+                ->modifyQueryUsing(fn ($query) => $query->where([
+                    'playlist_sync_status_id' => $syncId,
+                    'type' => 'channel',
+                    'status' => 'added',
+                ])),
+            'removed_channels' => Tab::make('Removed Channels')
+                ->badge($removedChannels)
+                ->badgeColor('danger')
+                ->modifyQueryUsing(fn ($query) => $query->where([
+                    'playlist_sync_status_id' => $syncId,
+                    'type' => 'channel',
+                    'status' => 'removed',
+                ])),
+            'added_groups' => Tab::make('Added Groups')
+                ->badge($addedGroups)
+                ->badgeColor('success')
+                ->modifyQueryUsing(fn ($query) => $query->where([
+                    'playlist_sync_status_id' => $syncId,
+                    'type' => 'group',
+                    'status' => 'added',
+                ])),
+            'removed_groups' => Tab::make('Removed Groups')
+                ->badge($removedGroups)
+                ->badgeColor('danger')
+                ->modifyQueryUsing(fn ($query) => $query->where([
+                    'playlist_sync_status_id' => $syncId,
+                    'type' => 'group',
+                    'status' => 'removed',
+                ])),
+        ];
+    }
 
     public function form(Schema $schema): Schema
     {
@@ -64,16 +126,16 @@ class LogsRelationManager extends RelationManager
                             ])
                             ->sortable()
                             ->searchable()
-                            ->toggleable()
-                    ])->grow(false)
+                            ->toggleable(),
+                    ])->grow(false),
                 ])->from('md'),
                 Panel::make([
                     Stack::make([
                         SyncStats::make('meta')
                             ->label('Item Details')
-                            ->searchable()
+                            ->searchable(),
                     ]),
-                ])->collapsible()
+                ])->collapsible(),
             ])
             ->filters([
                 // Tables\Filters\Filter::make('added')
@@ -109,71 +171,7 @@ class LogsRelationManager extends RelationManager
     public function getTabs(): array
     {
         $syncId = $this->getOwnerRecord()->getKey();
+
         return self::setupTabs($syncId);
-    }
-
-    public static function setupTabs(int $syncId): array
-    {
-        // Change count based on view
-        $addedChannels = PlaylistSyncStatusLog::query()
-            ->where([
-                'playlist_sync_status_id' => $syncId,
-                'type' => 'channel',
-                'status' => 'added',
-            ])->count();
-        $removedChannels = PlaylistSyncStatusLog::query()
-            ->where([
-                'playlist_sync_status_id' => $syncId,
-                'type' => 'channel',
-                'status' => 'removed',
-            ])->count();
-        $addedGroups = PlaylistSyncStatusLog::query()
-            ->where([
-                'playlist_sync_status_id' => $syncId,
-                'type' => 'group',
-                'status' => 'added',
-            ])->count();
-        $removedGroups = PlaylistSyncStatusLog::query()
-            ->where([
-                'playlist_sync_status_id' => $syncId,
-                'type' => 'group',
-                'status' => 'removed',
-            ])->count();
-
-        // Return tabs
-        return [
-            'added_channels' => Tab::make('Added Channels')
-                ->badge($addedChannels)
-                ->badgeColor('success')
-                ->modifyQueryUsing(fn($query) => $query->where([
-                    'playlist_sync_status_id' => $syncId,
-                    'type' => 'channel',
-                    'status' => 'added',
-                ])),
-            'removed_channels' => Tab::make('Removed Channels')
-                ->badge($removedChannels)
-                ->badgeColor('danger')
-                ->modifyQueryUsing(fn($query) => $query->where([
-                    'playlist_sync_status_id' => $syncId,
-                    'type' => 'channel',
-                    'status' => 'removed',
-                ])),
-            'added_groups' => Tab::make('Added Groups')
-                ->badge($addedGroups)
-                ->badgeColor('success')
-                ->modifyQueryUsing(fn($query) => $query->where([
-                    'playlist_sync_status_id' => $syncId,
-                    'type' => 'group',
-                    'status' => 'added',
-                ])),
-            'removed_groups' => Tab::make('Removed Groups')
-                ->badge($removedGroups)
-                ->badgeColor('danger')
-                ->modifyQueryUsing(fn($query) => $query->where([
-                    'playlist_sync_status_id' => $syncId,
-                    'type' => 'group',
-                    'status' => 'removed',
-                ])),
-        ];
     }
 }

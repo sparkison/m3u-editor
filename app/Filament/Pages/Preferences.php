@@ -6,22 +6,18 @@ use App\Jobs\RestartQueue;
 use App\Models\StreamProfile;
 use App\Rules\CheckIfUrlOrLocalPath;
 use App\Rules\Cron;
-use App\Services\FfmpegCodecService;
 use App\Services\M3uProxyService;
 use App\Services\PlaylistService;
-use App\Services\ProxyService;
 use App\Settings\GeneralSettings;
+use BackedEnum;
 use Cron\CronExpression;
 use Dom\Text;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Forms;
-use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Pages\SettingsPage;
 use Filament\Schemas\Components\Fieldset;
@@ -35,17 +31,13 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
-use ReflectionClass;
-use ReflectionProperty;
 
 class Preferences extends SettingsPage
 {
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-cog-6-tooth';
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-cog-6-tooth';
 
     protected static string $settings = GeneralSettings::class;
 
@@ -62,57 +54,14 @@ class Preferences extends SettingsPage
         return auth()->check() && auth()->user()->isAdmin();
     }
 
-    protected function getActions(): array
-    {
-        return [
-            Action::make('Reset Queue')
-                ->label('Reset Queue')
-                ->action(function () {
-                    app('Illuminate\Contracts\Bus\Dispatcher')
-                        ->dispatch(new RestartQueue);
-                })
-                ->after(function () {
-                    Notification::make()
-                        ->success()
-                        ->title('Queue reset')
-                        ->body('The queue workers have been restarted and any pending jobs flushed. You may need to manually sync any Playlists or EPGs that were in progress.')
-                        ->duration(10000)
-                        ->send();
-                })
-                ->color('gray')
-                ->requiresConfirmation()
-                ->icon('heroicon-o-exclamation-triangle')
-                ->modalIcon('heroicon-o-exclamation-triangle')
-                ->modalDescription('Resetting the queue will restart the queue workers and flush any pending jobs. Any syncs or background processes will be stopped and removed. Only perform this action if you are having sync issues.')
-                ->modalSubmitActionLabel('I understand, reset now'),
-            Action::make('Clear Logo Cache')
-                ->label('Clear Logo Cache')
-                ->action(fn() => Artisan::call('app:logo-cleanup --force --all'))
-                ->after(function () {
-                    Notification::make()
-                        ->success()
-                        ->title('Logo cache cleared')
-                        ->body('The logo cache has been cleared successfully.')
-                        ->duration(10000)
-                        ->send();
-                })
-                ->color('gray')
-                ->requiresConfirmation()
-                ->icon('heroicon-o-exclamation-triangle')
-                ->modalIcon('heroicon-o-exclamation-triangle')
-                ->modalDescription('Clearing the logo cache will remove all cached logo images. This action cannot be undone.')
-                ->modalSubmitActionLabel('I understand, clear logo cache now'),
-        ];
-    }
-
     public function form(Schema $schema): Schema
     {
-        $m3uPublicUrl = rtrim(config('proxy.m3u_proxy_public_url'), '/');
+        $m3uPublicUrl = mb_rtrim(config('proxy.m3u_proxy_public_url'), '/');
         $m3uToken = config('proxy.m3u_proxy_token', null);
         if (empty($m3uPublicUrl)) {
             $m3uPublicUrl = url('/m3u-proxy');
         }
-        $m3uProxyDocs = $m3uPublicUrl . '/docs';
+        $m3uProxyDocs = $m3uPublicUrl.'/docs';
 
         // Setup the service
         $service = new M3uProxyService();
@@ -151,9 +100,9 @@ class Preferences extends SettingsPage
                                                         if (config('dev.show_wan_details') !== null) {
                                                             $component->state((bool) config('dev.show_wan_details'));
                                                         }
-                                                    })->disabled(fn() => config('dev.show_wan_details') !== null)
-                                                    ->hint(fn() => config('dev.show_wan_details') !== null ? 'Already set by environment variable!' : null)
-                                                    ->dehydrated(fn() => config('dev.show_wan_details') === null),
+                                                    })->disabled(fn () => config('dev.show_wan_details') !== null)
+                                                    ->hint(fn () => config('dev.show_wan_details') !== null ? 'Already set by environment variable!' : null)
+                                                    ->dehydrated(fn () => config('dev.show_wan_details') === null),
                                             ]),
                                         Grid::make()
                                             ->columnSpanFull()
@@ -209,20 +158,20 @@ class Preferences extends SettingsPage
                                                         'heroicon-m-question-mark-circle',
                                                         tooltip: 'If you would like the proxied streams to use a different base URL than the configured app url. Useful for local network access or when using a different domain for streaming.'
                                                     )
-                                                    ->disabled(fn() => ! empty(config('proxy.url_override')))
-                                                    ->hint(fn() => ! empty(config('proxy.url_override')) ? 'Already set by environment variable!' : null)
+                                                    ->disabled(fn () => ! empty(config('proxy.url_override')))
+                                                    ->hint(fn () => ! empty(config('proxy.url_override')) ? 'Already set by environment variable!' : null)
                                                     ->prefixIcon('heroicon-m-link')
-                                                    ->disabled(fn() => ! empty(config('proxy.url_override')))
-                                                    ->hint(fn() => ! empty(config('proxy.url_override')) ? 'Already set by environment variable!' : null)
-                                                    ->default(fn() => ! empty(config('proxy.url_override')) ? config('proxy.url_override') : '')
+                                                    ->disabled(fn () => ! empty(config('proxy.url_override')))
+                                                    ->hint(fn () => ! empty(config('proxy.url_override')) ? 'Already set by environment variable!' : null)
+                                                    ->default(fn () => ! empty(config('proxy.url_override')) ? config('proxy.url_override') : '')
                                                     ->afterStateHydrated(function (TextInput $component, $state) {
                                                         if (! empty(config('proxy.url_override'))) {
                                                             $component->state((string) config('proxy.url_override'));
                                                         }
                                                     })
-                                                    ->dehydrated(fn() => empty(config('proxy.url_override')))
+                                                    ->dehydrated(fn () => empty(config('proxy.url_override')))
                                                     ->placeholder('http://192.168.0.123:36400')
-                                                    ->helperText(fn() => 'Leave empty to use the configured app url (default).'),
+                                                    ->helperText(fn () => 'Leave empty to use the configured app url (default).'),
 
                                                 Toggle::make('url_override_include_logos')
                                                     ->label('Include logos in proxy URL override')
@@ -231,16 +180,16 @@ class Preferences extends SettingsPage
                                                         'heroicon-m-question-mark-circle',
                                                         tooltip: 'This is useful for Plex which need HTTPS for logo images. When using a domain with HTTPS for the frontend, but proxy URL override points to a local HTTP address, Plex may not load the logos due to HTTPS requirements. By enabling this option you can keep the stream proxy override for local access while logos still use the HTTPS domain URL that Plex requires.'
                                                     )
-                                                    ->disabled(fn() => config('proxy.url_override_include_logos') !== null)
-                                                    ->hint(fn() => config('proxy.url_override_include_logos') !== null ? 'Already set by environment variable!' : null)
-                                                    ->default(fn() => config('proxy.url_override_include_logos') !== null)
+                                                    ->disabled(fn () => config('proxy.url_override_include_logos') !== null)
+                                                    ->hint(fn () => config('proxy.url_override_include_logos') !== null ? 'Already set by environment variable!' : null)
+                                                    ->default(fn () => config('proxy.url_override_include_logos') !== null)
                                                     ->afterStateHydrated(function (Toggle $component, $state) {
                                                         if (config('proxy.url_override_include_logos') !== null) {
-                                                            $component->state((bool)  config('proxy.url_override_include_logos'));
+                                                            $component->state((bool) config('proxy.url_override_include_logos'));
                                                         }
                                                     })
-                                                    ->hidden(fn($get) => empty(config('proxy.url_override')) && empty($get('url_override')))
-                                                    ->dehydrated(fn() => empty(config('proxy.url_override_include_logos')))
+                                                    ->hidden(fn ($get) => empty(config('proxy.url_override')) && empty($get('url_override')))
+                                                    ->dehydrated(fn () => empty(config('proxy.url_override_include_logos')))
                                                     ->helperText('Whether or not to use the URL override for logos and images too (default is enabled).'),
                                             ]),
 
@@ -254,15 +203,15 @@ class Preferences extends SettingsPage
                                                         tooltip: 'When enabled, the proxy will make a call to the editor to determine which failover to use based on available capacity. When disabled, a list of failover URLs will be sent to the proxy and it will loop through them without any capacity checks when a stream failure occurs.'
                                                     )
                                                     ->live()
-                                                    ->disabled(fn() => ! empty(config('proxy.resolver_url')))
-                                                    ->hint(fn() => ! empty(config('proxy.resolver_url')) ? 'Already set by environment variable!' : null)
+                                                    ->disabled(fn () => ! empty(config('proxy.resolver_url')))
+                                                    ->hint(fn () => ! empty(config('proxy.resolver_url')) ? 'Already set by environment variable!' : null)
                                                     ->default(false)
                                                     ->afterStateHydrated(function (Toggle $component, $state) {
                                                         if (! empty(config('proxy.resolver_url'))) {
                                                             $component->state((bool) config('proxy.resolver_url'));
                                                         }
                                                     })
-                                                    ->dehydrated(fn() => empty(config('proxy.resolver_url')))
+                                                    ->dehydrated(fn () => empty(config('proxy.resolver_url')))
                                                     ->helperText('Use to enable advanced failover checking and resolution.'),
 
                                                 TextInput::make('failover_resolver_url')
@@ -271,19 +220,19 @@ class Preferences extends SettingsPage
                                                     ->url()
                                                     ->live()
                                                     ->prefixIcon('heroicon-m-link')
-                                                    ->disabled(fn() => ! empty(config('proxy.resolver_url')))
-                                                    ->hint(fn() => ! empty(config('proxy.resolver_url')) ? 'Already set by environment variable!' : null)
-                                                    ->default(fn() => ! empty(config('proxy.resolver_url')) ? config('proxy.resolver_url') : '')
+                                                    ->disabled(fn () => ! empty(config('proxy.resolver_url')))
+                                                    ->hint(fn () => ! empty(config('proxy.resolver_url')) ? 'Already set by environment variable!' : null)
+                                                    ->default(fn () => ! empty(config('proxy.resolver_url')) ? config('proxy.resolver_url') : '')
                                                     ->afterStateHydrated(function (TextInput $component, $state) {
                                                         if (! empty(config('proxy.resolver_url'))) {
                                                             $component->state((string) config('proxy.resolver_url'));
                                                         }
                                                     })
-                                                    ->required(fn($get) => !! $get('enable_failover_resolver'))
-                                                    ->hidden(fn($get) => ! $get('enable_failover_resolver'))
-                                                    ->dehydrated(fn() => empty(config('proxy.resolver_url')))
-                                                    ->placeholder(fn() => $embedded ? 'http://127.0.0.1:' . config('app.port') : 'http://m3u-editor:36400')
-                                                    ->helperText(fn() => $embedded
+                                                    ->required(fn ($get) => (bool) $get('enable_failover_resolver'))
+                                                    ->hidden(fn ($get) => ! $get('enable_failover_resolver'))
+                                                    ->dehydrated(fn () => empty(config('proxy.resolver_url')))
+                                                    ->placeholder(fn () => $embedded ? 'http://127.0.0.1:'.config('app.port') : 'http://m3u-editor:36400')
+                                                    ->helperText(fn () => $embedded
                                                         ? 'For embedded mode, you should use localhost, e.g.: "http://127.0.0.1:36400" or "http://localhost:36400".'
                                                         : 'Domain the proxy can use to access the editor for faillover resolution, e.g.: "http://m3u-editor:36400", "http://192.168.0.101:36400", "http://your-domain.dev", etc.'),
 
@@ -293,7 +242,7 @@ class Preferences extends SettingsPage
                                                     ->action(function ($get) use ($service) {
                                                         $configUrl = config('proxy.resolver_url');
                                                         $url = $configUrl ?? $get('failover_resolver_url');
-                                                        $url = rtrim($url, '/');
+                                                        $url = mb_rtrim($url, '/');
                                                         $result = $service->testResolver($url);
 
                                                         if ($result['success']) {
@@ -301,7 +250,7 @@ class Preferences extends SettingsPage
                                                                 ->success()
                                                                 ->title('Connection Successful')
                                                                 ->body(Str::markdown(
-                                                                    "**Proxy can reach the editor!**\n\n" .
+                                                                    "**Proxy can reach the editor!**\n\n".
                                                                         "URL tested: `{$result['url_tested']}`\n\n"
                                                                 ))
                                                                 ->duration(8000)
@@ -311,14 +260,14 @@ class Preferences extends SettingsPage
                                                                 ->danger()
                                                                 ->title('Connection Failed')
                                                                 ->body(Str::markdown(
-                                                                    "**The proxy cannot reach the editor**\n\n" .
-                                                                        $result['message'] . "\n\n" .
-                                                                        "Please verify the Failover Resolver URL is correct and accessible from the proxy container/service."
+                                                                    "**The proxy cannot reach the editor**\n\n".
+                                                                        $result['message']."\n\n".
+                                                                        'Please verify the Failover Resolver URL is correct and accessible from the proxy container/service.'
                                                                 ))
                                                                 ->duration(10000)
                                                                 ->send();
                                                         }
-                                                    })->hidden(fn($get) => ! $get('enable_failover_resolver')),
+                                                    })->hidden(fn ($get) => ! $get('enable_failover_resolver')),
                                             ]),
 
                                         Fieldset::make('In-app player transcoding settings')
@@ -430,7 +379,7 @@ class Preferences extends SettingsPage
                                                 } catch (Exception $e) {
                                                     Notification::make()
                                                         ->title('Connection Failed')
-                                                        ->body('Could not connect to the m3u proxy instance. ' . $e->getMessage())
+                                                        ->body('Could not connect to the m3u proxy instance. '.$e->getMessage())
                                                         ->danger()
                                                         ->send();
                                                 }
@@ -513,8 +462,8 @@ class Preferences extends SettingsPage
                                     ->schema([
                                         Toggle::make('invalidate_import')
                                             ->label('Enable import invalidation')
-                                            ->disabled(fn() => ! empty(config('dev.invalidate_import')))
-                                            ->hint(fn() => ! empty(config('dev.invalidate_import')) ? 'Already set by environment variable!' : null)
+                                            ->disabled(fn () => ! empty(config('dev.invalidate_import')))
+                                            ->hint(fn () => ! empty(config('dev.invalidate_import')) ? 'Already set by environment variable!' : null)
                                             ->default(function () {
                                                 return ! empty(config('dev.invalidate_import')) ? (bool) config('dev.invalidate_import') : false;
                                             })
@@ -523,15 +472,15 @@ class Preferences extends SettingsPage
                                                     $component->state((bool) config('dev.invalidate_import'));
                                                 }
                                             })
-                                            ->dehydrated(fn() => empty(config('dev.invalidate_import')))
+                                            ->dehydrated(fn () => empty(config('dev.invalidate_import')))
                                             ->helperText('Invalidate Playlist sync if conditon met.'),
                                         TextInput::make('invalidate_import_threshold')
                                             ->label('Import invalidation threshold')
-                                            ->suffixIcon(fn() => ! empty(config('dev.invalidate_import_threshold')) ? 'heroicon-m-lock-closed' : null)
-                                            ->disabled(fn() => ! empty(config('dev.invalidate_import_threshold')))
-                                            ->hint(fn() => ! empty(config('dev.invalidate_import_threshold')) ? 'Already set by environment variable!' : null)
-                                            ->dehydrated(fn() => empty(config('dev.invalidate_import_threshold')))
-                                            ->placeholder(fn() => empty(config('dev.invalidate_import_threshold')) ? 100 : config('dev.invalidate_import_threshold'))
+                                            ->suffixIcon(fn () => ! empty(config('dev.invalidate_import_threshold')) ? 'heroicon-m-lock-closed' : null)
+                                            ->disabled(fn () => ! empty(config('dev.invalidate_import_threshold')))
+                                            ->hint(fn () => ! empty(config('dev.invalidate_import_threshold')) ? 'Already set by environment variable!' : null)
+                                            ->dehydrated(fn () => empty(config('dev.invalidate_import_threshold')))
+                                            ->placeholder(fn () => empty(config('dev.invalidate_import_threshold')) ? 100 : config('dev.invalidate_import_threshold'))
                                             ->numeric()
                                             ->helperText('If the current sync will have less channels than the current channel count (less this value), the sync will be invalidated and canceled.'),
                                     ]),
@@ -555,26 +504,26 @@ class Preferences extends SettingsPage
                                                 $tmdbIdFormat = $get('stream_file_sync_tmdb_id_format') ?? 'square';
 
                                                 // Build path preview
-                                                $preview = 'Preview: ' . $path;
+                                                $preview = 'Preview: '.$path;
 
                                                 if (in_array('category', $pathStructure)) {
-                                                    $preview .= '/' . $seriesExample->category;
+                                                    $preview .= '/'.$seriesExample->category;
                                                 }
                                                 if (in_array('series', $pathStructure)) {
-                                                    $preview .= '/' . $seriesExample->series->metadata['name'];
+                                                    $preview .= '/'.$seriesExample->series->metadata['name'];
                                                 }
                                                 if (in_array('season', $pathStructure)) {
-                                                    $preview .= '/Season ' . str_pad($seriesExample->info->season, 2, '0', STR_PAD_LEFT);
+                                                    $preview .= '/Season '.mb_str_pad($seriesExample->info->season, 2, '0', STR_PAD_LEFT);
                                                 }
 
                                                 // Build filename preview
-                                                $season = str_pad($seriesExample->info->season, 2, '0', STR_PAD_LEFT);
-                                                $episode = str_pad($seriesExample->episode_num, 2, '0', STR_PAD_LEFT);
+                                                $season = mb_str_pad($seriesExample->info->season, 2, '0', STR_PAD_LEFT);
+                                                $episode = mb_str_pad($seriesExample->episode_num, 2, '0', STR_PAD_LEFT);
                                                 $filename = PlaylistService::makeFilesystemSafe("S{$season}E{$episode} - {$seriesExample->title}", $get('stream_file_sync_replace_char') ?? ' ');
 
                                                 // Add metadata to filename
                                                 if (in_array('year', $filenameMetadata) && ! empty($seriesExample->series->release_date)) {
-                                                    $year = substr($seriesExample->series->release_date, 0, 4);
+                                                    $year = mb_substr($seriesExample->series->release_date, 0, 4);
                                                     $filename .= " ({$year})";
                                                 }
                                                 if (in_array('tmdb_id', $filenameMetadata) && ! empty($seriesExample->info->tmdb_id)) {
@@ -582,13 +531,13 @@ class Preferences extends SettingsPage
                                                     $filename .= " {$bracket[0]}tmdb-{$seriesExample->info->tmdb_id}{$bracket[1]}";
                                                 }
 
-                                                $preview .= '/' . $filename . '.strm';
+                                                $preview .= '/'.$filename.'.strm';
 
                                                 return $preview;
                                             })
                                             ->maxLength(255)
                                             ->required()
-                                            ->hidden(fn($get) => ! $get('stream_file_sync_enabled'))
+                                            ->hidden(fn ($get) => ! $get('stream_file_sync_enabled'))
                                             ->placeholder('/Series'),
                                         Forms\Components\ToggleButtons::make('stream_file_sync_path_structure')
                                             ->label('Path structure (folders)')
@@ -609,7 +558,7 @@ class Preferences extends SettingsPage
 
                                                 return $state;
                                             })
-                                            ->hidden(fn($get) => ! $get('stream_file_sync_enabled')),
+                                            ->hidden(fn ($get) => ! $get('stream_file_sync_enabled')),
                                         Fieldset::make('Include Metadata')
                                             ->columnSpanFull()
                                             ->schema([
@@ -643,10 +592,10 @@ class Preferences extends SettingsPage
                                                     ->options([
                                                         'square' => '[square]',
                                                         'curly' => '{curly}',
-                                                    ])->hidden(fn($get) => ! in_array('tmdb_id', $get('stream_file_sync_filename_metadata') ?? [])),
+                                                    ])->hidden(fn ($get) => ! in_array('tmdb_id', $get('stream_file_sync_filename_metadata') ?? [])),
 
                                             ])
-                                            ->hidden(fn($get) => ! $get('stream_file_sync_enabled')),
+                                            ->hidden(fn ($get) => ! $get('stream_file_sync_enabled')),
                                         Fieldset::make('Filename Cleansing')
                                             ->columnSpanFull()
                                             ->schema([
@@ -672,7 +621,7 @@ class Preferences extends SettingsPage
                                                         'remove' => 'Remove',
                                                     ]),
                                             ])
-                                            ->hidden(fn($get) => ! $get('stream_file_sync_enabled')),
+                                            ->hidden(fn ($get) => ! $get('stream_file_sync_enabled')),
                                     ]),
                                 Section::make('VOD stream file settings')
                                     ->description('Generate .strm files and sync them to a local file path. Options can be overriden per VOD in the VOD edit panel.')
@@ -694,13 +643,13 @@ class Preferences extends SettingsPage
                                                 $tmdbIdFormat = $get('vod_stream_file_sync_tmdb_id_format') ?? 'square';
 
                                                 // Build path preview
-                                                $preview = 'Preview: ' . $path;
+                                                $preview = 'Preview: '.$path;
 
                                                 if (in_array('group', $pathStructure)) {
-                                                    $preview .= '/' . $vodExample->group;
+                                                    $preview .= '/'.$vodExample->group;
                                                 }
                                                 if (in_array('title', $pathStructure)) {
-                                                    $preview .= '/' . PlaylistService::makeFilesystemSafe($vodExample->title, $get('vod_stream_file_sync_replace_char') ?? ' ');
+                                                    $preview .= '/'.PlaylistService::makeFilesystemSafe($vodExample->title, $get('vod_stream_file_sync_replace_char') ?? ' ');
                                                 }
 
                                                 // Build filename preview
@@ -712,13 +661,13 @@ class Preferences extends SettingsPage
                                                     $filename .= " {$bracket[0]}tmdb-{$vodExample->info['tmdb_id']}{$bracket[1]}";
                                                 }
 
-                                                $preview .= '/' . $filename . '.strm';
+                                                $preview .= '/'.$filename.'.strm';
 
                                                 return $preview;
                                             })
                                             ->maxLength(255)
                                             ->required()
-                                            ->hidden(fn($get) => ! $get('vod_stream_file_sync_enabled'))
+                                            ->hidden(fn ($get) => ! $get('vod_stream_file_sync_enabled'))
                                             ->placeholder('/VOD/movies'),
                                         Forms\Components\ToggleButtons::make('vod_stream_file_sync_path_structure')
                                             ->label('Path structure (folders)')
@@ -737,7 +686,7 @@ class Preferences extends SettingsPage
 
                                                 return $state;
                                             })
-                                            ->hidden(fn($get) => ! $get('vod_stream_file_sync_enabled')),
+                                            ->hidden(fn ($get) => ! $get('vod_stream_file_sync_enabled')),
                                         Fieldset::make('Include Metadata')
                                             ->columnSpanFull()
                                             ->schema([
@@ -771,9 +720,9 @@ class Preferences extends SettingsPage
                                                     ->options([
                                                         'square' => '[square]',
                                                         'curly' => '{curly}',
-                                                    ])->hidden(fn($get) => ! in_array('tmdb_id', $get('vod_stream_file_sync_filename_metadata') ?? [])),
+                                                    ])->hidden(fn ($get) => ! in_array('tmdb_id', $get('vod_stream_file_sync_filename_metadata') ?? [])),
                                             ])
-                                            ->hidden(fn($get) => ! $get('vod_stream_file_sync_enabled')),
+                                            ->hidden(fn ($get) => ! $get('vod_stream_file_sync_enabled')),
                                         Fieldset::make('Filename Cleansing')
                                             ->columnSpanFull()
                                             ->schema([
@@ -798,7 +747,7 @@ class Preferences extends SettingsPage
                                                         'remove' => 'Remove',
                                                     ]),
                                             ])
-                                            ->hidden(fn($get) => ! $get('vod_stream_file_sync_enabled')),
+                                            ->hidden(fn ($get) => ! $get('vod_stream_file_sync_enabled')),
                                     ]),
                             ]),
 
@@ -827,15 +776,15 @@ class Preferences extends SettingsPage
                                                     ->suffix(config('app.timezone'))
                                                     ->rules([new Cron])
                                                     ->live()
-                                                    ->helperText(fn($get) => CronExpression::isValidExpression($get('auto_backup_database_schedule'))
-                                                        ? 'Next scheduled backup: ' . (new CronExpression($get('auto_backup_database_schedule')))->getNextRunDate()->format('Y-m-d H:i:s')
+                                                    ->helperText(fn ($get) => CronExpression::isValidExpression($get('auto_backup_database_schedule'))
+                                                        ? 'Next scheduled backup: '.(new CronExpression($get('auto_backup_database_schedule')))->getNextRunDate()->format('Y-m-d H:i:s')
                                                         : 'Specify the CRON schedule for automatic backups, e.g. "0 3 * * *".'),
                                                 TextInput::make('auto_backup_database_max_backups')
                                                     ->label('Max Backups')
                                                     ->type('number')
                                                     ->minValue(0)
                                                     ->helperText('Specify the maximum number of backups to keep. Enter 0 for no limit.'),
-                                            ])->hidden(fn($get) => ! $get('auto_backup_database')),
+                                            ])->hidden(fn ($get) => ! $get('auto_backup_database')),
                                     ]),
                             ]),
 
@@ -896,7 +845,7 @@ class Preferences extends SettingsPage
                                                     Notification::make()
                                                         ->success()
                                                         ->title('Test Email Sent')
-                                                        ->body('Test email sent successfully to ' . $data['to_email'])
+                                                        ->body('Test email sent successfully to '.$data['to_email'])
                                                         ->send();
                                                 } catch (Exception $e) {
                                                     Notification::make()
@@ -1033,5 +982,48 @@ class Preferences extends SettingsPage
             ->success()
             ->title('Settings saved')
             ->body('Your preferences have been saved successfully.');
+    }
+
+    protected function getActions(): array
+    {
+        return [
+            Action::make('Reset Queue')
+                ->label('Reset Queue')
+                ->action(function () {
+                    app('Illuminate\Contracts\Bus\Dispatcher')
+                        ->dispatch(new RestartQueue);
+                })
+                ->after(function () {
+                    Notification::make()
+                        ->success()
+                        ->title('Queue reset')
+                        ->body('The queue workers have been restarted and any pending jobs flushed. You may need to manually sync any Playlists or EPGs that were in progress.')
+                        ->duration(10000)
+                        ->send();
+                })
+                ->color('gray')
+                ->requiresConfirmation()
+                ->icon('heroicon-o-exclamation-triangle')
+                ->modalIcon('heroicon-o-exclamation-triangle')
+                ->modalDescription('Resetting the queue will restart the queue workers and flush any pending jobs. Any syncs or background processes will be stopped and removed. Only perform this action if you are having sync issues.')
+                ->modalSubmitActionLabel('I understand, reset now'),
+            Action::make('Clear Logo Cache')
+                ->label('Clear Logo Cache')
+                ->action(fn () => Artisan::call('app:logo-cleanup --force --all'))
+                ->after(function () {
+                    Notification::make()
+                        ->success()
+                        ->title('Logo cache cleared')
+                        ->body('The logo cache has been cleared successfully.')
+                        ->duration(10000)
+                        ->send();
+                })
+                ->color('gray')
+                ->requiresConfirmation()
+                ->icon('heroicon-o-exclamation-triangle')
+                ->modalIcon('heroicon-o-exclamation-triangle')
+                ->modalDescription('Clearing the logo cache will remove all cached logo images. This action cannot be undone.')
+                ->modalSubmitActionLabel('I understand, clear logo cache now'),
+        ];
     }
 }

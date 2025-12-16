@@ -4,16 +4,17 @@ namespace App\Console\Commands;
 
 use App\Models\Epg;
 use App\Services\SchedulesDirectService;
+use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 
 class TestSchedulesDirectCommand extends Command
 {
-    private static string $USER_AGENT = 'm3u-editor/dev';
-
     protected $signature = 'app:schedules-direct-test {--epg=} {--username=} {--password=} {--country=USA} {--postal_code=60030} {--metadata}';
 
     protected $description = 'Test Schedules Direct API connection and metadata endpoints';
+
+    private static string $USER_AGENT = 'm3u-editor/dev';
 
     public function handle(SchedulesDirectService $service): int
     {
@@ -75,7 +76,7 @@ class TestSchedulesDirectCommand extends Command
 
             // Authentication successful
             $this->info('✓ Authentication successful!');
-            $this->info('Token: '.substr($authData['token'], 0, 20).'...');
+            $this->info('Token: '.mb_substr($authData['token'], 0, 20).'...');
             $this->info('Expires: '.date('Y-m-d H:i:s', $authData['expires']));
 
             $token = $authData['token'];
@@ -91,7 +92,7 @@ class TestSchedulesDirectCommand extends Command
             $this->info("\n✓ Schedules Direct API test completed successfully");
 
             return Command::SUCCESS;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->error('✗ Test failed: '.$e->getMessage());
 
             return Command::FAILURE;
@@ -152,7 +153,7 @@ class TestSchedulesDirectCommand extends Command
                                 $this->line("      - Ch {$channelNum}: {$stationId}");
                             }
                         }
-                    } catch (\Exception $e) {
+                    } catch (Exception $e) {
                         $this->line('    ✗ Preview failed: '.$e->getMessage());
                     }
                 }
@@ -255,7 +256,7 @@ class TestSchedulesDirectCommand extends Command
                             }
                         }
                     } else {
-                        $this->info('✅ SUCCESS - Response: '.substr(json_encode($data), 0, 200).'...');
+                        $this->info('✅ SUCCESS - Response: '.mb_substr(json_encode($data), 0, 200).'...');
                     }
                 } else {
                     $errorBody = $response->body();
@@ -267,7 +268,7 @@ class TestSchedulesDirectCommand extends Command
                         $this->error('  Error message: '.$errorData['message']);
                     }
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $this->error('❌ EXCEPTION - '.$e->getMessage());
             }
 
@@ -309,7 +310,7 @@ class TestSchedulesDirectCommand extends Command
 
                             return $this->fetchProgramIds($token, $stationIds, $lineupId);
                         }
-                    } catch (\Exception $e) {
+                    } catch (Exception $e) {
                         // Continue to next lineup
                         continue;
                     }
@@ -355,10 +356,10 @@ class TestSchedulesDirectCommand extends Command
 
                         // Look for OTA (over-the-air) lineups which are usually free
                         if (
-                            stripos($lineupName, 'antenna') !== false ||
-                            stripos($lineupName, 'over') !== false ||
-                            stripos($lineupName, 'broadcast') !== false ||
-                            stripos($lineupId, 'OTA') !== false
+                            mb_stripos($lineupName, 'antenna') !== false ||
+                            mb_stripos($lineupName, 'over') !== false ||
+                            mb_stripos($lineupName, 'broadcast') !== false ||
+                            mb_stripos($lineupId, 'OTA') !== false
                         ) {
 
                             try {
@@ -391,7 +392,7 @@ class TestSchedulesDirectCommand extends Command
                                         }
                                     }
                                 }
-                            } catch (\Exception $e) {
+                            } catch (Exception $e) {
                                 // Continue trying other lineups
                                 continue;
                             }
@@ -400,8 +401,8 @@ class TestSchedulesDirectCommand extends Command
                 }
             }
 
-            throw new \Exception('Could not find any suitable lineup for testing');
-        } catch (\Exception $e) {
+            throw new Exception('Could not find any suitable lineup for testing');
+        } catch (Exception $e) {
             $this->error('Error getting sample program IDs: '.$e->getMessage());
 
             return [];
@@ -411,7 +412,7 @@ class TestSchedulesDirectCommand extends Command
     private function fetchProgramIds(string $token, array $stationIds, string $lineupId): array
     {
         if (empty($stationIds)) {
-            throw new \Exception('No station IDs provided');
+            throw new Exception('No station IDs provided');
         }
 
         $today = date('Y-m-d');
@@ -448,9 +449,8 @@ class TestSchedulesDirectCommand extends Command
             $this->info('✓ Found '.count($programIds).' unique program IDs');
 
             return array_slice($programIds, 0, 15); // Return first 15 for testing
-        } else {
-            throw new \Exception('Failed to get schedules: '.$response->body());
         }
+        throw new Exception('Failed to get schedules: '.$response->body());
     }
 
     private function analyzeResponseStructure(array $item): void
@@ -474,7 +474,7 @@ class TestSchedulesDirectCommand extends Command
                 if (is_bool($value)) {
                     $this->line("    {$key}: ".($value ? 'true' : 'false'));
                 } elseif (is_string($value)) {
-                    $this->line("    {$key}: ".substr($value, 0, 100).'...');
+                    $this->line("    {$key}: ".mb_substr($value, 0, 100).'...');
                 } elseif (is_array($value)) {
                     $this->line("    {$key}: array with ".count($value).' items');
                 }
@@ -539,7 +539,7 @@ class TestSchedulesDirectCommand extends Command
             $this->line('Using '.count($stationIds).' stations from EPG configuration');
 
             return $this->fetchProgramIds($token, $stationIds, $epg->sd_lineup_id);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->error('Error getting program IDs from EPG stations: '.$e->getMessage());
 
             return [];

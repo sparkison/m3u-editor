@@ -5,9 +5,9 @@ namespace App\Models;
 use App\Enums\ChannelLogoType;
 use App\Enums\PlaylistSourceType;
 use App\Facades\ProxyFacade;
-use App\Http\Controllers\LogoProxyController;
 use App\Services\XtreamService;
 use App\Settings\GeneralSettings;
+use DateTimeImmutable;
 use Exception;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -19,7 +19,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Spatie\Tags\HasTags;
 use Symfony\Component\Process\Process as SymfonyProcess;
-use Illuminate\Support\Str;
 
 class Channel extends Model
 {
@@ -98,7 +97,7 @@ class Channel extends Model
     public function failoverChannels(): HasManyThrough
     {
         return $this->hasManyThrough(
-            Channel::class, // Deploy
+            self::class, // Deploy
             ChannelFailover::class, // Environment
             'channel_id', // Foreign key on the environments table...
             'id', // Foreign key on the deployments table...
@@ -235,8 +234,8 @@ class Channel extends Model
             $playlist = $this->playlist;
 
             // For Xtream playlists, use XtreamService
-            if (!$xtream) {
-                if (!$playlist->xtream && $playlist->source_type !== PlaylistSourceType::Xtream) {
+            if (! $xtream) {
+                if (! $playlist->xtream && $playlist->source_type !== PlaylistSourceType::Xtream) {
                     // Not an Xtream playlist and not Emby, no metadata source available
                     return false;
                 }
@@ -260,7 +259,7 @@ class Channel extends Model
             $releaseDate = $movieData['info']['release_date'] ?? null;
             $releaseDateAlt = $movieData['info']['releasedate'] ?? null;
             $year = $this->year;
-            if (!$releaseDate && $releaseDateAlt) {
+            if (! $releaseDate && $releaseDateAlt) {
                 // Make sure base release_date is always set
                 $movieData['info']['release_date'] = $releaseDateAlt;
             }
@@ -269,9 +268,9 @@ class Channel extends Model
                 $dateToParse = $releaseDate ?? $releaseDateAlt;
                 $year = null;
                 try {
-                    $date = new \DateTime($dateToParse);
+                    $date = new DateTimeImmutable($dateToParse);
                     $year = (int) $date->format('Y');
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::warning("Unable to parse release date \"{$dateToParse}\" for VOD {$this->id}");
                 }
             }
@@ -285,8 +284,8 @@ class Channel extends Model
             $this->update($update);
 
             return true;
-        } catch (\Exception $e) {
-            Log::error('Failed to fetch metadata for VOD ' . $this->id, ['exception' => $e]);
+        } catch (Exception $e) {
+            Log::error('Failed to fetch metadata for VOD '.$this->id, ['exception' => $e]);
         }
 
         return false;

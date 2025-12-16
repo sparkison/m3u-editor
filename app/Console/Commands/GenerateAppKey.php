@@ -30,11 +30,11 @@ class GenerateAppKey extends Command
             $this->info("🔑 App key check confirmed\n");
 
             return;
-        } else {
-            $this->info("🔑 App key not found, generating one now...\n");
-            $this->call('key:generate', [
-                '--force' => true,
-            ]);
         }
+        $this->info("🔑 App key not found, generating one now...\n");
+        $this->call('key:generate', [
+            '--force' => true,
+        ]);
+
     }
 }

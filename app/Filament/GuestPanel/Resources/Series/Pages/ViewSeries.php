@@ -2,7 +2,6 @@
 
 namespace App\Filament\GuestPanel\Resources\Series\Pages;
 
-use App\Facades\PlaylistFacade;
 use App\Filament\GuestPanel\Pages\Concerns\HasPlaylist;
 use App\Filament\GuestPanel\Resources\Series\SeriesResource;
 use Filament\Actions;
@@ -23,18 +22,6 @@ class ViewSeries extends ViewRecord
         return $this->record->name;
     }
 
-    protected function getHeaderActions(): array
-    {
-        return [
-            Actions\Action::make('back')
-                ->label('Back to series')
-                ->url(SeriesResource::getUrl('index'))
-                ->icon('heroicon-s-arrow-left')
-                ->color('gray')
-                ->size('sm'),
-        ];
-    }
-
     public function infolist(Schemas\Schema $schema): Schemas\Schema
     {
         return $schema
@@ -49,7 +36,19 @@ class ViewSeries extends ViewRecord
                         TextEntry::make('plot')
                             ->label('Description')
                             ->columnSpanFull(),
-                    ])
+                    ]),
             ]);
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Actions\Action::make('back')
+                ->label('Back to series')
+                ->url(SeriesResource::getUrl('index'))
+                ->icon('heroicon-s-arrow-left')
+                ->color('gray')
+                ->size('sm'),
+        ];
     }
 }

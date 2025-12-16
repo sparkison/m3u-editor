@@ -8,11 +8,11 @@ use Filament\Widgets\Widget;
 
 class UpdateNoticeWidget extends Widget
 {
-    protected string $view = 'filament.widgets.update-notice-widget';
-
     public static ?int $sort = -5;
 
     public array $versionData = [];
+
+    protected string $view = 'filament.widgets.update-notice-widget';
 
     public function mount(): void
     {

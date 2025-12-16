@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\M3uProxyService;
+use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -35,8 +36,8 @@ class RegisterM3uProxyWebhook extends Command
 
         // Construct webhook URL - use APP_URL instead of apiPublicUrl
         // because m3u-proxy needs to call back to Laravel, not to itself
-        $appUrl = rtrim(config('app.url'), '/');
-        $webhookUrl = $appUrl . '/api/m3u-proxy/webhooks';
+        $appUrl = mb_rtrim(config('app.url'), '/');
+        $webhookUrl = $appUrl.'/api/m3u-proxy/webhooks';
 
         $this->info("Webhook URL: {$webhookUrl}");
 
@@ -44,7 +45,7 @@ class RegisterM3uProxyWebhook extends Command
             $publicUrl = $service->getPublicUrl();
 
             // Check if webhook already exists
-            $listEndpoint = $publicUrl . '/webhooks';
+            $listEndpoint = $publicUrl.'/webhooks';
             $listResponse = Http::timeout(5)->acceptJson()
                 ->withHeaders([
                     'X-API-Token' => $service->getApiToken(),
@@ -64,8 +65,9 @@ class RegisterM3uProxyWebhook extends Command
                     }
                 }
 
-                if ($alreadyRegistered && !$this->option('force')) {
+                if ($alreadyRegistered && ! $this->option('force')) {
                     $this->info('✅ Webhook already registered');
+
                     return self::SUCCESS;
                 }
 
@@ -73,7 +75,7 @@ class RegisterM3uProxyWebhook extends Command
                     $this->warn('⚠️  Webhook already registered, removing and re-registering...');
 
                     // Remove existing webhook
-                    $deleteEndpoint = $service->getApiBaseUrl() . '/webhooks';
+                    $deleteEndpoint = $service->getApiBaseUrl().'/webhooks';
                     $deleteResponse = Http::timeout(5)->acceptJson()
                         ->withHeaders([
                             'X-API-Token' => $service->getApiToken(),
@@ -82,14 +84,14 @@ class RegisterM3uProxyWebhook extends Command
                             'webhook_url' => $webhookUrl,
                         ]);
 
-                    if (!$deleteResponse->successful()) {
+                    if (! $deleteResponse->successful()) {
                         $this->warn('⚠️  Failed to remove existing webhook, continuing anyway...');
                     }
                 }
             }
 
             // Register webhook
-            $registerEndpoint = $service->getApiBaseUrl() . '/webhooks';
+            $registerEndpoint = $service->getApiBaseUrl().'/webhooks';
             $payload = [
                 'url' => $webhookUrl,
                 'events' => [
@@ -102,7 +104,7 @@ class RegisterM3uProxyWebhook extends Command
                 'retry_attempts' => 2,
             ];
 
-            $this->info('Registering webhook with events: ' . implode(', ', $payload['events']));
+            $this->info('Registering webhook with events: '.implode(', ', $payload['events']));
 
             $response = Http::timeout(10)->acceptJson()
                 ->withHeaders([
@@ -121,14 +123,16 @@ class RegisterM3uProxyWebhook extends Command
                 return self::SUCCESS;
             }
 
-            $this->error('❌ Failed to register webhook: ' . $response->body());
+            $this->error('❌ Failed to register webhook: '.$response->body());
+
             return self::FAILURE;
-        } catch (\Exception $e) {
-            $this->error('❌ Error registering webhook: ' . $e->getMessage());
+        } catch (Exception $e) {
+            $this->error('❌ Error registering webhook: '.$e->getMessage());
             Log::error('Failed to register m3u-proxy webhook', [
                 'error' => $e->getMessage(),
                 'webhook_url' => $webhookUrl,
             ]);
+
             return self::FAILURE;
         }
     }

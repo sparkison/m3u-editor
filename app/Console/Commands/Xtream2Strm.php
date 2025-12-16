@@ -140,12 +140,12 @@ class Xtream2Strm extends Command
 
         foreach ($eps as $season => $episodes) {
             foreach ($episodes as $ep) {
-                $num = str_pad($ep['episode_num'], 2, '0', STR_PAD_LEFT);
-                $prefx = 'S'.str_pad($season, 2, '0', STR_PAD_LEFT)."E{$num}";
+                $num = mb_str_pad($ep['episode_num'], 2, '0', STR_PAD_LEFT);
+                $prefx = 'S'.mb_str_pad($season, 2, '0', STR_PAD_LEFT)."E{$num}";
                 $title = preg_match('/S\d{2}E\d{2} - (.*)/', $ep['title'], $m) ? $m[1] : 'Unknown';
                 $url = $xtream->buildSeriesUrl($ep['id'], $ep['container_extension']);
                 $path = config('xtream.output_path').'/'.$this->playlist->id.'/'
-                    .config('xtream.dirs.series')."/{$catFolder}/{$seriesName}/Season ".str_pad($season, 2, '0', '0');
+                    .config('xtream.dirs.series')."/{$catFolder}/{$seriesName}/Season ".mb_str_pad($season, 2, '0', '0');
                 $this->writeStrm($path, "{$prefx} - {$title}.strm", $url);
                 $this->info("→ {$prefx} - {$title}.strm");
             }

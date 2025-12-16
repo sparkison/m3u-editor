@@ -15,9 +15,9 @@ class FfmpegCodecService
                     'hevc_qsv' => 'HEVC (QSV)',
                     'mjpeg_qsv' => 'MJPEG (QSV)',
                     'mpeg2_qsv' => 'MPEG-2 (QSV)',
-                    'vc1_qsv'   => 'VC-1 (QSV)',
-                    'vp9_qsv'   => 'VP9 (QSV)',
-                    'av1_qsv'   => 'AV1 (QSV)', // Added as per log example
+                    'vc1_qsv' => 'VC-1 (QSV)',
+                    'vp9_qsv' => 'VP9 (QSV)',
+                    'av1_qsv' => 'AV1 (QSV)', // Added as per log example
                 ];
                 $codecs = array_merge($codecs, $qsvCodecs);
                 break;
@@ -55,6 +55,7 @@ class FfmpegCodecService
                 $codecs = array_merge($codecs, $softwareCodecs);
                 break;
         }
+
         return $codecs;
     }
 
@@ -97,6 +98,7 @@ class FfmpegCodecService
         if (empty($codec)) {
             return false;
         }
+
         return str_contains($codec, '_qsv') || str_contains($codec, '_vaapi');
     }
 }

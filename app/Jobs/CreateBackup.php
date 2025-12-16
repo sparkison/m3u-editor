@@ -2,14 +2,15 @@
 
 namespace App\Jobs;
 
-use Exception;
 use App\Models\User;
+use Exception;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Throwable;
 
 class CreateBackup implements ShouldQueue
 {
@@ -37,21 +38,21 @@ class CreateBackup implements ShouldQueue
         try {
             // Create a new backup
             Artisan::call('backup:run', [
-                '--only-db' => !$this->includeFiles,
+                '--only-db' => ! $this->includeFiles,
             ]);
 
             // Notify the admin that the backup was restored
             $user = User::whereIn('email', config('dev.admin_emails'))->first();
             if ($user) {
-                $message = "Backup created successfully";
+                $message = 'Backup created successfully';
                 Notification::make()
                     ->success()
-                    ->title("Backup created")
+                    ->title('Backup created')
                     ->body($message)
                     ->broadcast($user);
                 Notification::make()
                     ->success()
-                    ->title("Backup created")
+                    ->title('Backup created')
                     ->body($message)
                     ->sendToDatabase($user);
             }
@@ -65,12 +66,12 @@ class CreateBackup implements ShouldQueue
                 $message = "Backup create failed: {$e->getMessage()}";
                 Notification::make()
                     ->danger()
-                    ->title("Backup create failed")
-                    ->body("Backup create failed, please check the error logs for details")
+                    ->title('Backup create failed')
+                    ->body('Backup create failed, please check the error logs for details')
                     ->broadcast($user);
                 Notification::make()
                     ->danger()
-                    ->title("Backup create failed")
+                    ->title('Backup create failed')
                     ->body(Str::limit($message, 500))
                     ->sendToDatabase($user);
             }
@@ -80,7 +81,7 @@ class CreateBackup implements ShouldQueue
     /**
      * Handle a job failure.
      */
-    public function failed(\Throwable $exception): void
+    public function failed(Throwable $exception): void
     {
         Log::error("Backup creation failed: {$exception->getMessage()}");
     }

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Exception;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -26,15 +27,15 @@ class ExternalIpService
                     $response = Http::timeout(5)->get($service);
 
                     if ($response->successful()) {
-                        $ip = trim($response->body());
+                        $ip = mb_trim($response->body());
 
                         // Validate IP format
                         if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_IPV6)) {
                             return $ip;
                         }
                     }
-                } catch (\Exception $e) {
-                    Log::debug("Failed to get IP from {$service}: " . $e->getMessage());
+                } catch (Exception $e) {
+                    Log::debug("Failed to get IP from {$service}: ".$e->getMessage());
 
                     continue;
                 }
@@ -60,6 +61,14 @@ class ExternalIpService
     }
 
     /**
+     * Clear the cached external IP.
+     */
+    public function clearCache(): void
+    {
+        Cache::forget('external_ip');
+    }
+
+    /**
      * Get server IP using various methods.
      */
     protected function getServerIp(): string
@@ -78,13 +87,5 @@ class ExternalIpService
         }
 
         return 'Unable to detect IP';
-    }
-
-    /**
-     * Clear the cached external IP.
-     */
-    public function clearCache(): void
-    {
-        Cache::forget('external_ip');
     }
 }

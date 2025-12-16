@@ -2,21 +2,18 @@
 
 namespace App\Filament\Resources\Series\Pages;
 
-use Filament\Actions\Action;
-use App\Jobs\SyncXtreamSeries;
 use App\Filament\Resources\Series\SeriesResource;
 use App\Jobs\ProcessM3uImportSeriesEpisodes;
 use App\Jobs\SeriesFindAndReplace;
 use App\Jobs\SyncSeriesStrmFiles;
+use App\Jobs\SyncXtreamSeries;
 use App\Models\Playlist;
 use App\Models\Series;
-use Filament\Actions;
+use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\Placeholder;
-use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Tabs\Tab;
@@ -28,6 +25,49 @@ class ListSeries extends ListRecords
     protected static string $resource = SeriesResource::class;
 
     protected ?string $subheading = 'Only enabled series will be automatically updated on Playlist sync, this includes fetching episodes and metadata. You can also manually sync series to update episodes and metadata.';
+
+    public static function setupTabs($relationId = null): array
+    {
+        $where = [
+            ['user_id', auth()->id()],
+        ];
+
+        // Change count based on view
+        $totalCount = Series::query()
+            ->where($where)
+            ->when($relationId, function ($query, $relationId) {
+                return $query->where('category_id', $relationId);
+            })->count();
+        $enabledCount = Series::query()->where([...$where, ['enabled', true]])
+            ->when($relationId, function ($query, $relationId) {
+                return $query->where('category_id', $relationId);
+            })->count();
+        $disabledCount = Series::query()->where([...$where, ['enabled', false]])
+            ->when($relationId, function ($query, $relationId) {
+                return $query->where('category_id', $relationId);
+            })->count();
+
+        // Return tabs
+        return [
+            'all' => Tab::make('All Series')
+                ->badge($totalCount),
+            'enabled' => Tab::make('Enabled')
+                // ->icon('heroicon-m-check')
+                ->badgeColor('success')
+                ->modifyQueryUsing(fn ($query) => $query->where('enabled', true))
+                ->badge($enabledCount),
+            'disabled' => Tab::make('Disabled')
+                // ->icon('heroicon-m-x-mark')
+                ->badgeColor('danger')
+                ->modifyQueryUsing(fn ($query) => $query->where('enabled', false))
+                ->badge($disabledCount),
+        ];
+    }
+
+    public function getTabs(): array
+    {
+        return self::setupTabs();
+    }
 
     protected function getHeaderActions(): array
     {
@@ -76,7 +116,7 @@ class ListSeries extends ListRecords
                             ->required()
                             ->helperText('Select the Playlist you would like to fetch Series metadata for.')
                             ->options(Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                            ->hidden(fn(Get $get) => $get('all_playlists') === true)
+                            ->hidden(fn (Get $get) => $get('all_playlists') === true)
                             ->searchable(),
                     ])
                     ->action(function ($data) {
@@ -113,7 +153,7 @@ class ListSeries extends ListRecords
                             ->required()
                             ->helperText('Select the Playlist you would like to sync Series stream files for.')
                             ->options(Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                            ->hidden(fn(Get $get) => $get('all_playlists') === true)
+                            ->hidden(fn (Get $get) => $get('all_playlists') === true)
                             ->searchable(),
                     ])
                     ->action(function ($data) {
@@ -149,7 +189,7 @@ class ListSeries extends ListRecords
                             ->required()
                             ->helperText('Select the Series you would like to apply changes to.')
                             ->options(Series::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
-                            ->hidden(fn(Get $get) => $get('all_series') === true)
+                            ->hidden(fn (Get $get) => $get('all_series') === true)
                             ->searchable(),
                         Toggle::make('use_regex')
                             ->label('Use Regex')
@@ -167,20 +207,20 @@ class ListSeries extends ListRecords
                             ->required()
                             ->columnSpan(1),
                         TextInput::make('find_replace')
-                            ->label(fn(Get $get) =>  !$get('use_regex') ? 'String to replace' : 'Pattern to replace')
+                            ->label(fn (Get $get) => ! $get('use_regex') ? 'String to replace' : 'Pattern to replace')
                             ->required()
                             ->placeholder(
-                                fn(Get $get) => $get('use_regex')
+                                fn (Get $get) => $get('use_regex')
                                     ? '^(US- |UK- |CA- )'
                                     : 'US -'
                             )->helperText(
-                                fn(Get $get) => !$get('use_regex')
+                                fn (Get $get) => ! $get('use_regex')
                                     ? 'This is the string you want to find and replace.'
                                     : 'This is the regex pattern you want to find. Make sure to use valid regex syntax.'
                             ),
                         TextInput::make('replace_with')
                             ->label('Replace with (optional)')
-                            ->placeholder('Leave empty to remove')
+                            ->placeholder('Leave empty to remove'),
                     ])
                     ->action(function (array $data): void {
                         app('Illuminate\Contracts\Bus\Dispatcher')
@@ -205,8 +245,8 @@ class ListSeries extends ListRecords
                     ->color('gray')
                     ->modalIcon('heroicon-o-magnifying-glass')
                     ->modalDescription('Select what you would like to find and replace in your channels list.')
-                    ->modalSubmitActionLabel('Replace now')
-            ])->button()->label('Actions')
+                    ->modalSubmitActionLabel('Replace now'),
+            ])->button()->label('Actions'),
         ];
     }
 
@@ -217,48 +257,5 @@ class ListSeries extends ListRecords
     {
         return static::getResource()::getEloquentQuery()
             ->where('series.user_id', auth()->id());
-    }
-
-    public function getTabs(): array
-    {
-        return self::setupTabs();
-    }
-
-    public static function setupTabs($relationId = null): array
-    {
-        $where = [
-            ['user_id', auth()->id()],
-        ];
-
-        // Change count based on view
-        $totalCount = Series::query()
-            ->where($where)
-            ->when($relationId, function ($query, $relationId) {
-                return $query->where('category_id', $relationId);
-            })->count();
-        $enabledCount = Series::query()->where([...$where, ['enabled', true]])
-            ->when($relationId, function ($query, $relationId) {
-                return $query->where('category_id', $relationId);
-            })->count();
-        $disabledCount = Series::query()->where([...$where, ['enabled', false]])
-            ->when($relationId, function ($query, $relationId) {
-                return $query->where('category_id', $relationId);
-            })->count();
-
-        // Return tabs
-        return [
-            'all' => Tab::make('All Series')
-                ->badge($totalCount),
-            'enabled' => Tab::make('Enabled')
-                // ->icon('heroicon-m-check')
-                ->badgeColor('success')
-                ->modifyQueryUsing(fn($query) => $query->where('enabled', true))
-                ->badge($enabledCount),
-            'disabled' => Tab::make('Disabled')
-                // ->icon('heroicon-m-x-mark')
-                ->badgeColor('danger')
-                ->modifyQueryUsing(fn($query) => $query->where('enabled', false))
-                ->badge($disabledCount),
-        ];
     }
 }

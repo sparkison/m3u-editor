@@ -158,23 +158,23 @@ class TestXtream extends Command implements PromptsForMissingInput
             }
 
             return;
-        } else {
-            $cats = $xtream->getLiveCategories();
-            $map = collect($cats)->pluck('category_id', 'category_name')->toArray();
-            $catName = $this->choice('Pick a Live Category', array_keys($map));
-            $catId = $map[$catName];
-
-            $channels = $xtream->getLiveStreams($catId);
-            $channelMap = collect($channels)->pluck('stream_id', 'name')->toArray();
-            $pick = $this->choice('Pick a channel or All', array_merge(['All'], array_keys($channelMap)));
-
-            if ($pick === 'All') {
-                $this->generateCategoryChannels($xtream, $channels, $catName, $catId);
-            } else {
-                $channel = $channels[array_search($pick, array_column($channels, 'name'))];
-                $this->generateOneChannel($xtream, $channel, $catName, $catId);
-            }
         }
+        $cats = $xtream->getLiveCategories();
+        $map = collect($cats)->pluck('category_id', 'category_name')->toArray();
+        $catName = $this->choice('Pick a Live Category', array_keys($map));
+        $catId = $map[$catName];
+
+        $channels = $xtream->getLiveStreams($catId);
+        $channelMap = collect($channels)->pluck('stream_id', 'name')->toArray();
+        $pick = $this->choice('Pick a channel or All', array_merge(['All'], array_keys($channelMap)));
+
+        if ($pick === 'All') {
+            $this->generateCategoryChannels($xtream, $channels, $catName, $catId);
+        } else {
+            $channel = $channels[array_search($pick, array_column($channels, 'name'))];
+            $this->generateOneChannel($xtream, $channel, $catName, $catId);
+        }
+
     }
 
     protected function generateCategorySeries(XtreamService $xtream, array $seriesList, string $catName, int $catId)

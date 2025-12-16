@@ -19,6 +19,8 @@ class UserResource extends Resource
 {
     protected static ?string $model = User::class;
 
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::UserGroup;
+
     /**
      * Check if the user can access this page.
      * Only admin users can access the Preferences page.
@@ -35,8 +37,6 @@ class UserResource extends Resource
 
         return $query;
     }
-
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::UserGroup;
 
     public static function form(Schema $schema): Schema
     {
@@ -61,7 +61,7 @@ class UserResource extends Resource
                     ->password()
                     ->revealable()
                     ->columnSpanFull()
-                    ->hidden(fn($get, $record) => !$record ? false : ! $get('update_password'))
+                    ->hidden(fn ($get, $record) => ! $record ? false : ! $get('update_password'))
                     ->required(),
                 // Forms\Components\TextInput::make('avatar_url')
                 //     ->url(),
@@ -132,8 +132,8 @@ class UserResource extends Resource
     {
         return [
             'index' => Pages\ListUsers::route('/'),
-            //'create' => Pages\CreateUser::route('/create'),
-            //'edit' => Pages\EditUser::route('/{record}/edit'),
+            // 'create' => Pages\CreateUser::route('/create'),
+            // 'edit' => Pages\EditUser::route('/{record}/edit'),
         ];
     }
 }

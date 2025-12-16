@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\Channel;
 use App\Models\Group;
 use App\Models\Playlist;
+use Exception;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -45,9 +46,9 @@ class CopyAttributesToPlaylist implements ShouldQueue
 
         try {
             $results = $this->copyChannelAttributes();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Log the error
-            Log::error('Error copying attributes to playlist: ' . $e->getMessage());
+            Log::error('Error copying attributes to playlist: '.$e->getMessage());
 
             // Notify the user of the failure
             Notification::make()
@@ -122,7 +123,7 @@ class CopyAttributesToPlaylist implements ShouldQueue
         // Preload existing groups for the target playlist into a case-insensitive map
         $groupNameToId = [];
         foreach ($targetPlaylist->groups()->get(['id', 'name']) as $g) {
-            $groupNameToId[strtolower($g->name ?? '')] = $g->id;
+            $groupNameToId[mb_strtolower($g->name ?? '')] = $g->id;
         }
 
         // Build the target fields to select for matching
@@ -323,12 +324,12 @@ class CopyAttributesToPlaylist implements ShouldQueue
 
             // Special handling for group: translate group name into group_id on target
             if ($targetField === 'group') {
-                $desiredName = trim((string) $sourceValue);
+                $desiredName = mb_trim((string) $sourceValue);
                 if ($desiredName === '') {
                     continue;
                 }
 
-                $lower = strtolower($desiredName);
+                $lower = mb_strtolower($desiredName);
 
                 if (array_key_exists($lower, $groupNameToId)) {
                     $groupId = $groupNameToId[$lower];
@@ -401,8 +402,8 @@ class CopyAttributesToPlaylist implements ShouldQueue
 
         // Handle group creation/assignment
         if (! empty($sourceChannel->group)) {
-            $groupName = trim((string) $sourceChannel->group);
-            $lower = strtolower($groupName);
+            $groupName = mb_trim((string) $sourceChannel->group);
+            $lower = mb_strtolower($groupName);
 
             if (array_key_exists($lower, $groupNameToId)) {
                 $channelData['group_id'] = $groupNameToId[$lower];
@@ -473,7 +474,7 @@ class CopyAttributesToPlaylist implements ShouldQueue
             }
 
             // Normalize the value for consistent matching
-            $keyParts[] = strtolower(trim((string) $value));
+            $keyParts[] = mb_strtolower(mb_trim((string) $value));
         }
 
         // Create a composite key by joining all parts with a delimiter
@@ -511,7 +512,7 @@ class CopyAttributesToPlaylist implements ShouldQueue
                     $mapping['logo_internal'] = 'logo'; // Special case: source logo_internal -> custom logo
                     break;
 
-                // Then custom field mappings
+                    // Then custom field mappings
                 case 'name':
                     $mapping['name'] = ['name_custom', 'name']; // Prefer custom, fallback to base
                     break;
@@ -522,7 +523,7 @@ class CopyAttributesToPlaylist implements ShouldQueue
                     $mapping['stream_id'] = ['stream_id_custom', 'stream_id']; // Prefer custom, fallback to base
                     break;
 
-                // And finally, direct mappings without custom fields
+                    // And finally, direct mappings without custom fields
                 case 'enabled':
                 case 'station_id':
                 case 'group':

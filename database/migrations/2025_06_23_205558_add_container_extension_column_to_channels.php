@@ -32,7 +32,7 @@ return new class extends Migration
                 $containerExtension = null;
                 // Extract the file extension from the URL
                 if (preg_match('/\.(\w+)$/', $channel->url, $matches)) {
-                    $containerExtension = strtolower($matches[1]);
+                    $containerExtension = mb_strtolower($matches[1]);
                 }
                 // Use DB::table for direct update to avoid model events and potential issues
                 DB::table('channels')

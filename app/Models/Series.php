@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\PlaylistSourceType;
 use App\Jobs\SyncSeriesStrmFiles;
 use App\Services\XtreamService;
+use Exception;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,8 +13,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Log;
-use Spatie\Tags\HasTags;
 use Illuminate\Support\Str;
+use Spatie\Tags\HasTags;
 
 class Series extends Model
 {
@@ -39,7 +40,7 @@ class Series extends Model
         'backdrop_path' => 'array',
         'metadata' => 'array',
         'sync_settings' => 'array',
-        'last_metadata_fetch' => 'datetime'
+        'last_metadata_fetch' => 'datetime',
     ];
 
     public function user(): BelongsTo
@@ -83,20 +84,21 @@ class Series extends Model
             $playlist = $this->playlist;
 
             // For Xtream playlists, use XtreamService
-            if (!$playlist->xtream && $playlist->source_type !== PlaylistSourceType::Xtream) {
+            if (! $playlist->xtream && $playlist->source_type !== PlaylistSourceType::Xtream) {
                 // Not an Xtream playlist and not Emby, no metadata source available
                 return false;
             }
 
             $xtream = XtreamService::make($playlist);
 
-            if (!$xtream) {
+            if (! $xtream) {
                 Notification::make()
                     ->danger()
                     ->title('Series metadata sync failed')
                     ->body('Unable to connect to Xtream API provider to get series info, unable to fetch metadata.')
                     ->broadcast($playlist->user)
                     ->sendToDatabase($playlist->user);
+
                 return false;
             }
 
@@ -143,11 +145,11 @@ class Series extends Model
                     // Get season info if available
                     $seasonInfo = $seasons[$season] ?? [];
 
-                    if (!$playlistSeason) {
+                    if (! $playlistSeason) {
                         // Create the season if it doesn't exist
                         $playlistSeason = $this->seasons()->create([
                             'season_number' => $season,
-                            'name' => $seasonInfo['name'] ?? "Season " . str_pad($season, 2, '0', STR_PAD_LEFT),
+                            'name' => $seasonInfo['name'] ?? 'Season '.mb_str_pad($season, 2, '0', STR_PAD_LEFT),
                             'source_season_id' => $seasonInfo['id'] ?? null,
                             'episode_count' => $seasonInfo['episode_count'] ?? 0,
                             'cover' => $seasonInfo['cover'] ?? null,
@@ -180,7 +182,7 @@ class Series extends Model
                         $episodeCount++;
                         $url = $xtream->buildSeriesUrl($ep['id'], $ep['container_extension']);
                         $title = preg_match('/S\d{2}E\d{2} - (.*)/', $ep['title'], $m) ? $m[1] : null;
-                        if (!$title) {
+                        if (! $title) {
                             $title = $ep['title'] ?? "Episode {$ep['episode_num']}";
                         }
                         $bulk[] = [
@@ -225,7 +227,7 @@ class Series extends Model
                             'added',
                             'season',
                             'url',
-                            'info'
+                            'info',
                         ]
                     );
                 }
@@ -240,9 +242,10 @@ class Series extends Model
 
                 return $episodeCount;
             }
-        } catch (\Exception $e) {
-            Log::error('Failed to fetch metadata for series ' . $this->id, ['exception' => $e]);
+        } catch (Exception $e) {
+            Log::error('Failed to fetch metadata for series '.$this->id, ['exception' => $e]);
         }
+
         return false;
     }
 
@@ -252,7 +255,7 @@ class Series extends Model
     public function getCustomCategoryName(string $customPlaylistUuid): string
     {
         $tag = $this->tags()
-            ->where('type', $customPlaylistUuid . '-category')
+            ->where('type', $customPlaylistUuid.'-category')
             ->first();
 
         return $tag ? $tag->getAttributeValue('name') : 'Uncategorized';

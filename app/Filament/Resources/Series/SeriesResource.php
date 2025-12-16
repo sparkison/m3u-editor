@@ -18,6 +18,7 @@ use App\Models\Series;
 use App\Rules\CheckIfUrlOrLocalPath;
 use App\Services\PlaylistService;
 use App\Services\XtreamService;
+use App\Traits\HasUserFiltering;
 use Carbon\Carbon;
 use Exception;
 use Filament\Actions\Action;
@@ -56,7 +57,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
-use App\Traits\HasUserFiltering;
+use UnitEnum;
 
 class SeriesResource extends Resource
 {
@@ -66,12 +67,12 @@ class SeriesResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
+    protected static string|UnitEnum|null $navigationGroup = 'Series';
+
     public static function getGloballySearchableAttributes(): array
     {
         return ['name', 'plot', 'genre', 'release_date', 'director'];
     }
-
-    protected static string|\UnitEnum|null $navigationGroup = 'Series';
 
     public static function getNavigationSort(): ?int
     {
@@ -114,14 +115,14 @@ class SeriesResource extends Resource
                 ->width(80)
                 ->height(120)
                 ->checkFileExistence(false)
-                ->getStateUsing(fn($record) => LogoFacade::getSeriesLogoUrl($record))
+                ->getStateUsing(fn ($record) => LogoFacade::getSeriesLogoUrl($record))
                 ->searchable(),
             TextColumn::make('name')
-                ->description((fn($record) => Str::limit($record->plot, 200)))
+                ->description((fn ($record) => Str::limit($record->plot, 200)))
                 ->wrap()
                 ->extraAttributes(['style' => 'min-width: 350px;'])
                 ->searchable(query: function (Builder $query, string $search): Builder {
-                    return $query->orWhereRaw('LOWER(series.name) LIKE ?', ['%' . strtolower($search) . '%']);
+                    return $query->orWhereRaw('LOWER(series.name) LIKE ?', ['%'.mb_strtolower($search).'%']);
                 })
                 ->sortable(),
             TextInputColumn::make('sort')
@@ -130,7 +131,7 @@ class SeriesResource extends Resource
                 ->type('number')
                 ->placeholder('Sort Order')
                 ->sortable()
-                ->tooltip(fn($record) => ! $record->is_custom && $record->playlist?->auto_sort ? 'Playlist auto-sort enabled; any changes will be overwritten on next sync' : 'Channel sort order')
+                ->tooltip(fn ($record) => ! $record->is_custom && $record->playlist?->auto_sort ? 'Playlist auto-sort enabled; any changes will be overwritten on next sync' : 'Channel sort order')
                 ->toggleable(),
             ToggleColumn::make('enabled')
                 ->toggleable()
@@ -149,7 +150,7 @@ class SeriesResource extends Resource
                 ->toggleable()
                 ->sortable(),
             TextColumn::make('category.name')
-                ->hidden(fn() => ! $showCategory)
+                ->hidden(fn () => ! $showCategory)
                 ->badge()
                 ->numeric()
                 ->sortable(),
@@ -158,7 +159,7 @@ class SeriesResource extends Resource
             TextColumn::make('youtube_trailer')
                 ->label('YouTube Trailer')
                 ->placeholder('No trailer ID set.')
-                ->url(fn($record): string => 'https://www.youtube.com/watch?v=' . $record->youtube_trailer)
+                ->url(fn ($record): string => 'https://www.youtube.com/watch?v='.$record->youtube_trailer)
                 ->openUrlInNewTab()
                 ->icon('heroicon-s-play'),
             TextColumn::make('release_date')
@@ -176,7 +177,7 @@ class SeriesResource extends Resource
             TextColumn::make('playlist.name')
                 ->numeric()
                 ->sortable()
-                ->hidden(fn() => ! $showPlaylist),
+                ->hidden(fn () => ! $showPlaylist),
             TextColumn::make('created_at')
                 ->dateTime()
                 ->sortable()
@@ -196,7 +197,7 @@ class SeriesResource extends Resource
                 ->multiple()
                 ->preload()
                 ->searchable()
-                ->hidden(fn() => ! $showPlaylist),
+                ->hidden(fn () => ! $showPlaylist),
             Filter::make('enabled')
                 ->label('Series is enabled')
                 ->toggle()
@@ -220,7 +221,7 @@ class SeriesResource extends Resource
                             ->live()
                             ->label('Category')
                             ->helperText('Select the category you would like to move the series to.')
-                            ->options(fn(Get $get, $record) => Category::where(['user_id' => auth()->id(), 'playlist_id' => $record->playlist_id])->get(['name', 'id'])->pluck('name', 'id'))
+                            ->options(fn (Get $get, $record) => Category::where(['user_id' => auth()->id(), 'playlist_id' => $record->playlist_id])->get(['name', 'id'])->pluck('name', 'id'))
                             ->searchable(),
                     ])
                     ->action(function ($record, array $data): void {
@@ -317,13 +318,13 @@ class SeriesResource extends Resource
                             ->searchable(),
                         Select::make('category')
                             ->label('Custom Category')
-                            ->disabled(fn(Get $get) => ! $get('playlist'))
-                            ->helperText(fn(Get $get) => ! $get('playlist') ? 'Select a custom playlist first.' : 'Select the category you would like to assign to the selected series to.')
+                            ->disabled(fn (Get $get) => ! $get('playlist'))
+                            ->helperText(fn (Get $get) => ! $get('playlist') ? 'Select a custom playlist first.' : 'Select the category you would like to assign to the selected series to.')
                             ->options(function ($get) {
                                 $customList = CustomPlaylist::find($get('playlist'));
 
                                 return $customList ? $customList->categoryTags()->get()
-                                    ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
+                                    ->mapWithKeys(fn ($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
                                     ->toArray() : [];
                             })
                             ->searchable(),
@@ -347,7 +348,7 @@ class SeriesResource extends Resource
                             ->body('The selected series have been added to the chosen custom playlist.')
                             ->send();
                     })
-                    ->hidden(fn() => ! $addToCustom)
+                    ->hidden(fn () => ! $addToCustom)
                     ->deselectRecordsAfterCompletion()
                     ->requiresConfirmation()
                     ->icon('heroicon-o-play')
@@ -363,13 +364,13 @@ class SeriesResource extends Resource
                             ->label('Category')
                             ->helperText('Select the category you would like to move the series to.')
                             ->options(
-                                fn() => Category::query()
+                                fn () => Category::query()
                                     ->with(['playlist'])
                                     ->where(['user_id' => auth()->id()])
                                     ->get(['name', 'id', 'playlist_id'])
-                                    ->transform(fn($category) => [
+                                    ->transform(fn ($category) => [
                                         'id' => $category->id,
-                                        'name' => $category->name . ' (' . $category->playlist->name . ')',
+                                        'name' => $category->name.' ('.$category->playlist->name.')',
                                     ])->pluck('name', 'id')
                             )->searchable(),
                     ])
@@ -477,14 +478,14 @@ class SeriesResource extends Resource
                             ->required()
                             ->columnSpan(1),
                         TextInput::make('find_replace')
-                            ->label(fn(Get $get) => ! $get('use_regex') ? 'String to replace' : 'Pattern to replace')
+                            ->label(fn (Get $get) => ! $get('use_regex') ? 'String to replace' : 'Pattern to replace')
                             ->required()
                             ->placeholder(
-                                fn(Get $get) => $get('use_regex')
+                                fn (Get $get) => $get('use_regex')
                                     ? '^(US- |UK- |CA- )'
                                     : 'US -'
                             )->helperText(
-                                fn(Get $get) => ! $get('use_regex')
+                                fn (Get $get) => ! $get('use_regex')
                                     ? 'This is the string you want to find and replace.'
                                     : 'This is the regex pattern you want to find. Make sure to use valid regex syntax.'
                             ),
@@ -590,7 +591,7 @@ class SeriesResource extends Resource
                         TextEntry::make('playlist.name')
                             ->label('Playlist')
                             // ->badge(),
-                            ->url(fn($record) => PlaylistResource::getUrl('edit', ['record' => $record->playlist_id])),
+                            ->url(fn ($record) => PlaylistResource::getUrl('edit', ['record' => $record->playlist_id])),
                     ]),
             ]);
     }
@@ -689,12 +690,12 @@ class SeriesResource extends Resource
                                         ->live(),
                                     Toggle::make('sync_settings.enabled')
                                         ->live()
-                                        ->disabled(fn($get) => ! $get('sync_settings.override_global'))
+                                        ->disabled(fn ($get) => ! $get('sync_settings.override_global'))
                                         ->label('Enable .strm file generation'),
                                     TextInput::make('sync_location')
                                         ->label('Location')
                                         ->live()
-                                        ->disabled(fn($get) => ! $get('sync_settings.override_global'))
+                                        ->disabled(fn ($get) => ! $get('sync_settings.override_global'))
                                         ->rules([new CheckIfUrlOrLocalPath(localOnly: true, isDirectory: true)])
                                         ->helperText(function ($record, $get) {
                                             $path = $get('sync_location') ?? '';
@@ -715,26 +716,26 @@ class SeriesResource extends Resource
                                             $episodeTitle = $firstEpisode?->title ?? 'Izuku Midoriya: Origin';
 
                                             // Build path preview
-                                            $preview = 'Preview: ' . $path;
+                                            $preview = 'Preview: '.$path;
 
                                             if (in_array('category', $pathStructure)) {
-                                                $preview .= '/' . $categoryName;
+                                                $preview .= '/'.$categoryName;
                                             }
                                             if (in_array('series', $pathStructure)) {
-                                                $preview .= '/' . $seriesName;
+                                                $preview .= '/'.$seriesName;
                                             }
                                             if (in_array('season', $pathStructure)) {
-                                                $preview .= '/Season ' . str_pad($season, 2, '0', STR_PAD_LEFT);
+                                                $preview .= '/Season '.mb_str_pad($season, 2, '0', STR_PAD_LEFT);
                                             }
 
                                             // Build filename preview
-                                            $seasonPad = str_pad($season, 2, '0', STR_PAD_LEFT);
-                                            $episodePad = str_pad($episodeNum, 2, '0', STR_PAD_LEFT);
+                                            $seasonPad = mb_str_pad($season, 2, '0', STR_PAD_LEFT);
+                                            $episodePad = mb_str_pad($episodeNum, 2, '0', STR_PAD_LEFT);
                                             $filename = "S{$seasonPad}E{$episodePad} - {$episodeTitle}";
 
                                             // Add metadata to filename
                                             if (in_array('year', $filenameMetadata) && ! empty($releaseDate)) {
-                                                $year = substr($releaseDate, 0, 4);
+                                                $year = mb_substr($releaseDate, 0, 4);
                                                 $filename .= " ({$year})";
                                             }
                                             if (in_array('tmdb_id', $filenameMetadata) && ! empty($tmdbId)) {
@@ -742,18 +743,18 @@ class SeriesResource extends Resource
                                                 $filename .= " {$bracket[0]}tmdb-{$tmdbId}{$bracket[1]}";
                                             }
 
-                                            $preview .=  '/' . PlaylistService::makeFilesystemSafe($filename) . '.strm';
+                                            $preview .= '/'.PlaylistService::makeFilesystemSafe($filename).'.strm';
 
                                             return $preview;
                                         })
                                         ->maxLength(255)
                                         ->required()
-                                        ->hidden(fn($get) => ! $get('sync_settings.enabled'))
+                                        ->hidden(fn ($get) => ! $get('sync_settings.enabled'))
                                         ->placeholder('/Series'),
                                     Forms\Components\ToggleButtons::make('sync_settings.path_structure')
                                         ->label('Path structure (folders)')
                                         ->live()
-                                        ->disabled(fn($get) => ! $get('sync_settings.override_global'))
+                                        ->disabled(fn ($get) => ! $get('sync_settings.override_global'))
                                         ->multiple()
                                         ->grouped()
                                         ->options([
@@ -785,14 +786,14 @@ class SeriesResource extends Resource
                                             $set('sync_settings.include_season', in_array('season', $state));
 
                                             return $state;
-                                        })->hidden(fn($get) => ! $get('sync_settings.enabled')),
+                                        })->hidden(fn ($get) => ! $get('sync_settings.enabled')),
                                     Fieldset::make('Include Metadata')
                                         ->schema([
                                             Forms\Components\ToggleButtons::make('sync_settings.filename_metadata')
                                                 ->label('Filename metadata')
                                                 ->live()
                                                 ->inline()
-                                                ->disabled(fn($get) => ! $get('sync_settings.override_global'))
+                                                ->disabled(fn ($get) => ! $get('sync_settings.override_global'))
                                                 ->multiple()
                                                 ->columnSpanFull()
                                                 ->options([
@@ -832,31 +833,31 @@ class SeriesResource extends Resource
                                                 }),
                                             Forms\Components\ToggleButtons::make('sync_settings.tmdb_id_format')
                                                 ->label('TMDB ID format')
-                                                ->disabled(fn($get) => ! $get('sync_settings.override_global'))
+                                                ->disabled(fn ($get) => ! $get('sync_settings.override_global'))
                                                 ->inline()
                                                 ->live()
                                                 ->grouped()
                                                 ->options([
                                                     'square' => '[square]',
                                                     'curly' => '{curly}',
-                                                ])->hidden(fn($get) => ! in_array('tmdb_id', $get('sync_settings.filename_metadata') ?? [])),
+                                                ])->hidden(fn ($get) => ! in_array('tmdb_id', $get('sync_settings.filename_metadata') ?? [])),
                                         ])
-                                        ->hidden(fn($get) => ! $get('sync_settings.enabled')),
+                                        ->hidden(fn ($get) => ! $get('sync_settings.enabled')),
                                     Fieldset::make('Filename Cleansing')
                                         ->schema([
                                             Toggle::make('sync_settings.clean_special_chars')
                                                 ->label('Clean special characters')
-                                                ->disabled(fn($get) => ! $get('sync_settings.override_global'))
+                                                ->disabled(fn ($get) => ! $get('sync_settings.override_global'))
                                                 ->helperText('Remove or replace special characters in filenames')
                                                 ->inline(false),
                                             Toggle::make('sync_settings.remove_consecutive_chars')
                                                 ->label('Remove consecutive replacement characters')
-                                                ->disabled(fn($get) => ! $get('sync_settings.override_global'))
+                                                ->disabled(fn ($get) => ! $get('sync_settings.override_global'))
                                                 ->inline(false)
                                                 ->live(),
                                             Forms\Components\ToggleButtons::make('sync_settings.replace_char')
                                                 ->label('Replace with')
-                                                ->disabled(fn($get) => ! $get('sync_settings.override_global'))
+                                                ->disabled(fn ($get) => ! $get('sync_settings.override_global'))
                                                 ->inline()
                                                 ->live()
                                                 ->grouped()
@@ -869,7 +870,7 @@ class SeriesResource extends Resource
                                                     'remove' => 'Remove',
                                                 ]),
                                         ])
-                                        ->hidden(fn($get) => ! $get('sync_settings.enabled')),
+                                        ->hidden(fn ($get) => ! $get('sync_settings.enabled')),
                                 ]),
                         ]),
                 ]),
@@ -908,7 +909,7 @@ class SeriesResource extends Resource
                             $xtremeUrl = $xtreamConfig['url'] ?? '';
                             $xtreamUser = $xtreamConfig['username'] ?? '';
                             $xtreamPass = $xtreamConfig['password'] ?? '';
-                            $cacheKey = 'xtream_series_categories_' . md5($xtremeUrl . $xtreamUser . $xtreamPass);
+                            $cacheKey = 'xtream_series_categories_'.md5($xtremeUrl.$xtreamUser.$xtreamPass);
                             $cachedCategories = Cache::remember($cacheKey, 60 * 1, function () use ($xtremeUrl, $xtreamUser, $xtreamPass) {
                                 $service = new XtreamService;
                                 $xtream = $service->init(xtream_config: [
@@ -934,12 +935,12 @@ class SeriesResource extends Resource
                             return $cachedCategories;
                         })
                         ->helperText(
-                            fn(Get $get): string => $get('playlist')
+                            fn (Get $get): string => $get('playlist')
                                 ? 'Which category would you like to add a series from.'
                                 : 'You must select a playlist first.'
                         )
-                        ->disabled(fn(Get $get): bool => ! $get('playlist'))
-                        ->hidden(fn(Get $get): bool => ! $get('playlist'))
+                        ->disabled(fn (Get $get): bool => ! $get('playlist'))
+                        ->hidden(fn (Get $get): bool => ! $get('playlist'))
                         ->afterStateUpdated(function ($get, $set, $state) {
                             if ($state) {
                                 $playlist = $get('playlist');
@@ -950,7 +951,7 @@ class SeriesResource extends Resource
                                 $xtremeUrl = $xtreamConfig['url'] ?? '';
                                 $xtreamUser = $xtreamConfig['username'] ?? '';
                                 $xtreamPass = $xtreamConfig['password'] ?? '';
-                                $cacheKey = 'xtream_series_categories_' . md5($xtremeUrl . $xtreamUser . $xtreamPass);
+                                $cacheKey = 'xtream_series_categories_'.md5($xtremeUrl.$xtreamUser.$xtreamPass);
                                 $cachedCategories = Cache::get($cacheKey);
 
                                 if ($cachedCategories) {
@@ -966,7 +967,7 @@ class SeriesResource extends Resource
                         ->helperText('Automatically set when selecting a category.')
                         ->required()
                         ->disabled()
-                        ->dehydrated(fn(): bool => true),
+                        ->dehydrated(fn (): bool => true),
                 ]),
             Step::make('Series to Import')
                 ->schema([
@@ -999,7 +1000,7 @@ class SeriesResource extends Resource
                             $xtremeUrl = $xtreamConfig['url'] ?? '';
                             $xtreamUser = $xtreamConfig['username'] ?? '';
                             $xtreamPass = $xtreamConfig['password'] ?? '';
-                            $cacheKey = 'xtream_category_series' . md5($xtremeUrl . $xtreamUser . $xtreamPass . $category);
+                            $cacheKey = 'xtream_category_series'.md5($xtremeUrl.$xtreamUser.$xtreamPass.$category);
                             $cachedCategories = Cache::remember($cacheKey, 60 * 1, function () use ($xtremeUrl, $xtreamUser, $xtreamPass, $category) {
                                 $xtream = XtreamService::make(xtream_config: [
                                     'url' => $xtremeUrl,
@@ -1024,12 +1025,12 @@ class SeriesResource extends Resource
                             return $cachedCategories;
                         })
                         ->helperText(
-                            fn(Get $get): string => $get('playlist') && $get('category')
+                            fn (Get $get): string => $get('playlist') && $get('category')
                                 ? 'Which series would you like to import.'
                                 : 'You must select a playlist and category first.'
                         )
-                        ->disabled(fn(Get $get): bool => ! $get('playlist') || ! $get('category') || $get('import_all'))
-                        ->hidden(fn(Get $get): bool => ! $get('playlist') || ! $get('category') || $get('import_all')),
+                        ->disabled(fn (Get $get): bool => ! $get('playlist') || ! $get('category') || $get('import_all'))
+                        ->hidden(fn (Get $get): bool => ! $get('playlist') || ! $get('category') || $get('import_all')),
                 ]),
         ];
     }

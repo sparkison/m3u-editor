@@ -2,23 +2,15 @@
 
 namespace App\Filament\Resources\MergedPlaylists\Pages;
 
-use Filament\Actions\DeleteAction;
 use App\Filament\Resources\MergedPlaylists\MergedPlaylistResource;
 use App\Services\EpgCacheService;
-use Filament\Actions;
+use Filament\Actions\DeleteAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 
 class EditMergedPlaylist extends EditRecord
 {
     protected static string $resource = MergedPlaylistResource::class;
-
-    protected function getHeaderActions(): array
-    {
-        return [
-            DeleteAction::make(),
-        ];
-    }
 
     public function clearEpgFileCache()
     {
@@ -38,6 +30,13 @@ class EditMergedPlaylist extends EditRecord
         }
 
         // Close the modal
-        $this->dispatch('close-modal', id: 'epg-url-modal-' . $this->record->getKey());
+        $this->dispatch('close-modal', id: 'epg-url-modal-'.$this->record->getKey());
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            DeleteAction::make(),
+        ];
     }
 }

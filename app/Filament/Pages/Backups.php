@@ -2,13 +2,14 @@
 
 namespace App\Filament\Pages;
 
-use Filament\Actions\ActionGroup;
-use Filament\Actions\Action;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Toggle;
 use App\Jobs\CreateBackup;
 use App\Jobs\RestoreBackup;
+use BackedEnum;
+use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Support\Htmlable;
 use ShuvroRoy\FilamentSpatieLaravelBackup\FilamentSpatieLaravelBackup;
@@ -16,8 +17,10 @@ use ShuvroRoy\FilamentSpatieLaravelBackup\Pages\Backups as BaseBackups;
 
 class Backups extends BaseBackups
 {
-    protected static string | \BackedEnum | null $navigationIcon = '';
+    protected static string|BackedEnum|null $navigationIcon = '';
+
     protected static ?string $navigationLabel = 'Backup & Restore';
+
     protected ?string $subheading = 'NOTE: Restoring a backup will overwrite any existing data. Your manually uploaded EPG and Playlist files will NOT be restored. You will need to download the backup and manually re-upload where needed.';
 
     public static function getNavigationSort(): ?int
@@ -34,6 +37,21 @@ class Backups extends BaseBackups
         return auth()->check() && auth()->user()->isAdmin();
     }
 
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Tools';
+    }
+
+    public function getHeading(): string|Htmlable
+    {
+        return 'Manage Backups';
+    }
+
+    public function shouldDisplayStatusListRecords(): bool
+    {
+        return false;
+    }
+
     protected function getActions(): array
     {
         $data = [];
@@ -41,6 +59,7 @@ class Backups extends BaseBackups
             $data = array_merge($data, FilamentSpatieLaravelBackup::getBackupDestinationData($disk));
         }
         $data = collect($data)->sortByDesc('date');
+
         return [
             ActionGroup::make([
                 Action::make('Restore Backup')
@@ -83,7 +102,7 @@ class Backups extends BaseBackups
                                 'application/zip',
                                 'application/x-zip-compressed',
                                 'application/x-compressed',
-                                'multipart/x-zip'
+                                'multipart/x-zip',
                             ]),
                     ])
                     ->after(function () {
@@ -121,22 +140,7 @@ class Backups extends BaseBackups
                     ->modalIcon('heroicon-o-archive-box-arrow-down')
                     ->modalDescription('NOTE: When restoring a backup, only the database will be restored, files will not be automatically restored. You will need to manually re-upload them where needed.')
                     ->modalSubmitActionLabel('Create now'),
-            ])->button()->label('Actions')
+            ])->button()->label('Actions'),
         ];
-    }
-
-    public function getHeading(): string|Htmlable
-    {
-        return 'Manage Backups';
-    }
-
-    public static function getNavigationGroup(): ?string
-    {
-        return 'Tools';
-    }
-
-    public function shouldDisplayStatusListRecords(): bool
-    {
-        return false;
     }
 }

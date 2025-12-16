@@ -70,8 +70,8 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
                 if ($user) {
                     Notification::make()
                         ->success()
-                        ->title("Series Sync Completed")
-                        ->body("Series sync completed successfully for all series.")
+                        ->title('Series Sync Completed')
+                        ->body('Series sync completed successfully for all series.')
                         ->broadcast($user)
                         ->sendToDatabase($user);
                 }
@@ -95,9 +95,9 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
             $syncStrmFiles = $settings['enabled'] ?? $sync_settings['enabled'] ?? false;
             $body = "Series sync completed successfully for \"{$series->name}\". Imported {$results} episodes.";
             if ($syncStrmFiles) {
-                $body .= " .strm file sync is enabled, syncing now.";
+                $body .= ' .strm file sync is enabled, syncing now.';
             } else {
-                $body .= " .strm file sync is not enabled.";
+                $body .= ' .strm file sync is not enabled.';
             }
             Notification::make()
                 ->success()

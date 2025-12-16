@@ -27,7 +27,7 @@ class PruneOldNotifications extends Command
     public function handle()
     {
         $days = $this->option('days') ?? 30;
-        $this->info('Cleaning notifications older than ' . $days . ' days...');
+        $this->info('Cleaning notifications older than '.$days.' days...');
         DB::table('notifications')
             ->where('created_at', '<', now()->subDays($days))
             ->delete();

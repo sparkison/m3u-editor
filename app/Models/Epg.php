@@ -2,15 +2,13 @@
 
 namespace App\Models;
 
-use App\Enums\Status;
 use App\Enums\EpgSourceType;
-use App\Services\EpgCacheService;
+use App\Enums\Status;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 class Epg extends Model
@@ -51,19 +49,6 @@ class Epg extends Model
         'sd_token',
     ];
 
-    /**
-     * Boot function for model
-     */
-    protected static function boot()
-    {
-        parent::boot();
-        static::creating(function ($epg) {
-            if (empty($epg->uuid)) {
-                $epg->uuid = Str::uuid();
-            }
-        });
-    }
-
     public function getFolderPathAttribute(): string
     {
         return "epg/{$this->uuid}";
@@ -76,7 +61,7 @@ class Epg extends Model
 
     public function getCachedEpgMetaAttribute()
     {
-        if (!$this->is_cached || empty($this->cache_meta)) {
+        if (! $this->is_cached || empty($this->cache_meta)) {
             return [
                 'min_date' => null,
                 'max_date' => null,
@@ -85,6 +70,7 @@ class Epg extends Model
         }
         $range = $this->cache_meta['programme_date_range'] ?? null;
         $version = $this->cache_meta['cache_version'] ?? null;
+
         return [
             'min_date' => $range['min_date'] ?? null,
             'max_date' => $range['max_date'] ?? null,
@@ -106,12 +92,12 @@ class Epg extends Model
 
     public function hasSchedulesDirectCredentials(): bool
     {
-        return !empty($this->sd_username) && !empty($this->sd_password);
+        return ! empty($this->sd_username) && ! empty($this->sd_password);
     }
 
     public function hasSchedulesDirectLineup(): bool
     {
-        return !empty($this->sd_lineup_id);
+        return ! empty($this->sd_lineup_id);
     }
 
     public function user(): BelongsTo
@@ -132,5 +118,18 @@ class Epg extends Model
     public function postProcesses(): MorphToMany
     {
         return $this->morphToMany(PostProcess::class, 'processable');
+    }
+
+    /**
+     * Boot function for model
+     */
+    protected static function boot()
+    {
+        parent::boot();
+        static::creating(function ($epg) {
+            if (empty($epg->uuid)) {
+                $epg->uuid = Str::uuid();
+            }
+        });
     }
 }

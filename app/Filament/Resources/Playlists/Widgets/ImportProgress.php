@@ -8,9 +8,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class ImportProgress extends Widget
 {
-    protected string $view = 'filament.resources.playlist-resource.widgets.import-progress';
-
     public ?Model $record = null;
+
+    protected string $view = 'filament.resources.playlist-resource.widgets.import-progress';
 
     public function getColumnSpan(): int|string|array
     {
@@ -26,6 +26,7 @@ class ImportProgress extends Widget
             $record = $record->newQuery()->find($record->getKey());
             $isProcessing = $record->status === Status::Processing || $record->status === Status::Pending;
         }
+
         return [
             'processing' => $isProcessing,
             'progress' => round($record->progress ?? 100, 2), // default to complete if no record

@@ -10,8 +10,8 @@ use App\Models\MergedPlaylist;
 use App\Models\Playlist;
 use App\Models\PlaylistAlias;
 use App\Models\StreamProfile;
-use Exception;
 use App\Settings\GeneralSettings;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -20,20 +20,25 @@ use Illuminate\Support\Facades\Log;
 class M3uProxyService
 {
     protected string $apiBaseUrl;
-    protected string|null $apiPublicUrl;
-    protected string|null $apiToken;
+
+    protected ?string $apiPublicUrl;
+
+    protected ?string $apiToken;
+
     protected bool $autoResolve;
+
     protected bool $usingFailoverResolver;
-    protected string|null $failoverResolverUrl;
+
+    protected ?string $failoverResolverUrl;
 
     public function __construct()
     {
-        $this->apiBaseUrl = rtrim(config('proxy.m3u_proxy_host'), '/');
+        $this->apiBaseUrl = mb_rtrim(config('proxy.m3u_proxy_host'), '/');
         if ($port = config('proxy.m3u_proxy_port')) {
-            $this->apiBaseUrl .= ':' . $port;
+            $this->apiBaseUrl .= ':'.$port;
         }
 
-        $this->apiPublicUrl = config('proxy.m3u_proxy_public_url') ? rtrim(config('proxy.m3u_proxy_public_url'), '/') : null;
+        $this->apiPublicUrl = config('proxy.m3u_proxy_public_url') ? mb_rtrim(config('proxy.m3u_proxy_public_url'), '/') : null;
         $this->apiToken = config('proxy.m3u_proxy_token');
 
         // Configure URL resolver settings
@@ -51,88 +56,14 @@ class M3uProxyService
 
             $this->autoResolve = (bool) ($settings->m3u_proxy_public_url_auto_resolve ?? false);
             $this->usingFailoverResolver = (bool) ($settings->enable_failover_resolver ?? false);
-            $this->failoverResolverUrl = rtrim($settings->failover_resolver_url ?? '', '/');
+            $this->failoverResolverUrl = mb_rtrim($settings->failover_resolver_url ?? '', '/');
         } catch (Exception $e) {
         }
 
         // If config value is set, override settings values for failover resolver configuration
         if (! empty($configFailoverResolver)) {
             $this->usingFailoverResolver = true;
-            $this->failoverResolverUrl = rtrim($configFailoverResolver, '/');
-        }
-    }
-
-    /**
-     * Get the current proxy mode: 'embedded' or 'external'
-     */
-    public function mode(): string
-    {
-        return config('proxy.external_proxy_enabled') ? 'external' : 'embedded';
-    }
-
-    /**
-     * Check if failover resolver URL should be used
-     */
-    public function usingResolver(): bool
-    {
-        return $this->usingFailoverResolver && ! empty($this->failoverResolverUrl);
-    }
-
-    /**
-     * Test the resolver URL by asking the proxy to verify it can reach the editor.
-     * Returns an array with 'success' boolean and 'message' string.
-     * 
-     * @param  string|null  $url  Optional URL to test instead of the configured failover resolver
-     * 
-     */
-    public function testResolver($url = null): array
-    {
-        if (empty($this->apiBaseUrl)) {
-            return [
-                'success' => false,
-                'message' => 'M3U Proxy base URL is not configured',
-            ];
-        }
-
-        if (empty(!$url || $this->failoverResolverUrl)) {
-            return [
-                'success' => false,
-                'message' => 'Failover resolver URL is not configured',
-            ];
-        }
-
-        try {
-            // Call the proxy's test-url endpoint to verify it can reach the editor
-            $endpoint = $this->apiBaseUrl . '/test-connection';
-            $response = Http::timeout(15)->acceptJson()
-                ->withHeaders($this->apiToken ? [
-                    'X-API-Token' => $this->apiToken,
-                ] : [])
-                ->post($endpoint, [
-                    'url' => ($url ?? $this->failoverResolverUrl) . '/up', // Use the Laravel health check endpoint
-                ]);
-
-            if ($response->successful()) {
-                $data = $response->json();
-
-                return [
-                    'success' => $data['success'] ?? false,
-                    'message' => $data['message'] ?? 'Unknown response from proxy',
-                    'url_tested' => $data['url_tested'] ?? $this->failoverResolverUrl,
-                ];
-            }
-
-            return [
-                'success' => false,
-                'message' => 'Proxy returned status ' . $response->status(),
-            ];
-        } catch (Exception $e) {
-            Log::warning('Failed to test resolver URL: ' . $e->getMessage());
-
-            return [
-                'success' => false,
-                'message' => 'Unable to connect to proxy: ' . $e->getMessage(),
-            ];
+            $this->failoverResolverUrl = mb_rtrim($configFailoverResolver, '/');
         }
     }
 
@@ -148,7 +79,7 @@ class M3uProxyService
         }
 
         try {
-            $endpoint = $service->apiBaseUrl . '/streams/by-metadata';
+            $endpoint = $service->apiBaseUrl.'/streams/by-metadata';
             $response = Http::timeout(3)->acceptJson()
                 ->withHeaders($service->apiToken ? [
                     'X-API-Token' => $service->apiToken,
@@ -156,18 +87,21 @@ class M3uProxyService
                 ->get($endpoint, [
                     'field' => 'playlist_uuid',
                     'value' => $playlist->uuid,
-                    'active_only' => true
+                    'active_only' => true,
                 ]);
 
             if ($response->successful()) {
                 $data = $response->json();
+
                 return $data['total_clients'] ?? 0; // Return total client count across all streams
             }
 
-            Log::warning('Failed to fetch playlist streams from m3u-proxy: HTTP ' . $response->status());
+            Log::warning('Failed to fetch playlist streams from m3u-proxy: HTTP '.$response->status());
+
             return 0;
         } catch (Exception $e) {
-            Log::warning('Failed to fetch playlist streams from m3u-proxy: ' . $e->getMessage());
+            Log::warning('Failed to fetch playlist streams from m3u-proxy: '.$e->getMessage());
+
             return 0;
         }
     }
@@ -184,7 +118,7 @@ class M3uProxyService
         }
 
         try {
-            $endpoint = $service->apiBaseUrl . '/streams/by-metadata';
+            $endpoint = $service->apiBaseUrl.'/streams/by-metadata';
             $response = Http::timeout(3)->acceptJson()
                 ->withHeaders($service->apiToken ? [
                     'X-API-Token' => $service->apiToken,
@@ -192,18 +126,21 @@ class M3uProxyService
                 ->get($endpoint, [
                     'field' => 'playlist_uuid',
                     'value' => $playlist->uuid,
-                    'active_only' => true
+                    'active_only' => true,
                 ]);
 
             if ($response->successful()) {
                 $data = $response->json();
+
                 return $data['matching_streams'] ?? [];
             }
 
-            Log::warning('Failed to fetch playlist streams from m3u-proxy: HTTP ' . $response->status());
+            Log::warning('Failed to fetch playlist streams from m3u-proxy: HTTP '.$response->status());
+
             return [];
         } catch (Exception $e) {
-            Log::warning('Failed to fetch playlist streams from m3u-proxy: ' . $e->getMessage());
+            Log::warning('Failed to fetch playlist streams from m3u-proxy: '.$e->getMessage());
+
             return [];
         }
     }
@@ -220,7 +157,7 @@ class M3uProxyService
         }
 
         try {
-            $endpoint = $service->apiBaseUrl . '/streams/by-metadata';
+            $endpoint = $service->apiBaseUrl.'/streams/by-metadata';
             $response = Http::timeout(2)->acceptJson()
                 ->withHeaders($service->apiToken ? [
                     'X-API-Token' => $service->apiToken,
@@ -228,7 +165,7 @@ class M3uProxyService
                 ->get($endpoint, [
                     'field' => 'type',
                     'value' => 'channel',
-                    'active_only' => true
+                    'active_only' => true,
                 ]);
 
             if ($response->successful()) {
@@ -238,7 +175,7 @@ class M3uProxyService
                 foreach ($data['matching_streams'] ?? [] as $stream) {
                     if (
                         isset($stream['metadata']['id']) &&
-                        $stream['metadata']['id'] == $channel->id &&
+                        $stream['metadata']['id'] === $channel->id &&
                         $stream['client_count'] > 0
                     ) {
                         return true;
@@ -248,7 +185,8 @@ class M3uProxyService
 
             return false;
         } catch (Exception $e) {
-            Log::warning('Failed to check channel active status: ' . $e->getMessage());
+            Log::warning('Failed to check channel active status: '.$e->getMessage());
+
             return false;
         }
     }
@@ -265,7 +203,7 @@ class M3uProxyService
         }
 
         try {
-            $endpoint = $service->apiBaseUrl . '/streams/by-metadata';
+            $endpoint = $service->apiBaseUrl.'/streams/by-metadata';
             $response = Http::timeout(3)->acceptJson()
                 ->withHeaders($service->apiToken ? [
                     'X-API-Token' => $service->apiToken,
@@ -273,17 +211,19 @@ class M3uProxyService
                 ->get($endpoint, [
                     'field' => $field,
                     'value' => $value,
-                    'active_only' => true
+                    'active_only' => true,
                 ]);
 
             if ($response->successful()) {
                 $data = $response->json();
+
                 return $data['total_clients'] ?? 0;
             }
 
             return 0;
         } catch (Exception $e) {
-            Log::warning("Failed to get active streams count for {$field}={$value}: " . $e->getMessage());
+            Log::warning("Failed to get active streams count for {$field}={$value}: ".$e->getMessage());
+
             return 0;
         }
     }
@@ -349,12 +289,86 @@ class M3uProxyService
             if (
                 isset($stream['metadata']['type'], $stream['metadata']['id']) &&
                 $stream['metadata']['type'] === 'episode' &&
-                $stream['metadata']['id'] == $episode->id
+                $stream['metadata']['id'] === $episode->id
             ) {
                 return $stream['client_count'] > 0;
             }
         }
+
         return false;
+    }
+
+    /**
+     * Get the current proxy mode: 'embedded' or 'external'
+     */
+    public function mode(): string
+    {
+        return config('proxy.external_proxy_enabled') ? 'external' : 'embedded';
+    }
+
+    /**
+     * Check if failover resolver URL should be used
+     */
+    public function usingResolver(): bool
+    {
+        return $this->usingFailoverResolver && ! empty($this->failoverResolverUrl);
+    }
+
+    /**
+     * Test the resolver URL by asking the proxy to verify it can reach the editor.
+     * Returns an array with 'success' boolean and 'message' string.
+     *
+     * @param  string|null  $url  Optional URL to test instead of the configured failover resolver
+     */
+    public function testResolver($url = null): array
+    {
+        if (empty($this->apiBaseUrl)) {
+            return [
+                'success' => false,
+                'message' => 'M3U Proxy base URL is not configured',
+            ];
+        }
+
+        if (empty(! $url || $this->failoverResolverUrl)) {
+            return [
+                'success' => false,
+                'message' => 'Failover resolver URL is not configured',
+            ];
+        }
+
+        try {
+            // Call the proxy's test-url endpoint to verify it can reach the editor
+            $endpoint = $this->apiBaseUrl.'/test-connection';
+            $response = Http::timeout(15)->acceptJson()
+                ->withHeaders($this->apiToken ? [
+                    'X-API-Token' => $this->apiToken,
+                ] : [])
+                ->post($endpoint, [
+                    'url' => ($url ?? $this->failoverResolverUrl).'/up', // Use the Laravel health check endpoint
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                return [
+                    'success' => $data['success'] ?? false,
+                    'message' => $data['message'] ?? 'Unknown response from proxy',
+                    'url_tested' => $data['url_tested'] ?? $this->failoverResolverUrl,
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => 'Proxy returned status '.$response->status(),
+            ];
+        } catch (Exception $e) {
+            Log::warning('Failed to test resolver URL: '.$e->getMessage());
+
+            return [
+                'success' => false,
+                'message' => 'Unable to connect to proxy: '.$e->getMessage(),
+            ];
+        }
     }
 
     /**
@@ -423,17 +437,17 @@ class M3uProxyService
                         $playlist = $failoverPlaylist;
                         $primaryUrl = PlaylistUrlService::getChannelUrl($failoverChannel, $playlist);
                         break;
-                    } else {
-                        // Check if failover playlist has capacity
-                        $failoverActiveStreams = self::getActiveStreamsCountByMetadata('playlist_uuid', $failoverPlaylist->uuid);
-
-                        if ($failoverActiveStreams < $failoverPlaylist->available_streams) {
-                            // Found available failover playlist
-                            $playlist = $failoverPlaylist;
-                            $primaryUrl = PlaylistUrlService::getChannelUrl($failoverChannel, $playlist);
-                            break;
-                        }
                     }
+                    // Check if failover playlist has capacity
+                    $failoverActiveStreams = self::getActiveStreamsCountByMetadata('playlist_uuid', $failoverPlaylist->uuid);
+
+                    if ($failoverActiveStreams < $failoverPlaylist->available_streams) {
+                        // Found available failover playlist
+                        $playlist = $failoverPlaylist;
+                        $primaryUrl = PlaylistUrlService::getChannelUrl($failoverChannel, $playlist);
+                        break;
+                    }
+
                 }
 
                 // If we still have the original playlist, all are at capacity
@@ -442,7 +456,7 @@ class M3uProxyService
                         'channel_id' => $id,
                         'primary_playlist' => $playlist->uuid,
                         'primary_limit' => $playlist->available_streams,
-                        'primary_active' => $activeStreams
+                        'primary_active' => $activeStreams,
                     ]);
 
                     abort(503, 'All playlists have reached their maximum stream limit. Please try again later.');
@@ -473,17 +487,18 @@ class M3uProxyService
         $failovers = $this->usingResolver()
             ? $channel->failoverChannels()->count() > 0
             : $channel->failoverChannels()
-            ->select(['channels.id', 'channels.url', 'channels.url_custom', 'channels.playlist_id', 'channels.custom_playlist_id'])->get()
-            ->map(function ($ch) {
-                $playlist = $ch->getEffectivePlaylist();
-                if (! $playlist) {
-                    return null;
-                }
-                return PlaylistUrlService::getChannelUrl($ch, $playlist);
-            })
-            ->filter()
-            ->values()
-            ->toArray();
+                ->select(['channels.id', 'channels.url', 'channels.url_custom', 'channels.playlist_id', 'channels.custom_playlist_id'])->get()
+                ->map(function ($ch) {
+                    $playlist = $ch->getEffectivePlaylist();
+                    if (! $playlist) {
+                        return null;
+                    }
+
+                    return PlaylistUrlService::getChannelUrl($ch, $playlist);
+                })
+                ->filter()
+                ->values()
+                ->toArray();
 
         // Use appropriate endpoint based on whether transcoding profile is provided
         if ($profile) {
@@ -500,22 +515,22 @@ class M3uProxyService
 
             // Return transcoded stream URL
             return $this->buildTranscodeStreamUrl($streamId, $profile->format ?? 'ts');
-        } else {
-            // Use direct streaming endpoint
-            $streamId = $this->createStream($primaryUrl, $failovers, $userAgent, $headers, [
-                'id' => $id,
-                'type' => 'channel',
-                'playlist_uuid' => $playlist->uuid,
-                'strict_live_ts' => $playlist->strict_live_ts,
-            ]);
-
-            // Get the format from the URL
-            $format = pathinfo($primaryUrl, PATHINFO_EXTENSION);
-            $format = $format === 'm3u8' ? 'hls' : $format;
-
-            // Return the direct proxy URL using the stream ID
-            return $this->buildProxyUrl($streamId, $format);
         }
+        // Use direct streaming endpoint
+        $streamId = $this->createStream($primaryUrl, $failovers, $userAgent, $headers, [
+            'id' => $id,
+            'type' => 'channel',
+            'playlist_uuid' => $playlist->uuid,
+            'strict_live_ts' => $playlist->strict_live_ts,
+        ]);
+
+        // Get the format from the URL
+        $format = pathinfo($primaryUrl, PATHINFO_EXTENSION);
+        $format = $format === 'm3u8' ? 'hls' : $format;
+
+        // Return the direct proxy URL using the stream ID
+        return $this->buildProxyUrl($streamId, $format);
+
     }
 
     /**
@@ -545,7 +560,7 @@ class M3uProxyService
                     'episode_id' => $id,
                     'playlist' => $playlist->uuid,
                     'limit' => $playlist->available_streams,
-                    'active' => $activeStreams
+                    'active' => $activeStreams,
                 ]);
 
                 abort(503, 'Playlist has reached its maximum stream limit. Please try again later.');
@@ -590,22 +605,22 @@ class M3uProxyService
 
             // Return transcoded stream URL
             return $this->buildTranscodeStreamUrl($streamId, $profile->format ?? 'ts');
-        } else {
-            // Use direct streaming endpoint
-            $streamId = $this->createStream($url, false, $userAgent, $headers, [
-                'id' => $id,
-                'type' => 'episode',
-                'playlist_uuid' => $playlist->uuid,
-                'strict_live_ts' => $playlist->strict_live_ts,
-            ]);
-
-            // Get the format from the URL
-            $format = pathinfo($url, PATHINFO_EXTENSION);
-            $format = $format === 'm3u8' ? 'hls' : $format;
-
-            // Return the direct proxy URL using the stream ID
-            return $this->buildProxyUrl($streamId, $format);
         }
+        // Use direct streaming endpoint
+        $streamId = $this->createStream($url, false, $userAgent, $headers, [
+            'id' => $id,
+            'type' => 'episode',
+            'playlist_uuid' => $playlist->uuid,
+            'strict_live_ts' => $playlist->strict_live_ts,
+        ]);
+
+        // Get the format from the URL
+        $format = pathinfo($url, PATHINFO_EXTENSION);
+        $format = $format === 'm3u8' ? 'hls' : $format;
+
+        // Return the direct proxy URL using the stream ID
+        return $this->buildProxyUrl($streamId, $format);
+
     }
 
     /**
@@ -621,7 +636,7 @@ class M3uProxyService
         }
 
         try {
-            $endpoint = $this->apiBaseUrl . '/streams/' . $streamId . '/failover';
+            $endpoint = $this->apiBaseUrl.'/streams/'.$streamId.'/failover';
             $response = Http::timeout(10)->acceptJson()
                 ->withHeaders($this->apiToken ? [
                     'X-API-Token' => $this->apiToken,
@@ -634,11 +649,11 @@ class M3uProxyService
                 return true;
             }
 
-            Log::warning("Failed to trigger failover for stream {$streamId}: " . $response->body());
+            Log::warning("Failed to trigger failover for stream {$streamId}: ".$response->body());
 
             return false;
         } catch (Exception $e) {
-            Log::error("Error triggering failover for stream {$streamId}: " . $e->getMessage());
+            Log::error("Error triggering failover for stream {$streamId}: ".$e->getMessage());
 
             return false;
         }
@@ -657,7 +672,7 @@ class M3uProxyService
         }
 
         try {
-            $endpoint = $this->apiBaseUrl . '/streams/' . $streamId;
+            $endpoint = $this->apiBaseUrl.'/streams/'.$streamId;
             $response = Http::timeout(10)->acceptJson()
                 ->withHeaders($this->apiToken ? [
                     'X-API-Token' => $this->apiToken,
@@ -670,11 +685,11 @@ class M3uProxyService
                 return true;
             }
 
-            Log::warning("Failed to stop stream {$streamId}: " . $response->body());
+            Log::warning("Failed to stop stream {$streamId}: ".$response->body());
 
             return false;
         } catch (Exception $e) {
-            Log::error("Error stopping stream {$streamId}: " . $e->getMessage());
+            Log::error("Error stopping stream {$streamId}: ".$e->getMessage());
 
             return false;
         }
@@ -695,7 +710,7 @@ class M3uProxyService
         }
 
         try {
-            $endpoint = $this->apiBaseUrl . '/streams';
+            $endpoint = $this->apiBaseUrl.'/streams';
             $response = Http::timeout(5)->acceptJson()
                 ->withHeaders($this->apiToken ? [
                     'X-API-Token' => $this->apiToken,
@@ -709,26 +724,27 @@ class M3uProxyService
                 $streams = array_filter($data['streams'] ?? [], function ($stream) use ($playlistUuids) {
                     return isset($stream['metadata']['playlist_uuid']) && in_array($stream['metadata']['playlist_uuid'], $playlistUuids);
                 });
+
                 return [
                     'success' => true,
                     'streams' => $streams ?? [],
-                    'total' =>  count($streams) ?? 0,
+                    'total' => count($streams) ?? 0,
                 ];
             }
 
-            Log::warning('Failed to fetch active streams from m3u-proxy: HTTP ' . $response->status());
+            Log::warning('Failed to fetch active streams from m3u-proxy: HTTP '.$response->status());
 
             return [
                 'success' => false,
-                'error' => 'M3U Proxy returned status ' . $response->status(),
+                'error' => 'M3U Proxy returned status '.$response->status(),
                 'streams' => [],
             ];
         } catch (Exception $e) {
-            Log::warning('Failed to fetch active streams from m3u-proxy: ' . $e->getMessage());
+            Log::warning('Failed to fetch active streams from m3u-proxy: '.$e->getMessage());
 
             return [
                 'success' => false,
-                'error' => 'Unable to connect to m3u-proxy: ' . $e->getMessage(),
+                'error' => 'Unable to connect to m3u-proxy: '.$e->getMessage(),
                 'streams' => [],
             ];
         }
@@ -749,7 +765,7 @@ class M3uProxyService
         }
 
         try {
-            $endpoint = $this->apiBaseUrl . '/clients';
+            $endpoint = $this->apiBaseUrl.'/clients';
             $response = Http::timeout(5)->acceptJson()
                 ->withHeaders($this->apiToken ? [
                     'X-API-Token' => $this->apiToken,
@@ -765,22 +781,262 @@ class M3uProxyService
                 ];
             }
 
-            Log::warning('Failed to fetch active clients from m3u-proxy: HTTP ' . $response->status());
+            Log::warning('Failed to fetch active clients from m3u-proxy: HTTP '.$response->status());
 
             return [
                 'success' => false,
-                'error' => 'M3U Proxy returned status ' . $response->status(),
+                'error' => 'M3U Proxy returned status '.$response->status(),
                 'clients' => [],
             ];
         } catch (Exception $e) {
-            Log::warning('Failed to fetch active clients from m3u-proxy: ' . $e->getMessage());
+            Log::warning('Failed to fetch active clients from m3u-proxy: '.$e->getMessage());
 
             return [
                 'success' => false,
-                'error' => 'Unable to connect to m3u-proxy: ' . $e->getMessage(),
+                'error' => 'Unable to connect to m3u-proxy: '.$e->getMessage(),
                 'clients' => [],
             ];
         }
+    }
+
+    /**
+     * Get the base URL for the m3u-proxy API.
+     */
+    public function getApiBaseUrl(): string
+    {
+        return $this->apiBaseUrl;
+    }
+
+    public function getApiToken(): ?string
+    {
+        return $this->apiToken;
+    }
+
+    /**
+     * Resolve the public-facing URL for the m3u-proxy service.
+     *
+     * Resolution order:
+     * 1. If auto-resolve enabled and we have an HTTP request, compute from request host + root path
+     * 2. Explicit config/provided 'm3u_proxy_public_url'
+     * 3. Fall back to the APP_URL + /m3u-proxy (built-in reverse proxy route)
+     *
+     * This method is intentionally run-time (not only at construction) so URLs can be
+     * resolved per-request when desired.
+     */
+    public function getPublicUrl(): string
+    {
+        // 1) request-time resolution (if explicitly enabled and we are in a HTTP context)
+        // Allow the admin setting (GeneralSettings) to control request-time resolution
+        if ($this->autoResolve && ! app()->runningInConsole()) {
+            try {
+                $req = request();
+                if ($req) {
+                    $host = $req->getSchemeAndHttpHost();
+
+                    // Append root path + /m3u-proxy, which is an NGINX route that
+                    // proxies to the m3u-proxy service.
+                    return mb_rtrim($host, '/').'/m3u-proxy';
+                }
+            } catch (Exception $e) {
+                // ignore and fall back
+            }
+        }
+
+        // 2) explicit config
+        if (! empty($this->apiPublicUrl)) {
+            return $this->apiPublicUrl;
+        }
+
+        // 3) Smart fallback: Use APP_URL + /m3u-proxy if available (works with reverse proxy)
+        // This allows the proxy to work without requiring explicit PUBLIC_URL configuration.
+        // Works automatically in Docker containers with NGINX reverse proxy.
+        return ProxyFacade::getBaseUrl().'/m3u-proxy';
+    }
+
+    /**
+     * Get m3u-proxy server information including configuration and capabilities
+     *
+     * @return array Array with 'success', 'info', and optional 'error' keys
+     */
+    public function getProxyInfo(): array
+    {
+        if (empty($this->apiBaseUrl)) {
+            return [
+                'success' => false,
+                'error' => 'M3U Proxy base URL is not configured',
+                'info' => [],
+            ];
+        }
+
+        try {
+            $endpoint = $this->apiBaseUrl.'/info';
+            $response = Http::timeout(5)->acceptJson()
+                ->withHeaders($this->apiToken ? [
+                    'X-API-Token' => $this->apiToken,
+                ] : [])
+                ->get($endpoint);
+
+            if ($response->successful()) {
+                $data = $response->json() ?: [];
+
+                return [
+                    'success' => true,
+                    'info' => $data,
+                ];
+            }
+
+            Log::warning('Failed to fetch proxy info from m3u-proxy: HTTP '.$response->status());
+
+            return [
+                'success' => false,
+                'error' => 'M3U Proxy returned status '.$response->status(),
+                'info' => [],
+            ];
+        } catch (Exception $e) {
+            Log::warning('Failed to fetch proxy info from m3u-proxy: '.$e->getMessage());
+
+            return [
+                'success' => false,
+                'error' => 'Unable to connect to m3u-proxy: '.$e->getMessage(),
+                'info' => [],
+            ];
+        }
+    }
+
+    /**
+     * Validate and resolve failover URLs for smart failover handling.
+     * This is called by m3u-proxy during failover to get a viable failover URL.
+     *
+     * Uses the same capacity checking logic as getChannelUrl to determine which
+     * failover channels have available capacity.
+     *
+     * @param  int  $channelId  The original channel ID from stream metadata
+     * @param  string  $playlistUuid  The original playlist UUID from stream metadata
+     * @param  string  $currentUrl  The current URL being used
+     * @param  int  $index  The failover index being requested
+     * @return array Array with 'next_url' (single best option) and optional 'error' keys
+     *
+     * The response contains:
+     * - next_url: The best failover URL to use (or null if none viable)
+     * - error: Optional error message if validation fails
+     *
+     * This is a lightweight, low-overhead check that uses the same logic as getChannelUrl
+     * to prevent wasted connection attempts to playlists that are already at capacity.
+     */
+    public function resolveFailoverUrl(int $channelId, string $playlistUuid, string $currentUrl, int $index): array
+    {
+        try {
+            // Get the original channel to access its failover relationships
+            $channel = Channel::findOrFail($channelId);
+            $nextUrl = null;
+
+            // Get all failover channels with their relationships
+            $failoverChannels = $channel->failoverChannels()
+                ->select([
+                    'channels.id',
+                    'channels.url',
+                    'channels.url_custom',
+                    'channels.playlist_id',
+                    'channels.custom_playlist_id',
+                ])->get();
+
+            // Find the first valid failover URL that has capacity
+            foreach ($failoverChannels as $idx => $failoverChannel) {
+                $failoverPlaylist = $failoverChannel->getEffectivePlaylist();
+                if (! $failoverPlaylist) {
+                    continue;
+                }
+
+                // Before proceeding, see if the failover index is less than the desired index
+                if ($idx < $index) {
+                    // If the index is higher than the current loop, chances are it has already been attempted, continue to the next...
+                    Log::debug('Channel already attempted, skipping', [
+                        'channel' => $failoverPlaylist->title_custom ?? $failoverPlaylist->title,
+                        'index' => $idx,
+                        'requested_index' => $index,
+                    ]);
+
+                    continue;
+                }
+
+                // Get the url
+                $url = PlaylistUrlService::getChannelUrl($failoverChannel, $failoverPlaylist);
+
+                // Check if the url is the current URL (skip it)
+                if ($url === $currentUrl) {
+                    Log::debug('Failover URL matches current URL, skipping', [
+                        'url' => mb_substr($url, 0, 100),
+                        'playlist_uuid' => $failoverPlaylist->uuid,
+                    ]);
+
+                    continue;
+                }
+
+                // Check if playlist has capacity limits
+                if ($failoverPlaylist->available_streams === 0) {
+                    // No limits on this playlist, it's viable
+                    $nextUrl = $url;
+
+                    // Break on first url, no need to continue checking Playlist limits
+                    break;
+                }
+
+                // Check if playlist is at capacity
+                $activeStreams = self::getActiveStreamsCountByMetadata('playlist_uuid', $failoverPlaylist->uuid);
+                if ($activeStreams < $failoverPlaylist->available_streams) {
+                    // Still has capacity, it's viable!
+                    $nextUrl = $url;
+
+                    break;
+                }
+                // At capacity, skip this URL
+                Log::debug('Failover URL playlist at capacity, skipping', [
+                    'url' => mb_substr($url, 0, 100),
+                    'playlist_uuid' => $failoverPlaylist->uuid,
+                    'active' => $activeStreams,
+                    'limit' => $failoverPlaylist->available_streams,
+                ]);
+
+            }
+
+            // Return the first viable URL as the best option, plus the full list
+            return [
+                'next_url' => $nextUrl,
+            ];
+        } catch (Exception $e) {
+            Log::warning('Error resolving failover url: '.$e->getMessage(), [
+                'channel_id' => $channelId,
+                'playlist_uuid' => $playlistUuid,
+            ]);
+
+            // Return all URLs as fallback if something goes wrong
+            return [
+                'next_url' => $currentUrl,
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Get the failover resolver URL for smart failover handling.
+     * This URL is passed to m3u-proxy so it can call back to validate failover channels
+     * before attempting to stream from them.
+     *
+     * The m3u-proxy will POST to this endpoint with failover metadata to check if
+     * a failover is viable (i.e., the target playlist isn't at capacity).
+     *
+     * @return string|null The failover resolver endpoint URL, or null if not configured
+     */
+    public function getFailoverResolverUrl(): ?string
+    {
+        // Build the failover resolver path
+        if (! empty($this->failoverResolverUrl)) {
+            // Use the configured failover resolver URL
+            return "$this->failoverResolverUrl/api/m3u-proxy/failover-resolver";
+        }
+
+        // If here, return null
+        return null;
     }
 
     /**
@@ -804,7 +1060,7 @@ class M3uProxyService
         ?array $metadata = [],
     ): string {
         try {
-            $endpoint = $this->apiBaseUrl . '/streams';
+            $endpoint = $this->apiBaseUrl.'/streams';
 
             // Build the payload for direct streaming
             $payload = [
@@ -834,7 +1090,7 @@ class M3uProxyService
             }
 
             // Add custom headers if provided
-            if (!empty($headers)) {
+            if (! empty($headers)) {
                 // Need to return as key => value pairs, where `header` is key and `value` is value
                 foreach ($headers as $h) {
                     if (is_array($h) && isset($h['header'])) {
@@ -843,7 +1099,7 @@ class M3uProxyService
                         $normalized[$key] = $val;
                     }
                 }
-                if (!empty($normalized)) {
+                if (! empty($normalized)) {
                     $payload['headers'] = $normalized;
                 }
             }
@@ -869,7 +1125,7 @@ class M3uProxyService
                 throw new Exception('Stream ID not found in API response');
             }
 
-            throw new Exception('Failed to create stream: ' . $response->body());
+            throw new Exception('Failed to create stream: '.$response->body());
         } catch (Exception $e) {
             Log::error('Error creating/updating stream on m3u-proxy', [
                 'error' => $e->getMessage(),
@@ -901,13 +1157,13 @@ class M3uProxyService
         ?array $metadata = [],
     ): string {
         try {
-            $endpoint = $this->apiBaseUrl . '/transcode';
+            $endpoint = $this->apiBaseUrl.'/transcode';
 
             // Build the payload for transcoding
             $payload = [
                 'url' => $url,
                 'profile' => $profile->getProfileIdentifier(),  // Custom args template or predefined profile name
-                'metadata' => $metadata
+                'metadata' => $metadata,
             ];
 
             // If using failovers, provide the callback URL for smart failover handling, or list of URLs
@@ -926,7 +1182,7 @@ class M3uProxyService
             }
 
             // Add custom headers if provided
-            if (!empty($headers)) {
+            if (! empty($headers)) {
                 // Need to return as key => value pairs, where `header` is key and `value` is value
                 foreach ($headers as $h) {
                     if (is_array($h) && isset($h['header'])) {
@@ -935,7 +1191,7 @@ class M3uProxyService
                         $normalized[$key] = $val;
                     }
                 }
-                if (!empty($normalized)) {
+                if (! empty($normalized)) {
                     $payload['headers'] = $normalized;
                 }
             }
@@ -943,14 +1199,14 @@ class M3uProxyService
             // Always add profile variables for FFmpeg template substitution
             // Even custom FFmpeg templates may contain placeholders that need substitution
             $profileVars = $profile->getTemplateVariables();
-            if (!empty($profileVars)) {
+            if (! empty($profileVars)) {
                 $payload['profile_variables'] = $profileVars;
             }
 
             $response = Http::timeout(10)->acceptJson()
                 ->withHeaders(array_filter([
                     'X-API-Token' => $this->apiToken,
-                    'Content-Type' => 'application/json'
+                    'Content-Type' => 'application/json',
                 ]))
                 ->post($endpoint, $payload);
 
@@ -970,7 +1226,7 @@ class M3uProxyService
                 throw new Exception('Stream ID not found in transcoding API response');
             }
 
-            throw new Exception('Failed to create transcoded stream: ' . $response->body());
+            throw new Exception('Failed to create transcoded stream: '.$response->body());
         } catch (Exception $e) {
             Log::error('Error creating transcoded stream on m3u-proxy', [
                 'error' => $e->getMessage(),
@@ -1005,82 +1261,27 @@ class M3uProxyService
         $baseUrl = $this->getPublicUrl();
         if ($format === 'hls' || $format === 'm3u8') {
             // HLS format: /hls/{stream_id}/playlist.m3u8
-            return $baseUrl . '/hls/' . $streamId . '/playlist.m3u8';
+            return $baseUrl.'/hls/'.$streamId.'/playlist.m3u8';
         }
 
         // Direct stream format: /stream/{stream_id}
-        return $baseUrl . '/stream/' . $streamId;
-    }
-
-    /**
-     * Get the base URL for the m3u-proxy API.
-     */
-    public function getApiBaseUrl(): string
-    {
-        return $this->apiBaseUrl;
-    }
-
-    public function getApiToken(): ?string
-    {
-        return $this->apiToken;
-    }
-
-    /**
-     * Resolve the public-facing URL for the m3u-proxy service.
-     *
-     * Resolution order:
-     * 1. If auto-resolve enabled and we have an HTTP request, compute from request host + root path
-     * 2. Explicit config/provided 'm3u_proxy_public_url'
-     * 3. Fall back to the APP_URL + /m3u-proxy (built-in reverse proxy route)
-     *
-     * This method is intentionally run-time (not only at construction) so URLs can be
-     * resolved per-request when desired.
-     *
-     * @return string
-     */
-    public function getPublicUrl(): string
-    {
-        // 1) request-time resolution (if explicitly enabled and we are in a HTTP context)
-        // Allow the admin setting (GeneralSettings) to control request-time resolution
-        if ($this->autoResolve && !app()->runningInConsole()) {
-            try {
-                $req = request();
-                if ($req) {
-                    $host = $req->getSchemeAndHttpHost();
-                    // Append root path + /m3u-proxy, which is an NGINX route that
-                    // proxies to the m3u-proxy service.
-                    return rtrim($host, '/') . '/m3u-proxy';
-                }
-            } catch (\Exception $e) {
-                // ignore and fall back
-            }
-        }
-
-        // 2) explicit config
-        if (!empty($this->apiPublicUrl)) {
-            return $this->apiPublicUrl;
-        }
-
-        // 3) Smart fallback: Use APP_URL + /m3u-proxy if available (works with reverse proxy)
-        // This allows the proxy to work without requiring explicit PUBLIC_URL configuration.
-        // Works automatically in Docker containers with NGINX reverse proxy.
-        return ProxyFacade::getBaseUrl() . '/m3u-proxy';
+        return $baseUrl.'/stream/'.$streamId;
     }
 
     /**
      * Find an existing pooled transcoded stream for the given channel.
      * This allows multiple clients to connect to the same transcoded stream without
      * consuming additional provider connections.
-     * 
-     * @param int $channelId Channel ID
-     * @param string $playlistUuid Playlist UUID
+     *
+     * @param  int  $channelId  Channel ID
+     * @param  string  $playlistUuid  Playlist UUID
      * @return string|null Stream ID if found, null otherwise
      */
     protected function findExistingPooledStream(int $channelId, string $playlistUuid, ?int $profileId = null): ?string
     {
         try {
             // Query m3u-proxy for streams by metadata
-            $endpoint = $this->apiBaseUrl . '/streams/by-metadata';
+            $endpoint = $this->apiBaseUrl.'/streams/by-metadata';
             $response = Http::timeout(5)->acceptJson()
                 ->withHeaders(array_filter([
                     'X-API-Token' => $this->apiToken,
@@ -1091,7 +1292,7 @@ class M3uProxyService
                     'active_only' => true,  // Only return active streams
                 ]);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 return null;
             }
 
@@ -1108,10 +1309,10 @@ class M3uProxyService
                 // 3. Same profile ID (if profile is specified)
                 // 4. Is a transcoded stream (has transcoding metadata)
                 if (
-                    ($metadata['id'] ?? null) == $channelId &&
+                    ($metadata['id'] ?? null) === $channelId &&
                     ($metadata['playlist_uuid'] ?? null) === $playlistUuid &&
                     ($metadata['transcoding'] ?? null) === 'true' &&
-                    ($profileId === null || ($metadata['profile_id'] ?? null) == $profileId)
+                    ($profileId === null || ($metadata['profile_id'] ?? null) === $profileId)
                 ) {
                     Log::info('Found existing pooled transcoded stream', [
                         'stream_id' => $stream['stream_id'],
@@ -1127,192 +1328,9 @@ class M3uProxyService
 
             return null;
         } catch (Exception $e) {
-            Log::warning('Error finding existing pooled stream: ' . $e->getMessage());
+            Log::warning('Error finding existing pooled stream: '.$e->getMessage());
+
             return null;
         }
-    }
-
-    /**
-     * Get m3u-proxy server information including configuration and capabilities
-     *
-     * @return array Array with 'success', 'info', and optional 'error' keys
-     */
-    public function getProxyInfo(): array
-    {
-        if (empty($this->apiBaseUrl)) {
-            return [
-                'success' => false,
-                'error' => 'M3U Proxy base URL is not configured',
-                'info' => [],
-            ];
-        }
-
-        try {
-            $endpoint = $this->apiBaseUrl . '/info';
-            $response = Http::timeout(5)->acceptJson()
-                ->withHeaders($this->apiToken ? [
-                    'X-API-Token' => $this->apiToken,
-                ] : [])
-                ->get($endpoint);
-
-            if ($response->successful()) {
-                $data = $response->json() ?: [];
-
-                return [
-                    'success' => true,
-                    'info' => $data,
-                ];
-            }
-
-            Log::warning('Failed to fetch proxy info from m3u-proxy: HTTP ' . $response->status());
-
-            return [
-                'success' => false,
-                'error' => 'M3U Proxy returned status ' . $response->status(),
-                'info' => [],
-            ];
-        } catch (Exception $e) {
-            Log::warning('Failed to fetch proxy info from m3u-proxy: ' . $e->getMessage());
-
-            return [
-                'success' => false,
-                'error' => 'Unable to connect to m3u-proxy: ' . $e->getMessage(),
-                'info' => [],
-            ];
-        }
-    }
-
-    /**
-     * Validate and resolve failover URLs for smart failover handling.
-     * This is called by m3u-proxy during failover to get a viable failover URL.
-     * 
-     * Uses the same capacity checking logic as getChannelUrl to determine which
-     * failover channels have available capacity.
-     *
-     * @param  int  $channelId  The original channel ID from stream metadata
-     * @param  string  $playlistUuid  The original playlist UUID from stream metadata
-     * @param  string  $currentUrl  The current URL being used
-     * @param  int  $index  The failover index being requested
-     * @return array  Array with 'next_url' (single best option) and optional 'error' keys
-     *
-     * The response contains:
-     * - next_url: The best failover URL to use (or null if none viable)
-     * - error: Optional error message if validation fails
-     *
-     * This is a lightweight, low-overhead check that uses the same logic as getChannelUrl
-     * to prevent wasted connection attempts to playlists that are already at capacity.
-     */
-    public function resolveFailoverUrl(int $channelId, string $playlistUuid, string $currentUrl, int $index): array
-    {
-        try {
-            // Get the original channel to access its failover relationships
-            $channel = Channel::findOrFail($channelId);
-            $nextUrl = null;
-
-            // Get all failover channels with their relationships
-            $failoverChannels = $channel->failoverChannels()
-                ->select([
-                    'channels.id',
-                    'channels.url',
-                    'channels.url_custom',
-                    'channels.playlist_id',
-                    'channels.custom_playlist_id',
-                ])->get();
-
-            // Find the first valid failover URL that has capacity
-            foreach ($failoverChannels as $idx => $failoverChannel) {
-                $failoverPlaylist = $failoverChannel->getEffectivePlaylist();
-                if (!$failoverPlaylist) {
-                    continue;
-                }
-
-                // Before proceeding, see if the failover index is less than the desired index
-                if ($idx < $index) {
-                    // If the index is higher than the current loop, chances are it has already been attempted, continue to the next...
-                    Log::debug('Channel already attempted, skipping', [
-                        'channel' => $failoverPlaylist->title_custom ?? $failoverPlaylist->title,
-                        'index' => $idx,
-                        'requested_index' => $index,
-                    ]);
-                    continue;
-                }
-
-                // Get the url
-                $url = PlaylistUrlService::getChannelUrl($failoverChannel, $failoverPlaylist);
-
-                // Check if the url is the current URL (skip it)
-                if ($url === $currentUrl) {
-                    Log::debug('Failover URL matches current URL, skipping', [
-                        'url' => substr($url, 0, 100),
-                        'playlist_uuid' => $failoverPlaylist->uuid
-                    ]);
-                    continue;
-                }
-
-                // Check if playlist has capacity limits
-                if ($failoverPlaylist->available_streams === 0) {
-                    // No limits on this playlist, it's viable
-                    $nextUrl = $url;
-
-                    // Break on first url, no need to continue checking Playlist limits
-                    break;
-                }
-
-                // Check if playlist is at capacity
-                $activeStreams = self::getActiveStreamsCountByMetadata('playlist_uuid', $failoverPlaylist->uuid);
-                if ($activeStreams < $failoverPlaylist->available_streams) {
-                    // Still has capacity, it's viable!
-                    $nextUrl = $url;
-
-                    break;
-                } else {
-                    // At capacity, skip this URL
-                    Log::debug('Failover URL playlist at capacity, skipping', [
-                        'url' => substr($url, 0, 100),
-                        'playlist_uuid' => $failoverPlaylist->uuid,
-                        'active' => $activeStreams,
-                        'limit' => $failoverPlaylist->available_streams,
-                    ]);
-                }
-            }
-
-            // Return the first viable URL as the best option, plus the full list
-            return [
-                'next_url' => $nextUrl,
-            ];
-        } catch (Exception $e) {
-            Log::warning('Error resolving failover url: ' . $e->getMessage(), [
-                'channel_id' => $channelId,
-                'playlist_uuid' => $playlistUuid,
-            ]);
-
-            // Return all URLs as fallback if something goes wrong
-            return [
-                'next_url' => $currentUrl,
-                'error' => $e->getMessage(),
-            ];
-        }
-    }
-
-    /**
-     * Get the failover resolver URL for smart failover handling.
-     * This URL is passed to m3u-proxy so it can call back to validate failover channels
-     * before attempting to stream from them.
-     *
-     * The m3u-proxy will POST to this endpoint with failover metadata to check if
-     * a failover is viable (i.e., the target playlist isn't at capacity).
-     *
-     * @return string|null The failover resolver endpoint URL, or null if not configured
-     */
-    public function getFailoverResolverUrl(): string|null
-    {
-        // Build the failover resolver path
-        if (! empty($this->failoverResolverUrl)) {
-            // Use the configured failover resolver URL
-            return "$this->failoverResolverUrl/api/m3u-proxy/failover-resolver";
-        }
-
-        // If here, return null
-        return null;
     }
 }

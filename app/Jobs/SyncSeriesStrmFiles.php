@@ -2,11 +2,11 @@
 
 namespace App\Jobs;
 
-use App\Facades\ProxyFacade;
 use App\Models\Series;
 use App\Models\User;
 use App\Services\PlaylistService;
 use App\Settings\GeneralSettings;
+use Exception;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -132,7 +132,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
             }
 
             // Get the path info
-            $path = rtrim($sync_settings['sync_location'], '/');
+            $path = mb_rtrim($sync_settings['sync_location'], '/');
             if (! is_dir($path)) {
                 if ($this->notify) {
                     Notification::make()
@@ -162,7 +162,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 $cleanName = $cleanSpecialChars
                     ? PlaylistService::makeFilesystemSafe($catName, $replaceChar)
                     : PlaylistService::makeFilesystemSafe($catName);
-                $path .= '/' . $cleanName;
+                $path .= '/'.$cleanName;
                 if (! is_dir($path)) {
                     mkdir($path, 0777, true);
                 }
@@ -175,7 +175,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 $cleanName = $cleanSpecialChars
                     ? PlaylistService::makeFilesystemSafe($series->name, $replaceChar)
                     : PlaylistService::makeFilesystemSafe($series->name);
-                $path .= '/' . $cleanName;
+                $path .= '/'.$cleanName;
                 if (! is_dir($path)) {
                     mkdir($path, 0777, true);
                 }
@@ -190,15 +190,15 @@ class SyncSeriesStrmFiles implements ShouldQueue
             foreach ($episodes as $ep) {
                 // Setup episode prefix
                 $season = $ep->season;
-                $num = str_pad($ep->episode_num, 2, '0', STR_PAD_LEFT);
-                $prefx = 'S' . str_pad($season, 2, '0', STR_PAD_LEFT) . "E{$num}";
+                $num = mb_str_pad($ep->episode_num, 2, '0', STR_PAD_LEFT);
+                $prefx = 'S'.mb_str_pad($season, 2, '0', STR_PAD_LEFT)."E{$num}";
 
                 // Build the base filename
                 $fileName = "{$prefx} - {$ep->title}";
 
                 // Add metadata to filename
                 if (in_array('year', $filenameMetadata) && ! empty($series->release_date)) {
-                    $year = substr($series->release_date, 0, 4);
+                    $year = mb_substr($series->release_date, 0, 4);
                     $fileName .= " ({$year})";
                 }
 
@@ -218,25 +218,25 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 // Remove consecutive replacement characters if enabled
                 if ($removeConsecutiveChars && $replaceChar !== 'remove') {
                     $char = $replaceChar === 'space' ? ' ' : ($replaceChar === 'dash' ? '-' : ($replaceChar === 'underscore' ? '_' : '.'));
-                    $fileName = preg_replace('/' . preg_quote($char, '/') . '{2,}/', $char, $fileName);
+                    $fileName = preg_replace('/'.preg_quote($char, '/').'{2,}/', $char, $fileName);
                 }
 
                 $fileName = "{$fileName}.strm";
 
                 // Create the season folder
                 if (in_array('season', $pathStructure)) {
-                    $seasonPath = $path . '/Season ' . str_pad($season, 2, '0', STR_PAD_LEFT);
+                    $seasonPath = $path.'/Season '.mb_str_pad($season, 2, '0', STR_PAD_LEFT);
                     if (! is_dir($seasonPath)) {
                         mkdir($seasonPath, 0777, true);
                     }
-                    $filePath = $seasonPath . '/' . $fileName;
+                    $filePath = $seasonPath.'/'.$fileName;
                 } else {
-                    $filePath = $path . '/' . $fileName;
+                    $filePath = $path.'/'.$fileName;
                 }
 
                 // Generate the url
                 $containerExtension = $ep->container_extension ?? 'mp4';
-                $url = rtrim("/series/{$playlist->user->name}/{$playlist->uuid}/" . $ep->id . "." . $containerExtension, '.');
+                $url = mb_rtrim("/series/{$playlist->user->name}/{$playlist->uuid}/".$ep->id.'.'.$containerExtension, '.');
                 $url = PlaylistService::getBaseUrl($url);
 
                 // Check if the file already exists
@@ -260,7 +260,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                     ->broadcast($series->user)
                     ->sendToDatabase($series->user);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Notification::make()
                 ->danger()
                 ->title("Error sync .strm files for series \"{$series->name}\"")

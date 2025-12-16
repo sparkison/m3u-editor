@@ -2,40 +2,37 @@
 
 namespace App\Filament\Resources\PostProcesses;
 
-use Filament\Schemas\Schema;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\ToggleColumn;
-use Filament\Actions\ActionGroup;
-use Filament\Actions\EditAction;
-use Filament\Actions\DeleteAction;
-use Filament\Tables\Enums\RecordActionsPosition;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use App\Filament\Resources\PostProcesses\RelationManagers\ProcessesRelationManager;
-use App\Filament\Resources\PostProcesses\RelationManagers\LogsRelationManager;
-use App\Filament\Resources\PostProcesses\Pages\ListPostProcesses;
 use App\Filament\Resources\PostProcesses\Pages\EditPostProcess;
-use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\ToggleButtons;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Fieldset;
-use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\Textarea;
-use Filament\Schemas\Components\Grid;
-use Filament\Schemas\Components\Section;
+use App\Filament\Resources\PostProcesses\Pages\ListPostProcesses;
+use App\Filament\Resources\PostProcesses\RelationManagers\LogsRelationManager;
+use App\Filament\Resources\PostProcesses\RelationManagers\ProcessesRelationManager;
 use App\Filament\Resources\PostProcessResource\Pages;
-use App\Filament\Resources\PostProcessResource\RelationManagers;
 use App\Models\PostProcess;
 use App\Rules\CheckIfUrlOrLocalPath;
-use Filament\Forms;
-use Filament\Resources\Resource;
-use Filament\Tables;
-use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use App\Traits\HasUserFiltering;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\ToggleButtons;
+use Filament\Resources\Resource;
+use Filament\Schemas\Components\Fieldset;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
+use Filament\Tables;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ToggleColumn;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Tables\Table;
+use UnitEnum;
 
 class PostProcessResource extends Resource
 {
@@ -46,8 +43,10 @@ class PostProcessResource extends Resource
     protected static ?string $recordTitleAttribute = 'name';
 
     protected static ?string $label = 'Post Process';
+
     protected static ?string $pluralLabel = 'Post Processing';
-    protected static string | \UnitEnum | null $navigationGroup = 'Tools';
+
+    protected static string|UnitEnum|null $navigationGroup = 'Tools';
 
     public static function getGloballySearchableAttributes(): array
     {
@@ -173,39 +172,47 @@ class PostProcessResource extends Resource
                 ->default('url')
                 ->helperText('Select whether to send a request to a URL, execute a local script, or send an email.'),
             TextInput::make('metadata.path')
-                ->label(fn(Get $get) => ucfirst($get('metadata.local') ?? 'url'))
+                ->label(fn (Get $get) => ucfirst($get('metadata.local') ?? 'url'))
                 ->columnSpan(2)
                 ->prefixIcon(function (Get $get) {
                     if ($get('metadata.local') === 'url') {
                         return 'heroicon-o-globe-alt';
-                    } elseif ($get('metadata.local') === 'path') {
+                    }
+                    if ($get('metadata.local') === 'path') {
                         return 'heroicon-o-document';
-                    } elseif ($get('metadata.local') === 'email') {
+                    }
+                    if ($get('metadata.local') === 'email') {
                         return 'heroicon-o-envelope';
                     }
+
                     return 'heroicon-o-question-mark-circle';
                 })
                 ->placeholder(function (Get $get) {
                     if ($get('metadata.local') === 'url') {
                         return route('webhook.test.get');
-                    } elseif ($get('metadata.local') === 'path') {
+                    }
+                    if ($get('metadata.local') === 'path') {
                         return '/var/www/html/custom_script';
-                    } elseif ($get('metadata.local') === 'email') {
+                    }
+                    if ($get('metadata.local') === 'email') {
                         return 'user@example.com';
                     }
                 })
                 ->helperText(function (Get $get) {
                     if ($get('metadata.local') === 'url') {
                         return 'The URL to your webhook endpoint.';
-                    } elseif ($get('metadata.local') === 'path') {
+                    }
+                    if ($get('metadata.local') === 'path') {
                         return 'The path to your local script.';
-                    } elseif ($get('metadata.local') === 'email') {
+                    }
+                    if ($get('metadata.local') === 'email') {
                         return 'The email address to send notifications to.';
                     }
+
                     return 'The URL or path to your webhook endpoint.';
                 })
                 ->required()
-                ->rules(fn(Get $get) => $get('metadata.local') === 'email' ? [
+                ->rules(fn (Get $get) => $get('metadata.local') === 'email' ? [
                     'email',
                 ] : [
                     new CheckIfUrlOrLocalPath(
@@ -272,7 +279,7 @@ class PostProcessResource extends Resource
                                 ->default(false)
                                 ->inline(false)
                                 ->helperText('When enabled, the POST request will be sent without any body content. Useful for APIs that only need a POST trigger (e.g., Emby/Jellyfin scheduled tasks).')
-                                ->hidden(fn(Get $get) => !$get('metadata.post'))
+                                ->hidden(fn (Get $get) => ! $get('metadata.post'))
                                 ->live(),
                             Toggle::make('metadata.json_body')
                                 ->label('Send as JSON body')
@@ -280,7 +287,7 @@ class PostProcessResource extends Resource
                                 ->inline(false)
                                 ->live()
                                 ->helperText('When enabled, variables will be sent as a JSON body instead of form data. Only applies to POST requests.')
-                                ->hidden(fn(Get $get) => !$get('metadata.post') || $get('metadata.no_body')),
+                                ->hidden(fn (Get $get) => ! $get('metadata.post') || $get('metadata.no_body')),
 
                             Repeater::make('metadata.post_vars')
                                 ->label('GET/POST variables')
@@ -323,9 +330,9 @@ class PostProcessResource extends Resource
                                 ->columns(2)
                                 ->columnSpanFull()
                                 ->addActionLabel('Add GET/POST variable')
-                                ->hidden(fn(Get $get) => $get('metadata.post') && $get('metadata.no_body')),
+                                ->hidden(fn (Get $get) => $get('metadata.post') && $get('metadata.no_body')),
                         ]),
-                ])->hidden(fn(Get $get) => $get('metadata.local') !== 'url'),
+                ])->hidden(fn (Get $get) => $get('metadata.local') !== 'url'),
             Fieldset::make('Script Options')
                 ->schema([
                     Repeater::make('metadata.script_vars')
@@ -372,7 +379,7 @@ class PostProcessResource extends Resource
                         ->columns(2)
                         ->columnSpanFull()
                         ->addActionLabel('Add named export'),
-                ])->hidden(fn(Get $get) => $get('metadata.local') !== 'path'),
+                ])->hidden(fn (Get $get) => $get('metadata.local') !== 'path'),
 
             Fieldset::make('Email Options')
                 ->schema([
@@ -415,7 +422,7 @@ class PostProcessResource extends Resource
                         ->columns(2)
                         ->columnSpanFull()
                         ->addActionLabel('Add variable'),
-                ])->hidden(fn(Get $get) => $get('metadata.local') !== 'email'),
+                ])->hidden(fn (Get $get) => $get('metadata.local') !== 'email'),
             Fieldset::make('Conditional Settings')
                 ->schema([
                     Repeater::make('conditions')
@@ -468,8 +475,8 @@ class PostProcessResource extends Resource
                             TextInput::make('value')
                                 ->label('Value')
                                 ->helperText('Value to compare against (not needed for true/false/empty conditions).')
-                                ->hidden(fn(Get $get) => in_array($get('operator'), ['is_true', 'is_false', 'is_empty', 'is_not_empty']))
-                                ->required(fn(Get $get) => !in_array($get('operator'), ['is_true', 'is_false', 'is_empty', 'is_not_empty'])),
+                                ->hidden(fn (Get $get) => in_array($get('operator'), ['is_true', 'is_false', 'is_empty', 'is_not_empty']))
+                                ->required(fn (Get $get) => ! in_array($get('operator'), ['is_true', 'is_false', 'is_empty', 'is_not_empty'])),
                         ])
                         ->columns(3)
                         ->columnSpanFull()
@@ -477,15 +484,16 @@ class PostProcessResource extends Resource
                         ->helperText('Add conditions that must be met for this post process to execute. All conditions must be true for execution.'),
                 ]),
         ];
-        return  [
+
+        return [
             $operation === 'create'
                 ? Grid::make()->schema($schema)->columns(2)
                 : Section::make('Configuration')
-                ->icon('heroicon-s-pencil-square')
-                ->collapsible()
-                ->collapsed(true)
-                ->compact()
-                ->schema($schema)->columns(2),
+                    ->icon('heroicon-s-pencil-square')
+                    ->collapsible()
+                    ->collapsed(true)
+                    ->compact()
+                    ->schema($schema)->columns(2),
         ];
     }
 }

@@ -35,12 +35,12 @@ class GitInfo extends Command
             $this->line('');
 
             $gitInfo = file_get_contents($gitInfoFile);
-            $lines = explode("\n", trim($gitInfo));
+            $lines = explode("\n", mb_trim($gitInfo));
 
             foreach ($lines as $line) {
-                if (strpos($line, '=') !== false) {
+                if (mb_strpos($line, '=') !== false) {
                     [$key, $value] = explode('=', $line, 2);
-                    $this->line(sprintf('  <info>%s:</info> %s', str_replace('_', ' ', ucwords(strtolower($key), '_')), $value ?: 'N/A'));
+                    $this->line(sprintf('  <info>%s:</info> %s', str_replace('_', ' ', ucwords(mb_strtolower($key), '_')), $value ?: 'N/A'));
                 }
             }
         }
@@ -58,9 +58,9 @@ class GitInfo extends Command
             $this->line('Source: Local git repository');
             $this->line('');
 
-            $branch = trim(shell_exec('cd '.base_path().' && git rev-parse --abbrev-ref HEAD 2>/dev/null') ?: 'N/A');
-            $commit = trim(shell_exec('cd '.base_path().' && git rev-parse HEAD 2>/dev/null') ?: 'N/A');
-            $tag = trim(shell_exec('cd '.base_path().' && git describe --tags --exact-match 2>/dev/null') ?: 'N/A');
+            $branch = mb_trim(shell_exec('cd '.base_path().' && git rev-parse --abbrev-ref HEAD 2>/dev/null') ?: 'N/A');
+            $commit = mb_trim(shell_exec('cd '.base_path().' && git rev-parse HEAD 2>/dev/null') ?: 'N/A');
+            $tag = mb_trim(shell_exec('cd '.base_path().' && git describe --tags --exact-match 2>/dev/null') ?: 'N/A');
 
             $this->line(sprintf('  <info>Git Branch:</info> %s', $branch));
             $this->line(sprintf('  <info>Git Commit:</info> %s', $commit));

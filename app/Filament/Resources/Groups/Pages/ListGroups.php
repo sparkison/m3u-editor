@@ -2,11 +2,9 @@
 
 namespace App\Filament\Resources\Groups\Pages;
 
-use Filament\Actions\CreateAction;
 use App\Filament\Resources\Groups\GroupResource;
-use App\Models\Group;
 use App\Models\Playlist;
-use Filament\Actions;
+use Filament\Actions\CreateAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Tabs\Tab;
@@ -18,6 +16,33 @@ class ListGroups extends ListRecords
     protected static string $resource = GroupResource::class;
 
     protected ?string $subheading = 'Manage live groups.';
+
+    public static function setupTabs($relationId = null): array
+    {
+        $where = [
+            ['user_id', auth()->id()],
+        ];
+
+        // Fetch all the playlists for the current user, these will be our grouping tabs
+        $playlists = Playlist::where($where)
+            ->orderBy('name')
+            ->get();
+
+        // Return tabs
+        return $playlists->mapWithKeys(fn ($playlist) => [
+            $playlist->id => Tab::make($playlist->name)
+                ->modifyQueryUsing(fn ($query) => $query->where([
+                    ['playlist_id', $playlist->id],
+                    ['type', 'live'],
+                ]))
+                ->badge($playlist->liveGroups()->count()),
+        ])->toArray();
+    }
+
+    public function getTabs(): array
+    {
+        return self::setupTabs();
+    }
 
     protected function getHeaderActions(): array
     {
@@ -35,7 +60,7 @@ class ListGroups extends ListRecords
                         ->success()
                         ->title('Group created')
                         ->body('You can now assign channels to this group from the Channels section.'),
-                )->slideOver()
+                )->slideOver(),
         ];
     }
 
@@ -47,32 +72,5 @@ class ListGroups extends ListRecords
         return static::getResource()::getEloquentQuery()
             ->where('user_id', auth()->id())
             ->where('type', 'live');
-    }
-
-    public function getTabs(): array
-    {
-        return self::setupTabs();
-    }
-
-    public static function setupTabs($relationId = null): array
-    {
-        $where = [
-            ['user_id', auth()->id()],
-        ];
-
-        // Fetch all the playlists for the current user, these will be our grouping tabs
-        $playlists = Playlist::where($where)
-            ->orderBy('name')
-            ->get();
-
-        // Return tabs
-        return $playlists->mapWithKeys(fn($playlist) => [
-            $playlist->id => Tab::make($playlist->name)
-                ->modifyQueryUsing(fn($query) => $query->where([
-                    ['playlist_id', $playlist->id],
-                    ['type', 'live'],
-                ]))
-                ->badge($playlist->liveGroups()->count())
-        ])->toArray();
     }
 }

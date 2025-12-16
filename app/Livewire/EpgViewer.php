@@ -2,7 +2,6 @@
 
 namespace App\Livewire;
 
-use Exception;
 use App\Enums\ChannelLogoType;
 use App\Facades\ProxyFacade;
 use App\Filament\Resources\Channels\ChannelResource;
@@ -11,6 +10,7 @@ use App\Models\Channel;
 use App\Models\Epg;
 use App\Models\EpgChannel;
 use App\Services\EpgCacheService;
+use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
@@ -19,23 +19,29 @@ use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
-use Livewire\Component;
 use Illuminate\Support\Str;
+use Livewire\Component;
 
-class EpgViewer extends Component implements HasForms, HasActions
+class EpgViewer extends Component implements HasActions, HasForms
 {
-    use InteractsWithForms;
     use InteractsWithActions;
+    use InteractsWithForms;
 
     public ?array $data = [];
+
     public $record;
+
     public $type;
+
     public $editingChannelId = null;
+
     public $viewOnly = false;
+
     public $vod = true;
 
     // Use static cache to prevent Livewire from clearing it
     protected static $recordCache = [];
+
     protected static $maxCacheSize = 20; // Limit cache size to prevent memory issues
 
     public function mount($record): void
@@ -44,30 +50,11 @@ class EpgViewer extends Component implements HasForms, HasActions
         $this->type = class_basename($this->record);
     }
 
-    /**
-     * Clear old cache entries if cache gets too large
-     */
-    protected static function maintainCacheSize(): void
-    {
-        if (count(static::$recordCache) > static::$maxCacheSize) {
-            // Remove the oldest entries (first half of cache)
-            $halfSize = intval(static::$maxCacheSize / 2);
-            static::$recordCache = array_slice(static::$recordCache, $halfSize, null, true);
-        }
-    }
-
-    protected function getActions(): array
-    {
-        return [
-            $this->editChannelAction(),
-        ];
-    }
-
     public function editChannelAction(): Action
     {
         return EditAction::make('editChannel')
             ->label('Edit Channel')
-            ->record(fn() => $this->getChannelRecord())
+            ->record(fn () => $this->getChannelRecord())
             ->schema($this->type === 'Epg' ? EpgChannelResource::getForm() : ChannelResource::getForm(edit: true))
             ->action(function (array $data, $record) {
                 if ($record) {
@@ -166,6 +153,43 @@ class EpgViewer extends Component implements HasForms, HasActions
             ->modalWidth('4xl');
     }
 
+    public function openChannelEdit($channelId)
+    {
+        $this->editingChannelId = $channelId;
+        $this->mountAction('editChannel');
+    }
+
+    public function render()
+    {
+        $route = $this->type === 'Epg'
+            ? route('api.epg.data', ['uuid' => $this->record?->uuid])
+            : route('api.epg.playlist.data', ['uuid' => $this->record?->uuid]);
+
+        return view('livewire.epg-viewer', [
+            'route' => $route,
+            'vod' => $this->vod,
+        ]);
+    }
+
+    /**
+     * Clear old cache entries if cache gets too large
+     */
+    protected static function maintainCacheSize(): void
+    {
+        if (count(static::$recordCache) > static::$maxCacheSize) {
+            // Remove the oldest entries (first half of cache)
+            $halfSize = (int) (static::$maxCacheSize / 2);
+            static::$recordCache = array_slice(static::$recordCache, $halfSize, null, true);
+        }
+    }
+
+    protected function getActions(): array
+    {
+        return [
+            $this->editChannelAction(),
+        ];
+    }
+
     protected function getChannelRecord()
     {
         $cacheKey = "{$this->type}_{$this->editingChannelId}";
@@ -174,7 +198,7 @@ class EpgViewer extends Component implements HasForms, HasActions
         if (isset(static::$recordCache[$cacheKey])) {
             return static::$recordCache[$cacheKey];
         }
-        if (!$this->editingChannelId) {
+        if (! $this->editingChannelId) {
             return null;
         }
 
@@ -204,15 +228,16 @@ class EpgViewer extends Component implements HasForms, HasActions
             $epg = $epgChannel->epg;
 
             // If EPG is not fully loaded, reload it with all attributes
-            if (!$epg || !$epg->uuid) {
+            if (! $epg || ! $epg->uuid) {
                 $epg = Epg::find($epgChannel->epg_id);
             }
 
-            if (!$epg) {
+            if (! $epg) {
                 Log::debug('No EPG found for EPG channel', [
                     'epg_channel_id' => $epgChannel->id,
                     'epg_channel_epg_id' => $epgChannel->epg_id,
                 ]);
+
                 return [];
             }
 
@@ -228,27 +253,10 @@ class EpgViewer extends Component implements HasForms, HasActions
             Log::error('Failed to fetch programme data', [
                 'channel_id' => $channelId,
                 'epg_channel_id' => $epgChannel->id ?? null,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
+
             return [];
         }
-    }
-
-    public function openChannelEdit($channelId)
-    {
-        $this->editingChannelId = $channelId;
-        $this->mountAction('editChannel');
-    }
-
-    public function render()
-    {
-        $route = $this->type === 'Epg'
-            ? route('api.epg.data', ['uuid' => $this->record?->uuid])
-            : route('api.epg.playlist.data', ['uuid' => $this->record?->uuid]);
-
-        return view('livewire.epg-viewer', [
-            'route' => $route,
-            'vod' => $this->vod,
-        ]);
     }
 }

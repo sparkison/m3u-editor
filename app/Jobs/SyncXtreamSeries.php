@@ -4,9 +4,9 @@ namespace App\Jobs;
 
 use App\Models\Playlist;
 use App\Services\XtreamService;
-use Illuminate\Support\Str;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Str;
 
 class SyncXtreamSeries implements ShouldQueue
 {
@@ -29,11 +29,11 @@ class SyncXtreamSeries implements ShouldQueue
     public function handle(XtreamService $xtream): void
     {
         $playlist = Playlist::findOrFail($this->playlist);
-        if (!$playlist->xtream) {
+        if (! $playlist->xtream) {
             return;
         }
         $xtream = $xtream->init($playlist);
-        if (!$xtream) {
+        if (! $xtream) {
             return;
         }
 
@@ -46,7 +46,7 @@ class SyncXtreamSeries implements ShouldQueue
             ->first();
 
         // Create the category if it doesn't exist
-        if (!$playlistCategory) {
+        if (! $playlistCategory) {
             $catName = $this->catName;
             $catName = Str::of($catName)->replace(' | ', ' - ')->trim();
             $playlistCategory = $playlist
@@ -70,7 +70,7 @@ class SyncXtreamSeries implements ShouldQueue
             $playlistSeries = $playlist->series()
                 ->where('source_series_id', $seriesId)
                 ->first();
-            if (!$playlistSeries) {
+            if (! $playlistSeries) {
                 // Get the series info from the API
                 $seriesInfo = $xtream->getSeriesInfo($seriesId)['info'];
 

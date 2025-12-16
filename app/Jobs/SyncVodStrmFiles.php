@@ -2,11 +2,11 @@
 
 namespace App\Jobs;
 
-use App\Facades\ProxyFacade;
 use App\Models\Channel;
 use App\Models\Playlist;
 use App\Services\PlaylistService;
 use App\Settings\GeneralSettings;
+use Exception;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -70,7 +70,7 @@ class SyncVodStrmFiles implements ShouldQueue
                 }
 
                 // Get the path info
-                $path = rtrim($sync_settings['sync_location'], '/');
+                $path = mb_rtrim($sync_settings['sync_location'], '/');
                 if (! is_dir($path)) {
                     if ($this->notify) {
                         Notification::make()
@@ -99,7 +99,7 @@ class SyncVodStrmFiles implements ShouldQueue
                     $group = $cleanSpecialChars
                         ? PlaylistService::makeFilesystemSafe($channel->group, $replaceChar)
                         : PlaylistService::makeFilesystemSafe($channel->group);
-                    $groupPath = $path . '/' . $group;
+                    $groupPath = $path.'/'.$group;
                     if (! is_dir($groupPath)) {
                         mkdir($groupPath, 0777, true);
                     }
@@ -115,7 +115,7 @@ class SyncVodStrmFiles implements ShouldQueue
                     $title = $cleanSpecialChars
                         ? PlaylistService::makeFilesystemSafe($title, $replaceChar)
                         : PlaylistService::makeFilesystemSafe($title);
-                    $titlePath = $path . '/' . $title;
+                    $titlePath = $path.'/'.$title;
                     if (! is_dir($titlePath)) {
                         mkdir($titlePath, 0777, true);
                     }
@@ -125,7 +125,7 @@ class SyncVodStrmFiles implements ShouldQueue
                 // Add metadata to filename
                 if (in_array('year', $filenameMetadata) && ! empty($channel->year)) {
                     // Only add year if it's not already in the title
-                    if (strpos($fileName, "({$channel->year})") === false) {
+                    if (mb_strpos($fileName, "({$channel->year})") === false) {
                         $fileName .= " ({$channel->year})";
                     }
                 }
@@ -146,16 +146,16 @@ class SyncVodStrmFiles implements ShouldQueue
                 // Remove consecutive replacement characters if enabled
                 if ($removeConsecutiveChars && $replaceChar !== 'remove') {
                     $char = $replaceChar === 'space' ? ' ' : ($replaceChar === 'dash' ? '-' : ($replaceChar === 'underscore' ? '_' : '.'));
-                    $fileName = preg_replace('/' . preg_quote($char, '/') . '{2,}/', $char, $fileName);
+                    $fileName = preg_replace('/'.preg_quote($char, '/').'{2,}/', $char, $fileName);
                 }
 
                 $fileName = "{$fileName}.strm";
-                $filePath = $path . '/' . $fileName;
+                $filePath = $path.'/'.$fileName;
 
                 // Generate the url
                 $playlist = $this->playlist ?? $channel->getEffectivePlaylist();
                 $extension = $channel->container_extension ?? 'mkv';
-                $url = rtrim("/movie/{$playlist->user->name}/{$playlist->uuid}/" . $channel->id . "." . $extension, '.');
+                $url = mb_rtrim("/movie/{$playlist->user->name}/{$playlist->uuid}/".$channel->id.'.'.$extension, '.');
                 $url = PlaylistService::getBaseUrl($url);
 
                 // Check if the file already exists
@@ -169,9 +169,9 @@ class SyncVodStrmFiles implements ShouldQueue
                 }
                 file_put_contents($filePath, $url);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Log the exception or handle it as needed
-            Log::error('Error syncing VOD .strm files: ' . $e->getMessage());
+            Log::error('Error syncing VOD .strm files: '.$e->getMessage());
         }
     }
 }

@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
-use Generator;
-use Exception;
 use App\Models\Epg;
 use Carbon\Carbon;
+use Exception;
+use Generator;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -16,80 +16,29 @@ class SchedulesDirectService
 {
     private const BASE_URL = 'https://json.schedulesdirect.org/20141201';
 
-    private static string $USER_AGENT = 'm3u-editor/dev';
-    private static bool $FETCH_PROGRAM_ARTWORK = false; // Enable fetching program artwork
-
     // Configuration constants for performance tuning
     private const MAX_STATIONS_PER_SYNC = null;      // Limit stations for faster processing
+
     private const STATIONS_PER_CHUNK = 50;           // Smaller chunks for speed
+
     private const SCHEDULES_TIMEOUT = 180;           // Reduced timeout
+
     private const DEFAULT_TIMEOUT = 60;              // Default timeout
+
     private const CHUNK_DELAY_MICROSECONDS = 50000;  // Reduced delay (50ms)
+
     private const MAX_RETRIES = 2;                   // Fewer retries for speed
+
     private const PROGRAMS_BATCH_SIZE = 1000;        // Batch size for program requests
+
+    private static string $USER_AGENT = 'm3u-editor/dev';
+
+    private static bool $FETCH_PROGRAM_ARTWORK = false; // Enable fetching program artwork
 
     public function __construct()
     {
         // Set a more descriptive user agent
-        self::$USER_AGENT = 'm3u-editor/' . config('dev.version');
-    }
-
-    /**
-     * Generator to yield station chunks for memory-efficient processing
-     */
-    private function getStationChunks(array $stationIds, int $chunkSize): Generator
-    {
-        $totalStations = count($stationIds);
-        for ($i = 0; $i < $totalStations; $i += $chunkSize) {
-            yield array_slice($stationIds, $i, $chunkSize);
-        }
-    }
-
-    /**
-     * Generator to process schedules in memory-efficient chunks
-     */
-    private function processScheduleChunks(string $token, array $stationIds, array $dates): Generator
-    {
-        foreach ($this->getStationChunks($stationIds, self::STATIONS_PER_CHUNK) as $chunkIndex => $stationChunk) {
-            $chunkNumber = $chunkIndex + 1;
-            $success = false;
-
-            // Retry logic
-            for ($retry = 0; $retry < self::MAX_RETRIES && ! $success; $retry++) {
-                if ($retry > 0) {
-                    $sleepTime = min(30, (2 ** $retry));
-                    sleep($sleepTime);
-                }
-
-                $stationRequests = array_map(function ($stationId) use ($dates) {
-                    return [
-                        'stationID' => $stationId,
-                        'date' => $dates,
-                    ];
-                }, $stationChunk);
-
-                try {
-                    $chunkSchedules = $this->getSchedules($token, $stationRequests);
-
-                    if (is_array($chunkSchedules) && ! empty($chunkSchedules)) {
-                        $success = true;
-                        yield $chunkSchedules;
-
-                        // Clear the chunk data immediately
-                        unset($chunkSchedules, $stationRequests);
-                    } else {
-                        throw new Exception('Empty or invalid response received');
-                    }
-                } catch (Exception $e) {
-                    if ($retry === self::MAX_RETRIES - 1) {
-                        Log::error("Max retries exceeded for chunk {$chunkNumber}, skipping");
-                    }
-                }
-            }
-
-            // Delay between chunks
-            usleep(self::CHUNK_DELAY_MICROSECONDS);
-        }
+        self::$USER_AGENT = 'm3u-editor/'.config('dev.version');
     }
 
     /**
@@ -100,19 +49,19 @@ class SchedulesDirectService
         $passwordHash = hash('sha1', $password);
         $response = Http::withHeaders([
             'User-Agent' => self::$USER_AGENT,
-        ])->post(self::BASE_URL . '/token', [
+        ])->post(self::BASE_URL.'/token', [
             'username' => $username,
             'password' => $passwordHash,
         ]);
 
         if ($response->failed()) {
-            throw new Exception('Authentication failed: ' . $response->body());
+            throw new Exception('Authentication failed: '.$response->body());
         }
 
         $data = $response->json();
 
         if (isset($data['code']) && $data['code'] !== 0) {
-            throw new Exception('Authentication error: ' . ($data['message'] ?? 'Unknown error'));
+            throw new Exception('Authentication error: '.($data['message'] ?? 'Unknown error'));
         }
 
         return [
@@ -127,24 +76,24 @@ class SchedulesDirectService
     public function authenticateFromEpg(Epg $epg): array
     {
         if (! $epg->sd_username || ! $epg->sd_password) {
-            throw new \Exception('Schedules Direct credentials not configured');
+            throw new Exception('Schedules Direct credentials not configured');
         }
 
         $response = Http::withHeaders([
             'User-Agent' => self::$USER_AGENT,
-        ])->post(self::BASE_URL . '/token', [
+        ])->post(self::BASE_URL.'/token', [
             'username' => $epg->sd_username,
             'password' => hash('sha1', $epg->sd_password),
         ]);
 
         if ($response->failed()) {
-            throw new Exception('Authentication failed: ' . $response->body());
+            throw new Exception('Authentication failed: '.$response->body());
         }
 
         $data = $response->json();
 
         if (isset($data['code']) && $data['code'] !== 0) {
-            throw new Exception('Authentication error: ' . ($data['message'] ?? 'Unknown error'));
+            throw new Exception('Authentication error: '.($data['message'] ?? 'Unknown error'));
         }
 
         // Update the EPG model with new token data
@@ -176,7 +125,7 @@ class SchedulesDirectService
     {
         $response = Http::withHeaders([
             'User-Agent' => self::$USER_AGENT,
-        ])->get(self::BASE_URL . '/available/countries');
+        ])->get(self::BASE_URL.'/available/countries');
 
         if ($response->failed()) {
             throw new Exception('Failed to get countries from Schedules Direct');
@@ -227,7 +176,7 @@ class SchedulesDirectService
 
         if ($response->failed()) {
             $errorData = $response->json();
-            throw new Exception('Failed to add lineup: ' . ($errorData['message'] ?? $response->body()));
+            throw new Exception('Failed to add lineup: '.($errorData['message'] ?? $response->body()));
         }
 
         return $response->json();
@@ -242,7 +191,7 @@ class SchedulesDirectService
 
         if ($response->failed()) {
             $errorData = $response->json();
-            throw new Exception('Failed to remove lineup: ' . ($errorData['message'] ?? $response->body()));
+            throw new Exception('Failed to remove lineup: '.($errorData['message'] ?? $response->body()));
         }
 
         return $response->json();
@@ -289,12 +238,12 @@ class SchedulesDirectService
     }
 
     /**
-     * Get artwork for programs 
-     * 
+     * Get artwork for programs
+     *
      * Based on testing, the /metadata/programs endpoint returns error 1008 "INCORRECT_REQUEST"
      * for all tested formats. The regular /programs endpoint shows hasImageArtwork=true,
      * indicating artwork is available, but accessed differently.
-     * 
+     *
      * For now, this returns empty array but could be enhanced to:
      * 1. Check for artwork URLs embedded in program responses
      * 2. Try alternative API endpoints for metadata
@@ -329,7 +278,7 @@ class SchedulesDirectService
                 $response = Http::withHeaders([
                     'User-Agent' => self::$USER_AGENT,
                     'token' => $token,
-                ])->timeout(30)->post(self::BASE_URL . '/metadata/programs/', $batch);
+                ])->timeout(30)->post(self::BASE_URL.'/metadata/programs/', $batch);
 
                 if ($response->successful()) {
                     $artworkData = $response->json();
@@ -338,11 +287,11 @@ class SchedulesDirectService
                         $programId = $programArtwork['programID'] ?? null;
                         $artworkItems = $programArtwork['data'] ?? [];
 
-                        if ($programId && !empty($artworkItems)) {
+                        if ($programId && ! empty($artworkItems)) {
                             // Group and process all artwork types, not just the "best" one
                             $processedArtwork = $this->selectBestArtwork($artworkItems, $epgUuid);
 
-                            if (!empty($processedArtwork)) {
+                            if (! empty($processedArtwork)) {
                                 $allArtwork[$programId] = $processedArtwork;
                             }
                         }
@@ -368,247 +317,14 @@ class SchedulesDirectService
             ]);
 
             return $allArtwork;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Exception while fetching program artwork', [
                 'error' => $e->getMessage(),
                 'program_count' => count($programIds),
             ]);
+
             return [];
         }
-    }
-
-    /**
-     * Select only the best 1-2 images per type to avoid XMLTV bloat
-     */
-    private function selectBestArtwork(array $artworkItems, ?string $epgUuid = null): array
-    {
-        $selectedArtwork = [];
-        $typeGroups = [];
-
-        // Group artwork by type
-        foreach ($artworkItems as $artwork) {
-            if (empty($artwork['uri'])) continue;
-
-            $xmltvType = $this->mapSchedulesDirectCategoryToXMLTV($artwork['category'] ?? '');
-            if (empty($xmltvType)) continue; // Skip unmappable types
-
-            $typeGroups[$xmltvType][] = $artwork;
-        }
-
-        // Select the best 1-2 images per type
-        foreach ($typeGroups as $type => $artworks) {
-            // Sort by quality (prefer higher resolution and better tiers)
-            usort($artworks, function ($a, $b) {
-                $scoreA = $this->calculateArtworkScore($a);
-                $scoreB = $this->calculateArtworkScore($b);
-                return $scoreB <=> $scoreA; // Descending order (highest score first)
-            });
-
-            // Take only the best 1-2 images per type
-            $limit = ($type === 'poster') ? 2 : 1; // Allow 2 posters, 1 of other types
-            $selectedFromType = array_slice($artworks, 0, $limit);
-
-            foreach ($selectedFromType as $artwork) {
-                $imageUrl = $this->buildImageUrl($artwork['uri'], $epgUuid);
-
-                $artworkInfo = [
-                    'url' => $imageUrl,
-                    'type' => $type,
-                    'width' => $artwork['width'] ?? 0,
-                    'height' => $artwork['height'] ?? 0,
-                    'orient' => $this->determineOrientation($artwork['width'] ?? 0, $artwork['height'] ?? 0),
-                    'size' => $this->mapImageSize($artwork['width'] ?? 0, $artwork['height'] ?? 0),
-                    'category' => $artwork['category'] ?? '',
-                    'tier' => $artwork['tier'] ?? ''
-                ];
-
-                $selectedArtwork[] = $artworkInfo;
-            }
-        }
-
-        Log::debug('Artwork selection completed', [
-            'original_count' => count($artworkItems),
-            'selected_count' => count($selectedArtwork),
-            'types_found' => array_keys($typeGroups)
-        ]);
-
-        return $selectedArtwork;
-    }
-
-    /**
-     * Calculate a quality score for artwork to prioritize the best images
-     */
-    private function calculateArtworkScore(array $artwork): int
-    {
-        $score = 0;
-
-        // Resolution scoring (higher resolution = better)
-        $width = $artwork['width'] ?? 0;
-        $height = $artwork['height'] ?? 0;
-        $pixels = $width * $height;
-
-        if ($pixels >= 1000000) $score += 100; // 1MP+
-        elseif ($pixels >= 500000) $score += 80;  // 500K+
-        elseif ($pixels >= 250000) $score += 60;  // 250K+
-        elseif ($pixels >= 100000) $score += 40;  // 100K+
-        else $score += 20; // Small images
-
-        // Tier scoring (Episode > Season > Series)
-        $tier = strtolower($artwork['tier'] ?? '');
-        switch ($tier) {
-            case 'episode':
-                $score += 50;
-                break;
-            case 'season':
-                $score += 40;
-                break;
-            case 'series':
-                $score += 30;
-                break;
-            default:
-                $score += 20;
-                break;
-        }
-
-        // Category scoring (prefer iconic/poster over banners)
-        $category = strtolower($artwork['category'] ?? '');
-        if (str_contains($category, 'iconic')) $score += 30;
-        elseif (str_contains($category, 'poster')) $score += 25;
-        elseif (str_contains($category, 'banner-l1')) $score += 20;
-        elseif (str_contains($category, 'banner')) $score += 10;
-
-        return $score;
-    }
-
-    /**
-     * Build the complete image URL from the URI
-     */
-    private function buildImageUrl(string $uri, ?string $epgUuid = null): string
-    {
-        // If URI is already a complete URL (starts with https://), return as-is
-        if (str_starts_with($uri, 'https://')) {
-            return $uri;
-        }
-
-        // If we have an EPG UUID, use the proxy URL
-        if ($epgUuid) {
-            return route('schedules-direct.image.proxy', [
-                'epg' => $epgUuid,
-                'imageHash' => $uri
-            ]);
-        }
-
-        // Fallback to direct URL (will require authentication)
-        return self::BASE_URL . '/image/' . $uri;
-    }
-
-    /**
-     * Map Schedules Direct artwork categories to XMLTV image types
-     */
-    private function mapSchedulesDirectCategoryToXMLTV(string $category): string
-    {
-        return match (strtolower($category)) {
-            // Main poster/iconic images
-            'iconic' => 'poster',
-            'poster art', 'box art' => 'poster',
-
-            // Banner images (usually landscape) - map to backdrop
-            'banner', 'banner-l1', 'banner-l2', 'banner-l3', 'banner-lo', 'banner-lot' => 'backdrop',
-
-            // Still images from shows/movies
-            'scene still', 'photo', 'still' => 'still',
-
-            // People images
-            'cast ensemble', 'cast in character' => 'character',
-            'photo-headshot' => 'person',
-
-            // Logo/branding - not typically used in XMLTV image tags, skip
-            'logo', 'staple' => '', // Return empty to skip
-
-            default => 'poster' // Default to poster for unrecognized categories
-        };
-    }
-
-    /**
-     * Determine image orientation from dimensions
-     */
-    private function determineOrientation(int $width, int $height): string
-    {
-        if ($width == 0 || $height == 0) {
-            return 'P'; // Default to portrait
-        }
-
-        return $width > $height ? 'L' : 'P'; // Landscape or Portrait
-    }
-
-    /**
-     * Map image dimensions to XMLTV size (1=small, 2=medium, 3=large)
-     */
-    private function mapImageSize(int $width, int $height): string
-    {
-        $totalPixels = $width * $height;
-
-        if ($totalPixels >= 1000000) { // >= ~1000x1000
-            return '3'; // Large
-        } elseif ($totalPixels >= 250000) { // >= ~500x500
-            return '2'; // Medium
-        } else {
-            return '1'; // Small
-        }
-    }
-
-    /**
-     * Extract station artwork directly from lineup data
-     * Station logos are included in the lineup response, not from a separate API
-     */
-    private function extractStationArtworkFromLineup(array $lineupData): array
-    {
-        $stationArtworkCache = [];
-
-        try {
-            if (! empty($lineupData['stations'])) {
-                Log::debug('Extracting station artwork from lineup', ['station_count' => count($lineupData['stations'])]);
-
-                foreach ($lineupData['stations'] as $station) {
-                    $stationId = $station['stationID'] ?? null;
-                    if ($stationId && ! empty($station['stationLogo'])) {
-                        foreach ($station['stationLogo'] as $logo) {
-                            if (! empty($logo['URL'])) {
-                                $stationArtworkCache[$stationId] = $logo['URL'];
-                                break; // Use first available logo
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (\Exception $e) {
-            Log::warning('Failed to extract station artwork from lineup', ['error' => $e->getMessage()]);
-        }
-
-        Log::debug('Station artwork cache built', ['stations' => count($stationArtworkCache)]);
-
-        return $stationArtworkCache;
-    }
-
-    /**
-     * Extract artwork URL directly from program data
-     * This looks for artwork URLs embedded in the program response itself
-     */
-    private function extractArtworkFromProgram($program): ?string
-    {
-        // Check if program has artwork flags
-        $hasArtwork = $program->hasImageArtwork ?? false;
-        $hasEpisodeArtwork = $program->hasEpisodeArtwork ?? false;
-        $hasSeriesArtwork = $program->hasSeriesArtwork ?? false;
-        $hasSeasonArtwork = $program->hasSeasonArtwork ?? false;
-
-        if (! $hasArtwork && ! $hasEpisodeArtwork && ! $hasSeriesArtwork && ! $hasSeasonArtwork) {
-            return null;
-        }
-
-        // For now, we'll return null since we need to implement the metadata API correctly
-        // The artwork URLs are not included in the regular program data
-        return null;
     }
 
     /**
@@ -628,7 +344,7 @@ class SchedulesDirectService
 
             // Get lineup data
             if (! $epg->hasSchedulesDirectLineup()) {
-                throw new \Exception('No lineup configured for Schedules Direct EPG');
+                throw new Exception('No lineup configured for Schedules Direct EPG');
             }
 
             // Set the metadata fetching flag
@@ -708,6 +424,320 @@ class SchedulesDirectService
     }
 
     /**
+     * Generator to yield station chunks for memory-efficient processing
+     */
+    private function getStationChunks(array $stationIds, int $chunkSize): Generator
+    {
+        $totalStations = count($stationIds);
+        for ($i = 0; $i < $totalStations; $i += $chunkSize) {
+            yield array_slice($stationIds, $i, $chunkSize);
+        }
+    }
+
+    /**
+     * Generator to process schedules in memory-efficient chunks
+     */
+    private function processScheduleChunks(string $token, array $stationIds, array $dates): Generator
+    {
+        foreach ($this->getStationChunks($stationIds, self::STATIONS_PER_CHUNK) as $chunkIndex => $stationChunk) {
+            $chunkNumber = $chunkIndex + 1;
+            $success = false;
+
+            // Retry logic
+            for ($retry = 0; $retry < self::MAX_RETRIES && ! $success; $retry++) {
+                if ($retry > 0) {
+                    $sleepTime = min(30, (2 ** $retry));
+                    sleep($sleepTime);
+                }
+
+                $stationRequests = array_map(function ($stationId) use ($dates) {
+                    return [
+                        'stationID' => $stationId,
+                        'date' => $dates,
+                    ];
+                }, $stationChunk);
+
+                try {
+                    $chunkSchedules = $this->getSchedules($token, $stationRequests);
+
+                    if (is_array($chunkSchedules) && ! empty($chunkSchedules)) {
+                        $success = true;
+                        yield $chunkSchedules;
+
+                        // Clear the chunk data immediately
+                        unset($chunkSchedules, $stationRequests);
+                    } else {
+                        throw new Exception('Empty or invalid response received');
+                    }
+                } catch (Exception $e) {
+                    if ($retry === self::MAX_RETRIES - 1) {
+                        Log::error("Max retries exceeded for chunk {$chunkNumber}, skipping");
+                    }
+                }
+            }
+
+            // Delay between chunks
+            usleep(self::CHUNK_DELAY_MICROSECONDS);
+        }
+    }
+
+    /**
+     * Select only the best 1-2 images per type to avoid XMLTV bloat
+     */
+    private function selectBestArtwork(array $artworkItems, ?string $epgUuid = null): array
+    {
+        $selectedArtwork = [];
+        $typeGroups = [];
+
+        // Group artwork by type
+        foreach ($artworkItems as $artwork) {
+            if (empty($artwork['uri'])) {
+                continue;
+            }
+
+            $xmltvType = $this->mapSchedulesDirectCategoryToXMLTV($artwork['category'] ?? '');
+            if (empty($xmltvType)) {
+                continue;
+            } // Skip unmappable types
+
+            $typeGroups[$xmltvType][] = $artwork;
+        }
+
+        // Select the best 1-2 images per type
+        foreach ($typeGroups as $type => $artworks) {
+            // Sort by quality (prefer higher resolution and better tiers)
+            usort($artworks, function ($a, $b) {
+                $scoreA = $this->calculateArtworkScore($a);
+                $scoreB = $this->calculateArtworkScore($b);
+
+                return $scoreB <=> $scoreA; // Descending order (highest score first)
+            });
+
+            // Take only the best 1-2 images per type
+            $limit = ($type === 'poster') ? 2 : 1; // Allow 2 posters, 1 of other types
+            $selectedFromType = array_slice($artworks, 0, $limit);
+
+            foreach ($selectedFromType as $artwork) {
+                $imageUrl = $this->buildImageUrl($artwork['uri'], $epgUuid);
+
+                $artworkInfo = [
+                    'url' => $imageUrl,
+                    'type' => $type,
+                    'width' => $artwork['width'] ?? 0,
+                    'height' => $artwork['height'] ?? 0,
+                    'orient' => $this->determineOrientation($artwork['width'] ?? 0, $artwork['height'] ?? 0),
+                    'size' => $this->mapImageSize($artwork['width'] ?? 0, $artwork['height'] ?? 0),
+                    'category' => $artwork['category'] ?? '',
+                    'tier' => $artwork['tier'] ?? '',
+                ];
+
+                $selectedArtwork[] = $artworkInfo;
+            }
+        }
+
+        Log::debug('Artwork selection completed', [
+            'original_count' => count($artworkItems),
+            'selected_count' => count($selectedArtwork),
+            'types_found' => array_keys($typeGroups),
+        ]);
+
+        return $selectedArtwork;
+    }
+
+    /**
+     * Calculate a quality score for artwork to prioritize the best images
+     */
+    private function calculateArtworkScore(array $artwork): int
+    {
+        $score = 0;
+
+        // Resolution scoring (higher resolution = better)
+        $width = $artwork['width'] ?? 0;
+        $height = $artwork['height'] ?? 0;
+        $pixels = $width * $height;
+
+        if ($pixels >= 1000000) {
+            $score += 100;
+        } // 1MP+
+        elseif ($pixels >= 500000) {
+            $score += 80;
+        }  // 500K+
+        elseif ($pixels >= 250000) {
+            $score += 60;
+        }  // 250K+
+        elseif ($pixels >= 100000) {
+            $score += 40;
+        }  // 100K+
+        else {
+            $score += 20;
+        } // Small images
+
+        // Tier scoring (Episode > Season > Series)
+        $tier = mb_strtolower($artwork['tier'] ?? '');
+        switch ($tier) {
+            case 'episode':
+                $score += 50;
+                break;
+            case 'season':
+                $score += 40;
+                break;
+            case 'series':
+                $score += 30;
+                break;
+            default:
+                $score += 20;
+                break;
+        }
+
+        // Category scoring (prefer iconic/poster over banners)
+        $category = mb_strtolower($artwork['category'] ?? '');
+        if (str_contains($category, 'iconic')) {
+            $score += 30;
+        } elseif (str_contains($category, 'poster')) {
+            $score += 25;
+        } elseif (str_contains($category, 'banner-l1')) {
+            $score += 20;
+        } elseif (str_contains($category, 'banner')) {
+            $score += 10;
+        }
+
+        return $score;
+    }
+
+    /**
+     * Build the complete image URL from the URI
+     */
+    private function buildImageUrl(string $uri, ?string $epgUuid = null): string
+    {
+        // If URI is already a complete URL (starts with https://), return as-is
+        if (str_starts_with($uri, 'https://')) {
+            return $uri;
+        }
+
+        // If we have an EPG UUID, use the proxy URL
+        if ($epgUuid) {
+            return route('schedules-direct.image.proxy', [
+                'epg' => $epgUuid,
+                'imageHash' => $uri,
+            ]);
+        }
+
+        // Fallback to direct URL (will require authentication)
+        return self::BASE_URL.'/image/'.$uri;
+    }
+
+    /**
+     * Map Schedules Direct artwork categories to XMLTV image types
+     */
+    private function mapSchedulesDirectCategoryToXMLTV(string $category): string
+    {
+        return match (mb_strtolower($category)) {
+            // Main poster/iconic images
+            'iconic' => 'poster',
+            'poster art', 'box art' => 'poster',
+
+            // Banner images (usually landscape) - map to backdrop
+            'banner', 'banner-l1', 'banner-l2', 'banner-l3', 'banner-lo', 'banner-lot' => 'backdrop',
+
+            // Still images from shows/movies
+            'scene still', 'photo', 'still' => 'still',
+
+            // People images
+            'cast ensemble', 'cast in character' => 'character',
+            'photo-headshot' => 'person',
+
+            // Logo/branding - not typically used in XMLTV image tags, skip
+            'logo', 'staple' => '', // Return empty to skip
+
+            default => 'poster' // Default to poster for unrecognized categories
+        };
+    }
+
+    /**
+     * Determine image orientation from dimensions
+     */
+    private function determineOrientation(int $width, int $height): string
+    {
+        if ($width === 0 || $height === 0) {
+            return 'P'; // Default to portrait
+        }
+
+        return $width > $height ? 'L' : 'P'; // Landscape or Portrait
+    }
+
+    /**
+     * Map image dimensions to XMLTV size (1=small, 2=medium, 3=large)
+     */
+    private function mapImageSize(int $width, int $height): string
+    {
+        $totalPixels = $width * $height;
+
+        if ($totalPixels >= 1000000) { // >= ~1000x1000
+            return '3'; // Large
+        }
+        if ($totalPixels >= 250000) { // >= ~500x500
+            return '2'; // Medium
+        }
+
+        return '1'; // Small
+
+    }
+
+    /**
+     * Extract station artwork directly from lineup data
+     * Station logos are included in the lineup response, not from a separate API
+     */
+    private function extractStationArtworkFromLineup(array $lineupData): array
+    {
+        $stationArtworkCache = [];
+
+        try {
+            if (! empty($lineupData['stations'])) {
+                Log::debug('Extracting station artwork from lineup', ['station_count' => count($lineupData['stations'])]);
+
+                foreach ($lineupData['stations'] as $station) {
+                    $stationId = $station['stationID'] ?? null;
+                    if ($stationId && ! empty($station['stationLogo'])) {
+                        foreach ($station['stationLogo'] as $logo) {
+                            if (! empty($logo['URL'])) {
+                                $stationArtworkCache[$stationId] = $logo['URL'];
+                                break; // Use first available logo
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            Log::warning('Failed to extract station artwork from lineup', ['error' => $e->getMessage()]);
+        }
+
+        Log::debug('Station artwork cache built', ['stations' => count($stationArtworkCache)]);
+
+        return $stationArtworkCache;
+    }
+
+    /**
+     * Extract artwork URL directly from program data
+     * This looks for artwork URLs embedded in the program response itself
+     */
+    private function extractArtworkFromProgram($program): ?string
+    {
+        // Check if program has artwork flags
+        $hasArtwork = $program->hasImageArtwork ?? false;
+        $hasEpisodeArtwork = $program->hasEpisodeArtwork ?? false;
+        $hasSeriesArtwork = $program->hasSeriesArtwork ?? false;
+        $hasSeasonArtwork = $program->hasSeasonArtwork ?? false;
+
+        if (! $hasArtwork && ! $hasEpisodeArtwork && ! $hasSeriesArtwork && ! $hasSeasonArtwork) {
+            return null;
+        }
+
+        // For now, we'll return null since we need to implement the metadata API correctly
+        // The artwork URLs are not included in the regular program data
+        return null;
+    }
+
+    /**
      * Stream process data directly to XMLTV file to minimize memory usage
      * Optimized version that processes schedules and programs in a single pass
      */
@@ -733,7 +763,7 @@ class SchedulesDirectService
         // Open file for writing
         $file = fopen($filePath, 'w');
         if (! $file) {
-            throw new \Exception("Cannot open file for writing: {$filePath}");
+            throw new Exception("Cannot open file for writing: {$filePath}");
         }
         try {
             // Extract station artwork from lineup data (logos are included in lineup response)
@@ -748,7 +778,7 @@ class SchedulesDirectService
 
             // Write XML footer
             fwrite($file, "</tv>\n");
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Failed to stream process to XMLTV', [
                 'epg_id' => $epg->id,
                 'error' => $e->getMessage(),
@@ -845,7 +875,7 @@ class SchedulesDirectService
             ]);
 
             // Stream through schedule chunk and collect unique program IDs using file-based deduplication
-            $tempProgramIdFile = tempnam(sys_get_temp_dir(), 'epg_programs_chunk_' . $chunkIndex . '_');
+            $tempProgramIdFile = tempnam(sys_get_temp_dir(), 'epg_programs_chunk_'.$chunkIndex.'_');
             $programIdHandle = fopen($tempProgramIdFile, 'w');
             $seenProgramIds = []; // Small lookup table for deduplication
             $scheduleCount = 0;
@@ -857,7 +887,7 @@ class SchedulesDirectService
                     // Use array key existence check for O(1) deduplication
                     if (! isset($seenProgramIds[$programId])) {
                         $seenProgramIds[$programId] = true;
-                        fwrite($programIdHandle, $programId . "\n");
+                        fwrite($programIdHandle, $programId."\n");
                         $programCount++;
                     }
                 }
@@ -891,7 +921,7 @@ class SchedulesDirectService
                     // Update progress
                     $progress = min(100, (int) (($chunkIndex / $totalChunks) * 100));
                     $epg->update(['sd_progress' => $progress]);
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Log::error('Error processing chunk programs', [
                         'chunk' => $chunkIndex,
                         'error' => $e->getMessage(),
@@ -927,7 +957,7 @@ class SchedulesDirectService
     {
         $handle = fopen($programIdFile, 'r');
         if (! $handle) {
-            throw new \Exception("Cannot open program ID file: {$programIdFile}");
+            throw new Exception("Cannot open program ID file: {$programIdFile}");
         }
 
         $batch = [];
@@ -935,7 +965,7 @@ class SchedulesDirectService
         try {
             // Stream through program IDs and batch them
             while (($line = fgets($handle)) !== false) {
-                $programId = trim($line);
+                $programId = mb_trim($line);
                 if (! empty($programId)) {
                     $batch[] = $programId;
 
@@ -995,7 +1025,7 @@ class SchedulesDirectService
             $response = Http::withHeaders([
                 'User-Agent' => self::$USER_AGENT,
                 'token' => $token,
-            ])->timeout(300)->sink($tempResponseFile)->post(self::BASE_URL . '/programs', $programBatch);
+            ])->timeout(300)->sink($tempResponseFile)->post(self::BASE_URL.'/programs', $programBatch);
             if ($response->successful()) {
                 // Stream through the program response and match with schedules immediately
                 $programs = Items::fromFile($tempResponseFile);
@@ -1042,7 +1072,7 @@ class SchedulesDirectService
                     'status' => $response->status(),
                 ]);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error processing program batch directly', [
                 'chunk' => $chunkIndex,
                 'batch' => $batchIndex + 1,
@@ -1159,7 +1189,7 @@ class SchedulesDirectService
         if ($token) {
             $headers['token'] = $token;
         }
-        $url = self::BASE_URL . $endpoint;
+        $url = self::BASE_URL.$endpoint;
 
         // Configure timeout based on endpoint and data size
         $timeout = self::DEFAULT_TIMEOUT;
@@ -1199,7 +1229,7 @@ class SchedulesDirectService
         try {
             $startTime = microtime(true);
             if ($method === 'GET' && ! empty($data)) {
-                $url .= '?' . http_build_query($data);
+                $url .= '?'.http_build_query($data);
                 $response = $request->get($url);
             } elseif ($method === 'POST') {
                 $response = $request->post($url, $data);
@@ -1214,9 +1244,9 @@ class SchedulesDirectService
                 'endpoint' => $endpoint,
                 'duration_seconds' => $duration,
                 'status_code' => $response->status(),
-                'response_size' => strlen($response->body()),
+                'response_size' => mb_strlen($response->body()),
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Schedules Direct API request failed', [
                 'method' => $method,
                 'endpoint' => $endpoint,
