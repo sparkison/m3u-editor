@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Enums\EpgSourceType;
+use App\Traits\ProviderRequestDelay;
 use Exception;
 use XMLReader;
 use Throwable;
@@ -24,6 +25,7 @@ use Illuminate\Support\LazyCollection;
 class ProcessEpgImport implements ShouldQueue
 {
     use Queueable;
+    use ProviderRequestDelay;
 
     // To prevent errors when processing large files, limit imported channels to 50,000
     // NOTE: this only applies to M3U+ files
@@ -210,11 +212,11 @@ class ProcessEpgImport implements ShouldQueue
                 if (Storage::disk('local')->exists($epg->file_path)) {
                     Storage::disk('local')->delete($epg->file_path);
                 }
-                $response = Http::withUserAgent($userAgent)
+                $response = $this->withProviderThrottling(fn () => Http::withUserAgent($userAgent)
                     ->sink($filePath)
                     ->withOptions(['verify' => $verify])
                     ->timeout(60 * 5) // set timeout to five minutes
-                    ->throw()->get($url->toString());
+                    ->throw()->get($url->toString()));
 
                 if ($response->ok() && Storage::disk('local')->exists($epg->file_path)) {
                     // Update the file path

@@ -321,6 +321,19 @@ class Preferences extends SettingsPage
                                                     })->hidden(fn($get) => ! $get('enable_failover_resolver')),
                                             ]),
 
+                                        Fieldset::make('Stream limit settings')
+                                            ->schema([
+                                                Toggle::make('proxy_stop_oldest_on_limit')
+                                                    ->label('Stop oldest stream when limit reached')
+                                                    ->columnSpanFull()
+                                                    ->hintIcon(
+                                                        'heroicon-m-question-mark-circle',
+                                                        tooltip: 'When a playlist has a connection limit and it\'s reached, enabling this will automatically stop the oldest active stream to make room for the new request. This is useful for single-connection providers where you want instant channel switching. Note: This may cause issues if multiple clients share the same playlist - the newest request always wins.'
+                                                    )
+                                                    ->default(false)
+                                                    ->helperText('Enable to allow new stream requests to automatically stop the oldest stream when a playlist reaches its connection limit. Disabled by default.'),
+                                            ]),
+
                                         Fieldset::make('In-app player transcoding settings')
                                             ->schema([
                                                 Select::make('default_stream_profile_id')
@@ -505,6 +518,37 @@ class Preferences extends SettingsPage
 
                         Tab::make('Sync Options')
                             ->schema([
+                                Section::make('Provider Request Delay')
+                                    ->description('Add a delay between requests to providers to avoid rate limiting.')
+                                    ->columnSpan('full')
+                                    ->columns(1)
+                                    ->collapsible(false)
+                                    ->schema([
+                                        Toggle::make('enable_provider_request_delay')
+                                            ->label('Enable request delay')
+                                            ->live()
+                                            ->helperText('When enabled, a delay will be added between requests to the provider during playlist and EPG syncs.'),
+                                        TextInput::make('provider_request_delay_ms')
+                                            ->label('Request delay (milliseconds)')
+                                            ->integer()
+                                            ->required()
+                                            ->minValue(100)
+                                            ->maxValue(10000)
+                                            ->step(100)
+                                            ->default(500)
+                                            ->suffix('ms')
+                                            ->hidden(fn($get) => ! $get('enable_provider_request_delay'))
+                                            ->helperText('Delay in milliseconds between requests. Recommended: 500-2000ms. Higher values reduce load on provider but increase sync time.'),
+                                        TextInput::make('provider_max_concurrent_requests')
+                                            ->label('Max concurrent requests')
+                                            ->integer()
+                                            ->required()
+                                            ->minValue(1)
+                                            ->maxValue(10)
+                                            ->default(2)
+                                            ->hidden(fn($get) => ! $get('enable_provider_request_delay'))
+                                            ->helperText('Maximum number of simultaneous requests to the provider. Lower values (1-2) are safer but slower. Set to 1 to process requests sequentially.'),
+                                    ]),
                                 Section::make('Sync Invalidation')
                                     ->description('Prevent sync from proceeding if conditions are met.')
                                     ->columnSpan('full')
@@ -673,6 +717,22 @@ class Preferences extends SettingsPage
                                                     ]),
                                             ])
                                             ->hidden(fn($get) => ! $get('stream_file_sync_enabled')),
+                                        Fieldset::make('Name Filtering')
+                                            ->columnSpanFull()
+                                            ->schema([
+                                                Toggle::make('stream_file_sync_name_filter_enabled')
+                                                    ->label('Enable name filtering')
+                                                    ->helperText('Remove specific words or symbols from folder and file names (e.g. "DE • " from "DE • Action" → "Action")')
+                                                    ->inline(false)
+                                                    ->live(),
+                                                Forms\Components\TagsInput::make('stream_file_sync_name_filter_patterns')
+                                                    ->label('Patterns to remove')
+                                                    ->placeholder('Add pattern (e.g. "DE • " or "EN |")')
+                                                    ->helperText('Enter words, symbols or prefixes to remove from category, series and episode names. Press Enter after each pattern.')
+                                                    ->columnSpanFull()
+                                                    ->hidden(fn($get) => ! $get('stream_file_sync_name_filter_enabled')),
+                                            ])
+                                            ->hidden(fn($get) => ! $get('stream_file_sync_enabled')),
                                     ]),
                                 Section::make('VOD stream file settings')
                                     ->description('Generate .strm files and sync them to a local file path. Options can be overriden per VOD in the VOD edit panel.')
@@ -797,6 +857,22 @@ class Preferences extends SettingsPage
                                                         'period' => '.',
                                                         'remove' => 'Remove',
                                                     ]),
+                                            ])
+                                            ->hidden(fn($get) => ! $get('vod_stream_file_sync_enabled')),
+                                        Fieldset::make('Name Filtering')
+                                            ->columnSpanFull()
+                                            ->schema([
+                                                Toggle::make('vod_stream_file_sync_name_filter_enabled')
+                                                    ->label('Enable name filtering')
+                                                    ->helperText('Remove specific words or symbols from folder and file names (e.g. "DE • " from "DE • Action" → "Action")')
+                                                    ->inline(false)
+                                                    ->live(),
+                                                Forms\Components\TagsInput::make('vod_stream_file_sync_name_filter_patterns')
+                                                    ->label('Patterns to remove')
+                                                    ->placeholder('Add pattern (e.g. "DE • " or "EN |")')
+                                                    ->helperText('Enter words, symbols or prefixes to remove from group and file names. Press Enter after each pattern.')
+                                                    ->columnSpanFull()
+                                                    ->hidden(fn($get) => ! $get('vod_stream_file_sync_name_filter_enabled')),
                                             ])
                                             ->hidden(fn($get) => ! $get('vod_stream_file_sync_enabled')),
                                     ]),

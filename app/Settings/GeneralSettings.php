@@ -32,6 +32,7 @@ class GeneralSettings extends Settings
     public ?int $default_vod_stream_profile_id = null;
     public ?string $url_override = null;
     public ?bool $url_override_include_logos = true;
+    public ?bool $proxy_stop_oldest_on_limit = false;
 
 
     // SMTP settings
@@ -64,6 +65,11 @@ class GeneralSettings extends Settings
     public ?string $stream_file_sync_replace_char = 'space';
 
 
+    // Stream file sync name filtering options
+    public ?bool $stream_file_sync_name_filter_enabled = false;
+    public ?array $stream_file_sync_name_filter_patterns = null;
+
+
     // VOD stream file sync options
     public ?bool $vod_stream_file_sync_enabled = false;
     public ?bool $vod_stream_file_sync_include_series = false;
@@ -84,6 +90,11 @@ class GeneralSettings extends Settings
     public ?string $vod_stream_file_sync_replace_char = 'space';
 
 
+    // VOD stream file sync name filtering options
+    public ?bool $vod_stream_file_sync_name_filter_enabled = false;
+    public ?array $vod_stream_file_sync_name_filter_patterns = null;
+
+
     // Video player proxy options
     public ?bool $force_video_player_proxy = false;
     // Resolve m3u-proxy public URL at request time when not explicitly configured
@@ -99,6 +110,12 @@ class GeneralSettings extends Settings
     public ?bool $auto_backup_database = false;
     public ?string $auto_backup_database_schedule = null;
     public ?int $auto_backup_database_max_backups = 5;
+
+
+    // Provider request delay options
+    public ?bool $enable_provider_request_delay = false;
+    public ?int $provider_request_delay_ms = 500;
+    public ?int $provider_max_concurrent_requests = 2;
 
 
     public static function group(): string
