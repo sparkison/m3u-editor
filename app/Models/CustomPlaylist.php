@@ -151,4 +151,41 @@ class CustomPlaylist extends Model
     {
         return true;
     }
+
+    /**
+     * Get all unique source playlists that have channels assigned to this custom playlist.
+     * This is useful for determining which provider credentials need to be configured
+     * when creating a Playlist Alias.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getSourcePlaylists(): \Illuminate\Database\Eloquent\Collection
+    {
+        $playlistIds = $this->channels()
+            ->whereNotNull('playlist_id')
+            ->distinct()
+            ->pluck('playlist_id');
+
+        return Playlist::whereIn('id', $playlistIds)->get();
+    }
+
+    /**
+     * Get source playlists with their xtream config info for alias configuration.
+     * Returns an array of playlists with their URL base for matching.
+     *
+     * @return array<int, array{id: int, name: string, url: string|null}>
+     */
+    public function getSourcePlaylistsForAlias(): array
+    {
+        return $this->getSourcePlaylists()
+            ->map(function (Playlist $playlist) {
+                $url = $playlist->xtream_config['url'] ?? null;
+                return [
+                    'id' => $playlist->id,
+                    'name' => $playlist->name,
+                    'url' => $url ? rtrim($url, '/') : null,
+                ];
+            })
+            ->toArray();
+    }
 }
