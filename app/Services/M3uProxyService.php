@@ -336,6 +336,98 @@ class M3uProxyService
     }
 
     /**
+     * Stop all streams matching a specific metadata field/value.
+     * 
+     * This is useful for connection limit management - when switching channels
+     * on a limited connection playlist, stop the old stream first.
+     * 
+     * @param string $field Metadata field to filter by (e.g., 'playlist_uuid', 'type')
+     * @param string $value Value to match
+     * @param int|null $excludeChannelId Optional channel ID to exclude (keep this stream)
+     * @return array Result with deleted_count and success status
+     */
+    public static function stopStreamsByMetadata(string $field, string $value, ?int $excludeChannelId = null): array
+    {
+        $service = new self();
+
+        if (empty($service->apiBaseUrl)) {
+            return [
+                'success' => false,
+                'message' => 'M3U Proxy base URL is not configured',
+                'deleted_count' => 0,
+            ];
+        }
+
+        try {
+            $endpoint = $service->apiBaseUrl . '/streams/by-metadata';
+            $params = [
+                'field' => $field,
+                'value' => $value,
+            ];
+
+            if ($excludeChannelId !== null) {
+                $params['exclude_channel_id'] = (string) $excludeChannelId;
+            }
+
+            $response = Http::timeout(5)->acceptJson()
+                ->withHeaders($service->apiToken ? [
+                    'X-API-Token' => $service->apiToken,
+                ] : [])
+                ->delete($endpoint, $params);
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                // Invalidate cache since we just stopped streams
+                self::invalidateMetadataCache($field, $value);
+
+                Log::info('Successfully stopped streams by metadata', [
+                    'field' => $field,
+                    'value' => $value,
+                    'exclude_channel_id' => $excludeChannelId,
+                    'deleted_count' => $data['deleted_count'] ?? 0,
+                ]);
+
+                return [
+                    'success' => true,
+                    'message' => $data['message'] ?? 'Streams stopped successfully',
+                    'deleted_count' => $data['deleted_count'] ?? 0,
+                    'deleted_streams' => $data['deleted_streams'] ?? [],
+                ];
+            }
+
+            Log::warning('Failed to stop streams by metadata: HTTP ' . $response->status());
+            return [
+                'success' => false,
+                'message' => 'HTTP error: ' . $response->status(),
+                'deleted_count' => 0,
+            ];
+        } catch (Exception $e) {
+            Log::warning("Failed to stop streams by metadata ({$field}={$value}): " . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+                'deleted_count' => 0,
+            ];
+        }
+    }
+
+    /**
+     * Stop all streams for a specific playlist, optionally excluding a channel ID.
+     * 
+     * This is used when switching channels on a connection-limited playlist
+     * to free up the connection before starting a new stream.
+     * 
+     * @param string $playlistUuid The playlist UUID
+     * @param int|null $excludeChannelId Optional channel ID to exclude (keep this stream)
+     * @return array Result with deleted_count and success status
+     */
+    public static function stopPlaylistStreams(string $playlistUuid, ?int $excludeChannelId = null): array
+    {
+        return self::stopStreamsByMetadata('playlist_uuid', $playlistUuid, $excludeChannelId);
+    }
+
+    /**
      * Check if an episode is currently active (being streamed) via m3u-proxy.
      */
     public static function isEpisodeActive(Episode $episode): bool
