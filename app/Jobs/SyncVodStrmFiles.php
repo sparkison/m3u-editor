@@ -113,7 +113,8 @@ class SyncVodStrmFiles implements ShouldQueue
 
                 // Create the group folder if enabled
                 if (in_array('group', $pathStructure)) {
-                    $groupName = $channel->group->name ?? $channel->group->name_internal ?? 'Uncategorized';
+                    $group = $channel->group;
+                    $groupName = $group?->name ?? $group?->name_internal ?? 'Uncategorized';
                     $groupName = $applyNameFilter($groupName);
                     $group = $cleanSpecialChars
                         ? PlaylistService::makeFilesystemSafe($groupName, $replaceChar)
