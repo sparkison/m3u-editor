@@ -257,12 +257,12 @@ class ProcessM3uImportComplete implements ShouldQueue
                     $verify = !$playlist->disable_ssl_verification;
                     $userAgent = empty($playlist->user_agent) ? $this->userAgent : $playlist->user_agent;
 
-                    // Let's check if the EPG url is valid
+                    // Let's check if the EPG url is valid (using HEAD to avoid downloading the entire file)
                     $results = Http::withUserAgent($userAgent)
                         ->withOptions(['verify' => $verify])
                         ->timeout(30)
-                        ->throw()->get($epgUrl);
-                    if ($results->accepted()) {
+                        ->head($epgUrl);
+                    if ($results->successful()) {
                         // EPG found, create it
                         $epg = $user->epgs()->create([
                             'name' => $playlist->name . ' EPG',
