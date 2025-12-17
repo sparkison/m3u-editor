@@ -70,7 +70,7 @@ class PlaylistAlias extends Model
         foreach ($this->getXtreamConfigs() as $cfg) {
             // Normalize config URL
             $cfgUrl = rtrim((string) strtolower($cfg['url'] ?? ''), '/');
-            
+
             // If URLs match, return this config
             if ($cfgUrl !== '' && $cfgUrl === $needle) {
                 return $cfg;
@@ -194,7 +194,7 @@ class PlaylistAlias extends Model
     public function channels(): BelongsToMany|HasManyThrough
     {
         if ($this->custom_playlist_id) {
-            return $this->belongsToMany(Channel::class, 'channel_custom_playlist', 'custom_playlist_id', 'channel_id');
+            return $this->belongsToMany(Channel::class, 'channel_custom_playlist', 'custom_playlist_id', 'channel_id', 'custom_playlist_id', 'id');
         }
         return $this->hasManyThrough(
             Channel::class,
@@ -209,7 +209,7 @@ class PlaylistAlias extends Model
     public function series(): BelongsToMany|HasManyThrough
     {
         if ($this->custom_playlist_id) {
-            return $this->belongsToMany(Series::class, 'series_custom_playlist', 'custom_playlist_id', 'series_id');
+            return $this->belongsToMany(Series::class, 'series_custom_playlist', 'custom_playlist_id', 'series_id', 'custom_playlist_id', 'id');
         }
         return $this->hasManyThrough(
             Series::class,
