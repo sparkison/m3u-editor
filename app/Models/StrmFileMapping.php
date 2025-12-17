@@ -2,13 +2,17 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
+use Throwable;
 
 class StrmFileMapping extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'syncable_type',
         'syncable_id',
@@ -91,31 +95,39 @@ class StrmFileMapping extends Model
         string $url,
         array $pathOptions
     ): self {
-        // Ensure directory exists (0755 = owner full, others read+execute)
-        $directory = dirname($path);
-        if (! is_dir($directory)) {
-            if (! mkdir($directory, 0755, true)) {
-                throw new RuntimeException("STRM Sync: Failed to create directory: {$directory}");
+        try {
+            // Ensure directory exists (0755 = owner full, others read+execute)
+            $directory = dirname($path);
+            if (! is_dir($directory)) {
+                if (! @mkdir($directory, 0755, true)) {
+                    throw new RuntimeException("STRM Sync: Failed to create directory: {$directory}");
+                }
             }
+
+            // Write the file atomically using exclusive lock
+            $result = @file_put_contents($path, $url, LOCK_EX);
+            if ($result === false) {
+                throw new RuntimeException("STRM Sync: Failed to write file: {$path}");
+            }
+
+            Log::debug('STRM Sync: Created new file', ['path' => $path]);
+
+            // Create and return the mapping
+            return self::create([
+                'syncable_type' => get_class($syncable),
+                'syncable_id' => $syncable->id,
+                'sync_location' => $syncLocation,
+                'current_path' => $path,
+                'current_url' => $url,
+                'path_options' => $pathOptions,
+            ]);
+        } catch (Throwable $e) {
+            Log::error('STRM Sync: Failed to create file', [
+                'path' => $path,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
         }
-
-        // Write the file and check for errors
-        $result = file_put_contents($path, $url);
-        if ($result === false) {
-            throw new RuntimeException("STRM Sync: Failed to write file: {$path}");
-        }
-
-        Log::debug('STRM Sync: Created new file', ['path' => $path]);
-
-        // Create and return the mapping
-        return self::create([
-            'syncable_type' => get_class($syncable),
-            'syncable_id' => $syncable->id,
-            'sync_location' => $syncLocation,
-            'current_path' => $path,
-            'current_url' => $url,
-            'path_options' => $pathOptions,
-        ]);
     }
 
     /**
@@ -132,58 +144,77 @@ class StrmFileMapping extends Model
         $oldPath = $mapping->current_path;
         $oldDirectory = dirname($oldPath);
 
-        // Ensure new directory exists (0755 = owner full, others read+execute)
-        $newDirectory = dirname($newPath);
-        if (! is_dir($newDirectory)) {
-            if (! mkdir($newDirectory, 0755, true)) {
-                throw new RuntimeException("STRM Sync: Failed to create directory: {$newDirectory}");
-            }
-        }
-
-        // Rename or create the file
-        if (file_exists($oldPath)) {
-            // Try to rename the file
-            if (! @rename($oldPath, $newPath)) {
-                // Rename failed - try copy + delete as fallback (handles cross-device moves)
-                if (! @copy($oldPath, $newPath)) {
-                    throw new RuntimeException("STRM Sync: Failed to rename/copy file from {$oldPath} to {$newPath}");
+        try {
+            // Ensure new directory exists (0755 = owner full, others read+execute)
+            $newDirectory = dirname($newPath);
+            if (! is_dir($newDirectory)) {
+                if (! @mkdir($newDirectory, 0755, true)) {
+                    throw new RuntimeException("STRM Sync: Failed to create directory: {$newDirectory}");
                 }
-                // Copy succeeded, try to delete old file (non-critical if it fails)
-                if (! @unlink($oldPath)) {
-                    Log::warning('STRM Sync: Failed to delete old file after copy', ['path' => $oldPath]);
-                }
-                Log::info('STRM Sync: Moved file (copy+delete)', ['from' => $oldPath, 'to' => $newPath]);
-            } else {
-                Log::info('STRM Sync: Renamed file', ['from' => $oldPath, 'to' => $newPath]);
             }
 
-            // Update URL if it changed
-            if ($mapping->current_url !== $url) {
-                $result = file_put_contents($newPath, $url);
+            // Try to rename/move the file with race condition handling
+            $fileRenamed = false;
+            if (@file_exists($oldPath)) {
+                try {
+                    // Try to rename the file
+                    if (@rename($oldPath, $newPath)) {
+                        $fileRenamed = true;
+                        Log::info('STRM Sync: Renamed file', ['from' => $oldPath, 'to' => $newPath]);
+                    } else {
+                        // Rename failed - try copy + delete as fallback (handles cross-device moves)
+                        if (@copy($oldPath, $newPath)) {
+                            $fileRenamed = true;
+                            // Copy succeeded, try to delete old file (non-critical if it fails)
+                            if (! @unlink($oldPath)) {
+                                Log::warning('STRM Sync: Failed to delete old file after copy', ['path' => $oldPath]);
+                            }
+                            Log::info('STRM Sync: Moved file (copy+delete)', ['from' => $oldPath, 'to' => $newPath]);
+                        }
+                    }
+                } catch (Throwable $e) {
+                    Log::warning('STRM Sync: Exception during file rename', [
+                        'from' => $oldPath,
+                        'to' => $newPath,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // If rename failed or old file didn't exist, create new file
+            if (! $fileRenamed) {
+                $result = @file_put_contents($newPath, $url, LOCK_EX);
+                if ($result === false) {
+                    throw new RuntimeException("STRM Sync: Failed to create file: {$newPath}");
+                }
+                Log::debug('STRM Sync: Created file (rename failed or old file missing)', ['path' => $newPath]);
+            } elseif ($mapping->current_url !== $url) {
+                // File was renamed, update URL if it changed
+                $result = @file_put_contents($newPath, $url, LOCK_EX);
                 if ($result === false) {
                     Log::warning('STRM Sync: Failed to update URL in renamed file', ['path' => $newPath]);
                 }
             }
 
-            // Clean up empty old directories
+            // Clean up empty old directories (safe path handling)
             self::cleanupEmptyDirectories($oldDirectory, $mapping->sync_location);
-        } else {
-            // Old file doesn't exist, create new one
-            $result = file_put_contents($newPath, $url);
-            if ($result === false) {
-                throw new RuntimeException("STRM Sync: Failed to create file: {$newPath}");
-            }
-            Log::debug('STRM Sync: Created file (old file missing)', ['path' => $newPath]);
+
+            // Update the mapping
+            $mapping->update([
+                'current_path' => $newPath,
+                'current_url' => $url,
+                'path_options' => $pathOptions,
+            ]);
+
+            return $mapping;
+        } catch (Throwable $e) {
+            Log::error('STRM Sync: Failed to rename file', [
+                'from' => $oldPath,
+                'to' => $newPath,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
         }
-
-        // Update the mapping
-        $mapping->update([
-            'current_path' => $newPath,
-            'current_url' => $url,
-            'path_options' => $pathOptions,
-        ]);
-
-        return $mapping;
     }
 
     /**
@@ -191,35 +222,44 @@ class StrmFileMapping extends Model
      */
     protected static function updateFileUrl(self $mapping, string $url): self
     {
-        if (file_exists($mapping->current_path)) {
-            $result = file_put_contents($mapping->current_path, $url);
-            if ($result === false) {
-                Log::warning('STRM Sync: Failed to update URL', ['path' => $mapping->current_path]);
+        try {
+            if (@file_exists($mapping->current_path)) {
+                $result = @file_put_contents($mapping->current_path, $url, LOCK_EX);
+                if ($result === false) {
+                    Log::warning('STRM Sync: Failed to update URL', ['path' => $mapping->current_path]);
+                } else {
+                    Log::debug('STRM Sync: Updated URL', ['path' => $mapping->current_path]);
+                }
             } else {
-                Log::debug('STRM Sync: Updated URL', ['path' => $mapping->current_path]);
-            }
-        } else {
-            // File doesn't exist, create it
-            $directory = dirname($mapping->current_path);
-            if (! is_dir($directory)) {
-                if (! mkdir($directory, 0755, true)) {
-                    Log::warning('STRM Sync: Failed to create directory for URL update', ['directory' => $directory]);
+                // File doesn't exist, create it
+                $directory = dirname($mapping->current_path);
+                if (! is_dir($directory)) {
+                    if (! @mkdir($directory, 0755, true)) {
+                        Log::warning('STRM Sync: Failed to create directory for URL update', ['directory' => $directory]);
+
+                        return $mapping;
+                    }
+                }
+                $result = @file_put_contents($mapping->current_path, $url, LOCK_EX);
+                if ($result === false) {
+                    Log::warning('STRM Sync: Failed to recreate file with new URL', ['path' => $mapping->current_path]);
 
                     return $mapping;
                 }
+                Log::debug('STRM Sync: Recreated file with new URL', ['path' => $mapping->current_path]);
             }
-            $result = file_put_contents($mapping->current_path, $url);
-            if ($result === false) {
-                Log::warning('STRM Sync: Failed to recreate file with new URL', ['path' => $mapping->current_path]);
 
-                return $mapping;
-            }
-            Log::debug('STRM Sync: Recreated file with new URL', ['path' => $mapping->current_path]);
+            $mapping->update(['current_url' => $url]);
+
+            return $mapping;
+        } catch (Throwable $e) {
+            Log::warning('STRM Sync: Exception during URL update', [
+                'path' => $mapping->current_path,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $mapping;
         }
-
-        $mapping->update(['current_url' => $url]);
-
-        return $mapping;
     }
 
     /**
@@ -227,16 +267,23 @@ class StrmFileMapping extends Model
      */
     public function deleteFile(): void
     {
-        if (file_exists($this->current_path)) {
-            if (! @unlink($this->current_path)) {
-                Log::warning('STRM Sync: Failed to delete file', ['path' => $this->current_path]);
-                // Still delete the mapping to avoid retrying endlessly
-            } else {
-                Log::debug('STRM Sync: Deleted file', ['path' => $this->current_path]);
-            }
+        try {
+            if (@file_exists($this->current_path)) {
+                if (! @unlink($this->current_path)) {
+                    Log::warning('STRM Sync: Failed to delete file', ['path' => $this->current_path]);
+                    // Still delete the mapping to avoid retrying endlessly
+                } else {
+                    Log::debug('STRM Sync: Deleted file', ['path' => $this->current_path]);
+                }
 
-            // Clean up empty directories
-            self::cleanupEmptyDirectories(dirname($this->current_path), $this->sync_location);
+                // Clean up empty directories
+                self::cleanupEmptyDirectories(dirname($this->current_path), $this->sync_location);
+            }
+        } catch (Throwable $e) {
+            Log::warning('STRM Sync: Exception during file deletion', [
+                'path' => $this->current_path,
+                'error' => $e->getMessage(),
+            ]);
         }
 
         $this->delete();
@@ -244,23 +291,50 @@ class StrmFileMapping extends Model
 
     /**
      * Clean up empty directories up to the sync location
+     * Uses realpath() to prevent path traversal attacks
      */
     protected static function cleanupEmptyDirectories(string $directory, string $syncLocation): void
     {
-        $syncLocation = rtrim($syncLocation, '/');
+        try {
+            // Resolve real paths to prevent path traversal attacks
+            $realSyncLocation = realpath(rtrim($syncLocation, '/'));
+            if ($realSyncLocation === false) {
+                return; // Sync location doesn't exist
+            }
 
-        // Don't delete the sync location itself
-        while ($directory !== $syncLocation && strlen($directory) > strlen($syncLocation)) {
-            if (is_dir($directory) && self::isDirectoryEmpty($directory)) {
-                if (! @rmdir($directory)) {
-                    Log::debug('STRM Sync: Failed to remove empty directory (may be in use)', ['path' => $directory]);
+            $realDirectory = realpath($directory);
+            if ($realDirectory === false) {
+                return; // Directory doesn't exist
+            }
+
+            // Ensure directory is within sync location (prevent traversal)
+            if (! str_starts_with($realDirectory . '/', $realSyncLocation . '/')) {
+                Log::warning('STRM Sync: Directory cleanup blocked - path outside sync location', [
+                    'directory' => $directory,
+                    'sync_location' => $syncLocation,
+                ]);
+
+                return;
+            }
+
+            // Don't delete the sync location itself
+            while ($realDirectory !== $realSyncLocation && strlen($realDirectory) > strlen($realSyncLocation)) {
+                if (is_dir($realDirectory) && self::isDirectoryEmpty($realDirectory)) {
+                    if (! @rmdir($realDirectory)) {
+                        Log::debug('STRM Sync: Failed to remove empty directory (may be in use)', ['path' => $realDirectory]);
+                        break;
+                    }
+                    Log::debug('STRM Sync: Removed empty directory', ['path' => $realDirectory]);
+                    $realDirectory = dirname($realDirectory);
+                } else {
                     break;
                 }
-                Log::debug('STRM Sync: Removed empty directory', ['path' => $directory]);
-                $directory = dirname($directory);
-            } else {
-                break;
             }
+        } catch (Throwable $e) {
+            Log::debug('STRM Sync: Exception during directory cleanup', [
+                'directory' => $directory,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
@@ -273,22 +347,22 @@ class StrmFileMapping extends Model
             return false;
         }
 
-        $handle = opendir($directory);
+        $handle = @opendir($directory);
         if ($handle === false) {
             return false;
         }
 
-        while (($entry = readdir($handle)) !== false) {
-            if ($entry !== '.' && $entry !== '..') {
-                closedir($handle);
-
-                return false;
+        try {
+            while (($entry = readdir($handle)) !== false) {
+                if ($entry !== '.' && $entry !== '..') {
+                    return false;
+                }
             }
+
+            return true;
+        } finally {
+            closedir($handle);
         }
-
-        closedir($handle);
-
-        return true;
     }
 
     /**
