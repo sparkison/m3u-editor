@@ -321,6 +321,19 @@ class Preferences extends SettingsPage
                                                     })->hidden(fn($get) => ! $get('enable_failover_resolver')),
                                             ]),
 
+                                        Fieldset::make('Stream limit settings')
+                                            ->schema([
+                                                Toggle::make('proxy_stop_oldest_on_limit')
+                                                    ->label('Stop oldest stream when limit reached')
+                                                    ->columnSpanFull()
+                                                    ->hintIcon(
+                                                        'heroicon-m-question-mark-circle',
+                                                        tooltip: 'When a playlist has a connection limit and it\'s reached, enabling this will automatically stop the oldest active stream to make room for the new request. This is useful for single-connection providers where you want instant channel switching. Note: This may cause issues if multiple clients share the same playlist - the newest request always wins.'
+                                                    )
+                                                    ->default(false)
+                                                    ->helperText('Enable to allow new stream requests to automatically stop the oldest stream when a playlist reaches its connection limit. Disabled by default.'),
+                                            ]),
+
                                         Fieldset::make('In-app player transcoding settings')
                                             ->schema([
                                                 Select::make('default_stream_profile_id')

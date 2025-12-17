@@ -202,7 +202,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                     }
                 }
 
-                // Add TVDB/TMDB/IMDB ID to folder name for Trash Guides compatibility
+                // Add TVDB/TMDB ID to folder name for Trash Guides compatibility
                 $tvdbId = $series->metadata['tvdb_id'] ?? $series->metadata['tvdb'] ?? null;
                 $tmdbId = $series->metadata['tmdb_id'] ?? $series->metadata['tmdb'] ?? null;
                 $imdbId = $series->metadata['imdb_id'] ?? $series->metadata['imdb'] ?? null;

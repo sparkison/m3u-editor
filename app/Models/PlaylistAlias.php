@@ -29,6 +29,58 @@ class PlaylistAlias extends Model
         'strict_live_ts' => 'boolean',
     ];
 
+    public function getXtreamConfigs(): array
+    {
+        $raw = $this->xtream_config;
+
+        // Legacy format: single config object stored as array with 'url' key.
+        if (is_array($raw) && array_key_exists('url', $raw)) {
+            return [$raw];
+        }
+
+        // New format: list of configs.
+        if (is_array($raw)) {
+            $configs = [];
+            foreach ($raw as $item) {
+                if (is_array($item) && !empty($item['url'])) {
+                    $configs[] = $item;
+                }
+            }
+            return $configs;
+        }
+
+        return [];
+    }
+
+    public function getPrimaryXtreamConfig(): ?array
+    {
+        $configs = $this->getXtreamConfigs();
+        return $configs[0] ?? null;
+    }
+
+    public function findXtreamConfigByUrl(?string $url): ?array
+    {
+        if (!$url) {
+            return null;
+        }
+
+        // Normalize URL for comparison
+        $needle = rtrim(strtolower((string) $url), '/');
+
+        foreach ($this->getXtreamConfigs() as $cfg) {
+            // Normalize config URL
+            $cfgUrl = rtrim((string) strtolower($cfg['url'] ?? ''), '/');
+            
+            // If URLs match, return this config
+            if ($cfgUrl !== '' && $cfgUrl === $needle) {
+                return $cfg;
+            }
+        }
+
+        // No matching config found
+        return null;
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -242,18 +294,17 @@ class PlaylistAlias extends Model
      */
     public function getAuthObjectAttribute()
     {
-        // No alias-level credentials defined → no auth object
-        if (!$this->username || !$this->password) {
-            return null;
+        // If explicit alias-level credentials exist, always prefer them.
+        if ($this->username && $this->password) {
+            return (object)[
+                'username' => $this->username,
+                'password' => $this->password,
+            ];
         }
 
-        // Return credentials as a simple object, not an array
-        return (object)[
-            'username' => $this->username,
-            'password' => $this->password,
-        ];
+        return null;
     }
-    
+
     /**
      * Fetch the Xtream status for this alias
      */
@@ -262,11 +313,14 @@ class PlaylistAlias extends Model
         return Attribute::make(
             get: function ($value, $attributes) {
                 $key = "playlist_alias:{$attributes['id']}:xtream_status";
-                if (!$this->xtream_config) {
+
+                $primaryConfig = $this->getPrimaryXtreamConfig();
+                if (!$primaryConfig) {
                     return [];
                 }
+
                 try {
-                    $xtream = XtreamService::make(xtream_config: $this->xtream_config);
+                    $xtream = XtreamService::make(xtream_config: $primaryConfig);
                     if ($xtream) {
                         return Cache::remember(
                             $key,
@@ -278,8 +332,12 @@ class PlaylistAlias extends Model
                         );
                     }
                 } catch (\Exception $e) {
-                    Log::error('Failed to fetch metadata for Xtream playlist alias ' . $this->id, ['exception' => $e]);
+                    Log::error(
+                        'Failed to fetch metadata for Xtream playlist alias ' . $this->id,
+                        ['exception' => $e]
+                    );
                 }
+
                 return [];
             }
         );
@@ -293,18 +351,24 @@ class PlaylistAlias extends Model
     {
         $originalUrl = $channel->url ?? '';
 
-        // We need the xtream config to do any transformation
-        if (!$this->xtream_config) {
+        // We need at least one alias xtream config to do any transformation.
+        $primaryAliasConfig = $this->getPrimaryXtreamConfig();
+        if (!$primaryAliasConfig) {
             return $originalUrl;
         }
 
-        // Get the channel's effective playlist to find its source config
+        // Get the channel's effective playlist to find its source config.
         $effectivePlaylist = $channel->getEffectivePlaylist();
         if (!$effectivePlaylist || !$effectivePlaylist->xtream_config) {
             return $originalUrl;
         }
 
-        return $this->transformUrl($originalUrl, $effectivePlaylist->xtream_config, $this->xtream_config);
+        $sourceConfig = $effectivePlaylist->xtream_config;
+
+        // If this alias has multiple configs, choose the best match by base URL.
+        $aliasConfig = $this->findXtreamConfigByUrl((string)($sourceConfig['url'] ?? '')) ?? $primaryAliasConfig;
+
+        return $this->transformUrl($originalUrl, $sourceConfig, $aliasConfig);
     }
 
     /**
@@ -314,18 +378,24 @@ class PlaylistAlias extends Model
     {
         $originalUrl = $episode->url ?? '';
 
-        // We need the xtream config to do any transformation
-        if (!$this->xtream_config) {
+        // We need at least one alias xtream config to do any transformation.
+        $primaryAliasConfig = $this->getPrimaryXtreamConfig();
+        if (!$primaryAliasConfig) {
             return $originalUrl;
         }
 
-        // Get the episode's effective playlist to find its source config
+        // Get the episode's effective playlist to find its source config.
         $effectivePlaylist = $episode->getEffectivePlaylist();
         if (!$effectivePlaylist || !$effectivePlaylist->xtream_config) {
             return $originalUrl;
         }
 
-        return $this->transformUrl($originalUrl, $effectivePlaylist->xtream_config, $this->xtream_config);
+        $sourceConfig = $effectivePlaylist->xtream_config;
+
+        // If this alias has multiple configs, choose the best match by base URL.
+        $aliasConfig = $this->findXtreamConfigByUrl((string)($sourceConfig['url'] ?? '')) ?? $primaryAliasConfig;
+
+        return $this->transformUrl($originalUrl, $sourceConfig, $aliasConfig);
     }
 
     /**
@@ -336,28 +406,43 @@ class PlaylistAlias extends Model
         array $sourceConfig,
         array $aliasConfig
     ): string {
-        // Extract the source provider details
-        $sourceBaseUrl = rtrim($sourceConfig['url'], '/');
-        $sourceUsername = $sourceConfig['username'];
-        $sourcePassword = $sourceConfig['password'];
+        // Extract source provider details safely
+        $sourceBaseUrl = rtrim((string) ($sourceConfig['url'] ?? ''), '/');
+        $sourceUsername = (string) ($sourceConfig['username'] ?? '');
+        $sourcePassword = (string) ($sourceConfig['password'] ?? '');
 
-        // Extract the alias provider details  
-        $aliasBaseUrl = rtrim($aliasConfig['url'], '/');
-        $aliasUsername = $aliasConfig['username'];
-        $aliasPassword = $aliasConfig['password'];
+        // Extract alias provider details safely
+        $aliasBaseUrl = rtrim((string) ($aliasConfig['url'] ?? ''), '/');
+        $aliasUsername = (string) ($aliasConfig['username'] ?? '');
+        $aliasPassword = (string) ($aliasConfig['password'] ?? '');
 
-        // Replace the base URL and credentials
-        // Pattern matches: http://domain:port/path/username/password/streamid.ext
-        $pattern = '#^' . preg_quote($sourceBaseUrl, '#') . '/(live|series|movie)/' . preg_quote($sourceUsername, '#') . '/' . preg_quote($sourcePassword, '#') . '/(.+)$#';
+        // If any required value is missing, do not attempt to transform
+        if (
+            $sourceBaseUrl === '' ||
+            $sourceUsername === '' ||
+            $sourcePassword === '' ||
+            $aliasBaseUrl === '' ||
+            $aliasUsername === '' ||
+            $aliasPassword === ''
+        ) {
+            return $originalUrl;
+        }
+
+        // Pattern matches:
+        // http://domain:port/(live|series|movie)/username/password/<stream>
+        $pattern =
+            '#^' . preg_quote($sourceBaseUrl, '#') .
+            '/(live|series|movie)/' . preg_quote($sourceUsername, '#') .
+            '/' . preg_quote($sourcePassword, '#') .
+            '/(.+)$#';
 
         if (preg_match($pattern, $originalUrl, $matches)) {
-            $streamType = $matches[1]; // live, series, or movie
-            $streamIdAndExtension = $matches[2]; // e.g., "2083373.mkv" or "12345.ts"
+            $streamType = $matches[1];
+            $streamIdAndExtension = $matches[2];
 
             return "{$aliasBaseUrl}/{$streamType}/{$aliasUsername}/{$aliasPassword}/{$streamIdAndExtension}";
         }
 
-        // If pattern doesn't match, return original URL
         return $originalUrl;
     }
 }

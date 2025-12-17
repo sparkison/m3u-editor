@@ -151,6 +151,14 @@ class SyncVodStrmFiles implements ShouldQueue
                         ? PlaylistService::makeFilesystemSafe($titleFolder, $replaceChar)
                         : PlaylistService::makeFilesystemSafe($titleFolder);
                     $titlePath = $path . '/' . $titleFolder;
+                    if (! is_dir($titlePath)) {
+                        mkdir($titlePath, 0777, true);
+                    }
+
+                    $titleFolder = $cleanSpecialChars
+                        ? PlaylistService::makeFilesystemSafe($titleFolder, $replaceChar)
+                        : PlaylistService::makeFilesystemSafe($titleFolder);
+                    $titlePath = $path . '/' . $titleFolder;
                     $path = $titlePath;
                 }
 
