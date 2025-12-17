@@ -175,7 +175,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 // Create the category folder
                 // Remove any special characters from the category name
                 $category = $series->category;
-                $catName = $category->name ?? $category->name_internal ?? 'Uncategorized';
+                $catName = $category?->name ?? $category?->name_internal ?? 'Uncategorized';
                 // Apply name filtering
                 $catName = $applyNameFilter($catName);
                 $cleanName = $cleanSpecialChars
