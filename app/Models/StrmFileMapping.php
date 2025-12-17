@@ -79,7 +79,12 @@ class StrmFileMapping extends Model
             return self::updateFileUrl($mapping, $url);
         }
 
-        // Case 4: Nothing changed - just return the mapping
+        // Case 4: Nothing changed - ensure path_options stay in sync
+        if ($mapping->path_options != $pathOptions) {
+            $mapping->path_options = $pathOptions;
+            $mapping->save();
+        }
+
         return $mapping;
     }
 

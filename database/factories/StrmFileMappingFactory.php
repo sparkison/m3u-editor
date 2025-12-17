@@ -20,11 +20,9 @@ class StrmFileMappingFactory extends Factory
      */
     public function definition(): array
     {
-        $channel = Channel::factory()->create();
-
         return [
             'syncable_type' => Channel::class,
-            'syncable_id' => $channel->id,
+            'syncable_id' => fn (array $attributes) => Channel::factory()->create()->id,
             'sync_location' => '/tmp/strm-test',
             'current_path' => '/tmp/strm-test/' . $this->faker->word() . '.strm',
             'current_url' => $this->faker->url(),

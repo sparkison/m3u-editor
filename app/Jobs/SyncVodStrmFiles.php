@@ -155,10 +155,6 @@ class SyncVodStrmFiles implements ShouldQueue
                         mkdir($titlePath, 0777, true);
                     }
 
-                    $titleFolder = $cleanSpecialChars
-                        ? PlaylistService::makeFilesystemSafe($titleFolder, $replaceChar)
-                        : PlaylistService::makeFilesystemSafe($titleFolder);
-                    $titlePath = $path . '/' . $titleFolder;
                     $path = $titlePath;
                 }
 
@@ -223,10 +219,11 @@ class SyncVodStrmFiles implements ShouldQueue
             }
 
             // Clean up orphaned files for disabled/deleted channels
-            if ($this->playlist) {
+            // Run cleanup whenever we're syncing with a valid sync location
+            if ($syncLocation = $global_sync_settings['sync_location'] ?? null) {
                 StrmFileMapping::cleanupOrphaned(
                     Channel::class,
-                    $global_sync_settings['sync_location'] ?? ''
+                    $syncLocation
                 );
             }
         } catch (\Exception $e) {

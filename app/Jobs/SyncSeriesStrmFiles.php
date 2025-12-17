@@ -3,8 +3,8 @@
 namespace App\Jobs;
 
 use App\Facades\ProxyFacade;
+use App\Models\Episode;
 use App\Models\Series;
-use App\Models\SeriesEpisode;
 use App\Models\StrmFileMapping;
 use App\Models\User;
 use App\Services\PlaylistService;
@@ -300,7 +300,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
 
             // Clean up orphaned files for disabled/deleted episodes
             StrmFileMapping::cleanupOrphaned(
-                SeriesEpisode::class,
+                Episode::class,
                 $syncLocation
             );
 

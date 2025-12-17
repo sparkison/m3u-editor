@@ -19,26 +19,7 @@ afterEach(function () {
     }
 });
 
-// Helper function to recursively delete a directory
-function recursiveDelete(string $dir): void
-{
-    if (is_dir($dir)) {
-        $objects = scandir($dir);
-        foreach ($objects as $object) {
-            if ($object !== '.' && $object !== '..') {
-                $path = $dir . '/' . $object;
-                if (is_dir($path)) {
-                    recursiveDelete($path);
-                } else {
-                    @unlink($path);
-                }
-            }
-        }
-        @rmdir($dir);
-    }
-}
-
-// Make recursiveDelete available on $this
+// Helper closure to recursively delete a directory, available on $this
 beforeEach(function () {
     $this->recursiveDelete = function (string $dir): void {
         if (is_dir($dir)) {
@@ -86,10 +67,12 @@ describe('StrmFileMapping', function () {
         // Create initial file
         $mapping = StrmFileMapping::syncFile($channel, $this->testDir, $oldPath, $url);
         expect(file_exists($oldPath))->toBeTrue();
+        $originalId = $mapping->id;
 
         // Rename by syncing with new path
         $mapping = StrmFileMapping::syncFile($channel, $this->testDir, $newPath, $url);
 
+        expect($mapping->id)->toBe($originalId);
         expect($mapping->current_path)->toBe($newPath);
         expect(file_exists($newPath))->toBeTrue();
         expect(file_exists($oldPath))->toBeFalse();
