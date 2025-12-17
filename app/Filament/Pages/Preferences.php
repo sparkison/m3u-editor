@@ -196,10 +196,7 @@ class Preferences extends SettingsPage
                                                     )
                                                     ->helperText('Useful for multi-host access (VPN/Tailscale/etc.)')
                                                     ->default(false),
-                                            ]),
 
-                                        Fieldset::make('Proxy URL override')
-                                            ->schema([
                                                 TextInput::make('url_override')
                                                     ->label('Override URL')
                                                     ->columnSpanFull()
@@ -521,7 +518,7 @@ class Preferences extends SettingsPage
                                 Section::make('Provider Request Delay')
                                     ->description('Add a delay between requests to providers to avoid rate limiting.')
                                     ->columnSpan('full')
-                                    ->columns(1)
+                                    ->columns(3)
                                     ->collapsible(false)
                                     ->schema([
                                         Toggle::make('enable_provider_request_delay')
@@ -532,32 +529,41 @@ class Preferences extends SettingsPage
                                             ->label('Request delay (milliseconds)')
                                             ->integer()
                                             ->required()
+                                            ->hintIcon(
+                                                'heroicon-m-question-mark-circle',
+                                                tooltip: 'Recommended: 500-2000ms. Higher values reduce load on provider but increase sync time.'
+                                            )
                                             ->minValue(100)
                                             ->maxValue(10000)
                                             ->step(100)
                                             ->default(500)
                                             ->suffix('ms')
                                             ->hidden(fn($get) => ! $get('enable_provider_request_delay'))
-                                            ->helperText('Delay in milliseconds between requests. Recommended: 500-2000ms. Higher values reduce load on provider but increase sync time.'),
+                                            ->helperText('Delay in milliseconds between requests.'),
                                         TextInput::make('provider_max_concurrent_requests')
                                             ->label('Max concurrent requests')
                                             ->integer()
                                             ->required()
+                                            ->hintIcon(
+                                                'heroicon-m-question-mark-circle',
+                                                tooltip: 'Lower values (1-2) are safer but slower. Set to 1 to process requests sequentially.'
+                                            )
                                             ->minValue(1)
                                             ->maxValue(10)
                                             ->default(2)
                                             ->hidden(fn($get) => ! $get('enable_provider_request_delay'))
-                                            ->helperText('Maximum number of simultaneous requests to the provider. Lower values (1-2) are safer but slower. Set to 1 to process requests sequentially.'),
+                                            ->helperText('Maximum number of simultaneous requests to the provider.'),
                                     ]),
                                 Section::make('Sync Invalidation')
                                     ->description('Prevent sync from proceeding if conditions are met.')
                                     ->columnSpan('full')
-                                    ->columns(1)
+                                    ->columns(3)
                                     ->collapsible(false)
                                     ->schema([
                                         Toggle::make('invalidate_import')
                                             ->label('Enable import invalidation')
                                             ->disabled(fn() => ! empty(config('dev.invalidate_import')))
+                                            ->live()
                                             ->hint(fn() => ! empty(config('dev.invalidate_import')) ? 'Already set by environment variable!' : null)
                                             ->default(function () {
                                                 return ! empty(config('dev.invalidate_import')) ? (bool) config('dev.invalidate_import') : false;
@@ -571,11 +577,17 @@ class Preferences extends SettingsPage
                                             ->helperText('Invalidate Playlist sync if conditon met.'),
                                         TextInput::make('invalidate_import_threshold')
                                             ->label('Import invalidation threshold')
+                                            ->columnSpan(2)
+                                            ->hintIcon(
+                                                'heroicon-m-question-mark-circle',
+                                                tooltip: 'Some providers frequently remove and re-add groups/categories, which can lead to channels be removed during sync. This setting helps prevent large-scale removals by canceling the sync if too many channels would be removed.'
+                                            )
                                             ->suffixIcon(fn() => ! empty(config('dev.invalidate_import_threshold')) ? 'heroicon-m-lock-closed' : null)
                                             ->disabled(fn() => ! empty(config('dev.invalidate_import_threshold')))
                                             ->hint(fn() => ! empty(config('dev.invalidate_import_threshold')) ? 'Already set by environment variable!' : null)
                                             ->dehydrated(fn() => empty(config('dev.invalidate_import_threshold')))
                                             ->placeholder(fn() => empty(config('dev.invalidate_import_threshold')) ? 100 : config('dev.invalidate_import_threshold'))
+                                            ->hidden(fn($get) => ! empty(config('dev.invalidate_import')) || ! $get('invalidate_import'))
                                             ->numeric()
                                             ->helperText('If the current sync will have less channels than the current channel count (less this value), the sync will be invalidated and canceled.'),
                                     ]),
@@ -902,15 +914,7 @@ class Preferences extends SettingsPage
                         Tab::make('Backups')
                             ->schema([
                                 Section::make('Automated backups')
-                                    ->headerActions([
-                                        Action::make('view_cron_example')
-                                            ->label('CRON Example')
-                                            ->icon('heroicon-o-arrow-top-right-on-square')
-                                            ->iconPosition('after')
-                                            ->size('sm')
-                                            ->url('https://crontab.guru')
-                                            ->openUrlInNewTab(true),
-                                    ])->schema([
+                                    ->schema([
                                         Toggle::make('auto_backup_database')
                                             ->label('Enable Automatic Database Backups')
                                             ->live()
@@ -924,6 +928,15 @@ class Preferences extends SettingsPage
                                                     ->suffix(config('app.timezone'))
                                                     ->rules([new Cron])
                                                     ->live()
+                                                    ->hintAction(
+                                                        Action::make('view_cron_example')
+                                                            ->label('CRON Example')
+                                                            ->icon('heroicon-o-arrow-top-right-on-square')
+                                                            ->iconPosition('after')
+                                                            ->size('sm')
+                                                            ->url('https://crontab.guru')
+                                                            ->openUrlInNewTab(true)
+                                                    )
                                                     ->helperText(fn($get) => CronExpression::isValidExpression($get('auto_backup_database_schedule'))
                                                         ? 'Next scheduled backup: ' . (new CronExpression($get('auto_backup_database_schedule')))->getNextRunDate()->format('Y-m-d H:i:s')
                                                         : 'Specify the CRON schedule for automatic backups, e.g. "0 3 * * *".'),
