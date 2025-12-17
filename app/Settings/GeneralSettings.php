@@ -32,6 +32,7 @@ class GeneralSettings extends Settings
     public ?int $default_vod_stream_profile_id = null;
     public ?string $url_override = null;
     public ?bool $url_override_include_logos = true;
+    public ?bool $proxy_stop_oldest_on_limit = false;
 
 
     // SMTP settings
