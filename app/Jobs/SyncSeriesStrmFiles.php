@@ -77,6 +77,10 @@ class SyncSeriesStrmFiles implements ShouldQueue
 
     private function fetchMetadataForSeries(Series $series, $settings)
     {
+        if (!$series->enabled) {
+            return;  // Skip processing for disabled series
+        }
+        
         $series->load('enabled_episodes', 'playlist', 'user', 'category');
 
         $playlist = $series->playlist;

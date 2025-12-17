@@ -233,7 +233,7 @@ class Series extends Model
                 // Update last fetched timestamp for the series
                 $this->update($update);
 
-                if ($sync) {
+                if ($sync && $this->enabled) {
                     // Dispatch the job to sync .strm files
                     dispatch(new SyncSeriesStrmFiles(series: $this, notify: false));
                 }
