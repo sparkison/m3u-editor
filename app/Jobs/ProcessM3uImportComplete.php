@@ -17,6 +17,7 @@ use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Http;
 
 class ProcessM3uImportComplete implements ShouldQueue
 {
@@ -37,6 +38,10 @@ class ProcessM3uImportComplete implements ShouldQueue
     // Whether to invalidate the import if the number of new channels is less than the current count
     public $invalidateImport = false;
     public $invalidateImportThreshold = 100; // Default threshold for invalidating import
+
+    // Default user agent to use for HTTP requests
+    // Used when user agent is not set in the playlist
+    public $userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36';
 
     /**
      * Create a new job instance.
@@ -248,18 +253,23 @@ class ProcessM3uImportComplete implements ShouldQueue
                 // Make sure EPG doesn't already exist
                 $epg = $user->epgs()->where('url', $epgUrl)->first();
                 if (!$epg) {
-                    $headers = @get_headers($epgUrl);
-                    if (
-                        strpos($headers[0], '200') !== false ||
-                        strpos($headers[0], '301') !== false ||
-                        strpos($headers[0], '302') !== false
-                    ) {
+                    // Setup the user agent and SSL verification
+                    $verify = !$playlist->disable_ssl_verification;
+                    $userAgent = empty($playlist->user_agent) ? $this->userAgent : $playlist->user_agent;
+
+                    // Let's check if the EPG url is valid
+                    $results = Http::withUserAgent($userAgent)
+                        ->withOptions(['verify' => $verify])
+                        ->timeout(30)
+                        ->throw()->get($epgUrl);
+                    if ($results->accepted()) {
                         // EPG found, create it
                         $epg = $user->epgs()->create([
                             'name' => $playlist->name . ' EPG',
                             'url' => $epgUrl,
                             'user_id' => $user->id,
-                            'user_agent' => $playlist->user_agent
+                            'user_agent' => $playlist->user_agent,
+                            'disable_ssl_verification' => $playlist->disable_ssl_verification,
                         ]);
                         $msg = "\"{$playlist->name}\" EPG was created and is syncing now.";
                         Notification::make()
