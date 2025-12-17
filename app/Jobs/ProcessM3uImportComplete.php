@@ -253,40 +253,21 @@ class ProcessM3uImportComplete implements ShouldQueue
                 // Make sure EPG doesn't already exist
                 $epg = $user->epgs()->where('url', $epgUrl)->first();
                 if (!$epg) {
-                    // Setup the user agent and SSL verification
-                    $verify = !$playlist->disable_ssl_verification;
-                    $userAgent = empty($playlist->user_agent) ? $this->userAgent : $playlist->user_agent;
-
-                    // Let's check if the EPG url is valid (using HEAD to avoid downloading the entire file)
-                    $results = Http::withUserAgent($userAgent)
-                        ->withOptions(['verify' => $verify])
-                        ->timeout(30)
-                        ->head($epgUrl);
-                    if ($results->successful()) {
-                        // EPG found, create it
-                        $epg = $user->epgs()->create([
-                            'name' => $playlist->name . ' EPG',
-                            'url' => $epgUrl,
-                            'user_id' => $user->id,
-                            'user_agent' => $playlist->user_agent,
-                            'disable_ssl_verification' => $playlist->disable_ssl_verification,
-                        ]);
-                        $msg = "\"{$playlist->name}\" EPG was created and is syncing now.";
-                        Notification::make()
-                            ->success()
-                            ->title('EPG found for Playlist')
-                            ->body($msg)
-                            ->broadcast($playlist->user)
-                            ->sendToDatabase($playlist->user);
-                    } else {
-                        $msg = "\"{$playlist->name}\" EPG not found. Playlist was configured to auto-download EPG but no EPG was found using at the following url: \"$epgUrl\"";
-                        Notification::make()
-                            ->warning()
-                            ->title('No EPG found for Playlist')
-                            ->body($msg)
-                            ->broadcast($playlist->user)
-                            ->sendToDatabase($playlist->user);
-                    }
+                    // Create EPG to trigger sync
+                    $epg = $user->epgs()->create([
+                        'name' => $playlist->name . ' EPG',
+                        'url' => $epgUrl,
+                        'user_id' => $user->id,
+                        'user_agent' => $playlist->user_agent,
+                        'disable_ssl_verification' => $playlist->disable_ssl_verification,
+                    ]);
+                    $msg = "\"{$playlist->name}\" EPG was created and will sync shortly.";
+                    Notification::make()
+                        ->success()
+                        ->title('EPG created for Playlist')
+                        ->body($msg)
+                        ->broadcast($playlist->user)
+                        ->sendToDatabase($playlist->user);
                 }
             } catch (Exception $e) {
                 // Handle any exceptions that occur during EPG creation
