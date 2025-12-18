@@ -410,7 +410,7 @@ class PlaylistAliasResource extends Resource
                                             ->columnSpan(3)
                                             ->required(),
                                         Forms\Components\TextInput::make("xtream_config.{$i}.username")
-                                            ->label('Xtream API Password')
+                                            ->label('Xtream API Username')
                                             ->live()
                                             ->required()
                                             ->columnSpan(2)
