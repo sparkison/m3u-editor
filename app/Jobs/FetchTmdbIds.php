@@ -95,6 +95,7 @@ class FetchTmdbIds implements ShouldQueue
         // Use playlist-based filtering if provided
         if ($this->vodPlaylistId) {
             $query->where('playlist_id', $this->vodPlaylistId)
+                ->where('user_id', $this->user?->id)
                 ->where('enabled', true);
         } elseif ($this->allVodPlaylists && $this->user) {
             $query->whereHas('playlist', function ($q) {
@@ -102,7 +103,8 @@ class FetchTmdbIds implements ShouldQueue
             })->where('enabled', true);
         } elseif (!empty($this->vodChannelIds)) {
             // Legacy: direct ID array support
-            $query->whereIn('id', $this->vodChannelIds);
+            $query->whereIn('id', $this->vodChannelIds)
+                ->where('user_id', $this->user?->id);
         } else {
             return; // No criteria specified
         }
@@ -206,13 +208,15 @@ class FetchTmdbIds implements ShouldQueue
         // Use playlist-based filtering if provided
         if ($this->seriesPlaylistId) {
             $query->where('playlist_id', $this->seriesPlaylistId)
+                ->where('user_id', $this->user?->id)
                 ->where('enabled', true);
         } elseif ($this->allSeriesPlaylists && $this->user) {
             $query->where('user_id', $this->user->id)
                 ->where('enabled', true);
         } elseif (!empty($this->seriesIds)) {
             // Legacy: direct ID array support
-            $query->whereIn('id', $this->seriesIds);
+            $query->whereIn('id', $this->seriesIds)
+                ->where('user_id', $this->user?->id);
         } else {
             return; // No criteria specified
         }
