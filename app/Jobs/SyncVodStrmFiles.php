@@ -161,7 +161,7 @@ class SyncVodStrmFiles implements ShouldQueue
                         ?? $channel->movie_data['imdb_id']
                         ?? $channel->movie_data['imdb']
                         ?? null;
-                    
+
                     $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
                     if (! empty($tmdbId)) {
                         $titleFolder .= " {$bracket[0]}tmdb-{$tmdbId}{$bracket[1]}";
@@ -202,7 +202,7 @@ class SyncVodStrmFiles implements ShouldQueue
                         ?? $channel->movie_data['imdb_id']
                         ?? $channel->movie_data['imdb']
                         ?? null;
-                    
+
                     $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
                     if (! empty($tmdbId)) {
                         $fileName .= " {$bracket[0]}tmdb-{$tmdbId}{$bracket[1]}";

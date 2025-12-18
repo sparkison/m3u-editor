@@ -80,7 +80,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
         if (!$series->enabled) {
             return;  // Skip processing for disabled series
         }
-        
+
         $series->load('enabled_episodes', 'playlist', 'user', 'category');
 
         $playlist = $series->playlist;
