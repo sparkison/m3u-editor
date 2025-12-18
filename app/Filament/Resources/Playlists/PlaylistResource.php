@@ -968,7 +968,7 @@ class PlaylistResource extends Resource
                         ->live()
                         ->helperText('Enter the full url, using <url>:<port> format - without trailing slash (/).')
                         ->prefixIcon('heroicon-m-globe-alt')
-                        ->maxLength(2000)
+                        ->maxLength(4000)
                         ->url()
                         ->columnSpan(2)
                         ->required()
