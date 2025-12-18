@@ -217,7 +217,10 @@ class PlaylistResource extends Resource
                 ToggleColumn::make('enable_proxy')
                     ->label('Proxy')
                     ->toggleable()
-                    ->tooltip('Toggle proxy status')
+                    ->tooltip(fn (Playlist $record): string => $record->profiles_enabled
+                        ? 'Proxy is required when Provider Profiles are enabled'
+                        : 'Toggle proxy status')
+                    ->disabled(fn (Playlist $record): bool => $record->profiles_enabled)
                     ->sortable(),
                 ToggleColumn::make('auto_sync')
                     ->label('Auto Sync')
@@ -1072,6 +1075,13 @@ class PlaylistResource extends Resource
                                 $set('enable_proxy', true);
                             }
                         })
+                        ->rules([
+                            fn (): \Closure => function (string $attribute, $value, \Closure $fail) {
+                                if ($value && ! config('proxy.m3u_proxy_token')) {
+                                    $fail('Provider Profiles require the m3u-proxy to be configured. Please ensure M3U_PROXY_TOKEN is set.');
+                                }
+                            },
+                        ])
                         ->inline(false)
                         ->default(false),
 
@@ -1634,7 +1644,11 @@ class PlaylistResource extends Resource
                         ->hint(fn(Get $get): string => $get('enable_proxy') ? 'Proxied' : 'Not proxied')
                         ->hintIcon(fn(Get $get): string => ! $get('enable_proxy') ? 'heroicon-m-lock-open' : 'heroicon-m-lock-closed')
                         ->live()
-                        ->helperText('When enabled, all streams will be proxied through the application. This allows for better compatibility with various clients and enables features such as stream limiting and output format selection.')
+                        ->helperText(fn (Get $get): string => $get('profiles_enabled')
+                            ? 'Proxy mode is required when Provider Profiles are enabled.'
+                            : 'When enabled, all streams will be proxied through the application. This allows for better compatibility with various clients and enables features such as stream limiting and output format selection.')
+                        ->disabled(fn (Get $get): bool => (bool) $get('profiles_enabled'))
+                        ->dehydrated()
                         ->inline(false)
                         ->default(false),
                     Toggle::make('enable_logo_proxy')

@@ -82,7 +82,8 @@ class PlaylistProfile extends Model
         $baseConfig = $this->playlist->xtream_config;
 
         return [
-            'server' => $baseConfig['server'] ?? null,
+            // Use 'url' key to match XtreamService::init() expectations
+            'url' => $baseConfig['url'] ?? $baseConfig['server'] ?? null,
             'username' => $this->username,
             'password' => $this->password,
             'output' => $baseConfig['output'] ?? 'ts',
