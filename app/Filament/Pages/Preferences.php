@@ -780,10 +780,14 @@ class Preferences extends SettingsPage
                                                     if (! empty($vodExample->year) && strpos($titleFolder, "({$vodExample->year})") === false) {
                                                         $titleFolder .= " ({$vodExample->year})";
                                                     }
-                                                    // Add TMDB ID to folder for Trash Guides compatibility
-                                                    $tmdbId = $vodExample->info['tmdb_id'] ?? $vodExample->movie_data['tmdb_id'] ?? null;
+                                                    // Add TMDB/IMDB ID to folder for Trash Guides compatibility
+                                                    $tmdbId = $vodExample->info['tmdb_id'] ?? $vodExample->info['tmdb'] ?? $vodExample->movie_data['tmdb_id'] ?? $vodExample->movie_data['tmdb'] ?? null;
+                                                    $imdbId = $vodExample->info['imdb_id'] ?? $vodExample->info['imdb'] ?? $vodExample->movie_data['imdb_id'] ?? $vodExample->movie_data['imdb'] ?? null;
+                                                    $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
                                                     if (! empty($tmdbId)) {
-                                                        $titleFolder .= " {tmdb-{$tmdbId}}";
+                                                        $titleFolder .= " {$bracket[0]}tmdb-{$tmdbId}{$bracket[1]}";
+                                                    } elseif (! empty($imdbId)) {
+                                                        $titleFolder .= " {$bracket[0]}imdb-{$imdbId}{$bracket[1]}";
                                                     }
                                                     $preview .= '/' . $titleFolder;
                                                 }
@@ -798,11 +802,17 @@ class Preferences extends SettingsPage
                                                     }
                                                 }
 
-                                                // Only add TMDB ID to filename if title folder is NOT enabled
-                                                // (If title folder exists, TMDB ID is already in the folder name)
-                                                if (in_array('tmdb_id', $filenameMetadata) && ! $titleFolderEnabled && ! empty($vodExample->info['tmdb_id'])) {
+                                                // Only add TMDB/IMDB ID to filename if title folder is NOT enabled
+                                                // (If title folder exists, ID is already in the folder name)
+                                                $tmdbId = $vodExample->info['tmdb_id'] ?? $vodExample->info['tmdb'] ?? $vodExample->movie_data['tmdb_id'] ?? $vodExample->movie_data['tmdb'] ?? null;
+                                                $imdbId = $vodExample->info['imdb_id'] ?? $vodExample->info['imdb'] ?? $vodExample->movie_data['imdb_id'] ?? $vodExample->movie_data['imdb'] ?? null;
+                                                if (in_array('tmdb_id', $filenameMetadata) && ! $titleFolderEnabled) {
                                                     $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
-                                                    $filename .= " {$bracket[0]}tmdb-{$vodExample->info['tmdb_id']}{$bracket[1]}";
+                                                    if (! empty($tmdbId)) {
+                                                        $filename .= " {$bracket[0]}tmdb-{$tmdbId}{$bracket[1]}";
+                                                    } elseif (! empty($imdbId)) {
+                                                        $filename .= " {$bracket[0]}imdb-{$imdbId}{$bracket[1]}";
+                                                    }
                                                 }
 
                                                 $preview .= '/' . $filename . '.strm';
