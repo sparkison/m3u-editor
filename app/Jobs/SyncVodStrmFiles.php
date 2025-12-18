@@ -149,10 +149,24 @@ class SyncVodStrmFiles implements ShouldQueue
                         $titleFolder .= " ({$channel->year})";
                     }
 
-                    // Add TMDB ID to folder name for Trash Guides compatibility
-                    $tmdbId = $channel->info['tmdb_id'] ?? $channel->movie_data['tmdb_id'] ?? null;
+                    // Add TMDB/IMDB ID to folder name for Trash Guides compatibility
+                    // Check multiple possible locations for IDs (priority: TMDB > IMDB)
+                    $tmdbId = $channel->info['tmdb_id']
+                        ?? $channel->info['tmdb']
+                        ?? $channel->movie_data['tmdb_id']
+                        ?? $channel->movie_data['tmdb']
+                        ?? null;
+                    $imdbId = $channel->info['imdb_id']
+                        ?? $channel->info['imdb']
+                        ?? $channel->movie_data['imdb_id']
+                        ?? $channel->movie_data['imdb']
+                        ?? null;
+                    
+                    $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
                     if (! empty($tmdbId)) {
-                        $titleFolder .= " {tmdb-{$tmdbId}}";
+                        $titleFolder .= " {$bracket[0]}tmdb-{$tmdbId}{$bracket[1]}";
+                    } elseif (! empty($imdbId)) {
+                        $titleFolder .= " {$bracket[0]}imdb-{$imdbId}{$bracket[1]}";
                     }
 
                     $titleFolder = $cleanSpecialChars
@@ -174,13 +188,26 @@ class SyncVodStrmFiles implements ShouldQueue
                     }
                 }
 
-                // Only add TMDB ID to filename if title folder is NOT created
-                // (If title folder exists, TMDB ID is already in the folder name)
+                // Only add TMDB/IMDB ID to filename if title folder is NOT created
+                // (If title folder exists, ID is already in the folder name)
                 if (in_array('tmdb_id', $filenameMetadata) && ! $titleFolderCreated) {
-                    $tmdbId = $channel->info['tmdb_id'] ?? $channel->movie_data['tmdb_id'] ?? null;
+                    // Check multiple possible locations for IDs (priority: TMDB > IMDB)
+                    $tmdbId = $channel->info['tmdb_id']
+                        ?? $channel->info['tmdb']
+                        ?? $channel->movie_data['tmdb_id']
+                        ?? $channel->movie_data['tmdb']
+                        ?? null;
+                    $imdbId = $channel->info['imdb_id']
+                        ?? $channel->info['imdb']
+                        ?? $channel->movie_data['imdb_id']
+                        ?? $channel->movie_data['imdb']
+                        ?? null;
+                    
+                    $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
                     if (! empty($tmdbId)) {
-                        $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
                         $fileName .= " {$bracket[0]}tmdb-{$tmdbId}{$bracket[1]}";
+                    } elseif (! empty($imdbId)) {
+                        $fileName .= " {$bracket[0]}imdb-{$imdbId}{$bracket[1]}";
                     }
                 }
 
