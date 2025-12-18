@@ -27,6 +27,7 @@ class PlaylistAlias extends Model
         'priority' => 'integer',
         'custom_headers' => 'array',
         'strict_live_ts' => 'boolean',
+        'selected_xtream_config_index' => 'integer',
     ];
 
     public function getXtreamConfigs(): array
@@ -52,10 +53,29 @@ class PlaylistAlias extends Model
         return [];
     }
 
-    public function getPrimaryXtreamConfig(): ?array
+    public function getSelectedXtreamConfigIndex(): int
+    {
+        $idx = (int) ($this->selected_xtream_config_index ?? 0);
+        return $idx < 0 ? 0 : $idx;
+    }
+
+    public function getSelectedXtreamConfig(): ?array
     {
         $configs = $this->getXtreamConfigs();
-        return $configs[0] ?? null;
+        if (empty($configs)) {
+            return null;
+        }
+
+        $idx = $this->getSelectedXtreamConfigIndex();
+
+        // Fallback seguro a 0 si el índice no existe
+        return $configs[$idx] ?? $configs[0] ?? null;
+    }
+
+    public function getPrimaryXtreamConfig(): ?array
+    {
+        // Now "primary" means "selected by user", fallback to index 0
+        return $this->getSelectedXtreamConfig();
     }
 
     public function findXtreamConfigByUrl(?string $url): ?array
