@@ -1085,12 +1085,92 @@ class PlaylistResource extends Resource
                         ->inline(false)
                         ->default(false),
 
-                    Placeholder::make('primary_profile_info')
-                        ->label('Primary Account')
-                        ->content(fn (?Playlist $record): string => $record && $record->xtream_config
-                            ? "Username: {$record->xtream_config['username']} (will become Profile #1 when profiles are enabled)"
-                            : 'Configure Xtream credentials above first.')
-                        ->visible(fn (Get $get): bool => $get('profiles_enabled')),
+                    Grid::make()
+                        ->columns(2)
+                        ->visible(fn (Get $get): bool => $get('profiles_enabled'))
+                        ->schema([
+                            Placeholder::make('primary_profile_info')
+                                ->label('Primary Account')
+                                ->content(function (?Playlist $record): string {
+                                    if (! $record || ! $record->xtream_config) {
+                                        return 'Configure Xtream credentials above first.';
+                                    }
+
+                                    $username = $record->xtream_config['username'] ?? 'Unknown';
+                                    $primaryProfile = $record->profiles()->where('is_primary', true)->first();
+
+                                    if ($primaryProfile) {
+                                        $maxStreams = $primaryProfile->max_streams ?? 1;
+                                        $providerMax = $primaryProfile->provider_max_connections ?? 'Unknown';
+                                        return "Username: {$username} | Max Streams: {$maxStreams} (Provider: {$providerMax})";
+                                    }
+
+                                    return "Username: {$username} (Profile will be created when saved)";
+                                }),
+
+                            \Filament\Schemas\Components\Actions::make([
+                                \Filament\Actions\Action::make('test_primary_profile')
+                                    ->label('Test Primary')
+                                    ->icon('heroicon-o-signal')
+                                    ->color('info')
+                                    ->tooltip('Test primary account credentials and detect max connections')
+                                    ->action(function (Get $get, ?Playlist $record): void {
+                                        $xtreamConfig = $record?->xtream_config;
+
+                                        if (! $xtreamConfig) {
+                                            // Try to build from form data
+                                            $url = $get('xtream_config.url') ?? $get('xtream_config.server');
+                                            $username = $get('xtream_config.username');
+                                            $password = $get('xtream_config.password');
+
+                                            if (empty($url) || empty($username) || empty($password)) {
+                                                Notification::make()
+                                                    ->title('Missing Credentials')
+                                                    ->body('Please configure Xtream credentials first.')
+                                                    ->danger()
+                                                    ->send();
+                                                return;
+                                            }
+
+                                            $xtreamConfig = [
+                                                'url' => $url,
+                                                'username' => $username,
+                                                'password' => $password,
+                                            ];
+                                        } else {
+                                            $xtreamConfig = [
+                                                'url' => $xtreamConfig['url'] ?? $xtreamConfig['server'] ?? '',
+                                                'username' => $xtreamConfig['username'] ?? '',
+                                                'password' => $xtreamConfig['password'] ?? '',
+                                            ];
+                                        }
+
+                                        $result = ProfileService::testCredentials($xtreamConfig);
+
+                                        if ($result['valid']) {
+                                            // If the primary profile exists, update its max_streams
+                                            $primaryProfile = $record?->profiles()->where('is_primary', true)->first();
+                                            if ($primaryProfile) {
+                                                $primaryProfile->update(['max_streams' => $result['max_connections']]);
+                                            }
+
+                                            $expDate = $result['exp_date'] ? " | Expires: {$result['exp_date']}" : '';
+                                            Notification::make()
+                                                ->title('Primary Account Valid ✓')
+                                                ->body("Status: {$result['status']} | Max Connections: {$result['max_connections']} | Active: {$result['active_cons']}{$expDate}")
+                                                ->success()
+                                                ->duration(8000)
+                                                ->send();
+                                        } else {
+                                            Notification::make()
+                                                ->title('Primary Account Test Failed')
+                                                ->body($result['error'] ?? 'Unknown error')
+                                                ->danger()
+                                                ->send();
+                                        }
+                                    }),
+                            ])->verticallyAlignEnd(),
+                        ]),
 
                     Repeater::make('additional_profiles')
                         ->label('Additional Profiles')
@@ -1104,19 +1184,21 @@ class PlaylistResource extends Resource
                             TextInput::make('username')
                                 ->label('Username')
                                 ->required()
+                                ->live(onBlur: true)
                                 ->columnSpan(1),
                             TextInput::make('password')
                                 ->label('Password')
                                 ->password()
                                 ->revealable()
                                 ->required()
+                                ->live(onBlur: true)
                                 ->columnSpan(1),
                             TextInput::make('max_streams')
                                 ->label('Max Streams')
                                 ->numeric()
                                 ->default(1)
                                 ->minValue(1)
-                                ->helperText('Leave as detected or override manually.')
+                                ->helperText('Use "Test" to auto-detect from provider.')
                                 ->columnSpan(1),
                             TextInput::make('priority')
                                 ->label('Priority')
@@ -1135,6 +1217,66 @@ class PlaylistResource extends Resource
                         ->reorderable()
                         ->collapsible()
                         ->itemLabel(fn (array $state): ?string => $state['name'] ?? $state['username'] ?? 'New Profile')
+                        ->extraItemActions([
+                            \Filament\Actions\Action::make('test_profile')
+                                ->label('Test')
+                                ->icon('heroicon-o-signal')
+                                ->color('info')
+                                ->tooltip('Test credentials and auto-detect max connections')
+                                ->action(function (array $arguments, Get $get, Set $set, ?Playlist $record): void {
+                                    $itemKey = $arguments['item'];
+                                    $profileData = $get("additional_profiles.{$itemKey}");
+
+                                    if (empty($profileData['username']) || empty($profileData['password'])) {
+                                        Notification::make()
+                                            ->title('Missing Credentials')
+                                            ->body('Please enter username and password first.')
+                                            ->danger()
+                                            ->send();
+                                        return;
+                                    }
+
+                                    // Get the base URL from the playlist's xtream config
+                                    $baseUrl = $record?->xtream_config['url'] ?? $record?->xtream_config['server'] ?? null;
+
+                                    if (empty($baseUrl)) {
+                                        Notification::make()
+                                            ->title('Missing Base URL')
+                                            ->body('Playlist Xtream configuration is missing the server URL.')
+                                            ->danger()
+                                            ->send();
+                                        return;
+                                    }
+
+                                    // Build xtream config for testing
+                                    $testConfig = [
+                                        'url' => $baseUrl,
+                                        'username' => $profileData['username'],
+                                        'password' => $profileData['password'],
+                                    ];
+
+                                    $result = ProfileService::testCredentials($testConfig);
+
+                                    if ($result['valid']) {
+                                        // Auto-populate max_streams with provider's max_connections
+                                        $set("additional_profiles.{$itemKey}.max_streams", $result['max_connections']);
+
+                                        $expDate = $result['exp_date'] ? " | Expires: {$result['exp_date']}" : '';
+                                        Notification::make()
+                                            ->title('Profile Valid ✓')
+                                            ->body("Status: {$result['status']} | Max Connections: {$result['max_connections']} | Active: {$result['active_cons']}{$expDate}")
+                                            ->success()
+                                            ->duration(8000)
+                                            ->send();
+                                    } else {
+                                        Notification::make()
+                                            ->title('Profile Test Failed')
+                                            ->body($result['error'] ?? 'Unknown error')
+                                            ->danger()
+                                            ->send();
+                                    }
+                                }),
+                        ])
                         ->mutateRelationshipDataBeforeCreateUsing(function (array $data, Playlist $record): array {
                             $data['user_id'] = $record->user_id;
                             $data['playlist_id'] = $record->id;

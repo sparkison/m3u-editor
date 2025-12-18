@@ -320,18 +320,29 @@ class ProfileService
             $userInfo = $xtream->userInfo(timeout: 5);
 
             if ($userInfo) {
-                $profile->update([
+                $maxConnections = (int) ($userInfo['user_info']['max_connections'] ?? 1);
+
+                // Update max_streams if not manually set (null/0) OR if it was left at the default of 1
+                // This ensures auto-detection works for profiles that weren't properly configured
+                $shouldUpdateMaxStreams = ! $profile->max_streams
+                    || $profile->max_streams <= 0
+                    || $profile->max_streams === 1;
+
+                $updateData = [
                     'provider_info' => $userInfo,
                     'provider_info_updated_at' => now(),
-                ]);
+                ];
 
-                // Update max_streams if not manually set
-                if (! $profile->max_streams || $profile->max_streams <= 0) {
-                    $maxConnections = $userInfo['user_info']['max_connections'] ?? 1;
-                    $profile->update(['max_streams' => $maxConnections]);
+                if ($shouldUpdateMaxStreams && $maxConnections > 1) {
+                    $updateData['max_streams'] = $maxConnections;
                 }
 
-                Log::info("Refreshed provider info for profile {$profile->id}");
+                $profile->update($updateData);
+
+                Log::info("Refreshed provider info for profile {$profile->id}", [
+                    'max_connections' => $maxConnections,
+                    'updated_max_streams' => $shouldUpdateMaxStreams && $maxConnections > 1,
+                ]);
 
                 return true;
             }
@@ -353,13 +364,33 @@ class ProfileService
      */
     public static function verifyCredentials(PlaylistProfile $profile): array
     {
-        try {
-            $xtreamConfig = $profile->xtream_config;
+        $xtreamConfig = $profile->xtream_config;
 
-            if (! $xtreamConfig) {
+        if (! $xtreamConfig) {
+            return [
+                'valid' => false,
+                'error' => 'No Xtream configuration available',
+            ];
+        }
+
+        return static::testCredentials($xtreamConfig);
+    }
+
+    /**
+     * Test credentials from raw Xtream config data.
+     *
+     * This can be used to verify credentials before a profile is saved,
+     * useful for the "Test Profile" action in the UI.
+     *
+     * @param  array  $xtreamConfig  Array with 'url', 'username', 'password' keys
+     */
+    public static function testCredentials(array $xtreamConfig): array
+    {
+        try {
+            if (empty($xtreamConfig['url']) || empty($xtreamConfig['username']) || empty($xtreamConfig['password'])) {
                 return [
                     'valid' => false,
-                    'error' => 'No Xtream configuration available',
+                    'error' => 'Missing required credentials (url, username, or password)',
                 ];
             }
 
@@ -379,10 +410,10 @@ class ProfileService
 
                 return [
                     'valid' => true,
-                    'username' => $info['username'] ?? $profile->username,
+                    'username' => $info['username'] ?? $xtreamConfig['username'],
                     'status' => $info['status'] ?? 'Unknown',
-                    'max_connections' => $info['max_connections'] ?? 1,
-                    'active_cons' => $info['active_cons'] ?? 0,
+                    'max_connections' => (int) ($info['max_connections'] ?? 1),
+                    'active_cons' => (int) ($info['active_cons'] ?? 0),
                     'exp_date' => isset($info['exp_date']) ? date('Y-m-d', $info['exp_date']) : null,
                     'is_trial' => $info['is_trial'] ?? false,
                 ];
@@ -413,18 +444,29 @@ class ProfileService
 
         $config = $playlist->xtream_config;
 
+        // First, test credentials to get the provider's max_connections
+        $xtreamConfig = [
+            'url' => $config['url'] ?? $config['server'] ?? '',
+            'username' => $config['username'] ?? '',
+            'password' => $config['password'] ?? '',
+        ];
+
+        $testResult = static::testCredentials($xtreamConfig);
+        $maxStreams = $testResult['valid'] ? $testResult['max_connections'] : 1;
+
         $profile = PlaylistProfile::create([
             'playlist_id' => $playlist->id,
             'user_id' => $playlist->user_id,
             'name' => 'Primary Account',
             'username' => $config['username'] ?? '',
             'password' => $config['password'] ?? '',
+            'max_streams' => $maxStreams,
             'priority' => 0,
             'enabled' => true,
             'is_primary' => true,
         ]);
 
-        // Fetch provider info
+        // Fetch and store full provider info
         static::refreshProfile($profile);
 
         return $profile;

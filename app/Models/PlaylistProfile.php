@@ -99,52 +99,55 @@ class PlaylistProfile extends Model
         return Attribute::make(
             get: function ($value, $attributes) {
                 $cacheKey = "playlist_profile:{$attributes['id']}:provider_info";
+                $result = null;
 
                 // Try to get from cache first
                 $cached = Cache::get($cacheKey);
                 if ($cached !== null) {
-                    return $cached;
-                }
-
-                // If we have a recent value in the database, use that
-                if ($value && isset($attributes['provider_info_updated_at'])) {
+                    $result = $cached;
+                } elseif ($value && isset($attributes['provider_info_updated_at'])) {
+                    // If we have a recent value in the database, use that
                     $updatedAt = \Carbon\Carbon::parse($attributes['provider_info_updated_at']);
                     if ($updatedAt->diffInMinutes(now()) < 5) {
                         $decoded = is_string($value) ? json_decode($value, true) : $value;
                         Cache::put($cacheKey, $decoded, 60);
-
-                        return $decoded;
+                        $result = $decoded;
                     }
                 }
 
-                // Fetch fresh data from the provider
-                try {
-                    $xtreamConfig = $this->xtream_config;
-                    if ($xtreamConfig) {
-                        $xtream = XtreamService::make(xtream_config: $xtreamConfig);
-                        if ($xtream) {
-                            $userInfo = $xtream->userInfo(timeout: 3);
-                            if ($userInfo) {
-                                // Update the database
-                                $this->updateQuietly([
-                                    'provider_info' => $userInfo,
-                                    'provider_info_updated_at' => now(),
-                                ]);
+                if ($result === null) {
+                    // Fetch fresh data from the provider
+                    try {
+                        $xtreamConfig = $this->xtream_config;
+                        if ($xtreamConfig) {
+                            $xtream = XtreamService::make(xtream_config: $xtreamConfig);
+                            if ($xtream) {
+                                $userInfo = $xtream->userInfo(timeout: 3);
+                                if ($userInfo) {
+                                    // Update the database
+                                    $this->updateQuietly([
+                                        'provider_info' => $userInfo,
+                                        'provider_info_updated_at' => now(),
+                                    ]);
 
-                                Cache::put($cacheKey, $userInfo, 60);
-
-                                return $userInfo;
+                                    Cache::put($cacheKey, $userInfo, 60);
+                                    $result = $userInfo;
+                                }
                             }
                         }
+                    } catch (\Exception $e) {
+                        Log::warning("Failed to fetch provider info for profile {$attributes['id']}", [
+                            'exception' => $e->getMessage(),
+                        ]);
                     }
-                } catch (\Exception $e) {
-                    Log::warning("Failed to fetch provider info for profile {$attributes['id']}", [
-                        'exception' => $e->getMessage(),
-                    ]);
                 }
 
-                // Return stored value or empty array
-                return is_string($value) ? json_decode($value, true) : ($value ?? []);
+                // Return stored value or empty array if no result
+                if ($result === null) {
+                    $result = is_string($value) ? json_decode($value, true) : ($value ?? []);
+                }
+
+                return $result;
             }
         );
     }
