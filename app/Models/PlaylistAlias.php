@@ -49,9 +49,7 @@ class PlaylistAlias extends Model
                     $configs[] = $item;
                 }
             }
-            return collect($configs)
-                ->sortBy('sort')
-                ->toArray();
+            return collect($configs)->sortBy('sort')->values()->toArray();
         }
 
         return [];

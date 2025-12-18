@@ -387,10 +387,7 @@ class PlaylistAliasResource extends Resource
 
                             $tabs = [];
                             for ($i = 0; $i < $count; $i++) {
-                                $tabLabel = isset($sourcePlaylistInfo[$i])
-                                    ? $sourcePlaylistInfo[$i]['name']
-                                    : "Provider " . ($i + 1);
-
+                                $tabLabel = "Provider " . ($i + 1);
                                 $tabs[] = Tab::make($tabLabel)
                                     ->columns(4)
                                     ->schema([
@@ -403,6 +400,10 @@ class PlaylistAliasResource extends Resource
                                         Forms\Components\TextInput::make("xtream_config.{$i}.url")
                                             ->label('Xtream API URL')
                                             ->live()
+                                            ->hintIcon(
+                                                'heroicon-m-question-mark-circle',
+                                                tooltip: 'The URL will be used to match the provider for credential swap. If a URL in the source playlist matches this URL, the credentials will be swapped with the ones defined here.'
+                                            )
                                             ->helperText(text: 'Enter the full URL using <url>:<port> format - without trailing slash (/).')
                                             ->prefixIcon('heroicon-m-globe-alt')
                                             ->maxLength(255)
@@ -413,29 +414,14 @@ class PlaylistAliasResource extends Resource
                                             ->label('Xtream API Username')
                                             ->live()
                                             ->required()
-                                            ->columnSpan(2)
-                                            ->afterStateUpdated(function (Get $get, Set $set) use ($i) {
-                                                // Auto-fill alias auth when single provider and no auth set
-                                                $count = (int) ($get('xtream_config_count') ?? 1);
-                                                if ($get('enable_proxy') && $count === 1 && !$get('username') && !$get('password')) {
-                                                    $set('username', (string)($get("xtream_config.{$i}.username") ?? ''));
-                                                    $set('password', (string)($get("xtream_config.{$i}.password") ?? ''));
-                                                }
-                                            }),
+                                            ->columnSpan(2),
                                         Forms\Components\TextInput::make("xtream_config.{$i}.password")
                                             ->label('Xtream API Password')
                                             ->live()
                                             ->required()
                                             ->columnSpan(2)
                                             ->password()
-                                            ->revealable()
-                                            ->afterStateUpdated(function (Get $get, Set $set) use ($i) {
-                                                $count = (int) ($get('xtream_config_count') ?? 1);
-                                                if ($get('enable_proxy') && $count === 1 && !$get('username') && !$get('password')) {
-                                                    $set('username', (string)($get("xtream_config.{$i}.username") ?? ''));
-                                                    $set('password', (string)($get("xtream_config.{$i}.password") ?? ''));
-                                                }
-                                            }),
+                                            ->revealable(),
                                     ]);
                             }
                             return $tabs;
