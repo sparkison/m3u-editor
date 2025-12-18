@@ -392,8 +392,14 @@ class PlaylistAliasResource extends Resource
                                     : "Provider " . ($i + 1);
 
                                 $tabs[] = Tab::make($tabLabel)
-                                    ->columns(2)
+                                    ->columns(4)
                                     ->schema([
+                                        Forms\Components\Select::make("xtream_config.{$i}.sort")
+                                            ->label('Priority')
+                                            ->options(range(1, $count))
+                                            ->default($i + 1)
+                                            ->columnSpan(1)
+                                            ->required(),
                                         Forms\Components\TextInput::make("xtream_config.{$i}.url")
                                             ->label('Xtream API URL')
                                             ->live()
@@ -401,13 +407,13 @@ class PlaylistAliasResource extends Resource
                                             ->prefixIcon('heroicon-m-globe-alt')
                                             ->maxLength(255)
                                             ->url()
-                                            ->columnSpan(2)
+                                            ->columnSpan(3)
                                             ->required(),
                                         Forms\Components\TextInput::make("xtream_config.{$i}.username")
                                             ->label('Xtream API Password')
                                             ->live()
                                             ->required()
-                                            ->columnSpan(1)
+                                            ->columnSpan(2)
                                             ->afterStateUpdated(function (Get $get, Set $set) use ($i) {
                                                 // Auto-fill alias auth when single provider and no auth set
                                                 $count = (int) ($get('xtream_config_count') ?? 1);
@@ -420,7 +426,7 @@ class PlaylistAliasResource extends Resource
                                             ->label('Xtream API Password')
                                             ->live()
                                             ->required()
-                                            ->columnSpan(1)
+                                            ->columnSpan(2)
                                             ->password()
                                             ->revealable()
                                             ->afterStateUpdated(function (Get $get, Set $set) use ($i) {

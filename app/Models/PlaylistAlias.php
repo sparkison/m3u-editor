@@ -41,12 +41,17 @@ class PlaylistAlias extends Model
         // New format: list of configs.
         if (is_array($raw)) {
             $configs = [];
-            foreach ($raw as $item) {
+            foreach ($raw as $index => $item) {
                 if (is_array($item) && !empty($item['url'])) {
+                    if (!array_key_exists('sort', $item)) {
+                        $item['sort'] = $index + 1;
+                    }
                     $configs[] = $item;
                 }
             }
-            return $configs;
+            return collect($configs)
+                ->sortBy('sort')
+                ->toArray();
         }
 
         return [];
