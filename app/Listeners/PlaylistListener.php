@@ -7,6 +7,7 @@ use App\Events\PlaylistDeleted;
 use App\Events\PlaylistUpdated;
 use App\Jobs\ProcessM3uImport;
 use App\Jobs\RunPostProcess;
+use App\Services\ProfileService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 
@@ -40,13 +41,33 @@ class PlaylistListener
 
     private function handlePlaylistUpdated(PlaylistUpdated $event)
     {
+        $playlist = $event->playlist;
+
+        // Handle primary profile creation when profiles are first enabled
+        if ($playlist->profiles_enabled && $playlist->wasChanged('profiles_enabled')) {
+            $this->ensurePrimaryProfileExists($playlist);
+        }
+
         // Handle playlist updated event
-        $event->playlist->postProcesses()->where([
+        $playlist->postProcesses()->where([
             ['event', 'updated'],
             ['enabled', true],
-        ])->get()->each(function ($postProcess) use ($event) {
-            dispatch(new RunPostProcess($postProcess, $event->playlist));
+        ])->get()->each(function ($postProcess) use ($playlist) {
+            dispatch(new RunPostProcess($postProcess, $playlist));
         });
+    }
+
+    /**
+     * Ensure a primary profile exists when profiles are enabled.
+     */
+    private function ensurePrimaryProfileExists($playlist): void
+    {
+        // Check if primary profile already exists
+        $primaryExists = $playlist->profiles()->where('is_primary', true)->exists();
+
+        if (! $primaryExists && $playlist->xtream_config) {
+            ProfileService::createPrimaryProfile($playlist);
+        }
     }
 
     private function handlePlaylistDeleted(PlaylistDeleted $event)

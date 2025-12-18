@@ -15,6 +15,23 @@ class PlaylistProfile extends Model
     use HasFactory;
 
     /**
+     * The attributes that are mass assignable.
+     */
+    protected $fillable = [
+        'playlist_id',
+        'user_id',
+        'name',
+        'username',
+        'password',
+        'max_streams',
+        'priority',
+        'enabled',
+        'is_primary',
+        'provider_info',
+        'provider_info_updated_at',
+    ];
+
+    /**
      * The attributes that should be cast to native types.
      */
     protected $casts = [
@@ -241,5 +258,83 @@ class PlaylistProfile extends Model
         }
 
         return null;
+    }
+
+    /**
+     * Transform a channel URL to use this profile's credentials.
+     */
+    public function transformChannelUrl(Channel $channel): string
+    {
+        $originalUrl = $channel->url ?? '';
+
+        // Don't transform custom URLs
+        if ($channel->url_custom) {
+            return $channel->url_custom;
+        }
+
+        return $this->transformUrl($originalUrl);
+    }
+
+    /**
+     * Transform an episode URL to use this profile's credentials.
+     */
+    public function transformEpisodeUrl(Episode $episode): string
+    {
+        $originalUrl = $episode->url ?? '';
+
+        return $this->transformUrl($originalUrl);
+    }
+
+    /**
+     * Transform a URL to use this profile's credentials.
+     *
+     * Replaces the playlist's primary credentials with this profile's credentials.
+     */
+    public function transformUrl(string $originalUrl): string
+    {
+        $playlist = $this->playlist;
+
+        if (! $playlist || ! $playlist->xtream_config) {
+            return $originalUrl;
+        }
+
+        $sourceConfig = $playlist->xtream_config;
+
+        // Extract source provider details
+        $sourceBaseUrl = rtrim((string) ($sourceConfig['server'] ?? $sourceConfig['url'] ?? ''), '/');
+        $sourceUsername = (string) ($sourceConfig['username'] ?? '');
+        $sourcePassword = (string) ($sourceConfig['password'] ?? '');
+
+        // This profile's credentials
+        $profileUsername = $this->username;
+        $profilePassword = $this->password;
+
+        // If any required value is missing, do not transform
+        if (
+            $sourceBaseUrl === '' ||
+            $sourceUsername === '' ||
+            $sourcePassword === '' ||
+            $profileUsername === '' ||
+            $profilePassword === ''
+        ) {
+            return $originalUrl;
+        }
+
+        // Pattern matches:
+        // http://domain:port/(live|series|movie)/username/password/<stream>
+        $pattern =
+            '#^' . preg_quote($sourceBaseUrl, '#') .
+            '/(live|series|movie)/' . preg_quote($sourceUsername, '#') .
+            '/' . preg_quote($sourcePassword, '#') .
+            '/(.+)$#';
+
+        if (preg_match($pattern, $originalUrl, $matches)) {
+            $streamType = $matches[1];
+            $streamIdAndExtension = $matches[2];
+
+            return "{$sourceBaseUrl}/{$streamType}/{$profileUsername}/{$profilePassword}/{$streamIdAndExtension}";
+        }
+
+        return $originalUrl;
     }
 }

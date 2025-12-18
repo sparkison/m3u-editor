@@ -32,7 +32,9 @@ use App\Rules\CheckIfUrlOrLocalPath;
 use App\Rules\Cron;
 use App\Services\EpgCacheService;
 use App\Services\M3uProxyService;
+use App\Services\ProfileService;
 use App\Services\ProxyService;
+use App\Models\PlaylistProfile;
 use Carbon\Carbon;
 use Cron\CronExpression;
 use Exception;
@@ -1051,6 +1053,94 @@ class PlaylistResource extends Resource
                         ->onColor('danger')
                         ->inline(false)
                         ->default(false),
+                ]),
+
+            // Provider Profiles Section (Xtream only)
+            Section::make('Provider Profiles')
+                ->description('Pool multiple Xtream accounts from this provider to increase concurrent stream capacity.')
+                ->icon('heroicon-o-user-group')
+                ->collapsible()
+                ->collapsed(fn (?Playlist $record): bool => ! ($record?->profiles_enabled ?? false))
+                ->hidden(fn (Get $get): bool => ! $get('xtream'))
+                ->schema([
+                    Toggle::make('profiles_enabled')
+                        ->label('Enable Provider Profiles')
+                        ->helperText('When enabled, proxy mode is required for accurate connection tracking.')
+                        ->live()
+                        ->afterStateUpdated(function (Set $set, $state) {
+                            if ($state) {
+                                $set('enable_proxy', true);
+                            }
+                        })
+                        ->inline(false)
+                        ->default(false),
+
+                    Placeholder::make('primary_profile_info')
+                        ->label('Primary Account')
+                        ->content(fn (?Playlist $record): string => $record && $record->xtream_config
+                            ? "Username: {$record->xtream_config['username']} (will become Profile #1 when profiles are enabled)"
+                            : 'Configure Xtream credentials above first.')
+                        ->visible(fn (Get $get): bool => $get('profiles_enabled')),
+
+                    Repeater::make('additional_profiles')
+                        ->label('Additional Profiles')
+                        ->relationship('profiles', fn ($query) => $query->where('is_primary', false)->orderBy('priority'))
+                        ->visible(fn (Get $get): bool => $get('profiles_enabled'))
+                        ->schema([
+                            TextInput::make('name')
+                                ->label('Profile Name')
+                                ->placeholder('Backup Account')
+                                ->columnSpan(2),
+                            TextInput::make('username')
+                                ->label('Username')
+                                ->required()
+                                ->columnSpan(1),
+                            TextInput::make('password')
+                                ->label('Password')
+                                ->password()
+                                ->revealable()
+                                ->required()
+                                ->columnSpan(1),
+                            TextInput::make('max_streams')
+                                ->label('Max Streams')
+                                ->numeric()
+                                ->default(1)
+                                ->minValue(1)
+                                ->helperText('Leave as detected or override manually.')
+                                ->columnSpan(1),
+                            TextInput::make('priority')
+                                ->label('Priority')
+                                ->numeric()
+                                ->default(fn ($record) => PlaylistProfile::where('playlist_id', $record?->playlist_id)->max('priority') + 1 ?? 1)
+                                ->helperText('Lower = tried first')
+                                ->columnSpan(1),
+                            Toggle::make('enabled')
+                                ->label('Enabled')
+                                ->default(true)
+                                ->inline(false)
+                                ->columnSpan(1),
+                        ])
+                        ->columns(4)
+                        ->addActionLabel('Add Profile')
+                        ->reorderable()
+                        ->collapsible()
+                        ->itemLabel(fn (array $state): ?string => $state['name'] ?? $state['username'] ?? 'New Profile')
+                        ->mutateRelationshipDataBeforeCreateUsing(function (array $data, Playlist $record): array {
+                            $data['user_id'] = $record->user_id;
+                            $data['playlist_id'] = $record->id;
+                            return $data;
+                        }),
+
+                    Placeholder::make('pool_status')
+                        ->label('Pool Status')
+                        ->content(function (?Playlist $record): string {
+                            if (! $record || ! $record->profiles_enabled) {
+                                return 'Enable profiles to see pool status.';
+                            }
+                            $status = ProfileService::getPoolStatus($record);
+                            return "Total Capacity: {$status['total_capacity']} streams | Active: {$status['total_active']} | Available: {$status['available']}";
+                        })
+                        ->visible(fn (Get $get, ?Playlist $record): bool => $get('profiles_enabled') && $record?->exists),
                 ]),
         ];
 
