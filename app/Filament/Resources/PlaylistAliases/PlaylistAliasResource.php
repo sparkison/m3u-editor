@@ -274,6 +274,7 @@ class PlaylistAliasResource extends Resource
                                 $set('custom_playlist_id', null);
                                 $set('group', null);
                                 $set('group_id', null);
+                                $set('selected_xtream_config_index', 0);
                                 // Reset to single config format when switching to standard playlist
                                 self::resetXtreamConfigForPlaylist($set, $state);
                             }
@@ -289,11 +290,44 @@ class PlaylistAliasResource extends Resource
                         ->options(fn() => CustomPlaylist::where('user_id', auth()->id())->pluck('name', 'id'))
                         ->searchable()
                         ->live()
+                        ->afterStateHydrated(function (Get $get, Set $set, $state, ?PlaylistAlias $record) {
+                            if (!$state) {
+                                return;
+                            }
+
+                            $customPlaylist = CustomPlaylist::find($state);
+                            $sourcePlaylists = $customPlaylist?->getSourcePlaylistsForAlias() ?? [];
+                            $expectedCount = max(1, count($sourcePlaylists));
+
+                            // Take saved config from record first (edit), fallback to form state
+                            $raw = $record?->xtream_config ?? $get('xtream_config');
+                            $configs = self::normalizeXtreamConfigs($raw);
+
+                            // Extend without wiping existing credentials
+                            while (count($configs) < $expectedCount) {
+                                $index = count($configs);
+                                $configs[] = [
+                                    'url' => $sourcePlaylists[$index]['url'] ?? '',
+                                    'username' => '',
+                                    'password' => '',
+                                ];
+                            }
+
+                            $set('xtream_config', $configs);
+                            $set('xtream_config_count', count($configs));
+
+                            // If selected index is now invalid, reset to 0
+                            $idx = (int) ($get('selected_xtream_config_index') ?? 0);
+                            if ($idx < 0 || $idx >= count($configs)) {
+                                $set('selected_xtream_config_index', 0);
+                            }
+                        })
                         ->afterStateUpdated(function (Set $set, Get $get, $state) {
                             if ($state) {
                                 $set('playlist_id', null);
                                 $set('group', null);
                                 $set('group_id', null);
+                                $set('selected_xtream_config_index', 0);
                                 // Initialize multi-provider config when switching to custom playlist
                                 self::initializeXtreamConfigForCustomPlaylist($set, $state);
                             }
@@ -334,6 +368,85 @@ class PlaylistAliasResource extends Resource
                         ->password()
                         ->revealable(),
                 ]),
+
+            Forms\Components\Select::make('selected_xtream_config_index')
+                ->label('Active Provider (Expiry / Status Source)')
+                ->helperText('Select which provider index is used for expiry/status. If invalid, it will reset to 0.')
+                ->default(0)
+                ->required()
+                ->placeholder(null)
+                ->disablePlaceholderSelection()
+                ->reactive()
+
+                // NEW: when loading/editing, if saved index is out of range, persistently reset to 0
+                ->afterStateHydrated(function (Get $get, Set $set, $state) {
+                    $raw = $get('xtream_config');
+
+                    // Normalize legacy vs list
+                    $configs = [];
+                    if (is_array($raw) && array_key_exists('url', $raw)) {
+                        $configs = [$raw];
+                    } elseif (is_array($raw)) {
+                        $configs = $raw;
+                    }
+
+                    $count = max(1, count($configs));
+                    $idx = (int) ($state ?? 0);
+
+                    if ($idx < 0 || $idx >= $count) {
+                        $set('selected_xtream_config_index', 0);
+                    }
+                })
+
+                ->options(function (Get $get): array {
+                    $opts = [];
+
+                    $raw = $get('xtream_config');
+
+                    // Normalize legacy vs list
+                    $configs = [];
+                    if (is_array($raw) && array_key_exists('url', $raw)) {
+                        $configs = [$raw];
+                    } elseif (is_array($raw)) {
+                        $configs = $raw;
+                    }
+
+                    // Custom playlist: use source playlist names
+                    if ($customPlaylistId = $get('custom_playlist_id')) {
+                        $sourceInfo = [];
+                        $customPlaylist = CustomPlaylist::find($customPlaylistId);
+                        if ($customPlaylist) {
+                            $sourceInfo = $customPlaylist->getSourcePlaylistsForAlias(); // expects ['name' => ...]
+                        }
+
+                        $count = max(1, count($sourceInfo)); // <-- FIX: base on providers, not xtream_config
+                        for ($i = 0; $i < $count; $i++) {
+                            $name = $sourceInfo[$i]['name'] ?? ("Provider " . ($i + 1));
+                            $opts[(string) $i] = $name;
+                        }
+
+                        return $opts ?: ['0' => 'Provider 1'];
+                    }
+
+                    // Standard playlist: use selected playlist name
+                    if ($playlistId = $get('playlist_id')) {
+                        $playlistName = Playlist::find($playlistId)?->name ?? 'Playlist';
+                        $opts['0'] = $playlistName;
+                        return $opts;
+                    }
+
+                    // Fallback
+                    return ['0' => 'Provider'];
+                })
+                ->visible(function (Get $get): bool {
+                    $raw = $get('xtream_config');
+
+                    if (is_array($raw) && array_key_exists('url', $raw)) {
+                        return true;
+                    }
+
+                    return is_array($raw) && count($raw) >= 1;
+                }),
 
             // Multi-Provider Config (for Custom Playlists)
             Schemas\Components\Fieldset::make('Provider Credentials')
@@ -404,7 +517,7 @@ class PlaylistAliasResource extends Resource
                                             ->columnSpan(2)
                                             ->required(),
                                         Forms\Components\TextInput::make("xtream_config.{$i}.username")
-                                            ->label('Xtream API Password')
+                                            ->label('Xtream API Username')
                                             ->live()
                                             ->required()
                                             ->columnSpan(1)
