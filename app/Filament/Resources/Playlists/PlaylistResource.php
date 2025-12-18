@@ -68,6 +68,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
+use Illuminate\Support\HtmlString;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
@@ -147,6 +148,12 @@ class PlaylistResource extends Resource
                     ->getStateUsing(function ($record) {
                         if ($record->xtream) {
                             try {
+                                // If profiles are enabled, show total capacity from all profiles
+                                if ($record->profiles_enabled) {
+                                    $poolStatus = ProfileService::getPoolStatus($record);
+                                    return $poolStatus['total_capacity'] > 0 ? $poolStatus['total_capacity'] : 'N/A';
+                                }
+                                // Otherwise show primary account max connections
                                 if ($record->xtream_status['user_info'] ?? false) {
                                     return $record->xtream_status['user_info']['max_connections'];
                                 }
@@ -156,7 +163,19 @@ class PlaylistResource extends Resource
 
                         return 'N/A';
                     })
-                    ->description(fn(Playlist $record): string => $record->xtream ? 'Active: ' . ($record->xtream_status['user_info']['active_cons'] ?? 0) : '')
+                    ->description(function (Playlist $record): string {
+                        if (! $record->xtream) {
+                            return '';
+                        }
+                        // If profiles are enabled, show combined active count
+                        if ($record->profiles_enabled) {
+                            $poolStatus = ProfileService::getPoolStatus($record);
+                            $profileCount = count($poolStatus['profiles']);
+                            return "Active: {$poolStatus['total_active']} ({$profileCount} profiles)";
+                        }
+                        // Otherwise show primary account active
+                        return 'Active: ' . ($record->xtream_status['user_info']['active_cons'] ?? 0);
+                    })
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('available_streams')
                     ->label('Proxy Streams')
@@ -1223,11 +1242,13 @@ class PlaylistResource extends Resource
                                 ->icon('heroicon-o-signal')
                                 ->color('info')
                                 ->tooltip('Test credentials and auto-detect max connections')
-                                ->action(function (array $arguments, Get $get, Set $set, ?Playlist $record): void {
+                                ->action(function (array $arguments, Repeater $component, Get $get, Set $set, ?Playlist $record): void {
+                                    // Get the item data directly from the repeater's state
                                     $itemKey = $arguments['item'];
-                                    $profileData = $get("additional_profiles.{$itemKey}");
+                                    $allItems = $component->getState();
+                                    $profileData = $allItems[$itemKey] ?? null;
 
-                                    if (empty($profileData['username']) || empty($profileData['password'])) {
+                                    if (! $profileData || empty($profileData['username']) || empty($profileData['password'])) {
                                         Notification::make()
                                             ->title('Missing Credentials')
                                             ->body('Please enter username and password first.')
@@ -1258,8 +1279,9 @@ class PlaylistResource extends Resource
                                     $result = ProfileService::testCredentials($testConfig);
 
                                     if ($result['valid']) {
-                                        // Auto-populate max_streams with provider's max_connections
-                                        $set("additional_profiles.{$itemKey}.max_streams", $result['max_connections']);
+                                        // Update the state with the new max_streams value
+                                        $allItems[$itemKey]['max_streams'] = $result['max_connections'];
+                                        $component->state($allItems);
 
                                         $expDate = $result['exp_date'] ? " | Expires: {$result['exp_date']}" : '';
                                         Notification::make()
@@ -1277,20 +1299,74 @@ class PlaylistResource extends Resource
                                     }
                                 }),
                         ])
-                        ->mutateRelationshipDataBeforeCreateUsing(function (array $data, Playlist $record): array {
+                        ->mutateRelationshipDataBeforeCreateUsing(function (array $data, Get $get, $livewire): array {
+                            $record = $livewire->getRecord();
                             $data['user_id'] = $record->user_id;
                             $data['playlist_id'] = $record->id;
+
+                            // Auto-test credentials and populate max_streams if not manually set or set to default
+                            if (($data['max_streams'] ?? 1) <= 1 && ! empty($data['username']) && ! empty($data['password'])) {
+                                $baseUrl = $record->xtream_config['url'] ?? $record->xtream_config['server'] ?? null;
+                                if ($baseUrl) {
+                                    $testConfig = [
+                                        'url' => $baseUrl,
+                                        'username' => $data['username'],
+                                        'password' => $data['password'],
+                                    ];
+                                    $result = ProfileService::testCredentials($testConfig);
+                                    if ($result['valid'] && $result['max_connections'] > 1) {
+                                        $data['max_streams'] = $result['max_connections'];
+                                    }
+                                }
+                            }
+
+                            return $data;
+                        })
+                        ->mutateRelationshipDataBeforeSaveUsing(function (array $data, Get $get, $livewire): array {
+                            $record = $livewire->getRecord();
+                            // Auto-test credentials and update max_streams if still at default
+                            if (($data['max_streams'] ?? 1) <= 1 && ! empty($data['username']) && ! empty($data['password'])) {
+                                $baseUrl = $record->xtream_config['url'] ?? $record->xtream_config['server'] ?? null;
+                                if ($baseUrl) {
+                                    $testConfig = [
+                                        'url' => $baseUrl,
+                                        'username' => $data['username'],
+                                        'password' => $data['password'],
+                                    ];
+                                    $result = ProfileService::testCredentials($testConfig);
+                                    if ($result['valid'] && $result['max_connections'] > 1) {
+                                        $data['max_streams'] = $result['max_connections'];
+                                    }
+                                }
+                            }
+
                             return $data;
                         }),
 
                     Placeholder::make('pool_status')
                         ->label('Pool Status')
-                        ->content(function (?Playlist $record): string {
+                        ->content(function (?Playlist $record): HtmlString {
                             if (! $record || ! $record->profiles_enabled) {
-                                return 'Enable profiles to see pool status.';
+                                return new HtmlString('Enable profiles to see pool status.');
                             }
                             $status = ProfileService::getPoolStatus($record);
-                            return "Total Capacity: {$status['total_capacity']} streams | Active: {$status['total_active']} | Available: {$status['available']}";
+
+                            // Build profile breakdown
+                            $profileLines = [];
+                            foreach ($status['profiles'] as $profile) {
+                                $name = $profile['is_primary'] ? '⭐ Primary' : ($profile['name'] ?? $profile['username']);
+                                $statusIcon = $profile['enabled'] ? '✓' : '✗';
+                                $profileLines[] = "{$statusIcon} {$name}: {$profile['active_connections']}/{$profile['max_streams']} streams";
+                            }
+
+                            $html = "<div class='space-y-1'>";
+                            $html .= "<div class='font-semibold'>Total: {$status['total_active']}/{$status['total_capacity']} active | {$status['available']} available</div>";
+                            if (count($profileLines) > 0) {
+                                $html .= "<div class='text-sm text-gray-500 dark:text-gray-400'>" . implode('<br>', $profileLines) . '</div>';
+                            }
+                            $html .= '</div>';
+
+                            return new HtmlString($html);
                         })
                         ->visible(fn (Get $get, ?Playlist $record): bool => $get('profiles_enabled') && $record?->exists),
                 ]),
