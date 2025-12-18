@@ -9,6 +9,7 @@ use App\Filament\Resources\VodResource\Pages;
 use App\Filament\Resources\Vods\Pages\ListVod;
 use App\Jobs\ChannelFindAndReplace;
 use App\Jobs\ChannelFindAndReplaceReset;
+use App\Jobs\FetchTmdbIds;
 use App\Jobs\MapPlaylistChannelsToEpg;
 use App\Jobs\ProcessVodChannels;
 use App\Jobs\SyncVodStrmFiles;
@@ -19,6 +20,7 @@ use App\Models\Group;
 use App\Models\Playlist;
 use App\Rules\CheckIfUrlOrLocalPath;
 use App\Services\PlaylistService;
+use App\Settings\GeneralSettings;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -649,6 +651,49 @@ class VodResource extends Resource
                     ->modalIcon('heroicon-o-arrow-down-tray')
                     ->modalDescription('Fetch and process VOD metadata for the selected channels? Only enabled VOD channels will be processed.')
                     ->modalSubmitActionLabel('Yes, process now'),
+                BulkAction::make('fetch_tmdb_ids')
+                    ->label('Fetch TMDB IDs')
+                    ->icon('heroicon-o-magnifying-glass')
+                    ->schema([
+                        Toggle::make('overwrite_existing')
+                            ->label('Overwrite Existing IDs')
+                            ->helperText('Overwrite existing TMDB/IMDB IDs? If disabled, it will only fetch IDs for items that don\'t already have them.')
+                            ->default(false),
+                    ])
+                    ->action(function ($records, $data) {
+                        $settings = app(GeneralSettings::class);
+                        if (empty($settings->tmdb_api_key)) {
+                            Notification::make()
+                                ->danger()
+                                ->title('TMDB API Key Required')
+                                ->body('Please configure your TMDB API key in Settings > TMDB before using this feature.')
+                                ->duration(10000)
+                                ->send();
+                            return;
+                        }
+
+                        $vodIds = $records->pluck('id')->toArray();
+
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new FetchTmdbIds(
+                                vodChannelIds: $vodIds,
+                                seriesIds: null,
+                                overwriteExisting: $data['overwrite_existing'] ?? false,
+                                user: auth()->user(),
+                            ));
+
+                        Notification::make()
+                            ->success()
+                            ->title("Fetching TMDB IDs for " . count($vodIds) . " VOD channel(s)")
+                            ->body('The TMDB ID lookup has been started. You will be notified when it is complete.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->deselectRecordsAfterCompletion()
+                    ->requiresConfirmation()
+                    ->modalIcon('heroicon-o-magnifying-glass')
+                    ->modalDescription('Search TMDB for matching movies and populate TMDB/IMDB IDs for the selected VOD channels? This enables Trash Guides compatibility for Radarr/Sonarr.')
+                    ->modalSubmitActionLabel('Yes, fetch IDs now'),
                 BulkAction::make('sync')
                     ->label('Sync VOD .strm files')
                     ->action(function ($records) {

@@ -54,6 +54,7 @@ class SyncVodStrmFiles implements ShouldQueue
             // Setup our channels to sync
             $channels = $this->channels ?? collect();
             if ($this->channel) {
+                $this->channel->load('group');
                 $channels->push($this->channel);
             } elseif ($this->playlist) {
                 $channels = $this->playlist->channels()
@@ -62,6 +63,7 @@ class SyncVodStrmFiles implements ShouldQueue
                         ['enabled', true],
                         ['source_id', '!=', null],
                     ])
+                    ->with('group')
                     ->get();
             }
 
@@ -115,13 +117,18 @@ class SyncVodStrmFiles implements ShouldQueue
 
                 // Create the group folder if enabled
                 if (in_array('group', $pathStructure)) {
-                    $group = $channel->group;
-                    $groupName = $group?->name ?? $group?->name_internal ?? 'Uncategorized';
+                    // Note: $channel->group is a string column (not a relation) containing the group name
+                    // Use the group column value directly, or fall back to the related Group model
+                    $groupModel = $channel->getRelation('group');
+                    $groupName = $channel->group ?? $groupModel?->name ?? $groupModel?->name_internal ?? 'Uncategorized';
                     $groupName = $applyNameFilter($groupName);
-                    $group = $cleanSpecialChars
+                    $groupFolder = $cleanSpecialChars
                         ? PlaylistService::makeFilesystemSafe($groupName, $replaceChar)
                         : PlaylistService::makeFilesystemSafe($groupName);
-                    $groupPath = $path . '/' . $group;
+                    $groupPath = $path . '/' . $groupFolder;
+                    if (! is_dir($groupPath)) {
+                        mkdir($groupPath, 0777, true);
+                    }
                     $path = $groupPath;
                 }
 
@@ -142,10 +149,24 @@ class SyncVodStrmFiles implements ShouldQueue
                         $titleFolder .= " ({$channel->year})";
                     }
 
-                    // Add TMDB ID to folder name for Trash Guides compatibility
-                    $tmdbId = $channel->info['tmdb_id'] ?? $channel->movie_data['tmdb_id'] ?? null;
+                    // Add TMDB/IMDB ID to folder name for Trash Guides compatibility
+                    // Check multiple possible locations for IDs (priority: TMDB > IMDB)
+                    $tmdbId = $channel->info['tmdb_id']
+                        ?? $channel->info['tmdb']
+                        ?? $channel->movie_data['tmdb_id']
+                        ?? $channel->movie_data['tmdb']
+                        ?? null;
+                    $imdbId = $channel->info['imdb_id']
+                        ?? $channel->info['imdb']
+                        ?? $channel->movie_data['imdb_id']
+                        ?? $channel->movie_data['imdb']
+                        ?? null;
+
+                    $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
                     if (! empty($tmdbId)) {
-                        $titleFolder .= " {tmdb-{$tmdbId}}";
+                        $titleFolder .= " {$bracket[0]}tmdb-{$tmdbId}{$bracket[1]}";
+                    } elseif (! empty($imdbId)) {
+                        $titleFolder .= " {$bracket[0]}imdb-{$imdbId}{$bracket[1]}";
                     }
 
                     $titleFolder = $cleanSpecialChars
@@ -167,13 +188,26 @@ class SyncVodStrmFiles implements ShouldQueue
                     }
                 }
 
-                // Only add TMDB ID to filename if title folder is NOT created
-                // (If title folder exists, TMDB ID is already in the folder name)
+                // Only add TMDB/IMDB ID to filename if title folder is NOT created
+                // (If title folder exists, ID is already in the folder name)
                 if (in_array('tmdb_id', $filenameMetadata) && ! $titleFolderCreated) {
-                    $tmdbId = $channel->info['tmdb_id'] ?? $channel->movie_data['tmdb_id'] ?? null;
+                    // Check multiple possible locations for IDs (priority: TMDB > IMDB)
+                    $tmdbId = $channel->info['tmdb_id']
+                        ?? $channel->info['tmdb']
+                        ?? $channel->movie_data['tmdb_id']
+                        ?? $channel->movie_data['tmdb']
+                        ?? null;
+                    $imdbId = $channel->info['imdb_id']
+                        ?? $channel->info['imdb']
+                        ?? $channel->movie_data['imdb_id']
+                        ?? $channel->movie_data['imdb']
+                        ?? null;
+
+                    $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
                     if (! empty($tmdbId)) {
-                        $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
                         $fileName .= " {$bracket[0]}tmdb-{$tmdbId}{$bracket[1]}";
+                    } elseif (! empty($imdbId)) {
+                        $fileName .= " {$bracket[0]}imdb-{$imdbId}{$bracket[1]}";
                     }
                 }
 

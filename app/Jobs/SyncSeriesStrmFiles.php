@@ -80,7 +80,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
         if (!$series->enabled) {
             return;  // Skip processing for disabled series
         }
-        
+
         $series->load('enabled_episodes', 'playlist', 'user', 'category');
 
         $playlist = $series->playlist;
@@ -161,6 +161,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
             $pathStructure = $sync_settings['path_structure'] ?? ['category', 'series', 'season'];
             $replaceChar = $sync_settings['replace_char'] ?? 'space';
             $cleanSpecialChars = $sync_settings['clean_special_chars'] ?? false;
+            $tmdbIdFormat = $sync_settings['tmdb_id_format'] ?? 'square';
 
             // Get name filtering settings
             $nameFilterEnabled = $sync_settings['name_filter_enabled'] ?? false;
@@ -206,16 +207,18 @@ class SyncSeriesStrmFiles implements ShouldQueue
                     }
                 }
 
-                // Add TVDB/TMDB ID to folder name for Trash Guides compatibility
+                // Add TVDB/TMDB/IMDB ID to folder name for Trash Guides compatibility
+                // Priority: TVDB (Sonarr's source) > TMDB > IMDB
                 $tvdbId = $series->metadata['tvdb_id'] ?? $series->metadata['tvdb'] ?? null;
                 $tmdbId = $series->metadata['tmdb_id'] ?? $series->metadata['tmdb'] ?? null;
                 $imdbId = $series->metadata['imdb_id'] ?? $series->metadata['imdb'] ?? null;
+                $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
                 if (! empty($tvdbId)) {
-                    $seriesFolder .= " {tvdb-{$tvdbId}}";
+                    $seriesFolder .= " {$bracket[0]}tvdb-{$tvdbId}{$bracket[1]}";
                 } elseif (! empty($tmdbId)) {
-                    $seriesFolder .= " {tmdb-{$tmdbId}}";
+                    $seriesFolder .= " {$bracket[0]}tmdb-{$tmdbId}{$bracket[1]}";
                 } elseif (! empty($imdbId)) {
-                    $seriesFolder .= " {imdb-{$imdbId}}";
+                    $seriesFolder .= " {$bracket[0]}imdb-{$imdbId}{$bracket[1]}";
                 }
 
                 $cleanName = $cleanSpecialChars
@@ -226,7 +229,6 @@ class SyncSeriesStrmFiles implements ShouldQueue
 
             // Get filename metadata settings
             $filenameMetadata = $sync_settings['filename_metadata'] ?? [];
-            $tmdbIdFormat = $sync_settings['tmdb_id_format'] ?? 'square';
             $removeConsecutiveChars = $sync_settings['remove_consecutive_chars'] ?? false;
 
             // Loop through each episode
