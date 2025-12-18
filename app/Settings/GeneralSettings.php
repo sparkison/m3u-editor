@@ -118,6 +118,14 @@ class GeneralSettings extends Settings
     public ?int $provider_max_concurrent_requests = 2;
 
 
+    // TMDB integration settings
+    public ?string $tmdb_api_key = null;
+    public ?bool $tmdb_auto_lookup_on_import = false;
+    public ?int $tmdb_rate_limit = 40;
+    public ?string $tmdb_language = 'en-US';
+    public ?int $tmdb_confidence_threshold = 80;
+
+
     public static function group(): string
     {
         return 'general';

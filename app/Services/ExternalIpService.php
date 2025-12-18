@@ -6,6 +6,9 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Service to fetch the external IP address of the server/container.
+ */
 class ExternalIpService
 {
     protected array $ipServices = [

@@ -5,11 +5,13 @@ namespace App\Filament\Resources\Series\Pages;
 use Filament\Actions\Action;
 use App\Jobs\SyncXtreamSeries;
 use App\Filament\Resources\Series\SeriesResource;
+use App\Jobs\FetchTmdbIds;
 use App\Jobs\ProcessM3uImportSeriesEpisodes;
 use App\Jobs\SeriesFindAndReplace;
 use App\Jobs\SyncSeriesStrmFiles;
 use App\Models\Playlist;
 use App\Models\Series;
+use App\Settings\GeneralSettings;
 use Filament\Actions;
 use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\Select;
@@ -100,6 +102,76 @@ class ListSeries extends ListRecords
                     ->modalIcon('heroicon-o-arrow-down-tray')
                     ->modalDescription('Process now? This will fetch all episodes and seasons for the enabled series.')
                     ->modalSubmitActionLabel('Yes, process now'),
+                Action::make('fetch_tmdb_ids')
+                    ->label('Fetch TMDB/TVDB IDs')
+                    ->icon('heroicon-o-magnifying-glass')
+                    ->schema([
+                        Toggle::make('overwrite_existing')
+                            ->label('Overwrite Existing IDs')
+                            ->helperText('Overwrite existing TMDB/TVDB/IMDB IDs? If disabled, it will only fetch IDs for series that don\'t have them.')
+                            ->default(false),
+                        Toggle::make('all_playlists')
+                            ->label('All Playlists')
+                            ->live()
+                            ->helperText('Fetch IDs for all enabled Playlist Series? If disabled, it will only be fetched for Series of the selected Playlist.')
+                            ->default(true),
+                        Select::make('playlist')
+                            ->label('Playlist')
+                            ->required()
+                            ->helperText('Select the Playlist you would like to fetch TMDB IDs for.')
+                            ->options(Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                            ->hidden(fn(Get $get) => $get('all_playlists') === true)
+                            ->searchable(),
+                    ])
+                    ->action(function ($data) {
+                        $settings = app(GeneralSettings::class);
+                        if (empty($settings->tmdb_api_key)) {
+                            Notification::make()
+                                ->danger()
+                                ->title('TMDB API Key Required')
+                                ->body('Please configure your TMDB API key in Settings > TMDB before using this feature.')
+                                ->duration(10000)
+                                ->send();
+                            return;
+                        }
+
+                        $query = Series::where('user_id', auth()->id())
+                            ->where('enabled', true);
+
+                        if (!($data['all_playlists'] ?? false) && !empty($data['playlist'])) {
+                            $query->where('playlist_id', $data['playlist']);
+                        }
+
+                        $seriesIds = $query->pluck('id')->toArray();
+
+                        if (empty($seriesIds)) {
+                            Notification::make()
+                                ->warning()
+                                ->title('No series found')
+                                ->body('No enabled series found matching the criteria.')
+                                ->send();
+                            return;
+                        }
+
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new FetchTmdbIds(
+                                vodChannelIds: null,
+                                seriesIds: $seriesIds,
+                                overwriteExisting: $data['overwrite_existing'] ?? false,
+                                user: auth()->user(),
+                            ));
+
+                        Notification::make()
+                            ->success()
+                            ->title("Fetching TMDB/TVDB IDs for " . count($seriesIds) . " series")
+                            ->body('The TMDB ID lookup has been started. You will be notified when it is complete.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->modalIcon('heroicon-o-magnifying-glass')
+                    ->modalDescription('Search TMDB for matching TV series and populate TMDB/TVDB/IMDB IDs? This enables Trash Guides compatibility for Sonarr.')
+                    ->modalSubmitActionLabel('Yes, fetch IDs now'),
                 Action::make('sync')
                     ->label('Sync Series .strm files')
                     ->schema([

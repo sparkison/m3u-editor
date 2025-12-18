@@ -1066,6 +1066,125 @@ class Preferences extends SettingsPage
                                             ->helperText('The "From" email address for outgoing emails. Defaults to no-reply@m3u-editor.dev.'),
                                     ]),
                             ]),
+                        Tab::make('TMDB')
+                            ->columns(2)
+                            ->schema([
+                                Section::make('TMDB Integration')
+                                    ->description('Configure The Movie Database (TMDB) integration to automatically lookup and populate metadata IDs (TMDB, TVDB, IMDB) for your VOD content and Series.')
+                                    ->columnSpanFull()
+                                    ->columns(2)
+                                    ->headerActions([
+                                        Action::make('test_tmdb_connection')
+                                            ->label('Test Connection')
+                                            ->icon('heroicon-o-signal')
+                                            ->iconPosition('after')
+                                            ->color('gray')
+                                            ->size('sm')
+                                            ->action(function ($get): void {
+                                                $apiKey = $get('tmdb_api_key');
+                                                if (empty($apiKey)) {
+                                                    Notification::make()
+                                                        ->danger()
+                                                        ->title('API Key Required')
+                                                        ->body('Please enter a TMDB API key to test the connection.')
+                                                        ->send();
+                                                    return;
+                                                }
+
+                                                try {
+                                                    $response = Http::timeout(10)->get('https://api.themoviedb.org/3/configuration', [
+                                                        'api_key' => $apiKey,
+                                                    ]);
+
+                                                    if ($response->successful()) {
+                                                        Notification::make()
+                                                            ->success()
+                                                            ->title('Connection Successful')
+                                                            ->body('Successfully connected to TMDB API!')
+                                                            ->send();
+                                                    } else {
+                                                        $error = $response->json('status_message', 'Unknown error');
+                                                        Notification::make()
+                                                            ->danger()
+                                                            ->title('Connection Failed')
+                                                            ->body("TMDB API returned an error: {$error}")
+                                                            ->send();
+                                                    }
+                                                } catch (\Exception $e) {
+                                                    Notification::make()
+                                                        ->danger()
+                                                        ->title('Connection Failed')
+                                                        ->body('Could not connect to TMDB API: ' . $e->getMessage())
+                                                        ->send();
+                                                }
+                                            }),
+                                        Action::make('get_tmdb_api_key')
+                                            ->label('Get API Key')
+                                            ->icon('heroicon-o-arrow-top-right-on-square')
+                                            ->iconPosition('after')
+                                            ->size('sm')
+                                            ->url('https://www.themoviedb.org/settings/api')
+                                            ->openUrlInNewTab(true),
+                                    ])
+                                    ->schema([
+                                        TextInput::make('tmdb_api_key')
+                                            ->label('TMDB API Key')
+                                            ->placeholder('Enter your TMDB API Key (v3 auth)')
+                                            ->password()
+                                            ->revealable()
+                                            ->columnSpanFull()
+                                            ->helperText('Your TMDB API key (v3 auth). You can get one for free at themoviedb.org.'),
+                                        Toggle::make('tmdb_auto_lookup_on_import')
+                                            ->label('Auto-lookup on import')
+                                            ->helperText('Automatically lookup TMDB IDs when importing VOD content and Series. This may slow down imports for large playlists.')
+                                            ->default(false),
+                                        TextInput::make('tmdb_rate_limit')
+                                            ->label('Rate Limit (requests/second)')
+                                            ->placeholder('40')
+                                            ->numeric()
+                                            ->minValue(1)
+                                            ->maxValue(50)
+                                            ->default(40)
+                                            ->helperText('Maximum TMDB API requests per second. TMDB allows ~40 req/s for free accounts.'),
+                                        Select::make('tmdb_language')
+                                            ->label('Search Language')
+                                            ->searchable()
+                                            ->options([
+                                                'en-US' => 'English (US)',
+                                                'en-GB' => 'English (UK)',
+                                                'de-DE' => 'German',
+                                                'fr-FR' => 'French',
+                                                'es-ES' => 'Spanish (Spain)',
+                                                'es-MX' => 'Spanish (Mexico)',
+                                                'it-IT' => 'Italian',
+                                                'pt-PT' => 'Portuguese',
+                                                'pt-BR' => 'Portuguese (Brazil)',
+                                                'nl-NL' => 'Dutch',
+                                                'pl-PL' => 'Polish',
+                                                'ru-RU' => 'Russian',
+                                                'ja-JP' => 'Japanese',
+                                                'ko-KR' => 'Korean',
+                                                'zh-CN' => 'Chinese (Simplified)',
+                                                'zh-TW' => 'Chinese (Traditional)',
+                                                'ar-SA' => 'Arabic',
+                                                'tr-TR' => 'Turkish',
+                                                'sv-SE' => 'Swedish',
+                                                'da-DK' => 'Danish',
+                                                'fi-FI' => 'Finnish',
+                                                'no-NO' => 'Norwegian',
+                                            ])
+                                            ->default('en-US')
+                                            ->helperText('Preferred language for TMDB searches.'),
+                                        TextInput::make('tmdb_confidence_threshold')
+                                            ->label('Match Confidence Threshold (%)')
+                                            ->placeholder('80')
+                                            ->numeric()
+                                            ->minValue(50)
+                                            ->maxValue(100)
+                                            ->default(80)
+                                            ->helperText('Minimum title similarity percentage (50-100) required to accept a match. Higher values = stricter matching.'),
+                                    ]),
+                            ]),
                         Tab::make('API')
                             ->schema([
                                 Section::make('API Settings')

@@ -12,6 +12,7 @@ use Filament\Forms\Components\Placeholder;
 use App\Jobs\MergeChannels;
 use App\Jobs\UnmergeChannels;
 use App\Jobs\MapPlaylistChannelsToEpg;
+use App\Jobs\FetchTmdbIds;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Forms\Components\TextInput;
 use App\Jobs\ChannelFindAndReplace;
@@ -28,6 +29,7 @@ use App\Jobs\SyncVodStrmFiles;
 use App\Models\Channel;
 use App\Models\Epg;
 use App\Models\Playlist;
+use App\Settings\GeneralSettings;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Infolists\Components\TextEntry;
@@ -193,6 +195,72 @@ class ListVod extends ListRecords
                     ->modalIcon('heroicon-o-arrow-down-tray')
                     ->modalDescription('Fetch and process VOD metadata for the selected Playlist? Only enabled VOD channels will be processed.')
                     ->modalSubmitActionLabel('Yes, process now'),
+                Action::make('fetch_tmdb_ids')
+                    ->label('Fetch TMDB IDs')
+                    ->icon('heroicon-o-magnifying-glass')
+                    ->schema([
+                        Toggle::make('overwrite_existing')
+                            ->label('Overwrite Existing IDs')
+                            ->helperText('Overwrite existing TMDB/IMDB IDs? If disabled, it will only fetch IDs for items that don\'t have them.')
+                            ->default(false),
+                        Select::make('playlist')
+                            ->label('Playlist')
+                            ->required()
+                            ->helperText('Select the Playlist you would like to fetch TMDB IDs for.')
+                            ->options(Playlist::where(['user_id' => auth()->id()])->get(['name', 'id'])->pluck('name', 'id'))
+                            ->searchable(),
+                    ])
+                    ->action(function ($data) {
+                        $settings = app(GeneralSettings::class);
+                        if (empty($settings->tmdb_api_key)) {
+                            Notification::make()
+                                ->danger()
+                                ->title('TMDB API Key Required')
+                                ->body('Please configure your TMDB API key in Settings > TMDB before using this feature.')
+                                ->duration(10000)
+                                ->send();
+                            return;
+                        }
+
+                        $playlist = Playlist::find($data['playlist'] ?? null);
+                        if (!$playlist) {
+                            return;
+                        }
+
+                        $vodIds = $playlist->channels()
+                            ->where('is_vod', true)
+                            ->where('enabled', true)
+                            ->pluck('id')
+                            ->toArray();
+
+                        if (empty($vodIds)) {
+                            Notification::make()
+                                ->warning()
+                                ->title('No VOD channels found')
+                                ->body('No enabled VOD channels found in the selected playlist.')
+                                ->send();
+                            return;
+                        }
+
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new FetchTmdbIds(
+                                vodChannelIds: $vodIds,
+                                seriesIds: null,
+                                overwriteExisting: $data['overwrite_existing'] ?? false,
+                                user: auth()->user(),
+                            ));
+
+                        Notification::make()
+                            ->success()
+                            ->title("Fetching TMDB IDs for " . count($vodIds) . " VOD channel(s)")
+                            ->body('The TMDB ID lookup has been started. You will be notified when it is complete.')
+                            ->duration(10000)
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->modalIcon('heroicon-o-magnifying-glass')
+                    ->modalDescription('Search TMDB for matching movies and populate TMDB/IMDB IDs for all VOD channels in the selected playlist? This enables Trash Guides compatibility for Radarr.')
+                    ->modalSubmitActionLabel('Yes, fetch IDs now'),
                 Action::make('sync')
                     ->label('Sync VOD .strm files')
                     ->schema([
