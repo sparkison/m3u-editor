@@ -215,6 +215,16 @@ return [
             'database' => env('REDIS_IMPORT_DB', '3'),
         ],
 
+        // Add file sync connection
+        'file_sync' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'username' => env('REDIS_USERNAME'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('REDIS_SERVER_PORT', '36790'),
+            'database' => env('REDIS_FILE_SYNC_DB', '4'),
+        ],
+
         // Add session connection
         'session' => [
             'url' => env('REDIS_URL'),

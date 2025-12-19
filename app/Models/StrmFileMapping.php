@@ -384,6 +384,64 @@ class StrmFileMapping extends Model
     }
 
     /**
+     * Restore files and directories for a given sync location from stored mappings.
+     * Returns the number of files restored.
+     */
+    public static function restoreForSyncLocation(string $syncLocation): int
+    {
+        $restored = 0;
+        $root = rtrim($syncLocation, '/');
+
+        $mappings = self::where('sync_location', $root)->get();
+
+        foreach ($mappings as $mapping) {
+            $path = $mapping->current_path;
+
+            // Sanity check: ensure mapping path is within the requested sync location
+            if (! (str_starts_with($path, $root . '/') || $path === $root)) {
+                Log::warning('STRM Sync: Skipping mapping outside sync location', [
+                    'mapping_id' => $mapping->id,
+                    'path' => $path,
+                    'sync_location' => $root,
+                ]);
+                continue;
+            }
+
+            $directory = dirname($path);
+
+            if (! is_dir($directory)) {
+                if (! @mkdir($directory, 0755, true)) {
+                    Log::warning('STRM Sync: Failed to create directory while restoring', ['directory' => $directory]);
+                    continue;
+                }
+                Log::debug('STRM Sync: Created directory during restore', ['directory' => $directory]);
+            }
+
+            // Write file if missing or content differs
+            $shouldWrite = false;
+            if (! @file_exists($path)) {
+                $shouldWrite = true;
+            } else {
+                $existing = @file_get_contents($path);
+                if ($existing !== $mapping->current_url) {
+                    $shouldWrite = true;
+                }
+            }
+
+            if ($shouldWrite) {
+                if (@file_put_contents($path, $mapping->current_url, LOCK_EX) === false) {
+                    Log::warning('STRM Sync: Failed to write file during restore', ['path' => $path]);
+                    continue;
+                }
+                Log::info('STRM Sync: Restored file from mapping', ['path' => $path]);
+                $restored++;
+            }
+        }
+
+        return $restored;
+    }
+
+    /**
      * Delete all mappings and files for syncables that no longer exist or are disabled
      */
     public static function cleanupOrphaned(string $syncableType, string $syncLocation): int
