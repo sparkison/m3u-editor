@@ -79,7 +79,17 @@ class StrmFileMapping extends Model
             return self::updateFileUrl($mapping, $url, $pathOptions);
         }
 
-        // Case 4: Nothing changed - ensure path_options stay in sync
+        // Case 4: File missing from disk - recreate it
+        if (! @file_exists($mapping->current_path)) {
+            Log::info('STRM Sync: File missing from disk, recreating', ['path' => $mapping->current_path]);
+            $directory = dirname($mapping->current_path);
+            if (! is_dir($directory)) {
+                @mkdir($directory, 0755, true);
+            }
+            @file_put_contents($mapping->current_path, $url, LOCK_EX);
+        }
+
+        // Case 5: Nothing changed - ensure path_options stay in sync
         if ($mapping->path_options != $pathOptions) {
             $mapping->path_options = $pathOptions;
             $mapping->save();
