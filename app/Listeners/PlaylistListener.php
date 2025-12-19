@@ -30,12 +30,19 @@ class PlaylistListener
 
     private function handlePlaylistCreated(PlaylistCreated $event)
     {
-        dispatch(new ProcessM3uImport(playlist: $event->playlist, isNew: true));
-        $event->playlist->postProcesses()->where([
+        $playlist = $event->playlist;
+        
+        // Create primary profile if profiles are enabled on new playlist
+        if ($playlist->profiles_enabled) {
+            $this->ensurePrimaryProfileExists($playlist);
+        }
+        
+        dispatch(new ProcessM3uImport(playlist: $playlist, isNew: true));
+        $playlist->postProcesses()->where([
             ['event', 'created'],
             ['enabled', true],
-        ])->get()->each(function ($postProcess) use ($event) {
-            dispatch(new RunPostProcess($postProcess, $event->playlist));
+        ])->get()->each(function ($postProcess) use ($playlist) {
+            dispatch(new RunPostProcess($postProcess, $playlist));
         });
     }
 
@@ -43,8 +50,9 @@ class PlaylistListener
     {
         $playlist = $event->playlist;
 
-        // Handle primary profile creation when profiles are first enabled
-        if ($playlist->profiles_enabled && $playlist->wasChanged('profiles_enabled')) {
+        // Handle primary profile creation when profiles are enabled
+        // Check both when the setting changes AND when it's already enabled (to fix missing profiles)
+        if ($playlist->profiles_enabled) {
             $this->ensurePrimaryProfileExists($playlist);
         }
 
