@@ -1345,11 +1345,32 @@ class PlaylistResource extends Resource
 
                     Placeholder::make('pool_status')
                         ->label('Pool Status')
-                        ->content(function (?Playlist $record): HtmlString {
+                        ->content(function (?Playlist $record, Get $get): HtmlString {
                             if (! $record || ! $record->profiles_enabled) {
                                 return new HtmlString('Enable profiles to see pool status.');
                             }
                             $status = ProfileService::getPoolStatus($record);
+
+                            // Check if primary profile exists - if not, estimate from xtream_status
+                            $hasPrimaryProfile = collect($status['profiles'])->contains('is_primary', true);
+                            if (! $hasPrimaryProfile && $record->xtream) {
+                                // Primary profile will be created on save - show estimated capacity
+                                $primaryMax = $record->xtream_status['user_info']['max_connections'] ?? 1;
+                                $primaryActive = $record->xtream_status['user_info']['active_cons'] ?? 0;
+                                
+                                // Add pending primary to the display
+                                array_unshift($status['profiles'], [
+                                    'is_primary' => true,
+                                    'name' => 'Primary (pending)',
+                                    'username' => $record->xtream_config['username'] ?? '',
+                                    'enabled' => true,
+                                    'max_streams' => $primaryMax,
+                                    'active_connections' => $primaryActive,
+                                ]);
+                                $status['total_capacity'] += $primaryMax;
+                                $status['total_active'] += $primaryActive;
+                                $status['available'] = max(0, $status['total_capacity'] - $status['total_active']);
+                            }
 
                             // Build profile breakdown
                             $profileLines = [];
