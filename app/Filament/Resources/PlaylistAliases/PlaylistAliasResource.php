@@ -312,17 +312,21 @@ class PlaylistAliasResource extends Resource
                 ->schema([
                     Forms\Components\Repeater::make('xtream_config')
                         ->label('Credentials')
+                        ->helperText('Provider credentials to use for this alias. At least one set of credentials is required.')
                         ->columns(2)
                         ->defaultItems(0)
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'The credential(s) URL will be used to match the provider for credential swap. If a URL in the source playlist matches a credential URL, the credentials will be swapped with the ones defined here.'
+                        )
                         ->maxItems(fn($get) => $get('custom_playlist_id') ? null : 1)
+                        ->minItems(1)
+                        ->collapsible()
+                        ->itemLabel(fn(array $state): ?string => 'Provider: ' . parse_url($state['url'] ?? '', PHP_URL_HOST))
                         ->schema([
                             Forms\Components\TextInput::make('url')
                                 ->label('Xtream API URL')
                                 ->live()
-                                ->hintIcon(
-                                    'heroicon-m-question-mark-circle',
-                                    tooltip: 'The URL will be used to match the provider for credential swap. If a URL in the source playlist matches this URL, the credentials will be swapped with the ones defined here.'
-                                )
                                 ->helperText(text: 'Enter the full URL using <url>:<port> format - without trailing slash (/).')
                                 ->prefixIcon('heroicon-m-globe-alt')
                                 ->maxLength(4000)
