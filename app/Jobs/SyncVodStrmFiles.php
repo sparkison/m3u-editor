@@ -27,7 +27,8 @@ class SyncVodStrmFiles implements ShouldQueue
         public ?Collection $channels = null,
         public ?Playlist $playlist = null,
     ) {
-        //
+        // Run file synces on the dedicated queue
+        $this->onQueue('file_sync');
     }
 
     /**
@@ -78,18 +79,25 @@ class SyncVodStrmFiles implements ShouldQueue
                 $syncLocation = rtrim($sync_settings['sync_location'], '/');
                 $path = $syncLocation;
                 if (! is_dir($path)) {
-                    if ($this->notify) {
-                        Notification::make()
-                            ->danger()
-                            ->title("Error sync .strm files for VOD channel \"{$channel->title}\"")
-                            ->body("Sync location \"{$path}\" does not exist.")
-                            ->broadcast($channel->user)
-                            ->sendToDatabase($channel->user);
-                    } else {
-                        Log::error("Error sync .strm files for VOD channel \"{$channel->title}\": Sync location \"{$path}\" does not exist.");
+                    // Attempt to create the base sync location and restore files from mappings
+                    if (! @mkdir($path, 0755, true)) {
+                        if ($this->notify) {
+                            Notification::make()
+                                ->danger()
+                                ->title("Error sync .strm files for VOD channel \"{$channel->title}\"")
+                                ->body("Sync location \"{$path}\" does not exist.")
+                                ->broadcast($channel->user)
+                                ->sendToDatabase($channel->user);
+                        } else {
+                            Log::error("Error sync .strm files for VOD channel \"{$channel->title}\": Sync location \"{$path}\" does not exist.");
+                        }
+
+                        return;
                     }
 
-                    return;
+                    // If directory was created, attempt to restore files from DB mappings
+                    $restored = StrmFileMapping::restoreForSyncLocation($syncLocation);
+                    Log::info('STRM Sync: Created missing sync location and restored files', ['sync_location' => $syncLocation, 'restored' => $restored]);
                 }
 
                 // Get path structure and replacement character settings
