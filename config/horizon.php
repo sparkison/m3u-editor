@@ -185,7 +185,7 @@ return [
             'queue' => ['default', 'import'],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
-            'maxProcesses' => (bool) env('ENABLE_POSTGRES', false) ? 10 : 1,
+            'maxProcesses' => env('DB_CONNECTION', 'sqlite') === 'pgsql' ? 10 : 1,
             'maxTime' => 0,
             'maxJobs' => 0,
             'memory' => 512, // MB
