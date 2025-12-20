@@ -40,6 +40,7 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use ShuvroRoy\FilamentSpatieLaravelBackup\FilamentSpatieLaravelBackupPlugin;
+use Saade\FilamentLaravelLog\FilamentLaravelLogPlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -128,6 +129,15 @@ class AdminPanelProvider extends PanelProvider
                 FilamentSpatieLaravelBackupPlugin::make()
                     ->authorize(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true))
                     ->usingPage(Backups::class),
+                FilamentLaravelLogPlugin::make()
+                    ->authorize(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true))
+                    ->navigationGroup('Tools')
+                    ->navigationLabel('Logs')
+                    ->navigationIcon(null)
+                    ->activeNavigationIcon(null)
+                    ->navigationSort(6)
+                    ->title('Application Logs')
+                    ->slug('logs'),
             ])
             ->maxContentWidth($settings['content_width'])
             ->middleware([

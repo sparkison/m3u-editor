@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @import '../../vendor/filament/filament/resources/css/theme.css';
+@import '../../vendor/saade/filament-laravel-log/resources/css/filament-laravel-log.css';
 
 @import "./globals/global.scss";
 
@@ -14,7 +15,8 @@
 @source '../../resources/js/vendor';
 
 /* Filament plugins */
-@source '../../vendor/gboquizosanchez/filament-log-viewer/resources/views*.blade.php';
+@source '../../vendor/saade/filament-laravel-log/resources/views/**/*.blade.php';
+
 
 /* EPG Viewer Mobile Optimizations */
 @media (max-width: 767px) {
