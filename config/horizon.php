@@ -182,10 +182,11 @@ return [
     'defaults' => [
         'm3u-editor-queue' => [
             'connection' => 'redis',
-            'queue' => ['default', 'import'],
+            'queue' => ['default', 'import', 'file_sync'],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
-            'maxProcesses' => (bool) env('ENABLE_POSTGRES', false) ? 10 : 1,
+            // Set maxProcesses to 1 if using SQLite to avoid database locks
+            'maxProcesses' => env('DB_CONNECTION', 'sqlite') === 'sqlite' ? 1 : 12,
             'maxTime' => 0,
             'maxJobs' => 0,
             'memory' => 512, // MB
