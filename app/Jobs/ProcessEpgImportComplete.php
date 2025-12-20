@@ -6,6 +6,7 @@ use App\Enums\Status;
 use App\Events\SyncCompleted;
 use App\Models\EpgChannel;
 use App\Models\Job;
+use App\Models\JobProgress;
 use App\Models\User;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
@@ -72,6 +73,12 @@ class ProcessEpgImportComplete implements ShouldQueue
             'progress' => 100,
             'processing' => false,
         ]);
+
+        // Mark job progress as completed for EPG jobs
+        JobProgress::forTrackable($epg)
+            ->where('job_type', ProcessEpgImport::class)
+            ->active()
+            ->each(fn (JobProgress $job) => $job->complete('EPG sync completed successfully.'));
 
         // Check if there are any sync jobs that should be re-run
         $epg->epgMaps()->where('recurring', true)->get()->each(function ($map) {

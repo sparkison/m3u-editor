@@ -2,7 +2,6 @@
 
 namespace App\Providers\Filament;
 
-use AchyutN\FilamentLogViewer\FilamentLogViewer;
 use App\Filament\Auth\EditProfile;
 use App\Filament\Auth\Login;
 use App\Filament\Pages\Backups;
@@ -78,7 +77,7 @@ class AdminPanelProvider extends PanelProvider
                     ->recoverable(),
             ])
             ->brandName('m3u editor')
-            ->brandLogo(fn() => view('filament.admin.logo'))
+            ->brandLogo(fn () => view('filament.admin.logo'))
             ->favicon('/favicon.png')
             ->brandLogoHeight('2.5rem')
             ->databaseNotifications()
@@ -124,7 +123,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->plugins([
                 FilamentSpatieLaravelBackupPlugin::make()
-                    ->authorize(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true))
+                    ->authorize(fn (): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true))
                     ->usingPage(Backups::class),
             ])
             ->maxContentWidth($settings['content_width'])
@@ -146,7 +145,7 @@ class AdminPanelProvider extends PanelProvider
             ->viteTheme('resources/css/app.css')
             ->unsavedChangesAlerts()
             ->spa()
-            ->spaUrlExceptions(fn(): array => [
+            ->spaUrlExceptions(fn (): array => [
                 '*/playlist.m3u',
                 '*/epg.xml',
                 'epgs/*/epg.xml',
@@ -168,12 +167,18 @@ class AdminPanelProvider extends PanelProvider
         if ($settings['output_wan_address']) {
             FilamentView::registerRenderHook(
                 PanelsRenderHook::GLOBAL_SEARCH_BEFORE, // Place it before the global search
-                fn(): string => view('components.external-ip-display')->render()
+                fn (): string => view('components.external-ip-display')->render()
             );
         }
 
+        // Register background jobs indicator in the header
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::GLOBAL_SEARCH_BEFORE,
+            fn (): string => view('components.job-indicator')->render()
+        );
+
         // Register our custom app js
-        FilamentView::registerRenderHook('panels::body.end', fn() => Blade::render("@vite('resources/js/app.js')"));
+        FilamentView::registerRenderHook('panels::body.end', fn () => Blade::render("@vite('resources/js/app.js')"));
 
         // Return the configured panel
         return $adminPanel;

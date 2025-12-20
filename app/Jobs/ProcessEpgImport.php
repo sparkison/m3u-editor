@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Enums\EpgSourceType;
 use App\Traits\ProviderRequestDelay;
+use App\Traits\TracksJobProgress;
 use Exception;
 use XMLReader;
 use Throwable;
@@ -26,6 +27,7 @@ class ProcessEpgImport implements ShouldQueue
 {
     use Queueable;
     use ProviderRequestDelay;
+    use TracksJobProgress;
 
     // To prevent errors when processing large files, limit imported channels to 50,000
     // NOTE: this only applies to M3U+ files
@@ -92,6 +94,13 @@ class ProcessEpgImport implements ShouldQueue
                 return;
             }
         }
+
+        // Initialize job progress tracking
+        $this->initializeJobProgress(
+            name: "Syncing EPG: {$this->epg->name}",
+            trackable: $this->epg
+        );
+        $this->startJobProgress();
 
         // Update the EPG status to processing
         $this->epg->update([
@@ -385,6 +394,10 @@ class ProcessEpgImport implements ShouldQueue
                 // Get the jobs for the batch
                 $jobs = [];
                 $batchCount = Job::where('batch_no', $batchNo)->count();
+                
+                // Update job progress with actual item count
+                $this->setTotalItems($batchCount);
+                
                 $jobsBatch = Job::where('batch_no', $batchNo)->select('id')->cursor();
                 $jobsBatch->chunk(100)->each(function ($chunk) use (&$jobs, $batchCount) {
                     $jobs[] = new ProcessEpgImportChunk($chunk->pluck('id')->toArray(), $batchCount);

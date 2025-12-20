@@ -6,6 +6,7 @@ use App\Enums\Status;
 use App\Models\Epg;
 use App\Models\EpgMap;
 use App\Models\Job;
+use App\Models\JobProgress;
 use App\Models\Playlist;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
@@ -73,6 +74,12 @@ class MapEpgToChannelsComplete implements ShouldQueue
                 'processing' => false,
             ]);
         }
+
+        // Mark job progress as completed for EPG mapping jobs
+        JobProgress::forTrackable($this->epg)
+            ->where('job_type', MapPlaylistChannelsToEpg::class)
+            ->active()
+            ->each(fn (JobProgress $job) => $job->complete("EPG mapping completed. Mapped {$actualMappedCount} of {$this->channelCount} channels."));
 
         // Notify the user
         $epg = $this->epg;

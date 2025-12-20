@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Enums\Status;
+use App\Models\JobProgress;
 use App\Models\Playlist;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -41,6 +42,12 @@ class ProcessVodChannelsComplete implements ShouldQueue
             'errors' => null,
             'vod_progress' => 100,
         ]);
+
+        // Mark job progress as completed for VOD jobs
+        JobProgress::forTrackable($this->playlist)
+            ->where('job_type', ProcessVodChannels::class)
+            ->active()
+            ->each(fn (JobProgress $job) => $job->complete('VOD sync completed successfully.'));
 
         $message = "VOD sync completed successfully for playlist \"{$this->playlist->name}\".";
 

@@ -4,9 +4,11 @@ namespace App\Jobs;
 
 use App\Enums\Status;
 use App\Models\Channel;
+use App\Models\JobProgress;
 use App\Models\Playlist;
 use App\Services\XtreamService;
 use App\Traits\ProviderRequestDelay;
+use App\Traits\TracksJobProgress;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -18,6 +20,7 @@ class ProcessVodChannels implements ShouldQueue
 {
     use Queueable;
     use ProviderRequestDelay;
+    use TracksJobProgress;
 
     // Don't retry the job on failure
     public $tries = 1;
@@ -59,6 +62,13 @@ class ProcessVodChannels implements ShouldQueue
             $this->processSingleChannel($xtream, $playlist);
             return;
         }
+
+        // Initialize job progress tracking for bulk processing
+        $this->initializeJobProgress(
+            name: "Processing VOD: {$playlist->name}",
+            trackable: $playlist
+        );
+        $this->startJobProgress();
 
         // For bulk processing, use chunked approach
         $this->processVodChannelsInChunks($playlist);
@@ -154,6 +164,9 @@ class ProcessVodChannels implements ShouldQueue
 
         // Calculate total chunks without loading all IDs into memory
         $totalChunks = (int) ceil($total / self::CHUNK_SIZE);
+        
+        // Update job progress with actual item count
+        $this->setTotalItems($total);
 
         Log::info("Starting chunked VOD processing for playlist ID {$playlist->id}: {$total} channels in {$totalChunks} chunks");
 

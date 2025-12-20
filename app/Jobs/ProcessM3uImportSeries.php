@@ -5,7 +5,9 @@ namespace App\Jobs;
 use Exception;
 use App\Enums\Status;
 use App\Events\SyncCompleted;
+use App\Models\JobProgress;
 use App\Models\Playlist;
+use App\Traits\TracksJobProgress;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Str;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -17,6 +19,7 @@ use Throwable;
 class ProcessM3uImportSeries implements ShouldQueue
 {
     use Queueable;
+    use TracksJobProgress;
 
     public $tries = 1;
     public $timeout = 60 * 60 * 1; // 1 hour
@@ -49,6 +52,13 @@ class ProcessM3uImportSeries implements ShouldQueue
             }
         }
 
+        // Initialize job progress tracking
+        $this->initializeJobProgress(
+            name: "Syncing Series: {$this->playlist->name}",
+            trackable: $this->playlist
+        );
+        $this->startJobProgress();
+
         // Set the batch number
         if (!$this->batchNo) {
             $this->batchNo = Str::orderedUuid()->toString();
@@ -75,12 +85,18 @@ class ProcessM3uImportSeries implements ShouldQueue
         try {
             $jobs = [];
             $series = $this->playlist->series()->where('enabled', true)->cursor();
+            $seriesCount = 0;
             foreach ($series as $seriesItem) {
                 $jobs[] = new ProcessM3uImportSeriesEpisodes(
                     playlistSeries: $seriesItem,
                     notify: false, // don't notify user for bulk syncs
                 );
+                $seriesCount++;
             }
+            
+            // Update job progress with actual item count
+            $this->setTotalItems($seriesCount);
+            
             $jobs[] = new ProcessM3uImportSeriesComplete(
                 playlist: $this->playlist,
                 batchNo: $this->batchNo,

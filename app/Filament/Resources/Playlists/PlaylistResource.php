@@ -22,6 +22,7 @@ use App\Livewire\PlaylistInfo;
 use App\Livewire\PlaylistM3uUrl;
 use App\Livewire\XtreamApiInfo;
 use App\Models\Category;
+use App\Models\JobProgress;
 use App\Models\Playlist;
 use App\Models\PlaylistAuth;
 use App\Models\SharedStream;
@@ -297,7 +298,13 @@ class PlaylistResource extends Resource
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
-                        ->modalDescription('Process playlist now?')
+                        ->modalDescription(function ($record) {
+                            $activeJobs = JobProgress::forTrackable($record)->active()->count();
+                            if ($activeJobs > 0) {
+                                return "⚠️ There are {$activeJobs} background job(s) already running for this playlist. This sync will be queued and start after the current jobs complete.";
+                            }
+                            return 'Process playlist now?';
+                        })
                         ->modalSubmitActionLabel('Yes, process now'),
                     Action::make('reset_processing')
                         ->label('Reset Processing State')
@@ -347,7 +354,13 @@ class PlaylistResource extends Resource
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-down-tray')
                         ->modalIcon('heroicon-o-arrow-down-tray')
-                        ->modalDescription('Fetch Series metadata for this playlist now? Only enabled Series will be included.')
+                        ->modalDescription(function ($record) {
+                            $activeJobs = JobProgress::forTrackable($record)->active()->count();
+                            if ($activeJobs > 0) {
+                                return "⚠️ There are {$activeJobs} background job(s) already running for this playlist. This sync will be queued and start after the current jobs complete.\n\nFetch Series metadata for this playlist now? Only enabled Series will be included.";
+                            }
+                            return 'Fetch Series metadata for this playlist now? Only enabled Series will be included.';
+                        })
                         ->modalSubmitActionLabel('Yes, process now'),
                     Action::make('process_vod')
                         ->label('Fetch VOD Metadata')
@@ -372,7 +385,13 @@ class PlaylistResource extends Resource
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-down-tray')
                         ->modalIcon('heroicon-o-arrow-down-tray')
-                        ->modalDescription('Fetch VOD metadata for this playlist now? Only enabled VOD channels will be included.')
+                        ->modalDescription(function ($record) {
+                            $activeJobs = JobProgress::forTrackable($record)->active()->count();
+                            if ($activeJobs > 0) {
+                                return "⚠️ There are {$activeJobs} background job(s) already running for this playlist. This sync will be queued and start after the current jobs complete.\n\nFetch VOD metadata for this playlist now? Only enabled VOD channels will be included.";
+                            }
+                            return 'Fetch VOD metadata for this playlist now? Only enabled VOD channels will be included.';
+                        })
                         ->modalSubmitActionLabel('Yes, process now'),
                     Action::make('Download M3U')
                         ->label('Download M3U')
@@ -599,7 +618,16 @@ class PlaylistResource extends Resource
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
-                        ->modalDescription('Process the selected playlist(s) now?')
+                        ->modalDescription(function (Collection $records) {
+                            $totalActiveJobs = 0;
+                            foreach ($records as $record) {
+                                $totalActiveJobs += JobProgress::forTrackable($record)->active()->count();
+                            }
+                            if ($totalActiveJobs > 0) {
+                                return "⚠️ There are {$totalActiveJobs} background job(s) already running for the selected playlist(s). New syncs will be queued and start after the current jobs complete.\n\nProcess the selected playlist(s) now?";
+                            }
+                            return 'Process the selected playlist(s) now?';
+                        })
                         ->modalSubmitActionLabel('Yes, process now'),
                     BulkAction::make('reset')
                         ->label('Reset status')
@@ -687,7 +715,13 @@ class PlaylistResource extends Resource
                     ->requiresConfirmation()
                     ->icon('heroicon-o-arrow-path')
                     ->modalIcon('heroicon-o-arrow-path')
-                    ->modalDescription('Process playlist now?')
+                    ->modalDescription(function ($record) {
+                        $activeJobs = JobProgress::forTrackable($record)->active()->count();
+                        if ($activeJobs > 0) {
+                            return "⚠️ There are {$activeJobs} background job(s) already running for this playlist. This sync will be queued and start after the current jobs complete.";
+                        }
+                        return 'Process playlist now?';
+                    })
                     ->modalSubmitActionLabel('Yes, process now'),
                 Action::make('process_series')
                     ->label('Fetch Series Metadata')
@@ -712,7 +746,13 @@ class PlaylistResource extends Resource
                     ->requiresConfirmation()
                     ->icon('heroicon-o-arrow-down-tray')
                     ->modalIcon('heroicon-o-arrow-down-tray')
-                    ->modalDescription('Fetch Series metadata for this playlist now? Only enabled Series will be included.')
+                    ->modalDescription(function ($record) {
+                        $activeJobs = JobProgress::forTrackable($record)->active()->count();
+                        if ($activeJobs > 0) {
+                            return "⚠️ There are {$activeJobs} background job(s) already running for this playlist. This sync will be queued and start after the current jobs complete.\n\nFetch Series metadata for this playlist now? Only enabled Series will be included.";
+                        }
+                        return 'Fetch Series metadata for this playlist now? Only enabled Series will be included.';
+                    })
                     ->modalSubmitActionLabel('Yes, process now'),
                 Action::make('process_vod')
                     ->label('Fetch VOD Metadata')
@@ -737,7 +777,13 @@ class PlaylistResource extends Resource
                     ->requiresConfirmation()
                     ->icon('heroicon-o-arrow-down-tray')
                     ->modalIcon('heroicon-o-arrow-down-tray')
-                    ->modalDescription('Fetch VOD metadata for this playlist now? Only enabled VOD channels will be included.')
+                    ->modalDescription(function ($record) {
+                        $activeJobs = JobProgress::forTrackable($record)->active()->count();
+                        if ($activeJobs > 0) {
+                            return "⚠️ There are {$activeJobs} background job(s) already running for this playlist. This sync will be queued and start after the current jobs complete.\n\nFetch VOD metadata for this playlist now? Only enabled VOD channels will be included.";
+                        }
+                        return 'Fetch VOD metadata for this playlist now? Only enabled VOD channels will be included.';
+                    })
                     ->modalSubmitActionLabel('Yes, process now'),
                 Action::make('reset_processing')
                     ->label('Reset Processing State')
@@ -1434,26 +1480,35 @@ class PlaylistResource extends Resource
                 ->columnSpanFull()
                 ->collapsible()
                 ->collapsed($creating)
-                ->columns(2)
+                ->columns(3)
                 ->schema([
                     Toggle::make('auto_fetch_series_metadata')
-                        ->label('Fetch metadata & sync stream files')
+                        ->label('Fetch metadata')
                         ->inline(false)
                         ->hintIcon(
                             'heroicon-m-question-mark-circle',
-                            tooltip: 'Recommend leaving this disabled, unless you are including Series in the M3U output, or syncing stream files. When accessing via the Xtream API, metadata will be automatically fetched'
+                            tooltip: 'Enable this to automatically fetch metadata for enabled series. When accessing via the Xtream API, metadata will be automatically fetched.'
                         )
                         ->default(false)
-                        ->helperText('This will only fetch metadata/sync stream files for enabled series. When disabled, series metadata will be fetched automatically when access via the Xtream API for this playlist.'),
+                        ->helperText('This will only fetch metadata for enabled series.'),
+                    Toggle::make('auto_sync_series_stream_files')
+                        ->label('Sync stream files')
+                        ->inline(false)
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'Enable this to automatically sync .strm files for enabled series episodes when syncing metadata.'
+                        )
+                        ->default(false)
+                        ->helperText('This will only sync stream files for enabled series.'),
                     Toggle::make('include_series_in_m3u')
                         ->label('Include series in M3U output')
                         ->inline(false)
                         ->hintIcon(
                             'heroicon-m-question-mark-circle',
-                            tooltip: 'Enable this to output your enabled series in the M3U file. It is recommended to enable the "Auto-fetch series metadata" option when enabled, otherwise you will need to manually fetch metadata for each series.'
+                            tooltip: 'Enable this to output your enabled series in the M3U file. It is recommended to enable the "Fetch metadata" option when enabled.'
                         )
                         ->default(false)
-                        ->helperText('When enabled, series will be included in the M3U output. It is recommended to enable the "Auto-fetch series metadata" option when enabled.'),
+                        ->helperText('When enabled, series will be included in the M3U output. It is recommended to enable the "Fetch metadata" option when enabled.'),
                 ])->hidden(fn(Get $get): bool => ! $get('xtream')),
 
             Section::make('VOD Processing')

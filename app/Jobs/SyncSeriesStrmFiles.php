@@ -4,11 +4,13 @@ namespace App\Jobs;
 
 use App\Facades\ProxyFacade;
 use App\Models\Episode;
+use App\Models\Playlist;
 use App\Models\Series;
 use App\Models\StrmFileMapping;
 use App\Models\User;
 use App\Services\PlaylistService;
 use App\Settings\GeneralSettings;
+use App\Traits\TracksJobProgress;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -17,6 +19,7 @@ use Illuminate\Support\Facades\Log;
 class SyncSeriesStrmFiles implements ShouldQueue
 {
     use Queueable;
+    use TracksJobProgress;
 
     /**
      * Create a new job instance.
@@ -44,6 +47,34 @@ class SyncSeriesStrmFiles implements ShouldQueue
             // Disable notifications for bulk processing
             $this->notify = false;
 
+            // Get the playlist for tracking
+            $playlist = $this->playlist_id ? Playlist::find($this->playlist_id) : null;
+
+            // Count total series for progress tracking
+            $totalSeries = Series::query()
+                ->where([
+                    ['enabled', true],
+                    ['user_id', $this->user_id],
+                ])
+                ->when($this->playlist_id, function ($query) {
+                    $query->where('playlist_id', $this->playlist_id);
+                })
+                ->count();
+
+            // Initialize job progress tracking
+            $jobName = $playlist 
+                ? "Series STRM Sync: {$playlist->name}"
+                : "Series STRM Sync";
+            $this->initializeJobProgress(
+                name: $jobName,
+                trackable: $playlist,
+                totalItems: $totalSeries
+            );
+            $this->startJobProgress();
+
+            // Track processed count
+            $processedCount = 0;
+
             // Process all series in chunks
             Series::query()
                 ->where([
@@ -54,11 +85,20 @@ class SyncSeriesStrmFiles implements ShouldQueue
                     $query->where('playlist_id', $this->playlist_id);
                 })
                 ->with(['enabled_episodes', 'playlist', 'user', 'category'])
-                ->chunkById(100, function ($seriesChunk) use ($settings) {
-                    foreach ($seriesChunk as $series) {
-                        $this->fetchMetadataForSeries($series, $settings);
+                ->chunkById(100, function ($seriesChunk) use ($settings, &$processedCount) {
+                    foreach ($seriesChunk as $seriesItem) {
+                        $this->fetchMetadataForSeries($seriesItem, $settings);
+                        $processedCount++;
+                        
+                        // Update progress every 10 series
+                        if ($processedCount % 10 === 0) {
+                            $this->updateJobProgress($processedCount);
+                        }
                     }
                 });
+
+            // Mark job as completed
+            $this->completeJobProgress("Series STRM sync completed. Processed {$processedCount} series.");
 
             // Notify the user we're done!
             if ($this->user_id) {
@@ -81,7 +121,10 @@ class SyncSeriesStrmFiles implements ShouldQueue
             return;  // Skip processing for disabled series
         }
 
-        $series->load('enabled_episodes', 'playlist', 'user', 'category');
+        // Only load relations if not already loaded (bulk processing pre-loads them)
+        if (!$series->relationLoaded('enabled_episodes')) {
+            $series->load('enabled_episodes', 'playlist', 'user', 'category');
+        }
 
         $playlist = $series->playlist;
         try {

@@ -8,6 +8,7 @@ use App\Models\Playlist;
 use App\Models\StrmFileMapping;
 use App\Services\PlaylistService;
 use App\Settings\GeneralSettings;
+use App\Traits\TracksJobProgress;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\Log;
 class SyncVodStrmFiles implements ShouldQueue
 {
     use Queueable;
+    use TracksJobProgress;
 
     /**
      * Create a new job instance.
@@ -66,6 +68,23 @@ class SyncVodStrmFiles implements ShouldQueue
                     ->with('group')
                     ->get();
             }
+
+            // Initialize job progress tracking (only for bulk operations, not single channel)
+            $channelCount = $channels->count();
+            if ($channelCount > 1 || $this->playlist) {
+                $jobName = $this->playlist 
+                    ? "VOD STRM Sync: {$this->playlist->name}"
+                    : "VOD STRM Sync";
+                $this->initializeJobProgress(
+                    name: $jobName,
+                    trackable: $this->playlist,
+                    totalItems: $channelCount
+                );
+                $this->startJobProgress();
+            }
+
+            // Track processed count
+            $processedCount = 0;
 
             // Loop through each channel and sync
             foreach ($channels as $channel) {
@@ -251,6 +270,17 @@ class SyncVodStrmFiles implements ShouldQueue
                     $url,
                     $pathOptions
                 );
+
+                // Update job progress
+                $processedCount++;
+                if ($this->jobProgress && $processedCount % 100 === 0) {
+                    $this->updateJobProgress($processedCount);
+                }
+            }
+
+            // Final progress update before completion
+            if ($this->jobProgress && $processedCount > 0) {
+                $this->updateJobProgress($processedCount);
             }
 
             // Clean up orphaned files for disabled/deleted channels
@@ -261,9 +291,13 @@ class SyncVodStrmFiles implements ShouldQueue
                     $syncLocation
                 );
             }
+
+            // Mark job as completed
+            $this->completeJobProgress("VOD STRM sync completed. Processed {$processedCount} files.");
         } catch (\Exception $e) {
             // Log the exception or handle it as needed
             Log::error('Error syncing VOD .strm files: ' . $e->getMessage());
+            $this->failJobProgress('VOD STRM sync failed: ' . $e->getMessage());
         }
     }
 }

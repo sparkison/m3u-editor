@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Enums\Status;
+use App\Traits\TracksJobProgress;
 use Throwable;
 use Exception;
 use App\Models\Channel;
@@ -19,6 +20,7 @@ use Illuminate\Support\Str;
 class MapPlaylistChannelsToEpg implements ShouldQueue
 {
     use Queueable;
+    use TracksJobProgress;
 
     // Don't retry the job on failure
     public $tries = 1;
@@ -58,8 +60,20 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
             return;
         }
 
-        // Create the record
+        // Fetch playlist for job progress tracking
         $playlist = $this->playlist ? Playlist::find($this->playlist) : null;
+        
+        // Initialize job progress tracking
+        $jobName = $playlist 
+            ? "EPG Mapping: {$epg->name} -> {$playlist->name}"
+            : "EPG Mapping: {$epg->name}";
+        $this->initializeJobProgress(
+            name: $jobName,
+            trackable: $epg
+        );
+        $this->startJobProgress();
+
+        // Create the record
         $subtext = $playlist ? ' -> ' . $playlist->name . ' mapping' : ' custom channel mapping';
         if ($this->epgMapId) {
             // Fetch and update existing map record
@@ -156,6 +170,9 @@ class MapPlaylistChannelsToEpg implements ShouldQueue
 
             // Get the total channel count for processing
             $channelCount = $channels->count();
+            
+            // Update job progress with actual item count
+            $this->setTotalItems($channelCount);
 
             // Create jobs array for batch processing
             $jobs = [];

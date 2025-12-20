@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Enums\Status;
 use App\Events\SyncCompleted;
 use App\Models\Job;
+use App\Models\JobProgress;
 use App\Models\Playlist;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -41,6 +42,21 @@ class ProcessM3uImportSeriesComplete implements ShouldQueue
             'errors' => null,
             'series_progress' => 100,
         ]);
+
+        // Mark job progress as completed for series jobs
+        JobProgress::forTrackable($this->playlist)
+            ->where('job_type', ProcessM3uImportSeries::class)
+            ->active()
+            ->each(fn (JobProgress $job) => $job->complete('Series sync completed successfully.'));
+
+        // Sync stream files for series, if enabled
+        if ($this->playlist->auto_sync_series_stream_files) {
+            dispatch(new SyncSeriesStrmFiles(
+                playlist_id: $this->playlist->id,
+                user_id: $this->playlist->user_id,
+            ));
+        }
+
         $message = "Series sync completed successfully for playlist \"{$this->playlist->name}\".";
         Notification::make()
             ->success()
