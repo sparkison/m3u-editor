@@ -884,12 +884,16 @@ class XtreamApiController extends Controller
                 return response()->json(['error' => 'Series not found or not enabled'], 404);
             }
 
-            // Check if series metadata has been fetched, and if so how recently
-            if (!$seriesItem->last_metadata_fetch || $seriesItem->last_metadata_fetch < now()->subDays(1)) {
+            // Check if this is a media server integration series (already has metadata from sync)
+            $isMediaServerSeries = !empty($seriesItem->metadata['media_server_id'] ?? null);
+
+            // Only try to fetch metadata for non-media-server series that need refresh
+            if (!$isMediaServerSeries && (!$seriesItem->last_metadata_fetch || $seriesItem->last_metadata_fetch < now()->subDays(1))) {
                 // Either no metadata, or stale metadata
                 $results = $seriesItem->fetchMetadata(sync: false);
                 if ($results === false) {
-                    return response()->json(['error' => 'Failed to fetch series metadata'], 500);
+                    // For non-Xtream playlists without metadata, continue anyway with existing data
+                    // instead of returning an error
                 }
 
                 // Metadata fetched successfully
