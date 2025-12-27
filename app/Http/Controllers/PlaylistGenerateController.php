@@ -150,7 +150,7 @@ class PlaylistGenerateController extends Controller
                 }
 
                 // Output the enabled channels
-                $epgUrl = url('/epg/' . $playlist->uuid . '/epg.xml');
+                $epgUrl = route('epg.generate', ['uuid' => $playlist->uuid]);
                 echo "#EXTM3U url-tvg=\"$epgUrl\" \n";
                 $channelNumber = $playlist->auto_channel_increment ? $playlist->channel_start - 1 : 0;
                 $idChannelBy = $playlist->id_channel_by;
