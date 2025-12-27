@@ -528,6 +528,41 @@ class GroupResource extends Resource
                         ->modalIcon('heroicon-o-x-circle')
                         ->modalDescription('Disable the selected group(s) now?')
                         ->modalSubmitActionLabel('Yes, disable now'),
+                    BulkAction::make('recount_channels')
+                        ->label('Recount Channels')
+                        ->icon('heroicon-o-hashtag')
+                        ->form([
+                            TextInput::make('start')
+                                ->label('Start Number')
+                                ->numeric()
+                                ->default(1)
+                                ->required(),
+                        ])
+                        ->action(function (Collection $records, array $data): void {
+                            // Sort the selected groups by their sort_order to ensure sequential processing
+                            // that matches the visual order in the table (assuming table is sorted by sort_order)
+                            $sortedRecords = $records->sortBy('sort_order');
+                            $start = (int) $data['start'];
+
+                            foreach ($sortedRecords as $record) {
+                                // Get channels for this group ordered by their current sort
+                                $channels = $record->channels()->orderBy('sort')->get();
+                                foreach ($channels as $channel) {
+                                    $channel->update(['channel' => $start++]);
+                                }
+                            }
+                        })
+                        ->after(function () {
+                            Notification::make()
+                                ->success()
+                                ->title('Channels Recounted')
+                                ->body('The channels in the selected groups have been recounted sequentially.')
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion()
+                        ->requiresConfirmation()
+                        ->modalIcon('heroicon-o-hashtag')
+                        ->modalDescription('Recount channels across selected groups? This will renumber channels sequentially starting from the top-most selected group down to the bottom-most.'),
                 ]),
             ]);
     }
