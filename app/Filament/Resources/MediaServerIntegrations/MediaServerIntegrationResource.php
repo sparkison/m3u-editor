@@ -113,8 +113,11 @@ class MediaServerIntegrationResource extends Resource
                             ->label('API Key')
                             ->password()
                             ->revealable()
-                            ->required()
-                            ->helperText('Generate an API key in your media server\'s dashboard under Settings → API Keys'),
+                            ->required(fn (string $operation): bool => $operation === 'create')
+                            ->dehydrateStateUsing(fn ($state, $record) => filled($state) ? $state : $record?->api_key)
+                            ->helperText(fn (string $operation) => $operation === 'edit' 
+                                ? 'Leave blank to keep existing API key' 
+                                : 'Generate an API key in your media server\'s dashboard under Settings → API Keys'),
                     ]),
 
                 Section::make('Import Settings')
@@ -146,6 +149,30 @@ class MediaServerIntegrationResource extends Resource
                             ->label('Enabled')
                             ->helperText('Disable to pause syncing without deleting the integration')
                             ->default(true),
+                    ]),
+
+                Section::make('Sync Schedule')
+                    ->description('Configure automatic sync schedule')
+                    ->schema([
+                        Grid::make(2)->schema([
+                            Toggle::make('auto_sync')
+                                ->label('Auto Sync')
+                                ->helperText('Automatically sync content on schedule')
+                                ->default(true),
+
+                            Select::make('sync_interval')
+                                ->label('Sync Interval')
+                                ->options([
+                                    '0 * * * *' => 'Every hour',
+                                    '0 */3 * * *' => 'Every 3 hours',
+                                    '0 */6 * * *' => 'Every 6 hours',
+                                    '0 */12 * * *' => 'Every 12 hours',
+                                    '0 0 * * *' => 'Once daily (midnight)',
+                                    '0 0 * * 0' => 'Once weekly (Sunday)',
+                                ])
+                                ->default('0 */6 * * *')
+                                ->native(false),
+                        ]),
                     ]),
 
                 Section::make('Sync Status')

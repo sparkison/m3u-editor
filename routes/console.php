@@ -19,6 +19,11 @@ Schedule::command('app:refresh-playlist')
     ->everyMinute()
     ->withoutOverlapping();
 
+// Refresh media server integrations
+Schedule::command('app:refresh-media-server-integrations')
+    ->everyMinute()
+    ->withoutOverlapping();
+
 // Refresh EPG
 Schedule::command('app:refresh-epg')
     ->everyMinute()
