@@ -25,6 +25,7 @@ use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\NavigationGroup;
+use Filament\Navigation\NavigationItem;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -104,11 +105,27 @@ class AdminPanelProvider extends PanelProvider
                     ->icon('heroicon-m-play'),
                 NavigationGroup::make('EPG')
                     ->icon('heroicon-m-calendar-days'),
+                NavigationGroup::make('Integrations')
+                    ->icon('heroicon-m-server-stack'),
                 NavigationGroup::make('Proxy')
                     ->icon('heroicon-m-arrows-right-left'),
                 NavigationGroup::make('Tools')
                     ->collapsed()
                     ->icon('heroicon-m-wrench-screwdriver'),
+            ])
+            ->navigationItems([
+                NavigationItem::make('API Docs')
+                    ->url('/docs/api', shouldOpenInNewTab: true)
+                    ->group('Tools')
+                    ->sort(sort: 9)
+                    ->icon(null)
+                    ->visible(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true)),
+                NavigationItem::make('Queue Manager')
+                    ->url('/horizon', shouldOpenInNewTab: true)
+                    ->group('Tools')
+                    ->sort(10)
+                    ->icon(null)
+                    ->visible(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true)),
             ])
             ->breadcrumbs($settings['show_breadcrumbs'])
             ->widgets([

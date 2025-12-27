@@ -32,7 +32,9 @@ use App\Rules\CheckIfUrlOrLocalPath;
 use App\Rules\Cron;
 use App\Services\EpgCacheService;
 use App\Services\M3uProxyService;
+use App\Services\ProfileService;
 use App\Services\ProxyService;
+use App\Models\PlaylistProfile;
 use Carbon\Carbon;
 use Cron\CronExpression;
 use Exception;
@@ -66,6 +68,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
+use Illuminate\Support\HtmlString;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
@@ -145,6 +148,12 @@ class PlaylistResource extends Resource
                     ->getStateUsing(function ($record) {
                         if ($record->xtream) {
                             try {
+                                // If profiles are enabled, show total capacity from all profiles
+                                if ($record->profiles_enabled) {
+                                    $poolStatus = ProfileService::getPoolStatus($record);
+                                    return $poolStatus['total_capacity'] > 0 ? $poolStatus['total_capacity'] : 'N/A';
+                                }
+                                // Otherwise show primary account max connections
                                 if ($record->xtream_status['user_info'] ?? false) {
                                     return $record->xtream_status['user_info']['max_connections'];
                                 }
@@ -154,7 +163,19 @@ class PlaylistResource extends Resource
 
                         return 'N/A';
                     })
-                    ->description(fn(Playlist $record): string => $record->xtream ? 'Active: ' . ($record->xtream_status['user_info']['active_cons'] ?? 0) : '')
+                    ->description(function (Playlist $record): string {
+                        if (! $record->xtream) {
+                            return '';
+                        }
+                        // If profiles are enabled, show combined active count
+                        if ($record->profiles_enabled) {
+                            $poolStatus = ProfileService::getPoolStatus($record);
+                            $profileCount = count($poolStatus['profiles']);
+                            return "Active: {$poolStatus['total_active']} ({$profileCount} profiles)";
+                        }
+                        // Otherwise show primary account active
+                        return 'Active: ' . ($record->xtream_status['user_info']['active_cons'] ?? 0);
+                    })
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('available_streams')
                     ->label('Proxy Streams')
@@ -215,7 +236,10 @@ class PlaylistResource extends Resource
                 ToggleColumn::make('enable_proxy')
                     ->label('Proxy')
                     ->toggleable()
-                    ->tooltip('Toggle proxy status')
+                    ->tooltip(fn (Playlist $record): string => $record->profiles_enabled
+                        ? 'Proxy is required when Provider Profiles are enabled'
+                        : 'Toggle proxy status')
+                    ->disabled(fn (Playlist $record): bool => $record->profiles_enabled)
                     ->sortable(),
                 ToggleColumn::make('auto_sync')
                     ->label('Auto Sync')
@@ -278,6 +302,16 @@ class PlaylistResource extends Resource
                         ->label('Sync and Process')
                         ->icon('heroicon-o-arrow-path')
                         ->action(function ($record) {
+                            // For media server playlists, dispatch the media server sync job
+                            if (in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin])) {
+                                $integration = \App\Models\MediaServerIntegration::where('playlist_id', $record->id)->first();
+                                if ($integration) {
+                                    \App\Jobs\SyncMediaServer::dispatch($integration->id);
+                                    return;
+                                }
+                            }
+
+                            // For regular playlists, use the standard M3U import process
                             $record->update([
                                 'status' => Status::Processing,
                                 'progress' => 0,
@@ -285,11 +319,16 @@ class PlaylistResource extends Resource
                             ]);
                             app('Illuminate\Contracts\Bus\Dispatcher')
                                 ->dispatch(new ProcessM3uImport($record, force: true));
-                        })->after(function () {
+                        })->after(function ($record) {
+                            $isMediaServer = in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin]);
+                            $message = $isMediaServer 
+                                ? 'Media server content is being synced in the background. Depending on the size of your library, this may take several minutes. You will be notified on completion.'
+                                : 'Playlist is being processed in the background. Depending on the size of your playlist, this may take a while. You will be notified on completion.';
+                            
                             Notification::make()
                                 ->success()
-                                ->title('Playlist is processing')
-                                ->body('Playlist is being processed in the background. Depending on the size of your playlist, this may take a while. You will be notified on completion.')
+                                ->title($isMediaServer ? 'Media server sync started' : 'Playlist is processing')
+                                ->body($message)
                                 ->duration(10000)
                                 ->send();
                         })
@@ -297,8 +336,13 @@ class PlaylistResource extends Resource
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
-                        ->modalDescription('Process playlist now?')
-                        ->modalSubmitActionLabel('Yes, process now'),
+                        ->modalDescription(function ($record) {
+                            $isMediaServer = in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin]);
+                            return $isMediaServer 
+                                ? 'Sync content from the media server now? This will fetch all movies, series, and episodes from your media server library.'
+                                : 'Process playlist now?';
+                        })
+                        ->modalSubmitActionLabel('Yes, sync now'),
                     Action::make('reset_processing')
                         ->label('Reset Processing State')
                         ->icon('heroicon-o-arrow-path')
@@ -580,6 +624,16 @@ class PlaylistResource extends Resource
                         ->label('Process selected')
                         ->action(function (Collection $records): void {
                             foreach ($records as $record) {
+                                // For media server playlists, dispatch the media server sync job
+                                if (in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin])) {
+                                    $integration = \App\Models\MediaServerIntegration::where('playlist_id', $record->id)->first();
+                                    if ($integration) {
+                                        \App\Jobs\SyncMediaServer::dispatch($integration->id);
+                                        continue;
+                                    }
+                                }
+
+                                // For regular playlists, use the standard M3U import process
                                 $record->update([
                                     'status' => Status::Processing,
                                     'progress' => 0,
@@ -669,17 +723,32 @@ class PlaylistResource extends Resource
                     ->label('Sync and Process')
                     ->icon('heroicon-o-arrow-path')
                     ->action(function ($record) {
+                        // For media server playlists, dispatch the media server sync job
+                        if (in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin])) {
+                            $integration = \App\Models\MediaServerIntegration::where('playlist_id', $record->id)->first();
+                            if ($integration) {
+                                \App\Jobs\SyncMediaServer::dispatch($integration->id);
+                                return;
+                            }
+                        }
+
+                        // For regular playlists, use the standard M3U import process
                         $record->update([
                             'status' => Status::Processing,
                             'progress' => 0,
                         ]);
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new ProcessM3uImport($record, force: true));
-                    })->after(function () {
+                    })->after(function ($record) {
+                        $isMediaServer = in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin]);
+                        $message = $isMediaServer 
+                            ? 'Media server content is being synced in the background. Depending on the size of your library, this may take several minutes. You will be notified on completion.'
+                            : 'Playlist is being processed in the background. Depending on the size of your playlist, this may take a while. You will be notified on completion.';
+                        
                         Notification::make()
                             ->success()
-                            ->title('Playlist is processing')
-                            ->body('Playlist is being processed in the background. Depending on the size of your playlist, this may take a while. You will be notified on completion.')
+                            ->title($isMediaServer ? 'Media server sync started' : 'Playlist is processing')
+                            ->body($message)
                             ->duration(10000)
                             ->send();
                     })
@@ -687,8 +756,13 @@ class PlaylistResource extends Resource
                     ->requiresConfirmation()
                     ->icon('heroicon-o-arrow-path')
                     ->modalIcon('heroicon-o-arrow-path')
-                    ->modalDescription('Process playlist now?')
-                    ->modalSubmitActionLabel('Yes, process now'),
+                    ->modalDescription(function ($record) {
+                        $isMediaServer = in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin]);
+                        return $isMediaServer 
+                            ? 'Sync content from the media server now? This will fetch all movies, series, and episodes from your media server library.'
+                            : 'Process playlist now?';
+                    })
+                    ->modalSubmitActionLabel('Yes, sync now'),
                 Action::make('process_series')
                     ->label('Fetch Series Metadata')
                     ->icon('heroicon-o-arrow-down-tray')
@@ -1051,6 +1125,337 @@ class PlaylistResource extends Resource
                         ->onColor('danger')
                         ->inline(false)
                         ->default(false),
+                ]),
+
+            // Provider Profiles Section (Xtream only)
+            Section::make('Provider Profiles')
+                ->description('Pool multiple Xtream accounts from this provider to increase concurrent stream capacity.')
+                ->icon('heroicon-o-user-group')
+                ->collapsible()
+                ->collapsed(fn (?Playlist $record): bool => ! ($record?->profiles_enabled ?? false))
+                ->hidden(fn (Get $get): bool => ! $get('xtream'))
+                ->schema([
+                    Toggle::make('profiles_enabled')
+                        ->label('Enable Provider Profiles')
+                        ->helperText('When enabled, proxy mode is required for accurate connection tracking.')
+                        ->live()
+                        ->afterStateUpdated(function (Set $set, $state) {
+                            if ($state) {
+                                $set('enable_proxy', true);
+                            }
+                        })
+                        ->rules([
+                            fn (): \Closure => function (string $attribute, $value, \Closure $fail) {
+                                if ($value && ! config('proxy.m3u_proxy_token')) {
+                                    $fail('Provider Profiles require the m3u-proxy to be configured. Please ensure M3U_PROXY_TOKEN is set.');
+                                }
+                            },
+                        ])
+                        ->inline(false)
+                        ->default(false),
+
+                    Grid::make()
+                        ->columns(2)
+                        ->visible(fn (Get $get): bool => $get('profiles_enabled'))
+                        ->schema([
+                            Placeholder::make('primary_profile_info')
+                                ->label('Primary Account')
+                                ->content(function (?Playlist $record): string {
+                                    if (! $record || ! $record->xtream_config) {
+                                        return 'Configure Xtream credentials above first.';
+                                    }
+
+                                    $username = $record->xtream_config['username'] ?? 'Unknown';
+                                    $primaryProfile = $record->profiles()->where('is_primary', true)->first();
+
+                                    if ($primaryProfile) {
+                                        $maxStreams = $primaryProfile->max_streams ?? 1;
+                                        $providerMax = $primaryProfile->provider_max_connections ?? 'Unknown';
+                                        return "Username: {$username} | Max Streams: {$maxStreams} (Provider: {$providerMax})";
+                                    }
+
+                                    return "Username: {$username} (Profile will be created when saved)";
+                                }),
+
+                            \Filament\Schemas\Components\Actions::make([
+                                \Filament\Actions\Action::make('test_primary_profile')
+                                    ->label('Test Primary')
+                                    ->icon('heroicon-o-signal')
+                                    ->color('info')
+                                    ->tooltip('Test primary account credentials and detect max connections')
+                                    ->action(function (Get $get, ?Playlist $record): void {
+                                        $xtreamConfig = $record?->xtream_config;
+
+                                        if (! $xtreamConfig) {
+                                            // Try to build from form data
+                                            $url = $get('xtream_config.url') ?? $get('xtream_config.server');
+                                            $username = $get('xtream_config.username');
+                                            $password = $get('xtream_config.password');
+
+                                            if (empty($url) || empty($username) || empty($password)) {
+                                                Notification::make()
+                                                    ->title('Missing Credentials')
+                                                    ->body('Please configure Xtream credentials first.')
+                                                    ->danger()
+                                                    ->send();
+                                                return;
+                                            }
+
+                                            $xtreamConfig = [
+                                                'url' => $url,
+                                                'username' => $username,
+                                                'password' => $password,
+                                            ];
+                                        } else {
+                                            $xtreamConfig = [
+                                                'url' => $xtreamConfig['url'] ?? $xtreamConfig['server'] ?? '',
+                                                'username' => $xtreamConfig['username'] ?? '',
+                                                'password' => $xtreamConfig['password'] ?? '',
+                                            ];
+                                        }
+
+                                        $result = ProfileService::testCredentials($xtreamConfig);
+
+                                        if ($result['valid']) {
+                                            // If the primary profile exists, update its max_streams
+                                            $primaryProfile = $record?->profiles()->where('is_primary', true)->first();
+                                            if ($primaryProfile) {
+                                                $primaryProfile->update(['max_streams' => $result['max_connections']]);
+                                            }
+
+                                            $expDate = $result['exp_date'] ? " | Expires: {$result['exp_date']}" : '';
+                                            Notification::make()
+                                                ->title('Primary Account Valid ✓')
+                                                ->body("Status: {$result['status']} | Max Connections: {$result['max_connections']} | Active: {$result['active_cons']}{$expDate}")
+                                                ->success()
+                                                ->duration(8000)
+                                                ->send();
+                                        } else {
+                                            Notification::make()
+                                                ->title('Primary Account Test Failed')
+                                                ->body($result['error'] ?? 'Unknown error')
+                                                ->danger()
+                                                ->send();
+                                        }
+                                    }),
+                            ])->verticallyAlignEnd(),
+                        ]),
+
+                    Repeater::make('additional_profiles')
+                        ->label('Additional Profiles')
+                        ->relationship('profiles', fn ($query) => $query->where('is_primary', false)->orderBy('priority'))
+                        ->visible(fn (Get $get): bool => $get('profiles_enabled'))
+                        ->schema([
+                            TextInput::make('name')
+                                ->label('Profile Name')
+                                ->placeholder('Backup Account')
+                                ->columnSpan(2),
+                            TextInput::make('username')
+                                ->label('Username')
+                                ->required()
+                                ->live(onBlur: true)
+                                ->columnSpan(1),
+                            TextInput::make('password')
+                                ->label('Password')
+                                ->password()
+                                ->revealable()
+                                ->required(fn ($record) => $record === null) // Only required for new profiles
+                                ->dehydrated(fn ($state, $record) => filled($state) || $record === null) // Only save if filled or new
+                                ->dehydrateStateUsing(fn ($state, $record) => filled($state) ? $state : $record?->password)
+                                ->placeholder(fn ($record) => $record?->password ? '••••••••' : null)
+                                ->live(onBlur: true)
+                                ->columnSpan(1),
+                            TextInput::make('max_streams')
+                                ->label('Max Streams')
+                                ->numeric()
+                                ->default(1)
+                                ->minValue(1)
+                                ->helperText('Use "Test" to auto-detect from provider.')
+                                ->columnSpan(1),
+                            TextInput::make('priority')
+                                ->label('Priority')
+                                ->numeric()
+                                ->default(fn ($record) => PlaylistProfile::where('playlist_id', $record?->playlist_id)->max('priority') + 1 ?? 1)
+                                ->helperText('Lower = tried first')
+                                ->columnSpan(1),
+                            Toggle::make('enabled')
+                                ->label('Enabled')
+                                ->default(true)
+                                ->inline(false)
+                                ->columnSpan(1),
+                        ])
+                        ->columns(4)
+                        ->addActionLabel('Add Profile')
+                        ->reorderable()
+                        ->collapsible()
+                        ->itemLabel(fn (array $state): ?string => $state['name'] ?? $state['username'] ?? 'New Profile')
+                        ->extraItemActions([
+                            \Filament\Actions\Action::make('test_profile')
+                                ->label('Test')
+                                ->icon('heroicon-o-signal')
+                                ->color('info')
+                                ->tooltip('Test credentials and auto-detect max connections')
+                                ->action(function (array $arguments, Repeater $component, Get $get, Set $set, ?Playlist $record): void {
+                                    // Get the item data directly from the repeater's state
+                                    $itemKey = $arguments['item'];
+                                    $allItems = $component->getState();
+                                    $profileData = $allItems[$itemKey] ?? null;
+
+                                    // If password is empty, try to get it from the existing database record
+                                    $password = $profileData['password'] ?? null;
+                                    if (empty($password) && ! empty($profileData['id'])) {
+                                        $existingProfile = PlaylistProfile::find($profileData['id']);
+                                        $password = $existingProfile?->password;
+                                    }
+
+                                    if (! $profileData || empty($profileData['username']) || empty($password)) {
+                                        Notification::make()
+                                            ->title('Missing Credentials')
+                                            ->body('Please enter username and password first.')
+                                            ->danger()
+                                            ->send();
+                                        return;
+                                    }
+
+                                    // Get the base URL from the playlist's xtream config
+                                    $baseUrl = $record?->xtream_config['url'] ?? $record?->xtream_config['server'] ?? null;
+
+                                    if (empty($baseUrl)) {
+                                        Notification::make()
+                                            ->title('Missing Base URL')
+                                            ->body('Playlist Xtream configuration is missing the server URL.')
+                                            ->danger()
+                                            ->send();
+                                        return;
+                                    }
+
+                                    // Build xtream config for testing
+                                    $testConfig = [
+                                        'url' => $baseUrl,
+                                        'username' => $profileData['username'],
+                                        'password' => $password,
+                                    ];
+
+                                    $result = ProfileService::testCredentials($testConfig);
+
+                                    if ($result['valid']) {
+                                        // Update the state with the new max_streams value
+                                        $allItems[$itemKey]['max_streams'] = $result['max_connections'];
+                                        $component->state($allItems);
+
+                                        $expDate = $result['exp_date'] ? " | Expires: {$result['exp_date']}" : '';
+                                        Notification::make()
+                                            ->title('Profile Valid ✓')
+                                            ->body("Status: {$result['status']} | Max Connections: {$result['max_connections']} | Active: {$result['active_cons']}{$expDate}")
+                                            ->success()
+                                            ->duration(8000)
+                                            ->send();
+                                    } else {
+                                        Notification::make()
+                                            ->title('Profile Test Failed')
+                                            ->body($result['error'] ?? 'Unknown error')
+                                            ->danger()
+                                            ->send();
+                                    }
+                                }),
+                        ])
+                        ->mutateRelationshipDataBeforeCreateUsing(function (array $data, Get $get, $livewire): array {
+                            $record = $livewire->getRecord();
+                            $data['user_id'] = $record->user_id;
+                            $data['playlist_id'] = $record->id;
+
+                            // Auto-test credentials and populate max_streams if not manually set or set to default
+                            if (($data['max_streams'] ?? 1) <= 1 && ! empty($data['username']) && ! empty($data['password'])) {
+                                $baseUrl = $record->xtream_config['url'] ?? $record->xtream_config['server'] ?? null;
+                                if ($baseUrl) {
+                                    $testConfig = [
+                                        'url' => $baseUrl,
+                                        'username' => $data['username'],
+                                        'password' => $data['password'],
+                                    ];
+                                    $result = ProfileService::testCredentials($testConfig);
+                                    if ($result['valid'] && $result['max_connections'] > 1) {
+                                        $data['max_streams'] = $result['max_connections'];
+                                    }
+                                }
+                            }
+
+                            return $data;
+                        })
+                        ->mutateRelationshipDataBeforeSaveUsing(function (array $data, Get $get, $livewire, $record): array {
+                            $playlist = $livewire->getRecord();
+                            
+                            // If password is empty but we have an existing record, preserve the old password
+                            if (empty($data['password']) && $record instanceof PlaylistProfile) {
+                                $data['password'] = $record->password;
+                            }
+                            
+                            // Auto-test credentials and update max_streams if still at default
+                            if (($data['max_streams'] ?? 1) <= 1 && ! empty($data['username']) && ! empty($data['password'])) {
+                                $baseUrl = $playlist->xtream_config['url'] ?? $playlist->xtream_config['server'] ?? null;
+                                if ($baseUrl) {
+                                    $testConfig = [
+                                        'url' => $baseUrl,
+                                        'username' => $data['username'],
+                                        'password' => $data['password'],
+                                    ];
+                                    $result = ProfileService::testCredentials($testConfig);
+                                    if ($result['valid'] && $result['max_connections'] > 1) {
+                                        $data['max_streams'] = $result['max_connections'];
+                                    }
+                                }
+                            }
+
+                            return $data;
+                        }),
+
+                    Placeholder::make('pool_status')
+                        ->label('Pool Status')
+                        ->content(function (?Playlist $record, Get $get): HtmlString {
+                            if (! $record || ! $record->profiles_enabled) {
+                                return new HtmlString('Enable profiles to see pool status.');
+                            }
+                            $status = ProfileService::getPoolStatus($record);
+
+                            // Check if primary profile exists - if not, estimate from xtream_status
+                            $hasPrimaryProfile = collect($status['profiles'])->contains('is_primary', true);
+                            if (! $hasPrimaryProfile && $record->xtream) {
+                                // Primary profile will be created on save - show estimated capacity
+                                $primaryMax = $record->xtream_status['user_info']['max_connections'] ?? 1;
+                                $primaryActive = $record->xtream_status['user_info']['active_cons'] ?? 0;
+                                
+                                // Add pending primary to the display
+                                array_unshift($status['profiles'], [
+                                    'is_primary' => true,
+                                    'name' => 'Primary (pending)',
+                                    'username' => $record->xtream_config['username'] ?? '',
+                                    'enabled' => true,
+                                    'max_streams' => $primaryMax,
+                                    'active_connections' => $primaryActive,
+                                ]);
+                                $status['total_capacity'] += $primaryMax;
+                                $status['total_active'] += $primaryActive;
+                                $status['available'] = max(0, $status['total_capacity'] - $status['total_active']);
+                            }
+
+                            // Build profile breakdown
+                            $profileLines = [];
+                            foreach ($status['profiles'] as $profile) {
+                                $name = $profile['is_primary'] ? '⭐ Primary' : ($profile['name'] ?? $profile['username']);
+                                $statusIcon = $profile['enabled'] ? '✓' : '✗';
+                                $profileLines[] = "{$statusIcon} {$name}: {$profile['active_connections']}/{$profile['max_streams']} streams";
+                            }
+
+                            $html = "<div class='space-y-1'>";
+                            $html .= "<div class='font-semibold'>Total: {$status['total_active']}/{$status['total_capacity']} active | {$status['available']} available</div>";
+                            if (count($profileLines) > 0) {
+                                $html .= "<div class='text-sm text-gray-500 dark:text-gray-400'>" . implode('<br>', $profileLines) . '</div>';
+                            }
+                            $html .= '</div>';
+
+                            return new HtmlString($html);
+                        })
+                        ->visible(fn (Get $get, ?Playlist $record): bool => $get('profiles_enabled') && $record?->exists),
                 ]),
         ];
 
@@ -1544,7 +1949,11 @@ class PlaylistResource extends Resource
                         ->hint(fn(Get $get): string => $get('enable_proxy') ? 'Proxied' : 'Not proxied')
                         ->hintIcon(fn(Get $get): string => ! $get('enable_proxy') ? 'heroicon-m-lock-open' : 'heroicon-m-lock-closed')
                         ->live()
-                        ->helperText('When enabled, all streams will be proxied through the application. This allows for better compatibility with various clients and enables features such as stream limiting and output format selection.')
+                        ->helperText(fn (Get $get): string => $get('profiles_enabled')
+                            ? 'Proxy mode is required when Provider Profiles are enabled.'
+                            : 'When enabled, all streams will be proxied through the application. This allows for better compatibility with various clients and enables features such as stream limiting and output format selection.')
+                        ->disabled(fn (Get $get): bool => (bool) $get('profiles_enabled'))
+                        ->dehydrated()
                         ->inline(false)
                         ->default(false),
                     Toggle::make('enable_logo_proxy')

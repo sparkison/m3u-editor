@@ -9,6 +9,7 @@ use App\Models\Episode;
 use App\Models\MergedPlaylist;
 use App\Models\Playlist;
 use App\Models\PlaylistAlias;
+use App\Models\PlaylistProfile;
 use App\Models\StreamProfile;
 use Exception;
 use App\Settings\GeneralSettings;
@@ -85,9 +86,9 @@ class M3uProxyService
     /**
      * Test the resolver URL by asking the proxy to verify it can reach the editor.
      * Returns an array with 'success' boolean and 'message' string.
-     * 
+     *
      * @param  string|null  $url  Optional URL to test instead of the configured failover resolver
-     * 
+     *
      */
     public function testResolver($url = null): array
     {
@@ -341,10 +342,10 @@ class M3uProxyService
 
     /**
      * Stop all streams matching a specific metadata field/value.
-     * 
+     *
      * This is useful for connection limit management - when switching channels
      * on a limited connection playlist, stop the old stream first.
-     * 
+     *
      * @param string $field Metadata field to filter by (e.g., 'playlist_uuid', 'type')
      * @param string $value Value to match
      * @param int|null $excludeChannelId Optional channel ID to exclude (keep this stream)
@@ -418,10 +419,10 @@ class M3uProxyService
 
     /**
      * Stop all streams for a specific playlist, optionally excluding a channel ID.
-     * 
+     *
      * This is used when switching channels on a connection-limited playlist
      * to free up the connection before starting a new stream.
-     * 
+     *
      * @param string $playlistUuid The playlist UUID
      * @param int|null $excludeChannelId Optional channel ID to exclude (keep this stream)
      * @return array Result with deleted_count and success status
@@ -433,12 +434,12 @@ class M3uProxyService
 
     /**
      * Stop the OLDEST stream for a specific playlist.
-     * 
+     *
      * This implements a "latest wins" behavior - when a playlist reaches its
      * connection limit, stop the oldest stream to make room for the new one.
-     * 
+     *
      * Only deletes ONE stream (the oldest), unlike stopPlaylistStreams which deletes all.
-     * 
+     *
      * @param string $playlistUuid The playlist UUID
      * @param int|null $excludeChannelId Optional channel ID to exclude (keep this stream)
      * @return array Result with deleted_count and success status
@@ -649,9 +650,32 @@ class M3uProxyService
             }
         }
 
+        // Provider Profile selection for Xtream playlists with profiles enabled
+        $selectedProfile = null;
+        if ($playlist instanceof Playlist && $playlist->profiles_enabled) {
+            $selectedProfile = ProfileService::selectProfile($playlist);
+
+            if (! $selectedProfile) {
+                Log::warning('No profiles with capacity available', [
+                    'playlist_id' => $playlist->id,
+                    'channel_id' => $id,
+                ]);
+                abort(503, 'All provider profiles have reached their maximum stream limit. Please try again later.');
+            }
+
+            Log::debug('Selected profile for streaming', [
+                'profile_id' => $selectedProfile->id,
+                'profile_name' => $selectedProfile->name,
+                'playlist_id' => $playlist->id,
+                'channel_id' => $id,
+            ]);
+        }
+
         // If we didn't already get a primary URL from failover logic, get it now
         if ($primaryUrl === null) {
-            $primaryUrl = PlaylistUrlService::getChannelUrl($channel, $playlist);
+            // Use the selected profile as context if available
+            $urlContext = $selectedProfile ?? $playlist;
+            $primaryUrl = PlaylistUrlService::getChannelUrl($channel, $urlContext);
         }
         if (empty($primaryUrl)) {
             throw new Exception('Channel primary URL is empty');
@@ -690,23 +714,47 @@ class M3uProxyService
             // (before capacity check) to avoid blocking reuse of existing streams.
             // If we reach here, no existing stream was found, so create a new one.
 
-            $streamId = $this->createTranscodedStream($primaryUrl, $profile, $failovers, $userAgent, $headers, [
+            $metadata = [
                 'id' => $id,
                 'type' => 'channel',
                 'playlist_uuid' => $playlist->uuid,
                 'profile_id' => $profile->id,
-            ]);
+            ];
+
+            // Add provider profile ID if using profiles
+            if ($selectedProfile) {
+                $metadata['provider_profile_id'] = $selectedProfile->id;
+            }
+
+            $streamId = $this->createTranscodedStream($primaryUrl, $profile, $failovers, $userAgent, $headers, $metadata);
+
+            // Track connection for provider profile
+            if ($selectedProfile) {
+                ProfileService::incrementConnections($selectedProfile, $streamId);
+            }
 
             // Return transcoded stream URL
             return $this->buildTranscodeStreamUrl($streamId, $profile->format ?? 'ts');
         } else {
             // Use direct streaming endpoint
-            $streamId = $this->createStream($primaryUrl, $failovers, $userAgent, $headers, [
+            $metadata = [
                 'id' => $id,
                 'type' => 'channel',
                 'playlist_uuid' => $playlist->uuid,
                 'strict_live_ts' => $playlist->strict_live_ts,
-            ]);
+            ];
+
+            // Add provider profile ID if using profiles
+            if ($selectedProfile) {
+                $metadata['provider_profile_id'] = $selectedProfile->id;
+            }
+
+            $streamId = $this->createStream($primaryUrl, $failovers, $userAgent, $headers, $metadata);
+
+            // Track connection for provider profile
+            if ($selectedProfile) {
+                ProfileService::incrementConnections($selectedProfile, $streamId);
+            }
 
             // Get the format from the URL
             $format = pathinfo($primaryUrl, PATHINFO_EXTENSION);
@@ -1292,7 +1340,7 @@ class M3uProxyService
      * Find an existing pooled transcoded stream for the given channel.
      * This allows multiple clients to connect to the same transcoded stream without
      * consuming additional provider connections.
-     * 
+     *
      * @param int $channelId Channel ID
      * @param string $playlistUuid Playlist UUID
      * @return string|null Stream ID if found, null otherwise
@@ -1406,7 +1454,7 @@ class M3uProxyService
     /**
      * Validate and resolve failover URLs for smart failover handling.
      * This is called by m3u-proxy during failover to get a viable failover URL.
-     * 
+     *
      * Uses the same capacity checking logic as getChannelUrl to determine which
      * failover channels have available capacity.
      *

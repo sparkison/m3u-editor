@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('playlists', function (Blueprint $table) {
-            $table->dropColumn('emby_config');
+        Schema::table('series', function (Blueprint $table) {
+            $table->longText('cover')->nullable()->change();
         });
     }
 
@@ -21,8 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('playlists', function (Blueprint $table) {
-            $table->jsonb('emby_config')->nullable()->after('source_type');
+        Schema::table('series', function (Blueprint $table) {
+            $table->string('cover')->nullable()->change();
         });
     }
 };
