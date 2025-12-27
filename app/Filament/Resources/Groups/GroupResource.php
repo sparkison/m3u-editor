@@ -312,7 +312,10 @@ class GroupResource extends Resource
                         ->label('Sort Alpha')
                         ->icon('heroicon-o-bars-arrow-down')
                         ->action(function (Group $record): void {
-                            $channels = $record->channels()->orderBy('name')->get();
+                            // Sort by title_custom (if present) then title, matching the UI column sort
+                            $channels = $record->channels()
+                                ->orderByRaw('COALESCE(title_custom, title) ASC')
+                                ->get();
                             $sort = 1;
                             foreach ($channels as $channel) {
                                 $channel->update(['sort' => $sort++]);
