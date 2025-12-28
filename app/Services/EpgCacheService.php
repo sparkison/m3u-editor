@@ -86,15 +86,7 @@ class EpgCacheService
      */
     public function cacheEpgData(Epg $epg): bool
     {
-        $epgFilePath = null;
-        if ($epg->url && str_starts_with($epg->url, 'http')) {
-            $epgFilePath = Storage::disk('local')->path($epg->file_path);
-        } else if ($epg->uploads && Storage::disk('local')->exists($epg->uploads)) {
-            $epgFilePath = Storage::disk('local')->path($epg->uploads);
-        } else if ($epg->url) {
-            $epgFilePath = $epg->url;
-        }
-
+        $epgFilePath = Storage::disk('local')->path($epg->file_path);
         if (!file_exists($epgFilePath)) {
             Log::error("EPG file not found: {$epgFilePath}");
             return false;
