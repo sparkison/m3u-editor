@@ -38,7 +38,8 @@ config/logs
 config/env
 data/
 .DS_Store
-
+iptv_playlist.m3u
+playlist.m3u
 # Analysis and summary reports - never commit these
 *_ANALYSIS.md
 *_SUMMARY.md
