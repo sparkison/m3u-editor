@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Facades\ProxyFacade;
 use App\Models\Episode;
 use App\Models\Series;
 use App\Models\StrmFileMapping;
@@ -78,11 +77,14 @@ class SyncSeriesStrmFiles implements ShouldQueue
 
     private function fetchMetadataForSeries(Series $series, $settings)
     {
-        if (!$series->enabled) {
+        if (! $series->enabled) {
             return;  // Skip processing for disabled series
         }
 
-        $series->load('enabled_episodes', 'playlist', 'user', 'category');
+        // Only load relations if not already loaded (bulk processing pre-loads them)
+        if (! $series->relationLoaded('enabled_episodes')) {
+            $series->load('enabled_episodes', 'playlist', 'user', 'category');
+        }
 
         $playlist = $series->playlist;
         try {
@@ -165,6 +167,15 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 Log::info('STRM Sync: Created missing sync location and restored files', ['sync_location' => $syncLocation, 'restored' => $restored]);
             }
 
+            // PERFORMANCE OPTIMIZATION: Bulk load all existing mappings for this series' episodes
+            // This reduces N queries (one per episode) to 1 query per series
+            $episodeIds = $episodes->pluck('id')->toArray();
+            $mappingCache = StrmFileMapping::bulkLoadForSyncables(
+                Episode::class,
+                $episodeIds,
+                $syncLocation
+            );
+
             // Get path structure and replacement character settings
             $pathStructure = $sync_settings['path_structure'] ?? ['category', 'series', 'season'];
             $replaceChar = $sync_settings['replace_char'] ?? 'space';
@@ -183,6 +194,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 foreach ($nameFilterPatterns as $pattern) {
                     $name = str_replace($pattern, '', $name);
                 }
+
                 return trim($name);
             };
 
@@ -287,7 +299,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
 
                 // Generate the url
                 $containerExtension = $ep->container_extension ?? 'mp4';
-                $url = rtrim("/series/{$playlist->user->name}/{$playlist->uuid}/" . $ep->id . "." . $containerExtension, '.');
+                $url = rtrim("/series/{$playlist->user->name}/{$playlist->uuid}/" . $ep->id . '.' . $containerExtension, '.');
                 $url = PlaylistService::getBaseUrl($url);
 
                 // Build path options for tracking changes
@@ -302,13 +314,14 @@ class SyncSeriesStrmFiles implements ShouldQueue
                     'name_filter_patterns' => $nameFilterPatterns,
                 ];
 
-                // Use intelligent sync - handles create, rename, and URL updates
-                StrmFileMapping::syncFile(
+                // Use intelligent sync with pre-loaded cache - handles create, rename, and URL updates
+                StrmFileMapping::syncFileWithCache(
                     $ep,
                     $syncLocation,
                     $filePath,
                     $url,
-                    $pathOptions
+                    $pathOptions,
+                    $mappingCache
                 );
             }
 
