@@ -146,7 +146,7 @@ class SyncVodStrmFiles implements ShouldQueue
                     $groupFolder = $cleanSpecialChars
                         ? PlaylistService::makeFilesystemSafe($groupName, $replaceChar)
                         : PlaylistService::makeFilesystemSafe($groupName);
-                    $groupPath = $path.'/'.$groupFolder;
+                    $groupPath = $path . '/' . $groupFolder;
                     if (! is_dir($groupPath)) {
                         mkdir($groupPath, 0777, true);
                     }
@@ -193,7 +193,7 @@ class SyncVodStrmFiles implements ShouldQueue
                     $titleFolder = $cleanSpecialChars
                         ? PlaylistService::makeFilesystemSafe($titleFolder, $replaceChar)
                         : PlaylistService::makeFilesystemSafe($titleFolder);
-                    $titlePath = $path.'/'.$titleFolder;
+                    $titlePath = $path . '/' . $titleFolder;
                     if (! is_dir($titlePath)) {
                         mkdir($titlePath, 0777, true);
                     }
@@ -240,16 +240,16 @@ class SyncVodStrmFiles implements ShouldQueue
                 // Remove consecutive replacement characters if enabled
                 if ($removeConsecutiveChars && $replaceChar !== 'remove') {
                     $char = $replaceChar === 'space' ? ' ' : ($replaceChar === 'dash' ? '-' : ($replaceChar === 'underscore' ? '_' : '.'));
-                    $fileName = preg_replace('/'.preg_quote($char, '/').'{2,}/', $char, $fileName);
+                    $fileName = preg_replace('/' . preg_quote($char, '/') . '{2,}/', $char, $fileName);
                 }
 
                 $fileName = "{$fileName}.strm";
-                $filePath = $path.'/'.$fileName;
+                $filePath = $path . '/' . $fileName;
 
                 // Generate the url
                 $playlist = $this->playlist ?? $channel->getEffectivePlaylist();
                 $extension = $channel->container_extension ?? 'mkv';
-                $url = rtrim("/movie/{$playlist->user->name}/{$playlist->uuid}/".$channel->id.'.'.$extension, '.');
+                $url = rtrim("/movie/{$playlist->user->name}/{$playlist->uuid}/" . $channel->id . '.' . $extension, '.');
                 $url = PlaylistService::getBaseUrl($url);
 
                 // Build path options for tracking changes
@@ -285,7 +285,7 @@ class SyncVodStrmFiles implements ShouldQueue
             }
         } catch (\Exception $e) {
             // Log the exception or handle it as needed
-            Log::error('Error syncing VOD .strm files: '.$e->getMessage());
+            Log::error('Error syncing VOD .strm files: ' . $e->getMessage());
         }
     }
 }

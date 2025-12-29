@@ -419,7 +419,7 @@ class StrmFileMapping extends Model
             }
 
             // Ensure directory is within sync location (prevent traversal)
-            if (! str_starts_with($realDirectory.'/', $realSyncLocation.'/')) {
+            if (! str_starts_with($realDirectory . '/', $realSyncLocation . '/')) {
                 Log::warning('STRM Sync: Directory cleanup blocked - path outside sync location', [
                     'directory' => $directory,
                     'sync_location' => $syncLocation,
@@ -491,7 +491,7 @@ class StrmFileMapping extends Model
             $path = $mapping->current_path;
 
             // Sanity check: ensure mapping path is within the requested sync location
-            if (! (str_starts_with($path, $root.'/') || $path === $root)) {
+            if (! (str_starts_with($path, $root . '/') || $path === $root)) {
                 Log::warning('STRM Sync: Skipping mapping outside sync location', [
                     'mapping_id' => $mapping->id,
                     'path' => $path,
