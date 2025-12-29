@@ -25,6 +25,7 @@ use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\NavigationGroup;
+use Filament\Navigation\NavigationItem;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -40,6 +41,7 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use ShuvroRoy\FilamentSpatieLaravelBackup\FilamentSpatieLaravelBackupPlugin;
+use Saade\FilamentLaravelLog\FilamentLaravelLogPlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -109,6 +111,20 @@ class AdminPanelProvider extends PanelProvider
                     ->collapsed()
                     ->icon('heroicon-m-wrench-screwdriver'),
             ])
+            ->navigationItems([
+                NavigationItem::make('API Docs')
+                    ->url('/docs/api', shouldOpenInNewTab: true)
+                    ->group('Tools')
+                    ->sort(sort: 9)
+                    ->icon(null)
+                    ->visible(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true)),
+                NavigationItem::make('Queue Manager')
+                    ->url('/horizon', shouldOpenInNewTab: true)
+                    ->group('Tools')
+                    ->sort(10)
+                    ->icon(null)
+                    ->visible(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true)),
+            ])
             ->breadcrumbs($settings['show_breadcrumbs'])
             ->widgets([
                 UpdateNoticeWidget::class,
@@ -126,6 +142,15 @@ class AdminPanelProvider extends PanelProvider
                 FilamentSpatieLaravelBackupPlugin::make()
                     ->authorize(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true))
                     ->usingPage(Backups::class),
+                FilamentLaravelLogPlugin::make()
+                    ->authorize(fn(): bool => in_array(auth()->user()->email, config('dev.admin_emails'), true))
+                    ->navigationGroup('Tools')
+                    ->navigationLabel('Logs')
+                    ->navigationIcon(null)
+                    ->activeNavigationIcon(null)
+                    ->navigationSort(6)
+                    ->title('Application Logs')
+                    ->slug('logs'),
             ])
             ->maxContentWidth($settings['content_width'])
             ->middleware([
