@@ -496,6 +496,15 @@ class PlaylistGenerateController extends Controller
                     $tvgId = $channel->stream_id_custom ?? $channel->stream_id;
                     break;
             }
+
+            // If no TVG ID still, fallback to the channel source ID or internal ID as a last resort
+            if (empty($tvgId)) {
+                $tvgId = $channel->source_id ?? $channel->id;
+            }
+
+            // Make sure TVG ID only contains characters and numbers
+            $tvgId = preg_replace(config('dev.tvgid.regex'), '', $tvgId);
+
             return [
                 'GuideNumber' => (string)$tvgId,
                 'GuideName' => $channel->title_custom ?? $channel->title,

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
@@ -127,6 +128,20 @@ class Epg extends Model
     public function epgMaps(): HasMany
     {
         return $this->hasMany(EpgMap::class);
+    }
+
+    /**
+     * Get all Playlists that have Channels linked to this EPG.
+     * Uses joins to perform this in a single query.
+     */
+    public function getPlaylists(): Collection
+    {
+        return Playlist::select('playlists.*')
+            ->join('channels', 'channels.playlist_id', '=', 'playlists.id')
+            ->join('epg_channels', 'epg_channels.id', '=', 'channels.epg_channel_id')
+            ->where('epg_channels.epg_id', $this->id)
+            ->distinct()
+            ->get();
     }
 
     public function postProcesses(): MorphToMany
