@@ -65,7 +65,7 @@ class GenerateEpgCache implements ShouldQueue
             ]);
 
             // Clear out any related EPG file caches
-            foreach ($epg->getPlaylists() as $playlist) {
+            foreach ($epg->getAllPlaylists() as $playlist) {
                 EpgCacheService::clearPlaylistEpgCacheFile($playlist);
             }
 

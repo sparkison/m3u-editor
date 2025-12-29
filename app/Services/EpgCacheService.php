@@ -1117,6 +1117,7 @@ class EpgCacheService
                 $disk->delete($gzPath);
                 $cleared = true;
             }
+            Log::debug("Cleared EPG file cache for playlist {$playlist->name}");
             return $cleared;
         } catch (Exception $e) {
             Log::error("Failed to clear playlist EPG cache: {$e->getMessage()}");
