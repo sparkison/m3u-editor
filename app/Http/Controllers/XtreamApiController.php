@@ -451,12 +451,11 @@ class XtreamApiController extends Controller
             $scheme = $parsedUrl['scheme'] ?? 'http';
             $host = $parsedUrl['host'];
             $port = isset($parsedUrl['port']) ? (string)$parsedUrl['port'] : '80';
-            $httpsPort = ($scheme === 'https') ? (string)$port : '443';
 
             $serverInfo = [
                 'url' => $host,
-                'port' => (string)$port,
-                'https_port' => $httpsPort,
+                'port' => (string)$port, // Should be 80 for HTTP, otherwise use the specified port (e.g.: 36400
+                'https_port' => '443', // Should always be 443 for HTTPS
                 'server_protocol' => $scheme,
                 'rtmp_port' => '8001', // RTMP not available currently, we'll just return the default RTMP port
                 // Timestamps will use the passed in timezone (server timezone)
