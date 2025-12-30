@@ -95,8 +95,8 @@ class PlaylistGenerateController extends Controller
                     ->leftJoin('groups', 'channels.group_id', '=', 'groups.id')
                     ->where('channels.enabled', true)
                     ->when(!$playlist->include_vod_in_m3u, function ($q) {
-                        $q->where('channels.is_vod', false);
-                    })
+                    $q->where('channels.is_vod', false);
+                })
                     ->with(['epgChannel', 'tags', 'group'])
                     ->orderBy('groups.sort_order') // Primary sort
                     ->orderBy('channels.sort') // Secondary sort
@@ -153,6 +153,8 @@ class PlaylistGenerateController extends Controller
                 echo "#EXTM3U\n";
                 $channelNumber = $playlist->auto_channel_increment ? $playlist->channel_start - 1 : 0;
                 $idChannelBy = $playlist->id_channel_by;
+                $usedNames = [];
+                $usedTvgIds = [];
                 foreach ($channels as $channel) {
                     // Get the title and name
                     $title = $channel->title_custom ?? $channel->title;
@@ -176,6 +178,15 @@ class PlaylistGenerateController extends Controller
                         }
                     }
 
+                    // Deduplicate Name
+                    $originalName = $name;
+                    $nameCount = 2;
+                    while (isset($usedNames[$name])) {
+                        $name = "$originalName ($nameCount)";
+                        $nameCount++;
+                    }
+                    $usedNames[$name] = true;
+
                     // Get the TVG ID
                     switch ($idChannelBy) {
                         case PlaylistChannelId::ChannelId:
@@ -191,6 +202,16 @@ class PlaylistGenerateController extends Controller
                             $tvgId = $channel->stream_id_custom ?? $channel->stream_id;
                             break;
                     }
+
+                    // Fallback for empty TVG ID
+                    if (empty($tvgId)) {
+                        $tvgId = pathinfo($url, PATHINFO_FILENAME);
+                        if (empty($tvgId)) {
+                            $tvgId = md5($url);
+                        }
+                    }
+
+
 
                     // Get the icon
                     $icon = '';
@@ -239,8 +260,27 @@ class PlaylistGenerateController extends Controller
                     $url = rtrim($url, '.');
 
                     // Make sure TVG ID only contains characters and numbers
+                    // NOTE: Relaxed regex or removed it might be better if we want to allow dashes, but user asked for unique IDs.
+                    // The original code stripped special chars. If we use basename (e.g. 'US_CN_...'), it might get stripped.
+                    // Let's keep the strip but be aware it might reduce uniqueness if handled poorly.
+                    // Actually, if we dedupe BEFORE stripping, stripping might re-introduce dupes.
+                    // Dedupe should happen AFTER stripping? Or should we dedupe the FINAL id?
+                    // Let's dedupe the FINAL ID.
+    
                     $tvgId = preg_replace(config('dev.tvgid.regex'), '', $tvgId);
 
+                    // Deduplicate TVG ID
+                    $originalTvgId = $tvgId;
+                    $idCount = 2;
+                    while (isset($usedTvgIds[$tvgId])) {
+                        $tvgId = "$originalTvgId.$idCount";
+                        $idCount++;
+                    }
+                    $usedTvgIds[$tvgId] = true;
+
+                    // RE-PLANNING IN MID-FLIGHT:
+                    // I will include the regex strip in the replacement block and do deduplication AFTER it.
+    
                     // Output the channel
                     $extInf = "#EXTINF:-1";
                     if ($channel->catchup) {
@@ -281,8 +321,8 @@ class PlaylistGenerateController extends Controller
                         ->with([
                             'category',
                             'episodes' => function ($q) {
-                                $q->where('episodes.enabled', true);
-                            }
+                            $q->where('episodes.enabled', true);
+                        }
                         ])
                         ->orderBy('sort')
                         ->get();
@@ -491,7 +531,7 @@ class PlaylistGenerateController extends Controller
                     break;
             }
             return [
-                'GuideNumber' => (string)$tvgId,
+                'GuideNumber' => (string) $tvgId,
                 'GuideName' => $channel->title_custom ?? $channel->title,
                 'URL' => $url,
             ];
@@ -526,7 +566,7 @@ class PlaylistGenerateController extends Controller
     {
         // Return the HDHR device info
         $uuid = $playlist->uuid;
-        $tunerCount = (int)$playlist->streams === 0
+        $tunerCount = (int) $playlist->streams === 0
             ? ($xtreamStatus['user_info']['max_connections'] ?? $playlist->streams ?? 1)
             : $playlist->streams;
         $tunerCount = max($tunerCount, 1); // Ensure at least 1 tuner

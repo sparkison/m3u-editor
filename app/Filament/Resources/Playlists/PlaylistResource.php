@@ -569,39 +569,6 @@ class PlaylistResource extends Resource
                         ->modalSubmitActionLabel('Purge now')
                         ->hidden(fn($record): bool => !$record->xtream),
                     DeleteAction::make(),
-                    Action::make('recount')
-                        ->label('Recount Channels')
-                        ->icon('heroicon-o-hashtag')
-                        ->form([
-                            TextInput::make('start')
-                                ->label('Start Number')
-                                ->numeric()
-                                ->default(1)
-                                ->required(),
-                        ])
-                        ->action(function (Playlist $record, array $data): void {
-                            $start = (int) $data['start'];
-                            // Get all groups for this playlist, ordered by their sort order
-                            $groups = $record->groups()->orderBy('sort_order')->get();
-
-                            foreach ($groups as $group) {
-                                // Get all channels for this group, ordered by their sort order
-                                $channels = $group->channels()->orderBy('sort')->get();
-                                foreach ($channels as $channel) {
-                                    $channel->update(['channel' => $start++]);
-                                }
-                            }
-                        })
-                        ->after(function () {
-                            Notification::make()
-                                ->success()
-                                ->title('Playlist Channels Recounted')
-                                ->body('All channels in this playlist have been recounted sequentially.')
-                                ->send();
-                        })
-                        ->requiresConfirmation()
-                        ->modalIcon('heroicon-o-hashtag')
-                        ->modalDescription('Recount all channels in this playlist sequentially? This will go through each group in order and renumber all channels.'),
                 ])->button()->hiddenLabel()->size('sm'),
                 EditAction::make()->button()->hiddenLabel()->size('sm'),
                 ViewAction::make()

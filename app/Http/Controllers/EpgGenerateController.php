@@ -102,11 +102,13 @@ class EpgGenerateController extends Controller
         $channelNumber = $playlist->auto_channel_increment ? $playlist->channel_start - 1 : 0;
         $idChannelBy = $playlist->id_channel_by;
         $dummyEpgEnabled = $playlist->dummy_epg;
-        $dummyEpgLength = (int)($playlist->dummy_epg_length ?? 120); // Default to 120 minutes if not set
+        $dummyEpgLength = (int) ($playlist->dummy_epg_length ?? 120); // Default to 120 minutes if not set
         $proxyEnabled = $playlist->enable_proxy;
         $logoProxyEnabled = $playlist->enable_logo_proxy;
 
         // Generate `<channel>` tags for each channel
+        $usedNames = [];
+        $usedTvgIds = [];
         foreach ($channels as $channel) {
             // Get/set the channel number
             $channelNo = $channel->channel;
@@ -114,13 +116,23 @@ class EpgGenerateController extends Controller
                 $channelNo = ++$channelNumber;
             }
 
+            // Deduplicate Name
+            $name = $channel->name_custom ?? $channel->name;
+            $originalName = $name;
+            $nameCount = 2;
+            while (isset($usedNames[$name])) {
+                $name = "$originalName ($nameCount)";
+                $nameCount++;
+            }
+            $usedNames[$name] = true;
+
             // Get the `tvg-id` based on the playlist setting
             switch ($idChannelBy) {
                 case PlaylistChannelId::ChannelId:
                     $tvgId = $channelNo;
                     break;
                 case PlaylistChannelId::Name:
-                    $tvgId = $channel->name_custom ?? $channel->name;
+                    $tvgId = $name; // Use the deduplicated name
                     break;
                 case PlaylistChannelId::Title:
                     $tvgId = $channel->title_custom ?? $channel->title;
@@ -130,8 +142,58 @@ class EpgGenerateController extends Controller
                     break;
             }
 
+            // Fallback for empty TVG ID
+            // We need to derive URL locally for this fallback since correct URL generation logic is complex in EpgController
+            // We can approximate it or use just the channel info needed. 
+            if (empty($tvgId)) {
+                // Replicate simplistic URL logic from PlaylistGenerateController just for ID generation context
+                // Actually we don't have the $url variable here yet. 
+                // Let's rely on md5 of channel ID or something consistent if URL is missing.
+                // Or better, let's look at how PlaylistGenerateController gets it: 
+                // $url = PlaylistUrlService::getChannelUrl($channel, $playlist);
+                // We should probably include that usage.
+                // Although adding a dependency might be tricky.
+                // Let's check imports. PlaylistUrlService IS NOT imported in EpgGenerateController? 
+                // Wait, I should import it if I need it, or use a simpler persistent ID like md5($channel->id).
+                // But M3U used pathinfo($url). M3U *has* the URL.
+                // If I produce a different ID here, it won't match.
+                // I MUST Match M3U. M3U uses: PlaylistUrlService::getChannelUrl($channel, $playlist).
+                // So I must use it here too.
+            }
+            // Check imports first? NO, I will stick to what M3U does.
+            // But wait, `EpgGenerateController` does NOT import `PlaylistUrlService` at top?
+            // Let's check line 14 of EpgGenerateController... it was NOT in the view.
+            // I should verify imports.
+
+            // Assuming I can't easily add imports without seeing file top (I saw lines 1-100, checking...)
+            // Previous view showed: use App\Services\PlaylistUrlService; is NOT present.
+            // I need to add the import or fully qualify it.
+            // Fully qualified: \App\Services\PlaylistUrlService::getChannelUrl($channel, $playlist);
+
+            if (empty($tvgId)) {
+                $url = \App\Services\PlaylistUrlService::getChannelUrl($channel, $playlist);
+                $tvgId = pathinfo($url, PATHINFO_FILENAME);
+                if (empty($tvgId)) {
+                    $tvgId = md5($url);
+                }
+            }
+
             // Make sure TVG ID only contains characters and numbers
             $tvgId = preg_replace(config('dev.tvgid.regex'), '', $tvgId);
+
+            // Deduplicate TVG ID
+            $originalTvgId = $tvgId;
+            $idCount = 2;
+            while (isset($usedTvgIds[$tvgId])) {
+                $tvgId = "$originalTvgId.$idCount";
+                $idCount++;
+            }
+            $usedTvgIds[$tvgId] = true;
+
+            // Re-deduplicate TVG ID after regex stripping (if we did that in M3U... we didn't implement it in M3U based on my last check, M3U code just had the regex at end).
+            // Users report Emby is "not matching properly". Unique IDs are key.
+            // If M3U has RegEx at end, EPG must have RegEx at end.
+            // Parity is key.
 
             // Output the <channel> tag
             $title = $channel->title_custom ?? $channel->title;
@@ -157,7 +219,7 @@ class EpgGenerateController extends Controller
                 } elseif ($channel->logo_type === ChannelLogoType::Epg) {
                     $icon = $epgData->icon ?? '';
                 } elseif ($channel->logo_type === ChannelLogoType::Channel) {
-                    $icon =  $channel->logo ?? $channel->logo_internal ?? '';
+                    $icon = $channel->logo ?? $channel->logo_internal ?? '';
                 }
                 if (empty($icon)) {
                     $icon = url('/placeholder.png');
@@ -270,8 +332,10 @@ class EpgGenerateController extends Controller
 
                                 // Output programme tag
                                 echo '  <programme channel="' . htmlspecialchars($mappedChannelId) . '"';
-                                if ($start) echo ' start="' . $start . '"';
-                                if ($stop) echo ' stop="' . $stop . '"';
+                                if ($start)
+                                    echo ' start="' . $start . '"';
+                                if ($stop)
+                                    echo ' stop="' . $stop . '"';
                                 echo '>' . PHP_EOL;
 
                                 if ($programme['title']) {
