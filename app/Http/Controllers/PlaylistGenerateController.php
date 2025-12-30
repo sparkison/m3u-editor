@@ -87,12 +87,13 @@ class PlaylistGenerateController extends Controller
         // Get the base URL
         $baseUrl = ProxyFacade::getBaseUrl();
 
+        // Build the channel query
+        $channels = self::getChannelQuery($playlist);
+        $cursor = $channels->cursor();
+
         // Get all active channels
         return response()->stream(
-            function () use ($baseUrl, $playlist, $proxyEnabled, $logoProxyEnabled, $type, $usedAuth) {
-                // Build the channel query
-                $channels = self::getChannelQuery($playlist);
-
+            function () use ($cursor, $baseUrl, $playlist, $proxyEnabled, $logoProxyEnabled, $type, $usedAuth) {
                 // Set the auth details
                 if ($usedAuth) {
                     $username = urlencode($usedAuth->username);
@@ -107,7 +108,7 @@ class PlaylistGenerateController extends Controller
                 echo "#EXTM3U x-tvg-url=\"$epgUrl\" \n";
                 $channelNumber = $playlist->auto_channel_increment ? $playlist->channel_start - 1 : 0;
                 $idChannelBy = $playlist->id_channel_by;
-                foreach ($channels->cursor() as $channel) {
+                foreach ($cursor as $channel) {
                     // Get the title and name
                     $title = $channel->title_custom ?? $channel->title;
                     $name = $channel->name_custom ?? $channel->name;
@@ -133,7 +134,7 @@ class PlaylistGenerateController extends Controller
                     // Get the TVG ID
                     switch ($idChannelBy) {
                         case PlaylistChannelId::ChannelId:
-                            $tvgId = $channelNo;
+                            $tvgId = $channel->id;
                             break;
                         case PlaylistChannelId::Name:
                             $tvgId = $channel->name_custom ?? $channel->name;
@@ -280,7 +281,7 @@ class PlaylistGenerateController extends Controller
                             // Get the TVG ID
                             switch ($idChannelBy) {
                                 case PlaylistChannelId::ChannelId:
-                                    $tvgId = $channelNo;
+                                    $tvgId = $channel->id;
                                     break;
                                 case PlaylistChannelId::Name:
                                     $tvgId = $name;
@@ -435,7 +436,7 @@ class PlaylistGenerateController extends Controller
                 // Get the TVG ID
                 switch ($idChannelBy) {
                     case PlaylistChannelId::ChannelId:
-                        $tvgId = $channelNo;
+                        $tvgId = $channel->id;
                         break;
                     case PlaylistChannelId::Name:
                         $tvgId = $channel->name_custom ?? $channel->name;
