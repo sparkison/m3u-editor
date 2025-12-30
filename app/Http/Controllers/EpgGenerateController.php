@@ -88,15 +88,7 @@ class EpgGenerateController extends Controller
         // Set up the channels
         $epgChannels = [];
         $dummyEpgChannels = [];
-        $channels = $playlist->channels()
-            ->where('enabled', true)
-            ->when(!$playlist->include_vod_in_m3u, function ($q) {
-                $q->where('channels.is_vod', false);
-            })
-            ->orderBy('sort')
-            ->orderBy('channel')
-            ->orderBy('title')
-            ->cursor();
+        $channels = PlaylistGenerateController::getChannelQuery($playlist);
 
         // Get playlist settings
         $channelNumber = $playlist->auto_channel_increment ? $playlist->channel_start - 1 : 0;
@@ -107,9 +99,7 @@ class EpgGenerateController extends Controller
         $logoProxyEnabled = $playlist->enable_logo_proxy;
 
         // Generate `<channel>` tags for each channel
-        $usedNames = [];
-        $usedTvgIds = [];
-        foreach ($channels as $channel) {
+        foreach ($channels->cursor() as $channel) {
             // Get/set the channel number
             $channelNo = $channel->channel;
             if (!$channelNo && ($playlist->auto_channel_increment || $idChannelBy === PlaylistChannelId::ChannelId)) {
@@ -129,7 +119,7 @@ class EpgGenerateController extends Controller
             // Get the `tvg-id` based on the playlist setting
             switch ($idChannelBy) {
                 case PlaylistChannelId::ChannelId:
-                    $tvgId = $channelNo;
+                    $tvgId = $channel->id;
                     break;
                 case PlaylistChannelId::Name:
                     $tvgId = $name; // Use the deduplicated name
@@ -142,40 +132,9 @@ class EpgGenerateController extends Controller
                     break;
             }
 
-            // Fallback for empty TVG ID
-            // We need to derive URL locally for this fallback since correct URL generation logic is complex in EpgController
-            // We can approximate it or use just the channel info needed. 
+            // If no TVG ID still, fallback to the channel source ID or internal ID as a last resort
             if (empty($tvgId)) {
-                // Replicate simplistic URL logic from PlaylistGenerateController just for ID generation context
-                // Actually we don't have the $url variable here yet. 
-                // Let's rely on md5 of channel ID or something consistent if URL is missing.
-                // Or better, let's look at how PlaylistGenerateController gets it: 
-                // $url = PlaylistUrlService::getChannelUrl($channel, $playlist);
-                // We should probably include that usage.
-                // Although adding a dependency might be tricky.
-                // Let's check imports. PlaylistUrlService IS NOT imported in EpgGenerateController? 
-                // Wait, I should import it if I need it, or use a simpler persistent ID like md5($channel->id).
-                // But M3U used pathinfo($url). M3U *has* the URL.
-                // If I produce a different ID here, it won't match.
-                // I MUST Match M3U. M3U uses: PlaylistUrlService::getChannelUrl($channel, $playlist).
-                // So I must use it here too.
-            }
-            // Check imports first? NO, I will stick to what M3U does.
-            // But wait, `EpgGenerateController` does NOT import `PlaylistUrlService` at top?
-            // Let's check line 14 of EpgGenerateController... it was NOT in the view.
-            // I should verify imports.
-
-            // Assuming I can't easily add imports without seeing file top (I saw lines 1-100, checking...)
-            // Previous view showed: use App\Services\PlaylistUrlService; is NOT present.
-            // I need to add the import or fully qualify it.
-            // Fully qualified: \App\Services\PlaylistUrlService::getChannelUrl($channel, $playlist);
-
-            if (empty($tvgId)) {
-                $url = \App\Services\PlaylistUrlService::getChannelUrl($channel, $playlist);
-                $tvgId = pathinfo($url, PATHINFO_FILENAME);
-                if (empty($tvgId)) {
-                    $tvgId = md5($url);
-                }
+                $tvgId = $channel->source_id ?? $channel->id;
             }
 
             // Make sure TVG ID only contains characters and numbers
