@@ -19,6 +19,11 @@ class SyncSeriesStrmFiles implements ShouldQueue
     use Queueable;
 
     /**
+     * Track sync locations that were processed for deferred cleanup
+     */
+    protected array $processedSyncLocations = [];
+
+    /**
      * Create a new job instance.
      */
     public function __construct(
@@ -37,13 +42,27 @@ class SyncSeriesStrmFiles implements ShouldQueue
      */
     public function handle(GeneralSettings $settings): void
     {
+        // Track sync locations for cleanup at the end
+        $this->processedSyncLocations = [];
+
         // Get all the series episodes
         $series = $this->series;
         if ($series) {
             $this->fetchMetadataForSeries($series, $settings);
+
+            // For single series sync, cleanup immediately
+            $this->performCleanup();
         } else {
             // Disable notifications for bulk processing
             $this->notify = false;
+
+            Log::info('STRM Sync: Starting bulk series sync', [
+                'user_id' => $this->user_id,
+                'playlist_id' => $this->playlist_id,
+            ]);
+
+            $processedCount = 0;
+            $startTime = microtime(true);
 
             // Process all series in chunks
             Series::query()
@@ -55,11 +74,28 @@ class SyncSeriesStrmFiles implements ShouldQueue
                     $query->where('playlist_id', $this->playlist_id);
                 })
                 ->with(['enabled_episodes', 'playlist', 'user', 'category'])
-                ->chunkById(100, function ($seriesChunk) use ($settings) {
+                ->chunkById(100, function ($seriesChunk) use ($settings, &$processedCount) {
                     foreach ($seriesChunk as $series) {
-                        $this->fetchMetadataForSeries($series, $settings);
+                        $this->fetchMetadataForSeries($series, $settings, skipCleanup: true);
+                        $processedCount++;
                     }
+
+                    // Log progress every 100 series
+                    Log::debug('STRM Sync: Processed chunk', ['processed' => $processedCount]);
                 });
+
+            // Perform cleanup ONCE at the end for all sync locations
+            $cleanupStart = microtime(true);
+            $this->performCleanup();
+            $cleanupDuration = round(microtime(true) - $cleanupStart, 2);
+
+            $totalDuration = round(microtime(true) - $startTime, 2);
+            Log::info('STRM Sync: Bulk sync completed', [
+                'series_processed' => $processedCount,
+                'sync_locations' => count($this->processedSyncLocations),
+                'cleanup_duration_seconds' => $cleanupDuration,
+                'total_duration_seconds' => $totalDuration,
+            ]);
 
             // Notify the user we're done!
             if ($this->user_id) {
@@ -68,7 +104,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                     Notification::make()
                         ->success()
                         ->title('Sync .strm files for series completed')
-                        ->body('Sync completed for all series.')
+                        ->body("Sync completed for {$processedCount} series in {$totalDuration}s.")
                         ->broadcast($user)
                         ->sendToDatabase($user);
                 }
@@ -76,13 +112,41 @@ class SyncSeriesStrmFiles implements ShouldQueue
         }
     }
 
-    private function fetchMetadataForSeries(Series $series, $settings)
+    /**
+     * Perform cleanup for all processed sync locations.
+     * This should be called ONCE at the end of processing, not per-series.
+     */
+    private function performCleanup(): void
+    {
+        foreach ($this->processedSyncLocations as $syncLocation) {
+            // Clean up orphaned files for disabled/deleted episodes
+            StrmFileMapping::cleanupOrphaned(
+                Episode::class,
+                $syncLocation
+            );
+
+            // Clean up empty directories after orphaned cleanup
+            StrmFileMapping::cleanupEmptyDirectoriesInLocation($syncLocation);
+        }
+    }
+
+    /**
+     * Process a single series and sync its STRM files.
+     *
+     * @param Series $series The series to process
+     * @param GeneralSettings $settings Application settings
+     * @param bool $skipCleanup If true, skip cleanup (for bulk mode where cleanup happens at end)
+     */
+    private function fetchMetadataForSeries(Series $series, $settings, bool $skipCleanup = false): void
     {
         if (!$series->enabled) {
             return;  // Skip processing for disabled series
         }
 
-        $series->load('enabled_episodes', 'playlist', 'user', 'category');
+        // Only load relations if not already loaded (bulk mode pre-loads them)
+        if (!$series->relationLoaded('enabled_episodes')) {
+            $series->load('enabled_episodes', 'playlist', 'user', 'category');
+        }
 
         $playlist = $series->playlist;
         try {
@@ -312,11 +376,11 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 );
             }
 
-            // Clean up orphaned files for disabled/deleted episodes
-            StrmFileMapping::cleanupOrphaned(
-                Episode::class,
-                $syncLocation
-            );
+            // Track this sync location for deferred cleanup (bulk mode)
+            // or immediate cleanup (single series mode)
+            if (!in_array($syncLocation, $this->processedSyncLocations)) {
+                $this->processedSyncLocations[] = $syncLocation;
+            }
 
             // Notify the user
             if ($this->notify) {
