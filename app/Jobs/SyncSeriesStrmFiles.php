@@ -527,9 +527,6 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 $this->processedSyncLocations[] = $syncLocation;
             }
 
-            // Clean up empty directories after orphaned cleanup
-            StrmFileMapping::cleanupEmptyDirectories($syncLocation);
-
             // Notify the user
             if ($this->notify) {
                 Notification::make()
