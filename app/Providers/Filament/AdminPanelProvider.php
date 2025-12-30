@@ -150,7 +150,10 @@ class AdminPanelProvider extends PanelProvider
                     ->activeNavigationIcon(null)
                     ->navigationSort(6)
                     ->title('Application Logs')
-                    ->slug('logs'),
+                    ->slug('logs')
+                    ->logDirs([
+                        config('app.log.dir'),
+                    ]),
             ])
             ->maxContentWidth($settings['content_width'])
             ->middleware([
