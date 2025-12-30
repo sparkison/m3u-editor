@@ -424,9 +424,10 @@ class SyncSeriesStrmFiles implements ShouldQueue
 
                 // Add TVDB/TMDB/IMDB ID to folder name for Trash Guides compatibility
                 // Priority: TVDB (Sonarr's source) > TMDB > IMDB
-                $tvdbId = $series->metadata['tvdb_id'] ?? $series->metadata['tvdb'] ?? null;
-                $tmdbId = $series->metadata['tmdb_id'] ?? $series->metadata['tmdb'] ?? null;
-                $imdbId = $series->metadata['imdb_id'] ?? $series->metadata['imdb'] ?? null;
+                // Check dedicated columns first, then fall back to metadata JSON for legacy support
+                $tvdbId = $series->tvdb_id ?? $series->metadata['tvdb_id'] ?? $series->metadata['tvdb'] ?? null;
+                $tmdbId = $series->tmdb_id ?? $series->metadata['tmdb_id'] ?? $series->metadata['tmdb'] ?? null;
+                $imdbId = $series->imdb_id ?? $series->metadata['imdb_id'] ?? $series->metadata['imdb'] ?? null;
                 $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
                 if (! empty($tvdbId)) {
                     $seriesFolder .= " {$bracket[0]}tvdb-{$tvdbId}{$bracket[1]}";
@@ -525,6 +526,9 @@ class SyncSeriesStrmFiles implements ShouldQueue
             if (! in_array($syncLocation, $this->processedSyncLocations)) {
                 $this->processedSyncLocations[] = $syncLocation;
             }
+
+            // Clean up empty directories after orphaned cleanup
+            StrmFileMapping::cleanupEmptyDirectories($syncLocation);
 
             // Notify the user
             if ($this->notify) {
