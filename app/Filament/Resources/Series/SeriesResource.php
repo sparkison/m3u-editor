@@ -50,6 +50,7 @@ use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\TextInputColumn;
 use Filament\Tables\Columns\ToggleColumn;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Enums\RecordActionsPosition;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
@@ -138,6 +139,30 @@ class SeriesResource extends Resource
                 ->toggleable()
                 ->tooltip('Toggle series status')
                 ->sortable(),
+            IconColumn::make('has_metadata')
+                ->label('TMDB/TVDB')
+                ->boolean()
+                ->trueIcon('heroicon-m-check-circle')
+                ->falseIcon('heroicon-m-minus-circle')
+                ->trueColor('success')
+                ->falseColor('gray')
+                ->tooltip(function ($record): string {
+                    if ($record->has_metadata) {
+                        $ids = [];
+                        if ($record->tmdb_id || ($record->metadata['tmdb_id'] ?? null)) {
+                            $ids[] = 'TMDB: ' . ($record->tmdb_id ?? $record->metadata['tmdb_id']);
+                        }
+                        if ($record->tvdb_id || ($record->metadata['tvdb_id'] ?? null)) {
+                            $ids[] = 'TVDB: ' . ($record->tvdb_id ?? $record->metadata['tvdb_id']);
+                        }
+                        if ($record->imdb_id || ($record->metadata['imdb_id'] ?? null)) {
+                            $ids[] = 'IMDB: ' . ($record->imdb_id ?? $record->metadata['imdb_id']);
+                        }
+                        return implode(' | ', $ids);
+                    }
+                    return 'No TMDB/TVDB/IMDB IDs available';
+                })
+                ->toggleable(),
             TextColumn::make('seasons_count')
                 ->label('Seasons')
                 ->counts('seasons')
@@ -205,6 +230,33 @@ class SeriesResource extends Resource
                 ->query(function ($query) {
                     return $query->where('enabled', true);
                 }),
+            Filter::make('has_metadata')
+                ->label('Has TMDB/TVDB/IMDB ID')
+                ->toggle()
+                ->query(function ($query) {
+                    return $query->where(function ($q) {
+                        $q->whereNotNull('tmdb_id')
+                          ->orWhereNotNull('tvdb_id')
+                          ->orWhereNotNull('imdb_id')
+                          ->orWhereRaw("metadata::jsonb ?? 'tmdb_id'")
+                          ->orWhereRaw("metadata::jsonb ?? 'tvdb_id'")
+                          ->orWhereRaw("metadata::jsonb ?? 'imdb_id'");
+                    });
+                }),
+            Filter::make('missing_metadata')
+                ->label('Missing TMDB/TVDB/IMDB ID')
+                ->toggle()
+                ->query(function ($query) {
+                    return $query->whereNull('tmdb_id')
+                                 ->whereNull('tvdb_id')
+                                 ->whereNull('imdb_id')
+                                 ->where(function ($q) {
+                                     $q->whereNull('metadata')
+                                       ->orWhereRaw("NOT (metadata::jsonb ?? 'tmdb_id')")
+                                       ->orWhereRaw("NOT (metadata::jsonb ?? 'tvdb_id')")
+                                       ->orWhereRaw("NOT (metadata::jsonb ?? 'imdb_id')");
+                                 });
+                }),
         ];
     }
 
@@ -242,6 +294,28 @@ class SeriesResource extends Resource
                     ->modalIcon('heroicon-o-arrows-right-left')
                     ->modalDescription('Move the series to another category.')
                     ->modalSubmitActionLabel('Move now'),
+                Action::make('fetch_tmdb_ids')
+                    ->label('Fetch TMDB/TVDB IDs')
+                    ->icon('heroicon-o-film')
+                    ->modalIcon('heroicon-o-film')
+                    ->modalDescription('Fetch TMDB, TVDB, and IMDB IDs for this series from The Movie Database.')
+                    ->modalSubmitActionLabel('Fetch IDs now')
+                    ->action(function ($record) {
+                        app('Illuminate\Contracts\Bus\Dispatcher')
+                            ->dispatch(new FetchTmdbIds(
+                                type: 'series',
+                                ids: [$record->id]
+                            ));
+                    })
+                    ->after(function () {
+                        Notification::make()
+                            ->success()
+                            ->title('TMDB Search Started')
+                            ->body('Searching for TMDB/TVDB IDs. Check the logs or refresh the page in a few seconds.')
+                            ->duration(8000)
+                            ->send();
+                    })
+                    ->requiresConfirmation(),
                 Action::make('process')
                     ->label('Fetch Series Metadata')
                     ->schema([
