@@ -151,7 +151,7 @@ class PlaylistGenerateController extends Controller
 
                 // Output the enabled channels
                 $epgUrl = route('epg.generate', ['uuid' => $playlist->uuid]);
-                echo "#EXTM3U url-tvg=\"$epgUrl\" \n";
+                echo "#EXTM3U x-tvg-url=\"$epgUrl\" \n";
                 $channelNumber = $playlist->auto_channel_increment ? $playlist->channel_start - 1 : 0;
                 $idChannelBy = $playlist->id_channel_by;
                 foreach ($channels as $channel) {
@@ -191,6 +191,11 @@ class PlaylistGenerateController extends Controller
                         default:
                             $tvgId = $channel->stream_id_custom ?? $channel->stream_id;
                             break;
+                    }
+
+                    // If no TVG ID still, fallback to the channel source ID or internal ID as a last resort
+                    if (empty($tvgId)) {
+                        $tvgId = $channel->source_id ?? $channel->id;
                     }
 
                     // Get the icon
@@ -491,6 +496,15 @@ class PlaylistGenerateController extends Controller
                     $tvgId = $channel->stream_id_custom ?? $channel->stream_id;
                     break;
             }
+
+            // If no TVG ID still, fallback to the channel source ID or internal ID as a last resort
+            if (empty($tvgId)) {
+                $tvgId = $channel->source_id ?? $channel->id;
+            }
+
+            // Make sure TVG ID only contains characters and numbers
+            $tvgId = preg_replace(config('dev.tvgid.regex'), '', $tvgId);
+
             return [
                 'GuideNumber' => (string)$tvgId,
                 'GuideName' => $channel->title_custom ?? $channel->title,

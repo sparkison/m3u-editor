@@ -424,6 +424,7 @@ class XtreamApiController extends Controller
             $outputFormats = ['m3u8', 'ts'];
             if ($playlist->enable_proxy) {
                 if ($playlist->xtream_config ?? false) {
+                    // We'll restrict the format to the format the playlist was imported in
                     $proxyOutput = $playlist->xtream_config['output'] ?? 'ts';
                     $outputFormats = $proxyOutput === 'hls' ? ['m3u8'] : [$proxyOutput];
                 }
@@ -434,36 +435,35 @@ class XtreamApiController extends Controller
                 // 'playlist_id' => (string)$playlist->id, // Debugging
                 'username' => $username,
                 'password' => $password,
-                'message' => 'Welcome to m3u editor Xtream API',
-                'auth' => 1,
-                'status' => 'Active',
+                'message' => '',
+                'auth' => 1, // Authenticated successfully
+                'status' => 'Active', // No inactive playlists should reach this point
                 'exp_date' => (string)$expires,
-                'is_trial' => '0',
+                'is_trial' => '0', // Trial accounts not supported
                 'active_cons' => (string)$activeConnections,
                 'created_at' => (string)($playlist->user ? $playlist->user->created_at->timestamp : $now->timestamp),
                 'max_connections' => (string)$streams,
                 'allowed_output_formats' => $outputFormats,
             ];
 
+            // Parse base URL to extract components
             $parsedUrl = parse_url($baseUrl);
             $scheme = $parsedUrl['scheme'] ?? 'http';
             $host = $parsedUrl['host'];
-            $port = isset($parsedUrl['port']) ? ':' . $parsedUrl['port'] : '';
-            $httpsPort = ($scheme === 'https') ? (string)$port : "";
+            $port = isset($parsedUrl['port']) ? (string)$parsedUrl['port'] : '80';
 
             $serverInfo = [
-                'xui' => false, // Assuming this is not an XUI panel
-                'version' => null, // Placeholder version, update as needed
-                'revision' => null, // No revision info available
-                'url' => $baseUrl,
-                'port' => (string)$port,
-                'https_port' => $httpsPort,
+                'url' => $host,
+                'port' => (string)$port, // Should be 80 for HTTP, otherwise use the specified port (e.g.: 36400
+                'https_port' => '443', // Should always be 443 for HTTPS
                 'server_protocol' => $scheme,
-                'rtmp_port' => "", // RTMP not available currently
-                'server_software' => config('app.name') . ' Xtream API',
+                'rtmp_port' => '8001', // RTMP not available currently, we'll just return the default RTMP port
+                // Timestamps will use the passed in timezone (server timezone)
                 'timestamp_now' => $now->timestamp,
                 'time_now' => $now->toDateTimeString(),
+                // We'll set the timezone to the server timezone
                 'timezone' => Config::get('app.timezone', 'UTC'),
+                'process' => true, // Always true
             ];
 
             return response()->json([
