@@ -538,26 +538,70 @@ class StrmFileMapping extends Model
     }
 
     /**
-     * Delete all mappings and files for syncables that no longer exist or are disabled
+     * Delete all mappings and files for syncables that no longer exist or are disabled.
+     * Uses a single LEFT JOIN query instead of loading each syncable individually (N+1 prevention).
      */
     public static function cleanupOrphaned(string $syncableType, string $syncLocation): int
     {
         $count = 0;
 
-        self::where('syncable_type', $syncableType)
-            ->where('sync_location', $syncLocation)
-            ->chunk(100, function ($mappings) use (&$count) {
-                foreach ($mappings as $mapping) {
-                    // Check if the syncable still exists and is enabled
-                    $syncable = $mapping->syncable;
-                    if (! $syncable || ! ($syncable->enabled ?? true)) {
-                        $mapping->deleteFile();
-                        $count++;
-                    }
-                }
-            });
+        // Determine the table name from the syncable type
+        $modelInstance = new $syncableType;
+        $table = $modelInstance->getTable();
+
+        // Use LEFT JOIN to find orphaned mappings in a single query
+        // This is MUCH more efficient than loading each syncable individually
+        $orphanedMappings = self::query()
+            ->where('strm_file_mappings.syncable_type', $syncableType)
+            ->where('strm_file_mappings.sync_location', $syncLocation)
+            ->leftJoin($table, function ($join) use ($table) {
+                $join->on('strm_file_mappings.syncable_id', '=', "{$table}.id");
+            })
+            ->where(function ($query) use ($table) {
+                // Orphaned if: syncable doesn't exist OR syncable is disabled
+                $query->whereNull("{$table}.id")
+                    ->orWhere("{$table}.enabled", false);
+            })
+            ->select('strm_file_mappings.*')
+            ->cursor(); // Use cursor for memory efficiency iteration over large datasets
+
+        foreach ($orphanedMappings as $mapping) {
+            $mapping->deleteFile();
+            $count++;
+        }
 
         return $count;
+    }
+
+    /**
+     * Clean up all empty directories within a sync location.
+     * Uses depth-first traversal to remove empty directories from bottom up.
+     */
+    public static function cleanupEmptyDirectoriesInLocation(string $syncLocation): void
+    {
+        $realSyncLocation = realpath(rtrim($syncLocation, '/'));
+        if ($realSyncLocation === false || !is_dir($realSyncLocation)) {
+            return;
+        }
+
+        // Use RecursiveIteratorIterator to traverse directories depth-first (children before parents)
+        try {
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($realSyncLocation, \RecursiveDirectoryIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::CHILD_FIRST
+            );
+
+            foreach ($iterator as $file) {
+                if ($file->isDir() && self::isDirectoryEmpty($file->getRealPath())) {
+                    @rmdir($file->getRealPath());
+                }
+            }
+        } catch (Throwable $e) {
+            Log::debug('STRM Sync: Exception during bulk directory cleanup', [
+                'sync_location' => $syncLocation,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
