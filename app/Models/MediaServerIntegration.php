@@ -22,6 +22,7 @@ class MediaServerIntegration extends Model
         'ssl' => 'boolean',
         'import_movies' => 'boolean',
         'import_series' => 'boolean',
+        'auto_sync' => 'boolean',
         'last_synced_at' => 'datetime',
         'sync_stats' => 'array',
         'user_id' => 'integer',

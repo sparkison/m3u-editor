@@ -302,6 +302,16 @@ class PlaylistResource extends Resource
                         ->label('Sync and Process')
                         ->icon('heroicon-o-arrow-path')
                         ->action(function ($record) {
+                            // For media server playlists, dispatch the media server sync job
+                            if (in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin])) {
+                                $integration = \App\Models\MediaServerIntegration::where('playlist_id', $record->id)->first();
+                                if ($integration) {
+                                    \App\Jobs\SyncMediaServer::dispatch($integration->id);
+                                    return;
+                                }
+                            }
+
+                            // For regular playlists, use the standard M3U import process
                             $record->update([
                                 'status' => Status::Processing,
                                 'progress' => 0,
@@ -309,11 +319,16 @@ class PlaylistResource extends Resource
                             ]);
                             app('Illuminate\Contracts\Bus\Dispatcher')
                                 ->dispatch(new ProcessM3uImport($record, force: true));
-                        })->after(function () {
+                        })->after(function ($record) {
+                            $isMediaServer = in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin]);
+                            $message = $isMediaServer 
+                                ? 'Media server content is being synced in the background. Depending on the size of your library, this may take several minutes. You will be notified on completion.'
+                                : 'Playlist is being processed in the background. Depending on the size of your playlist, this may take a while. You will be notified on completion.';
+                            
                             Notification::make()
                                 ->success()
-                                ->title('Playlist is processing')
-                                ->body('Playlist is being processed in the background. Depending on the size of your playlist, this may take a while. You will be notified on completion.')
+                                ->title($isMediaServer ? 'Media server sync started' : 'Playlist is processing')
+                                ->body($message)
                                 ->duration(10000)
                                 ->send();
                         })
@@ -321,8 +336,13 @@ class PlaylistResource extends Resource
                         ->requiresConfirmation()
                         ->icon('heroicon-o-arrow-path')
                         ->modalIcon('heroicon-o-arrow-path')
-                        ->modalDescription('Process playlist now?')
-                        ->modalSubmitActionLabel('Yes, process now'),
+                        ->modalDescription(function ($record) {
+                            $isMediaServer = in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin]);
+                            return $isMediaServer 
+                                ? 'Sync content from the media server now? This will fetch all movies, series, and episodes from your media server library.'
+                                : 'Process playlist now?';
+                        })
+                        ->modalSubmitActionLabel('Yes, sync now'),
                     Action::make('reset_processing')
                         ->label('Reset Processing State')
                         ->icon('heroicon-o-arrow-path')
@@ -604,6 +624,16 @@ class PlaylistResource extends Resource
                         ->label('Process selected')
                         ->action(function (Collection $records): void {
                             foreach ($records as $record) {
+                                // For media server playlists, dispatch the media server sync job
+                                if (in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin])) {
+                                    $integration = \App\Models\MediaServerIntegration::where('playlist_id', $record->id)->first();
+                                    if ($integration) {
+                                        \App\Jobs\SyncMediaServer::dispatch($integration->id);
+                                        continue;
+                                    }
+                                }
+
+                                // For regular playlists, use the standard M3U import process
                                 $record->update([
                                     'status' => Status::Processing,
                                     'progress' => 0,
@@ -693,17 +723,32 @@ class PlaylistResource extends Resource
                     ->label('Sync and Process')
                     ->icon('heroicon-o-arrow-path')
                     ->action(function ($record) {
+                        // For media server playlists, dispatch the media server sync job
+                        if (in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin])) {
+                            $integration = \App\Models\MediaServerIntegration::where('playlist_id', $record->id)->first();
+                            if ($integration) {
+                                \App\Jobs\SyncMediaServer::dispatch($integration->id);
+                                return;
+                            }
+                        }
+
+                        // For regular playlists, use the standard M3U import process
                         $record->update([
                             'status' => Status::Processing,
                             'progress' => 0,
                         ]);
                         app('Illuminate\Contracts\Bus\Dispatcher')
                             ->dispatch(new ProcessM3uImport($record, force: true));
-                    })->after(function () {
+                    })->after(function ($record) {
+                        $isMediaServer = in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin]);
+                        $message = $isMediaServer 
+                            ? 'Media server content is being synced in the background. Depending on the size of your library, this may take several minutes. You will be notified on completion.'
+                            : 'Playlist is being processed in the background. Depending on the size of your playlist, this may take a while. You will be notified on completion.';
+                        
                         Notification::make()
                             ->success()
-                            ->title('Playlist is processing')
-                            ->body('Playlist is being processed in the background. Depending on the size of your playlist, this may take a while. You will be notified on completion.')
+                            ->title($isMediaServer ? 'Media server sync started' : 'Playlist is processing')
+                            ->body($message)
                             ->duration(10000)
                             ->send();
                     })
@@ -711,8 +756,13 @@ class PlaylistResource extends Resource
                     ->requiresConfirmation()
                     ->icon('heroicon-o-arrow-path')
                     ->modalIcon('heroicon-o-arrow-path')
-                    ->modalDescription('Process playlist now?')
-                    ->modalSubmitActionLabel('Yes, process now'),
+                    ->modalDescription(function ($record) {
+                        $isMediaServer = in_array($record->source_type, [\App\Enums\PlaylistSourceType::Emby, \App\Enums\PlaylistSourceType::Jellyfin]);
+                        return $isMediaServer 
+                            ? 'Sync content from the media server now? This will fetch all movies, series, and episodes from your media server library.'
+                            : 'Process playlist now?';
+                    })
+                    ->modalSubmitActionLabel('Yes, sync now'),
                 Action::make('process_series')
                     ->label('Fetch Series Metadata')
                     ->icon('heroicon-o-arrow-down-tray')
