@@ -31,7 +31,7 @@ class TmdbService
         $this->apiKey = $settings->tmdb_api_key;
         $this->language = $settings->tmdb_language ?? 'en-US';
         $this->rateLimit = $settings->tmdb_rate_limit ?? 40;
-        $this->confidenceThreshold = $settings->tmdb_confidence_threshold ?? 80;
+        $this->confidenceThreshold = $settings->tmdb_confidence_threshold ?? 70; // Lowered from 80 to 70
     }
 
     /**
@@ -308,59 +308,141 @@ class TmdbService
         $this->waitForRateLimit();
 
         try {
-            $params = [
-                'api_key' => $this->apiKey,
-                'query' => $this->normalizeTitle($name),
-                'language' => $this->language,
-                'include_adult' => false,
-            ];
-
-            if ($year) {
-                $params['first_air_date_year'] = $year;
-            }
-
-            $response = Http::timeout(15)->get(self::BASE_URL . '/search/tv', $params);
-
-            if (!$response->successful()) {
-                Log::warning('TMDB TV search failed', [
-                    'name' => $name,
-                    'status' => $response->status(),
+            $normalizedQuery = $this->normalizeTitle($name);
+            
+            // Try known German → English title mappings first
+            $originalTitleMapping = $this->getGermanToEnglishMapping($normalizedQuery);
+            if ($originalTitleMapping) {
+                Log::debug('TMDB: Using known German→English mapping', [
+                    'german' => $normalizedQuery,
+                    'english' => $originalTitleMapping,
                 ]);
-                return null;
+                $normalizedQuery = $originalTitleMapping;
             }
+            
+            // Detect likely language from title
+            $detectedLanguage = $this->detectTitleLanguage($name);
+            $searchLanguages = [];
+            
+            // Build search language priority list
+            if ($detectedLanguage && $detectedLanguage !== $this->language) {
+                // Try detected language first, then default language
+                $searchLanguages = [$detectedLanguage, $this->language];
+                Log::debug('TMDB: Language detected', [
+                    'title' => $name,
+                    'detected' => $detectedLanguage,
+                    'default' => $this->language,
+                ]);
+            } else {
+                // Just use default language
+                $searchLanguages = [$this->language];
+            }
+            
+            $searchLanguages = array_unique($searchLanguages); // Remove duplicates
+            $allResults = [];
+            
+            // Try each language
+            foreach ($searchLanguages as $lang) {
+                $params = [
+                    'api_key' => $this->apiKey,
+                    'query' => $normalizedQuery,
+                    'language' => $lang,
+                    'include_adult' => false,
+                ];
 
-            $results = $response->json('results', []);
-
-            if (empty($results)) {
-                // Try without year if we had one
                 if ($year) {
-                    return $this->searchTvSeries($name, null);
+                    $params['first_air_date_year'] = $year;
                 }
-                return null;
+
+                Log::debug('TMDB: Searching for TV series', [
+                    'original_name' => $name,
+                    'normalized_query' => $normalizedQuery,
+                    'year' => $year,
+                    'language' => $lang,
+                ]);
+
+                $response = Http::timeout(15)->get(self::BASE_URL . '/search/tv', $params);
+
+                if (!$response->successful()) {
+                    Log::warning('TMDB TV search failed', [
+                        'name' => $name,
+                        'normalized_query' => $normalizedQuery,
+                        'year' => $year,
+                        'language' => $lang,
+                        'status' => $response->status(),
+                        'response' => $response->body(),
+                    ]);
+                    continue;
+                }
+
+                $results = $response->json('results', []);
+
+                Log::debug('TMDB: TV search results', [
+                    'name' => $name,
+                    'normalized_query' => $normalizedQuery,
+                    'year' => $year,
+                    'language' => $lang,
+                    'result_count' => count($results),
+                    'first_results' => array_slice($results, 0, 3),
+                ]);
+
+                if (!empty($results)) {
+                    // Try to find best match with this language
+                    $match = $this->findBestMatch($results, $name, $year, 'name', 'first_air_date');
+                    
+                    if ($match) {
+                        // Found a good match, use it!
+                        Log::debug('TMDB: Best match found', [
+                            'search_name' => $name,
+                            'matched_name' => $match['name'] ?? null,
+                            'tmdb_id' => $match['id'],
+                            'first_air_date' => $match['first_air_date'] ?? null,
+                            'confidence' => $match['_confidence'] ?? 0,
+                            'language_used' => $lang,
+                        ]);
+
+                        // Get external IDs (for TVDB and IMDB)
+                        $externalIds = $this->getTvExternalIds($match['id']);
+
+                        Log::debug('TMDB: External IDs retrieved', [
+                            'tmdb_id' => $match['id'],
+                            'tvdb_id' => $externalIds['tvdb_id'] ?? null,
+                            'imdb_id' => $externalIds['imdb_id'] ?? null,
+                        ]);
+
+                        return [
+                            'tmdb_id' => $match['id'],
+                            'tvdb_id' => $externalIds['tvdb_id'] ?? null,
+                            'imdb_id' => $externalIds['imdb_id'] ?? null,
+                            'name' => $match['name'] ?? null,
+                            'first_air_date' => $match['first_air_date'] ?? null,
+                            'confidence' => $match['_confidence'] ?? 0,
+                        ];
+                    }
+                }
             }
 
-            // Find best match
-            $match = $this->findBestMatch($results, $name, $year, 'name', 'first_air_date');
-
-            if (!$match) {
-                return null;
+            // No good match found with any language, try without year as fallback
+            if ($year) {
+                Log::debug('TMDB: No results with year, retrying without year', [
+                    'name' => $name,
+                    'year' => $year,
+                ]);
+                return $this->searchTvSeries($name, null);
             }
-
-            // Get external IDs (for TVDB and IMDB)
-            $externalIds = $this->getTvExternalIds($match['id']);
-
-            return [
-                'tmdb_id' => $match['id'],
-                'tvdb_id' => $externalIds['tvdb_id'] ?? null,
-                'imdb_id' => $externalIds['imdb_id'] ?? null,
-                'name' => $match['name'] ?? null,
-                'first_air_date' => $match['first_air_date'] ?? null,
-                'confidence' => $match['_confidence'] ?? 0,
-            ];
+            
+            Log::info('TMDB: No TV series found', [
+                'name' => $name,
+                'normalized_query' => $normalizedQuery,
+                'tried_languages' => $searchLanguages,
+            ]);
+            return null;
         } catch (\Exception $e) {
             Log::error('TMDB TV search error', [
                 'name' => $name,
+                'year' => $year,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
             return null;
         }
@@ -437,11 +519,18 @@ class TmdbService
             $normalizedResult = $this->normalizeForComparison($resultTitle);
             $similarity = $this->calculateSimilarity($normalizedSearch, $normalizedResult);
 
-            // Also check original title if available (for non-English results)
-            if (isset($result['original_title']) && $result['original_title'] !== $resultTitle) {
-                $normalizedOriginal = $this->normalizeForComparison($result['original_title']);
+            // Check if search matches original title/name exactly (for localized content)
+            $originalField = isset($result['original_name']) ? 'original_name' : 'original_title';
+            if (isset($result[$originalField]) && $result[$originalField] !== $resultTitle) {
+                $normalizedOriginal = $this->normalizeForComparison($result[$originalField]);
                 $originalSimilarity = $this->calculateSimilarity($normalizedSearch, $normalizedOriginal);
-                $similarity = max($similarity, $originalSimilarity);
+                
+                // Exact match on original title/name should be 100% confidence
+                if ($normalizedSearch === $normalizedOriginal) {
+                    $similarity = 100;
+                } else {
+                    $similarity = max($similarity, $originalSimilarity);
+                }
             }
 
             // Year matching bonus/penalty
@@ -529,8 +618,8 @@ class TmdbService
         // Remove special bullet/marker characters: ●, •, ★, etc. and everything after them
         $title = preg_replace('/\s*[●•★☆■□▪▫►▶◄◀→←↑↓✓✔✗✘].*$/u', '', $title);
 
-        // Remove audio format info in parentheses: "(Dolby Atmos)", "(DTS-HD)", etc.
-        $title = preg_replace('/\s*\((?:Dolby\s*)?(?:Atmos|Vision|DTS(?:-HD)?|TrueHD|Digital|HDR|HDR10\+?|Directors?\s*Cut)\)/i', '', $title);
+        // Remove audio/language info in parentheses: "(Multi)", "(Dolby Atmos)", "(DTS-HD)", etc.
+        $title = preg_replace('/\s*\((?:Multi|Dual(?:\s+Audio)?|Dolby(?:\s*Atmos)?|Vision|DTS(?:-HD)?|TrueHD|Digital|HDR|HDR10\+?|Directors?\s*Cut)\)/i', '', $title);
 
         // Remove brackets with technical info: [4K], [UHD], [DE], etc.
         $title = preg_replace('/\s*\[[^\]]*\]/i', '', $title);
@@ -542,11 +631,21 @@ class TmdbService
         // Matches: 4K/UHD, 4KUHD, 4K UHD, 4K-UHD, UHD, HD, FHD, 720p, 1080p, 2160p, etc.
         $title = preg_replace('/\s*[-\/\s]*(4K\s*[\/\-]?\s*U?HD|UHD|FHD|HD|SD|720p|1080p|2160p|4K|REMUX|BluRay|Blu-Ray|BDRip|WEBRip|WEB-DL|HDRip|HDTV|DVDRip)/i', '', $title);
 
+        // Remove German subtitle after " - " (e.g., "See - Reich der Blinden" -> "See")
+        // Only if the subtitle starts with a German article or common German word
+        $title = preg_replace('/\s+-\s+(Die|Der|Das|Ein|Eine|Reich|Zeit|Land|Haus)\s+\S+.*$/iu', '', $title);
+
         // Remove language tags: DE, EN, GER, ENG, German, English, Multi, etc.
         $title = preg_replace('/\s*[-\s]*(DE|EN|GER|ENG|German|English|Deutsch|Multi|Dual|Audio)\s*$/i', '', $title);
 
         // Remove year at end of title (will be extracted separately): "Atlas 2024" -> "Atlas"
         $title = preg_replace('/\s+\d{4}\s*$/', '', $title);
+
+        // Remove or replace problematic apostrophes and special quotes
+        // TMDB search often fails with apostrophes, so we remove them
+        $title = str_replace("'", '', $title);  // Regular apostrophe
+        $title = str_replace('`', '', $title);  // Backtick
+        $title = preg_replace('/\x{2018}|\x{2019}/u', '', $title); // Unicode apostrophes
 
         // Remove leading/trailing special characters and whitespace
         $title = preg_replace('/^[\s\-:●•]+/', '', $title);
@@ -630,5 +729,105 @@ class TmdbService
         }
 
         return null;
+    }
+
+    /**
+     * Detect likely language from title based on common patterns and characters.
+     *
+     * @param string $title The title to analyze
+     * @return string|null Language code (e.g., 'de-DE', 'en-US') or null if cannot determine
+     */
+    protected function detectTitleLanguage(string $title): ?string
+    {
+        // German-specific patterns
+        $germanPatterns = [
+            '/\b(Der|Die|Das|Ein|Eine|Des|Dem|Den|Zur|Zum|Im|Am|Vom)\b/u',
+            '/[äöüßÄÖÜ]/',
+            '/\b(und|oder|mit|aus|von|für|über|unter)\b/iu',
+        ];
+
+        foreach ($germanPatterns as $pattern) {
+            if (preg_match($pattern, $title)) {
+                return 'de-DE';
+            }
+        }
+
+        // French-specific patterns
+        $frenchPatterns = [
+            '/\b(Le|La|Les|Un|Une|Des|Du|De|Au|Aux)\b/u',
+            '/[àâäéèêëïîôùûüÿçÀÂÄÉÈÊËÏÎÔÙÛÜŸÇ]/',
+            '/\b(et|ou|avec|dans|pour|sur|sous)\b/iu',
+        ];
+
+        foreach ($frenchPatterns as $pattern) {
+            if (preg_match($pattern, $title)) {
+                return 'fr-FR';
+            }
+        }
+
+        // Spanish-specific patterns
+        $spanishPatterns = [
+            '/\b(El|La|Los|Las|Un|Una|Del|Al)\b/u',
+            '/[áéíóúñÁÉÍÓÚÑ]/',
+            '/\b(y|o|con|en|por|para|sobre)\b/iu',
+        ];
+
+        foreach ($spanishPatterns as $pattern) {
+            if (preg_match($pattern, $title)) {
+                return 'es-ES';
+            }
+        }
+
+        // Italian-specific patterns
+        $italianPatterns = [
+            '/\b(Il|Lo|La|I|Gli|Le|Un|Una|Uno|Del|Della|Dei)\b/u',
+            '/[àèéìòù]/',
+            '/\b(e|o|con|in|per|da|su)\b/iu',
+        ];
+
+        foreach ($italianPatterns as $pattern) {
+            if (preg_match($pattern, $title)) {
+                return 'it-IT';
+            }
+        }
+
+        // If no specific language detected, return null (will use default)
+        return null;
+    }
+
+    /**
+     * Get known German to English title mappings for common series.
+     *
+     * @param string $germanTitle The German title
+     * @return string|null The English title or null if no mapping exists
+     */
+    protected function getGermanToEnglishMapping(string $germanTitle): ?string
+    {
+        $mappings = [
+            // Common series with German localized titles
+            'Spuk in Bly Manor' => 'The Haunting of Bly Manor',
+            'Spuk in Hill House' => 'The Haunting of Hill House',
+            'Haus des Geldes' => 'Money Heist',
+            'Berlin' => 'Money Heist: Berlin',
+            'Star Trek: Raumschiff Voyager' => 'Star Trek: Voyager',
+            'Star Trek: Das nächste Jahrhundert' => 'Star Trek: The Next Generation',
+            'Star Trek: Deep Space Nine' => 'Star Trek: Deep Space Nine',
+            'Star Trek: Enterprise' => 'Star Trek: Enterprise',
+            'Der Prinz der Drachen' => 'The Dragon Prince',
+            'See' => 'See',
+            'Belgravia' => 'Belgravia',
+            'Wunderbare Jahre' => 'The Wonder Years',
+            'Paartherapie mal anders' => 'Couples Therapy',
+            'Chip und Chap' => 'Chip n Dale',
+            'Glühendes Feuer' => 'Burning',
+            'Der Sandman' => 'The Sandman',
+            'Sandman' => 'The Sandman',
+            'Percy Jackson' => 'Percy Jackson and the Olympians',
+            'Tödliche Klippen' => 'Trom',
+            'Die Abschussliste' => 'The Terminal List',
+            'Kommando Irak' => 'Over There',
+        ];
+
+        return $mappings[$germanTitle] ?? null;
     }
 }
