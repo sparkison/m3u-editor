@@ -18,8 +18,11 @@ class TmdbService
     protected const BASE_URL = 'https://api.themoviedb.org/3';
 
     protected ?string $apiKey;
+
     protected string $language;
+
     protected int $rateLimit;
+
     protected int $confidenceThreshold;
 
     /**
@@ -39,21 +42,22 @@ class TmdbService
      */
     public function isConfigured(): bool
     {
-        return !empty($this->apiKey);
+        return ! empty($this->apiKey);
     }
 
     /**
      * Search for a movie by title and optionally year.
      *
-     * @param string $title The movie title to search for
-     * @param int|null $year The release year (optional, will be extracted from title if not provided)
-     * @param bool $tryFallback Whether to try fallback search strategies
+     * @param  string  $title  The movie title to search for
+     * @param  int|null  $year  The release year (optional, will be extracted from title if not provided)
+     * @param  bool  $tryFallback  Whether to try fallback search strategies
      * @return array|null Returns movie data with tmdb_id and imdb_id, or null if not found
      */
     public function searchMovie(string $title, ?int $year = null, bool $tryFallback = true): ?array
     {
-        if (!$this->isConfigured()) {
+        if (! $this->isConfigured()) {
             Log::warning('TMDB API key not configured');
+
             return null;
         }
 
@@ -85,13 +89,14 @@ class TmdbService
                 $params['year'] = $year;
             }
 
-            $response = Http::timeout(15)->get(self::BASE_URL . '/search/movie', $params);
+            $response = Http::timeout(15)->get(self::BASE_URL.'/search/movie', $params);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 Log::warning('TMDB movie search failed', [
                     'title' => $title,
                     'status' => $response->status(),
                 ]);
+
                 return null;
             }
 
@@ -101,6 +106,7 @@ class TmdbService
                 // Try without year if we had one
                 if ($year) {
                     Log::debug('TMDB: No results with year, retrying without year', ['title' => $normalizedTitle]);
+
                     return $this->searchMovie($title, null, $tryFallback);
                 }
 
@@ -108,6 +114,7 @@ class TmdbService
                 if ($tryFallback && str_contains($normalizedTitle, ' - ')) {
                     $mainTitle = trim(explode(' - ', $normalizedTitle)[0]);
                     Log::debug('TMDB: No results, trying without subtitle', ['main_title' => $mainTitle]);
+
                     return $this->searchMovieSimple($mainTitle, TmdbService::extractYearFromTitle($title));
                 }
 
@@ -118,10 +125,12 @@ class TmdbService
                     $this->language = 'en-US';
                     $result = $this->searchMovie($title, TmdbService::extractYearFromTitle($title), false);
                     $this->language = $originalLanguage;
+
                     return $result;
                 }
 
                 Log::debug('TMDB: No results found', ['title' => $normalizedTitle]);
+
                 return null;
             }
 
@@ -132,7 +141,7 @@ class TmdbService
             ]);
 
             // Find best match
-            $match = $this->findBestMatch($results, $title, $year, 'title', 'release_date');
+            $match = $this->findBestMatch($results, $title, $year, 'title', 'release_date', 'movie');
 
             if ($match) {
                 // Get external IDs (for IMDB)
@@ -170,7 +179,7 @@ class TmdbService
                 }
 
                 // Strategy 3: Take first result if year matches exactly
-                if (!empty($results) && $year) {
+                if (! empty($results) && $year) {
                     foreach ($results as $result) {
                         $resultYear = isset($result['release_date']) ? (int) substr($result['release_date'], 0, 4) : null;
                         if ($resultYear === $year) {
@@ -179,6 +188,7 @@ class TmdbService
                                 'year' => $resultYear,
                             ]);
                             $externalIds = $this->getMovieExternalIds($result['id']);
+
                             return [
                                 'tmdb_id' => $result['id'],
                                 'imdb_id' => $externalIds['imdb_id'] ?? null,
@@ -200,6 +210,7 @@ class TmdbService
                 $this->language = $fallbackLang;
                 $result = $this->searchMovie($title, $year, false);
                 $this->language = $originalLanguage;
+
                 return $result;
             }
 
@@ -209,6 +220,7 @@ class TmdbService
                 'title' => $title,
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
@@ -233,9 +245,9 @@ class TmdbService
                 $params['year'] = $year;
             }
 
-            $response = Http::timeout(15)->get(self::BASE_URL . '/search/movie', $params);
+            $response = Http::timeout(15)->get(self::BASE_URL.'/search/movie', $params);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 return null;
             }
 
@@ -245,7 +257,7 @@ class TmdbService
                 // Try without year
                 if ($year) {
                     unset($params['year']);
-                    $response = Http::timeout(15)->get(self::BASE_URL . '/search/movie', $params);
+                    $response = Http::timeout(15)->get(self::BASE_URL.'/search/movie', $params);
                     $results = $response->json('results', []);
                 }
             }
@@ -287,6 +299,7 @@ class TmdbService
                 'title' => $title,
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
@@ -294,14 +307,15 @@ class TmdbService
     /**
      * Search for a TV series by name and optionally year.
      *
-     * @param string $name The series name to search for
-     * @param int|null $year The first air date year (optional)
+     * @param  string  $name  The series name to search for
+     * @param  int|null  $year  The first air date year (optional)
      * @return array|null Returns series data with tmdb_id, tvdb_id, and imdb_id, or null if not found
      */
     public function searchTvSeries(string $name, ?int $year = null): ?array
     {
-        if (!$this->isConfigured()) {
+        if (! $this->isConfigured()) {
             Log::warning('TMDB API key not configured');
+
             return null;
         }
 
@@ -338,9 +352,9 @@ class TmdbService
                     'language' => $lang,
                 ]);
 
-                $response = Http::timeout(15)->get(self::BASE_URL . '/search/tv', $params);
+                $response = Http::timeout(15)->get(self::BASE_URL.'/search/tv', $params);
 
-                if (!$response->successful()) {
+                if (! $response->successful()) {
                     Log::warning('TMDB TV search failed', [
                         'name' => $name,
                         'normalized_query' => $normalizedQuery,
@@ -349,6 +363,7 @@ class TmdbService
                         'status' => $response->status(),
                         'response' => $response->body(),
                     ]);
+
                     continue;
                 }
 
@@ -363,10 +378,10 @@ class TmdbService
                     'first_results' => array_slice($results, 0, 3),
                 ]);
 
-                if (!empty($results)) {
+                if (! empty($results)) {
                     // Try to find best match with this language
-                    $match = $this->findBestMatch($results, $name, $year, 'name', 'first_air_date');
-                    
+                    $match = $this->findBestMatch($results, $name, $year, 'name', 'first_air_date', 'tv');
+
                     if ($match) {
                         // Found a good match, use it!
                         Log::debug('TMDB: Best match found', [
@@ -405,6 +420,7 @@ class TmdbService
                     'name' => $name,
                     'year' => $year,
                 ]);
+
                 return $this->searchTvSeries($name, null);
             }
 
@@ -412,6 +428,7 @@ class TmdbService
                 'name' => $name,
                 'normalized_query' => $normalizedQuery,
             ]);
+
             return null;
         } catch (\Exception $e) {
             Log::error('TMDB TV search error', [
@@ -420,6 +437,7 @@ class TmdbService
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
             return null;
         }
     }
@@ -433,7 +451,7 @@ class TmdbService
 
         try {
             $response = Http::timeout(15)->get(
-                self::BASE_URL . "/movie/{$tmdbId}/external_ids",
+                self::BASE_URL."/movie/{$tmdbId}/external_ids",
                 ['api_key' => $this->apiKey]
             );
 
@@ -459,7 +477,7 @@ class TmdbService
 
         try {
             $response = Http::timeout(15)->get(
-                self::BASE_URL . "/tv/{$tmdbId}/external_ids",
+                self::BASE_URL."/tv/{$tmdbId}/external_ids",
                 ['api_key' => $this->apiKey]
             );
 
@@ -477,14 +495,141 @@ class TmdbService
     }
 
     /**
-     * Find the best match from search results based on title and year.
+     * Get alternative titles for a TV series.
+     * Returns titles in different languages/regions.
+     *
+     * @param  int  $tmdbId  The TMDB ID of the TV series
+     * @return array Array of alternative titles with country codes
      */
-    protected function findBestMatch(array $results, string $searchTitle, ?int $searchYear, string $titleField, string $dateField): ?array
+    public function getTvAlternativeTitles(int $tmdbId): array
+    {
+        $cacheKey = "tmdb_tv_alt_titles_{$tmdbId}";
+
+        // Cache alternative titles for 24 hours
+        return Cache::remember($cacheKey, 86400, function () use ($tmdbId) {
+            $this->waitForRateLimit();
+
+            try {
+                $response = Http::timeout(15)->get(
+                    self::BASE_URL."/tv/{$tmdbId}/alternative_titles",
+                    ['api_key' => $this->apiKey]
+                );
+
+                if ($response->successful()) {
+                    $data = $response->json();
+
+                    return $data['results'] ?? [];
+                }
+            } catch (\Exception $e) {
+                Log::error('TMDB get TV alternative titles error', [
+                    'tmdb_id' => $tmdbId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            return [];
+        });
+    }
+
+    /**
+     * Get alternative titles for a movie.
+     * Returns titles in different languages/regions.
+     *
+     * @param  int  $tmdbId  The TMDB ID of the movie
+     * @return array Array of alternative titles with country codes
+     */
+    public function getMovieAlternativeTitles(int $tmdbId): array
+    {
+        $cacheKey = "tmdb_movie_alt_titles_{$tmdbId}";
+
+        // Cache alternative titles for 24 hours
+        return Cache::remember($cacheKey, 86400, function () use ($tmdbId) {
+            $this->waitForRateLimit();
+
+            try {
+                $response = Http::timeout(15)->get(
+                    self::BASE_URL."/movie/{$tmdbId}/alternative_titles",
+                    ['api_key' => $this->apiKey]
+                );
+
+                if ($response->successful()) {
+                    $data = $response->json();
+
+                    return $data['titles'] ?? [];
+                }
+            } catch (\Exception $e) {
+                Log::error('TMDB get movie alternative titles error', [
+                    'tmdb_id' => $tmdbId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            return [];
+        });
+    }
+
+    /**
+     * Check if a search term matches any of the alternative titles.
+     *
+     * @param  string  $searchTerm  The original search term
+     * @param  array  $alternativeTitles  Array of alternative titles from TMDB
+     * @return array|null Returns ['matched' => true, 'title' => '...', 'country' => '...'] or null
+     */
+    protected function matchAlternativeTitle(string $searchTerm, array $alternativeTitles): ?array
+    {
+        $normalizedSearch = $this->normalizeForComparison($searchTerm);
+
+        foreach ($alternativeTitles as $alt) {
+            $altTitle = $alt['title'] ?? $alt['name'] ?? null;
+            if (! $altTitle) {
+                continue;
+            }
+
+            $normalizedAlt = $this->normalizeForComparison($altTitle);
+
+            // Exact match
+            if ($normalizedSearch === $normalizedAlt) {
+                return [
+                    'matched' => true,
+                    'title' => $altTitle,
+                    'country' => $alt['iso_3166_1'] ?? 'unknown',
+                    'confidence' => 100,
+                ];
+            }
+
+            // High similarity match (>= 90%)
+            $similarity = $this->calculateSimilarity($normalizedSearch, $normalizedAlt);
+            if ($similarity >= 90) {
+                return [
+                    'matched' => true,
+                    'title' => $altTitle,
+                    'country' => $alt['iso_3166_1'] ?? 'unknown',
+                    'confidence' => (int) $similarity,
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Find the best match from search results based on title and year.
+     *
+     * @param  array  $results  Search results from TMDB
+     * @param  string  $searchTitle  The original search title
+     * @param  int|null  $searchYear  The year to match
+     * @param  string  $titleField  The field name for the title ('name' for TV, 'title' for movies)
+     * @param  string  $dateField  The field name for the date ('first_air_date' for TV, 'release_date' for movies)
+     * @param  string  $type  The type of entity: 'tv' or 'movie'
+     * @return array|null The best matching result or null
+     */
+    protected function findBestMatch(array $results, string $searchTitle, ?int $searchYear, string $titleField, string $dateField, string $type = 'tv'): ?array
     {
         // Normalize the search title for comparison (same way we normalize for search)
         $normalizedSearch = $this->normalizeForComparison($this->normalizeTitle($searchTitle));
         $bestMatch = null;
         $bestScore = 0;
+        $exactYearMatch = null;
 
         foreach ($results as $result) {
             $resultTitle = $result[$titleField] ?? '';
@@ -500,7 +645,7 @@ class TmdbService
             if (isset($result[$originalField]) && $result[$originalField] !== $resultTitle) {
                 $normalizedOriginal = $this->normalizeForComparison($result[$originalField]);
                 $originalSimilarity = $this->calculateSimilarity($normalizedSearch, $normalizedOriginal);
-                
+
                 // Exact match on original title/name should be 100% confidence
                 if ($normalizedSearch === $normalizedOriginal) {
                     $similarity = 100;
@@ -511,10 +656,12 @@ class TmdbService
 
             // Year matching bonus/penalty
             $yearScore = 0;
+            $isExactYearMatch = false;
             if ($searchYear && $resultYear) {
                 $yearDiff = abs($searchYear - $resultYear);
                 if ($yearDiff === 0) {
                     $yearScore = 15; // Exact year match bonus
+                    $isExactYearMatch = true;
                 } elseif ($yearDiff === 1) {
                     $yearScore = 10; // ±1 year tolerance bonus
                 } elseif ($yearDiff <= 2) {
@@ -534,6 +681,12 @@ class TmdbService
                 $bestMatch = $result;
                 $bestMatch['_confidence'] = (int) min(100, $similarity);
             }
+
+            // Track if we have an exact year match (useful for localized titles)
+            if ($isExactYearMatch && $exactYearMatch === null) {
+                $exactYearMatch = $result;
+                $exactYearMatch['_confidence'] = (int) min(100, $similarity);
+            }
         }
 
         // Only return if confidence meets threshold
@@ -543,7 +696,73 @@ class TmdbService
                 'match' => $bestMatch[$titleField] ?? 'unknown',
                 'confidence' => $bestMatch['_confidence'],
             ]);
+
             return $bestMatch;
+        }
+
+        // FALLBACK 1: Check alternative titles for low-confidence matches
+        // This is the most reliable way to match localized titles like "Unsere kleine Farm" → "Little House on the Prairie"
+        if ($bestMatch && ($bestMatch['_confidence'] ?? 0) < $this->confidenceThreshold) {
+            $tmdbId = $bestMatch['id'] ?? null;
+            if ($tmdbId) {
+                Log::debug('TMDB: Checking alternative titles for low-confidence match', [
+                    'search' => $searchTitle,
+                    'tmdb_id' => $tmdbId,
+                    'current_confidence' => $bestMatch['_confidence'] ?? 0,
+                    'type' => $type,
+                ]);
+
+                $alternativeTitles = $type === 'tv'
+                    ? $this->getTvAlternativeTitles($tmdbId)
+                    : $this->getMovieAlternativeTitles($tmdbId);
+
+                if (! empty($alternativeTitles)) {
+                    $altMatch = $this->matchAlternativeTitle($searchTitle, $alternativeTitles);
+                    if ($altMatch && $altMatch['matched']) {
+                        Log::debug('TMDB match found via alternative titles', [
+                            'search' => $searchTitle,
+                            'match' => $bestMatch[$titleField] ?? 'unknown',
+                            'alt_title_matched' => $altMatch['title'],
+                            'alt_country' => $altMatch['country'],
+                            'confidence' => $altMatch['confidence'],
+                        ]);
+                        $bestMatch['_confidence'] = $altMatch['confidence'];
+                        $bestMatch['_matched_via'] = 'alternative_title';
+                        $bestMatch['_alt_title'] = $altMatch['title'];
+                        $bestMatch['_alt_country'] = $altMatch['country'];
+
+                        return $bestMatch;
+                    }
+                }
+            }
+        }
+
+        // FALLBACK 2: If only 1 result with exact year match, accept it
+        // This handles cases where alternative titles don't exist but TMDB clearly found the right show
+        if (count($results) === 1 && $exactYearMatch !== null) {
+            Log::debug('TMDB match accepted (single result with exact year match - likely localized title)', [
+                'search' => $searchTitle,
+                'match' => $exactYearMatch[$titleField] ?? 'unknown',
+                'confidence' => $exactYearMatch['_confidence'] ?? 0,
+                'year' => $searchYear,
+            ]);
+            $exactYearMatch['_confidence'] = max($exactYearMatch['_confidence'] ?? 0, 70); // Boost confidence
+
+            return $exactYearMatch;
+        }
+
+        // FALLBACK 3: If only 1 result and no year provided, accept with lower confidence
+        // This handles cases where we search a localized title and TMDB finds the correct show
+        if (count($results) === 1 && $searchYear === null) {
+            $singleResult = $results[0];
+            $singleResult['_confidence'] = max($bestMatch['_confidence'] ?? 0, 60);
+            Log::debug('TMDB match accepted (single result, no year filter - likely localized title)', [
+                'search' => $searchTitle,
+                'match' => $singleResult[$titleField] ?? 'unknown',
+                'confidence' => $singleResult['_confidence'],
+            ]);
+
+            return $singleResult;
         }
 
         // If no match meets threshold but we have results, log for debugging
@@ -675,7 +894,7 @@ class TmdbService
     /**
      * Extract year from a title string.
      *
-     * @param string $title Title that may contain year in format "Title (YYYY)" or "Title YYYY" or "Title YYYY 4KUHD"
+     * @param  string  $title  Title that may contain year in format "Title (YYYY)" or "Title YYYY" or "Title YYYY 4KUHD"
      * @return int|null The extracted year or null
      */
     public static function extractYearFromTitle(string $title): ?int
