@@ -532,7 +532,8 @@ class PlaylistGenerateController extends Controller
         $query->leftJoin('epg_channels', 'channels.epg_channel_id', '=', 'epg_channels.id')
             ->selectRaw('epg_channels.icon as epg_icon')
             ->selectRaw('epg_channels.icon_custom as epg_icon_custom')
-            ->selectRaw('epg_channels.channel_id as epg_channel_id');
+            // Alias the external EPG channel identifier to avoid clobbering the FK attribute
+            ->selectRaw('epg_channels.channel_id as epg_channel_key');
 
         // If custom playlist, left join tags (aliased) for this playlist to use its order_column
         if ($playlist instanceof CustomPlaylist) {
