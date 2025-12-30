@@ -268,6 +268,9 @@ class SyncVodStrmFiles implements ShouldQueue
                     Channel::class,
                     $syncLocation
                 );
+                
+                // Clean up empty directories
+                StrmFileMapping::cleanupEmptyDirectoriesInLocation($syncLocation);
             }
         } catch (\Exception $e) {
             // Log the exception or handle it as needed

@@ -308,6 +308,47 @@ class StrmFileMapping extends Model
     }
 
     /**
+     * Clean up all empty directories within a sync location.
+     * Walks the directory tree and removes empty folders from deepest level up.
+     */
+    public static function cleanupEmptyDirectoriesInLocation(string $syncLocation): int
+    {
+        $count = 0;
+        $realSyncLocation = realpath(rtrim($syncLocation, '/'));
+        
+        if ($realSyncLocation === false || !is_dir($realSyncLocation)) {
+            return 0;
+        }
+
+        // Get all directories, deepest first (so we can delete from bottom up)
+        $directories = [];
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($realSyncLocation, \RecursiveDirectoryIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST
+        );
+
+        foreach ($iterator as $file) {
+            if ($file->isDir()) {
+                $directories[] = $file->getRealPath();
+            }
+        }
+
+        // Sort by depth (deepest first)
+        usort($directories, fn($a, $b) => substr_count($b, '/') - substr_count($a, '/'));
+
+        foreach ($directories as $directory) {
+            if (self::isDirectoryEmpty($directory)) {
+                if (@rmdir($directory)) {
+                    Log::debug('STRM Sync: Removed empty directory', ['path' => $directory]);
+                    $count++;
+                }
+            }
+        }
+
+        return $count;
+    }
+
+    /**
      * Clean up empty directories up to the sync location
      * Uses realpath() to prevent path traversal attacks
      */
@@ -442,24 +483,54 @@ class StrmFileMapping extends Model
     }
 
     /**
-     * Delete all mappings and files for syncables that no longer exist or are disabled
+     * Delete all mappings and files for syncables that no longer exist or are disabled.
+     * 
+     * OPTIMIZED: Uses a single query with LEFT JOIN instead of N+1 queries.
+     * This dramatically improves performance for large datasets.
      */
     public static function cleanupOrphaned(string $syncableType, string $syncLocation): int
     {
         $count = 0;
 
-        self::where('syncable_type', $syncableType)
+        // Determine the table name based on the syncable type
+        $model = new $syncableType();
+        $table = $model->getTable();
+        $primaryKey = $model->getKeyName();
+
+        // Get orphaned mappings in batches using an efficient LEFT JOIN query
+        // This finds mappings where:
+        // 1. The related record doesn't exist (deleted), OR
+        // 2. The related record exists but is disabled
+        $orphanedIds = self::where('syncable_type', $syncableType)
             ->where('sync_location', $syncLocation)
-            ->chunk(100, function ($mappings) use (&$count) {
-                foreach ($mappings as $mapping) {
-                    // Check if the syncable still exists and is enabled
-                    $syncable = $mapping->syncable;
-                    if (! $syncable || ! ($syncable->enabled ?? true)) {
-                        $mapping->deleteFile();
-                        $count++;
-                    }
-                }
-            });
+            ->leftJoin($table, function ($join) use ($table, $primaryKey) {
+                $join->on('strm_file_mappings.syncable_id', '=', "{$table}.{$primaryKey}");
+            })
+            ->where(function ($query) use ($table) {
+                $query->whereNull("{$table}.id")  // Record doesn't exist
+                      ->orWhere("{$table}.enabled", false);  // Record is disabled
+            })
+            ->pluck('strm_file_mappings.id')
+            ->toArray();
+
+        if (empty($orphanedIds)) {
+            return 0;
+        }
+
+        Log::debug('STRM Sync: Found orphaned mappings to clean up', [
+            'count' => count($orphanedIds),
+            'syncable_type' => $syncableType,
+            'sync_location' => $syncLocation,
+        ]);
+
+        // Process deletions in chunks to avoid memory issues with large datasets
+        foreach (array_chunk($orphanedIds, 100) as $idChunk) {
+            $mappings = self::whereIn('id', $idChunk)->get();
+            foreach ($mappings as $mapping) {
+                $mapping->deleteFile();
+                $count++;
+            }
+        }
 
         return $count;
     }
