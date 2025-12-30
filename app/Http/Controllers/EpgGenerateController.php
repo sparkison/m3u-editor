@@ -94,7 +94,7 @@ class EpgGenerateController extends Controller
         $channelNumber = $playlist->auto_channel_increment ? $playlist->channel_start - 1 : 0;
         $idChannelBy = $playlist->id_channel_by;
         $dummyEpgEnabled = $playlist->dummy_epg;
-        $dummyEpgLength = (int) ($playlist->dummy_epg_length ?? 120); // Default to 120 minutes if not set
+        $dummyEpgLength = (int)($playlist->dummy_epg_length ?? 120); // Default to 120 minutes if not set
         $proxyEnabled = $playlist->enable_proxy;
         $logoProxyEnabled = $playlist->enable_logo_proxy;
 
@@ -106,23 +106,13 @@ class EpgGenerateController extends Controller
                 $channelNo = ++$channelNumber;
             }
 
-            // Deduplicate Name
-            $name = $channel->name_custom ?? $channel->name;
-            $originalName = $name;
-            $nameCount = 2;
-            while (isset($usedNames[$name])) {
-                $name = "$originalName ($nameCount)";
-                $nameCount++;
-            }
-            $usedNames[$name] = true;
-
             // Get the `tvg-id` based on the playlist setting
             switch ($idChannelBy) {
                 case PlaylistChannelId::ChannelId:
                     $tvgId = $channel->id;
                     break;
                 case PlaylistChannelId::Name:
-                    $tvgId = $name; // Use the deduplicated name
+                    $tvgId = $channel->name_custom ?? $channel->name;
                     break;
                 case PlaylistChannelId::Title:
                     $tvgId = $channel->title_custom ?? $channel->title;
@@ -139,20 +129,6 @@ class EpgGenerateController extends Controller
 
             // Make sure TVG ID only contains characters and numbers
             $tvgId = preg_replace(config('dev.tvgid.regex'), '', $tvgId);
-
-            // Deduplicate TVG ID
-            $originalTvgId = $tvgId;
-            $idCount = 2;
-            while (isset($usedTvgIds[$tvgId])) {
-                $tvgId = "$originalTvgId.$idCount";
-                $idCount++;
-            }
-            $usedTvgIds[$tvgId] = true;
-
-            // Re-deduplicate TVG ID after regex stripping (if we did that in M3U... we didn't implement it in M3U based on my last check, M3U code just had the regex at end).
-            // Users report Emby is "not matching properly". Unique IDs are key.
-            // If M3U has RegEx at end, EPG must have RegEx at end.
-            // Parity is key.
 
             // Output the <channel> tag
             $title = $channel->title_custom ?? $channel->title;
@@ -178,7 +154,7 @@ class EpgGenerateController extends Controller
                 } elseif ($channel->logo_type === ChannelLogoType::Epg) {
                     $icon = $epgData->icon ?? '';
                 } elseif ($channel->logo_type === ChannelLogoType::Channel) {
-                    $icon = $channel->logo ?? $channel->logo_internal ?? '';
+                    $icon =  $channel->logo ?? $channel->logo_internal ?? '';
                 }
                 if (empty($icon)) {
                     $icon = url('/placeholder.png');
@@ -291,10 +267,8 @@ class EpgGenerateController extends Controller
 
                                 // Output programme tag
                                 echo '  <programme channel="' . htmlspecialchars($mappedChannelId) . '"';
-                                if ($start)
-                                    echo ' start="' . $start . '"';
-                                if ($stop)
-                                    echo ' stop="' . $stop . '"';
+                                if ($start) echo ' start="' . $start . '"';
+                                if ($stop) echo ' stop="' . $stop . '"';
                                 echo '>' . PHP_EOL;
 
                                 if ($programme['title']) {
