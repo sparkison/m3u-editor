@@ -211,14 +211,7 @@ class PlaylistGenerateController extends Controller
                         }
                     }
 
-                    // Deduplicate TVG ID
-                    $originalTvgId = $tvgId;
-                    $idCount = 2;
-                    while (isset($usedTvgIds[$tvgId])) {
-                        $tvgId = "$originalTvgId.$idCount";
-                        $idCount++;
-                    }
-                    $usedTvgIds[$tvgId] = true;
+
 
                     // Get the icon
                     $icon = '';
@@ -276,15 +269,15 @@ class PlaylistGenerateController extends Controller
     
                     $tvgId = preg_replace(config('dev.tvgid.regex'), '', $tvgId);
 
-                    // Re-deduplicate TVG ID after regex stripping to ensure uniqueness in output
-                    $originalTvgIdStripped = $tvgId;
-                    $idCountStripped = 2;
-                    // We must use a separate tracker for the final output ID or reuse the previous one?
-                    // The previous logic deduped based on raw ID. 
-                    // Let's move the regex UP before deduplication to be safe.
-                    // Wait, I can't move the block easily in one `ReplaceFileContent` if I don't replace everything.
-                    // I'll adjust the replacement block order above.
-    
+                    // Deduplicate TVG ID
+                    $originalTvgId = $tvgId;
+                    $idCount = 2;
+                    while (isset($usedTvgIds[$tvgId])) {
+                        $tvgId = "$originalTvgId.$idCount";
+                        $idCount++;
+                    }
+                    $usedTvgIds[$tvgId] = true;
+
                     // RE-PLANNING IN MID-FLIGHT:
                     // I will include the regex strip in the replacement block and do deduplication AFTER it.
     

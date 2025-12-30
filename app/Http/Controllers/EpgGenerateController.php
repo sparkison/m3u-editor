@@ -178,6 +178,9 @@ class EpgGenerateController extends Controller
                 }
             }
 
+            // Make sure TVG ID only contains characters and numbers
+            $tvgId = preg_replace(config('dev.tvgid.regex'), '', $tvgId);
+
             // Deduplicate TVG ID
             $originalTvgId = $tvgId;
             $idCount = 2;
@@ -186,9 +189,6 @@ class EpgGenerateController extends Controller
                 $idCount++;
             }
             $usedTvgIds[$tvgId] = true;
-
-            // Make sure TVG ID only contains characters and numbers
-            $tvgId = preg_replace(config('dev.tvgid.regex'), '', $tvgId);
 
             // Re-deduplicate TVG ID after regex stripping (if we did that in M3U... we didn't implement it in M3U based on my last check, M3U code just had the regex at end).
             // Users report Emby is "not matching properly". Unique IDs are key.
