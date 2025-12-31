@@ -6,6 +6,7 @@ use App\Models\Channel;
 use App\Models\Playlist;
 use App\Models\StrmFileMapping;
 use App\Services\PlaylistService;
+use App\Services\ResourceManager;
 use App\Settings\GeneralSettings;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -33,7 +34,7 @@ class SyncVodStrmFiles implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(GeneralSettings $settings): void
+    public function handle(GeneralSettings $settings, ResourceManager $resourceManager): void
     {
         try {
             // Get global sync settings
@@ -278,9 +279,13 @@ class SyncVodStrmFiles implements ShouldQueue
             // Clean up orphaned files for disabled/deleted channels
             // Run cleanup whenever we're syncing with a valid sync location
             if ($syncLocation = $global_sync_settings['sync_location'] ?? null) {
+                // Get cleanup chunk size from resource manager
+                $cleanupChunkSize = $resourceManager->getCleanupChunkSize();
+
                 StrmFileMapping::cleanupOrphaned(
                     Channel::class,
-                    $syncLocation
+                    $syncLocation,
+                    $cleanupChunkSize
                 );
 
                 // Clean up empty directories after orphaned cleanup

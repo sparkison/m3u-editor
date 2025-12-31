@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Enums\Status;
 use App\Models\Channel;
 use App\Models\Playlist;
+use App\Services\ResourceManager;
 use App\Services\XtreamService;
 use App\Traits\ProviderRequestDelay;
 use Filament\Notifications\Notification;
@@ -43,7 +44,7 @@ class ProcessVodChannels implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(XtreamService $xtream): void
+    public function handle(XtreamService $xtream, ResourceManager $resourceManager): void
     {
         $playlist = $this->playlist;
         if ($playlist === null) {
@@ -60,8 +61,8 @@ class ProcessVodChannels implements ShouldQueue
             return;
         }
 
-        // For bulk processing, use chunked approach
-        $this->processVodChannelsInChunks($playlist);
+        // For bulk processing, use chunked approach with ResourceManager
+        $this->processVodChannelsInChunks($playlist, $resourceManager);
     }
 
     /**
@@ -102,8 +103,17 @@ class ProcessVodChannels implements ShouldQueue
     /**
      * Process VOD channels in chunks using a job chain.
      */
-    protected function processVodChannelsInChunks(Playlist $playlist): void
+    protected function processVodChannelsInChunks(Playlist $playlist, ResourceManager $resourceManager): void
     {
+        // Get chunk size from resource manager (auto-detects or uses configured profile)
+        $chunkSize = $resourceManager->getMetadataChunkSize() * 2; // VOD can use larger chunks than series
+
+        Log::debug('VOD Metadata Sync: Starting bulk processing', [
+            'playlist_id' => $playlist->id,
+            'profile' => $resourceManager->getProfileName(),
+            'chunk_size' => $chunkSize,
+        ]);
+
         // Get all VOD channel IDs that need processing
         $query = $playlist->channels()
             ->where([
@@ -153,17 +163,22 @@ class ProcessVodChannels implements ShouldQueue
             ->sendToDatabase($playlist->user);
 
         // Calculate total chunks without loading all IDs into memory
-        $totalChunks = (int) ceil($total / self::CHUNK_SIZE);
+        $totalChunks = (int) ceil($total / $chunkSize);
 
-        Log::info("Starting chunked VOD processing for playlist ID {$playlist->id}: {$total} channels in {$totalChunks} chunks");
+        Log::debug("VOD Metadata Sync: Starting chunked processing", [
+            'playlist_id' => $playlist->id,
+            'total_channels' => $total,
+            'total_chunks' => $totalChunks,
+            'chunk_size' => $chunkSize,
+        ]);
 
         // Build the job chain using lazy collection to avoid memory issues
-        // Use cursor/generator approach - only load CHUNK_SIZE IDs at a time
+        // Use cursor/generator approach - only load chunk IDs at a time
         $jobs = [];
         $chunkIndex = 0;
 
         // Use chunk() on the query builder which processes in batches without loading all into memory
-        $query->select('id')->orderBy('id')->chunk(self::CHUNK_SIZE, function ($channels) use (&$jobs, &$chunkIndex, $playlist, $totalChunks) {
+        $query->select('id')->orderBy('id')->chunk($chunkSize, function ($channels) use (&$jobs, &$chunkIndex, $playlist, $totalChunks) {
             $chunkIds = $channels->pluck('id')->toArray();
             $jobs[] = new ProcessVodChannelsChunk(
                 playlist: $playlist,
