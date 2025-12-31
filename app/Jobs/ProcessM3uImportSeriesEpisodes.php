@@ -12,8 +12,8 @@ use Illuminate\Foundation\Queue\Queueable;
 
 class ProcessM3uImportSeriesEpisodes implements ShouldQueue
 {
-    use Queueable;
     use ProviderRequestDelay;
+    use Queueable;
 
     // Don't retry the job on failure
     public $tries = 1;
@@ -51,6 +51,7 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
             $this->notify = false;
 
             // Process all series in chunks
+            // In bulk mode, don't dispatch individual sync jobs - we do ONE at the end
             Series::query()
                 ->where([
                     ['enabled', true],
@@ -60,11 +61,23 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
                     $query->where('playlist_id', $this->playlist_id);
                 })
                 ->with(['playlist'])
-                ->chunkById(100, function ($seriesChunk) use ($global_sync_settings) {
+                ->chunkById(50, function ($seriesChunk) use ($global_sync_settings) {
                     foreach ($seriesChunk as $series) {
-                        $this->fetchMetadataForSeries($series, $global_sync_settings);
+                        // Pass dispatchSync: false to prevent per-series job dispatch
+                        $this->fetchMetadataForSeries($series, $global_sync_settings, dispatchSync: false);
                     }
                 });
+
+            // Dispatch ONE bulk sync job at the end instead of per-series
+            if ($global_sync_settings['enabled'] && $this->sync_stream_files) {
+                dispatch(new SyncSeriesStrmFiles(
+                    series: null,
+                    notify: false,
+                    all_playlists: $this->all_playlists,
+                    playlist_id: $this->playlist_id,
+                    user_id: $this->user_id,
+                ));
+            }
 
             // Notify the user we're done!
             if ($this->user_id) {
@@ -72,8 +85,8 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
                 if ($user) {
                     Notification::make()
                         ->success()
-                        ->title("Series Sync Completed")
-                        ->body("Series sync completed successfully for all series.")
+                        ->title('Series Sync Completed')
+                        ->body('Series sync completed successfully for all series.')
                         ->broadcast($user)
                         ->sendToDatabase($user);
                 }
@@ -81,16 +94,24 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
         }
     }
 
-    private function fetchMetadataForSeries($series, $settings)
+    /**
+     * Fetch metadata for a single series.
+     *
+     * @param  bool  $dispatchSync  Whether to dispatch sync job (false for bulk mode)
+     */
+    private function fetchMetadataForSeries($series, $settings, bool $dispatchSync = true)
     {
         // Get the playlist
         $playlist = $series->playlist;
 
+        // In bulk mode (dispatchSync=false), don't trigger per-series sync
+        $shouldSync = $dispatchSync && $this->sync_stream_files;
+
         // Use provider throttling to limit concurrent requests and apply delay
-        $results = $this->withProviderThrottling(function () use ($series) {
+        $results = $this->withProviderThrottling(function () use ($series, $shouldSync) {
             return $series->fetchMetadata(
                 refresh: $this->overwrite_existing,
-                sync: $this->sync_stream_files
+                sync: $shouldSync
             );
         });
 
@@ -100,9 +121,9 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
             $syncStrmFiles = $settings['enabled'] ?? $sync_settings['enabled'] ?? false;
             $body = "Series sync completed successfully for \"{$series->name}\". Imported {$results} episodes.";
             if ($syncStrmFiles) {
-                $body .= " .strm file sync is enabled, syncing now.";
+                $body .= ' .strm file sync is enabled, syncing now.';
             } else {
-                $body .= " .strm file sync is not enabled.";
+                $body .= ' .strm file sync is not enabled.';
             }
             Notification::make()
                 ->success()
