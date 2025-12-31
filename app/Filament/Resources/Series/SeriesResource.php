@@ -20,6 +20,7 @@ use App\Rules\CheckIfUrlOrLocalPath;
 use App\Services\PlaylistService;
 use App\Services\XtreamService;
 use App\Settings\GeneralSettings;
+use App\Traits\HasUserFiltering;
 use Carbon\Carbon;
 use Exception;
 use Filament\Actions\Action;
@@ -39,6 +40,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
@@ -46,11 +48,11 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\TextInputColumn;
 use Filament\Tables\Columns\ToggleColumn;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Enums\RecordActionsPosition;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
@@ -58,8 +60,8 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Js;
 use Illuminate\Support\Str;
-use App\Traits\HasUserFiltering;
 
 class SeriesResource extends Resource
 {
@@ -117,14 +119,14 @@ class SeriesResource extends Resource
                 ->width(80)
                 ->height(120)
                 ->checkFileExistence(false)
-                ->getStateUsing(fn($record) => LogoFacade::getSeriesLogoUrl($record))
+                ->getStateUsing(fn ($record) => LogoFacade::getSeriesLogoUrl($record))
                 ->searchable(),
             TextColumn::make('name')
-                ->description((fn($record) => Str::limit($record->plot, 200)))
+                ->description((fn ($record) => Str::limit($record->plot, 200)))
                 ->wrap()
                 ->extraAttributes(['style' => 'min-width: 350px;'])
                 ->searchable(query: function (Builder $query, string $search): Builder {
-                    return $query->orWhereRaw('LOWER(series.name) LIKE ?', ['%' . strtolower($search) . '%']);
+                    return $query->orWhereRaw('LOWER(series.name) LIKE ?', ['%'.strtolower($search).'%']);
                 })
                 ->sortable(),
             TextInputColumn::make('sort')
@@ -133,7 +135,7 @@ class SeriesResource extends Resource
                 ->type('number')
                 ->placeholder('Sort Order')
                 ->sortable()
-                ->tooltip(fn($record) => ! $record->is_custom && $record->playlist?->auto_sort ? 'Playlist auto-sort enabled; any changes will be overwritten on next sync' : 'Channel sort order')
+                ->tooltip(fn ($record) => ! $record->is_custom && $record->playlist?->auto_sort ? 'Playlist auto-sort enabled; any changes will be overwritten on next sync' : 'Channel sort order')
                 ->toggleable(),
             ToggleColumn::make('enabled')
                 ->toggleable()
@@ -150,16 +152,18 @@ class SeriesResource extends Resource
                     if ($record->has_metadata) {
                         $ids = [];
                         if ($record->tmdb_id || ($record->metadata['tmdb_id'] ?? null)) {
-                            $ids[] = 'TMDB: ' . ($record->tmdb_id ?? $record->metadata['tmdb_id']);
+                            $ids[] = 'TMDB: '.($record->tmdb_id ?? $record->metadata['tmdb_id']);
                         }
                         if ($record->tvdb_id || ($record->metadata['tvdb_id'] ?? null)) {
-                            $ids[] = 'TVDB: ' . ($record->tvdb_id ?? $record->metadata['tvdb_id']);
+                            $ids[] = 'TVDB: '.($record->tvdb_id ?? $record->metadata['tvdb_id']);
                         }
                         if ($record->imdb_id || ($record->metadata['imdb_id'] ?? null)) {
-                            $ids[] = 'IMDB: ' . ($record->imdb_id ?? $record->metadata['imdb_id']);
+                            $ids[] = 'IMDB: '.($record->imdb_id ?? $record->metadata['imdb_id']);
                         }
+
                         return implode(' | ', $ids);
                     }
+
                     return 'No TMDB/TVDB/IMDB IDs available';
                 })
                 ->toggleable(),
@@ -176,7 +180,7 @@ class SeriesResource extends Resource
                 ->toggleable()
                 ->sortable(),
             TextColumn::make('category.name')
-                ->hidden(fn() => ! $showCategory)
+                ->hidden(fn () => ! $showCategory)
                 ->badge()
                 ->numeric()
                 ->sortable(),
@@ -185,7 +189,7 @@ class SeriesResource extends Resource
             TextColumn::make('youtube_trailer')
                 ->label('YouTube Trailer')
                 ->placeholder('No trailer ID set.')
-                ->url(fn($record): string => 'https://www.youtube.com/watch?v=' . $record->youtube_trailer)
+                ->url(fn ($record): string => 'https://www.youtube.com/watch?v='.$record->youtube_trailer)
                 ->openUrlInNewTab()
                 ->icon('heroicon-s-play'),
             TextColumn::make('release_date')
@@ -203,7 +207,7 @@ class SeriesResource extends Resource
             TextColumn::make('playlist.name')
                 ->numeric()
                 ->sortable()
-                ->hidden(fn() => ! $showPlaylist),
+                ->hidden(fn () => ! $showPlaylist),
             TextColumn::make('created_at')
                 ->dateTime()
                 ->sortable()
@@ -223,7 +227,7 @@ class SeriesResource extends Resource
                 ->multiple()
                 ->preload()
                 ->searchable()
-                ->hidden(fn() => ! $showPlaylist),
+                ->hidden(fn () => ! $showPlaylist),
             Filter::make('enabled')
                 ->label('Series is enabled')
                 ->toggle()
@@ -236,11 +240,11 @@ class SeriesResource extends Resource
                 ->query(function ($query) {
                     return $query->where(function ($q) {
                         $q->whereNotNull('tmdb_id')
-                          ->orWhereNotNull('tvdb_id')
-                          ->orWhereNotNull('imdb_id')
-                          ->orWhereRaw("metadata::jsonb ?? 'tmdb_id'")
-                          ->orWhereRaw("metadata::jsonb ?? 'tvdb_id'")
-                          ->orWhereRaw("metadata::jsonb ?? 'imdb_id'");
+                            ->orWhereNotNull('tvdb_id')
+                            ->orWhereNotNull('imdb_id')
+                            ->orWhereRaw("metadata::jsonb ?? 'tmdb_id'")
+                            ->orWhereRaw("metadata::jsonb ?? 'tvdb_id'")
+                            ->orWhereRaw("metadata::jsonb ?? 'imdb_id'");
                     });
                 }),
             Filter::make('missing_metadata')
@@ -248,14 +252,14 @@ class SeriesResource extends Resource
                 ->toggle()
                 ->query(function ($query) {
                     return $query->whereNull('tmdb_id')
-                                 ->whereNull('tvdb_id')
-                                 ->whereNull('imdb_id')
-                                 ->where(function ($q) {
-                                     $q->whereNull('metadata')
-                                       ->orWhereRaw("NOT (metadata::jsonb ?? 'tmdb_id')")
-                                       ->orWhereRaw("NOT (metadata::jsonb ?? 'tvdb_id')")
-                                       ->orWhereRaw("NOT (metadata::jsonb ?? 'imdb_id')");
-                                 });
+                        ->whereNull('tvdb_id')
+                        ->whereNull('imdb_id')
+                        ->where(function ($q) {
+                            $q->whereNull('metadata')
+                                ->orWhereRaw("NOT (metadata::jsonb ?? 'tmdb_id')")
+                                ->orWhereRaw("NOT (metadata::jsonb ?? 'tvdb_id')")
+                                ->orWhereRaw("NOT (metadata::jsonb ?? 'imdb_id')");
+                        });
                 }),
         ];
     }
@@ -274,7 +278,7 @@ class SeriesResource extends Resource
                             ->live()
                             ->label('Category')
                             ->helperText('Select the category you would like to move the series to.')
-                            ->options(fn(Get $get, $record) => Category::where(['user_id' => auth()->id(), 'playlist_id' => $record->playlist_id])->get(['name', 'id'])->pluck('name', 'id'))
+                            ->options(fn (Get $get, $record) => Category::where(['user_id' => auth()->id(), 'playlist_id' => $record->playlist_id])->get(['name', 'id'])->pluck('name', 'id'))
                             ->searchable(),
                     ])
                     ->action(function ($record, array $data): void {
@@ -316,6 +320,101 @@ class SeriesResource extends Resource
                             ->send();
                     })
                     ->requiresConfirmation(),
+                Action::make('manual_tmdb_search')
+                    ->label('Manual TMDB Search')
+                    ->icon('heroicon-o-magnifying-glass')
+                    ->color('warning')
+                    ->slideOver()
+                    ->modalWidth('4xl')
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Close')
+                    ->fillForm(fn ($record) => [
+                        'search_query' => $record->name,
+                        'search_year' => $record->release_date ? (int) substr($record->release_date, 0, 4) : null,
+                        'series_id' => $record->id,
+                        'current_tmdb_id' => $record->tmdb_id,
+                        'current_tvdb_id' => $record->tvdb_id,
+                        'current_imdb_id' => $record->imdb_id,
+                    ])
+                    ->schema([
+                        Section::make('Current IDs')
+                            ->description('Currently stored external IDs for this series')
+                            ->schema([
+                                Grid::make(3)
+                                    ->schema([
+                                        TextInput::make('current_tmdb_id')
+                                            ->label('TMDB ID')
+                                            ->disabled()
+                                            ->placeholder('Not set'),
+                                        TextInput::make('current_tvdb_id')
+                                            ->label('TVDB ID')
+                                            ->disabled()
+                                            ->placeholder('Not set'),
+                                        TextInput::make('current_imdb_id')
+                                            ->label('IMDB ID')
+                                            ->disabled()
+                                            ->placeholder('Not set'),
+                                    ]),
+                            ])
+                            ->collapsible()
+                            ->collapsed(),
+                        Section::make('Search TMDB')
+                            ->description('Search The Movie Database for this series')
+                            ->schema([
+                                Grid::make(3)
+                                    ->schema([
+                                        TextInput::make('search_query')
+                                            ->label('Search Query')
+                                            ->placeholder('Enter series name...')
+                                            ->required()
+                                            ->columnSpan(2),
+                                        TextInput::make('search_year')
+                                            ->label('Year (optional)')
+                                            ->numeric()
+                                            ->minValue(1900)
+                                            ->maxValue(2100)
+                                            ->placeholder('e.g. 2024'),
+                                    ]),
+                                Actions::make([
+                                    Action::make('search_tmdb')
+                                        ->label('Search TMDB')
+                                        ->icon('heroicon-o-magnifying-glass')
+                                        ->action(function (Get $get, Set $set) {
+                                            $query = $get('search_query');
+                                            $year = $get('search_year');
+
+                                            if (empty($query)) {
+                                                Notification::make()
+                                                    ->warning()
+                                                    ->title('Please enter a search query')
+                                                    ->send();
+
+                                                return;
+                                            }
+
+                                            try {
+                                                $tmdbService = app(\App\Services\TmdbService::class);
+                                                $results = $tmdbService->searchTvSeriesManual($query, $year);
+                                                $set('search_results', $results);
+                                            } catch (\Exception $e) {
+                                                Notification::make()
+                                                    ->danger()
+                                                    ->title('Search Error')
+                                                    ->body($e->getMessage())
+                                                    ->send();
+                                            }
+                                        }),
+                                ])->fullWidth(),
+                            ]),
+                        Section::make('Search Results')
+                            ->description('Click on a result to apply the TMDB IDs')
+                            ->schema([
+                                Forms\Components\Hidden::make('series_id'),
+                                \App\Forms\Components\TmdbSearchResults::make('search_results')
+                                    ->type('tv')
+                                    ->default([]),
+                            ]),
+                    ]),
                 Action::make('process')
                     ->label('Fetch Series Metadata')
                     ->schema([
@@ -393,13 +492,13 @@ class SeriesResource extends Resource
                             ->searchable(),
                         Select::make('category')
                             ->label('Custom Category')
-                            ->disabled(fn(Get $get) => ! $get('playlist'))
-                            ->helperText(fn(Get $get) => ! $get('playlist') ? 'Select a custom playlist first.' : 'Select the category you would like to assign to the selected series to.')
+                            ->disabled(fn (Get $get) => ! $get('playlist'))
+                            ->helperText(fn (Get $get) => ! $get('playlist') ? 'Select a custom playlist first.' : 'Select the category you would like to assign to the selected series to.')
                             ->options(function ($get) {
                                 $customList = CustomPlaylist::find($get('playlist'));
 
                                 return $customList ? $customList->categoryTags()->get()
-                                    ->mapWithKeys(fn($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
+                                    ->mapWithKeys(fn ($tag) => [$tag->getAttributeValue('name') => $tag->getAttributeValue('name')])
                                     ->toArray() : [];
                             })
                             ->searchable(),
@@ -423,7 +522,7 @@ class SeriesResource extends Resource
                             ->body('The selected series have been added to the chosen custom playlist.')
                             ->send();
                     })
-                    ->hidden(fn() => ! $addToCustom)
+                    ->hidden(fn () => ! $addToCustom)
                     ->deselectRecordsAfterCompletion()
                     ->requiresConfirmation()
                     ->icon('heroicon-o-play')
@@ -439,13 +538,13 @@ class SeriesResource extends Resource
                             ->label('Category')
                             ->helperText('Select the category you would like to move the series to.')
                             ->options(
-                                fn() => Category::query()
+                                fn () => Category::query()
                                     ->with(['playlist'])
                                     ->where(['user_id' => auth()->id()])
                                     ->get(['name', 'id', 'playlist_id'])
-                                    ->transform(fn($category) => [
+                                    ->transform(fn ($category) => [
                                         'id' => $category->id,
-                                        'name' => $category->name . ' (' . $category->playlist->name . ')',
+                                        'name' => $category->name.' ('.$category->playlist->name.')',
                                     ])->pluck('name', 'id')
                             )->searchable(),
                     ])
@@ -529,6 +628,7 @@ class SeriesResource extends Resource
                                 ->body('Please configure your TMDB API key in Settings > TMDB before using this feature.')
                                 ->duration(10000)
                                 ->send();
+
                             return;
                         }
 
@@ -544,7 +644,7 @@ class SeriesResource extends Resource
 
                         Notification::make()
                             ->success()
-                            ->title("Fetching TMDB/TVDB IDs for " . count($seriesIds) . " series")
+                            ->title('Fetching TMDB/TVDB IDs for '.count($seriesIds).' series')
                             ->body('The TMDB ID lookup has been started. You will be notified when it is complete.')
                             ->duration(10000)
                             ->send();
@@ -596,14 +696,14 @@ class SeriesResource extends Resource
                             ->required()
                             ->columnSpan(1),
                         TextInput::make('find_replace')
-                            ->label(fn(Get $get) => ! $get('use_regex') ? 'String to replace' : 'Pattern to replace')
+                            ->label(fn (Get $get) => ! $get('use_regex') ? 'String to replace' : 'Pattern to replace')
                             ->required()
                             ->placeholder(
-                                fn(Get $get) => $get('use_regex')
+                                fn (Get $get) => $get('use_regex')
                                     ? '^(US- |UK- |CA- )'
                                     : 'US -'
                             )->helperText(
-                                fn(Get $get) => ! $get('use_regex')
+                                fn (Get $get) => ! $get('use_regex')
                                     ? 'This is the string you want to find and replace.'
                                     : 'This is the regex pattern you want to find. Make sure to use valid regex syntax.'
                             ),
@@ -709,7 +809,7 @@ class SeriesResource extends Resource
                         TextEntry::make('playlist.name')
                             ->label('Playlist')
                             // ->badge(),
-                            ->url(fn($record) => PlaylistResource::getUrl('edit', ['record' => $record->playlist_id])),
+                            ->url(fn ($record) => PlaylistResource::getUrl('edit', ['record' => $record->playlist_id])),
                     ]),
             ]);
     }
@@ -808,12 +908,12 @@ class SeriesResource extends Resource
                                         ->live(),
                                     Toggle::make('sync_settings.enabled')
                                         ->live()
-                                        ->disabled(fn($get) => ! $get('sync_settings.override_global'))
+                                        ->disabled(fn ($get) => ! $get('sync_settings.override_global'))
                                         ->label('Enable .strm file generation'),
                                     TextInput::make('sync_location')
                                         ->label('Location')
                                         ->live()
-                                        ->disabled(fn($get) => ! $get('sync_settings.override_global'))
+                                        ->disabled(fn ($get) => ! $get('sync_settings.override_global'))
                                         ->rules([new CheckIfUrlOrLocalPath(localOnly: true, isDirectory: true)])
                                         ->helperText(function ($record, $get) {
                                             $path = $get('sync_location') ?? '';
@@ -834,16 +934,16 @@ class SeriesResource extends Resource
                                             $episodeTitle = $firstEpisode?->title ?? 'Izuku Midoriya: Origin';
 
                                             // Build path preview
-                                            $preview = 'Preview: ' . $path;
+                                            $preview = 'Preview: '.$path;
 
                                             if (in_array('category', $pathStructure)) {
-                                                $preview .= '/' . $categoryName;
+                                                $preview .= '/'.$categoryName;
                                             }
                                             if (in_array('series', $pathStructure)) {
-                                                $preview .= '/' . $seriesName;
+                                                $preview .= '/'.$seriesName;
                                             }
                                             if (in_array('season', $pathStructure)) {
-                                                $preview .= '/Season ' . str_pad($season, 2, '0', STR_PAD_LEFT);
+                                                $preview .= '/Season '.str_pad($season, 2, '0', STR_PAD_LEFT);
                                             }
 
                                             // Build filename preview
@@ -861,18 +961,18 @@ class SeriesResource extends Resource
                                                 $filename .= " {$bracket[0]}tmdb-{$tmdbId}{$bracket[1]}";
                                             }
 
-                                            $preview .=  '/' . PlaylistService::makeFilesystemSafe($filename) . '.strm';
+                                            $preview .= '/'.PlaylistService::makeFilesystemSafe($filename).'.strm';
 
                                             return $preview;
                                         })
                                         ->maxLength(255)
                                         ->required()
-                                        ->hidden(fn($get) => ! $get('sync_settings.enabled'))
+                                        ->hidden(fn ($get) => ! $get('sync_settings.enabled'))
                                         ->placeholder('/Series'),
                                     Forms\Components\ToggleButtons::make('sync_settings.path_structure')
                                         ->label('Path structure (folders)')
                                         ->live()
-                                        ->disabled(fn($get) => ! $get('sync_settings.override_global'))
+                                        ->disabled(fn ($get) => ! $get('sync_settings.override_global'))
                                         ->multiple()
                                         ->grouped()
                                         ->options([
@@ -904,14 +1004,14 @@ class SeriesResource extends Resource
                                             $set('sync_settings.include_season', in_array('season', $state));
 
                                             return $state;
-                                        })->hidden(fn($get) => ! $get('sync_settings.enabled')),
+                                        })->hidden(fn ($get) => ! $get('sync_settings.enabled')),
                                     Fieldset::make('Include Metadata')
                                         ->schema([
                                             Forms\Components\ToggleButtons::make('sync_settings.filename_metadata')
                                                 ->label('Filename metadata')
                                                 ->live()
                                                 ->inline()
-                                                ->disabled(fn($get) => ! $get('sync_settings.override_global'))
+                                                ->disabled(fn ($get) => ! $get('sync_settings.override_global'))
                                                 ->multiple()
                                                 ->columnSpanFull()
                                                 ->options([
@@ -951,31 +1051,31 @@ class SeriesResource extends Resource
                                                 }),
                                             Forms\Components\ToggleButtons::make('sync_settings.tmdb_id_format')
                                                 ->label('TMDB ID format')
-                                                ->disabled(fn($get) => ! $get('sync_settings.override_global'))
+                                                ->disabled(fn ($get) => ! $get('sync_settings.override_global'))
                                                 ->inline()
                                                 ->live()
                                                 ->grouped()
                                                 ->options([
                                                     'square' => '[square]',
                                                     'curly' => '{curly}',
-                                                ])->hidden(fn($get) => ! in_array('tmdb_id', $get('sync_settings.filename_metadata') ?? [])),
+                                                ])->hidden(fn ($get) => ! in_array('tmdb_id', $get('sync_settings.filename_metadata') ?? [])),
                                         ])
-                                        ->hidden(fn($get) => ! $get('sync_settings.enabled')),
+                                        ->hidden(fn ($get) => ! $get('sync_settings.enabled')),
                                     Fieldset::make('Filename Cleansing')
                                         ->schema([
                                             Toggle::make('sync_settings.clean_special_chars')
                                                 ->label('Clean special characters')
-                                                ->disabled(fn($get) => ! $get('sync_settings.override_global'))
+                                                ->disabled(fn ($get) => ! $get('sync_settings.override_global'))
                                                 ->helperText('Remove or replace special characters in filenames')
                                                 ->inline(false),
                                             Toggle::make('sync_settings.remove_consecutive_chars')
                                                 ->label('Remove consecutive replacement characters')
-                                                ->disabled(fn($get) => ! $get('sync_settings.override_global'))
+                                                ->disabled(fn ($get) => ! $get('sync_settings.override_global'))
                                                 ->inline(false)
                                                 ->live(),
                                             Forms\Components\ToggleButtons::make('sync_settings.replace_char')
                                                 ->label('Replace with')
-                                                ->disabled(fn($get) => ! $get('sync_settings.override_global'))
+                                                ->disabled(fn ($get) => ! $get('sync_settings.override_global'))
                                                 ->inline()
                                                 ->live()
                                                 ->grouped()
@@ -988,7 +1088,7 @@ class SeriesResource extends Resource
                                                     'remove' => 'Remove',
                                                 ]),
                                         ])
-                                        ->hidden(fn($get) => ! $get('sync_settings.enabled')),
+                                        ->hidden(fn ($get) => ! $get('sync_settings.enabled')),
                                 ]),
                         ]),
                 ]),
@@ -1027,7 +1127,7 @@ class SeriesResource extends Resource
                             $xtremeUrl = $xtreamConfig['url'] ?? '';
                             $xtreamUser = $xtreamConfig['username'] ?? '';
                             $xtreamPass = $xtreamConfig['password'] ?? '';
-                            $cacheKey = 'xtream_series_categories_' . md5($xtremeUrl . $xtreamUser . $xtreamPass);
+                            $cacheKey = 'xtream_series_categories_'.md5($xtremeUrl.$xtreamUser.$xtreamPass);
                             $cachedCategories = Cache::remember($cacheKey, 60 * 1, function () use ($xtremeUrl, $xtreamUser, $xtreamPass) {
                                 $service = new XtreamService;
                                 $xtream = $service->init(xtream_config: [
@@ -1053,12 +1153,12 @@ class SeriesResource extends Resource
                             return $cachedCategories;
                         })
                         ->helperText(
-                            fn(Get $get): string => $get('playlist')
+                            fn (Get $get): string => $get('playlist')
                                 ? 'Which category would you like to add a series from.'
                                 : 'You must select a playlist first.'
                         )
-                        ->disabled(fn(Get $get): bool => ! $get('playlist'))
-                        ->hidden(fn(Get $get): bool => ! $get('playlist'))
+                        ->disabled(fn (Get $get): bool => ! $get('playlist'))
+                        ->hidden(fn (Get $get): bool => ! $get('playlist'))
                         ->afterStateUpdated(function ($get, $set, $state) {
                             if ($state) {
                                 $playlist = $get('playlist');
@@ -1069,7 +1169,7 @@ class SeriesResource extends Resource
                                 $xtremeUrl = $xtreamConfig['url'] ?? '';
                                 $xtreamUser = $xtreamConfig['username'] ?? '';
                                 $xtreamPass = $xtreamConfig['password'] ?? '';
-                                $cacheKey = 'xtream_series_categories_' . md5($xtremeUrl . $xtreamUser . $xtreamPass);
+                                $cacheKey = 'xtream_series_categories_'.md5($xtremeUrl.$xtreamUser.$xtreamPass);
                                 $cachedCategories = Cache::get($cacheKey);
 
                                 if ($cachedCategories) {
@@ -1085,7 +1185,7 @@ class SeriesResource extends Resource
                         ->helperText('Automatically set when selecting a category.')
                         ->required()
                         ->disabled()
-                        ->dehydrated(fn(): bool => true),
+                        ->dehydrated(fn (): bool => true),
                 ]),
             Step::make('Series to Import')
                 ->schema([
@@ -1118,7 +1218,7 @@ class SeriesResource extends Resource
                             $xtremeUrl = $xtreamConfig['url'] ?? '';
                             $xtreamUser = $xtreamConfig['username'] ?? '';
                             $xtreamPass = $xtreamConfig['password'] ?? '';
-                            $cacheKey = 'xtream_category_series' . md5($xtremeUrl . $xtreamUser . $xtreamPass . $category);
+                            $cacheKey = 'xtream_category_series'.md5($xtremeUrl.$xtreamUser.$xtreamPass.$category);
                             $cachedCategories = Cache::remember($cacheKey, 60 * 1, function () use ($xtremeUrl, $xtreamUser, $xtreamPass, $category) {
                                 $xtream = XtreamService::make(xtream_config: [
                                     'url' => $xtremeUrl,
@@ -1143,12 +1243,12 @@ class SeriesResource extends Resource
                             return $cachedCategories;
                         })
                         ->helperText(
-                            fn(Get $get): string => $get('playlist') && $get('category')
+                            fn (Get $get): string => $get('playlist') && $get('category')
                                 ? 'Which series would you like to import.'
                                 : 'You must select a playlist and category first.'
                         )
-                        ->disabled(fn(Get $get): bool => ! $get('playlist') || ! $get('category') || $get('import_all'))
-                        ->hidden(fn(Get $get): bool => ! $get('playlist') || ! $get('category') || $get('import_all')),
+                        ->disabled(fn (Get $get): bool => ! $get('playlist') || ! $get('category') || $get('import_all'))
+                        ->hidden(fn (Get $get): bool => ! $get('playlist') || ! $get('category') || $get('import_all')),
                 ]),
         ];
     }
