@@ -925,4 +925,262 @@ class TmdbService
 
         return null;
     }
+
+    /**
+     * Search for TV series and return multiple results for manual selection.
+     *
+     * @param  string  $query  The search query (title)
+     * @param  int|null  $year  The release year (optional)
+     * @param  string|null  $language  Override the default language (optional)
+     * @return array Returns array of search results with poster, name, year, overview
+     */
+    public function searchTvSeriesManual(string $query, ?int $year = null, ?string $language = null): array
+    {
+        if (! $this->isConfigured()) {
+            Log::warning('TMDB API key not configured');
+
+            return [];
+        }
+
+        $this->waitForRateLimit();
+
+        try {
+            $params = [
+                'api_key' => $this->apiKey,
+                'query' => $query,
+                'language' => $language ?? $this->language,
+                'include_adult' => false,
+            ];
+
+            if ($year) {
+                $params['first_air_date_year'] = $year;
+            }
+
+            Log::debug('TMDB: Manual TV search', [
+                'query' => $query,
+                'year' => $year,
+                'language' => $params['language'],
+            ]);
+
+            $response = Http::timeout(15)->get(self::BASE_URL.'/search/tv', $params);
+
+            if (! $response->successful()) {
+                Log::warning('TMDB manual TV search failed', [
+                    'query' => $query,
+                    'status' => $response->status(),
+                ]);
+
+                return [];
+            }
+
+            $results = $response->json('results', []);
+
+            // Transform results for UI display
+            return collect($results)->take(10)->map(function ($result) {
+                return [
+                    'id' => $result['id'],
+                    'name' => $result['name'] ?? $result['original_name'] ?? 'Unknown',
+                    'original_name' => $result['original_name'] ?? null,
+                    'first_air_date' => $result['first_air_date'] ?? null,
+                    'year' => isset($result['first_air_date']) ? substr($result['first_air_date'], 0, 4) : null,
+                    'overview' => Str::limit($result['overview'] ?? '', 200),
+                    'poster_path' => $result['poster_path'] ?? null,
+                    'vote_average' => $result['vote_average'] ?? null,
+                    'origin_country' => implode(', ', $result['origin_country'] ?? []),
+                ];
+            })->toArray();
+        } catch (\Exception $e) {
+            Log::error('TMDB manual TV search exception', [
+                'query' => $query,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    /**
+     * Search for movies and return multiple results for manual selection.
+     *
+     * @param  string  $query  The search query (title)
+     * @param  int|null  $year  The release year (optional)
+     * @param  string|null  $language  Override the default language (optional)
+     * @return array Returns array of search results with poster, title, year, overview
+     */
+    public function searchMovieManual(string $query, ?int $year = null, ?string $language = null): array
+    {
+        if (! $this->isConfigured()) {
+            Log::warning('TMDB API key not configured');
+
+            return [];
+        }
+
+        $this->waitForRateLimit();
+
+        try {
+            $params = [
+                'api_key' => $this->apiKey,
+                'query' => $query,
+                'language' => $language ?? $this->language,
+                'include_adult' => false,
+            ];
+
+            if ($year) {
+                $params['primary_release_year'] = $year;
+            }
+
+            Log::debug('TMDB: Manual movie search', [
+                'query' => $query,
+                'year' => $year,
+                'language' => $params['language'],
+            ]);
+
+            $response = Http::timeout(15)->get(self::BASE_URL.'/search/movie', $params);
+
+            if (! $response->successful()) {
+                Log::warning('TMDB manual movie search failed', [
+                    'query' => $query,
+                    'status' => $response->status(),
+                ]);
+
+                return [];
+            }
+
+            $results = $response->json('results', []);
+
+            // Transform results for UI display
+            return collect($results)->take(10)->map(function ($result) {
+                return [
+                    'id' => $result['id'],
+                    'title' => $result['title'] ?? $result['original_title'] ?? 'Unknown',
+                    'name' => $result['title'] ?? $result['original_title'] ?? 'Unknown',
+                    'original_title' => $result['original_title'] ?? null,
+                    'original_name' => $result['original_title'] ?? null,
+                    'release_date' => $result['release_date'] ?? null,
+                    'year' => isset($result['release_date']) ? substr($result['release_date'], 0, 4) : null,
+                    'overview' => Str::limit($result['overview'] ?? '', 200),
+                    'poster_path' => $result['poster_path'] ?? null,
+                    'vote_average' => $result['vote_average'] ?? null,
+                ];
+            })->toArray();
+        } catch (\Exception $e) {
+            Log::error('TMDB manual movie search exception', [
+                'query' => $query,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    /**
+     * Apply a manually selected TMDB result to a series.
+     *
+     * @param  int  $tmdbId  The TMDB ID to apply
+     * @return array|null Returns the full metadata with external IDs, or null on error
+     */
+    public function applyTvSeriesSelection(int $tmdbId): ?array
+    {
+        if (! $this->isConfigured()) {
+            return null;
+        }
+
+        $this->waitForRateLimit();
+
+        try {
+            // Get external IDs (TVDB, IMDB)
+            $externalIds = $this->getTvExternalIds($tmdbId);
+
+            // Get series details for the name
+            $params = [
+                'api_key' => $this->apiKey,
+                'language' => $this->language,
+            ];
+
+            $response = Http::timeout(15)->get(self::BASE_URL."/tv/{$tmdbId}", $params);
+
+            if (! $response->successful()) {
+                Log::warning('TMDB: Failed to get TV series details', [
+                    'tmdb_id' => $tmdbId,
+                    'status' => $response->status(),
+                ]);
+
+                return null;
+            }
+
+            $details = $response->json();
+
+            return [
+                'tmdb_id' => $tmdbId,
+                'tvdb_id' => $externalIds['tvdb_id'] ?? null,
+                'imdb_id' => $externalIds['imdb_id'] ?? null,
+                'name' => $details['name'] ?? null,
+                'original_name' => $details['original_name'] ?? null,
+                'first_air_date' => $details['first_air_date'] ?? null,
+                'confidence' => 100, // Manual selection = 100% confidence
+            ];
+        } catch (\Exception $e) {
+            Log::error('TMDB: Error applying TV series selection', [
+                'tmdb_id' => $tmdbId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * Apply a manually selected TMDB result to a movie/VOD.
+     *
+     * @param  int  $tmdbId  The TMDB ID to apply
+     * @return array|null Returns the full metadata with external IDs, or null on error
+     */
+    public function applyMovieSelection(int $tmdbId): ?array
+    {
+        if (! $this->isConfigured()) {
+            return null;
+        }
+
+        $this->waitForRateLimit();
+
+        try {
+            // Get external IDs (IMDB)
+            $externalIds = $this->getMovieExternalIds($tmdbId);
+
+            // Get movie details for the title
+            $params = [
+                'api_key' => $this->apiKey,
+                'language' => $this->language,
+            ];
+
+            $response = Http::timeout(15)->get(self::BASE_URL."/movie/{$tmdbId}", $params);
+
+            if (! $response->successful()) {
+                Log::warning('TMDB: Failed to get movie details', [
+                    'tmdb_id' => $tmdbId,
+                    'status' => $response->status(),
+                ]);
+
+                return null;
+            }
+
+            $details = $response->json();
+
+            return [
+                'tmdb_id' => $tmdbId,
+                'imdb_id' => $externalIds['imdb_id'] ?? null,
+                'title' => $details['title'] ?? null,
+                'original_title' => $details['original_title'] ?? null,
+                'release_date' => $details['release_date'] ?? null,
+                'confidence' => 100, // Manual selection = 100% confidence
+            ];
+        } catch (\Exception $e) {
+            Log::error('TMDB: Error applying movie selection', [
+                'tmdb_id' => $tmdbId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
 }
