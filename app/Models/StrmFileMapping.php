@@ -417,7 +417,7 @@ class StrmFileMapping extends Model
             }
 
             // Ensure directory is within sync location (prevent traversal)
-            if (! str_starts_with($realDirectory . '/', $realSyncLocation . '/')) {
+            if (! str_starts_with($realDirectory.'/', $realSyncLocation.'/')) {
                 Log::warning('STRM Sync: Directory cleanup blocked - path outside sync location', [
                     'directory' => $directory,
                     'sync_location' => $syncLocation,
@@ -489,7 +489,7 @@ class StrmFileMapping extends Model
             $path = $mapping->current_path;
 
             // Sanity check: ensure mapping path is within the requested sync location
-            if (! (str_starts_with($path, $root . '/') || $path === $root)) {
+            if (! (str_starts_with($path, $root.'/') || $path === $root)) {
                 Log::warning('STRM Sync: Skipping mapping outside sync location', [
                     'mapping_id' => $mapping->id,
                     'path' => $path,
@@ -538,18 +538,17 @@ class StrmFileMapping extends Model
     /**
      * Delete all mappings and files for syncables that no longer exist or are disabled.
      * Uses a single LEFT JOIN query instead of loading each syncable individually (N+1 prevention).
+     * Optimized for bulk operations: collects file paths, deletes files in batches, then bulk-deletes DB records.
      */
     public static function cleanupOrphaned(string $syncableType, string $syncLocation): int
     {
-        $count = 0;
-
         // Determine the table name from the syncable type
         $modelInstance = new $syncableType;
         $table = $modelInstance->getTable();
 
         // Use LEFT JOIN to find orphaned mappings in a single query
         // This is MUCH more efficient than loading each syncable individually
-        $orphanedMappings = self::query()
+        $orphanedQuery = self::query()
             ->where('strm_file_mappings.syncable_type', $syncableType)
             ->where('strm_file_mappings.sync_location', $syncLocation)
             ->leftJoin($table, function ($join) use ($table) {
@@ -560,15 +559,56 @@ class StrmFileMapping extends Model
                 $query->whereNull("{$table}.id")
                     ->orWhere("{$table}.enabled", false);
             })
-            ->select('strm_file_mappings.*')
-            ->cursor(); // Use cursor for memory efficiency iteration over large datasets
+            ->select('strm_file_mappings.id', 'strm_file_mappings.current_path');
 
-        foreach ($orphanedMappings as $mapping) {
-            $mapping->deleteFile();
-            $count++;
+        // Count total orphans first for logging
+        $totalCount = $orphanedQuery->count();
+
+        if ($totalCount === 0) {
+            return 0;
         }
 
-        return $count;
+        Log::info('STRM Sync: Starting bulk orphan cleanup', [
+            'syncable_type' => class_basename($syncableType),
+            'sync_location' => $syncLocation,
+            'orphan_count' => $totalCount,
+        ]);
+
+        $deletedFiles = 0;
+        $idsToDelete = [];
+
+        // Process in chunks to avoid memory issues with very large datasets
+        $orphanedQuery->chunkById(500, function ($mappings) use (&$deletedFiles, &$idsToDelete) {
+            foreach ($mappings as $mapping) {
+                // Collect IDs for bulk delete
+                $idsToDelete[] = $mapping->id;
+
+                // Delete the file from disk (no directory cleanup per file - done at end)
+                if (@file_exists($mapping->current_path)) {
+                    if (@unlink($mapping->current_path)) {
+                        $deletedFiles++;
+                    }
+                }
+            }
+
+            // Bulk delete DB records in batches of 500
+            if (count($idsToDelete) >= 500) {
+                self::whereIn('id', $idsToDelete)->delete();
+                $idsToDelete = [];
+            }
+        }, 'strm_file_mappings.id');
+
+        // Delete any remaining IDs
+        if (! empty($idsToDelete)) {
+            self::whereIn('id', $idsToDelete)->delete();
+        }
+
+        Log::info('STRM Sync: Bulk orphan cleanup completed', [
+            'files_deleted' => $deletedFiles,
+            'db_records_deleted' => $totalCount,
+        ]);
+
+        return $totalCount;
     }
 
     /**
@@ -578,7 +618,7 @@ class StrmFileMapping extends Model
     public static function cleanupEmptyDirectoriesInLocation(string $syncLocation): void
     {
         $realSyncLocation = realpath(rtrim($syncLocation, '/'));
-        if ($realSyncLocation === false || !is_dir($realSyncLocation)) {
+        if ($realSyncLocation === false || ! is_dir($realSyncLocation)) {
             return;
         }
 

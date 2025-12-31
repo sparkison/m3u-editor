@@ -63,7 +63,8 @@ class SyncSeriesStrmFiles implements ShouldQueue
             $processedCount = 0;
             $startTime = microtime(true);
 
-            // Process all series in chunks
+            // Process all series in smaller chunks to reduce memory pressure
+            // Each series can have hundreds of episodes, so smaller chunks prevent memory bloat
             Series::query()
                 ->where([
                     ['enabled', true],
@@ -73,14 +74,20 @@ class SyncSeriesStrmFiles implements ShouldQueue
                     $query->where('playlist_id', $this->playlist_id);
                 })
                 ->with(['enabled_episodes', 'playlist', 'user', 'category'])
-                ->chunkById(100, function ($seriesChunk) use ($settings, &$processedCount) {
+                ->chunkById(25, function ($seriesChunk) use ($settings, &$processedCount) {
                     foreach ($seriesChunk as $series) {
                         $this->fetchMetadataForSeries($series, $settings, skipCleanup: true);
                         $processedCount++;
+
+                        // Unload relations to free memory after processing each series
+                        $series->unsetRelations();
                     }
 
-                    // Log progress every 100 series
+                    // Log progress every chunk
                     Log::debug('STRM Sync: Processed chunk', ['processed' => $processedCount]);
+
+                    // Free memory between chunks
+                    gc_collect_cycles();
                 });
 
             // Perform cleanup ONCE at the end for all sync locations
@@ -132,9 +139,9 @@ class SyncSeriesStrmFiles implements ShouldQueue
     /**
      * Process a single series and sync its STRM files.
      *
-     * @param Series $series The series to process
-     * @param GeneralSettings $settings Application settings
-     * @param bool $skipCleanup If true, skip cleanup (for bulk mode where cleanup happens at end)
+     * @param  Series  $series  The series to process
+     * @param  GeneralSettings  $settings  Application settings
+     * @param  bool  $skipCleanup  If true, skip cleanup (for bulk mode where cleanup happens at end)
      */
     private function fetchMetadataForSeries(Series $series, $settings, bool $skipCleanup = false): void
     {
@@ -143,7 +150,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
         }
 
         // Only load relations if not already loaded (bulk mode pre-loads them)
-        if (!$series->relationLoaded('enabled_episodes')) {
+        if (! $series->relationLoaded('enabled_episodes')) {
             $series->load('enabled_episodes', 'playlist', 'user', 'category');
         }
 
@@ -270,7 +277,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 $cleanName = $cleanSpecialChars
                     ? PlaylistService::makeFilesystemSafe($catName, $replaceChar)
                     : PlaylistService::makeFilesystemSafe($catName);
-                $path .= '/' . $cleanName;
+                $path .= '/'.$cleanName;
             }
 
             // See if the series is enabled, if not, skip, else create the folder
@@ -305,7 +312,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 $cleanName = $cleanSpecialChars
                     ? PlaylistService::makeFilesystemSafe($seriesFolder, $replaceChar)
                     : PlaylistService::makeFilesystemSafe($seriesFolder);
-                $path .= '/' . $cleanName;
+                $path .= '/'.$cleanName;
             }
 
             // Get filename metadata settings
@@ -317,7 +324,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 // Setup episode prefix
                 $season = $ep->season;
                 $num = str_pad($ep->episode_num, 2, '0', STR_PAD_LEFT);
-                $prefx = 'S' . str_pad($season, 2, '0', STR_PAD_LEFT) . "E{$num}";
+                $prefx = 'S'.str_pad($season, 2, '0', STR_PAD_LEFT)."E{$num}";
 
                 // Build the base filename (apply name filtering to episode title)
                 $episodeTitle = $applyNameFilter($ep->title);
@@ -345,22 +352,22 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 // Remove consecutive replacement characters if enabled
                 if ($removeConsecutiveChars && $replaceChar !== 'remove') {
                     $char = $replaceChar === 'space' ? ' ' : ($replaceChar === 'dash' ? '-' : ($replaceChar === 'underscore' ? '_' : '.'));
-                    $fileName = preg_replace('/' . preg_quote($char, '/') . '{2,}/', $char, $fileName);
+                    $fileName = preg_replace('/'.preg_quote($char, '/').'{2,}/', $char, $fileName);
                 }
 
                 $fileName = "{$fileName}.strm";
 
                 // Build the season folder path
                 if (in_array('season', $pathStructure)) {
-                    $seasonPath = $path . '/Season ' . str_pad($season, 2, '0', STR_PAD_LEFT);
-                    $filePath = $seasonPath . '/' . $fileName;
+                    $seasonPath = $path.'/Season '.str_pad($season, 2, '0', STR_PAD_LEFT);
+                    $filePath = $seasonPath.'/'.$fileName;
                 } else {
-                    $filePath = $path . '/' . $fileName;
+                    $filePath = $path.'/'.$fileName;
                 }
 
                 // Generate the url
                 $containerExtension = $ep->container_extension ?? 'mp4';
-                $url = rtrim("/series/{$playlist->user->name}/{$playlist->uuid}/" . $ep->id . '.' . $containerExtension, '.');
+                $url = rtrim("/series/{$playlist->user->name}/{$playlist->uuid}/".$ep->id.'.'.$containerExtension, '.');
                 $url = PlaylistService::getBaseUrl($url);
 
                 // Build path options for tracking changes
@@ -388,7 +395,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
 
             // Track this sync location for deferred cleanup (bulk mode)
             // or immediate cleanup (single series mode)
-            if (!in_array($syncLocation, $this->processedSyncLocations)) {
+            if (! in_array($syncLocation, $this->processedSyncLocations)) {
                 $this->processedSyncLocations[] = $syncLocation;
             }
 
