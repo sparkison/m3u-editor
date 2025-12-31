@@ -671,15 +671,15 @@ class M3uProxyService
         // See if channel has any failovers
         // Return bool if using resolver, else array of failover URLs (legacy mode)
         $failovers = $this->usingResolver()
-			? $channel->failoverChannels()->count() > 0
-			: $channel->failoverChannels()
-			->select(['channels.id', 'channels.url', 'channels.url_custom', 'channels.playlist_id', 'channels.custom_playlist_id'])->get()
-			->map(function ($ch) use ($playlist) {
-				return PlaylistUrlService::getChannelUrl($ch, $playlist);
-			})
-			->filter()
-			->values()
-			->toArray();
+            ? $channel->failoverChannels()->count() > 0
+            : $channel->failoverChannels()
+            ->select(['channels.id', 'channels.url', 'channels.url_custom', 'channels.playlist_id', 'channels.custom_playlist_id'])->get()
+            ->map(function ($ch) use ($playlist) {
+                return PlaylistUrlService::getChannelUrl($ch, $playlist);
+            })
+            ->filter()
+            ->values()
+            ->toArray();
 
         // Use appropriate endpoint based on whether transcoding profile is provided
         if ($profile) {
@@ -1427,7 +1427,7 @@ class M3uProxyService
             $channel = Channel::findOrFail($channelId);
             $nextUrl = null;
             // Resolve the original stream context by UUID (Playlist / MergedPlaylist / CustomPlaylist / PlaylistAlias)
-			$contextPlaylist = !empty($playlistUuid) ? PlaylistFacade::resolvePlaylistByUuid($playlistUuid) : null;
+            $contextPlaylist = !empty($playlistUuid) ? PlaylistFacade::resolvePlaylistByUuid($playlistUuid) : null;
 
             // Get all failover channels with their relationships
             $failoverChannels = $channel->failoverChannels()
