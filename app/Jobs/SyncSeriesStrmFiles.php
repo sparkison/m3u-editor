@@ -7,6 +7,7 @@ use App\Models\Series;
 use App\Models\StrmFileMapping;
 use App\Models\User;
 use App\Services\PlaylistService;
+use App\Services\ResourceManager;
 use App\Settings\GeneralSettings;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -39,7 +40,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(GeneralSettings $settings): void
+    public function handle(GeneralSettings $settings, ResourceManager $resourceManager): void
     {
         // Track sync locations for cleanup at the end
         $this->processedSyncLocations = [];
@@ -50,21 +51,27 @@ class SyncSeriesStrmFiles implements ShouldQueue
             $this->fetchMetadataForSeries($series, $settings);
 
             // For single series sync, cleanup immediately
-            $this->performCleanup();
+            $this->performCleanup($resourceManager);
         } else {
             // Disable notifications for bulk processing
             $this->notify = false;
 
-            Log::info('STRM Sync: Starting bulk series sync', [
+            // Get chunk size from resource manager (auto-detects or uses configured profile)
+            $chunkSize = $resourceManager->getStrmSyncChunkSize();
+            $cleanupChunkSize = $resourceManager->getCleanupChunkSize();
+
+            Log::debug('STRM Sync: Starting bulk series sync', [
                 'user_id' => $this->user_id,
                 'playlist_id' => $this->playlist_id,
+                'profile' => $resourceManager->getProfileName(),
+                'strm_sync_chunk_size' => $chunkSize,
+                'cleanup_chunk_size' => $cleanupChunkSize,
             ]);
 
             $processedCount = 0;
             $startTime = microtime(true);
 
-            // Process all series in smaller chunks to reduce memory pressure
-            // Each series can have hundreds of episodes, so smaller chunks prevent memory bloat
+            // Process all series in chunks based on system resources
             Series::query()
                 ->where([
                     ['enabled', true],
@@ -74,7 +81,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                     $query->where('playlist_id', $this->playlist_id);
                 })
                 ->with(['enabled_episodes', 'playlist', 'user', 'category'])
-                ->chunkById(25, function ($seriesChunk) use ($settings, &$processedCount) {
+                ->chunkById($chunkSize, function ($seriesChunk) use ($settings, &$processedCount) {
                     foreach ($seriesChunk as $series) {
                         $this->fetchMetadataForSeries($series, $settings, skipCleanup: true);
                         $processedCount++;
@@ -92,7 +99,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
 
             // Perform cleanup ONCE at the end for all sync locations
             $cleanupStart = microtime(true);
-            $this->performCleanup();
+            $this->performCleanup($resourceManager);
             $cleanupDuration = round(microtime(true) - $cleanupStart, 2);
 
             $totalDuration = round(microtime(true) - $startTime, 2);
@@ -122,13 +129,16 @@ class SyncSeriesStrmFiles implements ShouldQueue
      * Perform cleanup for all processed sync locations.
      * This should be called ONCE at the end of processing, not per-series.
      */
-    private function performCleanup(): void
+    private function performCleanup(?ResourceManager $resourceManager = null): void
     {
+        $cleanupChunkSize = $resourceManager?->getCleanupChunkSize() ?? 500;
+
         foreach ($this->processedSyncLocations as $syncLocation) {
             // Clean up orphaned files for disabled/deleted episodes
             StrmFileMapping::cleanupOrphaned(
                 Episode::class,
-                $syncLocation
+                $syncLocation,
+                $cleanupChunkSize
             );
 
             // Clean up empty directories after orphaned cleanup

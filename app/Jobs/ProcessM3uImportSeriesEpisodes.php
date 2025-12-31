@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Series;
 use App\Models\User;
+use App\Services\ResourceManager;
 use App\Settings\GeneralSettings;
 use App\Traits\ProviderRequestDelay;
 use Filament\Notifications\Notification;
@@ -34,7 +35,7 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(GeneralSettings $settings): void
+    public function handle(GeneralSettings $settings, ResourceManager $resourceManager): void
     {
         // Get the series
         $series = $this->playlistSeries;
@@ -50,9 +51,19 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
             // Disable notifications for bulk processing
             $this->notify = false;
 
-            // Process all series in smaller chunks to reduce memory pressure
-            // Each series makes an API call and potentially creates hundreds of episodes
+            // Get chunk size from resource manager (auto-detects or uses configured profile)
+            $chunkSize = $resourceManager->getMetadataChunkSize();
+
+            \Illuminate\Support\Facades\Log::debug('Series Metadata Sync: Starting bulk processing', [
+                'profile' => $resourceManager->getProfileName(),
+                'metadata_chunk_size' => $chunkSize,
+                'user_id' => $this->user_id,
+                'playlist_id' => $this->playlist_id,
+            ]);
+
+            // Process all series in chunks based on system resources
             $processedCount = 0;
+            $startTime = microtime(true);
             Series::query()
                 ->where([
                     ['enabled', true],
@@ -62,7 +73,7 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
                     $query->where('playlist_id', $this->playlist_id);
                 })
                 ->with(['playlist'])
-                ->chunkById(10, function ($seriesChunk) use ($global_sync_settings, &$processedCount) {
+                ->chunkById($chunkSize, function ($seriesChunk) use ($global_sync_settings, &$processedCount) {
                     foreach ($seriesChunk as $series) {
                         // In bulk mode, don't dispatch sync per series - we do it once at the end
                         $this->fetchMetadataForSeries($series, $global_sync_settings, dispatchSync: false);
@@ -75,6 +86,13 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
                     // Free memory between chunks
                     gc_collect_cycles();
                 });
+
+            $duration = round(microtime(true) - $startTime, 2);
+            \Illuminate\Support\Facades\Log::debug('Series Metadata Sync: Completed bulk processing', [
+                'processed_count' => $processedCount,
+                'duration_seconds' => $duration,
+                'chunk_size_used' => $chunkSize,
+            ]);
 
             // Dispatch a SINGLE SyncSeriesStrmFiles job at the end instead of per-series
             // This dramatically reduces queue pressure and allows bulk optimizations

@@ -539,8 +539,13 @@ class StrmFileMapping extends Model
      * Delete all mappings and files for syncables that no longer exist or are disabled.
      * Uses a single LEFT JOIN query instead of loading each syncable individually (N+1 prevention).
      * Optimized for bulk operations: collects file paths, deletes files in batches, then bulk-deletes DB records.
+     *
+     * @param  string  $syncableType  The model class name (e.g., Episode::class)
+     * @param  string  $syncLocation  Base sync location path
+     * @param  int  $chunkSize  Number of records to process per batch (default: 500)
+     * @return int Number of orphaned records deleted
      */
-    public static function cleanupOrphaned(string $syncableType, string $syncLocation): int
+    public static function cleanupOrphaned(string $syncableType, string $syncLocation, int $chunkSize = 500): int
     {
         // Determine the table name from the syncable type
         $modelInstance = new $syncableType;
@@ -572,13 +577,14 @@ class StrmFileMapping extends Model
             'syncable_type' => class_basename($syncableType),
             'sync_location' => $syncLocation,
             'orphan_count' => $totalCount,
+            'chunk_size' => $chunkSize,
         ]);
 
         $deletedFiles = 0;
         $idsToDelete = [];
 
         // Process in chunks to avoid memory issues with very large datasets
-        $orphanedQuery->chunkById(500, function ($mappings) use (&$deletedFiles, &$idsToDelete) {
+        $orphanedQuery->chunkById($chunkSize, function ($mappings) use (&$deletedFiles, &$idsToDelete, $chunkSize) {
             foreach ($mappings as $mapping) {
                 // Collect IDs for bulk delete
                 $idsToDelete[] = $mapping->id;
@@ -591,8 +597,8 @@ class StrmFileMapping extends Model
                 }
             }
 
-            // Bulk delete DB records in batches of 500
-            if (count($idsToDelete) >= 500) {
+            // Bulk delete DB records in batches
+            if (count($idsToDelete) >= $chunkSize) {
                 self::whereIn('id', $idsToDelete)->delete();
                 $idsToDelete = [];
             }
