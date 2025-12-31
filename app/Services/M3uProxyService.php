@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Facades\ProxyFacade;
+use App\Facades\PlaylistFacade;
 use App\Models\Channel;
 use App\Models\CustomPlaylist;
 use App\Models\Episode;
@@ -697,11 +698,7 @@ class M3uProxyService
             ? $channel->failoverChannels()->count() > 0
             : $channel->failoverChannels()
             ->select(['channels.id', 'channels.url', 'channels.url_custom', 'channels.playlist_id', 'channels.custom_playlist_id'])->get()
-            ->map(function ($ch) {
-                $playlist = $ch->getEffectivePlaylist();
-                if (! $playlist) {
-                    return null;
-                }
+            ->map(function ($ch) use ($playlist) {
                 return PlaylistUrlService::getChannelUrl($ch, $playlist);
             })
             ->filter()
@@ -1477,6 +1474,8 @@ class M3uProxyService
             // Get the original channel to access its failover relationships
             $channel = Channel::findOrFail($channelId);
             $nextUrl = null;
+            // Resolve the original stream context by UUID (Playlist / MergedPlaylist / CustomPlaylist / PlaylistAlias)
+            $contextPlaylist = !empty($playlistUuid) ? PlaylistFacade::resolvePlaylistByUuid($playlistUuid) : null;
 
             // Get all failover channels with their relationships
             $failoverChannels = $channel->failoverChannels()
@@ -1507,7 +1506,7 @@ class M3uProxyService
                 }
 
                 // Get the url
-                $url = PlaylistUrlService::getChannelUrl($failoverChannel, $failoverPlaylist);
+                $url = PlaylistUrlService::getChannelUrl($failoverChannel, $contextPlaylist ?? $failoverPlaylist);
 
                 // Check if the url is the current URL (skip it)
                 if ($url === $currentUrl) {

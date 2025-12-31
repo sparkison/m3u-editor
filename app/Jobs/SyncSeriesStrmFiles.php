@@ -44,70 +44,81 @@ class SyncSeriesStrmFiles implements ShouldQueue
         // Track sync locations for cleanup at the end
         $this->processedSyncLocations = [];
 
-        // Get all the series episodes
-        $series = $this->series;
-        if ($series) {
-            $this->fetchMetadataForSeries($series, $settings);
+        try {
+            // Get all the series episodes
+            $series = $this->series;
+            if ($series) {
+                $this->fetchMetadataForSeries($series, $settings);
 
-            // For single series sync, cleanup immediately
-            $this->performCleanup();
-        } else {
-            // Disable notifications for bulk processing
-            $this->notify = false;
+                // For single series sync, cleanup immediately
+                $this->performCleanup();
+            } else {
+                // Disable notifications for bulk processing
+                $this->notify = false;
 
-            Log::info('STRM Sync: Starting bulk series sync', [
-                'user_id' => $this->user_id,
-                'playlist_id' => $this->playlist_id,
-            ]);
+                Log::info('STRM Sync: Starting bulk series sync', [
+                    'user_id' => $this->user_id,
+                    'playlist_id' => $this->playlist_id,
+                ]);
 
-            $processedCount = 0;
-            $startTime = microtime(true);
+                $processedCount = 0;
+                $startTime = microtime(true);
 
-            // Process all series in chunks
-            Series::query()
-                ->where([
-                    ['enabled', true],
-                    ['user_id', $this->user_id],
-                ])
-                ->when($this->playlist_id, function ($query) {
-                    $query->where('playlist_id', $this->playlist_id);
-                })
-                ->with(['enabled_episodes', 'playlist', 'user', 'category'])
-                ->chunkById(100, function ($seriesChunk) use ($settings, &$processedCount) {
-                    foreach ($seriesChunk as $series) {
-                        $this->fetchMetadataForSeries($series, $settings, skipCleanup: true);
-                        $processedCount++;
+                // Process all series in chunks
+                Series::query()
+                    ->where([
+                        ['enabled', true],
+                        ['user_id', $this->user_id],
+                    ])
+                    ->when($this->playlist_id, function ($query) {
+                        $query->where('playlist_id', $this->playlist_id);
+                    })
+                    ->with(['enabled_episodes', 'playlist', 'user', 'category'])
+                    ->chunkById(100, function ($seriesChunk) use ($settings, &$processedCount) {
+                        foreach ($seriesChunk as $series) {
+                            $this->fetchMetadataForSeries($series, $settings, skipCleanup: true);
+                            $processedCount++;
+                        }
+
+                        // Log progress every 100 series
+                        Log::debug('STRM Sync: Processed chunk', ['processed' => $processedCount]);
+                    });
+
+                // Perform cleanup ONCE at the end for all sync locations
+                $cleanupStart = microtime(true);
+                $this->performCleanup();
+                $cleanupDuration = round(microtime(true) - $cleanupStart, 2);
+
+                $totalDuration = round(microtime(true) - $startTime, 2);
+                Log::info('STRM Sync: Bulk sync completed', [
+                    'series_processed' => $processedCount,
+                    'sync_locations' => count($this->processedSyncLocations),
+                    'cleanup_duration_seconds' => $cleanupDuration,
+                    'total_duration_seconds' => $totalDuration,
+                ]);
+
+                // Notify the user we're done!
+                if ($this->user_id) {
+                    $user = User::find($this->user_id);
+                    if ($user) {
+                        Notification::make()
+                            ->success()
+                            ->title('Sync .strm files for series completed')
+                            ->body("Sync completed for {$processedCount} series in {$totalDuration}s.")
+                            ->broadcast($user)
+                            ->sendToDatabase($user);
                     }
-
-                    // Log progress every 100 series
-                    Log::debug('STRM Sync: Processed chunk', ['processed' => $processedCount]);
-                });
-
-            // Perform cleanup ONCE at the end for all sync locations
-            $cleanupStart = microtime(true);
-            $this->performCleanup();
-            $cleanupDuration = round(microtime(true) - $cleanupStart, 2);
-
-            $totalDuration = round(microtime(true) - $startTime, 2);
-            Log::info('STRM Sync: Bulk sync completed', [
-                'series_processed' => $processedCount,
-                'sync_locations' => count($this->processedSyncLocations),
-                'cleanup_duration_seconds' => $cleanupDuration,
-                'total_duration_seconds' => $totalDuration,
-            ]);
-
-            // Notify the user we're done!
-            if ($this->user_id) {
-                $user = User::find($this->user_id);
-                if ($user) {
-                    Notification::make()
-                        ->success()
-                        ->title('Sync .strm files for series completed')
-                        ->body("Sync completed for {$processedCount} series in {$totalDuration}s.")
-                        ->broadcast($user)
-                        ->sendToDatabase($user);
                 }
             }
+        } catch (\Throwable $e) {
+            // Log full exception with stack trace so failures are visible in logs
+            Log::error('STRM Sync: Unhandled exception in SyncSeriesStrmFiles::handle', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            // Re-throw to allow job retry semantics to continue as before
+            throw $e;
         }
     }
 
@@ -408,6 +419,12 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 ->body("Error: {$e->getMessage()}")
                 ->broadcast($series->user)
                 ->sendToDatabase($series->user);
+            // Also log exception with stack trace for easier debugging
+            Log::error('STRM Sync: Exception during fetchMetadataForSeries', [
+                'series_id' => $series->id ?? null,
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
         }
     }
 }

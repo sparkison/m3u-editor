@@ -541,31 +541,84 @@ class StrmFileMapping extends Model
      */
     public static function cleanupOrphaned(string $syncableType, string $syncLocation): int
     {
-        $count = 0;
+        // Normalize sync location
+        $syncLocation = rtrim($syncLocation, '/');
 
         // Determine the table name from the syncable type
         $modelInstance = new $syncableType;
         $table = $modelInstance->getTable();
 
-        // Use LEFT JOIN to find orphaned mappings in a single query
-        // This is MUCH more efficient than loading each syncable individually
-        $orphanedMappings = self::query()
+        $count = 0;
+
+        // Build base query to find orphaned mappings but only select minimal fields
+        $baseQuery = self::query()
             ->where('strm_file_mappings.syncable_type', $syncableType)
             ->where('strm_file_mappings.sync_location', $syncLocation)
             ->leftJoin($table, function ($join) use ($table) {
                 $join->on('strm_file_mappings.syncable_id', '=', "{$table}.id");
             })
             ->where(function ($query) use ($table) {
-                // Orphaned if: syncable doesn't exist OR syncable is disabled
                 $query->whereNull("{$table}.id")
                     ->orWhere("{$table}.enabled", false);
             })
-            ->select('strm_file_mappings.*')
-            ->cursor(); // Use cursor for memory efficiency iteration over large datasets
+            ->select('strm_file_mappings.id', 'strm_file_mappings.current_path');
 
-        foreach ($orphanedMappings as $mapping) {
-            $mapping->deleteFile();
-            $count++;
+        // Process in batches to reduce memory and DB overhead
+        $idsToDelete = [];
+        $pathsToUnlink = [];
+
+        $batchSize = 500;
+
+        // Ensure chunkById uses the fully-qualified column name to avoid ambiguous "id" when joined
+        $baseQuery->orderBy('strm_file_mappings.id')
+            ->chunkById($batchSize, function ($rows) use (&$idsToDelete, &$pathsToUnlink, &$count) {
+                foreach ($rows as $row) {
+                    $idsToDelete[] = $row->id;
+                    if (! empty($row->current_path)) {
+                        $pathsToUnlink[] = $row->current_path;
+                    }
+                    $count++;
+                }
+
+                // When we have a reasonable batch, perform unlink and bulk delete to minimize per-row operations
+                if (count($idsToDelete) >= 500) {
+                    // Unlink files (best-effort)
+                    foreach ($pathsToUnlink as $p) {
+                        try {
+                            @unlink($p);
+                        } catch (\Throwable $e) {
+                            Log::debug('STRM Sync: Failed to unlink orphaned file during bulk cleanup', ['path' => $p, 'error' => $e->getMessage()]);
+                        }
+                    }
+
+                    // Bulk delete DB rows
+                    try {
+                        self::whereIn('id', $idsToDelete)->delete();
+                    } catch (\Throwable $e) {
+                        Log::warning('STRM Sync: Bulk delete of orphaned mappings failed', ['error' => $e->getMessage()]);
+                    }
+
+                    // Reset accumulators
+                    $idsToDelete = [];
+                    $pathsToUnlink = [];
+                }
+            }, 'strm_file_mappings.id');
+
+        // Final flush of remaining ids/paths
+        if (! empty($pathsToUnlink)) {
+            foreach ($pathsToUnlink as $p) {
+                try {
+                    @unlink($p);
+                } catch (\Throwable $e) {
+                    Log::debug('STRM Sync: Failed to unlink orphaned file during final bulk cleanup', ['path' => $p, 'error' => $e->getMessage()]);
+                }
+            }
+
+            try {
+                self::whereIn('id', $idsToDelete)->delete();
+            } catch (\Throwable $e) {
+                Log::warning('STRM Sync: Final bulk delete of orphaned mappings failed', ['error' => $e->getMessage()]);
+            }
         }
 
         return $count;
