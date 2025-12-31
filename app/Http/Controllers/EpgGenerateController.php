@@ -440,7 +440,8 @@ class EpgGenerateController extends Controller
         $contentType = $compressed ? 'application/gzip' : 'application/xml';
 
         if ($compressed) {
-            // For compressed, generate content then compress and save
+            // For compressed, keep existing behaviour (generate then compress)
+            // NOTE: streaming gzip on-the-fly is more complex; keep as-is for safety
             ob_start();
             $this->generate($playlist);
             $content = ob_get_clean();
@@ -455,36 +456,92 @@ class EpgGenerateController extends Controller
                 'Access-Control-Allow-Origin' => '*',
                 'X-EPG-Cache' => 'MISS'
             ]);
-        } else {
-            // For regular XML, stream while saving to cache
-            return response()->stream(
-                function () use ($playlist, $disk, $cacheFilePath) {
-                    // Open a temporary stream to capture output
-                    $tempStream = fopen('php://temp', 'r+');
-
-                    // Capture output
-                    ob_start();
-                    $this->generate($playlist);
-                    $content = ob_get_clean();
-
-                    // Write to temp stream and cache file
-                    fwrite($tempStream, $content);
-                    $disk->put($cacheFilePath, $content);
-
-                    // Output the content
-                    rewind($tempStream);
-                    fpassthru($tempStream);
-                    fclose($tempStream);
-                },
-                200,
-                [
-                    'Access-Control-Allow-Origin' => '*',
-                    'Content-Disposition' => "attachment; filename=\"$filename\"",
-                    'Content-Type' => $contentType,
-                    'X-EPG-Cache' => 'MISS'
-                ]
-            );
         }
+
+        // For regular XML, stream generation directly to the client and write cache incrementally
+        return response()->stream(function () use ($playlist, $disk, $cacheFilePath) {
+            // Resolve full path for cache and ensure directory exists
+            $fullPath = $disk->path($cacheFilePath);
+            $dir = dirname($fullPath);
+            if (!is_dir($dir)) {
+                @mkdir($dir, 0755, true);
+            }
+
+            $tmpPath = $fullPath . '.tmp';
+            $fh = null;
+            $completed = false;
+
+            // Register a shutdown handler to remove the temp file if generation did not complete
+            $cleanupShutdown = function () use (&$completed, &$fh, $tmpPath, $dir) {
+                try {
+                    if (! $completed) {
+                        if (is_resource($fh)) {
+                            @fclose($fh);
+                        }
+                        if (file_exists($tmpPath)) {
+                            @unlink($tmpPath);
+                        }
+                    }
+
+                    // Also cleanup stale tmp files to avoid orphans
+                    foreach (glob($dir . '/*.tmp') as $f) {
+                        try {
+                            @unlink($f);
+                        } catch (\Throwable $e) {
+                            // ignore
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // ignore shutdown cleanup errors
+                }
+            };
+            register_shutdown_function($cleanupShutdown);
+
+            $fh = @fopen($tmpPath, 'w');
+            if ($fh === false) {
+                // Fallback: if we can't write cache, just stream without caching
+                $this->generate($playlist);
+                return;
+            }
+
+            // Start an output buffer with a callback that writes each flushed chunk to cache
+            ob_start(function ($buffer) use ($fh) {
+                // Write chunk to cache file
+                @fwrite($fh, $buffer);
+                // Return buffer so it is sent to the client
+                return $buffer;
+            }, 4096);
+
+            try {
+                // Generate will echo directly; each echo will be passed through the ob callback
+                $this->generate($playlist);
+
+                // Mark completed only after successful generation
+                $completed = true;
+
+                // Flush any remaining buffers
+                while (ob_get_level() > 0) {
+                    ob_end_flush();
+                }
+            } finally {
+                // Ensure file handle closed and atomically move temp to final path only on success
+                if (is_resource($fh)) {
+                    fclose($fh);
+                }
+                if ($completed) {
+                    @rename($tmpPath, $fullPath);
+                } else {
+                    if (file_exists($tmpPath)) {
+                        @unlink($tmpPath);
+                    }
+                }
+            }
+        }, 200, [
+            'Access-Control-Allow-Origin' => '*',
+            'Content-Disposition' => "attachment; filename=\"$filename\"",
+            'Content-Type' => $contentType,
+            'X-EPG-Cache' => 'MISS'
+        ]);
     }
 
     /**
