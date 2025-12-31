@@ -74,7 +74,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                         $query->where('playlist_id', $this->playlist_id);
                     })
                     ->with(['enabled_episodes', 'playlist', 'user', 'category'])
-                    ->chunkById(100, function ($seriesChunk) use ($settings, &$processedCount) {
+                    ->chunkById(10, function ($seriesChunk) use ($settings, &$processedCount) {
                         foreach ($seriesChunk as $series) {
                             $this->fetchMetadataForSeries($series, $settings, skipCleanup: true);
                             $processedCount++;
