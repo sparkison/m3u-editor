@@ -744,6 +744,15 @@ class Preferences extends SettingsPage
                                                     ->hidden(fn($get) => ! $get('stream_file_sync_name_filter_enabled')),
                                             ])
                                             ->hidden(fn($get) => ! $get('stream_file_sync_enabled')),
+                                        Fieldset::make('NFO File Generation')
+                                            ->columnSpanFull()
+                                            ->schema([
+                                                Toggle::make('stream_file_sync_generate_nfo')
+                                                    ->label('Generate NFO files')
+                                                    ->helperText('Create tvshow.nfo and episode.nfo files alongside .strm files for Kodi, Emby, and Jellyfin compatibility. These files contain metadata like TMDB/TVDB/IMDB IDs, plot, year, and poster URLs.')
+                                                    ->inline(false),
+                                            ])
+                                            ->hidden(fn($get) => ! $get('stream_file_sync_enabled')),
                                     ]),
                                 Section::make('VOD stream file settings')
                                     ->description('Generate .strm files and sync them to a local file path. Options can be overriden per VOD in the VOD edit panel.')
@@ -915,6 +924,15 @@ class Preferences extends SettingsPage
                                                     ->helperText('Enter words, symbols or prefixes to remove from group and file names. Press Enter after each pattern.')
                                                     ->columnSpanFull()
                                                     ->hidden(fn($get) => ! $get('vod_stream_file_sync_name_filter_enabled')),
+                                            ])
+                                            ->hidden(fn($get) => ! $get('vod_stream_file_sync_enabled')),
+                                        Fieldset::make('NFO File Generation')
+                                            ->columnSpanFull()
+                                            ->schema([
+                                                Toggle::make('vod_stream_file_sync_generate_nfo')
+                                                    ->label('Generate NFO files')
+                                                    ->helperText('Create movie.nfo files alongside .strm files for Kodi, Emby, and Jellyfin compatibility. These files contain metadata like TMDB/IMDB IDs, plot, year, rating, cast, and poster URLs.')
+                                                    ->inline(false),
                                             ])
                                             ->hidden(fn($get) => ! $get('vod_stream_file_sync_enabled')),
                                     ]),

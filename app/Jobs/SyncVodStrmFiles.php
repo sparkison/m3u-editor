@@ -6,6 +6,7 @@ use App\Facades\ProxyFacade;
 use App\Models\Channel;
 use App\Models\Playlist;
 use App\Models\StrmFileMapping;
+use App\Services\NfoService;
 use App\Services\PlaylistService;
 use App\Settings\GeneralSettings;
 use Filament\Notifications\Notification;
@@ -50,7 +51,11 @@ class SyncVodStrmFiles implements ShouldQueue
                 'replace_char' => $settings->vod_stream_file_sync_replace_char ?? 'space',
                 'name_filter_enabled' => $settings->vod_stream_file_sync_name_filter_enabled ?? false,
                 'name_filter_patterns' => $settings->vod_stream_file_sync_name_filter_patterns ?? [],
+                'generate_nfo' => $settings->vod_stream_file_sync_generate_nfo ?? false,
             ];
+
+            // NFO service for generating movie.nfo files
+            $nfoService = ($global_sync_settings['generate_nfo'] ?? false) ? app(NfoService::class) : null;
 
             // Setup our channels to sync
             $channels = $this->channels ?? collect();
@@ -169,6 +174,9 @@ class SyncVodStrmFiles implements ShouldQueue
                         ?? $channel->movie_data['imdb_id']
                         ?? $channel->movie_data['imdb']
                         ?? null;
+                    // Ensure IDs are scalar values (not arrays)
+                    $tmdbId = is_scalar($tmdbId) ? $tmdbId : null;
+                    $imdbId = is_scalar($imdbId) ? $imdbId : null;
 
                     $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
                     if (! empty($tmdbId)) {
@@ -210,6 +218,9 @@ class SyncVodStrmFiles implements ShouldQueue
                         ?? $channel->movie_data['imdb_id']
                         ?? $channel->movie_data['imdb']
                         ?? null;
+                    // Ensure IDs are scalar values (not arrays)
+                    $tmdbId = is_scalar($tmdbId) ? $tmdbId : null;
+                    $imdbId = is_scalar($imdbId) ? $imdbId : null;
 
                     $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
                     if (! empty($tmdbId)) {
@@ -259,6 +270,11 @@ class SyncVodStrmFiles implements ShouldQueue
                     $url,
                     $pathOptions
                 );
+
+                // Generate movie NFO file if enabled
+                if ($nfoService) {
+                    $nfoService->generateMovieNfo($channel, $filePath);
+                }
             }
 
             // Clean up orphaned files for disabled/deleted channels
