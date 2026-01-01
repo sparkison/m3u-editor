@@ -849,9 +849,8 @@ class XtreamApiController extends Controller
                     }
 
                     $tmdb = $seriesItem->metadata['tmdb'] ?? '';
-                    $lastModified = $seriesItem->updated_at
-                        ? $seriesItem->updated_at->timestamp
-                        : Carbon::now()->timestamp;
+                    $lastModified = $seriesItem->metadata['last_modified'] ?? null;
+
                     $seriesList[] = [
                         'num' => $index + 1,
                         'name' => $seriesItem->name,
@@ -913,9 +912,8 @@ class XtreamApiController extends Controller
 
             $now = Carbon::now();
             $tmdb = $seriesItem->metadata['tmdb'] ?? '';
-            $lastModified = $seriesItem->updated_at
-                ? $seriesItem->updated_at->timestamp
-                : Carbon::now()->timestamp;
+            $lastModified = $seriesItem->metadata['last_modified'] ?? null;
+
             $seriesInfo = [
                 'name' => $seriesItem->name,
                 'cover' => $cover,

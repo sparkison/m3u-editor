@@ -54,10 +54,11 @@ class SyncSeriesStrmFiles implements ShouldQueue
         // Track sync locations for cleanup at the end
         $this->processedSyncLocations = [];
 
-        // Get all the series episodes
-        $series = $this->series;
-        if ($series) {
-            $this->fetchMetadataForSeries($series, $settings);
+        try {
+            // Get all the series episodes
+            $series = $this->series;
+            if ($series) {
+                $this->fetchMetadataForSeries($series, $settings);
 
             // For single series sync, cleanup immediately
             $this->performCleanup();
@@ -517,6 +518,12 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 ->body("Error: {$e->getMessage()}")
                 ->broadcast($series->user)
                 ->sendToDatabase($series->user);
+            // Also log exception with stack trace for easier debugging
+            Log::error('STRM Sync: Exception during fetchMetadataForSeries', [
+                'series_id' => $series->id ?? null,
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
         }
     }
 }
