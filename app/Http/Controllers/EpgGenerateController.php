@@ -249,49 +249,57 @@ class EpgGenerateController extends Controller
                     // Get programmes from cache for date range
                     $cachedProgrammes = $cacheService->getCachedProgrammesRange($epg, $startDate, $endDate, $epgChannelIds);
 
+                    // Pre-build channel mapping index for O(1) lookups
+                    $channelMapping = [];
+                    foreach ($channels as $channelMap) {
+                        foreach ($channelMap as $epgChannelId => $mappedId) {
+                            if (!isset($channelMapping[$epgChannelId])) {
+                                $channelMapping[$epgChannelId] = [];
+                            }
+                            $channelMapping[$epgChannelId][] = $mappedId;
+                        }
+                    }
+
                     // Output programmes from cache
                     foreach ($cachedProgrammes as $channelId => $programmes) {
+                        // Skip if no mapping for this channel
+                        if (!isset($channelMapping[$channelId])) {
+                            continue;
+                        }
+
                         foreach ($programmes as $programme) {
-                            // Find matching channels for this EPG channel ID
-                            $filtered = array_filter($channels, fn($ch) => array_key_exists($channelId, $ch));
-                            if (!count($filtered)) {
-                                continue;
-                            }
+                            // Format times once per programme (not per channel mapping)
+                            $start = $this->formatXmltvDateTime($programme['start']);
+                            $stop = $this->formatXmltvDateTime($programme['stop']);
 
-                            foreach ($filtered as $ch) {
-                                $mappedChannelId = $ch[$channelId];
-
-                                // Format times for XMLTV
-                                $start = $this->formatXmltvDateTime($programme['start']);
-                                $stop = $this->formatXmltvDateTime($programme['stop']);
-
-                                // Output programme tag
-                                echo '  <programme channel="' . htmlspecialchars($mappedChannelId) . '"';
-                                if ($start) echo ' start="' . $start . '"';
-                                if ($stop) echo ' stop="' . $stop . '"';
-                                echo '>' . PHP_EOL;
+                            foreach ($channelMapping[$channelId] as $mappedChannelId) {
+                                // Build programme XML in buffer for batch output
+                                $progXml = '  <programme channel="' . htmlspecialchars($mappedChannelId) . '"';
+                                if ($start) $progXml .= ' start="' . $start . '"';
+                                if ($stop) $progXml .= ' stop="' . $stop . '"';
+                                $progXml .= '>' . PHP_EOL;
 
                                 if ($programme['title']) {
-                                    echo '    <title>' . htmlspecialchars($programme['title']) . '</title>' . PHP_EOL;
+                                    $progXml .= '    <title>' . htmlspecialchars($programme['title']) . '</title>' . PHP_EOL;
                                 }
                                 if ($programme['subtitle']) {
-                                    echo '    <sub-title>' . htmlspecialchars($programme['subtitle']) . '</sub-title>' . PHP_EOL;
+                                    $progXml .= '    <sub-title>' . htmlspecialchars($programme['subtitle']) . '</sub-title>' . PHP_EOL;
                                 }
                                 if ($programme['desc']) {
-                                    echo '    <desc>' . htmlspecialchars($programme['desc']) . '</desc>' . PHP_EOL;
+                                    $progXml .= '    <desc>' . htmlspecialchars($programme['desc']) . '</desc>' . PHP_EOL;
                                 }
                                 if ($programme['category']) {
-                                    echo '    <category>' . htmlspecialchars($programme['category']) . '</category>' . PHP_EOL;
+                                    $progXml .= '    <category>' . htmlspecialchars($programme['category']) . '</category>' . PHP_EOL;
                                 }
                                 if ($programme['episode_num']) {
-                                    echo '    <episode-num system="xmltv_ns">' . htmlspecialchars($programme['episode_num']) . '</episode-num>' . PHP_EOL;
+                                    $progXml .= '    <episode-num system="xmltv_ns">' . htmlspecialchars($programme['episode_num']) . '</episode-num>' . PHP_EOL;
                                 }
                                 if ($programme['icon']) {
                                     $icon = htmlspecialchars($programme['icon']);
                                     if ($logoProxyEnabled) {
                                         $icon = LogoProxyController::generateProxyUrl($icon);
                                     }
-                                    echo '    <icon src="' . $icon . '"/>' . PHP_EOL;
+                                    $progXml .= '    <icon src="' . $icon . '"/>' . PHP_EOL;
                                 }
                                 // Program artwork images (NEW)
                                 if (!empty($programme['images'] ?? null) && is_array($programme['images'])) {
@@ -308,17 +316,18 @@ class EpgGenerateController extends Controller
                                         $orient = htmlspecialchars($image['orient'], ENT_XML1);
                                         $size = htmlspecialchars($image['size'], ENT_XML1);
 
-                                        echo "    <icon src=\"{$url}\" type=\"{$type}\" width=\"{$width}\" height=\"{$height}\" orient=\"{$orient}\" size=\"{$size}\" />\n";
+                                        $progXml .= "    <icon src=\"{$url}\" type=\"{$type}\" width=\"{$width}\" height=\"{$height}\" orient=\"{$orient}\" size=\"{$size}\" />\n";
                                     }
                                 }
                                 if ($programme['rating']) {
-                                    echo '    <rating><value>' . htmlspecialchars($programme['rating']) . '</value></rating>' . PHP_EOL;
+                                    $progXml .= '    <rating><value>' . htmlspecialchars($programme['rating']) . '</value></rating>' . PHP_EOL;
                                 }
                                 if (!empty($programme['new']) && $programme['new']) {
-                                    echo '    <new />' . PHP_EOL;
+                                    $progXml .= '    <new />' . PHP_EOL;
                                 }
 
-                                echo '  </programme>' . PHP_EOL;
+                                $progXml .= '  </programme>' . PHP_EOL;
+                                echo $progXml;
                             }
                         }
                     }
@@ -334,41 +343,43 @@ class EpgGenerateController extends Controller
 
         // If dummy EPG channels, generate dummy programmes
         if (count($dummyEpgChannels) > 0) {
+            // Pre-calculate all time slots once (major optimization)
+            $timeSlots = [];
+            $startTime = Carbon::now()->startOf('day')->subMinutes($dummyEpgLength);
+            $iterations = (int)((5 * 24 * 60) / $dummyEpgLength);
+
+            for ($i = 0; $i < $iterations; $i++) {
+                $startTime->addMinutes($dummyEpgLength);
+                $timeSlots[] = [
+                    'start' => str_replace(':', '', $startTime->format('YmdHis P')),
+                    'end' => str_replace(':', '', $startTime->copy()->addMinutes($dummyEpgLength)->format('YmdHis P'))
+                ];
+            }
+
+            // Generate programmes for each channel using pre-calculated time slots
             foreach ($dummyEpgChannels as $dummyEpgChannel) {
                 $tvgId = $dummyEpgChannel['tvg_id'];
                 $title = $dummyEpgChannel['title'];
                 $icon = $dummyEpgChannel['icon'];
-                $channelNo = $dummyEpgChannel['channel_no'];
                 $group = $dummyEpgChannel['group'];
                 $includeCategory = $dummyEpgChannel['include_category'];
 
-                // Generate dummy programmes for the specified length
-                $startTime = Carbon::now()
-                    ->startOf('day')
-                    ->subMinutes($dummyEpgLength);
-
-                // Generate 5 days worth of EPG data, based on the `$dummyEpgLength`, which is how long the programme should last in minutes
-                for ($i = 0; $i < (5 * 24 * 60) / $dummyEpgLength; $i++) {
-                    $startTime->addMinutes($dummyEpgLength);
-                    $endTime = clone $startTime;
-                    $endTime->addMinutes($dummyEpgLength);
-
-                    // Format the start and end times
-                    $start = str_replace(':', '', $startTime->format('YmdHis P'));
-                    $end = str_replace(':', '', $endTime->format('YmdHis P'));
-
-                    // Output the <programme> tag
-                    echo '  <programme channel="' . $tvgId . '" start="' . $start . '" stop="' . $end . '">' . PHP_EOL;
-                    echo '    <title>' . $title . '</title>' . PHP_EOL;
+                // Build all programmes for this channel in one string buffer
+                $buffer = '';
+                foreach ($timeSlots as $slot) {
+                    $buffer .= '  <programme channel="' . $tvgId . '" start="' . $slot['start'] . '" stop="' . $slot['end'] . '">' . PHP_EOL;
+                    $buffer .= '    <title>' . $title . '</title>' . PHP_EOL;
                     if ($icon) {
-                        echo '    <icon src="' . $icon . '"/>' . PHP_EOL;
+                        $buffer .= '    <icon src="' . $icon . '"/>' . PHP_EOL;
                     }
-                    echo '    <desc>' . $title . '</desc>' . PHP_EOL;
+                    $buffer .= '    <desc>' . $title . '</desc>' . PHP_EOL;
                     if ($includeCategory) {
-                        echo '    <category lang="en">' . $group . '</category>' . PHP_EOL;
+                        $buffer .= '    <category lang="en">' . $group . '</category>' . PHP_EOL;
                     }
-                    echo '  </programme>' . PHP_EOL;
+                    $buffer .= '  </programme>' . PHP_EOL;
                 }
+                // Single echo per channel instead of 600+ echoes
+                echo $buffer;
             }
         }
 
