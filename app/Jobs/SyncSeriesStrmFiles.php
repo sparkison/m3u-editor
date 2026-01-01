@@ -54,22 +54,33 @@ class SyncSeriesStrmFiles implements ShouldQueue
         // Track sync locations for cleanup at the end
         $this->processedSyncLocations = [];
 
-        // Get all the series episodes
-        $series = $this->series;
-        if ($series) {
-            $this->fetchMetadataForSeries($series, $settings);
+        try {
+            // Get all the series episodes
+            $series = $this->series;
+            if ($series) {
+                $this->fetchMetadataForSeries($series, $settings);
 
-            // For single series sync, cleanup immediately
-            $this->performCleanup();
-        } elseif ($this->isCleanupJob) {
-            // Special cleanup job - runs after all batch jobs
-            $this->performGlobalCleanup($settings);
-        } elseif ($this->batchOffset !== null) {
-            // Batch processing mode
-            $this->processBatch($settings);
-        } else {
-            // Initial dispatch - calculate and dispatch batches
-            $this->dispatchBatches($settings);
+                // For single series sync, cleanup immediately
+                $this->performCleanup();
+            } elseif ($this->isCleanupJob) {
+                // Special cleanup job - runs after all batch jobs
+                $this->performGlobalCleanup($settings);
+            } elseif ($this->batchOffset !== null) {
+                // Batch processing mode
+                $this->processBatch($settings);
+            } else {
+                // Initial dispatch - calculate and dispatch batches
+                $this->dispatchBatches($settings);
+            }
+        } catch (\Throwable $e) {
+            // Log full exception with stack trace so failures are visible in logs
+            Log::error('STRM Sync: Unhandled exception in SyncSeriesStrmFiles::handle', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            // Re-throw to allow job retry semantics to continue as before
+            throw $e;
         }
     }
 

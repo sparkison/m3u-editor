@@ -81,10 +81,6 @@ class ProcessM3uImportSeries implements ShouldQueue
                     notify: false, // don't notify user for bulk syncs
                 );
             }
-            $jobs[] = new ProcessM3uImportSeriesComplete(
-                playlist: $this->playlist,
-                batchNo: $this->batchNo,
-            );
             $playlist = $this->playlist;
             Bus::chain($jobs)
                 ->onConnection('redis') // force to use redis connection
