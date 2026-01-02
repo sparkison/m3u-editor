@@ -318,7 +318,7 @@ class EpgApiController extends Controller
                 // Get the TVG ID
                 switch ($idChannelBy) {
                     case PlaylistChannelId::ChannelId:
-                        $tvgId = $channel->id;
+                        $tvgId = $channel->source_id ?? $channel->id;
                         break;
                     case PlaylistChannelId::Name:
                         $tvgId = $channel->name_custom ?? $channel->name;

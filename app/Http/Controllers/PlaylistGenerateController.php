@@ -134,7 +134,7 @@ class PlaylistGenerateController extends Controller
                     // Get the TVG ID
                     switch ($idChannelBy) {
                         case PlaylistChannelId::ChannelId:
-                            $tvgId = $channel->id;
+                            $tvgId = $channel->source_id ?? $channel->id;
                             break;
                         case PlaylistChannelId::Name:
                             $tvgId = $channel->name_custom ?? $channel->name;
@@ -281,7 +281,7 @@ class PlaylistGenerateController extends Controller
                             // Get the TVG ID
                             switch ($idChannelBy) {
                                 case PlaylistChannelId::ChannelId:
-                                    $tvgId = $channel->id;
+                                    $tvgId = $channel->source_id ?? $channel->id;
                                     break;
                                 case PlaylistChannelId::Name:
                                     $tvgId = $name;
@@ -436,7 +436,7 @@ class PlaylistGenerateController extends Controller
                 // Get the TVG ID
                 switch ($idChannelBy) {
                     case PlaylistChannelId::ChannelId:
-                        $tvgId = $channel->id;
+                        $tvgId = $channel->source_id ?? $channel->id;
                         break;
                     case PlaylistChannelId::Name:
                         $tvgId = $channel->name_custom ?? $channel->name;
@@ -535,11 +535,16 @@ class PlaylistGenerateController extends Controller
             // Alias the external EPG channel identifier to avoid clobbering the FK attribute
             ->selectRaw('epg_channels.channel_id as epg_channel_key');
 
-        // If custom playlist, left join tags (aliased) for this playlist to use its order_column
+        // If custom playlist, left join tags through the taggables polymorphic table
         if ($playlist instanceof CustomPlaylist) {
+            $query->leftJoin('taggables', function ($join) {
+                $join->on('channels.id', '=', 'taggables.taggable_id')
+                    ->where('taggables.taggable_type', '=', Channel::class);
+            });
+            
             $query->leftJoin('tags as custom_tags', function ($join) use ($playlistUuid) {
-                $join->on('custom_tags.channel_id', '=', 'channels.id')
-                    ->where('custom_tags.type', $playlistUuid);
+                $join->on('taggables.tag_id', '=', 'custom_tags.id')
+                    ->where('custom_tags.type', '=', $playlistUuid);
             });
 
             // Order by custom tag order when present, otherwise fall back to group sort_order
