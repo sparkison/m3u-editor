@@ -110,9 +110,15 @@ class SyncListener
     private function postProcessEpg(Epg $epg)
     {
         // Update status to Processing (so UI components will continue to refresh) and dispatch cache job
+        // IMPORTANT: Set is_cached to false to prevent race condition where users
+        // try to read the EPG cache (JSON files) while it's being regenerated
+        // Note: Playlist EPG cache files (XML) are NOT cleared here - they remain available
+        // for users until the new cache is generated, preventing fallback to slow XML reader
         // Note: processing_started_at and processing_phase will be set by GenerateEpgCache job
         $epg->update([
             'status' => Status::Processing,
+            'is_cached' => false,
+            'cache_meta' => null,
             'processing_started_at' => null,
             'processing_phase' => null,
         ]);

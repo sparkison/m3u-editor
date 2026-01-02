@@ -227,11 +227,10 @@ class EpgGenerateController extends Controller
             }
 
             try {
-                // Try to use cached data first
-                // if ($cacheService->isCacheValid($epg)) {
-                // Do a quick check instead of fetching metadata and parsing
-                // If flagged as cached, use the cache
-                if ($epg->is_cached) {
+                // Try to use cached data first with proper validation
+                // CRITICAL: Check both is_cached flag AND that cache is actually valid
+                // This prevents race condition where cache is being regenerated
+                if ($epg->is_cached && $cacheService->isCacheValid($epg)) {
                     // Get all programmes from cache
                     $startDate = Carbon::now()->subDays(1)->format('Y-m-d');
                     $epgDays = config('dev.default_epg_days', 7);
