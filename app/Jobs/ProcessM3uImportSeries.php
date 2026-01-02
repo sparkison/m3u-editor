@@ -73,45 +73,22 @@ class ProcessM3uImportSeries implements ShouldQueue
     public function importSeries(): void
     {
         try {
-            $jobs = [];
-            $series = $this->playlist->series()->where('enabled', true)->cursor();
-            foreach ($series as $seriesItem) {
-                $jobs[] = new ProcessM3uImportSeriesEpisodes(
-                    playlistSeries: $seriesItem,
-                    notify: false, // don't notify user for bulk syncs
-                );
-            }
-            $playlist = $this->playlist;
-            Bus::chain($jobs)
-                ->onConnection('redis') // force to use redis connection
-                ->onQueue('import')
-                ->catch(function (Throwable $e) use ($playlist) {
-                    $error = "Error processing series sync on \"{$playlist->name}\": {$e->getMessage()}";
-                    Log::error($error);
-                    Notification::make()
-                        ->danger()
-                        ->title("Error processing series sync on \"{$playlist->name}\"")
-                        ->body('Please view your notifications for details.')
-                        ->broadcast($playlist->user);
-                    Notification::make()
-                        ->danger()
-                        ->title("Error processing series sync on \"{$playlist->name}\"")
-                        ->body($error)
-                        ->sendToDatabase($playlist->user);
-                    $playlist->update([
-                        'status' => Status::Failed,
-                        'synced' => now(),
-                        'errors' => $error,
-                        'series_progress' => 100,
-                        'processing' => [
-                            ...$playlist->processing ?? [],
-                            'series_processing' => false,
-                        ],
-                    ]);
+            // Use the new bulk dispatcher pattern instead of creating individual jobs
+            // This prevents flooding Redis with thousands of jobs
+            dispatch(new ProcessM3uImportSeriesEpisodes(
+                playlistSeries: null,  // null triggers bulk mode
+                notify: true,
+                all_playlists: false,
+                playlist_id: $this->playlist->id,
+                overwrite_existing: false,
+                user_id: $this->playlist->user_id,
+                sync_stream_files: true,
+            ));
 
-                    // Fire the playlist synced event
-                    event(new SyncCompleted($playlist));
-                })->dispatch();
+            Log::info('ProcessM3uImportSeries: Dispatched bulk series sync', [
+                'playlist_id' => $this->playlist->id,
+                'playlist_name' => $this->playlist->name,
+            ]);
         } catch (Exception $e) {
             // Update the playlist status to error
             $error = Str::limit($e->getMessage(), 255);
