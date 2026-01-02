@@ -64,7 +64,8 @@ class GenerateEpgCache implements ShouldQueue
                 'processing_phase' => null,
             ]);
 
-            // Clear out any related EPG file caches
+            // Clear playlist EPG cache files AFTER new cache is generated
+            // This ensures users can still get cached EPG files during regeneration
             foreach ($epg->getAllPlaylists() as $playlist) {
                 EpgCacheService::clearPlaylistEpgCacheFile($playlist);
             }

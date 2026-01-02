@@ -55,6 +55,12 @@ class EpgCacheService
      */
     public function isCacheValid(Epg $epg): bool
     {
+        // CRITICAL: If EPG is currently being processed, cache is NOT valid
+        // This prevents race condition where we try to read a cache being regenerated
+        if ($epg->processing_phase === 'cache' || $epg->status === Status::Processing) {
+            return false;
+        }
+
         $metadataPath = $this->getCacheFilePath($epg, self::METADATA_FILE);
 
         if (!Storage::disk('local')->exists($metadataPath)) {
