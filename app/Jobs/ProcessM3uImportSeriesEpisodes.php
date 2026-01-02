@@ -9,6 +9,7 @@ use App\Traits\ProviderRequestDelay;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
 
 class ProcessM3uImportSeriesEpisodes implements ShouldQueue
@@ -54,21 +55,34 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
             'enabled' => $settings->stream_file_sync_enabled ?? false,
         ];
 
+        // Debug logging to see which path is taken
+        Log::info('ProcessM3uImportSeriesEpisodes: Starting', [
+            'has_series' => $series !== null,
+            'has_batch_offset' => $this->batchOffset !== null,
+            'user_id' => $this->user_id,
+            'playlist_id' => $this->playlist_id,
+            'all_playlists' => $this->all_playlists,
+        ]);
+
         if ($series) {
             // Single series processing
+            Log::info('ProcessM3uImportSeriesEpisodes: Single series mode');
             $this->fetchMetadataForSeries($series, $global_sync_settings);
         } elseif ($this->batchOffset !== null) {
             // Batch processing mode - process a specific batch
+            Log::info('ProcessM3uImportSeriesEpisodes: Batch processing mode');
             $this->processBatch($settings, $global_sync_settings);
         } else {
             // Initial dispatch - calculate batches and dispatch them
+            Log::info('ProcessM3uImportSeriesEpisodes: Dispatch batches mode');
             $this->dispatchBatches($settings);
         }
     }
 
     /**
-     * Calculate total series count and dispatch batch jobs.
-     * This prevents one giant job from running for hours.
+     * Dispatch first chain of batch jobs.
+     * Uses Bus::chain() with CheckSeriesImportProgress to recursively process series
+     * in waves, preventing Redis memory exhaustion.
      */
     private function dispatchBatches(GeneralSettings $settings): void
     {
@@ -85,61 +99,68 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
 
         if ($totalCount === 0) {
             Log::info('Series Sync: No series to process');
-
             return;
         }
 
-        $totalBatches = (int) ceil($totalCount / self::BATCH_SIZE);
+        $batchSize = self::BATCH_SIZE;
+        $totalBatches = (int) ceil($totalCount / $batchSize);
+        $jobsPerChain = CheckSeriesImportProgress::JOBS_PER_CHAIN;
+        $totalChains = (int) ceil($totalBatches / $jobsPerChain);
 
-        Log::info('Series Sync: Dispatching batch jobs', [
+        Log::info('Series Sync: Starting chain-based dispatch', [
             'total_series' => $totalCount,
-            'batch_size' => self::BATCH_SIZE,
+            'batch_size' => $batchSize,
             'total_batches' => $totalBatches,
+            'jobs_per_chain' => $jobsPerChain,
+            'total_chains' => $totalChains,
             'user_id' => $this->user_id,
             'playlist_id' => $this->playlist_id,
         ]);
 
-        // Dispatch batch jobs
-        for ($batch = 0; $batch < $totalBatches; $batch++) {
-            $offset = $batch * self::BATCH_SIZE;
+        // Build first chain
+        $jobs = [];
+        $jobsInFirstChain = min($jobsPerChain, $totalBatches);
 
-            dispatch(new self(
+        for ($batch = 0; $batch < $jobsInFirstChain; $batch++) {
+            $offset = $batch * $batchSize;
+
+            $jobs[] = new self(
                 playlistSeries: null,
                 notify: false,
                 all_playlists: $this->all_playlists,
                 playlist_id: $this->playlist_id,
                 overwrite_existing: $this->overwrite_existing,
                 user_id: $this->user_id,
-                sync_stream_files: $this->sync_stream_files,
+                sync_stream_files: false, // Don't trigger per-job STRM sync
                 batchOffset: $offset,
                 totalBatches: $totalBatches,
                 currentBatch: $batch + 1,
-            ));
+            );
         }
 
-        // Dispatch the STRM sync job at the end (will be queued after all batch jobs)
-        $global_sync_settings = [
-            'enabled' => $settings->stream_file_sync_enabled ?? false,
-        ];
+        // Add checker job at the end of the chain
+        $jobs[] = new CheckSeriesImportProgress(
+            currentOffset: $jobsInFirstChain * $batchSize,
+            totalSeries: $totalCount,
+            notify: $this->notify,
+            all_playlists: $this->all_playlists,
+            playlist_id: $this->playlist_id,
+            overwrite_existing: $this->overwrite_existing,
+            user_id: $this->user_id,
+            sync_stream_files: $this->sync_stream_files,
+        );
 
-        if ($global_sync_settings['enabled'] && $this->sync_stream_files) {
-            dispatch(new SyncSeriesStrmFiles(
-                series: null,
-                notify: true,
-                all_playlists: $this->all_playlists,
-                playlist_id: $this->playlist_id,
-                user_id: $this->user_id,
-            ));
-        }
+        // Dispatch the chain
+        Bus::chain($jobs)->dispatch();
 
-        // Notify user that batches were dispatched
+        // Notify user that sync has started
         if ($this->user_id) {
             $user = User::find($this->user_id);
             if ($user) {
                 Notification::make()
                     ->info()
                     ->title('Series Sync Started')
-                    ->body("Processing {$totalCount} series in {$totalBatches} batches...")
+                    ->body("Processing {$totalCount} series in {$totalChains} chain(s) of {$jobsPerChain} jobs each...")
                     ->broadcast($user)
                     ->sendToDatabase($user);
             }
@@ -198,18 +219,8 @@ class ProcessM3uImportSeriesEpisodes implements ShouldQueue
             'duration_seconds' => $duration,
         ]);
 
-        // On last batch, notify user
-        if ($this->currentBatch === $this->totalBatches && $this->user_id) {
-            $user = User::find($this->user_id);
-            if ($user) {
-                Notification::make()
-                    ->success()
-                    ->title('Series Metadata Sync Completed')
-                    ->body("All {$this->totalBatches} batches processed successfully.")
-                    ->broadcast($user)
-                    ->sendToDatabase($user);
-            }
-        }
+        // Note: Completion notification is handled by CheckSeriesImportProgress
+        // which runs after all chains complete, not after individual batches
     }
 
     /**

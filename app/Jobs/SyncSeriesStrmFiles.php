@@ -11,6 +11,7 @@ use App\Settings\GeneralSettings;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
 
 class SyncSeriesStrmFiles implements ShouldQueue
@@ -85,7 +86,8 @@ class SyncSeriesStrmFiles implements ShouldQueue
     }
 
     /**
-     * Dispatch batch jobs for processing series STRM files.
+     * Dispatch first chain of batch jobs.
+     * Uses Bus::chain() with CheckSeriesStrmProgress to recursively process series.
      */
     private function dispatchBatches(GeneralSettings $settings): void
     {
@@ -101,23 +103,30 @@ class SyncSeriesStrmFiles implements ShouldQueue
 
         if ($totalCount === 0) {
             Log::info('STRM Sync: No series to process');
-
             return;
         }
 
-        $totalBatches = (int) ceil($totalCount / self::BATCH_SIZE);
+        $batchSize = self::BATCH_SIZE;
+        $totalBatches = (int) ceil($totalCount / $batchSize);
+        $jobsPerChain = CheckSeriesStrmProgress::JOBS_PER_CHAIN;
+        $totalChains = (int) ceil($totalBatches / $jobsPerChain);
 
-        Log::info('STRM Sync: Dispatching batch jobs', [
+        Log::info('STRM Sync: Starting chain-based dispatch', [
             'total_series' => $totalCount,
-            'batch_size' => self::BATCH_SIZE,
+            'batch_size' => $batchSize,
             'total_batches' => $totalBatches,
+            'jobs_per_chain' => $jobsPerChain,
+            'total_chains' => $totalChains,
         ]);
 
-        // Dispatch batch jobs
-        for ($batch = 0; $batch < $totalBatches; $batch++) {
-            $offset = $batch * self::BATCH_SIZE;
+        // Build first chain
+        $jobs = [];
+        $jobsInFirstChain = min($jobsPerChain, $totalBatches);
 
-            dispatch(new self(
+        for ($batch = 0; $batch < $jobsInFirstChain; $batch++) {
+            $offset = $batch * $batchSize;
+
+            $jobs[] = new self(
                 series: null,
                 notify: false,
                 all_playlists: $this->all_playlists,
@@ -126,18 +135,23 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 batchOffset: $offset,
                 totalBatches: $totalBatches,
                 currentBatch: $batch + 1,
-            ));
+            );
         }
 
-        // Dispatch cleanup job at the end (queued after all batch jobs)
-        dispatch(new self(
-            series: null,
+        // Add checker job at the end of the chain
+        // Last chain will trigger cleanup
+        $jobs[] = new CheckSeriesStrmProgress(
+            currentOffset: $jobsInFirstChain * $batchSize,
+            totalSeries: $totalCount,
             notify: $this->notify,
             all_playlists: $this->all_playlists,
             playlist_id: $this->playlist_id,
             user_id: $this->user_id,
-            isCleanupJob: true,
-        ));
+            needsCleanup: true, // Cleanup will run after all chains complete
+        );
+
+        // Dispatch the chain
+        Bus::chain($jobs)->dispatch();
     }
 
     /**
