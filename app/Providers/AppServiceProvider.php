@@ -2,9 +2,6 @@
 
 namespace App\Providers;
 
-use App\Services\GitInfoService;
-use Throwable;
-use Exception;
 use App\Events\EpgCreated;
 use App\Events\EpgDeleted;
 use App\Events\EpgUpdated;
@@ -13,42 +10,44 @@ use App\Events\PlaylistDeleted;
 use App\Events\PlaylistUpdated;
 use App\Livewire\BackupDestinationListRecords;
 use App\Livewire\StreamPlayer;
+use App\Livewire\TmdbSearch;
 use App\Models\ChannelFailover;
 use App\Models\CustomPlaylist;
-use App\Models\MergedPlaylist;
 use App\Models\Epg;
 use App\Models\Group;
+use App\Models\MergedPlaylist;
 use App\Models\Playlist;
 use App\Models\PlaylistAlias;
 use App\Models\StreamProfile;
 use App\Models\User;
 use App\Services\EpgCacheService;
+use App\Services\GitInfoService;
 use App\Services\PlaylistService;
 use App\Services\ProxyService;
 use App\Settings\GeneralSettings;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Routing\Route;
-use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Storage;
-use Opcodes\LogViewer\Facades\LogViewer;
-use Filament\Support\Facades\FilamentView;
-use Filament\View\PanelsRenderHook;
-use Illuminate\Support\HtmlString;
-use Illuminate\Cache\RateLimiting\Limit;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\RateLimiter;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecurityScheme;
-use Illuminate\Support\Str;
+use Exception;
+use Filament\Support\Facades\FilamentView;
+use Filament\View\PanelsRenderHook;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\HtmlString;
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Spatie\Tags\Tag;
+use Throwable;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -74,7 +73,7 @@ class AppServiceProvider extends ServiceProvider
             // no HTTP request context for URL generation. Force the root URL,
             // including the configured port, so route()/url() use the correct base.
             $this->configureConsoleBaseUrl();
-        } else if (request()->hasHeader('X-Forwarded-Proto')) {
+        } elseif (request()->hasHeader('X-Forwarded-Proto')) {
             // Detect actual protocol from request headers
             // This allows the app to work correctly with both HTTP and HTTPS access
             // when behind a reverse proxy with SSL termination
@@ -161,7 +160,7 @@ class AppServiceProvider extends ServiceProvider
         $hasPortInUrl = parse_url($baseUrl, PHP_URL_PORT) !== null;
 
         if ($configuredPort && ! $hasPortInUrl) {
-            $baseUrl .= ':' . $configuredPort;
+            $baseUrl .= ':'.$configuredPort;
         }
 
         URL::forceRootUrl($baseUrl);
@@ -251,7 +250,7 @@ class AppServiceProvider extends ServiceProvider
         try {
             foreach (['sqlite', 'jobs'] as $connection) {
                 // Check if the file exists
-                if (File::exists(database_path($connection . '.sqlite')) === false) {
+                if (File::exists(database_path($connection.'.sqlite')) === false) {
                     continue;
                 }
 
@@ -270,7 +269,7 @@ class AppServiceProvider extends ServiceProvider
             }
         } catch (Throwable $throwable) {
             // Log the error
-            Log::error('Error setting SQLite pragmas: ' . $throwable->getMessage());
+            Log::error('Error setting SQLite pragmas: '.$throwable->getMessage());
         }
     }
 
@@ -296,13 +295,13 @@ class AppServiceProvider extends ServiceProvider
         // Register the event listener
         try {
             // Process playlist on creation
-            Playlist::created(fn(Playlist $playlist) => event(new PlaylistCreated($playlist)));
-            Playlist::updated(fn(Playlist $playlist) => event(new PlaylistUpdated($playlist)));
+            Playlist::created(fn (Playlist $playlist) => event(new PlaylistCreated($playlist)));
+            Playlist::updated(fn (Playlist $playlist) => event(new PlaylistUpdated($playlist)));
             Playlist::creating(function (Playlist $playlist) {
-                if (!$playlist->user_id) {
+                if (! $playlist->user_id) {
                     $playlist->user_id = auth()->id();
                 }
-                if (!$playlist->sync_interval) {
+                if (! $playlist->sync_interval) {
                     $playlist->sync_interval = '0 0 * * *';
                 }
                 if (($playlist->xtream_config['url'] ?? false) && Str::endsWith($playlist->xtream_config['url'], '/')) {
@@ -313,10 +312,11 @@ class AppServiceProvider extends ServiceProvider
                     ];
                 }
                 $playlist->uuid = Str::orderedUuid()->toString();
+
                 return $playlist;
             });
             Playlist::updating(function (Playlist $playlist) {
-                if (!$playlist->sync_interval) {
+                if (! $playlist->sync_interval) {
                     $playlist->sync_interval = '0 0 * * *';
                 }
                 if (($playlist->xtream_config['url'] ?? false) && Str::endsWith($playlist->xtream_config['url'], '/')) {
@@ -336,6 +336,7 @@ class AppServiceProvider extends ServiceProvider
                         $playlist->generateShortUrl();
                     }
                 }
+
                 return $playlist;
             });
             Playlist::deleting(function (Playlist $playlist) {
@@ -352,26 +353,29 @@ class AppServiceProvider extends ServiceProvider
                 $playlist->playlistAuths()->detach();
                 event(new PlaylistDeleted($playlist));
                 $playlist->postProcesses()->detach();
+
                 return $playlist;
             });
 
             // Process epg on creation
-            Epg::created(fn(Epg $epg) => event(new EpgCreated($epg)));
-            Epg::updated(fn(Epg $epg) => event(new EpgUpdated($epg)));
+            Epg::created(fn (Epg $epg) => event(new EpgCreated($epg)));
+            Epg::updated(fn (Epg $epg) => event(new EpgUpdated($epg)));
             Epg::creating(function (Epg $epg) {
-                if (!$epg->user_id) {
+                if (! $epg->user_id) {
                     $epg->user_id = auth()->id();
                 }
-                if (!$epg->sync_interval) {
+                if (! $epg->sync_interval) {
                     $epg->sync_interval = '0 0 * * *';
                 }
                 $epg->uuid = Str::orderedUuid()->toString();
+
                 return $epg;
             });
             Epg::updating(function (Epg $epg) {
-                if (!$epg->sync_interval) {
+                if (! $epg->sync_interval) {
                     $epg->sync_interval = '0 0 * * *';
                 }
+
                 return $epg;
             });
             Epg::deleting(function (Epg $epg) {
@@ -381,16 +385,18 @@ class AppServiceProvider extends ServiceProvider
                 }
                 event(new EpgDeleted($epg));
                 $epg->postProcesses()->detach();
+
                 return $epg;
             });
 
             // Merged playlist
             // MergedPlaylist::created(fn(MergedPlaylist $mergedPlaylist) => /* ... */);
             MergedPlaylist::creating(function (MergedPlaylist $mergedPlaylist) {
-                if (!$mergedPlaylist->user_id) {
+                if (! $mergedPlaylist->user_id) {
                     $mergedPlaylist->user_id = auth()->id();
                 }
                 $mergedPlaylist->uuid = Str::orderedUuid()->toString();
+
                 return $mergedPlaylist;
             });
             MergedPlaylist::updating(function (MergedPlaylist $mergedPlaylist) {
@@ -404,21 +410,24 @@ class AppServiceProvider extends ServiceProvider
                         $mergedPlaylist->generateShortUrl();
                     }
                 }
+
                 return $mergedPlaylist;
             });
             MergedPlaylist::deleting(function (MergedPlaylist $mergedPlaylist) {
                 // Remove short URLs
                 $mergedPlaylist->removeShortUrls();
+
                 return $mergedPlaylist;
             });
 
             // Custom playlist
             // CustomPlaylist::created(fn(CustomPlaylist $customPlaylist) => /* ... */);
             CustomPlaylist::creating(function (CustomPlaylist $customPlaylist) {
-                if (!$customPlaylist->user_id) {
+                if (! $customPlaylist->user_id) {
                     $customPlaylist->user_id = auth()->id();
                 }
                 $customPlaylist->uuid = Str::orderedUuid()->toString();
+
                 return $customPlaylist;
             });
             CustomPlaylist::updating(function (CustomPlaylist $customPlaylist) {
@@ -438,9 +447,10 @@ class AppServiceProvider extends ServiceProvider
                         ->where('type', $originalUuid)
                         ->update(['type' => $customPlaylist->uuid]);
                     Tag::query()
-                        ->where('type', $originalUuid . '-category')
-                        ->update(['type' => $customPlaylist->uuid . '-category']);
+                        ->where('type', $originalUuid.'-category')
+                        ->update(['type' => $customPlaylist->uuid.'-category']);
                 }
+
                 return $customPlaylist;
             });
             CustomPlaylist::deleting(function (CustomPlaylist $customPlaylist) {
@@ -449,8 +459,9 @@ class AppServiceProvider extends ServiceProvider
                 // Cleanup tags
                 Tag::query()
                     ->where('type', $customPlaylist->uuid)
-                    ->orWhere('type', $customPlaylist->uuid . '-category')
+                    ->orWhere('type', $customPlaylist->uuid.'-category')
                     ->delete();
+
                 return $customPlaylist;
             });
 
@@ -466,15 +477,16 @@ class AppServiceProvider extends ServiceProvider
 
             // Failover channels
             ChannelFailover::creating(function (ChannelFailover $channelFailover) {
-                if (!$channelFailover->user_id) {
+                if (! $channelFailover->user_id) {
                     $channelFailover->user_id = auth()->id();
                 }
+
                 return $channelFailover;
             });
 
             // PlayslistAlias
             PlaylistAlias::creating(function (PlaylistAlias $playlistAlias) {
-                if (!$playlistAlias->user_id) {
+                if (! $playlistAlias->user_id) {
                     $playlistAlias->user_id = auth()->id();
                 }
                 if (($playlistAlias->xtream_config['url'] ?? false) && Str::endsWith($playlistAlias->xtream_config['url'], '/')) {
@@ -485,6 +497,7 @@ class AppServiceProvider extends ServiceProvider
                     ];
                 }
                 $playlistAlias->uuid = Str::orderedUuid()->toString();
+
                 return $playlistAlias;
             });
             PlaylistAlias::updating(function (PlaylistAlias $playlistAlias) {
@@ -505,19 +518,22 @@ class AppServiceProvider extends ServiceProvider
                         $playlistAlias->generateShortUrl();
                     }
                 }
+
                 return $playlistAlias;
             });
             PlaylistAlias::deleting(function (PlaylistAlias $playlistAlias) {
                 // Remove short URLs
                 $playlistAlias->removeShortUrls();
+
                 return $playlistAlias;
             });
 
             // StreamProfile
             StreamProfile::creating(function (StreamProfile $streamProfile) {
-                if (!$streamProfile->user_id) {
+                if (! $streamProfile->user_id) {
                     $streamProfile->user_id = auth()->id();
                 }
+
                 return $streamProfile;
             });
         } catch (Throwable $e) {
@@ -534,13 +550,13 @@ class AppServiceProvider extends ServiceProvider
         // Add scroll to top event listener
         FilamentView::registerRenderHook(
             PanelsRenderHook::SCRIPTS_AFTER,
-            fn(): string => new HtmlString('<script>document.addEventListener("scroll-to-top", () => window.scrollTo({top: 0, left: 0, behavior: "smooth"}))</script>'),
+            fn (): string => new HtmlString('<script>document.addEventListener("scroll-to-top", () => window.scrollTo({top: 0, left: 0, behavior: "smooth"}))</script>'),
         );
 
         // Add footer view
         FilamentView::registerRenderHook(
             PanelsRenderHook::FOOTER,
-            fn() => view('footer')
+            fn () => view('footer')
         );
     }
 
@@ -565,12 +581,12 @@ class AppServiceProvider extends ServiceProvider
         // Configure the API
         Scramble::configure()
             ->routes(function (Route $route) {
-                return !Str::startsWith($route->uri, 'playlist/v/') && Str::startsWith($route->uri, [
+                return ! Str::startsWith($route->uri, 'playlist/v/') && Str::startsWith($route->uri, [
                     'playlist/',
                     'epg/',
                     'user/',
                     'channel/',
-                    'player_api.php'
+                    'player_api.php',
                 ]);
             })
             ->withDocumentTransformers(function (OpenApi $openApi) {
@@ -587,12 +603,12 @@ class AppServiceProvider extends ServiceProvider
     {
         // Register the proxy service
         $this->app->singleton('proxy', function () {
-            return new ProxyService();
+            return new ProxyService;
         });
 
         // Register the playlist url service
         $this->app->singleton('playlist', function () {
-            return new PlaylistService();
+            return new PlaylistService;
         });
     }
 
@@ -606,6 +622,9 @@ class AppServiceProvider extends ServiceProvider
 
         // Register the stream player component
         Livewire::component('stream-player', StreamPlayer::class);
+
+        // Register the TMDB search component
+        Livewire::component('tmdb-search', TmdbSearch::class);
     }
 
     /**
@@ -614,13 +633,13 @@ class AppServiceProvider extends ServiceProvider
     private function configureFilamentV3Compatibility(): void
     {
         // Preserve v3 file upload behavior (public visibility)
-        \Filament\Forms\Components\FileUpload::configureUsing(fn(\Filament\Forms\Components\FileUpload $fileUpload) => $fileUpload
+        \Filament\Forms\Components\FileUpload::configureUsing(fn (\Filament\Forms\Components\FileUpload $fileUpload) => $fileUpload
             ->visibility('public'));
 
-        \Filament\Tables\Columns\ImageColumn::configureUsing(fn(\Filament\Tables\Columns\ImageColumn $imageColumn) => $imageColumn
+        \Filament\Tables\Columns\ImageColumn::configureUsing(fn (\Filament\Tables\Columns\ImageColumn $imageColumn) => $imageColumn
             ->visibility('public'));
 
-        \Filament\Infolists\Components\ImageEntry::configureUsing(fn(\Filament\Infolists\Components\ImageEntry $imageEntry) => $imageEntry
+        \Filament\Infolists\Components\ImageEntry::configureUsing(fn (\Filament\Infolists\Components\ImageEntry $imageEntry) => $imageEntry
             ->visibility('public'));
 
         // // Preserve v3 table filter behavior (not deferred)
@@ -629,17 +648,17 @@ class AppServiceProvider extends ServiceProvider
         //     ->paginationPageOptions([5, 10, 25, 50, 'all']));
 
         // Preserve v3 layout component behavior (column span full)
-        \Filament\Schemas\Components\Fieldset::configureUsing(fn(\Filament\Schemas\Components\Fieldset $fieldset) => $fieldset
+        \Filament\Schemas\Components\Fieldset::configureUsing(fn (\Filament\Schemas\Components\Fieldset $fieldset) => $fieldset
             ->columnSpanFull());
 
-        \Filament\Schemas\Components\Grid::configureUsing(fn(\Filament\Schemas\Components\Grid $grid) => $grid
+        \Filament\Schemas\Components\Grid::configureUsing(fn (\Filament\Schemas\Components\Grid $grid) => $grid
             ->columnSpanFull());
 
-        \Filament\Schemas\Components\Section::configureUsing(fn(\Filament\Schemas\Components\Section $section) => $section
+        \Filament\Schemas\Components\Section::configureUsing(fn (\Filament\Schemas\Components\Section $section) => $section
             ->columnSpanFull());
 
         // Preserve v3 unique validation behavior (not ignoring record by default)
-        \Filament\Forms\Components\Field::configureUsing(fn(\Filament\Forms\Components\Field $field) => $field
+        \Filament\Forms\Components\Field::configureUsing(fn (\Filament\Forms\Components\Field $field) => $field
             ->uniqueValidationIgnoresRecordByDefault(false));
     }
 }

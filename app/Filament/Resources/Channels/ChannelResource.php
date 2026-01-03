@@ -22,6 +22,7 @@ use Filament\Forms\Components\Select;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Components\Utilities\Get;
 use App\Jobs\MapPlaylistChannelsToEpg;
+use App\Jobs\FetchTmdbIds;
 use Filament\Forms\Components\ToggleButtons;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\TextInput;
@@ -419,6 +420,32 @@ class ChannelResource extends Resource
                 ->hiddenLabel()
                 ->disabled(fn(Model $record) => $record->is_custom)
                 ->hidden(fn(Model $record) => $record->is_custom),
+            Action::make('fetch_tmdb_ids')
+                ->label('Fetch TMDB IDs')
+                ->icon('heroicon-o-film')
+                ->tooltip('Fetch TMDB/TVDB/IMDB IDs for this channel')
+                ->action(function ($record) {
+                    app('Illuminate\Contracts\Bus\Dispatcher')
+                        ->dispatch(new FetchTmdbIds(
+                            type: 'vod',
+                            ids: [$record->id]
+                        ));
+                })
+                ->after(function () {
+                    \Filament\Notifications\Notification::make()
+                        ->success()
+                        ->title('TMDB Search Started')
+                        ->body('Searching for TMDB/TVDB IDs. Check the logs or refresh the page in a few seconds.')
+                        ->duration(8000)
+                        ->send();
+                })
+                ->requiresConfirmation()
+                ->modalIcon('heroicon-o-film')
+                ->modalDescription('Fetch TMDB, TVDB, and IMDB IDs for this channel from The Movie Database.')
+                ->modalSubmitActionLabel('Fetch IDs now')
+                ->button()
+                ->hiddenLabel()
+                ->size('sm'),
             Action::make('play')
                 ->tooltip('Play Channel')
                 ->action(function ($record, $livewire) {

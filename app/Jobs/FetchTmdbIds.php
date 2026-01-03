@@ -245,6 +245,13 @@ class FetchTmdbIds implements ShouldQueue
         $existingTmdbId = $series->tmdb_id ?? $series->metadata['tmdb_id'] ?? null;
 
         if (($existingTvdbId || $existingTmdbId) && !$this->overwriteExisting) {
+            Log::debug('FetchTmdbIds: Skipping series (already has IDs)', [
+                'series_id' => $series->id,
+                'name' => $series->name,
+                'existing_tmdb_id' => $existingTmdbId,
+                'existing_tvdb_id' => $existingTvdbId,
+                'overwrite_existing' => $this->overwriteExisting,
+            ]);
             $this->skippedCount++;
             return;
         }
@@ -262,9 +269,20 @@ class FetchTmdbIds implements ShouldQueue
         }
 
         if (empty($name)) {
+            Log::debug('FetchTmdbIds: Skipping series (empty name)', [
+                'series_id' => $series->id,
+            ]);
             $this->skippedCount++;
             return;
         }
+
+        // Log search attempt
+        Log::info('FetchTmdbIds: Searching TMDB for series', [
+            'series_id' => $series->id,
+            'name' => $name,
+            'year' => $year,
+            'release_date' => $series->release_date,
+        ]);
 
         // Search TMDB
         $result = $tmdb->searchTvSeries($name, $year);
@@ -295,20 +313,24 @@ class FetchTmdbIds implements ShouldQueue
 
             $series->update($updateData);
 
-            Log::info('FetchTmdbIds: Found IDs for series', [
+            Log::info('FetchTmdbIds: Successfully found and saved IDs for series', [
                 'series_id' => $series->id,
                 'name' => $name,
                 'tmdb_id' => $result['tmdb_id'],
                 'tvdb_id' => $result['tvdb_id'] ?? null,
+                'imdb_id' => $result['imdb_id'] ?? null,
                 'confidence' => $result['confidence'] ?? 'N/A',
+                'matched_name' => $result['name'] ?? null,
             ]);
 
             $this->foundCount++;
         } else {
-            Log::debug('FetchTmdbIds: No TMDB match found for series', [
+            Log::warning('FetchTmdbIds: No TMDB match found for series', [
                 'series_id' => $series->id,
                 'name' => $name,
                 'year' => $year,
+                'release_date' => $series->release_date,
+                'search_result' => $result,
             ]);
             $this->notFoundCount++;
         }
