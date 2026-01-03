@@ -13,15 +13,6 @@ class StrmFileMapping extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
-        'syncable_type',
-        'syncable_id',
-        'sync_location',
-        'current_path',
-        'current_url',
-        'path_options',
-    ];
-
     protected $casts = [
         'path_options' => 'array',
     ];

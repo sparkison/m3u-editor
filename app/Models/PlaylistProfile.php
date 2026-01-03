@@ -15,23 +15,6 @@ class PlaylistProfile extends Model
     use HasFactory;
 
     /**
-     * The attributes that are mass assignable.
-     */
-    protected $fillable = [
-        'playlist_id',
-        'user_id',
-        'name',
-        'username',
-        'password',
-        'max_streams',
-        'priority',
-        'enabled',
-        'is_primary',
-        'provider_info',
-        'provider_info_updated_at',
-    ];
-
-    /**
      * The attributes that should be cast to native types.
      */
     protected $casts = [
@@ -71,7 +54,8 @@ class PlaylistProfile extends Model
     /**
      * Build xtream_config array compatible with XtreamService.
      *
-     * Uses the playlist's base URL and output format with this profile's credentials.
+     * Uses this profile's URL if set, otherwise falls back to playlist's base URL.
+     * This allows profiles to connect to different providers.
      */
     public function getXtreamConfigAttribute(): ?array
     {
@@ -81,9 +65,16 @@ class PlaylistProfile extends Model
 
         $baseConfig = $this->playlist->xtream_config;
 
+        // Use profile's URL if set, otherwise use playlist's URL
+        $url = $this->url ?? $baseConfig['url'] ?? $baseConfig['server'] ?? null;
+
+        if (! $url) {
+            return null;
+        }
+
         return [
             // Use 'url' key to match XtreamService::init() expectations
-            'url' => $baseConfig['url'] ?? $baseConfig['server'] ?? null,
+            'url' => $url,
             'username' => $this->username,
             'password' => $this->password,
             'output' => $baseConfig['output'] ?? 'ts',
@@ -293,6 +284,7 @@ class PlaylistProfile extends Model
      * Transform a URL to use this profile's credentials.
      *
      * Replaces the playlist's primary credentials with this profile's credentials.
+     * If the profile has a custom URL, the entire base URL is replaced as well.
      */
     public function transformUrl(string $originalUrl): string
     {
@@ -309,7 +301,8 @@ class PlaylistProfile extends Model
         $sourceUsername = (string) ($sourceConfig['username'] ?? '');
         $sourcePassword = (string) ($sourceConfig['password'] ?? '');
 
-        // This profile's credentials
+        // This profile's credentials and URL
+        $profileUrl = $this->url ? rtrim($this->url, '/') : $sourceBaseUrl;
         $profileUsername = $this->username;
         $profilePassword = $this->password;
 
@@ -319,7 +312,8 @@ class PlaylistProfile extends Model
             $sourceUsername === '' ||
             $sourcePassword === '' ||
             $profileUsername === '' ||
-            $profilePassword === ''
+            $profilePassword === '' ||
+            $profileUrl === ''
         ) {
             return $originalUrl;
         }
@@ -336,7 +330,8 @@ class PlaylistProfile extends Model
             $streamType = $matches[1];
             $streamIdAndExtension = $matches[2];
 
-            return "{$sourceBaseUrl}/{$streamType}/{$profileUsername}/{$profilePassword}/{$streamIdAndExtension}";
+            // Use profile's URL (which may be different from source URL)
+            return "{$profileUrl}/{$streamType}/{$profileUsername}/{$profilePassword}/{$streamIdAndExtension}";
         }
 
         return $originalUrl;

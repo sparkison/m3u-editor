@@ -21,6 +21,12 @@ class ProfileService
     protected const CONNECTION_CACHE_TTL = 60;
 
     /**
+     * TTL for stream tracking keys (seconds).
+     * Set to 24 hours - stale keys will auto-expire.
+     */
+    protected const STREAM_TRACKING_TTL = 86400;
+
+    /**
      * Select the best available profile for streaming.
      *
      * Iterates through enabled profiles in priority order and returns
@@ -102,8 +108,11 @@ class ProfileService
         try {
             Redis::pipeline(function ($pipe) use ($countKey, $streamKey, $streamsKey, $profile, $streamId) {
                 $pipe->incr($countKey);
+                $pipe->expire($countKey, static::STREAM_TRACKING_TTL);
                 $pipe->set($streamKey, $profile->id);
+                $pipe->expire($streamKey, static::STREAM_TRACKING_TTL);
                 $pipe->sadd($streamsKey, $streamId);
+                $pipe->expire($streamsKey, static::STREAM_TRACKING_TTL);
             });
 
             Log::debug("Incremented connections for profile {$profile->id}", [
@@ -130,16 +139,25 @@ class ProfileService
         $streamsKey = static::getProfileStreamsKey($profile);
 
         try {
-            Redis::pipeline(function ($pipe) use ($countKey, $streamKey, $streamsKey, $streamId) {
-                $pipe->decr($countKey);
-                $pipe->del($streamKey);
-                $pipe->srem($streamsKey, $streamId);
-            });
+            // Check count before decrementing to avoid race conditions
+            $currentCount = (int) Redis::get($countKey);
 
-            // Ensure count doesn't go negative
-            $count = Redis::get($countKey);
-            if ($count !== null && (int) $count < 0) {
-                Redis::set($countKey, 0);
+            if ($currentCount > 0) {
+                Redis::pipeline(function ($pipe) use ($countKey, $streamKey, $streamsKey, $streamId) {
+                    $pipe->decr($countKey);
+                    $pipe->del($streamKey);
+                    $pipe->srem($streamsKey, $streamId);
+                });
+            } else {
+                // Just clean up the stream references
+                Redis::pipeline(function ($pipe) use ($streamKey, $streamsKey, $streamId) {
+                    $pipe->del($streamKey);
+                    $pipe->srem($streamsKey, $streamId);
+                });
+
+                Log::warning("Attempted to decrement connections for profile {$profile->id} but count was already 0", [
+                    'stream_id' => $streamId,
+                ]);
             }
 
             Log::debug("Decremented connections for profile {$profile->id}", [
@@ -210,7 +228,7 @@ class ProfileService
 
         return $playlist->enabledProfiles()
             ->get()
-            ->sum(fn ($profile) => $profile->effective_max_streams);
+            ->sum(fn($profile) => $profile->effective_max_streams);
     }
 
     /**
@@ -458,6 +476,7 @@ class ProfileService
             'playlist_id' => $playlist->id,
             'user_id' => $playlist->user_id,
             'name' => 'Primary Account',
+            'url' => $xtreamConfig['url'], // Store the URL in the profile
             'username' => $config['username'] ?? '',
             'password' => $config['password'] ?? '',
             'max_streams' => $maxStreams,

@@ -1250,6 +1250,11 @@ class PlaylistResource extends Resource
                                 ->label('Profile Name')
                                 ->placeholder('Backup Account')
                                 ->columnSpan(2),
+                            TextInput::make('url')
+                                ->label('Provider URL')
+                                ->placeholder(fn (Get $get, $livewire) => $livewire->getRecord()?->xtream_config['url'] ?? 'http://provider.com:port')
+                                ->helperText('Leave blank to use the same provider as the primary account.')
+                                ->columnSpan(2),
                             TextInput::make('username')
                                 ->label('Username')
                                 ->required()
@@ -1317,13 +1322,13 @@ class PlaylistResource extends Resource
                                         return;
                                     }
 
-                                    // Get the base URL from the playlist's xtream config
-                                    $baseUrl = $record?->xtream_config['url'] ?? $record?->xtream_config['server'] ?? null;
+                                    // Use profile's URL if provided, otherwise use playlist's base URL
+                                    $url = $profileData['url'] ?? $record?->xtream_config['url'] ?? $record?->xtream_config['server'] ?? null;
 
-                                    if (empty($baseUrl)) {
+                                    if (empty($url)) {
                                         Notification::make()
-                                            ->title('Missing Base URL')
-                                            ->body('Playlist Xtream configuration is missing the server URL.')
+                                            ->title('Missing URL')
+                                            ->body('Please provide a provider URL or configure the playlist Xtream URL.')
                                             ->danger()
                                             ->send();
                                         return;
@@ -1331,7 +1336,7 @@ class PlaylistResource extends Resource
 
                                     // Build xtream config for testing
                                     $testConfig = [
-                                        'url' => $baseUrl,
+                                        'url' => $url,
                                         'username' => $profileData['username'],
                                         'password' => $password,
                                     ];
@@ -1366,10 +1371,11 @@ class PlaylistResource extends Resource
 
                             // Auto-test credentials and populate max_streams if not manually set or set to default
                             if (($data['max_streams'] ?? 1) <= 1 && ! empty($data['username']) && ! empty($data['password'])) {
-                                $baseUrl = $record->xtream_config['url'] ?? $record->xtream_config['server'] ?? null;
-                                if ($baseUrl) {
+                                // Use profile URL if provided, otherwise use playlist URL
+                                $url = $data['url'] ?? $record->xtream_config['url'] ?? $record->xtream_config['server'] ?? null;
+                                if ($url) {
                                     $testConfig = [
-                                        'url' => $baseUrl,
+                                        'url' => $url,
                                         'username' => $data['username'],
                                         'password' => $data['password'],
                                     ];
@@ -1390,12 +1396,18 @@ class PlaylistResource extends Resource
                                 $data['password'] = $record->password;
                             }
                             
+                            // If URL is empty but we have an existing record, preserve the old URL
+                            if (empty($data['url']) && $record instanceof PlaylistProfile) {
+                                $data['url'] = $record->url;
+                            }
+                            
                             // Auto-test credentials and update max_streams if still at default
                             if (($data['max_streams'] ?? 1) <= 1 && ! empty($data['username']) && ! empty($data['password'])) {
-                                $baseUrl = $playlist->xtream_config['url'] ?? $playlist->xtream_config['server'] ?? null;
-                                if ($baseUrl) {
+                                // Use profile URL if provided, otherwise use playlist URL
+                                $url = $data['url'] ?? $playlist->xtream_config['url'] ?? $playlist->xtream_config['server'] ?? null;
+                                if ($url) {
                                     $testConfig = [
-                                        'url' => $baseUrl,
+                                        'url' => $url,
                                         'username' => $data['username'],
                                         'password' => $data['password'],
                                     ];
