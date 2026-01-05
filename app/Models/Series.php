@@ -77,6 +77,21 @@ class Series extends Model
         return $this->hasMany(Episode::class)->where('enabled', true);
     }
 
+    /**
+     * Check if the series has TMDB/TVDB/IMDB metadata.
+     */
+    public function getHasMetadataAttribute(): bool
+    {
+        // Check if the series has TMDB, TVDB, or IMDB IDs
+        // Also check metadata array for backward compatibility
+        return !empty($this->tmdb_id) 
+            || !empty($this->tvdb_id) 
+            || !empty($this->imdb_id)
+            || !empty($this->metadata['tmdb_id'] ?? null)
+            || !empty($this->metadata['tvdb_id'] ?? null)
+            || !empty($this->metadata['imdb_id'] ?? null);
+    }
+
     public function fetchMetadata($refresh = false, $sync = true)
     {
         try {

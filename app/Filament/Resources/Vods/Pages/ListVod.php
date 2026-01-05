@@ -29,6 +29,8 @@ use App\Jobs\SyncVodStrmFiles;
 use App\Models\Channel;
 use App\Models\Epg;
 use App\Models\Playlist;
+use App\Models\Series;
+use App\Services\TmdbService;
 use App\Settings\GeneralSettings;
 use Filament\Actions;
 use Filament\Forms;
@@ -41,6 +43,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Hydrat\TableLayoutToggle\Concerns\HasToggleableTable;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class ListVod extends ListRecords
@@ -532,5 +535,95 @@ class ListVod extends ListRecords
                 ->modifyQueryUsing(fn($query) => $query->where('is_custom', true))
                 ->badge($customCount),
         ];
+    }
+
+    public function applyTmdbSelection(int $tmdbId, string $type, int $recordId, string $recordType): void
+    {
+        try {
+            $tmdbService = app(TmdbService::class);
+
+            if ($type === 'tv' && $recordType === 'series') {
+                $metadata = $tmdbService->applyTvSeriesSelection($tmdbId);
+
+                if ($metadata) {
+                    $series = Series::find($recordId);
+                    if ($series) {
+                        $series->update([
+                            'tmdb_id' => $metadata['tmdb_id'],
+                            'tvdb_id' => $metadata['tvdb_id'],
+                            'imdb_id' => $metadata['imdb_id'],
+                        ]);
+
+                        Log::info('Manual TMDB search: Applied IDs to series', [
+                            'series_id' => $series->id,
+                            'series_name' => $series->name,
+                            'tmdb_id' => $metadata['tmdb_id'],
+                            'tvdb_id' => $metadata['tvdb_id'],
+                            'imdb_id' => $metadata['imdb_id'],
+                        ]);
+
+                        Notification::make()
+                            ->success()
+                            ->title('TMDB IDs Applied')
+                            ->body("Successfully linked \"{$series->name}\" to \"{$metadata['name']}\" (TMDB: {$metadata['tmdb_id']})")
+                            ->send();
+
+                        $this->unmountAction();
+
+                        return;
+                    }
+                }
+            } elseif ($type === 'movie' && $recordType === 'vod') {
+                $metadata = $tmdbService->applyMovieSelection($tmdbId);
+
+                if ($metadata) {
+                    $vod = Channel::find($recordId);
+                    if ($vod) {
+                        $info = $vod->info ?? [];
+                        $info['tmdb_id'] = $metadata['tmdb_id'];
+                        $info['imdb_id'] = $metadata['imdb_id'];
+
+                        $vod->update([
+                            'info' => $info,
+                        ]);
+
+                        Log::info('Manual TMDB search: Applied IDs to VOD', [
+                            'vod_id' => $vod->id,
+                            'vod_name' => $vod->name ?? $vod->title,
+                            'tmdb_id' => $metadata['tmdb_id'],
+                            'imdb_id' => $metadata['imdb_id'],
+                        ]);
+
+                        $vodName = $vod->title_custom ?: $vod->title ?: $vod->name;
+                        Notification::make()
+                            ->success()
+                            ->title('TMDB IDs Applied')
+                            ->body("Successfully linked \"{$vodName}\" to \"{$metadata['title']}\" (TMDB: {$metadata['tmdb_id']})")
+                            ->send();
+
+                        $this->unmountAction();
+
+                        return;
+                    }
+                }
+            }
+
+            Notification::make()
+                ->danger()
+                ->title('Error')
+                ->body('Failed to apply TMDB selection.')
+                ->send();
+        } catch (\Exception $e) {
+            Log::error('Manual TMDB search: Error applying selection', [
+                'error' => $e->getMessage(),
+                'tmdb_id' => $tmdbId,
+            ]);
+
+            Notification::make()
+                ->danger()
+                ->title('Error')
+                ->body('An error occurred: ' . $e->getMessage())
+                ->send();
+        }
     }
 }

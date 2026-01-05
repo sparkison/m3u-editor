@@ -153,3 +153,6 @@
 
 <!-- Floating Stream Players -->
 <x-floating-stream-players />
+
+<!-- TMDB Search Modal -->
+@livewire('tmdb-search')
