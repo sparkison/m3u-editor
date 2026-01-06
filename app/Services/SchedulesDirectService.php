@@ -7,6 +7,7 @@ use Exception;
 use App\Models\Epg;
 use Carbon\Carbon;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -174,18 +175,21 @@ class SchedulesDirectService
 
     /**
      * Get available countries
+     * Results are cached for 5 minutes
      */
     public function getCountries(): array
     {
-        $response = Http::withHeaders([
-            'User-Agent' => self::$USER_AGENT,
-        ])->get(self::BASE_URL . '/available/countries');
+        return Cache::remember('schedules_direct_countries', 300, function () {
+            $response = Http::withHeaders([
+                'User-Agent' => self::$USER_AGENT,
+            ])->get(self::BASE_URL . '/available/countries');
 
-        if ($response->failed()) {
-            throw new Exception('Failed to get countries from Schedules Direct');
-        }
+            if ($response->failed()) {
+                throw new Exception('Failed to get countries from Schedules Direct');
+            }
 
-        return $response->json();
+            return $response->json();
+        });
     }
 
     /**
