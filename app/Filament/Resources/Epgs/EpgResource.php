@@ -396,10 +396,29 @@ class EpgResource extends Resource
                             Select::make('sd_country')
                                 ->label('Country')
                                 ->required(fn(Get $get): bool => $get('source_type') === EpgSourceType::SCHEDULES_DIRECT->value)
-                                ->options([
-                                    'USA' => 'United States',
-                                    'CAN' => 'Canada',
-                                ])
+                                ->searchable()
+                                ->preload()
+                                ->options(function (SchedulesDirectService $service) {
+                                    try {
+                                        $countries = $service->getCountries();
+                                        $options = [];
+
+                                        // Process each region
+                                        foreach ($countries as $region => $regionCountries) {
+                                            foreach ($regionCountries as $country) {
+                                                $options[$country['shortName']] = $country['fullName'];
+                                            }
+                                        }
+
+                                        return $options;
+                                    } catch (Exception $e) {
+                                        // Fallback to a basic list if API fails
+                                        return [
+                                            'USA' => 'United States',
+                                            'CAN' => 'Canada',
+                                        ];
+                                    }
+                                })
                                 ->default('USA')
                                 ->live(),
                             TextInput::make('sd_postal_code')
