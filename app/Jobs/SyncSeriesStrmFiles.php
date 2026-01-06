@@ -456,15 +456,23 @@ class SyncSeriesStrmFiles implements ShouldQueue
             $filenameMetadata = $sync_settings['filename_metadata'] ?? [];
             $removeConsecutiveChars = $sync_settings['remove_consecutive_chars'] ?? false;
 
-            // NFO generation setting
+            // NFO generation setting - instantiate service once if needed
             $generateNfo = $sync_settings['generate_nfo'] ?? false;
-            $nfoService = $generateNfo ? app(NfoService::class) : null;
-
-            // Generate tvshow.nfo for the series if NFO generation is enabled
-            // This should be at the series folder level (or base path if no series folder)
-            if ($nfoService) {
+            $nfoService = null;
+            
+            // Early NFO generation for series-level tvshow.nfo
+            if ($generateNfo) {
+                $nfoService = app(NfoService::class);
+                // Generate tvshow.nfo for the series if NFO generation is enabled
+                // This should be at the series folder level (or base path if no series folder)
                 $nfoService->generateSeriesNfo($series, $seriesFolderPath);
             }
+
+            // Cache frequently accessed values to avoid repeated property lookups in the episode loop
+            $seriesReleaseDate = $series->release_date;
+            $seriesMetadata = $series->metadata ?? [];
+            $playlistUser = $playlist->user;
+            $playlistUuid = $playlist->uuid;
 
             // Loop through each episode
             foreach ($episodes as $ep) {
@@ -478,13 +486,13 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 $fileName = "{$prefx} - {$episodeTitle}";
 
                 // Add metadata to filename
-                if (in_array('year', $filenameMetadata) && ! empty($series->release_date)) {
-                    $year = substr($series->release_date, 0, 4);
+                if (in_array('year', $filenameMetadata) && ! empty($seriesReleaseDate)) {
+                    $year = substr($seriesReleaseDate, 0, 4);
                     $fileName .= " ({$year})";
                 }
 
                 if (in_array('tmdb_id', $filenameMetadata)) {
-                    $tmdbId = $series->metadata['tmdb_id'] ?? $ep->info['tmdb_id'] ?? null;
+                    $tmdbId = $seriesMetadata['tmdb_id'] ?? $ep->info['tmdb_id'] ?? null;
                     // Ensure ID is a scalar value (not an array)
                     $tmdbId = is_scalar($tmdbId) ? $tmdbId : null;
                     if (! empty($tmdbId)) {
@@ -514,9 +522,9 @@ class SyncSeriesStrmFiles implements ShouldQueue
                     $filePath = $path . '/' . $fileName;
                 }
 
-                // Generate the url
+                // Generate the url (use cached playlist properties to avoid object access in loop)
                 $containerExtension = $ep->container_extension ?? 'mp4';
-                $url = rtrim("/series/{$playlist->user->name}/{$playlist->uuid}/" . $ep->id . '.' . $containerExtension, '.');
+                $url = rtrim("/series/{$playlistUser->name}/{$playlistUuid}/" . $ep->id . '.' . $containerExtension, '.');
                 $url = PlaylistService::getBaseUrl($url);
 
                 // Build path options for tracking changes
@@ -541,9 +549,10 @@ class SyncSeriesStrmFiles implements ShouldQueue
                     $mappingCache
                 );
 
-                // Generate episode NFO file if enabled
+                // Generate episode NFO file if enabled (pass mapping for hash optimization)
                 if ($nfoService) {
-                    $nfoService->generateEpisodeNfo($ep, $series, $filePath);
+                    $episodeMapping = $mappingCache[$ep->id] ?? null;
+                    $nfoService->generateEpisodeNfo($ep, $series, $filePath, $episodeMapping);
                 }
             }
 

@@ -11,8 +11,13 @@ class NfoService
 {
     /**
      * Generate a tvshow.nfo file for a series (Kodi/Emby/Jellyfin format)
+     * 
+     * @param Series $series The series to generate NFO for
+     * @param string $path Directory path where tvshow.nfo should be written
+     * @param \App\Models\StrmFileMapping|null $mapping Optional mapping to check/update hash
+     * @return bool Success status
      */
-    public function generateSeriesNfo(Series $series, string $path): bool
+    public function generateSeriesNfo(Series $series, string $path, $mapping = null): bool
     {
         try {
             $metadata = $series->metadata ?? [];
@@ -115,7 +120,7 @@ class NfoService
 
         $filePath = rtrim($path, '/') . '/tvshow.nfo';
 
-        return $this->writeFile($filePath, $xml);
+        return $this->writeFileWithHash($filePath, $xml, $mapping);
         } catch (\Throwable $e) {
             Log::error("NfoService: Error generating series NFO for {$series->name}: {$e->getMessage()}");
 
@@ -125,8 +130,14 @@ class NfoService
 
     /**
      * Generate an episode.nfo file for a series episode
+     * 
+     * @param Episode $episode The episode to generate NFO for
+     * @param Series $series The parent series
+     * @param string $filePath Path to the .strm file (will be converted to .nfo)
+     * @param \App\Models\StrmFileMapping|null $mapping Optional mapping to check/update hash
+     * @return bool Success status
      */
-    public function generateEpisodeNfo(Episode $episode, Series $series, string $filePath): bool
+    public function generateEpisodeNfo(Episode $episode, Series $series, string $filePath, $mapping = null): bool
     {
         try {
         $info = $episode->info ?? [];
@@ -202,7 +213,7 @@ class NfoService
         // Change extension from .strm to .nfo
         $nfoPath = preg_replace('/\.strm$/i', '.nfo', $filePath);
 
-        return $this->writeFile($nfoPath, $xml);
+        return $this->writeFileWithHash($nfoPath, $xml, $mapping);
         } catch (\Throwable $e) {
             Log::error("NfoService: Error generating episode NFO for {$episode->title}: {$e->getMessage()}");
 
@@ -212,8 +223,13 @@ class NfoService
 
     /**
      * Generate a movie.nfo file for a VOD (Kodi/Emby/Jellyfin format)
+     * 
+     * @param Channel $channel The channel/movie to generate NFO for
+     * @param string $filePath Path to the .strm file (will be converted to .nfo)
+     * @param \App\Models\StrmFileMapping|null $mapping Optional mapping to check/update hash
+     * @return bool Success status
      */
-    public function generateMovieNfo(Channel $channel, string $filePath): bool
+    public function generateMovieNfo(Channel $channel, string $filePath, $mapping = null): bool
     {
         try {
             $info = $channel->info ?? [];
@@ -364,7 +380,7 @@ class NfoService
         // Change extension from .strm to .nfo
         $nfoPath = preg_replace('/\.strm$/i', '.nfo', $filePath);
 
-        return $this->writeFile($nfoPath, $xml);
+        return $this->writeFileWithHash($nfoPath, $xml, $mapping);
         } catch (\Throwable $e) {
             Log::error("NfoService: Error generating movie NFO for {$channel->title}: {$e->getMessage()}");
 
@@ -459,8 +475,76 @@ class NfoService
     }
 
     /**
+     * Write content to file with hash-based optimization.
+     * Computes hash of content and compares to stored hash to avoid file reads.
+     * 
+     * @param string $path Full path to write the file
+     * @param string $content Content to write
+     * @param \App\Models\StrmFileMapping|null $mapping Optional mapping to check/update hash
+     * @return bool Success status
+     */
+    private function writeFileWithHash(string $path, string $content, $mapping = null): bool
+    {
+        try {
+            // Ensure directory exists
+            $dir = dirname($path);
+            if (! is_dir($dir)) {
+                if (! @mkdir($dir, 0755, true)) {
+                    Log::error("NfoService: Failed to create directory: {$dir}");
+                    return false;
+                }
+            }
+
+            // OPTIMIZATION: Hash-based content comparison
+            // Compute hash of new content (SHA-256 for security, but MD5 would be faster)
+            $newHash = hash('sha256', $content);
+
+            // If we have a mapping with a stored hash, compare hashes instead of reading file
+            if ($mapping && $mapping->nfo_hash === $newHash) {
+                // Hash matches - content is identical, skip write
+                return true;
+            }
+
+            // Fallback: If no mapping or hash doesn't match, check file directly
+            // This handles cases where hash tracking is new or was reset
+            if (!$mapping && file_exists($path)) {
+                $existingContent = @file_get_contents($path);
+                if ($existingContent === $content) {
+                    // Content unchanged, but update hash for future optimization
+                    if ($mapping) {
+                        $mapping->nfo_hash = $newHash;
+                        $mapping->save();
+                    }
+                    return true;
+                }
+            }
+
+            // Content has changed (or file doesn't exist), write it
+            $result = file_put_contents($path, $content);
+
+            if ($result === false) {
+                Log::error("NfoService: Failed to write file: {$path}");
+                return false;
+            }
+
+            // Update the hash in the mapping for next time
+            if ($mapping) {
+                $mapping->nfo_hash = $newHash;
+                $mapping->save();
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error("NfoService: Error writing file: {$path} - {$e->getMessage()}");
+            return false;
+        }
+    }
+
+    /**
      * Write content to file
      * Optimized to skip writing if the existing file has identical content.
+     * 
+     * @deprecated Use writeFileWithHash() for better performance with hash tracking
      */
     private function writeFile(string $path, string $content): bool
     {
