@@ -6,6 +6,7 @@ use App\Models\Episode;
 use App\Models\Series;
 use App\Models\StrmFileMapping;
 use App\Models\User;
+use App\Services\NfoService;
 use App\Services\PlaylistService;
 use App\Settings\GeneralSettings;
 use Filament\Notifications\Notification;
@@ -301,6 +302,7 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 'replace_char' => $settings->stream_file_sync_replace_char ?? 'space',
                 'name_filter_enabled' => $settings->stream_file_sync_name_filter_enabled ?? false,
                 'name_filter_patterns' => $settings->stream_file_sync_name_filter_patterns ?? [],
+                'generate_nfo' => $settings->stream_file_sync_generate_nfo ?? false,
             ];
 
             // Merge global settings with series specific settings
@@ -428,6 +430,10 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 $tvdbId = $series->tvdb_id ?? $series->metadata['tvdb_id'] ?? $series->metadata['tvdb'] ?? null;
                 $tmdbId = $series->tmdb_id ?? $series->metadata['tmdb_id'] ?? $series->metadata['tmdb'] ?? null;
                 $imdbId = $series->imdb_id ?? $series->metadata['imdb_id'] ?? $series->metadata['imdb'] ?? null;
+                // Ensure IDs are scalar values (not arrays)
+                $tvdbId = is_scalar($tvdbId) ? $tvdbId : null;
+                $tmdbId = is_scalar($tmdbId) ? $tmdbId : null;
+                $imdbId = is_scalar($imdbId) ? $imdbId : null;
                 $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
                 if (! empty($tvdbId)) {
                     $seriesFolder .= " {$bracket[0]}tvdb-{$tvdbId}{$bracket[1]}";
@@ -443,9 +449,30 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 $path .= '/' . $cleanName;
             }
 
+            // Track the series folder path for tvshow.nfo generation
+            $seriesFolderPath = $path;
+
             // Get filename metadata settings
             $filenameMetadata = $sync_settings['filename_metadata'] ?? [];
             $removeConsecutiveChars = $sync_settings['remove_consecutive_chars'] ?? false;
+
+            // NFO generation setting - instantiate service once if needed
+            $generateNfo = $sync_settings['generate_nfo'] ?? false;
+            $nfoService = null;
+            
+            // Early NFO generation for series-level tvshow.nfo
+            if ($generateNfo) {
+                $nfoService = app(NfoService::class);
+                // Generate tvshow.nfo for the series if NFO generation is enabled
+                // This should be at the series folder level (or base path if no series folder)
+                $nfoService->generateSeriesNfo($series, $seriesFolderPath);
+            }
+
+            // Cache frequently accessed values to avoid repeated property lookups in the episode loop
+            $seriesReleaseDate = $series->release_date;
+            $seriesMetadata = $series->metadata ?? [];
+            $playlistUser = $playlist->user;
+            $playlistUuid = $playlist->uuid;
 
             // Loop through each episode
             foreach ($episodes as $ep) {
@@ -459,13 +486,15 @@ class SyncSeriesStrmFiles implements ShouldQueue
                 $fileName = "{$prefx} - {$episodeTitle}";
 
                 // Add metadata to filename
-                if (in_array('year', $filenameMetadata) && ! empty($series->release_date)) {
-                    $year = substr($series->release_date, 0, 4);
+                if (in_array('year', $filenameMetadata) && ! empty($seriesReleaseDate)) {
+                    $year = substr($seriesReleaseDate, 0, 4);
                     $fileName .= " ({$year})";
                 }
 
                 if (in_array('tmdb_id', $filenameMetadata)) {
-                    $tmdbId = $series->metadata['tmdb_id'] ?? $ep->info['tmdb_id'] ?? null;
+                    $tmdbId = $seriesMetadata['tmdb_id'] ?? $ep->info['tmdb_id'] ?? null;
+                    // Ensure ID is a scalar value (not an array)
+                    $tmdbId = is_scalar($tmdbId) ? $tmdbId : null;
                     if (! empty($tmdbId)) {
                         $bracket = $tmdbIdFormat === 'curly' ? ['{', '}'] : ['[', ']'];
                         $fileName .= " {$bracket[0]}tmdb-{$tmdbId}{$bracket[1]}";
@@ -493,9 +522,9 @@ class SyncSeriesStrmFiles implements ShouldQueue
                     $filePath = $path . '/' . $fileName;
                 }
 
-                // Generate the url
+                // Generate the url (use cached playlist properties to avoid object access in loop)
                 $containerExtension = $ep->container_extension ?? 'mp4';
-                $url = rtrim("/series/{$playlist->user->name}/{$playlist->uuid}/" . $ep->id . '.' . $containerExtension, '.');
+                $url = rtrim("/series/{$playlistUser->name}/{$playlistUuid}/" . $ep->id . '.' . $containerExtension, '.');
                 $url = PlaylistService::getBaseUrl($url);
 
                 // Build path options for tracking changes
@@ -519,6 +548,12 @@ class SyncSeriesStrmFiles implements ShouldQueue
                     $pathOptions,
                     $mappingCache
                 );
+
+                // Generate episode NFO file if enabled (pass mapping for hash optimization)
+                if ($nfoService) {
+                    $episodeMapping = $mappingCache[$ep->id] ?? null;
+                    $nfoService->generateEpisodeNfo($ep, $series, $filePath, $episodeMapping);
+                }
             }
 
             // Track this sync location for deferred cleanup (bulk mode)

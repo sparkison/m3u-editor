@@ -69,6 +69,9 @@ class GeneralSettings extends Settings
     public ?bool $stream_file_sync_name_filter_enabled = false;
     public ?array $stream_file_sync_name_filter_patterns = null;
 
+    // Series NFO file generation
+    public ?bool $stream_file_sync_generate_nfo = false;
+
 
     // VOD stream file sync options
     public ?bool $vod_stream_file_sync_enabled = false;
@@ -93,6 +96,9 @@ class GeneralSettings extends Settings
     // VOD stream file sync name filtering options
     public ?bool $vod_stream_file_sync_name_filter_enabled = false;
     public ?array $vod_stream_file_sync_name_filter_patterns = null;
+
+    // VOD NFO file generation
+    public ?bool $vod_stream_file_sync_generate_nfo = false;
 
 
     // Video player proxy options
