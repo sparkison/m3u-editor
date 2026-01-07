@@ -44,5 +44,5 @@ Schedule::command('queue:prune-failed --hours=48')
     ->daily();
 
 // Prune old notifications
-Schedule::command('app:prune-old-notifications --days=30')
+Schedule::command('app:prune-old-notifications --days=7')
     ->daily();
