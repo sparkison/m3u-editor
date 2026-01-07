@@ -42,7 +42,7 @@ class RefreshPlaylist extends Command
             $playlists = Playlist::query()->where([
                 ['status', '!=', Status::Processing],
                 ['auto_sync', '=', true],
-            ])->whereNotNull('synced');
+            ]);
 
             $totalPlaylists = $playlists->count();
             if ($totalPlaylists === 0) {
