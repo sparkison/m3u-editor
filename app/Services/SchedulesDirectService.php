@@ -18,7 +18,9 @@ use JsonMachine\Items;
  */
 class SchedulesDirectService
 {
-    private const BASE_URL = 'https://json.schedulesdirect.org/20141201';
+    private const API_VERSION = '20141201';
+
+    private const BASE_URL = 'https://json.schedulesdirect.org';
 
     private static string $USER_AGENT = 'm3u-editor/dev';
     private static bool $FETCH_PROGRAM_ARTWORK = false; // Enable fetching program artwork
@@ -104,7 +106,7 @@ class SchedulesDirectService
         $passwordHash = hash('sha1', $password);
         $response = Http::withHeaders([
             'User-Agent' => self::$USER_AGENT,
-        ])->post(self::BASE_URL . '/token', [
+        ])->post(self::BASE_URL . '/' . self::API_VERSION . '/token', [
             'username' => $username,
             'password' => $passwordHash,
         ]);
@@ -136,7 +138,7 @@ class SchedulesDirectService
 
         $response = Http::withHeaders([
             'User-Agent' => self::$USER_AGENT,
-        ])->post(self::BASE_URL . '/token', [
+        ])->post(self::BASE_URL . '/' . self::API_VERSION . '/token', [
             'username' => $epg->sd_username,
             'password' => hash('sha1', $epg->sd_password),
         ]);
@@ -182,7 +184,7 @@ class SchedulesDirectService
         return Cache::remember('schedules_direct_countries', 300, function () {
             $response = Http::withHeaders([
                 'User-Agent' => self::$USER_AGENT,
-            ])->get(self::BASE_URL . '/available/countries');
+            ])->get(self::BASE_URL . '/' . self::API_VERSION . '/available/countries');
 
             if ($response->failed()) {
                 throw new Exception('Failed to get countries from Schedules Direct');
@@ -336,7 +338,7 @@ class SchedulesDirectService
                 $response = Http::withHeaders([
                     'User-Agent' => self::$USER_AGENT,
                     'token' => $token,
-                ])->timeout(30)->post(self::BASE_URL . '/metadata/programs/', $batch);
+                ])->timeout(30)->post(self::BASE_URL . '/' . self::API_VERSION . '/metadata/programs/', $batch);
 
                 if ($response->successful()) {
                     $artworkData = $response->json();
@@ -506,7 +508,7 @@ class SchedulesDirectService
         }
 
         // Fallback to direct URL (will require authentication)
-        return self::BASE_URL . '/image/' . $uri;
+        return self::BASE_URL . '/' . self::API_VERSION . '/image/' . $uri;
     }
 
     /**
@@ -1002,7 +1004,7 @@ class SchedulesDirectService
             $response = Http::withHeaders([
                 'User-Agent' => self::$USER_AGENT,
                 'token' => $token,
-            ])->timeout(300)->sink($tempResponseFile)->post(self::BASE_URL . '/programs', $programBatch);
+            ])->timeout(300)->sink($tempResponseFile)->post(self::BASE_URL . '/' . self::API_VERSION . '/programs', $programBatch);
             if ($response->successful()) {
                 // Stream through the program response and match with schedules immediately
                 $programs = Items::fromFile($tempResponseFile);
@@ -1166,7 +1168,7 @@ class SchedulesDirectService
         if ($token) {
             $headers['token'] = $token;
         }
-        $url = self::BASE_URL . $endpoint;
+        $url = self::BASE_URL . '/' . self::API_VERSION . $endpoint;
 
         // Configure timeout based on endpoint and data size
         $timeout = self::DEFAULT_TIMEOUT;
