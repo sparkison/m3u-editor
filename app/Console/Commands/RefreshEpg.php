@@ -44,7 +44,7 @@ class RefreshEpg extends Command
             $epgs = Epg::query()->where([
                 ['status', '!=', Status::Processing],
                 ['auto_sync', '=', true],
-            ])->whereNotNull('synced');
+            ]);
 
             $totalEpgs = $epgs->count();
             if ($totalEpgs === 0) {
