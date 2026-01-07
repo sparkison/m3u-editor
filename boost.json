@@ -1,0 +1,12 @@
+{
+    "agents": [
+        "copilot",
+        "gemini"
+    ],
+    "editors": [
+        "vscode"
+    ],
+    "guidelines": [
+        "filament/filament"
+    ]
+}
