@@ -1217,10 +1217,15 @@ class PlaylistResource extends Resource
                                         $result = ProfileService::testCredentials($xtreamConfig);
 
                                         if ($result['valid']) {
-                                            // If the primary profile exists, update its max_streams
+                                            // If the primary profile exists, only update max_streams when not manually set
                                             $primaryProfile = $record?->profiles()->where('is_primary', true)->first();
                                             if ($primaryProfile) {
-                                                $primaryProfile->update(['max_streams' => $result['max_connections']]);
+                                                $currentMax = $primaryProfile->max_streams ?? null;
+                                                $shouldUpdateMax = ! $currentMax || $currentMax <= 1;
+
+                                                if ($shouldUpdateMax && $result['max_connections'] > 0) {
+                                                    $primaryProfile->update(['max_streams' => $result['max_connections']]);
+                                                }
                                             }
 
                                             $expDate = $result['exp_date'] ? " | Expires: {$result['exp_date']}" : '';
@@ -1344,9 +1349,13 @@ class PlaylistResource extends Resource
                                     $result = ProfileService::testCredentials($testConfig);
 
                                     if ($result['valid']) {
-                                        // Update the state with the new max_streams value
-                                        $allItems[$itemKey]['max_streams'] = $result['max_connections'];
-                                        $component->state($allItems);
+                                        $currentMax = $allItems[$itemKey]['max_streams'] ?? null;
+                                        $shouldUpdateMax = ! $currentMax || $currentMax <= 1;
+
+                                        if ($shouldUpdateMax && $result['max_connections'] > 0) {
+                                            $allItems[$itemKey]['max_streams'] = $result['max_connections'];
+                                            $component->state($allItems);
+                                        }
 
                                         $expDate = $result['exp_date'] ? " | Expires: {$result['exp_date']}" : '';
                                         Notification::make()
