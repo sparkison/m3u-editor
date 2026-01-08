@@ -23,10 +23,9 @@ class MediaServerProxyController extends Controller
      *
      * Route: /media-server/{integrationId}/image/{itemId}/{imageType?}
      *
-     * @param Request $request
-     * @param int $integrationId The integration ID
-     * @param string $itemId The media server's item ID
-     * @param string $imageType The image type (Primary, Backdrop, Logo, etc.)
+     * @param  int  $integrationId  The integration ID
+     * @param  string  $itemId  The media server's item ID
+     * @param  string  $imageType  The image type (Primary, Backdrop, Logo, etc.)
      * @return Response|StreamedResponse
      */
     public function proxyImage(Request $request, int $integrationId, string $itemId, string $imageType = 'Primary')
@@ -34,11 +33,11 @@ class MediaServerProxyController extends Controller
         try {
             $integration = MediaServerIntegration::find($integrationId);
 
-            if (!$integration) {
+            if (! $integration) {
                 return response()->json(['error' => 'Integration not found'], 404);
             }
 
-            if (!$integration->enabled) {
+            if (! $integration->enabled) {
                 return response()->json(['error' => 'Integration is disabled'], 403);
             }
 
@@ -122,10 +121,9 @@ class MediaServerProxyController extends Controller
      * This streams the video content directly, hiding the API key from the client.
      * Uses chunked streaming to handle large video files efficiently.
      *
-     * @param Request $request
-     * @param int $integrationId The integration ID
-     * @param string $itemId The media server's item ID
-     * @param string $container The container format (mp4, mkv, ts, etc.)
+     * @param  int  $integrationId  The integration ID
+     * @param  string  $itemId  The media server's item ID
+     * @param  string  $container  The container format (mp4, mkv, ts, etc.)
      * @return StreamedResponse
      */
     public function proxyStream(Request $request, int $integrationId, string $itemId, string $container = 'ts')
@@ -133,11 +131,11 @@ class MediaServerProxyController extends Controller
         try {
             $integration = MediaServerIntegration::find($integrationId);
 
-            if (!$integration) {
+            if (! $integration) {
                 return response()->json(['error' => 'Integration not found'], 404);
             }
 
-            if (!$integration->enabled) {
+            if (! $integration->enabled) {
                 return response()->json(['error' => 'Integration is disabled'], 403);
             }
 
@@ -156,7 +154,7 @@ class MediaServerProxyController extends Controller
                 }
             }
 
-            $fullUrl = $streamUrl . '?' . http_build_query($params);
+            $fullUrl = $streamUrl.'?'.http_build_query($params);
 
             // Get content type based on container
             $contentType = $this->getContentTypeForContainer($container);
@@ -205,13 +203,14 @@ class MediaServerProxyController extends Controller
             return new StreamedResponse(function () use ($fullUrl, $headers) {
                 $ch = curl_init($fullUrl);
                 curl_setopt($ch, CURLOPT_HTTPHEADER, array_map(
-                    fn($k, $v) => "{$k}: {$v}",
+                    fn ($k, $v) => "{$k}: {$v}",
                     array_keys($headers),
                     array_values($headers)
                 ));
                 curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($ch, $data) {
                     echo $data;
                     flush();
+
                     return strlen($data);
                 });
                 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
@@ -235,9 +234,6 @@ class MediaServerProxyController extends Controller
 
     /**
      * Get the appropriate content type for a container format.
-     *
-     * @param string $container
-     * @return string
      */
     protected function getContentTypeForContainer(string $container): string
     {
@@ -256,11 +252,6 @@ class MediaServerProxyController extends Controller
 
     /**
      * Generate a proxy URL for an image.
-     *
-     * @param int $integrationId
-     * @param string $itemId
-     * @param string $imageType
-     * @return string
      */
     public static function generateImageProxyUrl(int $integrationId, string $itemId, string $imageType = 'Primary'): string
     {
@@ -269,11 +260,6 @@ class MediaServerProxyController extends Controller
 
     /**
      * Generate a proxy URL for a stream.
-     *
-     * @param int $integrationId
-     * @param string $itemId
-     * @param string $container
-     * @return string
      */
     public static function generateStreamProxyUrl(int $integrationId, string $itemId, string $container = 'ts'): string
     {

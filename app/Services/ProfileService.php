@@ -228,7 +228,7 @@ class ProfileService
 
         return $playlist->enabledProfiles()
             ->get()
-            ->sum(fn($profile) => $profile->effective_max_streams);
+            ->sum(fn ($profile) => $profile->effective_max_streams);
     }
 
     /**
@@ -585,7 +585,7 @@ class ProfileService
      */
     protected static function getConnectionCountKey(PlaylistProfile $profile): string
     {
-        return static::REDIS_PREFIX . "{$profile->id}:connections";
+        return static::REDIS_PREFIX."{$profile->id}:connections";
     }
 
     /**
@@ -593,7 +593,7 @@ class ProfileService
      */
     protected static function getProfileStreamsKey(PlaylistProfile $profile): string
     {
-        return static::REDIS_PREFIX . "{$profile->id}:streams";
+        return static::REDIS_PREFIX."{$profile->id}:streams";
     }
 
     /**

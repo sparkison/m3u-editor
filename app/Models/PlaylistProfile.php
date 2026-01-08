@@ -321,9 +321,9 @@ class PlaylistProfile extends Model
         // Pattern matches:
         // http://domain:port/(live|series|movie)/username/password/<stream>
         $pattern =
-            '#^' . preg_quote($sourceBaseUrl, '#') .
-            '/(live|series|movie)/' . preg_quote($sourceUsername, '#') .
-            '/' . preg_quote($sourcePassword, '#') .
+            '#^'.preg_quote($sourceBaseUrl, '#').
+            '/(live|series|movie)/'.preg_quote($sourceUsername, '#').
+            '/'.preg_quote($sourcePassword, '#').
             '/(.+)$#';
 
         if (preg_match($pattern, $originalUrl, $matches)) {

@@ -34,13 +34,15 @@ class RefreshMediaServerIntegrations extends Command
             $this->info("Refreshing integration with ID: {$integrationId}");
             $integration = MediaServerIntegration::findOrFail($integrationId);
 
-            if (!$integration->enabled) {
+            if (! $integration->enabled) {
                 $this->warn('Integration is disabled, skipping');
+
                 return;
             }
 
             dispatch(new SyncMediaServer($integration->id));
             $this->info('Dispatched integration for refresh');
+
             return;
         }
 
@@ -55,6 +57,7 @@ class RefreshMediaServerIntegrations extends Command
 
         if ($integrations->isEmpty()) {
             $this->info('No integrations available for refresh');
+
             return;
         }
 

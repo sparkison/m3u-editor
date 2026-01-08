@@ -19,7 +19,9 @@ use Illuminate\Support\Facades\Log;
 class MediaServerService
 {
     protected MediaServerIntegration $integration;
+
     protected string $baseUrl;
+
     protected string $apiKey;
 
     /**
@@ -66,6 +68,7 @@ class MediaServerService
 
             if ($response->successful()) {
                 $data = $response->json();
+
                 return [
                     'success' => true,
                     'message' => 'Connection successful',
@@ -76,7 +79,7 @@ class MediaServerService
 
             return [
                 'success' => false,
-                'message' => 'Server returned status: ' . $response->status(),
+                'message' => 'Server returned status: '.$response->status(),
             ];
         } catch (Exception $e) {
             Log::warning('MediaServerService: Connection test failed', [
@@ -86,7 +89,7 @@ class MediaServerService
 
             return [
                 'success' => false,
-                'message' => 'Connection failed: ' . $e->getMessage(),
+                'message' => 'Connection failed: '.$e->getMessage(),
             ];
         }
     }
@@ -109,6 +112,7 @@ class MediaServerService
 
             if ($response->successful()) {
                 $data = $response->json();
+
                 return collect($data['Items'] ?? []);
             }
 
@@ -146,6 +150,7 @@ class MediaServerService
 
             if ($response->successful()) {
                 $data = $response->json();
+
                 return collect($data['Items'] ?? []);
             }
 
@@ -168,7 +173,7 @@ class MediaServerService
     /**
      * Fetch all seasons for a series.
      *
-     * @param string $seriesId The media server's series ID
+     * @param  string  $seriesId  The media server's series ID
      * @return Collection<int, array>
      */
     public function fetchSeasons(string $seriesId): Collection
@@ -180,6 +185,7 @@ class MediaServerService
 
             if ($response->successful()) {
                 $data = $response->json();
+
                 return collect($data['Items'] ?? []);
             }
 
@@ -198,8 +204,8 @@ class MediaServerService
     /**
      * Fetch all episodes for a series (or optionally a specific season).
      *
-     * @param string $seriesId The media server's series ID
-     * @param string|null $seasonId Optional season ID to filter by
+     * @param  string  $seriesId  The media server's series ID
+     * @param  string|null  $seasonId  Optional season ID to filter by
      * @return Collection<int, array>
      */
     public function fetchEpisodes(string $seriesId, ?string $seasonId = null): Collection
@@ -217,6 +223,7 @@ class MediaServerService
 
             if ($response->successful()) {
                 $data = $response->json();
+
                 return collect($data['Items'] ?? []);
             }
 
@@ -236,9 +243,8 @@ class MediaServerService
     /**
      * Get the proxy stream URL for an item (hides API key from clients).
      *
-     * @param string $itemId The media server's item ID
-     * @param string $container The container format (e.g., 'mp4', 'mkv', 'ts')
-     * @return string
+     * @param  string  $itemId  The media server's item ID
+     * @param  string  $container  The container format (e.g., 'mp4', 'mkv', 'ts')
      */
     public function getStreamUrl(string $itemId, string $container = 'ts'): string
     {
@@ -253,9 +259,8 @@ class MediaServerService
     /**
      * Get the direct stream URL for an item (internal use only - contains API key).
      *
-     * @param string $itemId The media server's item ID
-     * @param string $container The container format (e.g., 'mp4', 'mkv', 'ts')
-     * @return string
+     * @param  string  $itemId  The media server's item ID
+     * @param  string  $container  The container format (e.g., 'mp4', 'mkv', 'ts')
      */
     public function getDirectStreamUrl(string $itemId, string $container = 'ts'): string
     {
@@ -265,9 +270,8 @@ class MediaServerService
     /**
      * Get the proxy image URL for an item (hides API key from clients).
      *
-     * @param string $itemId The media server's item ID
-     * @param string $imageType Image type: 'Primary', 'Backdrop', 'Logo', etc.
-     * @return string
+     * @param  string  $itemId  The media server's item ID
+     * @param  string  $imageType  Image type: 'Primary', 'Backdrop', 'Logo', etc.
      */
     public function getImageUrl(string $itemId, string $imageType = 'Primary'): string
     {
@@ -282,9 +286,8 @@ class MediaServerService
     /**
      * Get the direct image URL for an item (internal use only - contains API key).
      *
-     * @param string $itemId The media server's item ID
-     * @param string $imageType Image type: 'Primary', 'Backdrop', 'Logo', etc.
-     * @return string
+     * @param  string  $itemId  The media server's item ID
+     * @param  string  $imageType  Image type: 'Primary', 'Backdrop', 'Logo', etc.
      */
     public function getDirectImageUrl(string $itemId, string $imageType = 'Primary'): string
     {
@@ -294,7 +297,7 @@ class MediaServerService
     /**
      * Extract genres from an item, respecting the genre_handling setting.
      *
-     * @param array $item The item data from the API
+     * @param  array  $item  The item data from the API
      * @return array List of genre names
      */
     public function extractGenres(array $item): array
@@ -315,14 +318,13 @@ class MediaServerService
     /**
      * Get the container extension from media sources.
      *
-     * @param array $item The item data from the API
-     * @return string
+     * @param  array  $item  The item data from the API
      */
     public function getContainerExtension(array $item): string
     {
         $mediaSources = $item['MediaSources'] ?? [];
 
-        if (!empty($mediaSources)) {
+        if (! empty($mediaSources)) {
             $container = $mediaSources[0]['Container'] ?? null;
             if ($container) {
                 return strtolower($container);
@@ -336,7 +338,7 @@ class MediaServerService
     /**
      * Convert runtime ticks to seconds.
      *
-     * @param int|null $ticks Runtime in ticks (100-nanosecond intervals)
+     * @param  int|null  $ticks  Runtime in ticks (100-nanosecond intervals)
      * @return int|null Runtime in seconds
      */
     public function ticksToSeconds(?int $ticks): ?int

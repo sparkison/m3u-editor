@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\Playlist;
-use App\Models\PlaylistProfile;
 use App\Services\M3uProxyService;
 use App\Services\ProfileService;
 use Illuminate\Console\Command;
@@ -49,7 +48,7 @@ class ReconcileProfileConnections extends Command
 
         $this->info("Reconciling connection counts for {$playlists->count()} playlist(s)...");
 
-        $proxyService = new M3uProxyService();
+        $proxyService = new M3uProxyService;
 
         foreach ($playlists as $playlist) {
             $this->reconcilePlaylist($playlist, $proxyService);
@@ -97,7 +96,7 @@ class ReconcileProfileConnections extends Command
                 try {
                     Redis::set($key, $proxyCount);
 
-                    Log::info("Reconciled profile connection count", [
+                    Log::info('Reconciled profile connection count', [
                         'profile_id' => $profile->id,
                         'playlist_id' => $playlist->id,
                         'old_count' => $redisCount,

@@ -58,6 +58,6 @@ Schedule::command('profiles:reconcile')
     ->withoutOverlapping();
 
 // Refresh provider profile info (every 15 minutes)
-Schedule::job(new \App\Jobs\RefreshPlaylistProfiles())
+Schedule::job(new \App\Jobs\RefreshPlaylistProfiles)
     ->everyFifteenMinutes()
     ->withoutOverlapping();

@@ -62,11 +62,11 @@ class EditMediaServerIntegration extends EditRecord
                 Action::make('viewPlaylist')
                     ->label('View Playlist')
                     ->icon('heroicon-o-queue-list')
-                    ->url(fn() => $this->record->playlist_id
+                    ->url(fn () => $this->record->playlist_id
                         ? route('filament.admin.resources.playlists.edit', $this->record->playlist_id)
                         : null
                     )
-                    ->visible(fn() => $this->record->playlist_id !== null),
+                    ->visible(fn () => $this->record->playlist_id !== null),
 
                 DeleteAction::make(),
             ]),

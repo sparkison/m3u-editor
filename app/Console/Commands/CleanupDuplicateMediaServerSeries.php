@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Episode;
 use App\Models\MediaServerIntegration;
 use App\Models\Season;
 use App\Models\Series;
@@ -35,6 +34,7 @@ class CleanupDuplicateMediaServerSeries extends Command
 
         if ($integrations->isEmpty()) {
             $this->error('No media server integrations found');
+
             return 1;
         }
 
@@ -95,8 +95,8 @@ class CleanupDuplicateMediaServerSeries extends Command
             }
 
             // If no CRC format series exists, keep the first one with episodes
-            if (!$keeper) {
-                usort($entries, fn($a, $b) => $b['episode_count'] <=> $a['episode_count']);
+            if (! $keeper) {
+                usort($entries, fn ($a, $b) => $b['episode_count'] <=> $a['episode_count']);
                 $keeper = array_shift($entries);
                 $toDelete = $entries;
             }
@@ -110,7 +110,7 @@ class CleanupDuplicateMediaServerSeries extends Command
                 $oldSeries = $entry['series'];
                 $this->line("    Merging: ID {$oldSeries->id} (episodes: {$entry['episode_count']}, seasons: {$entry['season_count']})");
 
-                if (!$dryRun) {
+                if (! $dryRun) {
                     DB::transaction(function () use ($oldSeries, $keeperSeries, &$mergedEpisodes, &$mergedSeasons) {
                         // Map old seasons to new seasons by season_number
                         $seasonMap = [];

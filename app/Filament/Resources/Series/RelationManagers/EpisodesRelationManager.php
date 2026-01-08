@@ -3,27 +3,23 @@
 namespace App\Filament\Resources\Series\RelationManagers;
 
 use App\Facades\LogoFacade;
-use Filament\Schemas\Schema;
-use Filament\Tables\Columns\Layout\Stack;
-use Filament\Tables\Columns\ImageColumn;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\Layout\Grid;
-use Filament\Actions\ViewAction;
 use Filament\Actions;
 use Filament\Actions\Action;
-use Filament\Schemas\Components\Section;
-use Filament\Infolists\Components\TextEntry;
+use Filament\Actions\ViewAction;
 use Filament\Infolists\Components\ImageEntry;
-use Filament\Forms;
-use Filament\Infolists;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\ImageColumn;
+use Filament\Tables\Columns\Layout\Grid;
+use Filament\Tables\Columns\Layout\Stack;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class EpisodesRelationManager extends RelationManager
 {
@@ -69,14 +65,14 @@ class EpisodesRelationManager extends RelationManager
                         ->width('full')
                         ->extraImgAttributes(['class' => 'episode-placeholder rounded-t-lg object-cover w-full h-48'])
                         ->checkFileExistence(false)
-                        ->getStateUsing(fn($record) => LogoFacade::getEpisodeLogoUrl($record)),
+                        ->getStateUsing(fn ($record) => LogoFacade::getEpisodeLogoUrl($record)),
 
                     Stack::make([
                         TextColumn::make('title')
                             ->weight('semibold')
                             ->size('sm')
                             ->limit(50)
-                            ->tooltip(fn($record) => $record->title),
+                            ->tooltip(fn ($record) => $record->title),
 
                         TextColumn::make('episode_info')
                             ->label('')
@@ -85,6 +81,7 @@ class EpisodesRelationManager extends RelationManager
                             ->getStateUsing(function ($record) {
                                 $seasonName = $record->season ? "Season {$record->season}" : 'Unknown Season';
                                 $episodeNum = $record->episode_num ? "Episode {$record->episode_num}" : '';
+
                                 return trim("{$seasonName} {$episodeNum}");
                             }),
 
@@ -96,10 +93,11 @@ class EpisodesRelationManager extends RelationManager
                             ->tooltip(fn ($record) => $record->plot ?? $record->info['plot'] ?? null)
                             ->getStateUsing(function ($record) {
                                 // Check the dedicated plot column first, then fall back to info.plot
-                                if (!empty($record->plot)) {
+                                if (! empty($record->plot)) {
                                     return $record->plot;
                                 }
                                 $info = $record->info ?? [];
+
                                 return $info['plot'] ?? null;
                             })
                             ->placeholder('No description available'),
@@ -114,6 +112,7 @@ class EpisodesRelationManager extends RelationManager
                                     ->icon('heroicon-m-clock')
                                     ->getStateUsing(function ($record) {
                                         $info = $record->info ?? [];
+
                                         return $info['duration'] ?? null;
                                     }),
 
@@ -125,6 +124,7 @@ class EpisodesRelationManager extends RelationManager
                                     ->icon('heroicon-m-star')
                                     ->getStateUsing(function ($record) {
                                         $info = $record->info ?? [];
+
                                         return $info['rating'] ?? null;
                                     }),
                             ]),
@@ -137,6 +137,7 @@ class EpisodesRelationManager extends RelationManager
                             ->prefix('Released: ')
                             ->getStateUsing(function ($record) {
                                 $info = $record->info ?? [];
+
                                 return $info['release_date'] ?? null;
                             })
                             ->placeholder(''),
@@ -242,6 +243,7 @@ class EpisodesRelationManager extends RelationManager
                             ->date()
                             ->getStateUsing(function ($record) {
                                 $info = $record->info ?? [];
+
                                 return $info['release_date'] ?? null;
                             }),
                     ]),
@@ -256,6 +258,7 @@ class EpisodesRelationManager extends RelationManager
                             ->columnSpan(1)
                             ->getStateUsing(function ($record) {
                                 $info = $record->info ?? [];
+
                                 return $info['movie_image'] ?? $info['cover_big'] ?? null;
                             }),
 
@@ -267,6 +270,7 @@ class EpisodesRelationManager extends RelationManager
                                     ->label('Duration')
                                     ->getStateUsing(function ($record) {
                                         $info = $record->info ?? [];
+
                                         return $info['duration'] ?? null;
                                     }),
                                 TextEntry::make('info.rating')
@@ -276,6 +280,7 @@ class EpisodesRelationManager extends RelationManager
                                     ->icon('heroicon-m-star')
                                     ->getStateUsing(function ($record) {
                                         $info = $record->info ?? [];
+
                                         return $info['rating'] ?? null;
                                     }),
                                 TextEntry::make('info.bitrate')
@@ -283,23 +288,27 @@ class EpisodesRelationManager extends RelationManager
                                     ->getStateUsing(function ($record) {
                                         $info = $record->info ?? [];
                                         $bitrate = $info['bitrate'] ?? null;
+
                                         return $bitrate ? "{$bitrate} kbps" : null;
                                     }),
                                 TextEntry::make('info.season')
                                     ->label('Season (Metadata)')
                                     ->getStateUsing(function ($record) {
                                         $info = $record->info ?? [];
+
                                         return $info['season'] ?? null;
                                     }),
                                 TextEntry::make('info.tmdb_id')
                                     ->label('TMDB ID')
                                     ->getStateUsing(function ($record) {
                                         $info = $record->info ?? [];
+
                                         return $info['tmdb_id'] ?? null;
                                     })
                                     ->url(function ($record) {
                                         $info = $record->info ?? [];
                                         $tmdbId = $info['tmdb_id'] ?? null;
+
                                         return $tmdbId ? "https://www.themoviedb.org/tv/episode/{$tmdbId}" : null;
                                     }, true),
                             ]),
@@ -309,6 +318,7 @@ class EpisodesRelationManager extends RelationManager
                             ->columnSpanFull()
                             ->getStateUsing(function ($record) {
                                 $info = $record->info ?? [];
+
                                 return $info['plot'] ?? 'No plot information available.';
                             }),
 
@@ -316,7 +326,7 @@ class EpisodesRelationManager extends RelationManager
                             ->label('Stream URL')
                             ->columnSpanFull()
                             ->copyable()
-                            ->url(fn($record) => $record->url)
+                            ->url(fn ($record) => $record->url)
                             ->openUrlInNewTab(),
                     ]),
             ]);

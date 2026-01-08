@@ -61,6 +61,7 @@ class MediaServerIntegration extends Model
     public function getBaseUrlAttribute(): string
     {
         $protocol = $this->ssl ? 'https' : 'http';
+
         return "{$protocol}://{$this->host}:{$this->port}";
     }
 

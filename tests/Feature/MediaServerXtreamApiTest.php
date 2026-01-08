@@ -21,8 +21,11 @@ class MediaServerXtreamApiTest extends TestCase
     use RefreshDatabase;
 
     protected User $user;
+
     protected Playlist $playlist;
+
     protected PlaylistAuth $auth;
+
     protected MediaServerIntegration $integration;
 
     protected function setUp(): void
@@ -360,7 +363,7 @@ class MediaServerXtreamApiTest extends TestCase
 
         $movieData = $response->json('movie_data');
         $this->assertStringContainsString('movie', $movieData['direct_source']);
-        $this->assertStringContainsString((string)$channel->id, $movieData['direct_source']);
+        $this->assertStringContainsString((string) $channel->id, $movieData['direct_source']);
         $this->assertStringContainsString('.mp4', $movieData['direct_source']);
     }
 
@@ -408,7 +411,7 @@ class MediaServerXtreamApiTest extends TestCase
 
         $episodeData = $response->json('episodes.1.0');
         $this->assertStringContainsString('series', $episodeData['direct_source']);
-        $this->assertStringContainsString((string)$episode->id, $episodeData['direct_source']);
+        $this->assertStringContainsString((string) $episode->id, $episodeData['direct_source']);
         $this->assertStringContainsString('.mkv', $episodeData['direct_source']);
     }
 

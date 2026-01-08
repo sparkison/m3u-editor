@@ -8,8 +8,6 @@ use App\Events\PlaylistUpdated;
 use App\Jobs\ProcessM3uImport;
 use App\Jobs\RunPostProcess;
 use App\Services\ProfileService;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Queue\InteractsWithQueue;
 
 class PlaylistListener
 {
@@ -31,12 +29,12 @@ class PlaylistListener
     private function handlePlaylistCreated(PlaylistCreated $event)
     {
         $playlist = $event->playlist;
-        
+
         // Create primary profile if profiles are enabled on new playlist
         if ($playlist->profiles_enabled) {
             $this->ensurePrimaryProfileExists($playlist);
         }
-        
+
         dispatch(new ProcessM3uImport(playlist: $playlist, isNew: true));
         $playlist->postProcesses()->where([
             ['event', 'created'],

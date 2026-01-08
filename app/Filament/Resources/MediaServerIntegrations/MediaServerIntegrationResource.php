@@ -11,8 +11,6 @@ use App\Models\Season;
 use App\Models\Series;
 use App\Services\MediaServerService;
 use App\Traits\HasUserFiltering;
-use Illuminate\Support\Facades\DB;
-use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkAction;
@@ -25,13 +23,10 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
-use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Enums\RecordActionsPosition;
@@ -40,6 +35,7 @@ use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class MediaServerIntegrationResource extends Resource
 {
@@ -115,8 +111,8 @@ class MediaServerIntegrationResource extends Resource
                             ->revealable()
                             ->required(fn (string $operation): bool => $operation === 'create')
                             ->dehydrateStateUsing(fn ($state, $record) => filled($state) ? $state : $record?->api_key)
-                            ->helperText(fn (string $operation) => $operation === 'edit' 
-                                ? 'Leave blank to keep existing API key' 
+                            ->helperText(fn (string $operation) => $operation === 'edit'
+                                ? 'Leave blank to keep existing API key'
                                 : 'Generate an API key in your media server\'s dashboard under Settings → API Keys'),
                     ]),
 
@@ -184,12 +180,13 @@ class MediaServerIntegrationResource extends Resource
                                 ->disabled()
                                 ->dehydrated(false)
                                 ->formatStateUsing(function ($state) {
-                                    if (!$state) {
+                                    if (! $state) {
                                         return 'Never';
                                     }
                                     if (is_string($state)) {
                                         $state = \Carbon\Carbon::parse($state);
                                     }
+
                                     return $state->diffForHumans();
                                 }),
 
@@ -198,10 +195,11 @@ class MediaServerIntegrationResource extends Resource
                                 ->disabled()
                                 ->dehydrated(false)
                                 ->formatStateUsing(function ($record) {
-                                    if (!$record || !$record->sync_stats) {
+                                    if (! $record || ! $record->sync_stats) {
                                         return 'No sync data';
                                     }
                                     $stats = $record->sync_stats;
+
                                     return sprintf(
                                         '%d movies, %d series, %d episodes',
                                         $stats['movies_synced'] ?? 0,
@@ -227,8 +225,8 @@ class MediaServerIntegrationResource extends Resource
                 TextColumn::make('type')
                     ->label('Type')
                     ->badge()
-                    ->formatStateUsing(fn(string $state): string => ucfirst($state))
-                    ->color(fn(string $state): string => match ($state) {
+                    ->formatStateUsing(fn (string $state): string => ucfirst($state))
+                    ->color(fn (string $state): string => match ($state) {
                         'emby' => 'success',
                         'jellyfin' => 'info',
                         default => 'gray',
@@ -236,7 +234,7 @@ class MediaServerIntegrationResource extends Resource
 
                 TextColumn::make('host')
                     ->label('Server')
-                    ->formatStateUsing(fn($record): string => "{$record->host}:{$record->port}")
+                    ->formatStateUsing(fn ($record): string => "{$record->host}:{$record->port}")
                     ->copyable(),
 
                 ToggleColumn::make('enabled')
@@ -250,7 +248,7 @@ class MediaServerIntegrationResource extends Resource
 
                 TextColumn::make('playlist.name')
                     ->label('Playlist')
-                    ->url(fn($record) => $record->playlist_id
+                    ->url(fn ($record) => $record->playlist_id
                         ? route('filament.admin.resources.playlists.edit', $record->playlist_id)
                         : null
                     )
@@ -365,7 +363,7 @@ class MediaServerIntegrationResource extends Resource
                             Notification::make()
                                 ->success()
                                 ->title('Sync Started')
-                                ->body('Syncing ' . $records->count() . ' media servers.')
+                                ->body('Syncing '.$records->count().' media servers.')
                                 ->send();
                         }),
 
@@ -391,7 +389,7 @@ class MediaServerIntegrationResource extends Resource
 
     /**
      * Clean up duplicate series created by sync format changes.
-     * 
+     *
      * When the sync switched from storing raw media_server_id to crc32() hashed values,
      * it created duplicate series entries. This method finds duplicates (same metadata.media_server_id)
      * and merges them, keeping the one with the correct CRC format.
@@ -432,7 +430,7 @@ class MediaServerIntegrationResource extends Resource
             $toDelete = [];
 
             foreach ($entries as $entry) {
-                if ($entry['has_crc_format'] && (!$keeper || $entry['episode_count'] > $keeper['episode_count'])) {
+                if ($entry['has_crc_format'] && (! $keeper || $entry['episode_count'] > $keeper['episode_count'])) {
                     if ($keeper) {
                         $toDelete[] = $keeper;
                     }
@@ -443,8 +441,8 @@ class MediaServerIntegrationResource extends Resource
             }
 
             // If no CRC format series exists, keep the one with most episodes
-            if (!$keeper) {
-                usort($entries, fn($a, $b) => $b['episode_count'] <=> $a['episode_count']);
+            if (! $keeper) {
+                usort($entries, fn ($a, $b) => $b['episode_count'] <=> $a['episode_count']);
                 $keeper = array_shift($entries);
                 $toDelete = $entries;
             }

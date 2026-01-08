@@ -17,7 +17,6 @@ use Exception;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -74,13 +73,15 @@ class SyncMediaServer implements ShouldQueue
     {
         $integration = MediaServerIntegration::find($this->integrationId);
 
-        if (!$integration) {
+        if (! $integration) {
             Log::error('SyncMediaServer: Integration not found', ['id' => $this->integrationId]);
+
             return;
         }
 
-        if (!$integration->enabled) {
+        if (! $integration->enabled) {
             Log::info('SyncMediaServer: Integration is disabled', ['id' => $this->integrationId]);
+
             return;
         }
 
@@ -105,8 +106,8 @@ class SyncMediaServer implements ShouldQueue
 
             // Test connection first
             $connectionTest = $service->testConnection();
-            if (!$connectionTest['success']) {
-                throw new Exception('Connection failed: ' . $connectionTest['message']);
+            if (! $connectionTest['success']) {
+                throw new Exception('Connection failed: '.$connectionTest['message']);
             }
 
             // Sync movies (as VOD channels)
@@ -266,13 +267,13 @@ class SyncMediaServer implements ShouldQueue
 
         // Extract director(s) from People array
         $directors = array_column(
-            array_filter($movie['People'] ?? [], fn($p) => ($p['Type'] ?? '') === 'Director'),
+            array_filter($movie['People'] ?? [], fn ($p) => ($p['Type'] ?? '') === 'Director'),
             'Name'
         );
 
         // Extract actors from People array (limit to 10)
         $actors = array_slice(array_column(
-            array_filter($movie['People'] ?? [], fn($p) => ($p['Type'] ?? '') === 'Actor'),
+            array_filter($movie['People'] ?? [], fn ($p) => ($p['Type'] ?? '') === 'Actor'),
             'Name'
         ), 0, 10);
 
@@ -340,7 +341,7 @@ class SyncMediaServer implements ShouldQueue
             ->where('name', $genreName)
             ->first();
 
-        if (!$group) {
+        if (! $group) {
             $group = Group::create([
                 'name' => $genreName,
                 'name_internal' => $genreName,
@@ -498,7 +499,7 @@ class SyncMediaServer implements ShouldQueue
                 'source_episode_id' => crc32("media-server-{$integration->id}-{$episodeId}"),
             ],
             [
-                'title' => $episodeData['Name'] ?? 'Episode ' . ($episodeData['IndexNumber'] ?? '?'),
+                'title' => $episodeData['Name'] ?? 'Episode '.($episodeData['IndexNumber'] ?? '?'),
                 'user_id' => $playlist->user_id,
                 'series_id' => $series->id,
                 'season_id' => $season->id,
@@ -529,7 +530,7 @@ class SyncMediaServer implements ShouldQueue
             ->where('name', $genreName)
             ->first();
 
-        if (!$category) {
+        if (! $category) {
             $category = Category::create([
                 'name' => $genreName,
                 'name_internal' => $genreName,
