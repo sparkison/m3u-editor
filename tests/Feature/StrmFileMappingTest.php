@@ -2,7 +2,6 @@
 
 use App\Models\Channel;
 use App\Models\StrmFileMapping;
-use App\Models\User;
 
 // Note: These tests are skipped in CI because they require specific database
 // setup and the StrmFileMapping::findOrphanedMappings() method uses chunkById

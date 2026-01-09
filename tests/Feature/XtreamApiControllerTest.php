@@ -3,17 +3,13 @@
 namespace Tests\Feature;
 
 use App\Enums\ChannelLogoType;
-use App\Models\Category;
 use App\Models\Channel;
-use App\Models\Episode;
 use App\Models\Group;
 use App\Models\Playlist;
 use App\Models\PlaylistAuth;
-use App\Models\Season;
 use App\Models\Series;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Tests\TestCase;
