@@ -66,7 +66,7 @@ RUN NODE_ENV=production npm run build && \
 ########################################
 # Stage 3: m3u-proxy builder - prepares Python proxy service
 ########################################
-FROM alpine:3.21.3 AS proxy_builder
+FROM alpine:3.23.2 AS proxy_builder
 
 # Re-declare ARGs for this stage
 ARG M3U_PROXY_REPO=https://github.com/sparkison/m3u-proxy.git
@@ -86,7 +86,7 @@ RUN echo "Cloning m3u-proxy from: ${M3U_PROXY_REPO} (branch: ${M3U_PROXY_BRANCH}
 ########################################
 # Stage 4: Runtime image
 ########################################
-FROM alpine:3.21.3 AS runtime
+FROM alpine:3.23.2 AS runtime
 
 # Labels for image metadata
 LABEL org.opencontainers.image.title="m3u-editor" \
