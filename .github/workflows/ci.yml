@@ -147,9 +147,17 @@ jobs:
         run: npm run build
 
       - name: Prepare Laravel Application
+        env:
+          DB_CONNECTION: pg_test
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          TEST_DB_DATABASE: m3ue_test
+          TEST_DB_USERNAME: testing
+          TEST_DB_PASSWORD: testing
         run: |
           cp .env.example .env || echo "APP_KEY=" > .env
           php artisan key:generate
+          php artisan migrate --force
 
       - name: Run Pest tests
         env:
@@ -161,7 +169,7 @@ jobs:
           TEST_DB_PASSWORD: testing
           REDIS_HOST: 127.0.0.1
           REDIS_PORT: 6379
-        run: php artisan test --parallel --processes=4
+        run: php artisan test --parallel --processes=4 --recreate-databases
 
   build-check:
     name: Docker Build Validation
