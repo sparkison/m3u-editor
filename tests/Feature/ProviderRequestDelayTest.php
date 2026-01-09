@@ -95,20 +95,20 @@ it('acquires and releases slots correctly', function () {
     // Acquire first slot
     $slot1 = $testClass->callAcquireSlot();
     expect($slot1)->not->toBeNull();
-    expect(Cache::get('provider_concurrent_requests:count'))->toBe(1);
+    expect((int) Cache::get('provider_concurrent_requests:count'))->toBe(1);
 
     // Acquire second slot
     $slot2 = $testClass->callAcquireSlot();
     expect($slot2)->not->toBeNull();
-    expect(Cache::get('provider_concurrent_requests:count'))->toBe(2);
+    expect((int) Cache::get('provider_concurrent_requests:count'))->toBe(2);
 
     // Release first slot
     $testClass->callReleaseSlot($slot1);
-    expect(Cache::get('provider_concurrent_requests:count'))->toBe(1);
+    expect((int) Cache::get('provider_concurrent_requests:count'))->toBe(1);
 
     // Release second slot
     $testClass->callReleaseSlot($slot2);
-    expect(Cache::get('provider_concurrent_requests:count'))->toBe(0);
+    expect((int) Cache::get('provider_concurrent_requests:count'))->toBe(0);
 });
 
 it('does not decrement below zero', function () {
@@ -125,7 +125,7 @@ it('does not decrement below zero', function () {
     // Release without acquiring (should not go negative)
     $testClass->callReleaseSlot('fake-key');
 
-    $count = Cache::get('provider_concurrent_requests:count');
+    $count = (int) Cache::get('provider_concurrent_requests:count');
     expect($count)->toBe(0);
 });
 
@@ -144,7 +144,7 @@ it('executes callback with throttling', function () {
 
     expect($result)->toBe('success');
     // After callback, slot should be released
-    expect(Cache::get('provider_concurrent_requests:count', 0))->toBe(0);
+    expect((int) Cache::get('provider_concurrent_requests:count', 0))->toBe(0);
 });
 
 it('releases slot even on exception', function () {
@@ -165,7 +165,7 @@ it('releases slot even on exception', function () {
     }
 
     // Slot should still be released
-    expect(Cache::get('provider_concurrent_requests:count', 0))->toBe(0);
+    expect((int) Cache::get('provider_concurrent_requests:count', 0))->toBe(0);
 });
 
 it('validates milliseconds as integer', function () {

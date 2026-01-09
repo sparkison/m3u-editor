@@ -4,6 +4,7 @@
 /public/hot
 /public/storage
 /storage/*.key
+/storage/logs
 /storage/pail
 /vendor
 /docker/sail-mariadb
