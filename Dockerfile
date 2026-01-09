@@ -41,14 +41,13 @@ RUN composer dump-autoload --no-dev --optimize --classmap-authoritative
 FROM node:18-alpine AS node_builder
 WORKDIR /app
 
-# Cache bust argument - change this value to force npm ci layer rebuild
-ARG NPM_CACHE_BUST=2026-01-09-v4
-
 # Copy package files first for better layer caching
+# Docker will automatically invalidate this layer when package*.json files change
 COPY package.json package-lock.json ./
+
 # Install all dependencies including dev deps (Vite is needed for build)
 # Note: NODE_ENV must NOT be set to production here, or npm ci will skip devDependencies
-RUN echo "Cache bust: ${NPM_CACHE_BUST}" && npm ci --silent
+RUN npm ci --silent
 
 # Copy only files needed for the build
 COPY vite.config.js postcss.config.js ./
