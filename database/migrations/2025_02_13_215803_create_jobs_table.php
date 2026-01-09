@@ -11,15 +11,18 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::connection('jobs')->dropIfExists('jobs');
-        Schema::connection('jobs')->create('jobs', function (Blueprint $table) {
-            $table->id();
-            $table->string('title');
-            $table->string('batch_no');
-            $table->longText('payload');
-            $table->json('variables')->nullable();
-            $table->timestamps();
-        });
+        // Use hasTable check to prevent conflicts during parallel testing
+        // The dropIfExists + create pattern can cause race conditions
+        if (! Schema::connection('jobs')->hasTable('jobs')) {
+            Schema::connection('jobs')->create('jobs', function (Blueprint $table) {
+                $table->id();
+                $table->string('title');
+                $table->string('batch_no');
+                $table->longText('payload');
+                $table->json('variables')->nullable();
+                $table->timestamps();
+            });
+        }
     }
 
     /**
