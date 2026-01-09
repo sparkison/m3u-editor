@@ -32,9 +32,9 @@ return [
 
         'reverb' => [
             'driver' => 'reverb',
-            'key' => '5e2a227aacd3bc04713e595428195896617947b8f5ec11db31029abd13b13538', // env('REVERB_APP_KEY'),
-            'secret' => env('REVERB_APP_SECRET'),
-            'app_id' => env('REVERB_APP_ID'),
+            'key' => env('REVERB_APP_KEY', '5e2a227aacd3bc04713e595428195896617947b8f5ec11db31029abd13b13538'),
+            'secret' => env('REVERB_APP_SECRET', 'f6b0e6f9c8d7a5b4c3e2d1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0'),
+            'app_id' => env('REVERB_APP_ID', 'm3u-editor'),
             'options' => [
                 'host' => env('REVERB_HOST', 'localhost'),
                 'port' => env('REVERB_PORT', 36800),
