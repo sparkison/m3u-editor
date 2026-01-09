@@ -1,6 +1,7 @@
 ########################################
 # Build Arguments - Configurable at build time
 ########################################
+# Cache bust: 2026-01-09
 # Allow customization of m3u-proxy repository and branch
 # NOTE: GitHub Actions workflow automatically overrides these with dynamic values
 # based on the repository owner (e.g., hektyc/m3u-proxy for hektyc/m3u-editor)
@@ -8,7 +9,7 @@
 # Override: --build-arg M3U_PROXY_REPO=https://github.com/yourusername/m3u-proxy.git
 #           --build-arg M3U_PROXY_BRANCH=dev
 ARG M3U_PROXY_REPO=https://github.com/sparkison/m3u-proxy.git
-ARG M3U_PROXY_BRANCH=main
+ARG M3U_PROXY_BRANCH=master
 
 ########################################
 # Stage 1: Composer builder - installs PHP dependencies
