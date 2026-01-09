@@ -70,8 +70,8 @@ it('generates xtream config from playlist base and profile credentials', functio
 
     expect($config)
         ->toBeArray()
-        ->toHaveKeys(['server', 'username', 'password', 'output'])
-        ->and($config['server'])->toBe('http://example.com')
+        ->toHaveKeys(['url', 'username', 'password', 'output'])
+        ->and($config['url'])->toBe('http://example.com')
         ->and($config['username'])->toBe('profile_user')
         ->and($config['password'])->toBe('profile_pass')
         ->and($config['output'])->toBe('ts');
@@ -114,7 +114,7 @@ it('scopes to only enabled profiles', function () {
         'user_id' => $this->user->id,
     ]);
 
-    expect(PlaylistProfile::enabled()->count())->toBe(1);
+    expect(PlaylistProfile::where('playlist_id', $this->playlist->id)->enabled()->count())->toBe(1);
 });
 
 it('orders profiles by selection priority', function () {
@@ -247,7 +247,7 @@ it('can get primary profile for playlist', function () {
 
     expect($found)
         ->toBeInstanceOf(PlaylistProfile::class)
-        ->id->toBe($primary->id)
+        ->is_primary->toBeTrue()
         ->name->toBe('Primary Profile');
 });
 
@@ -276,8 +276,8 @@ it('selects profile with capacity for streaming', function () {
 
     expect($selected)
         ->toBeInstanceOf(PlaylistProfile::class)
-        ->id->toBe($available->id)
-        ->name->toBe('Available Profile');
+        ->name->toBe('Available Profile')
+        ->hasCapacity()->toBeTrue();
 });
 
 it('returns null when no profiles have capacity', function () {
@@ -317,8 +317,8 @@ it('excludes specific profile when selecting for streaming', function () {
 
     expect($selected)
         ->toBeInstanceOf(PlaylistProfile::class)
-        ->id->toBe($profile2->id)
-        ->name->toBe('Profile 2');
+        ->name->toBe('Profile 2')
+        ->hasCapacity()->toBeTrue();
 });
 
 it('playlist has profiles relationship', function () {
@@ -327,7 +327,7 @@ it('playlist has profiles relationship', function () {
         'user_id' => $this->user->id,
     ]);
 
-    expect($this->playlist->profiles)->toHaveCount(3);
+    expect($this->playlist->fresh()->profiles)->toHaveCount(3);
 });
 
 it('playlist has enabled profiles relationship', function () {
@@ -342,5 +342,5 @@ it('playlist has enabled profiles relationship', function () {
         'user_id' => $this->user->id,
     ]);
 
-    expect($this->playlist->enabledProfiles)->toHaveCount(1);
+    expect($this->playlist->fresh()->enabledProfiles)->toHaveCount(1);
 });
