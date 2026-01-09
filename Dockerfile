@@ -41,16 +41,13 @@ RUN composer dump-autoload --no-dev --optimize --classmap-authoritative
 FROM node:18-alpine AS node_builder
 WORKDIR /app
 
-# Set production environment for optimized builds
-ENV NODE_ENV=production
-
 # Cache bust argument - change this value to force npm ci layer rebuild
-ARG NPM_CACHE_BUST=2026-01-09-v3
+ARG NPM_CACHE_BUST=2026-01-09-v4
 
 # Copy package files first for better layer caching
 COPY package.json package-lock.json ./
 # Install all dependencies including dev deps (Vite is needed for build)
-# Note: Do NOT use --omit=dev as Vite is a devDependency required for build
+# Note: NODE_ENV must NOT be set to production here, or npm ci will skip devDependencies
 RUN echo "Cache bust: ${NPM_CACHE_BUST}" && npm ci --silent
 
 # Copy only files needed for the build
@@ -61,8 +58,9 @@ COPY public/ ./public/
 # Copy vendor built by composer stage for Vite to resolve vendor CSS
 COPY --from=composer_builder /app/vendor ./vendor
 
-# Run the frontend build (Vite)
-RUN npm run build && \
+# Run the frontend build (Vite) with production optimizations
+# NODE_ENV=production enables minification and tree-shaking
+RUN NODE_ENV=production npm run build && \
     # Clean up node_modules after build - not needed in final image
     rm -rf node_modules
 
