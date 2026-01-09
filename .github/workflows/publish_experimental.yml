@@ -12,6 +12,12 @@ env:
   REGISTRY_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/m3u-editor
 
 jobs:
+  # Run CI checks first
+  ci-check:
+    name: CI Validation
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
   # Extract version from config/dev.php
   get-version:
     name: Get Version
@@ -36,7 +42,7 @@ jobs:
   push-amd64:
     name: Build & Push (amd64)
     runs-on: ubuntu-latest
-    needs: [get-version]
+    needs: [ci-check, get-version]
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
@@ -74,7 +80,7 @@ jobs:
   push-arm64:
     name: Build & Push (arm64)
     runs-on: ubuntu-22.04-arm
-    needs: [get-version]
+    needs: [ci-check, get-version]
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
