@@ -67,7 +67,7 @@ FROM python:3.12-alpine AS proxy_builder
 
 # Re-declare ARGs for this stage
 ARG M3U_PROXY_REPO=https://github.com/sparkison/m3u-proxy.git
-ARG M3U_PROXY_BRANCH=main
+ARG M3U_PROXY_BRANCH=master
 
 WORKDIR /opt/m3u-proxy
 
