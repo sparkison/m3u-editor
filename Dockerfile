@@ -45,7 +45,8 @@ ENV NODE_ENV=production
 
 # Copy package files first for better layer caching
 COPY package.json package-lock.json ./
-RUN npm ci --silent --omit=dev
+# Install all dependencies including dev deps (Vite is needed for build)
+RUN npm ci --silent
 
 # Copy only files needed for the build
 COPY vite.config.js postcss.config.js ./
