@@ -1075,6 +1075,12 @@ class ProcessM3uImport implements ShouldQueue
 
         // Create the source groups
         foreach ($liveGroups->chunk(50) as $chunk) {
+            // Deduplicate the channels
+            $chunk = collect($chunk)
+                ->unique(fn ($item) => $item['category_name'].$playlistId.'live')
+                ->toArray();
+
+            // Upsert the source groups
             SourceGroup::upsert(
                 collect($chunk)->map(function ($group) use ($playlistId) {
                     return [
@@ -1089,6 +1095,12 @@ class ProcessM3uImport implements ShouldQueue
             );
         }
         foreach ($vodGroups->chunk(50) as $chunk) {
+            // Deduplicate the channels
+            $chunk = collect($chunk)
+                ->unique(fn ($item) => $item['category_name'].$playlistId.'vod')
+                ->toArray();
+
+            // Upsert the source groups
             SourceGroup::upsert(
                 collect($chunk)->map(function ($group) use ($playlistId) {
                     return [
