@@ -169,7 +169,7 @@ jobs:
           TEST_DB_USERNAME: testing
           TEST_DB_PASSWORD: testing
           REDIS_HOST: 127.0.0.1
-          REDIS_PORT: 6379
+          REDIS_SERVER_PORT: 6379
         run: php artisan test --parallel --processes=4 --recreate-databases
 
   build-check:
