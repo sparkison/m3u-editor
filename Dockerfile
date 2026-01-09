@@ -66,7 +66,7 @@ RUN NODE_ENV=production npm run build && \
 ########################################
 # Stage 3: m3u-proxy builder - prepares Python proxy service
 ########################################
-FROM python:3.12-alpine AS proxy_builder
+FROM alpine:3.21.3 AS proxy_builder
 
 # Re-declare ARGs for this stage
 ARG M3U_PROXY_REPO=https://github.com/sparkison/m3u-proxy.git
@@ -77,16 +77,11 @@ WORKDIR /opt/m3u-proxy
 # Install git for cloning
 RUN apk add --no-cache git
 
-# Clone and setup m3u-proxy
+# Clone m3u-proxy source code
 RUN echo "Cloning m3u-proxy from: ${M3U_PROXY_REPO} (branch: ${M3U_PROXY_BRANCH})" && \
     git clone -b ${M3U_PROXY_BRANCH} ${M3U_PROXY_REPO} . && \
     # Remove .git to reduce image size
     rm -rf .git
-
-# Create virtual environment and install dependencies
-RUN python3 -m venv .venv && \
-    .venv/bin/pip install --no-cache-dir --upgrade pip && \
-    .venv/bin/pip install --no-cache-dir -r requirements.txt
 
 ########################################
 # Stage 4: Runtime image
@@ -148,8 +143,9 @@ RUN echo "@edge https://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/rep
     postgresql \
     postgresql-client \
     postgresql-contrib \
-    # Python runtime (for m3u-proxy)
+    # Python runtime and pip (for m3u-proxy)
     python3 \
+    py3-pip \
     # PHP 8.4 and all required extensions
     php84-cli \
     php84-fpm \
@@ -219,6 +215,12 @@ COPY --chmod=755 start-container /usr/local/bin/start-container
 
 # Copy m3u-proxy from builder stage
 COPY --from=proxy_builder --chown=${WWWUSER}:${WWWGROUP} /opt/m3u-proxy /opt/m3u-proxy
+
+# Install m3u-proxy Python dependencies
+# Using --break-system-packages since we control the container and don't need isolation
+RUN if [ -f /opt/m3u-proxy/requirements.txt ]; then \
+        pip3 install --no-cache-dir --break-system-packages -r /opt/m3u-proxy/requirements.txt; \
+    fi
 
 # Copy application code (changes more frequently)
 COPY --chown=${WWWUSER}:${WWWGROUP} . /var/www/html
