@@ -268,7 +268,8 @@ class SeriesResource extends Resource
         return [
             ActionGroup::make([
                 EditAction::make()
-                    ->slideOver(),
+                    ->slideOver()
+                    ->after(fn ($livewire) => $livewire->dispatch('$refresh')),
                 Action::make('move')
                     ->label('Move Series to Category')
                     ->schema([
