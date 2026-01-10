@@ -33,6 +33,10 @@ class XtreamStreamController extends Controller
             ->where('enabled', true)
             ->first();
 
+        if ($playlistAuth && $playlistAuth->isExpired()) {
+            $playlistAuth = null;
+        }
+
         if ($playlistAuth) {
             $playlist = $playlistAuth->getAssignedModel();
             if ($playlist) {

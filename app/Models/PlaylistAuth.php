@@ -24,11 +24,24 @@ class PlaylistAuth extends Model
         'id' => 'integer',
         'enabled' => 'boolean',
         'user_id' => 'integer',
+        'expires_at' => 'datetime',
     ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Determine whether this auth credential is expired.
+     */
+    public function isExpired(): bool
+    {
+        if ($this->expires_at === null) {
+            return false;
+        }
+
+        return now()->greaterThanOrEqualTo($this->expires_at);
     }
 
     public function playlists(): HasMany

@@ -468,6 +468,13 @@ class PlaylistAliasResource extends Resource
                         ->columnSpan(1)
                         ->password()
                         ->revealable(),
+                    Forms\Components\DateTimePicker::make('expires_at')
+                        ->label('Expiration (date & time)')
+                        ->seconds(false)
+                        ->native(false)
+                        ->helperText('If set, this alias credentials will stop working at that exact time.')
+                        ->nullable()
+                        ->columnSpan(2),
                 ]),
         ];
     }
