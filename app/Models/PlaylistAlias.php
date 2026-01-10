@@ -122,7 +122,7 @@ class PlaylistAlias extends Model
         if ($this->expires_at === null) {
             return false;
         }
-    
+
         return now()->greaterThanOrEqualTo($this->expires_at);
     }
 
