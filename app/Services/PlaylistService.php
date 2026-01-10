@@ -384,7 +384,7 @@ class PlaylistService
             ->where('enabled', true)
             ->first();
 
-        if ($playlistAuth) {
+        if ($playlistAuth && $playlistAuth->isExpired()) {
             $playlist = $playlistAuth->getAssignedModel();
             if ($playlist) {
                 // Load necessary relationships for the playlist
