@@ -573,10 +573,15 @@ class StrmFileMapping extends Model
 
                 // When we have a reasonable batch, perform unlink and bulk delete to minimize per-row operations
                 if (count($idsToDelete) >= 500) {
-                    // Unlink files (best-effort)
+                    // Unlink STRM files and corresponding NFO files (best-effort)
                     foreach ($pathsToUnlink as $p) {
                         try {
                             @unlink($p);
+                            // Also delete the corresponding NFO file if it exists
+                            $nfoPath = preg_replace('/\.strm$/i', '.nfo', $p);
+                            if ($nfoPath !== $p && file_exists($nfoPath)) {
+                                @unlink($nfoPath);
+                            }
                         } catch (\Throwable $e) {
                             Log::debug('STRM Sync: Failed to unlink orphaned file during bulk cleanup', ['path' => $p, 'error' => $e->getMessage()]);
                         }
@@ -600,6 +605,11 @@ class StrmFileMapping extends Model
             foreach ($pathsToUnlink as $p) {
                 try {
                     @unlink($p);
+                    // Also delete the corresponding NFO file if it exists
+                    $nfoPath = preg_replace('/\.strm$/i', '.nfo', $p);
+                    if ($nfoPath !== $p && file_exists($nfoPath)) {
+                        @unlink($nfoPath);
+                    }
                 } catch (\Throwable $e) {
                     Log::debug('STRM Sync: Failed to unlink orphaned file during final bulk cleanup', ['path' => $p, 'error' => $e->getMessage()]);
                 }
@@ -618,6 +628,7 @@ class StrmFileMapping extends Model
     /**
      * Clean up all empty directories within a sync location.
      * Uses depth-first traversal to remove empty directories from bottom up.
+     * Also removes orphaned tvshow.nfo files before checking if directory is empty.
      */
     public static function cleanupEmptyDirectoriesInLocation(string $syncLocation): void
     {
@@ -634,8 +645,21 @@ class StrmFileMapping extends Model
             );
 
             foreach ($iterator as $file) {
-                if ($file->isDir() && self::isDirectoryEmpty($file->getRealPath())) {
-                    @rmdir($file->getRealPath());
+                if ($file->isDir()) {
+                    $dirPath = $file->getRealPath();
+
+                    // Check if directory only contains tvshow.nfo (orphaned series folder)
+                    // If so, delete the tvshow.nfo first to allow directory cleanup
+                    $tvshowNfo = $dirPath.'/tvshow.nfo';
+                    if (file_exists($tvshowNfo) && self::isDirectoryOnlyContainsNfo($dirPath)) {
+                        @unlink($tvshowNfo);
+                        Log::debug('STRM Sync: Deleted orphaned tvshow.nfo', ['path' => $tvshowNfo]);
+                    }
+
+                    // Now check if directory is empty and remove it
+                    if (self::isDirectoryEmpty($dirPath)) {
+                        @rmdir($dirPath);
+                    }
                 }
             }
         } catch (Throwable $e) {
@@ -643,6 +667,37 @@ class StrmFileMapping extends Model
                 'sync_location' => $syncLocation,
                 'error' => $e->getMessage(),
             ]);
+        }
+    }
+
+    /**
+     * Check if a directory only contains NFO files (tvshow.nfo, etc.)
+     * Used to identify orphaned series folders that should be cleaned up.
+     */
+    protected static function isDirectoryOnlyContainsNfo(string $directory): bool
+    {
+        if (! is_dir($directory)) {
+            return false;
+        }
+
+        $handle = @opendir($directory);
+        if ($handle === false) {
+            return false;
+        }
+
+        try {
+            while (($entry = readdir($handle)) !== false) {
+                if ($entry !== '.' && $entry !== '..') {
+                    // If we find any file that's not an NFO, return false
+                    if (! str_ends_with(strtolower($entry), '.nfo')) {
+                        return false;
+                    }
+                }
+            }
+
+            return true; // Directory only contains NFO files (or is empty)
+        } finally {
+            closedir($handle);
         }
     }
 

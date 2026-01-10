@@ -82,14 +82,18 @@ class NfoService
             }
 
             // Poster
-            if (! empty($metadata['poster_path'])) {
-                $posterUrl = 'https://image.tmdb.org/t/p/original'.$metadata['poster_path'];
+            $poster = $this->getScalarValue($metadata['poster_path'] ?? null);
+            if (! empty($poster) && is_string($poster)) {
+                // Handle both full URLs and TMDB paths
+                $posterUrl = str_starts_with($poster, 'http') ? $poster : 'https://image.tmdb.org/t/p/original'.$poster;
                 $xml .= $this->xmlElement('thumb', $posterUrl, ['aspect' => 'poster']);
             }
 
             // Backdrop
-            if (! empty($metadata['backdrop_path'])) {
-                $backdropUrl = 'https://image.tmdb.org/t/p/original'.$metadata['backdrop_path'];
+            $backdrop = $this->getScalarValue($metadata['backdrop_path'] ?? null);
+            if (! empty($backdrop) && is_string($backdrop)) {
+                // Handle both full URLs and TMDB paths
+                $backdropUrl = str_starts_with($backdrop, 'http') ? $backdrop : 'https://image.tmdb.org/t/p/original'.$backdrop;
                 $xml .= $this->xmlElement('fanart', $backdropUrl);
             }
 
@@ -143,10 +147,10 @@ class NfoService
             $info = $episode->info ?? [];
             $metadata = $series->metadata ?? [];
 
-            // Get IDs
-            $tmdbId = $info['tmdb_id'] ?? $info['tmdb'] ?? $metadata['tmdb_id'] ?? $metadata['tmdb'] ?? null;
-            $tvdbId = $metadata['tvdb_id'] ?? $metadata['tvdb'] ?? null;
-            $imdbId = $metadata['imdb_id'] ?? $metadata['imdb'] ?? null;
+            // Get IDs (ensure scalar values)
+            $tmdbId = $this->getScalarValue($info['tmdb_id'] ?? $info['tmdb'] ?? $metadata['tmdb_id'] ?? $metadata['tmdb'] ?? null);
+            $tvdbId = $this->getScalarValue($metadata['tvdb_id'] ?? $metadata['tvdb'] ?? null);
+            $imdbId = $this->getScalarValue($metadata['imdb_id'] ?? $metadata['imdb'] ?? null);
 
             // Build the NFO XML
             $xml = $this->startXml('episodedetails');
@@ -188,16 +192,20 @@ class NfoService
             }
 
             // Thumbnail/Still
-            if (! empty($info['still_path'])) {
-                $thumbUrl = 'https://image.tmdb.org/t/p/original'.$info['still_path'];
+            $stillPath = $this->getScalarValue($info['still_path'] ?? null);
+            $movieImage = $this->getScalarValue($info['movie_image'] ?? null);
+            if (! empty($stillPath) && is_string($stillPath)) {
+                // Handle both full URLs and TMDB paths
+                $thumbUrl = str_starts_with($stillPath, 'http') ? $stillPath : 'https://image.tmdb.org/t/p/original'.$stillPath;
                 $xml .= $this->xmlElement('thumb', $thumbUrl);
-            } elseif (! empty($info['movie_image'])) {
-                $xml .= $this->xmlElement('thumb', $info['movie_image']);
+            } elseif (! empty($movieImage) && is_string($movieImage)) {
+                $xml .= $this->xmlElement('thumb', $movieImage);
             }
 
             // Unique IDs
-            if (! empty($info['tmdb_episode_id'])) {
-                $xml .= $this->xmlElement('uniqueid', $info['tmdb_episode_id'], ['type' => 'tmdb', 'default' => 'true']);
+            $tmdbEpisodeId = $this->getScalarValue($info['tmdb_episode_id'] ?? null);
+            if (! empty($tmdbEpisodeId)) {
+                $xml .= $this->xmlElement('uniqueid', $tmdbEpisodeId, ['type' => 'tmdb', 'default' => 'true']);
             } elseif (! empty($tmdbId)) {
                 $xml .= $this->xmlElement('uniqueid', $tmdbId, ['type' => 'tmdb', 'default' => 'true']);
             }
@@ -227,13 +235,18 @@ class NfoService
      * @param  Channel  $channel  The channel/movie to generate NFO for
      * @param  string  $filePath  Path to the .strm file (will be converted to .nfo)
      * @param  \App\Models\StrmFileMapping|null  $mapping  Optional mapping to check/update hash
+     * @param  array  $options  Optional options including name_filter_enabled and name_filter_patterns
      * @return bool Success status
      */
-    public function generateMovieNfo(Channel $channel, string $filePath, $mapping = null): bool
+    public function generateMovieNfo(Channel $channel, string $filePath, $mapping = null, array $options = []): bool
     {
         try {
             $info = $channel->info ?? [];
             $movieData = $channel->movie_data ?? [];
+
+            // Get name filter settings from options
+            $nameFilterEnabled = $options['name_filter_enabled'] ?? false;
+            $nameFilterPatterns = $options['name_filter_patterns'] ?? [];
 
             // Get IDs from multiple sources (ensure scalar values)
             $tmdbId = $this->getScalarValue($info['tmdb_id'] ?? $info['tmdb'] ?? $movieData['tmdb_id'] ?? $movieData['tmdb'] ?? null);
@@ -242,8 +255,9 @@ class NfoService
             // Build the NFO XML
             $xml = $this->startXml('movie');
 
-            // Basic info
+            // Basic info - apply name filter if enabled
             $title = $channel->title_custom ?? $channel->title;
+            $title = $this->applyNameFilter($title, $nameFilterEnabled, $nameFilterPatterns);
             $xml .= $this->xmlElement('title', $title);
             $xml .= $this->xmlElement('originaltitle', $title);
             $xml .= $this->xmlElement('sorttitle', $title);
@@ -333,8 +347,8 @@ class NfoService
             }
 
             // Poster
-            $poster = $info['poster_path'] ?? $movieData['cover_big'] ?? $movieData['movie_image'] ?? null;
-            if (! empty($poster)) {
+            $poster = $this->getScalarValue($info['poster_path'] ?? $movieData['cover_big'] ?? $movieData['movie_image'] ?? null);
+            if (! empty($poster) && is_string($poster)) {
                 $posterUrl = str_starts_with($poster, 'http')
                     ? $poster
                     : 'https://image.tmdb.org/t/p/original'.$poster;
@@ -342,8 +356,8 @@ class NfoService
             }
 
             // Backdrop
-            $backdrop = $info['backdrop_path'] ?? $movieData['backdrop_path'] ?? null;
-            if (! empty($backdrop)) {
+            $backdrop = $this->getScalarValue($info['backdrop_path'] ?? $movieData['backdrop_path'] ?? null);
+            if (! empty($backdrop) && is_string($backdrop)) {
                 $backdropUrl = str_starts_with($backdrop, 'http')
                     ? $backdrop
                     : 'https://image.tmdb.org/t/p/original'.$backdrop;
@@ -598,5 +612,26 @@ class NfoService
         }
 
         return $value;
+    }
+
+    /**
+     * Apply name filter patterns to a string
+     *
+     * @param  string  $name  The name to filter
+     * @param  bool  $enabled  Whether name filtering is enabled
+     * @param  array  $patterns  Array of patterns to remove from the name
+     * @return string The filtered name
+     */
+    private function applyNameFilter(string $name, bool $enabled, array $patterns): string
+    {
+        if (! $enabled || empty($patterns)) {
+            return $name;
+        }
+
+        foreach ($patterns as $pattern) {
+            $name = str_replace($pattern, '', $name);
+        }
+
+        return trim($name);
     }
 }
