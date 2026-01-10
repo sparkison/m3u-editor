@@ -16,6 +16,7 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -145,6 +146,13 @@ class PlaylistAuthResource extends Resource
                 ->required()
                 ->revealable()
                 ->columnSpan(1),
+            DateTimePicker::make('expires_at')
+                ->label('Expiration (date & time)')
+                ->seconds(false)
+                ->native(false)
+                ->helperText('If set, this account will stop working at that exact time.')
+                ->nullable()
+                ->columnSpan(2),
         ];
 
         return [
