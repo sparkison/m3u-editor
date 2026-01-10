@@ -385,6 +385,10 @@ class PlaylistService
             ->first();
 
         if ($playlistAuth && $playlistAuth->isExpired()) {
+            $playlistAuth = null;
+        }
+
+        if ($playlistAuth) {
             $playlist = $playlistAuth->getAssignedModel();
             if ($playlist) {
                 // Load necessary relationships for the playlist
