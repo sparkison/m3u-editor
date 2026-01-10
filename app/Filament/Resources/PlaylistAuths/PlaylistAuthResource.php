@@ -151,7 +151,8 @@ class PlaylistAuthResource extends Resource
                 ->seconds(false)
                 ->native(false)
                 ->helperText('If set, this account will stop working at that exact time.')
-                ->nullable(),
+                ->nullable()
+                ->columnSpan(2),
         ];
 
         return [
