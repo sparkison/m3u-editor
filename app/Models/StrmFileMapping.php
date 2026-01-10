@@ -228,7 +228,12 @@ class StrmFileMapping extends Model
     }
 
     /**
-     * Rename an existing .strm file
+     * Rename an existing .strm file or directory
+     *
+     * Strategy:
+     * 1. If only the directory name changed (filename stays the same), rename the directory
+     *    This is more efficient and automatically moves all related files (NFO, etc.)
+     * 2. If the filename changed, rename/move the individual file and its NFO companion
      *
      * @throws RuntimeException If rename or file creation fails
      */
@@ -240,42 +245,56 @@ class StrmFileMapping extends Model
     ): self {
         $oldPath = $mapping->current_path;
         $oldDirectory = dirname($oldPath);
+        $newDirectory = dirname($newPath);
+        $oldFilename = basename($oldPath);
+        $newFilename = basename($newPath);
 
         try {
-            // Ensure new directory exists (0755 = owner full, others read+execute)
-            $newDirectory = dirname($newPath);
+            // Strategy 1: If only the directory changed (filename same), rename the directory
+            // This is more efficient and moves all files (STRM, NFO, etc.) automatically
+            if ($oldFilename === $newFilename && $oldDirectory !== $newDirectory) {
+                $directoryRenamed = self::tryRenameDirectory($oldDirectory, $newDirectory, $mapping->sync_location);
+
+                if ($directoryRenamed) {
+                    // Directory renamed successfully - update URL if changed
+                    if ($mapping->current_url !== $url) {
+                        $result = @file_put_contents($newPath, $url, LOCK_EX);
+                        if ($result === false) {
+                            Log::warning('STRM Sync: Failed to update URL after directory rename', ['path' => $newPath]);
+                        }
+                    }
+
+                    // Update the mapping
+                    $mapping->update([
+                        'current_path' => $newPath,
+                        'current_url' => $url,
+                        'path_options' => $pathOptions,
+                    ]);
+
+                    return $mapping;
+                }
+                // If directory rename failed, fall through to file-based approach
+            }
+
+            // Strategy 2: Rename/move individual files (filename changed or directory rename failed)
+            // Ensure new directory exists
             if (! is_dir($newDirectory)) {
                 if (! @mkdir($newDirectory, 0755, true)) {
                     throw new RuntimeException("STRM Sync: Failed to create directory: {$newDirectory}");
                 }
             }
 
-            // Try to rename/move the file with race condition handling
+            // Try to rename/move the STRM file with race condition handling
             $fileRenamed = false;
             if (@file_exists($oldPath)) {
-                try {
-                    // Try to rename the file
-                    if (@rename($oldPath, $newPath)) {
-                        $fileRenamed = true;
-                        Log::info('STRM Sync: Renamed file', ['from' => $oldPath, 'to' => $newPath]);
-                    } else {
-                        // Rename failed - try copy + delete as fallback (handles cross-device moves)
-                        if (@copy($oldPath, $newPath)) {
-                            $fileRenamed = true;
-                            // Copy succeeded, try to delete old file (non-critical if it fails)
-                            if (! @unlink($oldPath)) {
-                                Log::warning('STRM Sync: Failed to delete old file after copy', ['path' => $oldPath]);
-                            }
-                            Log::info('STRM Sync: Moved file (copy+delete)', ['from' => $oldPath, 'to' => $newPath]);
-                        }
-                    }
-                } catch (Throwable $e) {
-                    Log::warning('STRM Sync: Exception during file rename', [
-                        'from' => $oldPath,
-                        'to' => $newPath,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
+                $fileRenamed = self::tryRenameOrCopyFile($oldPath, $newPath);
+            }
+
+            // Also move the NFO file if it exists (companion file)
+            $oldNfoPath = preg_replace('/\.strm$/i', '.nfo', $oldPath);
+            $newNfoPath = preg_replace('/\.strm$/i', '.nfo', $newPath);
+            if ($oldNfoPath !== $oldPath && @file_exists($oldNfoPath)) {
+                self::tryRenameOrCopyFile($oldNfoPath, $newNfoPath);
             }
 
             // If rename failed or old file didn't exist, create new file
@@ -311,6 +330,104 @@ class StrmFileMapping extends Model
                 'error' => $e->getMessage(),
             ]);
             throw $e;
+        }
+    }
+
+    /**
+     * Try to rename a directory, ensuring it's safe and within sync location
+     *
+     * @return bool True if directory was renamed successfully
+     */
+    protected static function tryRenameDirectory(string $oldDirectory, string $newDirectory, string $syncLocation): bool
+    {
+        // Safety check: ensure both directories are within sync location
+        $realSyncLocation = realpath(rtrim($syncLocation, '/'));
+        if ($realSyncLocation === false) {
+            return false;
+        }
+
+        // Check old directory exists and is within sync location
+        $realOldDirectory = realpath($oldDirectory);
+        if ($realOldDirectory === false || ! str_starts_with($realOldDirectory.'/', $realSyncLocation.'/')) {
+            return false;
+        }
+
+        // Ensure new directory's parent exists
+        $newParentDirectory = dirname($newDirectory);
+        if (! is_dir($newParentDirectory)) {
+            if (! @mkdir($newParentDirectory, 0755, true)) {
+                Log::warning('STRM Sync: Failed to create parent directory for rename', ['directory' => $newParentDirectory]);
+
+                return false;
+            }
+        }
+
+        // Check if new directory already exists (can't rename into existing directory)
+        if (is_dir($newDirectory)) {
+            Log::debug('STRM Sync: Target directory already exists, cannot rename', [
+                'from' => $oldDirectory,
+                'to' => $newDirectory,
+            ]);
+
+            return false;
+        }
+
+        try {
+            if (@rename($oldDirectory, $newDirectory)) {
+                Log::info('STRM Sync: Renamed directory', ['from' => $oldDirectory, 'to' => $newDirectory]);
+
+                return true;
+            }
+
+            Log::debug('STRM Sync: Directory rename failed', ['from' => $oldDirectory, 'to' => $newDirectory]);
+
+            return false;
+        } catch (Throwable $e) {
+            Log::warning('STRM Sync: Exception during directory rename', [
+                'from' => $oldDirectory,
+                'to' => $newDirectory,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
+     * Try to rename a file, falling back to copy+delete for cross-device moves
+     *
+     * @return bool True if file was renamed/moved successfully
+     */
+    protected static function tryRenameOrCopyFile(string $oldPath, string $newPath): bool
+    {
+        try {
+            // Try to rename the file
+            if (@rename($oldPath, $newPath)) {
+                Log::info('STRM Sync: Renamed file', ['from' => $oldPath, 'to' => $newPath]);
+
+                return true;
+            }
+
+            // Rename failed - try copy + delete as fallback (handles cross-device moves)
+            if (@copy($oldPath, $newPath)) {
+                // Copy succeeded, try to delete old file (non-critical if it fails)
+                if (! @unlink($oldPath)) {
+                    Log::warning('STRM Sync: Failed to delete old file after copy', ['path' => $oldPath]);
+                }
+                Log::info('STRM Sync: Moved file (copy+delete)', ['from' => $oldPath, 'to' => $newPath]);
+
+                return true;
+            }
+
+            return false;
+        } catch (Throwable $e) {
+            Log::warning('STRM Sync: Exception during file rename', [
+                'from' => $oldPath,
+                'to' => $newPath,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
         }
     }
 
