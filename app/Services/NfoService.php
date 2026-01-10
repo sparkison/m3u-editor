@@ -15,9 +15,11 @@ class NfoService
      * @param  Series  $series  The series to generate NFO for
      * @param  string  $path  Directory path where tvshow.nfo should be written
      * @param  \App\Models\StrmFileMapping|null  $mapping  Optional mapping to check/update hash
+     * @param  bool  $nameFilterEnabled  Whether name filtering is enabled
+     * @param  array  $nameFilterPatterns  Patterns to filter from names
      * @return bool Success status
      */
-    public function generateSeriesNfo(Series $series, string $path, $mapping = null): bool
+    public function generateSeriesNfo(Series $series, string $path, $mapping = null, bool $nameFilterEnabled = false, array $nameFilterPatterns = []): bool
     {
         try {
             $metadata = $series->metadata ?? [];
@@ -30,10 +32,11 @@ class NfoService
             // Build the NFO XML
             $xml = $this->startXml('tvshow');
 
-            // Basic info
-            $xml .= $this->xmlElement('title', $series->name);
-            $xml .= $this->xmlElement('originaltitle', $series->name);
-            $xml .= $this->xmlElement('sorttitle', $series->name);
+            // Basic info - apply name filter if enabled
+            $seriesName = $this->applyNameFilter($series->name, $nameFilterEnabled, $nameFilterPatterns);
+            $xml .= $this->xmlElement('title', $seriesName);
+            $xml .= $this->xmlElement('originaltitle', $seriesName);
+            $xml .= $this->xmlElement('sorttitle', $seriesName);
 
             // Plot/Overview
             if (! empty($metadata['plot']) && is_string($metadata['plot'])) {
@@ -139,9 +142,11 @@ class NfoService
      * @param  Series  $series  The parent series
      * @param  string  $filePath  Path to the .strm file (will be converted to .nfo)
      * @param  \App\Models\StrmFileMapping|null  $mapping  Optional mapping to check/update hash
+     * @param  bool  $nameFilterEnabled  Whether name filtering is enabled
+     * @param  array  $nameFilterPatterns  Patterns to filter from names
      * @return bool Success status
      */
-    public function generateEpisodeNfo(Episode $episode, Series $series, string $filePath, $mapping = null): bool
+    public function generateEpisodeNfo(Episode $episode, Series $series, string $filePath, $mapping = null, bool $nameFilterEnabled = false, array $nameFilterPatterns = []): bool
     {
         try {
             $info = $episode->info ?? [];
@@ -155,9 +160,11 @@ class NfoService
             // Build the NFO XML
             $xml = $this->startXml('episodedetails');
 
-            // Basic info
-            $xml .= $this->xmlElement('title', $episode->title);
-            $xml .= $this->xmlElement('showtitle', $series->name);
+            // Basic info - apply name filter if enabled
+            $episodeTitle = $this->applyNameFilter($episode->title, $nameFilterEnabled, $nameFilterPatterns);
+            $seriesName = $this->applyNameFilter($series->name, $nameFilterEnabled, $nameFilterPatterns);
+            $xml .= $this->xmlElement('title', $episodeTitle);
+            $xml .= $this->xmlElement('showtitle', $seriesName);
 
             // Season and Episode
             $xml .= $this->xmlElement('season', $episode->season);
