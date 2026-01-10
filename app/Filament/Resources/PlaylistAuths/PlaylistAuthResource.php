@@ -29,6 +29,7 @@ use Filament\Tables\Enums\RecordActionsPosition;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Filament\Forms\Components\DateTimePicker;
 
 class PlaylistAuthResource extends Resource
 {
@@ -145,6 +146,12 @@ class PlaylistAuthResource extends Resource
                 ->required()
                 ->revealable()
                 ->columnSpan(1),
+            DateTimePicker::make('expires_at')
+                ->label('Expiration (date & time)')
+                ->seconds(false)
+                ->native(false)
+                ->helperText('If set, this account will stop working at that exact time.')
+                ->nullable(),
         ];
 
         return [
