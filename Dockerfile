@@ -246,8 +246,9 @@ RUN echo -e '#!/bin/bash\nphp artisan app:"$@"' > /usr/bin/m3ue && \
 RUN chown -R ${WWWUSER}:${WWWGROUP} /var/www/html && \
     chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache 2>/dev/null || true
 
-# Expose ports
-EXPOSE 80 443 8080 6001
+# Note: Ports are configured via environment variables (APP_PORT, REVERB_PORT, etc.)
+# and should be exposed in docker-compose.yml or via -p flags as needed.
+# Default ports: APP_PORT=36400, REVERB_PORT=36800, M3U_PROXY_PORT=8085, XTREAM_PORT=36401
 
 # Health check for the application
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
