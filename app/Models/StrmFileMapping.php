@@ -13,6 +13,13 @@ class StrmFileMapping extends Model
 {
     use HasFactory;
 
+    /** File extension constants */
+    public const STRM_EXTENSION = '.strm';
+
+    public const NFO_EXTENSION = '.nfo';
+
+    public const TVSHOW_NFO_FILENAME = 'tvshow.nfo';
+
     protected $casts = [
         'path_options' => 'array',
     ];
@@ -291,8 +298,8 @@ class StrmFileMapping extends Model
             }
 
             // Also move the NFO file if it exists (companion file)
-            $oldNfoPath = preg_replace('/\.strm$/i', '.nfo', $oldPath);
-            $newNfoPath = preg_replace('/\.strm$/i', '.nfo', $newPath);
+            $oldNfoPath = self::strmPathToNfoPath($oldPath);
+            $newNfoPath = self::strmPathToNfoPath($newPath);
             if ($oldNfoPath !== $oldPath && @file_exists($oldNfoPath)) {
                 self::tryRenameOrCopyFile($oldNfoPath, $newNfoPath);
             }
@@ -679,7 +686,7 @@ class StrmFileMapping extends Model
 
         // Ensure chunkById uses the fully-qualified column name to avoid ambiguous "id" when joined
         $baseQuery->orderBy('strm_file_mappings.id')
-            ->chunkById($batchSize, function ($rows) use (&$idsToDelete, &$pathsToUnlink, &$count) {
+            ->chunkById($batchSize, function ($rows) use (&$idsToDelete, &$pathsToUnlink, &$count, $batchSize) {
                 foreach ($rows as $row) {
                     $idsToDelete[] = $row->id;
                     if (! empty($row->current_path)) {
@@ -689,13 +696,13 @@ class StrmFileMapping extends Model
                 }
 
                 // When we have a reasonable batch, perform unlink and bulk delete to minimize per-row operations
-                if (count($idsToDelete) >= 500) {
+                if (count($idsToDelete) >= $batchSize) {
                     // Unlink STRM files and corresponding NFO files (best-effort)
                     foreach ($pathsToUnlink as $p) {
                         try {
                             @unlink($p);
                             // Also delete the corresponding NFO file if it exists
-                            $nfoPath = preg_replace('/\.strm$/i', '.nfo', $p);
+                            $nfoPath = self::strmPathToNfoPath($p);
                             if ($nfoPath !== $p && file_exists($nfoPath)) {
                                 @unlink($nfoPath);
                             }
@@ -767,7 +774,7 @@ class StrmFileMapping extends Model
 
                     // Check if directory only contains tvshow.nfo (orphaned series folder)
                     // If so, delete the tvshow.nfo first to allow directory cleanup
-                    $tvshowNfo = $dirPath.'/tvshow.nfo';
+                    $tvshowNfo = $dirPath.'/'.self::TVSHOW_NFO_FILENAME;
                     if (file_exists($tvshowNfo) && self::isDirectoryOnlyContainsNfo($dirPath)) {
                         @unlink($tvshowNfo);
                         Log::debug('STRM Sync: Deleted orphaned tvshow.nfo', ['path' => $tvshowNfo]);
@@ -806,7 +813,7 @@ class StrmFileMapping extends Model
             while (($entry = readdir($handle)) !== false) {
                 if ($entry !== '.' && $entry !== '..') {
                     // If we find any file that's not an NFO, return false
-                    if (! str_ends_with(strtolower($entry), '.nfo')) {
+                    if (! str_ends_with(strtolower($entry), self::NFO_EXTENSION)) {
                         return false;
                     }
                 }

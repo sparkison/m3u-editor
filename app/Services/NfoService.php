@@ -610,11 +610,20 @@ class NfoService
     }
 
     /**
-     * Get a scalar value from mixed input, returning null if it's an array or object
+     * Get a scalar value from mixed input.
+     * If an array is provided, extract and return the first element.
+     * If an object is provided, return null.
+     *
+     * @param  mixed  $value  The value to extract from
+     * @return mixed The scalar value, first array element, or null
      */
     private function getScalarValue(mixed $value): mixed
     {
-        if (is_array($value) || is_object($value)) {
+        if (is_array($value)) {
+            return ! empty($value) ? reset($value) : null;
+        }
+
+        if (is_object($value)) {
             return null;
         }
 
@@ -636,7 +645,10 @@ class NfoService
         }
 
         foreach ($patterns as $pattern) {
-            $name = str_replace($pattern, '', $name);
+            // Only process string patterns to prevent TypeError
+            if (is_string($pattern) && $pattern !== '') {
+                $name = str_replace($pattern, '', $name);
+            }
         }
 
         return trim($name);
