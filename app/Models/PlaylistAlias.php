@@ -25,6 +25,7 @@ class PlaylistAlias extends Model
         'enabled' => 'boolean',
         'enable_proxy' => 'boolean',
         'priority' => 'integer',
+        'expires_at' => 'datetime',
         'custom_headers' => 'array',
         'strict_live_ts' => 'boolean',
     ];
@@ -111,6 +112,18 @@ class PlaylistAlias extends Model
     public function customPlaylist(): BelongsTo
     {
         return $this->belongsTo(CustomPlaylist::class);
+    }
+
+    /**
+     * Determine whether this alias auth credential is expired.
+     */
+    public function isExpired(): bool
+    {
+        if ($this->expires_at === null) {
+            return false;
+        }
+    
+        return now()->greaterThanOrEqualTo($this->expires_at);
     }
 
     /**
