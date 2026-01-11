@@ -15,6 +15,7 @@ use Exception;
 use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
@@ -167,6 +168,16 @@ class Preferences extends SettingsPage
                                                         Width::ScreenTwoExtraLarge->value => '2XL',
                                                         Width::Full->value => 'Full',
                                                     ]),
+                                            ]),
+                                        Grid::make()
+                                            ->columnSpanFull()
+                                            ->columns(1)
+                                            ->schema([
+                                                Textarea::make('xtream_api_message')
+                                                    ->label('Xtream API panel message')
+                                                    ->helperText('Returned as user_info.message in player_api.php responses.')
+                                                    ->rows(3)
+                                                    ->default(''),
                                             ]),
                                     ]),
                             ]),
