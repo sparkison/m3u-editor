@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static array getMediaFlowProxyServerUrl()
  * @method static array|bool authenticate($username, $password) // [\App\Models\Playlist|\App\Models\MergedPlaylist|\App\Models\CustomPlaylist|\App\Models\PlaylistAlias|null, string $authMethod, string $username, string $password] or false on failure
  * @method static \App\Models\Playlist|\App\Models\MergedPlaylist|\App\Models\CustomPlaylist|\App\Models\PlaylistAlias|null resolvePlaylistByUuid(string $uuid)
+ * @method static int resolveXtreamExpDate($authRecord, string $authMethod, ?string $username, ?string $password)
  */
 class PlaylistFacade extends Facade
 {

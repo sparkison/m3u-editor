@@ -533,7 +533,7 @@ class PlaylistService
      *
      * @param  mixed  $authRecord  PlaylistAuth|PlaylistAlias|Playlist|CustomPlaylist|MergedPlaylist
      */
-    private function resolveXtreamExpDate($authRecord, string $authMethod, ?string $username, ?string $password): int
+    public function resolveXtreamExpDate($authRecord, string $authMethod, ?string $username, ?string $password): int
     {
         // PlaylistAuth login
         if ($authMethod === 'playlist_auth' && $authRecord instanceof \App\Models\PlaylistAuth) {

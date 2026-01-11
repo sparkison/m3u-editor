@@ -417,7 +417,7 @@ class XtreamApiController extends Controller
                 $activeConnections = M3uProxyService::getPlaylistActiveStreamsCount($playlist);
             }
 
-            $expDate = $this->resolveXtreamExpDate(
+            $expDate = PlaylistFacade::resolveXtreamExpDate(
                 $playlist,
                 $authMethod,
                 $username,
