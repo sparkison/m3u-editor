@@ -417,14 +417,28 @@ class XtreamApiController extends Controller
                 $activeConnections = M3uProxyService::getPlaylistActiveStreamsCount($playlist);
             }
 
+            $expDate = PlaylistFacade::resolveXtreamExpDate(
+                $playlist,
+                $authMethod,
+                $username,
+                $password
+            );
+
+            if (empty($expDate) || (int) $expDate === 0) {
+                $expDate = $expires;
+            }
+
+            $settings = app(\App\Settings\GeneralSettings::class);
+            $message = $settings->xtream_api_message ?? '';
+
             $userInfo = [
                 // 'playlist_id' => (string)$playlist->id, // Debugging
                 'username' => $username,
                 'password' => $password,
-                'message' => '',
+                'message' => (string) $message,
                 'auth' => 1, // Authenticated successfully
                 'status' => 'Active', // No inactive playlists should reach this point
-                'exp_date' => (string) $expires,
+                'exp_date' => (string) $expDate,
                 'is_trial' => '0', // Trial accounts not supported
                 'active_cons' => (string) $activeConnections,
                 'created_at' => (string) ($playlist->user ? $playlist->user->created_at->timestamp : $now->timestamp),
