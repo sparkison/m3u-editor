@@ -303,13 +303,11 @@ class PlaylistGenerateController extends Controller
                     }
                 }
 
-                // If the playlist includes networks in M3U, include the user's networks as live channels
-                if ($playlist->include_networks_in_m3u) {
-                    $networks = Network::where('user_id', $playlist->user_id)
-                        ->where('enabled', true)
-                        ->orderBy('channel_number')
-                        ->orderBy('name')
-                        ->get();
+                // If the playlist includes networks in M3U, include networks as live channels
+                // For MediaServerIntegration playlists, get networks linked to that integration
+                // For regular playlists with the option enabled, get user's unlinked networks
+                if ($playlist->include_networks_in_m3u && method_exists($playlist, 'getNetworks')) {
+                    $networks = $playlist->getNetworks();
 
                     foreach ($networks as $network) {
                         $channelNo = $network->channel_number ?? ++$channelNumber;

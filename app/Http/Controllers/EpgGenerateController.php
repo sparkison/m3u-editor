@@ -208,14 +208,11 @@ class EpgGenerateController extends Controller
         }
 
         // If networks are included, output their channel tags
+        // For MediaServerIntegration playlists, get networks linked to that integration
+        // For regular playlists, get user's networks (or none)
         $networkChannels = [];
-        if ($playlist->include_networks_in_m3u) {
-            $networks = \App\Models\Network::where('user_id', $playlist->user_id)
-                ->where('enabled', true)
-                ->with('programmes')
-                ->orderBy('channel_number')
-                ->orderBy('name')
-                ->get();
+        if ($playlist->include_networks_in_m3u && method_exists($playlist, 'getNetworks')) {
+            $networks = $playlist->getNetworks();
 
             foreach ($networks as $network) {
                 $tvgId = 'network-'.$network->id;

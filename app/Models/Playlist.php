@@ -96,6 +96,45 @@ class Playlist extends Model
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * Get the media server integration that owns this playlist (if any).
+     */
+    public function mediaServerIntegration(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(MediaServerIntegration::class);
+    }
+
+    /**
+     * Check if this playlist belongs to a media server integration.
+     */
+    public function isMediaServerPlaylist(): bool
+    {
+        return $this->mediaServerIntegration()->exists();
+    }
+
+    /**
+     * Get networks associated with this playlist's media server integration.
+     */
+    public function getNetworks(): \Illuminate\Database\Eloquent\Collection
+    {
+        $integration = $this->mediaServerIntegration;
+        if (! $integration) {
+            // Fallback: get user's networks not linked to any specific integration
+            return Network::where('user_id', $this->user_id)
+                ->whereNull('media_server_integration_id')
+                ->where('enabled', true)
+                ->orderBy('channel_number')
+                ->orderBy('name')
+                ->get();
+        }
+
+        return $integration->networks()
+            ->where('enabled', true)
+            ->orderBy('channel_number')
+            ->orderBy('name')
+            ->get();
+    }
+
     public function streamProfile(): BelongsTo
     {
         return $this->belongsTo(StreamProfile::class, 'stream_profile_id');
