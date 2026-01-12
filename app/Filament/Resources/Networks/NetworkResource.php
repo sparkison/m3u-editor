@@ -133,17 +133,7 @@ class NetworkResource extends Resource
                             ->disabled()
                             ->dehydrated(false)
                             ->formatStateUsing(fn ($record) => $record?->epg_url ?? 'Save network first')
-                            ->suffixAction(
-                                \Filament\Forms\Components\Actions\Action::make('copy')
-                                    ->icon('heroicon-o-clipboard')
-                                    ->action(function ($state, $livewire) {
-                                        $livewire->js("navigator.clipboard.writeText('{$state}')");
-                                        Notification::make()
-                                            ->success()
-                                            ->title('Copied to clipboard')
-                                            ->send();
-                                    })
-                            ),
+                            ->copyable(),
 
                         TextInput::make('schedule_info')
                             ->label('Schedule Info')
@@ -171,17 +161,14 @@ class NetworkResource extends Resource
                             ->disabled()
                             ->dehydrated(false)
                             ->formatStateUsing(fn ($record) => $record?->stream_url ?? 'Save network first')
-                            ->suffixAction(
-                                \Filament\Forms\Components\Actions\Action::make('copy_stream')
-                                    ->icon('heroicon-o-clipboard')
-                                    ->action(function ($state, $livewire) {
-                                        $livewire->js("navigator.clipboard.writeText('{$state}')");
-                                        Notification::make()
-                                            ->success()
-                                            ->title('Copied to clipboard')
-                                            ->send();
-                                    })
-                            ),
+                            ->copyable(),
+
+                        TextInput::make('m3u_url')
+                            ->label('M3U Playlist URL')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->formatStateUsing(fn ($record) => $record ? route('network.playlist', ['network' => $record->uuid]) : 'Save network first')
+                            ->copyable(),
                     ])
                     ->visibleOn('edit'),
             ]);

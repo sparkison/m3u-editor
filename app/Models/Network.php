@@ -42,11 +42,17 @@ class Network extends Model
     }
 
     /**
-     * Get the route key for the model.
+     * Resolve route binding - use UUID for public routes, ID for admin.
      */
-    public function getRouteKeyName(): string
+    public function resolveRouteBinding($value, $field = null)
     {
-        return 'uuid';
+        // If it looks like a UUID, find by uuid
+        if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $value)) {
+            return $this->where('uuid', $value)->firstOrFail();
+        }
+
+        // Otherwise use default (id)
+        return parent::resolveRouteBinding($value, $field);
     }
 
     /**

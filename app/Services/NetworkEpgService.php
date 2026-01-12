@@ -68,6 +68,32 @@ class NetworkEpgService
     }
 
     /**
+     * Stream XMLTV output for multiple networks (for large schedules).
+     */
+    public function streamXmltvForNetworks(Collection $networks): void
+    {
+        echo $this->getXmlHeader();
+
+        // Output all channel tags first
+        foreach ($networks as $network) {
+            echo $this->generateChannelXml($network);
+        }
+
+        // Stream programmes for each network
+        foreach ($networks as $network) {
+            $network->programmes()
+                ->orderBy('start_time')
+                ->chunk(100, function ($programmes) use ($network) {
+                    foreach ($programmes as $programme) {
+                        echo $this->formatProgrammeXml($network, $programme);
+                    }
+                });
+        }
+
+        echo $this->getXmlFooter();
+    }
+
+    /**
      * Get XMLTV header.
      */
     protected function getXmlHeader(): string
