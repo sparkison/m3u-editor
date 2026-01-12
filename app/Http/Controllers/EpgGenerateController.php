@@ -207,6 +207,41 @@ class EpgGenerateController extends Controller
             }
         }
 
+        // If networks are included, output their channel tags
+        $networkChannels = [];
+        if ($playlist->include_networks_in_m3u) {
+            $networks = \App\Models\Network::where('user_id', $playlist->user_id)
+                ->where('enabled', true)
+                ->with('programmes')
+                ->orderBy('channel_number')
+                ->orderBy('name')
+                ->get();
+
+            foreach ($networks as $network) {
+                $tvgId = 'network-'.$network->id;
+                $title = htmlspecialchars($network->name, ENT_XML1);
+                $icon = $network->logo ?? url('/placeholder.png');
+                if ($logoProxyEnabled) {
+                    $icon = LogoProxyController::generateProxyUrl($icon);
+                }
+                $channelNo = $network->channel_number;
+
+                // Store for programme output later
+                $networkChannels[] = $network;
+
+                // Output the <channel> tag
+                echo '  <channel id="'.$tvgId.'">'.PHP_EOL;
+                echo '    <display-name>'.$title.'</display-name>';
+                if ($channelNo !== null) {
+                    echo PHP_EOL.'    <display-name>'.$channelNo.'</display-name>';
+                }
+                if ($icon) {
+                    echo PHP_EOL.'    <icon src="'.htmlspecialchars($icon, ENT_XML1).'"/>';
+                }
+                echo PHP_EOL.'  </channel>'.PHP_EOL;
+            }
+        }
+
         // Fetch the EPGs (channels are keyed by EPG ID)
         $epgs = Epg::whereIn('id', array_keys($epgChannels))
             ->get();
@@ -381,6 +416,39 @@ class EpgGenerateController extends Controller
                 }
                 // Single echo per channel instead of 600+ echoes
                 echo $buffer;
+            }
+        }
+
+        // Output Network programme schedules
+        if (! empty($networkChannels)) {
+            foreach ($networkChannels as $network) {
+                $tvgId = 'network-'.$network->id;
+
+                // Get programmes that haven't ended yet
+                $programmes = $network->programmes()
+                    ->where('end_time', '>', Carbon::now()->subDay())
+                    ->orderBy('start_time')
+                    ->get();
+
+                foreach ($programmes as $programme) {
+                    $start = str_replace(':', '', $programme->start_time->format('YmdHis O'));
+                    $stop = str_replace(':', '', $programme->end_time->format('YmdHis O'));
+                    $title = htmlspecialchars($programme->title, ENT_XML1);
+                    $desc = $programme->description ? htmlspecialchars($programme->description, ENT_XML1) : '';
+                    $icon = $programme->image ? htmlspecialchars($programme->image, ENT_XML1) : '';
+                    $category = $programme->contentable_type === 'App\\Models\\Episode' ? 'Series' : 'Movie';
+
+                    echo '  <programme channel="'.$tvgId.'" start="'.$start.'" stop="'.$stop.'">'.PHP_EOL;
+                    echo '    <title>'.$title.'</title>'.PHP_EOL;
+                    if ($desc) {
+                        echo '    <desc>'.$desc.'</desc>'.PHP_EOL;
+                    }
+                    if ($icon) {
+                        echo '    <icon src="'.$icon.'"/>'.PHP_EOL;
+                    }
+                    echo '    <category>'.$category.'</category>'.PHP_EOL;
+                    echo '  </programme>'.PHP_EOL;
+                }
             }
         }
 

@@ -82,6 +82,14 @@ class MediaServerIntegration extends Model
     }
 
     /**
+     * Get networks associated with this integration.
+     */
+    public function networks(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Network::class);
+    }
+
+    /**
      * Scope to only enabled integrations.
      */
     public function scopeEnabled($query)

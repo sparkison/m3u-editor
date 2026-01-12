@@ -1891,6 +1891,15 @@ class PlaylistResource extends Resource
                         )
                         ->default(false)
                         ->helperText('When enabled, series will be included in the M3U output. It is recommended to enable the "Auto-fetch series metadata" option when enabled.'),
+                    Toggle::make('include_networks_in_m3u')
+                        ->label('Include Networks in M3U output')
+                        ->inline(false)
+                        ->hintIcon(
+                            'heroicon-m-question-mark-circle',
+                            tooltip: 'Enable this to include your Networks (pseudo-TV channels) in the M3U file as live channels.'
+                        )
+                        ->default(false)
+                        ->helperText('When enabled, your Networks will be included as live channels in the M3U output.'),
                 ])->hidden(fn (Get $get): bool => ! $get('xtream')),
 
             Section::make('VOD Processing')

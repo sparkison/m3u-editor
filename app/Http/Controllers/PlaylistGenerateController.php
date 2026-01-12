@@ -8,6 +8,7 @@ use App\Facades\PlaylistFacade;
 use App\Facades\ProxyFacade;
 use App\Models\Channel;
 use App\Models\CustomPlaylist;
+use App\Models\Network;
 use App\Models\Playlist;
 use App\Models\PlaylistAlias;
 use App\Services\PlaylistUrlService;
@@ -299,6 +300,34 @@ class PlaylistGenerateController extends Controller
                             echo "$extInf,".$title."\n";
                             echo $url."\n";
                         }
+                    }
+                }
+
+                // If the playlist includes networks in M3U, include the user's networks as live channels
+                if ($playlist->include_networks_in_m3u) {
+                    $networks = Network::where('user_id', $playlist->user_id)
+                        ->where('enabled', true)
+                        ->orderBy('channel_number')
+                        ->orderBy('name')
+                        ->get();
+
+                    foreach ($networks as $network) {
+                        $channelNo = $network->channel_number ?? ++$channelNumber;
+                        $tvgId = 'network-'.$network->id;
+                        $name = $network->name;
+                        $title = $network->name;
+                        $icon = $network->logo ?? $baseUrl.'/placeholder.png';
+                        $group = 'Networks';
+                        $url = $network->stream_url;
+
+                        if ($logoProxyEnabled) {
+                            $icon = LogoProxyController::generateProxyUrl($icon);
+                        }
+
+                        $extInf = '#EXTINF:-1';
+                        $extInf .= " tvg-chno=\"$channelNo\" tvg-id=\"$tvgId\" tvg-name=\"$name\" tvg-logo=\"$icon\" group-title=\"$group\"";
+                        echo "$extInf,".$title."\n";
+                        echo $url."\n";
                     }
                 }
             },
