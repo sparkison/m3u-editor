@@ -2,9 +2,12 @@
 
 namespace App\Filament\Resources\Networks;
 
+use App\Filament\Resources\Networks\Pages\AddEpisodesToNetwork;
+use App\Filament\Resources\Networks\Pages\AddMoviesToNetwork;
 use App\Filament\Resources\Networks\Pages\CreateNetwork;
 use App\Filament\Resources\Networks\Pages\EditNetwork;
 use App\Filament\Resources\Networks\Pages\ListNetworks;
+use App\Filament\Resources\Networks\RelationManagers\NetworkContentRelationManager;
 use App\Models\Network;
 use App\Services\NetworkScheduleService;
 use App\Traits\HasUserFiltering;
@@ -125,41 +128,31 @@ class NetworkResource extends Resource
                             ->default(true),
                     ]),
 
-                Section::make('EPG Output')
-                    ->description('EPG URL for IPTV players')
+                Section::make('Schedule Status')
+                    ->description('Information about the generated schedule')
                     ->schema([
-                        TextInput::make('epg_url')
-                            ->label('EPG URL')
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->formatStateUsing(fn ($record) => $record?->epg_url ?? 'Save network first')
-                            ->suffixAction(
-                                \Filament\Forms\Components\Actions\Action::make('copy')
-                                    ->icon('heroicon-o-clipboard')
-                                    ->action(function ($state, $livewire) {
-                                        $livewire->js("navigator.clipboard.writeText('{$state}')");
-                                        Notification::make()
-                                            ->success()
-                                            ->title('Copied to clipboard')
-                                            ->send();
-                                    })
-                            ),
+                        Grid::make(2)->schema([
+                            TextInput::make('schedule_generated_at')
+                                ->label('Schedule Generated')
+                                ->disabled()
+                                ->dehydrated(false)
+                                ->formatStateUsing(function ($state) {
+                                    if (! $state) {
+                                        return 'Never';
+                                    }
+                                    if (is_string($state)) {
+                                        $state = \Carbon\Carbon::parse($state);
+                                    }
 
-                        TextInput::make('schedule_info')
-                            ->label('Schedule Info')
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->formatStateUsing(function ($record) {
-                                if (! $record) {
-                                    return 'Not generated';
-                                }
-                                $count = $record->programmes()->count();
-                                $last = $record->programmes()->latest('end_time')->first();
+                                    return $state->diffForHumans();
+                                }),
 
-                                return $count > 0
-                                    ? "{$count} programmes until ".($last?->end_time?->format('M j, Y H:i') ?? 'unknown')
-                                    : 'No programmes - generate schedule first';
-                            }),
+                            TextInput::make('content_count')
+                                ->label('Content Items')
+                                ->disabled()
+                                ->dehydrated(false)
+                                ->formatStateUsing(fn ($record) => $record?->networkContent()->count() ?? 0),
+                        ]),
                     ])
                     ->visibleOn('edit'),
             ]);
@@ -237,6 +230,12 @@ class NetworkResource extends Resource
                                 ->send();
                         }),
 
+                    Action::make('manageContent')
+                        ->label('Manage Content')
+                        ->icon('heroicon-o-film')
+                        ->color('info')
+                        ->url(fn (Network $record) => static::getUrl('edit', ['record' => $record]) . '#content'),
+
                     EditAction::make(),
 
                     DeleteAction::make(),
@@ -257,7 +256,7 @@ class NetworkResource extends Resource
                             Notification::make()
                                 ->success()
                                 ->title('Schedules Generated')
-                                ->body('Generated schedules for '.$records->count().' networks.')
+                                ->body('Generated schedules for ' . $records->count() . ' networks.')
                                 ->send();
                         }),
 
@@ -269,7 +268,7 @@ class NetworkResource extends Resource
     public static function getRelations(): array
     {
         return [
-            RelationManagers\NetworkContentRelationManager::class,
+            NetworkContentRelationManager::class,
         ];
     }
 
@@ -279,6 +278,8 @@ class NetworkResource extends Resource
             'index' => ListNetworks::route('/'),
             'create' => CreateNetwork::route('/create'),
             'edit' => EditNetwork::route('/{record}/edit'),
+            'add-episodes' => AddEpisodesToNetwork::route('/{record}/add-episodes'),
+            'add-movies' => AddMoviesToNetwork::route('/{record}/add-movies'),
         ];
     }
 

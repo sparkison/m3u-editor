@@ -3,6 +3,7 @@
 use App\Http\Controllers\EpgFileController;
 use App\Http\Controllers\EpgGenerateController;
 use App\Http\Controllers\LogoProxyController;
+use App\Http\Controllers\NetworkEpgController;
 use App\Http\Controllers\PlaylistGenerateController;
 use App\Http\Controllers\XtreamApiController;
 use App\Services\ExternalIpService;
@@ -84,6 +85,12 @@ Route::get('/{uuid}/epg.xml.gz', [EpgGenerateController::class, 'compressed'])
 // Serve the EPG file
 Route::get('epgs/{uuid}/epg.xml', EpgFileController::class)
     ->name('epg.file');
+
+// Network EPG routes
+Route::get('/network/{network}/epg.xml', [NetworkEpgController::class, 'show'])
+    ->name('network.epg');
+Route::get('/network/{network}/epg.xml.gz', [NetworkEpgController::class, 'compressed'])
+    ->name('network.epg.compressed');
 
 /*
  * DEBUG routes

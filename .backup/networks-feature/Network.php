@@ -5,8 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Str;
 
 class Network extends Model
 {
@@ -26,28 +26,6 @@ class Network extends Model
         'media_server_integration_id' => 'integer',
         'schedule_generated_at' => 'datetime',
     ];
-
-    /**
-     * Boot the model.
-     */
-    protected static function boot(): void
-    {
-        parent::boot();
-
-        static::creating(function (Network $network) {
-            if (empty($network->uuid)) {
-                $network->uuid = Str::uuid()->toString();
-            }
-        });
-    }
-
-    /**
-     * Get the route key for the model.
-     */
-    public function getRouteKeyName(): string
-    {
-        return 'uuid';
-    }
 
     /**
      * Get the user that owns this network.
@@ -82,6 +60,26 @@ class Network extends Model
     }
 
     /**
+     * Get episodes assigned to this network.
+     */
+    public function episodes(): BelongsToMany
+    {
+        return $this->morphedByMany(Episode::class, 'contentable', 'network_content')
+            ->withPivot(['sort_order', 'weight'])
+            ->withTimestamps();
+    }
+
+    /**
+     * Get VOD channels (movies) assigned to this network.
+     */
+    public function channels(): BelongsToMany
+    {
+        return $this->morphedByMany(Channel::class, 'contentable', 'network_content')
+            ->withPivot(['sort_order', 'weight'])
+            ->withTimestamps();
+    }
+
+    /**
      * Check if the schedule needs to be regenerated.
      */
     public function needsScheduleRegeneration(): bool
@@ -97,13 +95,5 @@ class Network extends Model
         }
 
         return $lastProgramme->end_time->diffInHours(now()) < 24;
-    }
-
-    /**
-     * Get the EPG URL for this network.
-     */
-    public function getEpgUrlAttribute(): string
-    {
-        return route('network.epg', ['network' => $this->uuid]);
     }
 }
