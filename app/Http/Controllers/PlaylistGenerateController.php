@@ -303,31 +303,8 @@ class PlaylistGenerateController extends Controller
                     }
                 }
 
-                // If the playlist includes networks in M3U, include networks as live channels
-                // For MediaServerIntegration playlists, get networks linked to that integration
-                // For regular playlists with the option enabled, get user's unlinked networks
-                if ($playlist->include_networks_in_m3u && method_exists($playlist, 'getNetworks')) {
-                    $networks = $playlist->getNetworks();
-
-                    foreach ($networks as $network) {
-                        $channelNo = $network->channel_number ?? ++$channelNumber;
-                        $tvgId = 'network-'.$network->id;
-                        $name = $network->name;
-                        $title = $network->name;
-                        $icon = $network->logo ?? $baseUrl.'/placeholder.png';
-                        $group = 'Networks';
-                        $url = $network->stream_url;
-
-                        if ($logoProxyEnabled) {
-                            $icon = LogoProxyController::generateProxyUrl($icon);
-                        }
-
-                        $extInf = '#EXTINF:-1';
-                        $extInf .= " tvg-chno=\"$channelNo\" tvg-id=\"$tvgId\" tvg-name=\"$name\" tvg-logo=\"$icon\" group-title=\"$group\"";
-                        echo "$extInf,".$title."\n";
-                        echo $url."\n";
-                    }
-                }
+                // Networks are now synced as actual Channel records with network_id
+                // They will be included automatically in the channel query above
             },
             200,
             [

@@ -7,6 +7,7 @@ use App\Events\PlaylistDeleted;
 use App\Events\PlaylistUpdated;
 use App\Jobs\ProcessM3uImport;
 use App\Jobs\RunPostProcess;
+use App\Services\NetworkChannelSyncService;
 use App\Services\ProfileService;
 
 class PlaylistListener
@@ -52,6 +53,11 @@ class PlaylistListener
         // Check both when the setting changes AND when it's already enabled (to fix missing profiles)
         if ($playlist->profiles_enabled) {
             $this->ensurePrimaryProfileExists($playlist);
+        }
+
+        // Sync networks as channels if the setting is enabled
+        if ($playlist->wasChanged('include_networks_in_m3u') || $playlist->include_networks_in_m3u) {
+            app(NetworkChannelSyncService::class)->syncNetworksToPlaylist($playlist);
         }
 
         // Handle playlist updated event

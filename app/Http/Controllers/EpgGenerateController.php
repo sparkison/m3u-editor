@@ -96,8 +96,16 @@ class EpgGenerateController extends Controller
         $proxyEnabled = $playlist->enable_proxy;
         $logoProxyEnabled = $playlist->enable_logo_proxy;
 
+        // Track network channels for programme output later
+        $networkChannelIds = [];
+
         // Generate `<channel>` tags for each channel
         foreach ($channels->cursor() as $channel) {
+            // Track network channels for special programme handling
+            if ($channel->network_id) {
+                $networkChannelIds[$channel->network_id] = $channel->stream_id ?? 'network-'.$channel->network_id;
+            }
+
             // Get/set the channel number
             $channelNo = $channel->channel;
             if (! $channelNo && ($playlist->auto_channel_increment || $idChannelBy === PlaylistChannelId::ChannelId)) {
@@ -207,37 +215,9 @@ class EpgGenerateController extends Controller
             }
         }
 
-        // If networks are included, output their channel tags
-        // For MediaServerIntegration playlists, get networks linked to that integration
-        // For regular playlists, get user's networks (or none)
-        $networkChannels = [];
-        if ($playlist->include_networks_in_m3u && method_exists($playlist, 'getNetworks')) {
-            $networks = $playlist->getNetworks();
-
-            foreach ($networks as $network) {
-                $tvgId = 'network-'.$network->id;
-                $title = htmlspecialchars($network->name, ENT_XML1);
-                $icon = $network->logo ?? url('/placeholder.png');
-                if ($logoProxyEnabled) {
-                    $icon = LogoProxyController::generateProxyUrl($icon);
-                }
-                $channelNo = $network->channel_number;
-
-                // Store for programme output later
-                $networkChannels[] = $network;
-
-                // Output the <channel> tag
-                echo '  <channel id="'.$tvgId.'">'.PHP_EOL;
-                echo '    <display-name>'.$title.'</display-name>';
-                if ($channelNo !== null) {
-                    echo PHP_EOL.'    <display-name>'.$channelNo.'</display-name>';
-                }
-                if ($icon) {
-                    echo PHP_EOL.'    <icon src="'.htmlspecialchars($icon, ENT_XML1).'"/>';
-                }
-                echo PHP_EOL.'  </channel>'.PHP_EOL;
-            }
-        }
+        // Network channels are now included in the regular channel loop above
+        // (they are real Channel records with network_id set)
+        // We'll output their programmes after regular EPG programmes
 
         // Fetch the EPGs (channels are keyed by EPG ID)
         $epgs = Epg::whereIn('id', array_keys($epgChannels))
@@ -416,18 +396,19 @@ class EpgGenerateController extends Controller
             }
         }
 
-        // Output Network programme schedules
-        if (! empty($networkChannels)) {
-            foreach ($networkChannels as $network) {
-                $tvgId = 'network-'.$network->id;
+        // Output Network programme schedules (from channels with network_id)
+        if (! empty($networkChannelIds)) {
+            $networks = \App\Models\Network::whereIn('id', array_keys($networkChannelIds))
+                ->with(['programmes' => function ($q) {
+                    $q->where('end_time', '>', Carbon::now()->subDay())
+                        ->orderBy('start_time');
+                }])
+                ->get();
 
-                // Get programmes that haven't ended yet
-                $programmes = $network->programmes()
-                    ->where('end_time', '>', Carbon::now()->subDay())
-                    ->orderBy('start_time')
-                    ->get();
+            foreach ($networks as $network) {
+                $tvgId = $networkChannelIds[$network->id];
 
-                foreach ($programmes as $programme) {
+                foreach ($network->programmes as $programme) {
                     $start = str_replace(':', '', $programme->start_time->format('YmdHis O'));
                     $stop = str_replace(':', '', $programme->end_time->format('YmdHis O'));
                     $title = htmlspecialchars($programme->title, ENT_XML1);

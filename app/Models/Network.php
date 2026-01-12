@@ -39,6 +39,16 @@ class Network extends Model
                 $network->uuid = Str::uuid()->toString();
             }
         });
+
+        // Sync network channels when network is updated
+        static::updated(function (Network $network) {
+            app(\App\Services\NetworkChannelSyncService::class)->refreshNetworkChannel($network);
+        });
+
+        // Remove network channels when network is deleted
+        static::deleting(function (Network $network) {
+            \App\Models\Channel::where('network_id', $network->id)->delete();
+        });
     }
 
     /**
