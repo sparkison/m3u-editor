@@ -1,0 +1,222 @@
+<?php
+
+namespace App\Filament\Resources\Networks\RelationManagers;
+
+use App\Models\Channel;
+use App\Models\Episode;
+use App\Models\NetworkContent;
+use App\Models\Series;
+use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
+use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Tables\Table;
+use Illuminate\Support\Facades\Auth;
+
+class NetworkContentRelationManager extends RelationManager
+{
+    protected static string $relationship = 'networkContent';
+
+    protected static ?string $title = 'Content';
+
+    protected static ?string $recordTitleAttribute = 'id';
+
+    public function table(Table $table): Table
+    {
+        return $table
+            ->reorderable('sort_order')
+            ->defaultSort('sort_order')
+            ->columns([
+                TextColumn::make('sort_order')
+                    ->label('#')
+                    ->sortable()
+                    ->width('60px'),
+
+                TextColumn::make('contentable_type')
+                    ->label('Type')
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'App\\Models\\Episode' => 'Episode',
+                        'App\\Models\\Channel' => 'Movie',
+                        default => 'Unknown',
+                    })
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'App\\Models\\Episode' => 'info',
+                        'App\\Models\\Channel' => 'success',
+                        default => 'gray',
+                    }),
+
+                TextColumn::make('title')
+                    ->label('Title')
+                    ->getStateUsing(fn (NetworkContent $record): string => $record->title)
+                    ->wrap()
+                    ->searchable(false),
+
+                TextColumn::make('duration')
+                    ->label('Duration')
+                    ->getStateUsing(function (NetworkContent $record): string {
+                        $seconds = $record->duration_seconds;
+                        if ($seconds <= 0) {
+                            return '~30m (default)';
+                        }
+                        $hours = floor($seconds / 3600);
+                        $minutes = floor(($seconds % 3600) / 60);
+
+                        return $hours > 0
+                            ? sprintf('%dh %dm', $hours, $minutes)
+                            : sprintf('%dm', $minutes);
+                    }),
+
+                TextColumn::make('weight')
+                    ->label('Weight')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+            ])
+            ->headerActions([
+                Action::make('addEpisodes')
+                    ->label('Add Episodes')
+                    ->icon('heroicon-o-film')
+                    ->color('info')
+                    ->form([
+                        Select::make('series_id')
+                            ->label('Series')
+                            ->options(function () {
+                                return Series::where('user_id', Auth::id())
+                                    ->orderBy('name')
+                                    ->pluck('name', 'id');
+                            })
+                            ->searchable()
+                            ->preload()
+                            ->live()
+                            ->required(),
+
+                        Select::make('episode_ids')
+                            ->label('Episodes')
+                            ->options(function (callable $get) {
+                                $seriesId = $get('series_id');
+                                if (! $seriesId) {
+                                    return [];
+                                }
+
+                                $existingIds = $this->getOwnerRecord()
+                                    ->networkContent()
+                                    ->where('contentable_type', Episode::class)
+                                    ->pluck('contentable_id');
+
+                                return Episode::where('series_id', $seriesId)
+                                    ->whereNotIn('id', $existingIds)
+                                    ->orderBy('season')
+                                    ->orderBy('episode_num')
+                                    ->get()
+                                    ->mapWithKeys(fn ($ep) => [
+                                        $ep->id => "S{$ep->season}E{$ep->episode_num} - {$ep->title}",
+                                    ]);
+                            })
+                            ->multiple()
+                            ->searchable()
+                            ->required(),
+                    ])
+                    ->action(function (array $data) {
+                        $network = $this->getOwnerRecord();
+                        $maxSort = $network->networkContent()->max('sort_order') ?? 0;
+
+                        foreach ($data['episode_ids'] as $episodeId) {
+                            NetworkContent::create([
+                                'network_id' => $network->id,
+                                'contentable_type' => Episode::class,
+                                'contentable_id' => $episodeId,
+                                'sort_order' => ++$maxSort,
+                                'weight' => 1,
+                            ]);
+                        }
+
+                        Notification::make()
+                            ->success()
+                            ->title('Episodes Added')
+                            ->body('Added '.count($data['episode_ids']).' episodes to the network.')
+                            ->send();
+                    }),
+
+                Action::make('addMovies')
+                    ->label('Add Movies')
+                    ->icon('heroicon-o-video-camera')
+                    ->color('success')
+                    ->form([
+                        Select::make('channel_ids')
+                            ->label('Movies (VOD)')
+                            ->options(function () {
+                                $existingIds = $this->getOwnerRecord()
+                                    ->networkContent()
+                                    ->where('contentable_type', Channel::class)
+                                    ->pluck('contentable_id');
+
+                                return Channel::where('user_id', Auth::id())
+                                    ->where('is_vod', true)
+                                    ->whereNotIn('id', $existingIds)
+                                    ->orderBy('name')
+                                    ->limit(500)
+                                    ->pluck('name', 'id');
+                            })
+                            ->multiple()
+                            ->searchable()
+                            ->required(),
+                    ])
+                    ->action(function (array $data) {
+                        $network = $this->getOwnerRecord();
+                        $maxSort = $network->networkContent()->max('sort_order') ?? 0;
+
+                        foreach ($data['channel_ids'] as $channelId) {
+                            NetworkContent::create([
+                                'network_id' => $network->id,
+                                'contentable_type' => Channel::class,
+                                'contentable_id' => $channelId,
+                                'sort_order' => ++$maxSort,
+                                'weight' => 1,
+                            ]);
+                        }
+
+                        Notification::make()
+                            ->success()
+                            ->title('Movies Added')
+                            ->body('Added '.count($data['channel_ids']).' movies to the network.')
+                            ->send();
+                    }),
+            ])
+            ->recordActions([
+                DeleteAction::make()
+                    ->icon('heroicon-o-x-circle')
+                    ->button()
+                    ->hiddenLabel(),
+            ], position: RecordActionsPosition::BeforeCells)
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
+                ]),
+            ]);
+    }
+
+    public function form(Schema $schema): Schema
+    {
+        return $schema->components([
+            TextInput::make('sort_order')
+                ->label('Sort Order')
+                ->numeric()
+                ->default(0)
+                ->required(),
+
+            TextInput::make('weight')
+                ->label('Weight (for shuffle)')
+                ->numeric()
+                ->default(1)
+                ->minValue(1)
+                ->helperText('Higher weight = more likely to appear when shuffling'),
+        ]);
+    }
+}
