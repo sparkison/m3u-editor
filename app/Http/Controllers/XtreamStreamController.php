@@ -11,7 +11,6 @@ use App\Models\PlaylistAlias;
 use App\Models\PlaylistAuth;
 use App\Services\PlaylistService;
 use App\Services\PlaylistUrlService;
-use App\Services\M3uProxyService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
@@ -20,7 +19,6 @@ use Illuminate\Support\Str;
 
 class XtreamStreamController extends Controller
 {
-
     /**
      * Append traceability information to m3u-proxy URLs.
      *
@@ -36,27 +34,27 @@ class XtreamStreamController extends Controller
     {
         $parts = parse_url($url);
         $query = [];
-    
+
         if (! empty($parts['query'])) {
             parse_str($parts['query'], $query);
         }
-    
+
         // Never overwrite if already set upstream
         $query['username'] = $query['username'] ?? $username;
-        $query['client_id'] = $query['client_id'] ?? ('xt_' . Str::uuid()->toString());
-    
+        $query['client_id'] = $query['client_id'] ?? ('xt_'.Str::uuid()->toString());
+
         $rebuilt = $url;
         $rebuilt = strtok($rebuilt, '?');
-        $rebuilt .= '?' . http_build_query($query);
-    
+        $rebuilt .= '?'.http_build_query($query);
+
         // Preserve fragment if present
         if (! empty($parts['fragment'])) {
-            $rebuilt .= '#' . $parts['fragment'];
+            $rebuilt .= '#'.$parts['fragment'];
         }
-    
+
         return $rebuilt;
     }
-    
+
     /**
      * Authenticates a playlist using either PlaylistAuth credentials or the original method
      * (username = playlist owner's name, password = playlist UUID).

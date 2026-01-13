@@ -19,7 +19,6 @@ use Symfony\Component\HttpFoundation\Response;
 
 class M3uProxyApiController extends Controller
 {
-
     /**
      * Append traceability information to m3u-proxy URLs.
      *
@@ -32,27 +31,27 @@ class M3uProxyApiController extends Controller
         if (empty($username)) {
             return $url;
         }
-    
+
         $parts = parse_url($url);
         $query = [];
-    
+
         if (! empty($parts['query'])) {
             parse_str($parts['query'], $query);
         }
-    
+
         // Never overwrite if already set upstream
         $query['username'] = $query['username'] ?? $username;
-        $query['client_id'] = $query['client_id'] ?? ('xt_' . Str::uuid()->toString());
-    
-        $rebuilt = strtok($url, '?') . '?' . http_build_query($query);
-    
+        $query['client_id'] = $query['client_id'] ?? ('xt_'.Str::uuid()->toString());
+
+        $rebuilt = strtok($url, '?').'?'.http_build_query($query);
+
         if (! empty($parts['fragment'])) {
-            $rebuilt .= '#' . $parts['fragment'];
+            $rebuilt .= '#'.$parts['fragment'];
         }
-    
+
         return $rebuilt;
     }
-    
+
     /**
      * Get the proxied URL for a channel and redirect
      *
@@ -107,7 +106,7 @@ class M3uProxyApiController extends Controller
 
         // Append traceability params so the Python proxy can register usernames per connection.
         $url = $this->appendProxyTraceParams($url, $username);
-        
+
         return redirect($url);
     }
 
@@ -155,7 +154,7 @@ class M3uProxyApiController extends Controller
 
         // Append traceability params so the Python proxy can register usernames per connection.
         $url = $this->appendProxyTraceParams($url, $username);
-        
+
         return redirect($url);
     }
 
@@ -217,6 +216,7 @@ class M3uProxyApiController extends Controller
 
         $username = $request->input('username', null);
         $url = $this->appendProxyTraceParams($url, $username);
+
         return redirect($url);
     }
 
@@ -262,6 +262,7 @@ class M3uProxyApiController extends Controller
 
         $username = $request->input('username', null);
         $url = $this->appendProxyTraceParams($url, $username);
+
         return redirect($url);
     }
 
