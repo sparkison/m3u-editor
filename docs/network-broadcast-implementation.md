@@ -4,6 +4,10 @@
 
 This document outlines the phased implementation of continuous "live" broadcasting for Networks (pseudo-TV channels). The goal is to create channels that broadcast content according to a schedule, just like traditional TV - when you tune in, the show is already playing at the appropriate time.
 
+## What are Networks?
+
+Networks are your own personal TV station that contain your lineups (local media content). They allow you to create custom broadcast channels with scheduled programming from your media library.
+
 ## Architecture Summary
 
 ```
@@ -93,19 +97,40 @@ This document outlines the phased implementation of continuous "live" broadcasti
    - `playlist()` - Serve live.m3u8 with proper headers
    - `segment()` - Serve .ts segment files
 
-### Testing Checkpoint
+### Testing Checkpoint ✅
 
-- [ ] Run migration: `php artisan migrate`
-- [ ] Can create/edit network with broadcast settings in UI
-- [ ] Settings persist correctly
-- [ ] HLS endpoint returns 404/503 (expected - no broadcast running yet)
-- [ ] Defaults are sensible
+- [x] Run migration: `php artisan migrate`
+- [x] Can create/edit network with broadcast settings in UI
+- [x] Settings persist correctly
+- [x] HLS endpoint returns 404/503 (expected - no broadcast running yet)
+- [x] Defaults are sensible
 
 ---
 
-## Phase 2: Storage & HLS Endpoint
+## Phase 2: Storage & HLS Endpoint ✅ COMPLETE
 
 **Goal**: Set up storage location for HLS segments and create endpoint to serve them.
+
+### Completed:
+
+1. **NetworkFactory** (`database/factories/NetworkFactory.php`)
+   - Created factory for Network model
+   - Added `broadcasting()` state for enabled broadcast
+   - Added `activeBroadcast()` state for running broadcast
+
+2. **Tests** (`tests/Feature/NetworkHlsControllerTest.php`)
+   - Created comprehensive test suite for HLS endpoints
+   - Tests playlist endpoint (404 disabled, 503 no content, 200 with content)
+   - Tests segment endpoint (404 disabled, 404 missing, 200 with content)
+   - Tests storage path creation
+   - Tests model helper methods (isBroadcasting, getStreamUrlAttribute)
+
+3. **Manual Verification**
+   - Created test HLS files in network storage directory
+   - Verified playlist endpoint returns correct `Content-Type: application/vnd.apple.mpegurl`
+   - Verified segment endpoint returns correct `Content-Type: video/MP2T`
+   - Verified 404 when broadcast disabled
+   - Verified 503 when broadcast enabled but no playlist
 
 ### Storage Structure
 
@@ -174,12 +199,44 @@ ffmpeg \
   "{storage_path}/live.m3u8"
 ```
 
-### Testing Checkpoint
+### Testing Checkpoint ✅
 
-- [ ] Can start FFmpeg process manually via tinker/command
-- [ ] FFmpeg outputs segments to correct location
-- [ ] Process can be stopped gracefully
-- [ ] live.m3u8 is created and updated
+- [x] Can start FFmpeg process manually via tinker/command
+- [x] FFmpeg outputs segments to correct location
+- [x] Process can be stopped gracefully
+- [x] live.m3u8 is created and updated
+
+---
+
+## Phase 3: FFmpeg Process Management ✅ COMPLETE
+
+**Goal**: Create service to spawn and manage FFmpeg processes per network.
+
+### Completed:
+
+1. **NetworkBroadcastService** (`app/Services/NetworkBroadcastService.php`)
+   - `start(Network $network)` - Starts FFmpeg broadcast process
+   - `stop(Network $network)` - Gracefully stops broadcast (SIGTERM, then SIGKILL)
+   - `isProcessRunning(Network $network)` - Checks if FFmpeg is still running
+   - `buildFfmpegCommand()` - Builds FFmpeg command with:
+     - Media server stream URL with StartTimeTicks for seeking
+     - Duration limit for current programme
+     - Video/audio stream mapping (excludes subtitles)
+     - HLS output with proper flags
+   - `getStatus(Network $network)` - Returns comprehensive status info
+   - `cleanupSegments(Network $network)` - Removes old segment files
+
+2. **Key Implementation Details**:
+   - Uses media server's native seeking via `StartTimeTicks` parameter
+   - Maps only video and audio streams (`-map 0:v:0 -map 0:a:0`) to avoid subtitle issues
+   - Supports both copy mode (when media server transcodes) and local transcode
+   - Background process via `nohup` with PID tracking
+   - Logs FFmpeg output to `{hlsPath}/ffmpeg.log`
+
+3. **Bug Fixes Applied**:
+   - Fixed `getCurrentSeekPosition()` and `getCurrentRemainingDuration()` methods in Network model
+   - Prioritized `info['media_server_id']` over `source_episode_id` for item ID lookup
+   - Fixed duplicate return statement in getStreamUrl
 
 ---
 
@@ -220,42 +277,48 @@ When there's a gap in schedule:
 
 ### Testing Checkpoint
 
-- [ ] Current programme is correctly identified
-- [ ] Seek position is calculated correctly
-- [ ] FFmpeg seeks to correct position in video
-- [ ] Transition to next programme works
+### Testing Checkpoint ✅
+
+- [x] Current programme is correctly identified
+- [x] Seek position is calculated correctly
+- [x] FFmpeg seeks to correct position in video
+- [x] Transition to next programme works
 
 ---
 
-## Phase 5: Background Worker
+## Phase 4 & 5: Schedule-Aware Streaming & Background Worker ✅ COMPLETE
 
 **Goal**: Create a persistent worker that manages all active network broadcasts.
 
-### Artisan Command
+### Completed:
 
-```php
-php artisan network:broadcast {network?}
-```
+1. **NetworkBroadcastService Extended** (`app/Services/NetworkBroadcastService.php`)
+   - `needsRestart(Network $network)` - Checks if restart is needed
+   - `restart(Network $network)` - Stop and start broadcast
+   - `tick(Network $network)` - Single iteration of worker loop
+   - `getBroadcastingNetworks()` - Get all enabled networks
 
-Options:
-- No argument: Run all enabled networks
-- With network UUID: Run specific network
+2. **NetworkBroadcastWorker Command** (`app/Console/Commands/NetworkBroadcastWorker.php`)
+   - `php artisan network:broadcast {network?}` - Run for specific or all networks
+   - `--once` flag for single tick (useful for cron/testing)
+   - `--interval=5` - Configurable tick interval
+   - Continuous mode with Ctrl+C support
+   - Status display with colorized output
 
-### Worker Loop
+### Usage Examples:
 
-```php
-while (true) {
-    foreach ($activeNetworks as $network) {
-        if ($this->needsProcessRestart($network)) {
-            $this->stopProcess($network);
-            $this->startProcess($network);
-        }
-        
-        $this->monitorHealth($network);
-    }
-    
-    sleep(1); // Check every second
-}
+```bash
+# Run for all networks continuously
+php artisan network:broadcast
+
+# Run for specific network
+php artisan network:broadcast 1306afaa-b639-4bdb-a603-5bfff3f81ecc
+
+# Single tick for testing
+php artisan network:broadcast --once
+
+# Custom interval (10 seconds)
+php artisan network:broadcast --interval=10
 ```
 
 ### Supervisor Configuration
