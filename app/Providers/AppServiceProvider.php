@@ -57,6 +57,14 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(GitInfoService::class);
+
+        // Register Artisan commands for HLS maintenance
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                \App\Console\Commands\HlsGarbageCollect::class,
+                \App\Console\Commands\NetworkBroadcastHeal::class,
+            ]);
+        }
     }
 
     /**
