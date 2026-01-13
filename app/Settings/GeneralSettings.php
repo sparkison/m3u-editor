@@ -22,6 +22,10 @@ class GeneralSettings extends Settings
 
     public ?bool $output_wan_address = false;
 
+    public ?string $xtream_api_message = '';
+
+    public ?array $xtream_api_details = null;
+
     // MediaFlow proxy settings
     public ?string $mediaflow_proxy_url = null;
 

@@ -528,6 +528,44 @@ class PlaylistService
     }
 
     /**
+     * Resolve exp_date for Xtream user_info based on the auth method used.
+     * Xtream expects exp_date as a UNIX timestamp (seconds). Use "0" for no expiration.
+     *
+     * @param  mixed  $authRecord  PlaylistAuth|PlaylistAlias|Playlist|CustomPlaylist|MergedPlaylist
+     */
+    public function resolveXtreamExpDate($authRecord, string $authMethod, ?string $username, ?string $password): int
+    {
+        // PlaylistAuth login
+        if ($authMethod === 'playlist_auth' && $authRecord instanceof \App\Models\PlaylistAuth) {
+            return $authRecord->expires_at ? $authRecord->expires_at->timestamp : 0;
+        }
+
+        // Alias login
+        if ($authMethod === 'alias_auth' && $authRecord instanceof \App\Models\PlaylistAlias) {
+            return $authRecord->expires_at ? $authRecord->expires_at->timestamp : 0;
+        }
+
+        // Legacy (owner_auth)
+        if ($authMethod === 'owner_auth' && $username && $password) {
+            // Optional legacy-expiration override: a PlaylistAuth matching legacy creds
+            $legacyOverride = \App\Models\PlaylistAuth::where('username', $username)
+                ->where('password', $password)
+                ->where('enabled', true)
+                ->first();
+
+            if ($legacyOverride) {
+                return $legacyOverride->expires_at ? $legacyOverride->expires_at->timestamp : 0;
+            }
+
+            // No override => treat as "never expires" (0)
+            return 0;
+        }
+
+        // Default fallback
+        return 0;
+    }
+
+    /**
      * Generate a timeshift URL for a given stream.
      *
      * @param  Playlist|MergedPlaylist|CustomPlaylist|PlaylistAlias  $playlist

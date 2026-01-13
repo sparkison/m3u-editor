@@ -417,14 +417,27 @@ class XtreamApiController extends Controller
                 $activeConnections = M3uProxyService::getPlaylistActiveStreamsCount($playlist);
             }
 
+            $expDate = PlaylistFacade::resolveXtreamExpDate(
+                $playlist,
+                $authMethod,
+                $username,
+                $password
+            );
+
+            if (empty($expDate) || (int) $expDate === 0) {
+                $expDate = $expires;
+            }
+
+            $settings = app(\App\Settings\GeneralSettings::class);
+            $message = $settings->xtream_api_message ?? '';
+
             $userInfo = [
-                // 'playlist_id' => (string)$playlist->id, // Debugging
                 'username' => $username,
                 'password' => $password,
-                'message' => '',
+                'message' => (string) $message,
                 'auth' => 1, // Authenticated successfully
                 'status' => 'Active', // No inactive playlists should reach this point
-                'exp_date' => (string) $expires,
+                'exp_date' => (string) $expDate,
                 'is_trial' => '0', // Trial accounts not supported
                 'active_cons' => (string) $activeConnections,
                 'created_at' => (string) ($playlist->user ? $playlist->user->created_at->timestamp : $now->timestamp),
@@ -438,10 +451,13 @@ class XtreamApiController extends Controller
             $host = $parsedUrl['host'];
             $port = isset($parsedUrl['port']) ? (string) $parsedUrl['port'] : '80';
 
+            $port = $settings->xtream_api_details['http_port'] ?? $port;
+            $httpsPort = $settings->xtream_api_details['https_port'] ?? '443';
+
             $serverInfo = [
                 'url' => $host,
                 'port' => (string) $port, // Should be 80 for HTTP, otherwise use the specified port (e.g.: 36400
-                'https_port' => '443', // Should always be 443 for HTTPS
+                'https_port' => (string) $httpsPort, // Should always be 443 for HTTPS
                 'server_protocol' => $scheme,
                 'rtmp_port' => '8001', // RTMP not available currently, we'll just return the default RTMP port
                 // Timestamps will use the passed in timezone (server timezone)

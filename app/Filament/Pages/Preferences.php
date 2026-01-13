@@ -15,6 +15,7 @@ use Exception;
 use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
@@ -120,7 +121,7 @@ class Preferences extends SettingsPage
                     ->persistTabInQueryString()
                     ->columnSpanFull()
                     ->tabs([
-                        Tab::make('Appearance')
+                        Tab::make('General')
                             ->schema([
                                 Section::make('Layout & Display Options')
                                     ->schema([
@@ -167,6 +168,32 @@ class Preferences extends SettingsPage
                                                         Width::ScreenTwoExtraLarge->value => '2XL',
                                                         Width::Full->value => 'Full',
                                                     ]),
+                                            ]),
+
+                                    ]),
+                                Section::make('Xtream API Panel Settings')
+                                    ->schema([
+                                        Grid::make()
+                                            ->columnSpanFull()
+                                            ->columns(2)
+                                            ->schema([
+                                                TextInput::make('xtream_api_details.http_port')
+                                                    ->label('HTTP Port')
+                                                    ->numeric()
+                                                    ->placeholder(fn () => config('app.port', '80'))
+                                                    ->helperText('Returned as "server_info.http_port" in "player_api.php" responses. Leave empty to use APP_PORT (default).'),
+                                                TextInput::make('xtream_api_details.https_port')
+                                                    ->label('HTTPS Port')
+                                                    ->numeric()
+                                                    ->placeholder('443')
+                                                    ->helperText('Returned as "server_info.https_port" in "player_api.php" responses. Leave empty to use 443 (default).'),
+                                                Textarea::make('xtream_api_message')
+                                                    ->label('Xtream API panel message')
+                                                    ->helperText('Returned as "user_info.message" in "player_api.php" responses.')
+                                                    ->rows(3)
+                                                    ->columnSpanFull()
+                                                    ->default(''),
+
                                             ]),
                                     ]),
                             ]),
