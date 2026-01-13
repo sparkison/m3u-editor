@@ -91,6 +91,14 @@ class Network extends Model
     }
 
     /**
+     * Get the playlist this network outputs to (for M3U generation).
+     */
+    public function networkPlaylist(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Playlist::class, 'network_playlist_id');
+    }
+
+    /**
      * Get the content items assigned to this network.
      */
     public function networkContent(): HasMany
@@ -201,7 +209,7 @@ class Network extends Model
             return 0;
         }
 
-        return now()->diffInSeconds($current->start_time);
+        return (int) $current->start_time->diffInSeconds(now(), false);
     }
 
     /**
@@ -214,6 +222,43 @@ class Network extends Model
             return 0;
         }
 
-        return $current->end_time->diffInSeconds(now());
+        return (int) now()->diffInSeconds($current->end_time, false);
+    }
+
+    /**
+     * Count HLS segment files for this network.
+     */
+    public function getHlsSegmentCountAttribute(): int
+    {
+        $path = $this->getHlsStoragePath();
+
+        if (! is_dir($path)) {
+            return 0;
+        }
+
+        $files = glob($path.'/*.ts');
+
+        return $files === false ? 0 : count($files);
+    }
+
+    /**
+     * Total bytes used by HLS files for this network.
+     */
+    public function getHlsStorageBytesAttribute(): int
+    {
+        $path = $this->getHlsStoragePath();
+
+        if (! is_dir($path)) {
+            return 0;
+        }
+
+        $total = 0;
+        foreach (glob($path.'/*') as $file) {
+            if (is_file($file)) {
+                $total += filesize($file) ?: 0;
+            }
+        }
+
+        return (int) $total;
     }
 }

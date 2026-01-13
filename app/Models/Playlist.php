@@ -46,7 +46,6 @@ class Playlist extends Model
         'backup_before_sync' => 'boolean',
         'sync_logs_enabled' => 'boolean',
         'include_series_in_m3u' => 'boolean',
-        'include_networks_in_m3u' => 'boolean',
         'include_vod_in_m3u' => 'boolean',
         'auto_fetch_series_metadata' => 'boolean',
         'auto_merge_channels_enabled' => 'boolean',
@@ -56,6 +55,7 @@ class Playlist extends Model
         'custom_headers' => 'array',
         'strict_live_ts' => 'boolean',
         'profiles_enabled' => 'boolean',
+        'is_network_playlist' => 'boolean',
         'status' => Status::class,
         'id_channel_by' => PlaylistChannelId::class,
         'source_type' => PlaylistSourceType::class,
@@ -148,6 +148,14 @@ class Playlist extends Model
     public function channels(): HasMany
     {
         return $this->hasMany(Channel::class);
+    }
+
+    /**
+     * Get networks that output to this playlist (for network playlists).
+     */
+    public function networks(): HasMany
+    {
+        return $this->hasMany(Network::class, 'network_playlist_id');
     }
 
     public function enabled_channels(): HasMany
