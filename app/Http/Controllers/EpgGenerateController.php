@@ -40,6 +40,11 @@ class EpgGenerateController extends Controller
             return response()->json(['Error' => 'Playlist Not Found'], 404);
         }
 
+        // Handle network playlists - generate EPG from networks
+        if ($playlist instanceof \App\Models\Playlist && $playlist->is_network_playlist) {
+            return $this->generateNetworkPlaylistEpg($playlist);
+        }
+
         // Check if we have a valid cached file
         if ($this->isCacheValid($playlist, false)) {
             return $this->serveCachedFile($playlist, false);
@@ -727,5 +732,35 @@ class EpgGenerateController extends Controller
         }
         // Close the XMLReader for this epg
         $programReader->close();
+    }
+
+    /**
+     * Generate EPG for a network playlist (outputs network programme schedules).
+     */
+    protected function generateNetworkPlaylistEpg(\App\Models\Playlist $playlist)
+    {
+        $networks = $playlist->networks()
+            ->where('enabled', true)
+            ->get();
+
+        if ($networks->isEmpty()) {
+            return response('<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE tv SYSTEM "xmltv.dtd">
+<tv generator-info-name="M3U Editor Networks">
+<!-- No networks assigned to this playlist -->
+</tv>', 200, [
+                'Content-Type' => 'application/xml',
+            ]);
+        }
+
+        $epgService = app(\App\Services\NetworkEpgService::class);
+
+        return response()->stream(function () use ($networks, $epgService) {
+            $epgService->streamXmltvForNetworks($networks);
+        }, 200, [
+            'Content-Type' => 'application/xml',
+            'Content-Disposition' => 'inline; filename="epg.xml"',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+        ]);
     }
 }

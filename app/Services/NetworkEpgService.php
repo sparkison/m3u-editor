@@ -168,9 +168,60 @@ class NetworkEpgService
         $xml = '  <programme channel="'.$channelId.'" start="'.$start.'" stop="'.$stop.'">'.PHP_EOL;
         $xml .= '    <title>'.$title.'</title>'.PHP_EOL;
 
-        if ($programme->description) {
-            $desc = htmlspecialchars($programme->description, ENT_XML1);
+        // Try to get description from programme or contentable's info field
+        $description = $programme->description;
+        $content = $programme->contentable;
+        $info = null;
+
+        if ($content) {
+            $info = $content->info ?? null;
+            if (! $description && $info) {
+                $description = $info['plot'] ?? $info['description'] ?? null;
+            }
+        }
+
+        if ($description) {
+            $desc = htmlspecialchars($description, ENT_XML1);
             $xml .= '    <desc>'.$desc.'</desc>'.PHP_EOL;
+        }
+
+        // Add credits (director, actors)
+        if ($info) {
+            $hasCredits = ! empty($info['director']) || ! empty($info['cast']) || ! empty($info['actors']);
+            if ($hasCredits) {
+                $xml .= '    <credits>'.PHP_EOL;
+
+                if (! empty($info['director'])) {
+                    $directors = explode(',', $info['director']);
+                    foreach ($directors as $director) {
+                        $director = trim($director);
+                        if ($director) {
+                            $xml .= '      <director>'.htmlspecialchars($director, ENT_XML1).'</director>'.PHP_EOL;
+                        }
+                    }
+                }
+
+                $actors = $info['cast'] ?? $info['actors'] ?? null;
+                if ($actors) {
+                    $actorList = explode(',', $actors);
+                    foreach (array_slice($actorList, 0, 10) as $actor) { // Limit to 10 actors
+                        $actor = trim($actor);
+                        if ($actor) {
+                            $xml .= '      <actor>'.htmlspecialchars($actor, ENT_XML1).'</actor>'.PHP_EOL;
+                        }
+                    }
+                }
+
+                $xml .= '    </credits>'.PHP_EOL;
+            }
+        }
+
+        // Add year/date
+        if ($info && ! empty($info['release_date'])) {
+            $year = substr($info['release_date'], 0, 4);
+            if ($year && is_numeric($year)) {
+                $xml .= '    <date>'.$year.'</date>'.PHP_EOL;
+            }
         }
 
         if ($programme->image) {
@@ -180,7 +231,6 @@ class NetworkEpgService
 
         // Add episode info if it's an Episode
         if ($programme->contentable_type === 'App\\Models\\Episode') {
-            $content = $programme->contentable;
             if ($content) {
                 $seasonNum = ($content->season ?? 1) - 1; // XMLTV uses 0-based
                 $episodeNum = ($content->episode_num ?? 1) - 1;
@@ -188,9 +238,19 @@ class NetworkEpgService
             }
         }
 
-        // Add category based on content type
-        $category = $programme->contentable_type === 'App\\Models\\Episode' ? 'Series' : 'Movie';
-        $xml .= '    <category>'.$category.'</category>'.PHP_EOL;
+        // Add category/genre
+        $genre = null;
+        if ($info && ! empty($info['genre'])) {
+            $genre = $info['genre'];
+        } else {
+            $genre = $programme->contentable_type === 'App\\Models\\Episode' ? 'Series' : 'Movie';
+        }
+        $xml .= '    <category>'.htmlspecialchars($genre, ENT_XML1).'</category>'.PHP_EOL;
+
+        // Add country if available
+        if ($info && ! empty($info['country'])) {
+            $xml .= '    <country>'.htmlspecialchars($info['country'], ENT_XML1).'</country>'.PHP_EOL;
+        }
 
         $xml .= '  </programme>'.PHP_EOL;
 

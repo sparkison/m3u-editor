@@ -24,6 +24,11 @@ class PlaylistGenerateController extends Controller
             return response()->json(['Error' => 'Playlist Not Found'], 404);
         }
 
+        // Handle network playlists separately
+        if ($playlist instanceof \App\Models\Playlist && $playlist->is_network_playlist) {
+            return $this->generateNetworkPlaylist($request, $playlist);
+        }
+
         switch (class_basename($playlist)) {
             case 'Playlist':
                 $type = 'standard';
@@ -571,5 +576,56 @@ class PlaylistGenerateController extends Controller
         }
 
         return $query;
+    }
+
+    /**
+     * Generate M3U output for a network playlist (outputs networks instead of channels).
+     */
+    protected function generateNetworkPlaylist(Request $request, \App\Models\Playlist $playlist)
+    {
+        $networks = $playlist->networks()
+            ->where('enabled', true)
+            ->orderBy('channel_number')
+            ->orderBy('name')
+            ->get();
+
+        if ($networks->isEmpty()) {
+            return response("#EXTM3U\n# No networks assigned to this playlist\n", 200, [
+                'Content-Type' => 'audio/x-mpegurl',
+            ]);
+        }
+
+        $baseUrl = url('/');
+
+        return response()->stream(function () use ($networks, $baseUrl, $playlist) {
+            // M3U header with EPG URL
+            $epgUrl = route('epg.generate', ['uuid' => $playlist->uuid]);
+            echo "#EXTM3U x-tvg-url=\"{$epgUrl}\"\n";
+
+            foreach ($networks as $network) {
+                $name = $network->name;
+                $channelNumber = $network->channel_number ?? $network->id;
+                $tvgId = "network-{$network->id}";
+                $logo = $network->logo ?? "{$baseUrl}/placeholder.png";
+                $group = 'Networks';
+                $streamUrl = $network->stream_url;
+
+                // Build EXTINF line
+                $extInf = "#EXTINF:-1";
+                $extInf .= " tvg-chno=\"{$channelNumber}\"";
+                $extInf .= " tvg-id=\"{$tvgId}\"";
+                $extInf .= " tvg-name=\"{$name}\"";
+                $extInf .= " tvg-logo=\"{$logo}\"";
+                $extInf .= " group-title=\"{$group}\"";
+                $extInf .= ",{$name}";
+
+                echo "{$extInf}\n";
+                echo "{$streamUrl}\n";
+            }
+        }, 200, [
+            'Content-Type' => 'audio/x-mpegurl',
+            'Content-Disposition' => 'inline; filename="'.$playlist->name.'.m3u"',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+        ]);
     }
 }

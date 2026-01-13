@@ -128,10 +128,80 @@ class NetworkPlaylistController extends Controller
     }
 
     /**
+     * Generate M3U playlist for networks belonging to a media server integration.
+     *
+     * Route: /media-integration/{integration}/networks/playlist.m3u
+     */
+    public function forIntegration(Request $request, \App\Models\MediaServerIntegration $integration): StreamedResponse
+    {
+        $networks = Network::where('media_server_integration_id', $integration->id)
+            ->where('enabled', true)
+            ->orderBy('channel_number')
+            ->orderBy('name')
+            ->get();
+
+        if ($networks->isEmpty()) {
+            abort(404, 'No enabled networks found for this integration');
+        }
+
+        $baseUrl = url('/');
+        $integrationName = $integration->name;
+
+        return response()->stream(function () use ($networks, $baseUrl, $integration) {
+            // M3U header with EPG URL pointing to integration-specific networks EPG
+            $epgUrl = route('media-integration.networks.epg', ['integration' => $integration->id]);
+            echo "#EXTM3U x-tvg-url=\"{$epgUrl}\"\n";
+
+            foreach ($networks as $network) {
+                $this->outputNetworkChannel($network, $baseUrl);
+            }
+        }, 200, [
+            'Content-Type' => 'audio/x-mpegurl',
+            'Content-Disposition' => 'inline; filename="'.$integrationName.'-networks.m3u"',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+        ]);
+    }
+
+    /**
+     * Generate EPG for networks belonging to a media server integration.
+     *
+     * Route: /media-integration/{integration}/networks/epg.xml
+     */
+    public function epgForIntegration(Request $request, \App\Models\MediaServerIntegration $integration): StreamedResponse
+    {
+        $networks = Network::where('media_server_integration_id', $integration->id)
+            ->where('enabled', true)
+            ->get();
+
+        if ($networks->isEmpty()) {
+            abort(404, 'No enabled networks found for this integration');
+        }
+
+        $epgService = app(\App\Services\NetworkEpgService::class);
+        $integrationName = $integration->name;
+
+        return response()->stream(function () use ($networks, $epgService) {
+            $epgService->streamXmltvForNetworks($networks);
+        }, 200, [
+            'Content-Type' => 'application/xml',
+            'Content-Disposition' => 'inline; filename="'.$integrationName.'-networks-epg.xml"',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+        ]);
+    }
+
+    /**
      * Generate a playlist URL for a user's networks.
      */
     public static function generatePlaylistUrl(User $user): string
     {
         return route('networks.playlist', ['user' => $user->id]);
+    }
+
+    /**
+     * Generate a playlist URL for networks of a media server integration.
+     */
+    public static function generateIntegrationPlaylistUrl(\App\Models\MediaServerIntegration $integration): string
+    {
+        return route('media-integration.networks.playlist', ['integration' => $integration->id]);
     }
 }

@@ -109,6 +109,12 @@ Route::get('/networks/{user}/playlist.m3u', NetworkPlaylistController::class)
 Route::get('/networks/{user}/epg.xml', [NetworkPlaylistController::class, 'epg'])
     ->name('networks.epg');
 
+// Media Integration Networks playlist - networks for a specific media server integration
+Route::get('/media-integration/{integration}/networks/playlist.m3u', [NetworkPlaylistController::class, 'forIntegration'])
+    ->name('media-integration.networks.playlist');
+Route::get('/media-integration/{integration}/networks/epg.xml', [NetworkPlaylistController::class, 'epgForIntegration'])
+    ->name('media-integration.networks.epg');
+
 // Network HLS broadcast routes (for continuous live broadcasting)
 Route::get('/network/{network}/live.m3u8', [\App\Http\Controllers\NetworkHlsController::class, 'playlist'])
     ->name('network.hls.playlist');
