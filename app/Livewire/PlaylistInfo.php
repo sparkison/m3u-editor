@@ -33,6 +33,28 @@ class PlaylistInfo extends Component
             return [];
         }
 
+        // Network playlists show network info instead of channels
+        if ($playlist->is_network_playlist) {
+            $networks = $playlist->networks()->with('mediaServerIntegration')->get();
+
+            // Check if the broadcast service is enabled (from Docker env or .env)
+            $broadcastServiceEnabled = filter_var(getenv('NETWORK_BROADCAST_ENABLED') ?: env('NETWORK_BROADCAST_ENABLED', false), FILTER_VALIDATE_BOOLEAN);
+
+            return [
+                'is_network_playlist' => true,
+                'broadcast_service_enabled' => $broadcastServiceEnabled,
+                'network_count' => $networks->count(),
+                'networks' => $networks->map(fn ($n) => [
+                    'id' => $n->id,
+                    'name' => $n->name,
+                    'channel_number' => $n->channel_number,
+                    'broadcast_enabled' => $n->broadcast_enabled,
+                    'is_broadcasting' => $n->isBroadcasting(),
+                    'media_server' => $n->mediaServerIntegration?->name,
+                ])->toArray(),
+            ];
+        }
+
         $stats = [
             'proxy_enabled' => $playlist->enable_proxy,
 
