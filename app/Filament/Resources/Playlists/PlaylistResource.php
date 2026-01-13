@@ -1102,6 +1102,9 @@ class PlaylistResource extends Resource
                                     tooltip: 'Disable this for better performance if you only want to merge new channels.'
                                 )
                                 ->helperText('When enabled, all channels will be re-evaluated during merge, including existing failover relationships.'),
+                            static::makeToggle('auto_merge_config.prefer_catchup_as_primary')
+                                ->label('Prefer catch-up channels as primary')
+                                ->helperText('When enabled, channels with catch-up enabled will be selected as the master channel when available.'),
                         ]),
 
                     TextInput::make('sync_interval')

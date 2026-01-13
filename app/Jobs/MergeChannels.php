@@ -26,6 +26,7 @@ class MergeChannels implements ShouldQueue
         public bool $checkResolution = false,
         public bool $deactivateFailoverChannels = false,
         public bool $forceCompleteRemerge = false,
+        public bool $preferCatchupAsPrimary = false,
     ) {}
 
     /**
@@ -138,9 +139,15 @@ class MergeChannels implements ShouldQueue
      */
     private function selectMasterChannel($group, array $playlistPriority)
     {
+        $selectionGroup = $group->when($this->preferCatchupAsPrimary, function ($group) {
+            $catchupChannels = $group->filter(fn ($channel) => ! empty($channel->catchup));
+
+            return $catchupChannels->isNotEmpty() ? $catchupChannels : $group;
+        });
+
         if ($this->checkResolution) {
             // Resolution-based selection: Find channel(s) with highest resolution
-            $channelsWithResolution = $group->map(function ($channel) {
+            $channelsWithResolution = $selectionGroup->map(function ($channel) {
                 return [
                     'channel' => $channel,
                     'resolution' => $this->getResolution($channel),
@@ -166,7 +173,7 @@ class MergeChannels implements ShouldQueue
 
             // If preferred playlist is set, try to use it first
             if ($this->playlistId) {
-                $preferredChannels = $group->where('playlist_id', $this->playlistId);
+                $preferredChannels = $selectionGroup->where('playlist_id', $this->playlistId);
                 if ($preferredChannels->isNotEmpty()) {
                     // Return first channel from preferred playlist (sorted by ID for consistency)
                     return $preferredChannels->sortBy('id')->first();
@@ -174,7 +181,7 @@ class MergeChannels implements ShouldQueue
             }
 
             // No preferred playlist or none found: use playlist priority order, then ID for consistency
-            return $group->sortBy([
+            return $selectionGroup->sortBy([
                 fn ($channel) => $playlistPriority[$channel->playlist_id] ?? 999,
                 fn ($channel) => $channel->id,
             ])->first();
