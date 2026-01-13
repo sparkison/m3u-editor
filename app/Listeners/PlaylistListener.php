@@ -7,7 +7,6 @@ use App\Events\PlaylistDeleted;
 use App\Events\PlaylistUpdated;
 use App\Jobs\ProcessM3uImport;
 use App\Jobs\RunPostProcess;
-use App\Services\NetworkChannelSyncService;
 use App\Services\ProfileService;
 
 class PlaylistListener
@@ -31,6 +30,23 @@ class PlaylistListener
     {
         $playlist = $event->playlist;
 
+        // Network playlists don't need M3U import - they get content from assigned networks
+        if ($playlist->is_network_playlist) {
+            \Illuminate\Support\Facades\Log::info('Network playlist created, skipping M3U import', [
+                'playlist_id' => $playlist->id,
+                'name' => $playlist->name,
+            ]);
+            $playlist->update(['status' => \App\Enums\Status::Completed]);
+
+            return;
+        }
+
+        \Illuminate\Support\Facades\Log::info('Regular playlist created, dispatching M3U import', [
+            'playlist_id' => $playlist->id,
+            'name' => $playlist->name,
+            'is_network_playlist' => $playlist->is_network_playlist,
+        ]);
+
         // Create primary profile if profiles are enabled on new playlist
         if ($playlist->profiles_enabled) {
             $this->ensurePrimaryProfileExists($playlist);
@@ -53,11 +69,6 @@ class PlaylistListener
         // Check both when the setting changes AND when it's already enabled (to fix missing profiles)
         if ($playlist->profiles_enabled) {
             $this->ensurePrimaryProfileExists($playlist);
-        }
-
-        // Sync networks as channels if the setting is enabled
-        if ($playlist->wasChanged('include_networks_in_m3u') || $playlist->include_networks_in_m3u) {
-            app(NetworkChannelSyncService::class)->syncNetworksToPlaylist($playlist);
         }
 
         // Handle playlist updated event
