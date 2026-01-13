@@ -97,15 +97,17 @@ class MergeChannels implements ShouldQueue
             // Create failover relationships for remaining channels
             $failoverChannels = $group->where('id', '!=', $master->id);
             if ($this->checkResolution) {
-                // Sort failovers by resolution (highest first), then by playlist priority, then by ID for consistency
+                // Sort failovers by catch-up (if preferred), resolution (highest first), then playlist priority, then ID for consistency
                 $failoverChannels = $failoverChannels->sortBy([
+                    fn ($channel) => $this->preferCatchupAsPrimary && empty($channel->catchup) ? 1 : 0,
                     fn ($channel) => -$this->getResolution($channel), // Negative for desc sort
                     fn ($channel) => $playlistPriority[$channel->playlist_id] ?? 999,
                     fn ($channel) => $channel->id,
                 ]);
             } else {
-                // Sort failovers by playlist priority, then by ID for consistency
+                // Sort failovers by catch-up (if preferred), then playlist priority, then ID for consistency
                 $failoverChannels = $failoverChannels->sortBy([
+                    fn ($channel) => $this->preferCatchupAsPrimary && empty($channel->catchup) ? 1 : 0,
                     fn ($channel) => $playlistPriority[$channel->playlist_id] ?? 999,
                     fn ($channel) => $channel->id,
                 ]);
