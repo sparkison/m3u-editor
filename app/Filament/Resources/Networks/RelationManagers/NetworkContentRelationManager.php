@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Networks\RelationManagers;
 
 use App\Models\Channel;
 use App\Models\Episode;
+use App\Models\Network;
 use App\Models\NetworkContent;
 use App\Models\Series;
 use Filament\Actions\Action;
@@ -18,7 +19,6 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\RecordActionsPosition;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Auth;
 
 class NetworkContentRelationManager extends RelationManager
 {
@@ -28,8 +28,33 @@ class NetworkContentRelationManager extends RelationManager
 
     protected static ?string $recordTitleAttribute = 'id';
 
+    /**
+     * Get the playlist ID associated with this network's media server integration.
+     */
+    protected function getMediaServerPlaylistId(): ?int
+    {
+        /** @var Network $network */
+        $network = $this->getOwnerRecord();
+
+        return $network->mediaServerIntegration?->playlist_id;
+    }
+
+    /**
+     * Get the media server integration name for display.
+     */
+    protected function getMediaServerName(): string
+    {
+        /** @var Network $network */
+        $network = $this->getOwnerRecord();
+
+        return $network->mediaServerIntegration?->name ?? 'Unknown';
+    }
+
     public function table(Table $table): Table
     {
+        $playlistId = $this->getMediaServerPlaylistId();
+        $mediaServerName = $this->getMediaServerName();
+
         return $table
             ->reorderable('sort_order')
             ->defaultSort('sort_order')
@@ -84,11 +109,17 @@ class NetworkContentRelationManager extends RelationManager
                     ->label('Add Episodes')
                     ->icon('heroicon-o-film')
                     ->color('info')
+                    ->visible(fn () => $playlistId !== null)
                     ->form([
                         Select::make('series_id')
                             ->label('Series')
-                            ->options(function () {
-                                return Series::where('user_id', Auth::id())
+                            ->helperText("From {$mediaServerName}")
+                            ->options(function () use ($playlistId) {
+                                if (! $playlistId) {
+                                    return [];
+                                }
+
+                                return Series::where('playlist_id', $playlistId)
                                     ->orderBy('name')
                                     ->pluck('name', 'id');
                             })
@@ -148,16 +179,22 @@ class NetworkContentRelationManager extends RelationManager
                     ->label('Add Movies')
                     ->icon('heroicon-o-video-camera')
                     ->color('success')
+                    ->visible(fn () => $playlistId !== null)
                     ->form([
                         Select::make('channel_ids')
                             ->label('Movies (VOD)')
-                            ->options(function () {
+                            ->helperText("From {$mediaServerName}")
+                            ->options(function () use ($playlistId) {
+                                if (! $playlistId) {
+                                    return [];
+                                }
+
                                 $existingIds = $this->getOwnerRecord()
                                     ->networkContent()
                                     ->where('contentable_type', Channel::class)
                                     ->pluck('contentable_id');
 
-                                return Channel::where('user_id', Auth::id())
+                                return Channel::where('playlist_id', $playlistId)
                                     ->where('is_vod', true)
                                     ->whereNotIn('id', $existingIds)
                                     ->orderBy('name')
@@ -189,6 +226,15 @@ class NetworkContentRelationManager extends RelationManager
                             ->send();
                     }),
             ])
+            ->emptyStateHeading(fn () => $playlistId
+                ? 'No content added yet'
+                : 'No media server linked')
+            ->emptyStateDescription(fn () => $playlistId
+                ? 'Add episodes or movies from your media server to this network.'
+                : 'This network must be linked to a media server to add content.')
+            ->emptyStateIcon(fn () => $playlistId
+                ? 'heroicon-o-film'
+                : 'heroicon-o-exclamation-triangle')
             ->recordActions([
                 DeleteAction::make()
                     ->icon('heroicon-o-x-circle')
