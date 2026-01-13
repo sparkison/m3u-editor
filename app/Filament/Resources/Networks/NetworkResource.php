@@ -6,6 +6,7 @@ use App\Filament\Resources\Networks\Pages\CreateNetwork;
 use App\Filament\Resources\Networks\Pages\EditNetwork;
 use App\Filament\Resources\Networks\Pages\ListNetworks;
 use App\Models\Network;
+use App\Services\NetworkBroadcastService;
 use App\Services\NetworkScheduleService;
 use App\Traits\HasUserFiltering;
 use Filament\Actions\Action;
@@ -19,11 +20,13 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Forms\Get;
+use Filament\Schemas\Components\Utilities\Get;
+
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
@@ -53,6 +56,11 @@ class NetworkResource extends Resource
 
     protected static ?int $navigationSort = 110;
 
+    public static function getDescription(): ?string
+    {
+        return 'Networks are your own personal TV station that contain your lineups (local media content). Create custom broadcast channels with scheduled programming from your media library.';
+    }
+
     public static function getRecordTitle(?Model $record): string|null|Htmlable
     {
         return $record?->name;
@@ -61,230 +69,435 @@ class NetworkResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema
-            ->components([
-                Section::make('Network Configuration')
-                    ->description('Configure your pseudo-TV network channel')
-                    ->schema([
-                        Grid::make(2)->schema([
-                            TextInput::make('name')
-                                ->label('Network Name')
-                                ->placeholder('e.g., Movie Classics, 80s TV, Kids Zone')
-                                ->required()
-                                ->maxLength(255),
+            ->components(self::getFormSections());
+    }
 
-                            TextInput::make('channel_number')
-                                ->label('Channel Number')
-                                ->numeric()
-                                ->placeholder('e.g., 100')
-                                ->helperText('Optional channel number for EPG')
-                                ->minValue(1),
-                        ]),
+    /**
+     * Get form sections for edit view (non-wizard).
+     */
+    public static function getFormSections(): array
+    {
+        return [
+            Section::make('Media Server')
+                ->description('Select the media server that provides content for this network.')
+                ->icon('heroicon-o-server')
+                ->schema([
+                    Select::make('media_server_integration_id')
+                        ->label('Media Server')
+                        ->relationship('mediaServerIntegration', 'name')
+                        ->helperText('Networks pull VOD content from the linked media server.')
+                        ->required()
+                        ->native(false)
+                        ->preload(),
+                ]),
 
-                        Textarea::make('description')
-                            ->label('Description')
-                            ->placeholder('A channel dedicated to classic movies from the golden age of cinema')
-                            ->rows(2)
-                            ->maxLength(1000),
+            Section::make('Network Details')
+                ->description('Configure your pseudo-TV network channel')
+                ->icon('heroicon-o-tv')
+                ->schema([
+                    Grid::make(2)->schema([
+                        TextInput::make('name')
+                            ->label('Network Name')
+                            ->placeholder('e.g., Movie Classics, 80s TV, Kids Zone')
+                            ->required()
+                            ->maxLength(255),
 
-                        TextInput::make('logo')
-                            ->label('Logo URL')
-                            ->placeholder('https://example.com/logo.png')
-                            ->url()
-                            ->maxLength(500),
+                        TextInput::make('channel_number')
+                            ->label('Channel Number')
+                            ->numeric()
+                            ->placeholder('e.g., 100')
+                            ->helperText('Optional channel number for EPG')
+                            ->minValue(1),
                     ]),
 
-                Section::make('Schedule Settings')
-                    ->description('Control how content is scheduled on this network')
-                    ->schema([
-                        Grid::make(2)->schema([
-                            Select::make('schedule_type')
-                                ->label('Schedule Type')
-                                ->options([
-                                    'sequential' => 'Sequential (play in order)',
-                                    'shuffle' => 'Shuffle (randomized)',
-                                ])
-                                ->default('sequential')
-                                ->helperText('How content is ordered in the schedule')
-                                ->native(false),
+                    Textarea::make('description')
+                        ->label('Description')
+                        ->placeholder('A channel dedicated to classic movies from the golden age of cinema')
+                        ->rows(2)
+                        ->maxLength(1000),
 
-                            Toggle::make('loop_content')
-                                ->label('Loop Content')
-                                ->helperText('Restart from beginning when all content has played')
-                                ->default(true),
-                        ]),
+                    TextInput::make('logo')
+                        ->label('Logo URL')
+                        ->placeholder('https://example.com/logo.png')
+                        ->url()
+                        ->maxLength(500),
+                ]),
 
-                        Select::make('media_server_integration_id')
-                            ->label('Media Server')
-                            ->relationship('mediaServerIntegration', 'name')
-                            ->helperText('Optional: Link to a media server for content source')
-                            ->nullable()
+            Section::make('Schedule Settings')
+                ->description('Control how content is scheduled on this network')
+                ->icon('heroicon-o-calendar')
+                ->schema([
+                    Grid::make(2)->schema([
+                        Select::make('schedule_type')
+                            ->label('Schedule Type')
+                            ->options([
+                                'sequential' => 'Sequential (play in order)',
+                                'shuffle' => 'Shuffle (randomized)',
+                            ])
+                            ->default('sequential')
+                            ->helperText('How content is ordered in the schedule')
                             ->native(false),
 
-                        Toggle::make('enabled')
-                            ->label('Enabled')
-                            ->helperText('Disable to stop generating schedule without deleting')
+                        Toggle::make('loop_content')
+                            ->label('Loop Content')
+                            ->helperText('Restart from beginning when all content has played')
                             ->default(true),
                     ]),
 
-                Section::make('EPG Output')
-                    ->description('EPG URL for IPTV players')
-                    ->schema([
-                        TextInput::make('epg_url')
-                            ->label('EPG URL')
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->formatStateUsing(fn ($record) => $record?->epg_url ?? 'Save network first')
-                            ->copyable(),
+                    Select::make('network_playlist_id')
+                        ->label('Output Playlist')
+                        ->relationship(
+                            'networkPlaylist',
+                            'name',
+                            fn (Builder $query) => $query->where('is_network_playlist', true)
+                        )
+                        ->helperText('Assign this network to a playlist for M3U/EPG output. Create one if none exist.')
+                        ->createOptionForm([
+                            TextInput::make('name')
+                                ->label('Playlist Name')
+                                ->placeholder('e.g., My Networks')
+                                ->required(),
+                        ])
+                        ->createOptionUsing(function (array $data): int {
+                            $playlist = \App\Models\Playlist::create([
+                                'name' => $data['name'],
+                                'uuid' => (string) \Illuminate\Support\Str::uuid(),
+                                'user_id' => Auth::id(),
+                                'is_network_playlist' => true,
+                            ]);
 
-                        TextInput::make('schedule_info')
-                            ->label('Schedule Info')
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->formatStateUsing(function ($record) {
-                                if (! $record) {
-                                    return 'Not generated';
-                                }
-                                $count = $record->programmes()->count();
-                                $last = $record->programmes()->latest('end_time')->first();
+                            return $playlist->id;
+                        })
+                        ->nullable()
+                        ->native(false),
 
-                                return $count > 0
-                                    ? "{$count} programmes until ".($last?->end_time?->format('M j, Y H:i') ?? 'unknown')
-                                    : 'No programmes - generate schedule first';
-                            }),
-                    ])
-                    ->visibleOn('edit'),
+                    Toggle::make('enabled')
+                        ->label('Enabled')
+                        ->helperText('Disable to stop generating schedule without deleting')
+                        ->default(true),
+                ]),
 
-                Section::make('Stream Output')
-                    ->description('Live stream URL for IPTV players')
-                    ->schema([
-                        TextInput::make('stream_url')
-                            ->label('Stream URL')
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->formatStateUsing(fn ($record) => $record?->stream_url ?? 'Save network first')
-                            ->copyable(),
+            ...self::getOutputSections(),
+            ...self::getBroadcastSections(),
+        ];
+    }
 
-                        TextInput::make('m3u_url')
-                            ->label('M3U Playlist URL')
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->formatStateUsing(fn ($record) => $record ? route('network.playlist', ['network' => $record->uuid]) : 'Save network first')
-                            ->copyable(),
-                    ])
-                    ->visibleOn('edit'),
-
-                Section::make('Broadcast Settings')
-                    ->description('Configure continuous live broadcasting (pseudo-TV). When enabled, the network streams content according to the schedule like a real TV channel.')
-                    ->schema([
-                        Toggle::make('broadcast_enabled')
-                            ->label('Enable Broadcasting')
-                            ->helperText('When enabled, this network will continuously broadcast content according to the schedule. Viewers can tune in at any time.')
-                            ->default(false)
-                            ->live(),
-
-                        Grid::make(2)->schema([
-                            Select::make('output_format')
-                                ->label('Output Format')
-                                ->options([
-                                    'hls' => 'HLS (recommended)',
-                                    'mpegts' => 'MPEG-TS',
-                                ])
-                                ->default('hls')
+    /**
+     * Get wizard steps for create view.
+     */
+    public static function getFormSteps(): array
+    {
+        return [
+            Step::make('Media Server')
+                ->description('Select content source')
+                ->icon('heroicon-o-server')
+                ->schema([
+                    Section::make('')
+                        ->description('Networks pull their content from a media server integration. Select which media server to use.')
+                        ->schema([
+                            Select::make('media_server_integration_id')
+                                ->label('Media Server')
+                                ->relationship('mediaServerIntegration', 'name')
+                                ->helperText('This network will use VOD content (movies/series) from this media server.')
+                                ->required()
                                 ->native(false)
-                                ->helperText('HLS provides better compatibility with most players'),
+                                ->preload()
+                                ->placeholder('Select a media server...'),
+                        ]),
+                ]),
 
-                            TextInput::make('segment_duration')
-                                ->label('Segment Duration')
-                                ->numeric()
-                                ->default(6)
-                                ->suffix('seconds')
-                                ->minValue(2)
-                                ->maxValue(30)
-                                ->helperText('HLS segment length (6s recommended)'),
-                        ])->hidden(fn (Get $get): bool => ! $get('broadcast_enabled')),
+            Step::make('Network Info')
+                ->description('Name and branding')
+                ->icon('heroicon-o-tv')
+                ->schema([
+                    Section::make('')
+                        ->description('Give your network a name and optional branding.')
+                        ->schema([
+                            Grid::make(2)->schema([
+                                TextInput::make('name')
+                                    ->label('Network Name')
+                                    ->placeholder('e.g., Movie Classics, 80s TV, Kids Zone')
+                                    ->required()
+                                    ->maxLength(255),
 
-                        Section::make('Transcoding')
-                            ->description('Control how media is transcoded. When enabled, the media server handles transcoding with hardware acceleration.')
-                            ->schema([
-                                Toggle::make('transcode_on_server')
-                                    ->label('Transcode on Media Server')
-                                    ->helperText('Let Jellyfin/Emby transcode with hardware acceleration. Disable to use source quality.')
-                                    ->default(true)
-                                    ->live(),
-
-                                Grid::make(3)->schema([
-                                    TextInput::make('video_bitrate')
-                                        ->label('Video Bitrate')
-                                        ->numeric()
-                                        ->suffix('kbps')
-                                        ->placeholder('Source')
-                                        ->helperText('Leave empty for source quality')
-                                        ->nullable(),
-
-                                    TextInput::make('audio_bitrate')
-                                        ->label('Audio Bitrate')
-                                        ->numeric()
-                                        ->suffix('kbps')
-                                        ->default(192)
-                                        ->helperText('128-320 recommended'),
-
-                                    Select::make('video_resolution')
-                                        ->label('Resolution')
-                                        ->options([
-                                            null => 'Source (no scaling)',
-                                            '3840x2160' => '4K (3840x2160)',
-                                            '1920x1080' => '1080p (1920x1080)',
-                                            '1280x720' => '720p (1280x720)',
-                                            '854x480' => '480p (854x480)',
-                                        ])
-                                        ->placeholder('Source')
-                                        ->native(false)
-                                        ->nullable(),
-                                ])->hidden(fn (Get $get): bool => ! $get('transcode_on_server')),
-                            ])
-                            ->collapsed()
-                            ->hidden(fn (Get $get): bool => ! $get('broadcast_enabled')),
-
-                        Section::make('Advanced HLS Settings')
-                            ->schema([
-                                TextInput::make('hls_list_size')
-                                    ->label('Playlist Size')
+                                TextInput::make('channel_number')
+                                    ->label('Channel Number')
                                     ->numeric()
-                                    ->default(10)
-                                    ->suffix('segments')
-                                    ->minValue(3)
-                                    ->maxValue(60)
-                                    ->helperText('Number of segments to keep in the HLS playlist'),
+                                    ->placeholder('e.g., 100')
+                                    ->helperText('Optional channel number for EPG ordering')
+                                    ->minValue(1),
+                            ]),
+
+                            Textarea::make('description')
+                                ->label('Description')
+                                ->placeholder('A channel dedicated to classic movies from the golden age of cinema')
+                                ->rows(2)
+                                ->maxLength(1000),
+
+                            TextInput::make('logo')
+                                ->label('Logo URL')
+                                ->placeholder('https://example.com/logo.png')
+                                ->url()
+                                ->maxLength(500),
+                        ]),
+                ]),
+
+            Step::make('Schedule')
+                ->description('Playback settings')
+                ->icon('heroicon-o-calendar')
+                ->schema([
+                    Section::make('')
+                        ->description('Configure how content is scheduled and where the network is published.')
+                        ->schema([
+                            Grid::make(2)->schema([
+                                Select::make('schedule_type')
+                                    ->label('Schedule Type')
+                                    ->options([
+                                        'sequential' => 'Sequential (play in order)',
+                                        'shuffle' => 'Shuffle (randomized)',
+                                    ])
+                                    ->default('sequential')
+                                    ->helperText('How content is ordered in the schedule')
+                                    ->native(false),
+
+                                Toggle::make('loop_content')
+                                    ->label('Loop Content')
+                                    ->helperText('Restart from beginning when all content has played')
+                                    ->default(true),
+                            ]),
+
+                            Select::make('network_playlist_id')
+                                ->label('Output Playlist')
+                                ->relationship(
+                                    'networkPlaylist',
+                                    'name',
+                                    fn (Builder $query) => $query->where('is_network_playlist', true)
+                                )
+                                ->helperText('Assign to a network playlist for M3U/EPG output.')
+                                ->createOptionForm([
+                                    TextInput::make('name')
+                                        ->label('Playlist Name')
+                                        ->placeholder('e.g., My Networks')
+                                        ->required(),
+                                ])
+                                ->createOptionUsing(function (array $data): int {
+                                    $playlist = \App\Models\Playlist::create([
+                                        'name' => $data['name'],
+                                        'uuid' => (string) \Illuminate\Support\Str::uuid(),
+                                        'user_id' => Auth::id(),
+                                        'is_network_playlist' => true,
+                                    ]);
+
+                                    return $playlist->id;
+                                })
+                                ->nullable()
+                                ->native(false),
+
+                            Toggle::make('enabled')
+                                ->label('Enabled')
+                                ->helperText('Enable this network for schedule generation')
+                                ->default(true),
+                        ]),
+                ]),
+
+            Step::make('Broadcast')
+                ->description('Live streaming (optional)')
+                ->icon('heroicon-o-signal')
+                ->schema([
+                    Section::make('')
+                        ->description('Enable live broadcasting to stream content like a real TV channel. This is optional - you can enable it later.')
+                        ->schema([
+                            Toggle::make('broadcast_enabled')
+                                ->label('Enable Broadcasting')
+                                ->helperText('When enabled, this network will continuously broadcast content according to the schedule.')
+                                ->default(false)
+                                ->live(),
+
+                            Grid::make(2)->schema([
+                                Select::make('output_format')
+                                    ->label('Output Format')
+                                    ->options([
+                                        'hls' => 'HLS (recommended)',
+                                        'mpegts' => 'MPEG-TS',
+                                    ])
+                                    ->default('hls')
+                                    ->native(false),
+
+                                TextInput::make('segment_duration')
+                                    ->label('Segment Duration')
+                                    ->numeric()
+                                    ->default(6)
+                                    ->suffix('seconds')
+                                    ->minValue(2)
+                                    ->maxValue(30),
+                            ])->visible(fn (Get $get): bool => $get('broadcast_enabled')),
+                        ]),
+                ]),
+        ];
+    }
+
+    /**
+     * Output sections (EPG/Stream URLs) - visible on edit only.
+     */
+    private static function getOutputSections(): array
+    {
+        return [
+            Section::make('EPG Output')
+                ->description('EPG URL for IPTV players')
+                ->icon('heroicon-o-document-text')
+                ->schema([
+                    TextInput::make('epg_url')
+                        ->label('EPG URL')
+                        ->disabled()
+                        ->dehydrated(false)
+                        ->formatStateUsing(fn ($record) => $record?->epg_url ?? 'Save network first')
+                        ->copyable(),
+
+                    TextInput::make('schedule_info')
+                        ->label('Schedule Info')
+                        ->disabled()
+                        ->dehydrated(false)
+                        ->formatStateUsing(function ($record) {
+                            if (! $record) {
+                                return 'Not generated';
+                            }
+                            $count = $record->programmes()->count();
+                            $last = $record->programmes()->latest('end_time')->first();
+
+                            return $count > 0
+                                ? "{$count} programmes until ".($last?->end_time?->format('M j, Y H:i') ?? 'unknown')
+                                : 'No programmes - generate schedule first';
+                        }),
+                ])
+                ->collapsible()
+                ->visibleOn('edit'),
+
+            Section::make('Stream Output')
+                ->description('Live stream URL for IPTV players')
+                ->icon('heroicon-o-play')
+                ->schema([
+                    TextInput::make('stream_url')
+                        ->label('Stream URL')
+                        ->disabled()
+                        ->dehydrated(false)
+                        ->formatStateUsing(fn ($record) => $record?->stream_url ?? 'Save network first')
+                        ->copyable(),
+
+                    TextInput::make('m3u_url')
+                        ->label('M3U Playlist URL')
+                        ->disabled()
+                        ->dehydrated(false)
+                        ->formatStateUsing(fn ($record) => $record ? route('network.playlist', ['network' => $record->uuid]) : 'Save network first')
+                        ->copyable(),
+                ])
+                ->collapsible()
+                ->visibleOn('edit'),
+        ];
+    }
+
+    /**
+     * Broadcast settings sections - visible on edit only.
+     */
+    private static function getBroadcastSections(): array
+    {
+        return [
+            Section::make('Broadcast Settings')
+                ->description('Configure continuous live broadcasting (pseudo-TV)')
+                ->icon('heroicon-o-signal')
+                ->schema([
+                    Toggle::make('broadcast_enabled')
+                        ->label('Enable Broadcasting')
+                        ->helperText('When enabled, this network will continuously broadcast content according to the schedule.')
+                        ->default(false)
+                        ->live(),
+
+                    Grid::make(2)->schema([
+                        Select::make('output_format')
+                            ->label('Output Format')
+                            ->options([
+                                'hls' => 'HLS (recommended)',
+                                'mpegts' => 'MPEG-TS',
                             ])
-                            ->collapsed()
-                            ->hidden(fn (Get $get): bool => ! $get('broadcast_enabled') || $get('output_format') !== 'hls'),
+                            ->default('hls')
+                            ->native(false)
+                            ->helperText('HLS provides better compatibility'),
 
-                        Section::make('Broadcast Status')
-                            ->schema([
-                                TextInput::make('broadcast_status')
-                                    ->label('Status')
-                                    ->disabled()
-                                    ->dehydrated(false)
-                                    ->formatStateUsing(fn ($record) => $record?->isBroadcasting() ? '🟢 Broadcasting (PID: '.$record->broadcast_pid.')' : '⚪ Not broadcasting'),
+                        TextInput::make('segment_duration')
+                            ->label('Segment Duration')
+                            ->numeric()
+                            ->default(6)
+                            ->suffix('seconds')
+                            ->minValue(2)
+                            ->maxValue(30)
+                            ->helperText('HLS segment length (6s recommended)'),
+                    ])->visible(fn (Get $get): bool => $get('broadcast_enabled')),
 
-                                TextInput::make('broadcast_started_at_display')
-                                    ->label('Started At')
-                                    ->disabled()
-                                    ->dehydrated(false)
-                                    ->formatStateUsing(fn ($record) => $record?->broadcast_started_at?->format('M j, Y H:i:s') ?? '-'),
+                    Section::make('Transcoding')
+                        ->description('Control how media is transcoded')
+                        ->schema([
+                            Toggle::make('transcode_on_server')
+                                ->label('Transcode on Media Server')
+                                ->helperText('Let Jellyfin/Emby transcode with hardware acceleration.')
+                                ->default(true)
+                                ->live(),
 
-                                TextInput::make('hls_url')
-                                    ->label('HLS Playlist URL')
-                                    ->disabled()
-                                    ->dehydrated(false)
-                                    ->formatStateUsing(fn ($record) => $record ? route('network.hls.playlist', ['network' => $record->uuid]) : 'Save network first')
-                                    ->copyable(),
-                            ])
-                            ->hidden(fn (Get $get): bool => ! $get('broadcast_enabled')),
-                    ])
-                    ->collapsible()
-                    ->visibleOn('edit'),
-            ]);
+                            Grid::make(3)->schema([
+                                TextInput::make('video_bitrate')
+                                    ->label('Video Bitrate')
+                                    ->numeric()
+                                    ->suffix('kbps')
+                                    ->placeholder('Source')
+                                    ->nullable(),
+
+                                TextInput::make('audio_bitrate')
+                                    ->label('Audio Bitrate')
+                                    ->numeric()
+                                    ->suffix('kbps')
+                                    ->default(192),
+
+                                Select::make('video_resolution')
+                                    ->label('Resolution')
+                                    ->options([
+                                        null => 'Source (no scaling)',
+                                        '3840x2160' => '4K',
+                                        '1920x1080' => '1080p',
+                                        '1280x720' => '720p',
+                                        '854x480' => '480p',
+                                    ])
+                                    ->placeholder('Source')
+                                    ->native(false)
+                                    ->nullable(),
+                            ])->visible(fn (Get $get): bool => $get('transcode_on_server')),
+                        ])
+                        ->collapsed()
+                        ->visible(fn (Get $get): bool => $get('broadcast_enabled')),
+
+                    Section::make('Broadcast Status')
+                        ->schema([
+                            TextInput::make('broadcast_status')
+                                ->label('Status')
+                                ->disabled()
+                                ->dehydrated(false)
+                                ->formatStateUsing(fn ($record) => $record?->isBroadcasting() ? '🟢 Broadcasting (PID: '.$record->broadcast_pid.')' : '⚪ Not broadcasting'),
+
+                            TextInput::make('broadcast_started_at_display')
+                                ->label('Started At')
+                                ->disabled()
+                                ->dehydrated(false)
+                                ->formatStateUsing(fn ($record) => $record?->broadcast_started_at?->format('M j, Y H:i:s') ?? '-'),
+
+                            TextInput::make('hls_url')
+                                ->label('HLS Playlist URL')
+                                ->disabled()
+                                ->dehydrated(false)
+                                ->formatStateUsing(fn ($record) => $record ? route('network.hls.playlist', ['network' => $record->uuid]) : 'Save network first')
+                                ->copyable(),
+                        ])
+                        ->visible(fn (Get $get): bool => $get('broadcast_enabled')),
+                ])
+                ->collapsible()
+                ->visibleOn('edit'),
+        ];
     }
 
     public static function table(Table $table): Table
@@ -329,6 +542,32 @@ class NetworkResource extends Resource
                 TextColumn::make('mediaServerIntegration.name')
                     ->label('Media Server')
                     ->placeholder('None'),
+
+                TextColumn::make('broadcast_status')
+                    ->label('Broadcast')
+                    ->badge()
+                    ->getStateUsing(function (Network $record): string {
+                        if (! $record->broadcast_enabled) {
+                            return 'Disabled';
+                        }
+                        if ($record->isBroadcasting()) {
+                            return 'Live';
+                        }
+
+                        return 'Ready';
+                    })
+                    ->color(fn (string $state): string => match ($state) {
+                        'Live' => 'success',
+                        'Ready' => 'info',
+                        'Disabled' => 'gray',
+                        default => 'gray',
+                    })
+                    ->icon(fn (string $state): string => match ($state) {
+                        'Live' => 'heroicon-o-signal',
+                        'Ready' => 'heroicon-o-play',
+                        'Disabled' => 'heroicon-o-no-symbol',
+                        default => 'heroicon-o-question-mark-circle',
+                    }),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('schedule_type')
@@ -341,10 +580,56 @@ class NetworkResource extends Resource
             ])
             ->recordActions([
                 ActionGroup::make([
+                    Action::make('startBroadcast')
+                        ->label('Start Broadcast')
+                        ->icon('heroicon-o-play')
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->modalHeading('Start Broadcasting')
+                        ->modalDescription('Start continuous HLS broadcasting for this network. The stream will be available at the network\'s HLS URL.')
+                        ->visible(fn (Network $record): bool => $record->broadcast_enabled && ! $record->isBroadcasting())
+                        ->action(function (Network $record) {
+                            $service = app(NetworkBroadcastService::class);
+                            $result = $service->start($record);
+
+                            if ($result) {
+                                Notification::make()
+                                    ->success()
+                                    ->title('Broadcast Started')
+                                    ->body("Broadcasting started for {$record->name}")
+                                    ->send();
+                            } else {
+                                Notification::make()
+                                    ->danger()
+                                    ->title('Failed to Start')
+                                    ->body('Could not start broadcast. Check that there is content scheduled.')
+                                    ->send();
+                            }
+                        }),
+
+                    Action::make('stopBroadcast')
+                        ->label('Stop Broadcast')
+                        ->icon('heroicon-o-stop')
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->modalHeading('Stop Broadcasting')
+                        ->modalDescription('Stop the current broadcast. Viewers will be disconnected.')
+                        ->visible(fn (Network $record): bool => $record->isBroadcasting())
+                        ->action(function (Network $record) {
+                            $service = app(NetworkBroadcastService::class);
+                            $service->stop($record);
+
+                            Notification::make()
+                                ->warning()
+                                ->title('Broadcast Stopped')
+                                ->body("Broadcasting stopped for {$record->name}")
+                                ->send();
+                        }),
+
                     Action::make('generateSchedule')
                         ->label('Generate Schedule')
                         ->icon('heroicon-o-calendar')
-                        ->color('success')
+                        ->color('info')
                         ->requiresConfirmation()
                         ->modalHeading('Generate Schedule')
                         ->modalDescription('This will generate a 7-day programme schedule for this network. Existing future programmes will be replaced.')
