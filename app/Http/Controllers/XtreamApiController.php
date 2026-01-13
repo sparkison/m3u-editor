@@ -432,7 +432,6 @@ class XtreamApiController extends Controller
             $message = $settings->xtream_api_message ?? '';
 
             $userInfo = [
-                // 'playlist_id' => (string)$playlist->id, // Debugging
                 'username' => $username,
                 'password' => $password,
                 'message' => (string) $message,
@@ -452,10 +451,13 @@ class XtreamApiController extends Controller
             $host = $parsedUrl['host'];
             $port = isset($parsedUrl['port']) ? (string) $parsedUrl['port'] : '80';
 
+            $port = $settings->xtream_api_details['http_port'] ?? $port;
+            $httpsPort = $settings->xtream_api_details['https_port'] ?? '443';
+
             $serverInfo = [
                 'url' => $host,
                 'port' => (string) $port, // Should be 80 for HTTP, otherwise use the specified port (e.g.: 36400
-                'https_port' => '443', // Should always be 443 for HTTPS
+                'https_port' => (string) $httpsPort, // Should always be 443 for HTTPS
                 'server_protocol' => $scheme,
                 'rtmp_port' => '8001', // RTMP not available currently, we'll just return the default RTMP port
                 // Timestamps will use the passed in timezone (server timezone)
