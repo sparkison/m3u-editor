@@ -15,6 +15,7 @@ use App\Models\ChannelFailover;
 use App\Models\CustomPlaylist;
 use App\Models\Epg;
 use App\Models\Group;
+use App\Models\MediaServerIntegration;
 use App\Models\MergedPlaylist;
 use App\Models\Playlist;
 use App\Models\PlaylistAlias;
@@ -545,6 +546,15 @@ class AppServiceProvider extends ServiceProvider
 
                 return $streamProfile;
             });
+
+            // MediaServerIntegration
+            MediaServerIntegration::deleting(function (MediaServerIntegration $integration) {
+                // Remove any associated Playlists
+                $integration->playlists()->delete();
+
+                return $integration;
+            });
+
         } catch (Throwable $e) {
             // Log the error
             report($e);
