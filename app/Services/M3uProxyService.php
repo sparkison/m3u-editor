@@ -669,9 +669,32 @@ class M3uProxyService
             }
         }
 
+        // Provider Profile selection for Xtream playlists with profiles enabled
+        $selectedProfile = null;
+        if ($playlist instanceof Playlist && $playlist->profiles_enabled) {
+            $selectedProfile = ProfileService::selectProfile($playlist);
+
+            if (! $selectedProfile) {
+                Log::warning('No profiles with capacity available', [
+                    'playlist_id' => $playlist->id,
+                    'channel_id' => $id,
+                ]);
+                abort(503, 'All provider profiles have reached their maximum stream limit. Please try again later.');
+            }
+
+            Log::debug('Selected profile for streaming', [
+                'profile_id' => $selectedProfile->id,
+                'profile_name' => $selectedProfile->name,
+                'playlist_id' => $playlist->id,
+                'channel_id' => $id,
+            ]);
+        }
+
         // If we didn't already get a primary URL from failover logic, get it now
         if ($primaryUrl === null) {
-            $primaryUrl = PlaylistUrlService::getChannelUrl($channel, $playlist);
+            // Use the selected profile as context if available
+            $urlContext = $selectedProfile ?? $playlist;
+            $primaryUrl = PlaylistUrlService::getChannelUrl($channel, $urlContext);
         }
         if (empty($primaryUrl)) {
             throw new Exception('Channel primary URL is empty');
@@ -706,23 +729,47 @@ class M3uProxyService
             // (before capacity check) to avoid blocking reuse of existing streams.
             // If we reach here, no existing stream was found, so create a new one.
 
-            $streamId = $this->createTranscodedStream($primaryUrl, $profile, $failovers, $userAgent, $headers, [
+            $metadata = [
                 'id' => $id,
                 'type' => 'channel',
                 'playlist_uuid' => $playlist->uuid,
                 'profile_id' => $profile->id,
-            ]);
+            ];
+
+            // Add provider profile ID if using profiles
+            if ($selectedProfile) {
+                $metadata['provider_profile_id'] = $selectedProfile->id;
+            }
+
+            $streamId = $this->createTranscodedStream($primaryUrl, $profile, $failovers, $userAgent, $headers, $metadata);
+
+            // Track connection for provider profile
+            if ($selectedProfile) {
+                ProfileService::incrementConnections($selectedProfile, $streamId);
+            }
 
             // Return transcoded stream URL
             return $this->buildTranscodeStreamUrl($streamId, $profile->format ?? 'ts');
         } else {
             // Use direct streaming endpoint
-            $streamId = $this->createStream($primaryUrl, $failovers, $userAgent, $headers, [
+            $metadata = [
                 'id' => $id,
                 'type' => 'channel',
                 'playlist_uuid' => $playlist->uuid,
                 'strict_live_ts' => $playlist->strict_live_ts,
-            ]);
+            ];
+
+            // Add provider profile ID if using profiles
+            if ($selectedProfile) {
+                $metadata['provider_profile_id'] = $selectedProfile->id;
+            }
+
+            $streamId = $this->createStream($primaryUrl, $failovers, $userAgent, $headers, $metadata);
+
+            // Track connection for provider profile
+            if ($selectedProfile) {
+                ProfileService::incrementConnections($selectedProfile, $streamId);
+            }
 
             // Get the format from the URL
             $format = pathinfo($primaryUrl, PATHINFO_EXTENSION);
