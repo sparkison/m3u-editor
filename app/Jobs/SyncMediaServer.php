@@ -574,4 +574,22 @@ class SyncMediaServer implements ShouldQueue
 
         return $category;
     }
+
+    public function failed(Exception $exception): void
+    {
+        $integration = MediaServerIntegration::find($this->integrationId);
+        if ($integration) {
+            $integration->update([
+                'status' => 'failed',
+                'progress' => 0,
+                'movie_progress' => 0,
+                'series_progress' => 0,
+            ]);
+        }
+        Log::error('SyncMediaServer: Job failed unexpectedly', [
+            'integration_id' => $this->integrationId,
+            'error' => $exception->getMessage(),
+            'trace' => $exception->getTraceAsString(),
+        ]);
+    }
 }
