@@ -201,6 +201,7 @@ class SyncMediaServer implements ShouldQueue
             'source_type' => $sourceType,
             'status' => Status::Pending,
             'auto_sync' => false, // Sync is managed by the integration, not the playlist
+            'user_agent' => 'M3U-Editor-MediaServer-Sync/1.0', // required value for playlist, set to something meaningful
         ]);
 
         // Link the playlist to the integration

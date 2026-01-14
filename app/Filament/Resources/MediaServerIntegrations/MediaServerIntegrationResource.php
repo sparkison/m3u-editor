@@ -216,6 +216,9 @@ class MediaServerIntegrationResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->filtersTriggerAction(function ($action) {
+                return $action->button()->label('Filters');
+            })
             ->columns([
                 TextColumn::make('name')
                     ->label('Name')
@@ -268,7 +271,6 @@ class MediaServerIntegrationResource extends Resource
                     Action::make('test')
                         ->label('Test Connection')
                         ->icon('heroicon-o-signal')
-                        ->color('info')
                         ->action(function (MediaServerIntegration $record) {
                             $service = MediaServerService::make($record);
                             $result = $service->testConnection();
@@ -291,7 +293,6 @@ class MediaServerIntegrationResource extends Resource
                     Action::make('sync')
                         ->label('Sync Now')
                         ->icon('heroicon-o-arrow-path')
-                        ->color('success')
                         ->requiresConfirmation()
                         ->modalHeading('Sync Media Server')
                         ->modalDescription('This will sync all content from the media server. For large libraries, this may take several minutes.')
@@ -304,6 +305,15 @@ class MediaServerIntegrationResource extends Resource
                                 ->body("Syncing content from {$record->name}. You'll be notified when complete.")
                                 ->send();
                         }),
+
+                    Action::make('viewPlaylist')
+                        ->label('View Playlist')
+                        ->icon('heroicon-o-queue-list')
+                        ->url(fn ($record) => $record->playlist_id
+                            ? route('filament.admin.resources.playlists.edit', $record->playlist_id)
+                            : null
+                        )
+                        ->visible(fn ($record) => $record->playlist_id !== null),
 
                     Action::make('cleanupDuplicates')
                         ->label('Cleanup Duplicates')
@@ -331,23 +341,14 @@ class MediaServerIntegrationResource extends Resource
                         })
                         ->visible(fn ($record) => $record->playlist_id !== null),
 
-                    EditAction::make(),
-
-                    Action::make('viewPlaylist')
-                        ->label('View Playlist')
-                        ->icon('heroicon-o-queue-list')
-                        ->url(fn ($record) => $record->playlist_id
-                            ? route('filament.admin.resources.playlists.edit', $record->playlist_id)
-                            : null
-                        )
-                        ->visible(fn ($record) => $record->playlist_id !== null),
-
                     DeleteAction::make()
                         ->before(function (MediaServerIntegration $record) {
                             // Optionally delete the associated playlist
                             // For now, we leave the playlist intact (sidecar philosophy)
                         }),
                 ])->button()->hiddenLabel()->size('sm'),
+                EditAction::make()
+                    ->button()->hiddenLabel()->size('sm'),
             ], position: RecordActionsPosition::BeforeCells)
             ->toolbarActions([
                 BulkActionGroup::make([
