@@ -82,12 +82,14 @@ class MediaServerIntegrationResource extends Resource
                                     'jellyfin' => 'Jellyfin',
                                 ])
                                 ->required()
+                                ->default('emby')
                                 ->native(false),
                         ]),
 
                         Grid::make(3)->schema([
                             TextInput::make('host')
                                 ->label('Host / IP Address')
+                                ->prefix(fn (callable $get) => $get('ssl') ? 'https://' : 'http://')
                                 ->placeholder('192.168.1.100 or media.example.com')
                                 ->required()
                                 ->maxLength(255),
@@ -101,6 +103,8 @@ class MediaServerIntegrationResource extends Resource
                                 ->maxValue(65535),
 
                             Toggle::make('ssl')
+                                ->live()
+                                ->inline(false)
                                 ->label('Use HTTPS')
                                 ->helperText('Enable if your server uses SSL/TLS')
                                 ->default(false),
