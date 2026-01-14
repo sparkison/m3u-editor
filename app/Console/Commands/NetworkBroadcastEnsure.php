@@ -18,7 +18,17 @@ class NetworkBroadcastEnsure extends Command
     {
         $arg = $this->argument('network');
 
-        $network = Network::where('uuid', $arg)->orWhere('id', $arg)->first();
+        // Treat numeric ids vs UUIDs safely to avoid type casting errors on Postgres
+        if (preg_match('/^[0-9]+$/', (string) $arg)) {
+            $network = Network::find((int) $arg);
+        } else {
+            $network = Network::where('uuid', $arg)->first();
+        }
+
+        // Fallback: try either strategy
+        if (! $network) {
+            $network = Network::where('uuid', $arg)->orWhere('id', $arg)->first();
+        }
 
         if (! $network) {
             $this->error('Network not found: '.$arg);
