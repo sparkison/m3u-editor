@@ -293,6 +293,7 @@ class MediaServerIntegrationResource extends Resource
             ->recordActions([
                 ActionGroup::make([
                     Action::make('sync')
+                        ->disabled(fn ($record) => $record->status === 'processing')
                         ->label('Sync Now')
                         ->icon('heroicon-o-arrow-path')
                         ->requiresConfirmation()
