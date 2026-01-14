@@ -268,6 +268,22 @@ class MediaServerIntegrationResource extends Resource
             ])
             ->recordActions([
                 ActionGroup::make([
+                    Action::make('sync')
+                        ->label('Sync Now')
+                        ->icon('heroicon-o-arrow-path')
+                        ->requiresConfirmation()
+                        ->modalHeading('Sync Media Server')
+                        ->modalDescription('This will sync all content from the media server. For large libraries, this may take several minutes.')
+                        ->action(function (MediaServerIntegration $record) {
+                            app('Illuminate\Contracts\Bus\Dispatcher')
+                                ->dispatch(new SyncMediaServer($record->id));
+
+                            Notification::make()
+                                ->success()
+                                ->title('Sync Started')
+                                ->body("Syncing content from {$record->name}. You'll be notified when complete.")
+                                ->send();
+                        }),
                     Action::make('test')
                         ->label('Test Connection')
                         ->icon('heroicon-o-signal')
@@ -288,22 +304,6 @@ class MediaServerIntegrationResource extends Resource
                                     ->body($result['message'])
                                     ->send();
                             }
-                        }),
-
-                    Action::make('sync')
-                        ->label('Sync Now')
-                        ->icon('heroicon-o-arrow-path')
-                        ->requiresConfirmation()
-                        ->modalHeading('Sync Media Server')
-                        ->modalDescription('This will sync all content from the media server. For large libraries, this may take several minutes.')
-                        ->action(function (MediaServerIntegration $record) {
-                            dispatch(new SyncMediaServer($record->id));
-
-                            Notification::make()
-                                ->success()
-                                ->title('Sync Started')
-                                ->body("Syncing content from {$record->name}. You'll be notified when complete.")
-                                ->send();
                         }),
 
                     Action::make('viewPlaylist')
@@ -358,7 +358,8 @@ class MediaServerIntegrationResource extends Resource
                         ->requiresConfirmation()
                         ->action(function ($records) {
                             foreach ($records as $record) {
-                                dispatch(new SyncMediaServer($record->id));
+                                app('Illuminate\Contracts\Bus\Dispatcher')
+                                    ->dispatch(new SyncMediaServer($record->id));
                             }
 
                             Notification::make()

@@ -8,6 +8,7 @@ use App\Events\EpgUpdated;
 use App\Events\PlaylistCreated;
 use App\Events\PlaylistDeleted;
 use App\Events\PlaylistUpdated;
+use App\Jobs\SyncMediaServer;
 use App\Livewire\BackupDestinationListRecords;
 use App\Livewire\StreamPlayer;
 use App\Livewire\TmdbSearch;
@@ -548,9 +549,15 @@ class AppServiceProvider extends ServiceProvider
             });
 
             // MediaServerIntegration
+            MediaServerIntegration::created(function (MediaServerIntegration $integration) {
+                // Dispatch initial sync job
+                dispatch(new SyncMediaServer($integration->id));
+
+                return $integration;
+            });
             MediaServerIntegration::deleting(function (MediaServerIntegration $integration) {
                 // Remove any associated Playlists
-                $integration->playlists()->delete();
+                $integration->playlist()->delete();
 
                 return $integration;
             });

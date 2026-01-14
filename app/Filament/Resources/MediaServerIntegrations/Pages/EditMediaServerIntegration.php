@@ -49,7 +49,8 @@ class EditMediaServerIntegration extends EditRecord
                 ->modalHeading('Sync Media Server')
                 ->modalDescription('This will sync all content from the media server. For large libraries, this may take several minutes.')
                 ->action(function () {
-                    dispatch(new SyncMediaServer($this->record->id));
+                    app('Illuminate\Contracts\Bus\Dispatcher')
+                        ->dispatch(new SyncMediaServer($this->record->id));
 
                     Notification::make()
                         ->success()
