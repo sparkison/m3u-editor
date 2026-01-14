@@ -19,7 +19,6 @@ class ProxyController extends Controller
      * - Streams grouped by playlist
      * - Proxy server info and health
      *
-     * @return JsonResponse
      *
      * @response array{
      *     proxy_enabled: bool,
@@ -35,7 +34,7 @@ class ProxyController extends Controller
     public function status(): JsonResponse
     {
         $proxyEnabled = config('proxy.external_proxy_enabled', false);
-        $proxyService = new M3uProxyService();
+        $proxyService = new M3uProxyService;
 
         $mode = $proxyService->mode();
         $proxyUrl = config('proxy.m3u_proxy_public_url') ?: config('proxy.m3u_proxy_host');
@@ -52,7 +51,7 @@ class ProxyController extends Controller
         foreach ($streams as $stream) {
             $playlistUuid = $stream['metadata']['playlist_uuid'] ?? null;
             if ($playlistUuid) {
-                if (!isset($streamsByPlaylist[$playlistUuid])) {
+                if (! isset($streamsByPlaylist[$playlistUuid])) {
                     $streamsByPlaylist[$playlistUuid] = [
                         'playlist_uuid' => $playlistUuid,
                         'playlist_name' => null,
@@ -65,7 +64,7 @@ class ProxyController extends Controller
         }
 
         // Fetch playlist names
-        if (!empty($playlistUuids)) {
+        if (! empty($playlistUuids)) {
             $playlists = Playlist::whereIn('uuid', $playlistUuids)->pluck('name', 'uuid');
             foreach ($streamsByPlaylist as $uuid => &$data) {
                 $data['playlist_name'] = $playlists[$uuid] ?? 'Unknown';

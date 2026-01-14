@@ -634,7 +634,7 @@ class XtreamApiController extends Controller
                         $directSource = ProxyFacade::getProxyUrlForChannel($channel->id, $playlist->uuid);
                     } else {
                         // Use the Xtream API style URL for direct access
-                        $directSource = $baseUrl . "/live/{$urlSafeUser}/{$urlSafePass}/" . $channel->id . "." . $extension;
+                        $directSource = $baseUrl."/live/{$urlSafeUser}/{$urlSafePass}/".$channel->id.'.'.$extension;
                     }
 
                     // Use stream_icon as thumbnail (or a dedicated thumbnail if available)
@@ -779,7 +779,7 @@ class XtreamApiController extends Controller
                         $directSource = ProxyFacade::getProxyUrlForChannel($channel->id, $playlist->uuid);
                     } else {
                         // Use the Xtream API style URL for direct access
-                        $directSource = $baseUrl . "/movie/{$urlSafeUser}/{$urlSafePass}/" . $channel->id . "." . $extension;
+                        $directSource = $baseUrl."/movie/{$urlSafeUser}/{$urlSafePass}/".$channel->id.'.'.$extension;
                     }
 
                     $vodStreams[] = [
