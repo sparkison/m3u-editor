@@ -36,6 +36,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use RyanChandler\FilamentProgressColumn\ProgressColumn;
 
 class MediaServerIntegrationResource extends Resource
 {
@@ -225,6 +226,9 @@ class MediaServerIntegrationResource extends Resource
                     ->searchable()
                     ->sortable(),
 
+                ToggleColumn::make('enabled')
+                    ->label('Enabled'),
+
                 TextColumn::make('type')
                     ->label('Type')
                     ->badge()
@@ -235,20 +239,6 @@ class MediaServerIntegrationResource extends Resource
                         default => 'gray',
                     }),
 
-                TextColumn::make('host')
-                    ->label('Server')
-                    ->formatStateUsing(fn ($record): string => "{$record->host}:{$record->port}")
-                    ->copyable(),
-
-                ToggleColumn::make('enabled')
-                    ->label('Enabled'),
-
-                TextColumn::make('last_synced_at')
-                    ->label('Last Synced')
-                    ->dateTime()
-                    ->since()
-                    ->sortable(),
-
                 TextColumn::make('playlist.name')
                     ->label('Playlist')
                     ->url(fn ($record) => $record->playlist_id
@@ -256,6 +246,40 @@ class MediaServerIntegrationResource extends Resource
                         : null
                     )
                     ->placeholder('Not synced yet'),
+
+                TextColumn::make('host')
+                    ->label('Server')
+                    ->formatStateUsing(fn ($record): string => "{$record->host}:{$record->port}")
+                    ->copyable(),
+
+                TextColumn::make('status')
+                    ->label('Status')
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => ucfirst($state))
+                    ->color(fn (string $state): string => match ($state) {
+                        'processing' => 'warning',
+                        'completed' => 'success',
+                        'failed' => 'danger',
+                        default => 'gray',
+                    })
+                    ->sortable(),
+
+                ProgressColumn::make('movie_progress')
+                    ->label('Movie Sync')
+                    ->poll(fn ($record) => $record->status !== 'completed' && $record->status !== 'failed' ? '3s' : null)
+                    ->toggleable(),
+
+                ProgressColumn::make('series_progress')
+                    ->label('Series Sync')
+                    ->poll(fn ($record) => $record->status !== 'completed' && $record->status !== 'failed' ? '3s' : null)
+                    ->toggleable(),
+
+                TextColumn::make('last_synced_at')
+                    ->label('Last Synced')
+                    ->dateTime()
+                    ->since()
+                    ->sortable(),
+
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('type')

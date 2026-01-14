@@ -27,6 +27,11 @@ class MediaServerIntegration extends Model
         'sync_stats' => 'array',
         'user_id' => 'integer',
         'playlist_id' => 'integer',
+        'progress' => 'integer',
+        'movie_progress' => 'integer',
+        'series_progress' => 'integer',
+        'total_movies' => 'integer',
+        'total_series' => 'integer',
     ];
 
     /**
