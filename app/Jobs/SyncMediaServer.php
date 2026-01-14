@@ -585,6 +585,12 @@ class SyncMediaServer implements ShouldQueue
                 'movie_progress' => 0,
                 'series_progress' => 0,
             ]);
+            Notification::make()
+                ->danger()
+                ->title('Media Server Sync Failed')
+                ->body("Sync job for {$integration->name} failed unexpectedly: {$exception->getMessage()}")
+                ->broadcast($integration->user)
+                ->sendToDatabase($integration->user);
         }
         Log::error('SyncMediaServer: Job failed unexpectedly', [
             'integration_id' => $this->integrationId,
