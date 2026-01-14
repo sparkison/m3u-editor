@@ -106,18 +106,45 @@ class ProxyController extends Controller
     /**
      * Get proxy streams information.
      *
-     * Returns the current state of the m3u-proxy streams.
-     *
+     * Returns detailed information about all active streams from the m3u-proxy,
+     * including client connections, bandwidth usage, and stream metadata.
      *
      * @response array{
-     *     proxy_enabled: bool,
-     *     mode: string,
-     *     proxy_url: string|null,
-     *     using_failover_resolver: bool,
-     *     active_streams: int,
-     *     streams_by_playlist: array<array{playlist_uuid: string, playlist_name: string, active_count: int}>,
-     *     proxy_info: array|null,
-     *     health: string
+     *     success: bool,
+     *     streams: array<array{
+     *         stream_id: string,
+     *         source_url: string,
+     *         current_url: string,
+     *         format: string,
+     *         status: string,
+     *         client_count: int,
+     *         bandwidth_kbps: float,
+     *         bytes_transferred: string,
+     *         uptime: string,
+     *         started_at: string,
+     *         process_running: bool,
+     *         model: array{title: string, logo: string|null},
+     *         clients: array<array{ip: string, username: string|null, connected_at: string, duration: string, bytes_received: string, bandwidth: string, is_active: bool}>,
+     *         has_failover: bool,
+     *         error_count: int,
+     *         segments_served: int,
+     *         transcoding: bool,
+     *         transcoding_format: string|null,
+     *         failover_urls: array<string>,
+     *         failover_resolver_url: string|null,
+     *         current_failover_index: int,
+     *         failover_attempts: int,
+     *         last_failover_time: string|null,
+     *         using_failover: bool
+     *     }>,
+     *     globalStats: array{
+     *         total_streams: int,
+     *         active_streams: int,
+     *         total_clients: int,
+     *         total_bandwidth_kbps: float,
+     *         avg_clients_per_stream: string
+     *     },
+     *     systemStats: array
      * }
      */
     public function streams(): JsonResponse
