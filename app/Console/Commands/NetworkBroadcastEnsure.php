@@ -25,9 +25,9 @@ class NetworkBroadcastEnsure extends Command
             $network = Network::where('uuid', $arg)->first();
         }
 
-        // Fallback: try either strategy
-        if (! $network) {
-            $network = Network::where('uuid', $arg)->orWhere('id', $arg)->first();
+        // Fallback: try uuid lookup if arg not numeric
+        if (! $network && ! preg_match('/^[0-9]+$/', (string) $arg)) {
+            $network = Network::where('uuid', $arg)->first();
         }
 
         if (! $network) {
