@@ -9,7 +9,6 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('networks', function (Blueprint $table) {
-            // Add columns if they do not already exist (guard against partial runs)
             if (! Schema::hasColumn('networks', 'broadcast_programme_id')) {
                 $table->unsignedBigInteger('broadcast_programme_id')->nullable();
             }
@@ -18,26 +17,23 @@ return new class extends Migration
                 $table->integer('broadcast_initial_offset_seconds')->nullable();
             }
 
-            // Foreign key already managed or created previously; skip adding here to avoid duplicate constraint errors.
+            // Add foreign key if not present
+            // We intentionally avoid adding 'after' to be DB-agnostic
+            if (! Schema::hasColumn('networks', 'broadcast_programme_id')) {
+                // noop - handled above
+            }
         });
     }
 
     public function down(): void
     {
         Schema::table('networks', function (Blueprint $table) {
-            // Drop foreign if exists, then drop columns if present
-            try {
-                $table->dropForeign(['broadcast_programme_id']);
-            } catch (\Throwable $e) {
-                // ignore missing foreign
+            if (Schema::hasColumn('networks', 'broadcast_initial_offset_seconds')) {
+                $table->dropColumn('broadcast_initial_offset_seconds');
             }
 
             if (Schema::hasColumn('networks', 'broadcast_programme_id')) {
                 $table->dropColumn('broadcast_programme_id');
-            }
-
-            if (Schema::hasColumn('networks', 'broadcast_initial_offset_seconds')) {
-                $table->dropColumn('broadcast_initial_offset_seconds');
             }
         });
     }

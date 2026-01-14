@@ -67,18 +67,33 @@ class NetworkBroadcastWorker extends Command
             return self::SUCCESS;
         }
 
-        // Continuous loop
+        // Continuous loop with resilience (catch exceptions and apply exponential backoff)
         $this->info("Running in continuous mode (Ctrl+C to stop)...");
         $this->info("Tick interval: {$interval} seconds");
 
+        $backoff = 1; // seconds
         while (true) {
-            $result = $service->tick($network);
+            try {
+                $result = $service->tick($network);
 
-            if ($result['action'] !== 'monitoring') {
-                $this->displayTickResult($network->name, $result);
+                if ($result['action'] !== 'monitoring') {
+                    $this->displayTickResult($network->name, $result);
+                }
+
+                // Reset backoff after successful tick
+                $backoff = 1;
+
+                sleep($interval);
+            } catch (\Throwable $e) {
+                // Log and backoff to prevent crash loops
+                Log::error('Network broadcast worker exception (single network)', [
+                    'network' => $network->id,
+                    'error' => $e->getMessage(),
+                ]);
+
+                sleep($backoff);
+                $backoff = min($backoff * 2, 60);
             }
-
-            sleep($interval);
         }
     }
 
@@ -104,22 +119,36 @@ class NetworkBroadcastWorker extends Command
             return self::SUCCESS;
         }
 
-        // Continuous loop
+        // Continuous loop with resilience (catch exceptions and apply exponential backoff)
         $this->info("Running in continuous mode (Ctrl+C to stop)...");
         $this->info("Tick interval: {$interval} seconds");
 
+        $backoff = 1; // seconds
         while (true) {
-            $networks = $service->getBroadcastingNetworks();
+            try {
+                $networks = $service->getBroadcastingNetworks();
 
-            foreach ($networks as $network) {
-                $result = $service->tick($network);
+                foreach ($networks as $network) {
+                    $result = $service->tick($network);
 
-                if ($result['action'] !== 'monitoring') {
-                    $this->displayTickResult($network->name, $result);
+                    if ($result['action'] !== 'monitoring') {
+                        $this->displayTickResult($network->name, $result);
+                    }
                 }
-            }
 
-            sleep($interval);
+                // Reset backoff after successful traversal
+                $backoff = 1;
+
+                sleep($interval);
+            } catch (\Throwable $e) {
+                Log::error('Network broadcast worker exception (all networks)', [
+                    'error' => $e->getMessage(),
+                ]);
+
+                // Exponential backoff to avoid crash-fast behavior
+                sleep($backoff);
+                $backoff = min($backoff * 2, 60);
+            }
         }
     }
 
